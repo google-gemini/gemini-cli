@@ -205,6 +205,7 @@ gemini
 ```
 
 #### Analyze existing code
+
 ```bash
 git clone https://github.com/google-gemini/gemini-cli
 cd gemini-cli
