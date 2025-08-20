@@ -10,8 +10,6 @@ import * as crypto from 'crypto';
 
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
-const TMP_DIR_NAME = 'tmp';
-const COMMANDS_DIR_NAME = 'commands';
 
 /**
  * Special characters that need to be escaped in file paths for shell compatibility.
@@ -172,33 +170,6 @@ export function unescapePath(filePath: string): string {
  */
 export function getProjectHash(projectRoot: string): string {
   return crypto.createHash('sha256').update(projectRoot).digest('hex');
-}
-
-/**
- * Generates a unique temporary directory path for a project.
- * @param projectRoot The absolute path to the project's root directory.
- * @returns The path to the project's temporary directory.
- */
-export function getProjectTempDir(projectRoot: string): string {
-  const hash = getProjectHash(projectRoot);
-  return path.join(os.homedir(), GEMINI_DIR, TMP_DIR_NAME, hash);
-}
-
-/**
- * Returns the absolute path to the user-level commands directory.
- * @returns The path to the user's commands directory.
- */
-export function getUserCommandsDir(): string {
-  return path.join(os.homedir(), GEMINI_DIR, COMMANDS_DIR_NAME);
-}
-
-/**
- * Returns the absolute path to the project-level commands directory.
- * @param projectRoot The absolute path to the project's root directory.
- * @returns The path to the project's commands directory.
- */
-export function getProjectCommandsDir(projectRoot: string): string {
-  return path.join(projectRoot, GEMINI_DIR, COMMANDS_DIR_NAME);
 }
 
 /**

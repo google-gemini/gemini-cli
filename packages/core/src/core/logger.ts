@@ -7,7 +7,7 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { Content } from '@google/genai';
-import { getProjectTempDir } from '../utils/paths.js';
+import { Storage } from '../config/storage.js';
 
 const LOG_FILE_NAME = 'logs.json';
 
@@ -67,7 +67,10 @@ export class Logger {
   private initialized = false;
   private logs: LogEntry[] = []; // In-memory cache, ideally reflects the last known state of the file
 
-  constructor(sessionId: string) {
+  constructor(
+    sessionId: string,
+    private readonly storage: Storage,
+  ) {
     this.sessionId = sessionId;
   }
 
@@ -130,7 +133,7 @@ export class Logger {
       return;
     }
 
-    this.geminiDir = getProjectTempDir(process.cwd());
+    this.geminiDir = this.storage.getProjectTempDir();
     this.logFilePath = path.join(this.geminiDir, LOG_FILE_NAME);
 
     try {

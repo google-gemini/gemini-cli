@@ -40,9 +40,11 @@ describe('ChatRecordingService', () => {
     mockConfig = {
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
-      getProjectTempDir: vi
-        .fn()
-        .mockReturnValue('/test/project/root/.gemini/tmp'),
+      storage: {
+        getProjectTempDir: vi
+          .fn()
+          .mockReturnValue('/test/project/root/.gemini/tmp'),
+      },
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getDebugMode: vi.fn().mockReturnValue(false),
     } as unknown as Config;

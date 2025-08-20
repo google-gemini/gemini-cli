@@ -6,7 +6,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'os';
-import * as fs from 'fs';
 import * as path from 'path';
 import { ShellTool, EditTool, WriteFileTool } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments } from './config.js';
@@ -18,6 +17,38 @@ import { isWorkspaceTrusted } from './trustedFolders.js';
 vi.mock('./trustedFolders.js', () => ({
   isWorkspaceTrusted: vi.fn(),
 }));
+
+vi.mock('fs', async (importOriginal) => {
+  const actualFs = await importOriginal<typeof import('fs')>();
+  const pathMod = await import('path');
+  const mockHome = '/mock/home/user';
+  const MOCK_CWD1 = process.cwd();
+  const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
+
+  const mockPaths = new Set([
+    MOCK_CWD1,
+    MOCK_CWD2,
+    pathMod.resolve(pathMod.sep, 'cli', 'path1'),
+    pathMod.resolve(pathMod.sep, 'settings', 'path1'),
+    pathMod.join(mockHome, 'settings', 'path2'),
+    pathMod.join(MOCK_CWD2, 'cli', 'path2'),
+    pathMod.join(MOCK_CWD2, 'settings', 'path3'),
+  ]);
+
+  return {
+    ...actualFs,
+    mkdirSync: vi.fn(),
+    writeFileSync: vi.fn(),
+    existsSync: vi.fn((p) => mockPaths.has(p.toString())),
+    statSync: vi.fn((p) => {
+      if (mockPaths.has(p.toString())) {
+        return { isDirectory: () => true } as unknown as import('fs').Stats;
+      }
+      return (actualFs as typeof import('fs')).statSync(p as unknown as string);
+    }),
+    realpathSync: vi.fn((p) => p),
+  };
+});
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -1439,35 +1470,6 @@ describe('loadCliConfig folderTrust', () => {
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getFolderTrust()).toBe(true);
   });
-});
-
-vi.mock('fs', async () => {
-  const actualFs = await vi.importActual<typeof fs>('fs');
-  const MOCK_CWD1 = process.cwd();
-  const MOCK_CWD2 = path.resolve(path.sep, 'home', 'user', 'project');
-
-  const mockPaths = new Set([
-    MOCK_CWD1,
-    MOCK_CWD2,
-    path.resolve(path.sep, 'cli', 'path1'),
-    path.resolve(path.sep, 'settings', 'path1'),
-    path.join(os.homedir(), 'settings', 'path2'),
-    path.join(MOCK_CWD2, 'cli', 'path2'),
-    path.join(MOCK_CWD2, 'settings', 'path3'),
-  ]);
-
-  return {
-    ...actualFs,
-    existsSync: vi.fn((p) => mockPaths.has(p.toString())),
-    statSync: vi.fn((p) => {
-      if (mockPaths.has(p.toString())) {
-        return { isDirectory: () => true };
-      }
-      // Fallback for other paths if needed, though the test should be specific.
-      return actualFs.statSync(p);
-    }),
-    realpathSync: vi.fn((p) => p),
-  };
 });
 
 describe('loadCliConfig with includeDirectories', () => {
