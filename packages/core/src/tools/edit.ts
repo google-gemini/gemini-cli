@@ -55,40 +55,6 @@ export function applyReplacement(
   return currentContent.replaceAll(oldString, newString);
 }
 
-export function getErrorReplaceResult(
-  params: EditToolParams,
-  occurrences: number,
-  expectedReplacements: number,
-  finalOldString: string,
-  finalNewString: string,
-) {
-  let error: { display: string; raw: string; type: ToolErrorType } | undefined =
-    undefined;
-  if (occurrences === 0) {
-    error = {
-      display: `Failed to edit, could not find the string to replace.`,
-      raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
-      type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
-    };
-  } else if (occurrences !== expectedReplacements) {
-    const occurrenceTerm =
-      expectedReplacements === 1 ? 'occurrence' : 'occurrences';
-
-    error = {
-      display: `Failed to edit, expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences}.`,
-      raw: `Failed to edit, Expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
-      type: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
-    };
-  } else if (finalOldString === finalNewString) {
-    error = {
-      display: `No changes to apply. The old_string and new_string are identical.`,
-      raw: `No changes to apply. The old_string and new_string are identical in file: ${params.file_path}`,
-      type: ToolErrorType.EDIT_NO_CHANGE,
-    };
-  }
-  return error;
-}
-
 /**
  * Parameters for the Edit tool
  */
@@ -189,13 +155,6 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         raw: `File not found: ${params.file_path}`,
         type: ToolErrorType.FILE_NOT_FOUND,
       };
-    } else if (fileExists && params.old_string === '') {
-      // Error: Trying to create a file that already exists
-      error = {
-        display: `Failed to edit. Attempted to create a file that already exists.`,
-        raw: `File already exists, cannot create: ${params.file_path}`,
-        type: ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
-      };
     } else if (currentContent !== null) {
       // Editing an existing file
       const correctedEdit = await ensureCorrectEdit(
@@ -209,13 +168,35 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       finalNewString = correctedEdit.params.new_string;
       occurrences = correctedEdit.occurrences;
 
-      error = getErrorReplaceResult(
-        params,
-        occurrences,
-        expectedReplacements,
-        finalOldString,
-        finalNewString,
-      );
+      if (params.old_string === '') {
+        // Error: Trying to create a file that already exists
+        error = {
+          display: `Failed to edit. Attempted to create a file that already exists.`,
+          raw: `File already exists, cannot create: ${params.file_path}`,
+          type: ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
+        };
+      } else if (occurrences === 0) {
+        error = {
+          display: `Failed to edit, could not find the string to replace.`,
+          raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. No edits made. The exact text in old_string was not found. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${ReadFileTool.Name} tool to verify.`,
+          type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
+        };
+      } else if (occurrences !== expectedReplacements) {
+        const occurrenceTerm =
+          expectedReplacements === 1 ? 'occurrence' : 'occurrences';
+
+        error = {
+          display: `Failed to edit, expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences}.`,
+          raw: `Failed to edit, Expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
+          type: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+        };
+      } else if (finalOldString === finalNewString) {
+        error = {
+          display: `No changes to apply. The old_string and new_string are identical.`,
+          raw: `No changes to apply. The old_string and new_string are identical in file: ${params.file_path}`,
+          type: ToolErrorType.EDIT_NO_CHANGE,
+        };
+      }
     } else {
       // Should not happen if fileExists and no exception was thrown, but defensively:
       error = {
