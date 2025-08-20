@@ -47,7 +47,6 @@ brew install gemini-cli
 
 ## Release Cadence and Tags
 
-
 See [Releases](./docs/releases.md) for more details.
 
 ### Preview
