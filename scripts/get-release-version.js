@@ -24,10 +24,14 @@ function getShortSha() {
   return execSync('git rev-parse --short HEAD').toString().trim();
 }
 
-export function getNightlyTagName(stableVersion) {
+function getNextVersionString(stableVersion, minorIncrement) {
   const [major, minor] = stableVersion.substring(1).split('.');
-  const nextMinorVersion = parseInt(minor) + 2;
-  const version = `${major}.${nextMinorVersion}.0`;
+  const nextMinorVersion = parseInt(minor, 10) + minorIncrement;
+  return `${major}.${nextMinorVersion}.0`;
+}
+
+export function getNightlyTagName(stableVersion) {
+  const version = getNextVersionString(stableVersion, 2);
 
   const now = new Date();
   const year = now.getUTCFullYear().toString();
@@ -40,10 +44,26 @@ export function getNightlyTagName(stableVersion) {
 }
 
 export function getPreviewTagName(stableVersion) {
-  const [major, minor] = stableVersion.substring(1).split('.');
-  const nextMinorVersion = parseInt(minor) + 1;
-  const version = `${major}.${nextMinorVersion}.0`;
+  const version = getNextVersionString(stableVersion, 1);
   return `v${version}-preview`;
+}
+
+function getPreviousReleaseTag(isNightly) {
+  if (isNightly) {
+    console.error('Finding latest nightly release...');
+    return execSync(
+      `gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("nightly"))] | .[0].tagName'`,
+    )
+      .toString()
+      .trim();
+  } else {
+    console.error('Finding latest STABLE release (excluding pre-releases)...');
+    return execSync(
+      `gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | (contains("nightly") or contains("preview")) | not)] | .[0].tagName'`,
+    )
+      .toString()
+      .trim();
+  }
 }
 
 export function getReleaseVersion() {
@@ -97,7 +117,9 @@ export function getReleaseVersion() {
     npmTag = releaseVersion.split('-')[1].split('.')[0];
   }
 
-  return { releaseTag, releaseVersion, npmTag };
+  const previousReleaseTag = getPreviousReleaseTag(isNightly);
+
+  return { releaseTag, releaseVersion, npmTag, previousReleaseTag };
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
