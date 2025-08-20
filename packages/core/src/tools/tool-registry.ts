@@ -20,6 +20,7 @@ import { connectAndDiscover } from './mcp-client.js';
 import { McpClientManager } from './mcp-client-manager.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -36,7 +37,7 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return `Calling discovered tool: ${this.toolName}`;
+    return safeJsonStringify(this.params);
   }
 
   async execute(
