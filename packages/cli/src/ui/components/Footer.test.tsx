@@ -14,6 +14,19 @@ import path from 'node:path';
 vi.mock('../hooks/useTerminalSize.js');
 const useTerminalSizeMock = vi.mocked(useTerminalSize.useTerminalSize);
 
+vi.mock('react-i18next', () => ({
+  useTranslation: vi.fn(() => ({
+    t: vi.fn((key: string) => {
+      const translations: Record<string, string> = {
+        'footer.noSandbox': 'no sandbox',
+        'footer.seeDocsHint': '(see /docs)', 
+        'footer.untrusted': 'untrusted',
+      };
+      return translations[key] || key;
+    }),
+  })),
+}));
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('@google/gemini-cli-core')>();

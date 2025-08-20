@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from '../../i18n/useTranslation.js';
 
+// Legacy phrases - now replaced by i18n
 export const WITTY_LOADING_PHRASES = [
   "I'm Feeling Lucky",
   'Shipping awesomeness... ',
@@ -147,14 +149,23 @@ export const PHRASE_CHANGE_INTERVAL_MS = 15000;
  * @returns The current loading phrase.
  */
 export const usePhraseCycler = (isActive: boolean, isWaiting: boolean) => {
-  const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState(
-    WITTY_LOADING_PHRASES[0],
-  );
+  const { t } = useTranslation();
+  const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState('');
   const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get the loading phrases from translations
+  const getLoadingPhrases = useCallback(() => {
+    try {
+      return t('ui:loading.phrases', { returnObjects: true }) as string[];
+    } catch {
+      // Fallback to legacy phrases if i18n fails
+      return WITTY_LOADING_PHRASES;
+    }
+  }, [t]);
 
   useEffect(() => {
     if (isWaiting) {
-      setCurrentLoadingPhrase('Waiting for user confirmation...');
+      setCurrentLoadingPhrase(t('ui:loading.waitingForConfirmation'));
       if (phraseIntervalRef.current) {
         clearInterval(phraseIntervalRef.current);
         phraseIntervalRef.current = null;
@@ -163,18 +174,21 @@ export const usePhraseCycler = (isActive: boolean, isWaiting: boolean) => {
       if (phraseIntervalRef.current) {
         clearInterval(phraseIntervalRef.current);
       }
+      
+      const phrases = getLoadingPhrases();
       // Select an initial random phrase
       const initialRandomIndex = Math.floor(
-        Math.random() * WITTY_LOADING_PHRASES.length,
+        Math.random() * phrases.length,
       );
-      setCurrentLoadingPhrase(WITTY_LOADING_PHRASES[initialRandomIndex]);
+      setCurrentLoadingPhrase(phrases[initialRandomIndex]);
 
       phraseIntervalRef.current = setInterval(() => {
+        const currentPhrases = getLoadingPhrases();
         // Select a new random phrase
         const randomIndex = Math.floor(
-          Math.random() * WITTY_LOADING_PHRASES.length,
+          Math.random() * currentPhrases.length,
         );
-        setCurrentLoadingPhrase(WITTY_LOADING_PHRASES[randomIndex]);
+        setCurrentLoadingPhrase(currentPhrases[randomIndex]);
       }, PHRASE_CHANGE_INTERVAL_MS);
     } else {
       // Idle or other states, clear the phrase interval
@@ -183,7 +197,8 @@ export const usePhraseCycler = (isActive: boolean, isWaiting: boolean) => {
         clearInterval(phraseIntervalRef.current);
         phraseIntervalRef.current = null;
       }
-      setCurrentLoadingPhrase(WITTY_LOADING_PHRASES[0]);
+      const phrases = getLoadingPhrases();
+      setCurrentLoadingPhrase(phrases[0] || WITTY_LOADING_PHRASES[0]);
     }
 
     return () => {
@@ -192,7 +207,7 @@ export const usePhraseCycler = (isActive: boolean, isWaiting: boolean) => {
         phraseIntervalRef.current = null;
       }
     };
-  }, [isActive, isWaiting]);
+  }, [isActive, isWaiting, t, getLoadingPhrases]);
 
   return currentLoadingPhrase;
 };

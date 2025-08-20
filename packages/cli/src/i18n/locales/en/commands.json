@@ -1,0 +1,89 @@
+{
+  "lang": {
+    "description": "Switch interface language",
+    "usage": "Usage: /lang [en|zh|current]",
+    "currentLanguage": "Current language: {{language}}",
+    "languageChanged": "Language switched to {{language}}",
+    "invalidLanguage": "Invalid language: {{language}}. Available: en, zh",
+    "availableLanguages": "Available languages: {{languages}}"
+  },
+  "auth": {
+    "description": "Configure authentication method",
+    "openingDialog": "Opening authentication dialog..."
+  },
+  "settings": {
+    "description": "Open settings configuration",
+    "openingDialog": "Opening settings dialog..."
+  },
+  "help": {
+    "description": "Show help information",
+    "showingHelp": "Showing help in {{language}}"
+  },
+  "chat": {
+    "list": "List saved conversation checkpoints",
+    "save": "Save the current conversation as a checkpoint. Usage: /chat save <tag>",
+    "resume": "Resume a conversation from a checkpoint. Usage: /chat resume <tag>",
+    "delete": "Delete a conversation checkpoint. Usage: /chat delete <tag>"
+  },
+  "ide": {
+    "description": "manage IDE integration",
+    "status": "check status of IDE integration",
+    "install": "install required IDE companion",
+    "enable": "enable IDE integration", 
+    "disable": "disable IDE integration"
+  },
+  "directory": {
+    "description": "manage workspace directories",
+    "add": "Add directories to the workspace. Use comma to separate multiple paths",
+    "show": "Show all directories in the workspace"
+  },
+  "mcp": {
+    "description": "manage MCP servers",
+    "list": "List configured MCP servers and tools",
+    "auth": "Authenticate with an OAuth-enabled MCP server",
+    "refresh": "Refresh the list of MCP servers and tools"
+  },
+  "memory": {
+    "description": "manage conversation memory",
+    "show": "Show the current memory contents",
+    "add": "Add content to the memory",
+    "refresh": "Refresh the memory from the source"
+  },
+  "stats": {
+    "description": "show session statistics",
+    "model": "Show model-specific usage statistics",
+    "tools": "Show tool-specific usage statistics"
+  },
+  "descriptions": {
+    "about": "show version info",
+    "auth": "change the auth method",
+    "help": "Show help information",
+    "settings": "Configure application settings",
+    "bug": "submit a bug report",
+    "chat": "Manage conversation history.",
+    "clear": "clear the screen and conversation history",
+    "compress": "Compresses the context by replacing it with a summary.",
+    "copy": "Copy the last result or code snippet to clipboard",
+    "corgi": "Toggles corgi mode.",
+    "docs": "Open documentation in your browser",
+    "directory": "Switch working directory", 
+    "editor": "Configure external editor settings",
+    "extensions": "Manage extensions",
+    "help": "Show help information",
+    "ide": "Configure IDE integration",
+    "init": "Initialize a new project",
+    "lang": "Switch interface language / 切换界面语言",
+    "mcp": "Manage MCP servers",
+    "memory": "Manage conversation memory",
+    "privacy": "Show privacy information",
+    "quit": "Exit the application",
+    "restore": "Restore from backup",
+    "settings": "Configure application settings",
+    "stats": "Show session statistics", 
+    "theme": "Change color theme",
+    "tools": "Show available tools",
+    "vim": "Toggle Vim mode",
+    "setup-github": "Set up GitHub Actions",
+    "terminal-setup": "Configure terminal keybindings for multiline input (VS Code, Cursor, Windsurf)"
+  }
+}

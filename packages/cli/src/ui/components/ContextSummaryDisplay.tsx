@@ -10,6 +10,7 @@ import { Colors } from '../colors.js';
 import { type IdeContext, type MCPServerConfig } from '@google/gemini-cli-core';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+import { useTranslation } from '../../i18n/useTranslation.js';
 
 interface ContextSummaryDisplayProps {
   geminiMdFileCount: number;
@@ -33,6 +34,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   const mcpServerCount = Object.keys(mcpServers || {}).length;
   const blockedMcpServerCount = blockedMcpServers?.length || 0;
   const openFileCount = ideContext?.workspaceState?.openFiles?.length ?? 0;
+  const { t } = useTranslation('ui');
 
   if (
     geminiMdFileCount === 0 &&
@@ -47,9 +49,8 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     if (openFileCount === 0) {
       return '';
     }
-    return `${openFileCount} open file${
-      openFileCount > 1 ? 's' : ''
-    } (ctrl+g to view)`;
+    const openFileWord = openFileCount > 1 ? t('ui:context.openFiles') : t('ui:context.openFile');
+    return `${openFileCount}${openFileWord} ${t('ui:context.viewHint')}`;
   })();
 
   const geminiMdText = (() => {
@@ -58,9 +59,8 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     }
     const allNamesTheSame = new Set(contextFileNames).size < 2;
     const name = allNamesTheSame ? contextFileNames[0] : 'context';
-    return `${geminiMdFileCount} ${name} file${
-      geminiMdFileCount > 1 ? 's' : ''
-    }`;
+    const fileWord = geminiMdFileCount > 1 ? t('ui:context.files') : t('ui:context.file');
+    return `${geminiMdFileCount} ${name} ${fileWord}`;
   })();
 
   const mcpText = (() => {
@@ -99,7 +99,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   if (isNarrow) {
     return (
       <Box flexDirection="column">
-        <Text color={Colors.Gray}>Using:</Text>
+        <Text color={Colors.Gray}>{t('ui:context.using')}</Text>
         {summaryParts.map((part, index) => (
           <Text key={index} color={Colors.Gray}>
             {'  '}- {part}
@@ -111,7 +111,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
 
   return (
     <Box>
-      <Text color={Colors.Gray}>Using: {summaryParts.join(' | ')}</Text>
+      <Text color={Colors.Gray}>{t('ui:context.using')} {summaryParts.join(' | ')}</Text>
     </Box>
   );
 };

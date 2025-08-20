@@ -7,6 +7,7 @@
 import { Text } from 'ink';
 import { Colors } from '../colors.js';
 import { tokenLimit } from '@google/gemini-cli-core';
+import { useTranslation } from '../../i18n/useTranslation.js';
 
 export const ContextUsageDisplay = ({
   promptTokenCount,
@@ -15,11 +16,13 @@ export const ContextUsageDisplay = ({
   promptTokenCount: number;
   model: string;
 }) => {
+  const { t } = useTranslation();
   const percentage = promptTokenCount / tokenLimit(model);
+  const remainingPercent = ((1 - percentage) * 100).toFixed(0);
 
   return (
     <Text color={Colors.Gray}>
-      ({((1 - percentage) * 100).toFixed(0)}% context left)
+      ({t('ui:contextUsage.remaining', { percent: remainingPercent })})
     </Text>
   );
 };

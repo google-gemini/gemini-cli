@@ -6,6 +6,7 @@
 
 import { CommandKind, SlashCommand } from './types.js';
 import { MessageType, type HistoryItemHelp } from '../types.js';
+import i18n from '../../i18n/index.js';
 
 export const helpCommand: SlashCommand = {
   name: 'help',
@@ -13,9 +14,11 @@ export const helpCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   description: 'for help on gemini-cli',
   action: async (context) => {
+    const currentLanguage = i18n.language as 'en' | 'zh';
     const helpItem: Omit<HistoryItemHelp, 'id'> = {
       type: MessageType.HELP,
       timestamp: new Date(),
+      language: currentLanguage,
     };
 
     context.ui.addItem(helpItem, Date.now());

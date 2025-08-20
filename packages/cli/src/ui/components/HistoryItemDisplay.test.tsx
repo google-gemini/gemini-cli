@@ -10,6 +10,39 @@ import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { HistoryItem, MessageType } from '../types.js';
 import { SessionStatsProvider } from '../contexts/SessionContext.js';
 
+vi.mock('../../i18n/useTranslation.js', () => ({
+  useTranslation: vi.fn(() => ({
+    t: vi.fn((key: string) => {
+      const translations: Record<string, string> = {
+        'ui:about.title': 'About Gemini CLI',
+        'ui:about.cliVersion': 'CLI Version',
+        'ui:about.gitCommit': 'Git Commit',
+        'ui:about.model': 'Model',
+        'ui:about.sandbox': 'Sandbox',
+        'ui:about.os': 'OS',
+        'ui:about.authMethod': 'Auth Method',
+        'ui:about.gcpProject': 'GCP Project',
+        'ui:about.ideClient': 'IDE Client',
+        'ui:sessionSummary.title': 'Agent powering down. Goodbye!',
+        'ui:sessionSummary.interactionSummary': 'Interaction Summary',
+        'ui:sessionSummary.performance': 'Performance',
+        'ui:sessionSummary.sessionId': 'Session ID:',
+        'ui:sessionSummary.toolCalls': 'Tool Calls:',
+        'ui:sessionSummary.successRate': 'Success Rate:',
+        'ui:sessionSummary.wallTime': 'Wall Time:',
+        'ui:sessionSummary.agentActive': 'Agent Active:',
+        'ui:sessionSummary.apiTime': 'API Time:',
+        'ui:sessionSummary.toolTime': 'Tool Time:',
+        'ui:sessionSummary.modelUsage': 'Model Usage',
+        'ui:sessionSummary.reqs': 'Reqs',
+        'ui:sessionSummary.inputTokens': 'Input Tokens',
+        'ui:sessionSummary.outputTokens': 'Output Tokens',
+      };
+      return translations[key] || key;
+    }),
+  })),
+}));
+
 // Mock child components
 vi.mock('./messages/ToolGroupMessage.js', () => ({
   ToolGroupMessage: () => <div />,

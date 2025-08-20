@@ -101,6 +101,7 @@ export type HistoryItemAbout = HistoryItemBase & {
 export type HistoryItemHelp = HistoryItemBase & {
   type: 'help';
   timestamp: Date;
+  language?: 'en' | 'zh'; // Optional language preference for i18n
 };
 
 export type HistoryItemStats = HistoryItemBase & {

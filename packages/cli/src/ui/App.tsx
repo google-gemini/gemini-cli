@@ -12,6 +12,9 @@ import {
   useRef,
   useContext,
 } from 'react';
+import { useTranslation } from 'react-i18next';
+// Initialize i18n system 
+import '../i18n/index.js';
 import {
   Box,
   DOMElement,
@@ -144,6 +147,7 @@ export const AppWrapper = (props: AppProps) => {
 };
 
 const App = ({ config, startupWarnings = [], version }: AppProps) => {
+  const { t } = useTranslation('ui');
   const isFocused = useFocus();
   useBracketedPaste();
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
@@ -162,6 +166,7 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
   useEffect(() => {
     registerCleanup(() => config.getIdeClient().disconnect());
   }, [config]);
+  
   const shouldShowIdePrompt =
     currentIDE &&
     !config.getIdeMode() &&
@@ -924,8 +929,8 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
   // enough but not too large to make the terminal hard to use.
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
   const placeholder = vimModeEnabled
-    ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
-    : '  Type your message or @path/to/file';
+    ? t('input.vimPlaceholder')
+    : t('input.defaultPlaceholder');
 
   return (
     <StreamingContext.Provider value={streamingState}>

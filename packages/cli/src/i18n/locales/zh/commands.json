@@ -1,0 +1,87 @@
+{
+  "lang": {
+    "description": "切换界面语言",
+    "usage": "用法: /lang [en|zh|current]",
+    "currentLanguage": "当前语言: {{language}}",
+    "languageChanged": "语言已切换到 {{language}}",
+    "invalidLanguage": "无效语言: {{language}}。可用语言: en, zh",
+    "availableLanguages": "可用语言: {{languages}}"
+  },
+  "auth": {
+    "description": "配置身份验证方法",
+    "openingDialog": "正在打开身份验证对话框..."
+  },
+  "settings": {
+    "description": "打开设置配置",
+    "openingDialog": "正在打开设置对话框..."
+  },
+  "help": {
+    "description": "显示帮助信息",
+    "showingHelp": "正在显示 {{language}} 帮助"
+  },
+  "chat": {
+    "list": "列出已保存的对话检查点",
+    "save": "将当前对话保存为检查点。用法: /chat save <标签>",
+    "resume": "从检查点恢复对话。用法: /chat resume <标签>",
+    "delete": "删除对话检查点。用法: /chat delete <标签>"
+  },
+  "ide": {
+    "description": "管理 IDE 集成",
+    "status": "检查 IDE 集成状态",
+    "install": "安装所需的 IDE 配套扩展",
+    "enable": "启用 IDE 集成",
+    "disable": "禁用 IDE 集成"
+  },
+  "directory": {
+    "description": "管理工作区目录",
+    "add": "添加目录到工作区。使用逗号分隔多个路径",
+    "show": "显示工作区中的所有目录"
+  },
+  "mcp": {
+    "description": "管理 MCP 服务器",
+    "list": "列出已配置的 MCP 服务器和工具",
+    "auth": "使用支持 OAuth 的 MCP 服务器进行身份验证",
+    "refresh": "刷新 MCP 服务器和工具列表"
+  },
+  "memory": {
+    "description": "管理对话内存",
+    "show": "显示当前内存内容",
+    "add": "添加内容到内存",
+    "refresh": "从源文件刷新内存"
+  },
+  "stats": {
+    "description": "显示会话统计信息",
+    "model": "显示模型特定的使用统计",
+    "tools": "显示工具特定的使用统计"
+  },
+  "descriptions": {
+    "about": "显示版本信息",
+    "auth": "配置身份验证方法",
+    "bug": "提交错误报告",
+    "chat": "管理对话历史记录",
+    "clear": "清屏并清除对话历史",
+    "compress": "通过摘要压缩上下文",
+    "copy": "将最后的结果或代码片段复制到剪贴板",
+    "corgi": "切换柯基模式",
+    "docs": "在浏览器中打开文档",
+    "directory": "切换工作目录",
+    "editor": "配置外部编辑器设置", 
+    "extensions": "管理扩展",
+    "help": "显示帮助信息",
+    "ide": "配置 IDE 集成",
+    "init": "初始化新项目",
+    "lang": "切换界面语言",
+    "mcp": "管理 MCP 服务器",
+    "memory": "管理对话内存",
+    "privacy": "显示隐私信息",
+    "quit": "退出应用程序",
+    "restore": "从备份恢复",
+    "settings": "配置应用程序设置",
+    "stats": "显示会话统计", 
+    "theme": "更改颜色主题",
+    "tools": "显示可用工具",
+    "vim": "切换 Vim 模式",
+    "setup-github": "设置 GitHub Actions",
+    "terminal-setup": "配置终端多行输入键绑定"
+  }
+}

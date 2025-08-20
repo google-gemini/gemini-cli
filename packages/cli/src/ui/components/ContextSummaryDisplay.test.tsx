@@ -14,6 +14,15 @@ vi.mock('../hooks/useTerminalSize.js', () => ({
   useTerminalSize: vi.fn(),
 }));
 
+vi.mock('../../i18n/useTranslation.js', () => ({
+  useTranslation: vi.fn(() => ({
+    t: vi.fn((key: string) => {
+      if (key === 'ui:context.using') return 'Using:';
+      return key;
+    }),
+  })),
+}));
+
 const useTerminalSizeMock = vi.mocked(useTerminalSize.useTerminalSize);
 
 const renderWithWidth = (

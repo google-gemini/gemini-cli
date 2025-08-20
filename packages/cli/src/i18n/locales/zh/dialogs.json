@@ -1,0 +1,26 @@
+{
+  "auth": {
+    "title": "开始使用",
+    "description": "您希望如何为此项目进行身份验证？",
+    "instructions": "(使用 Enter 选择)",
+    "terms": "Gemini CLI 服务条款和隐私声明",
+    "termsUrl": "https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md",
+    "options": {
+      "google": "使用 Google 登录",
+      "cloudShell": "使用 Cloud Shell 用户凭据",
+      "geminiKey": "使用 Gemini API 密钥",
+      "vertexAI": "Vertex AI"
+    },
+    "errors": {
+      "invalidAuthType": "GEMINI_DEFAULT_AUTH_TYPE 的值无效：\"{{value}}\"。有效值为：{{validValues}}。",
+      "existingApiKey": "检测到现有 API 密钥 (GEMINI_API_KEY)。请选择\"使用 Gemini API 密钥\"选项来使用它。",
+      "authRequired": "您必须选择一种认证方法才能继续。按 Ctrl+C 两次退出。"
+    }
+  },
+  "settings": {
+    "title": "设置",
+    "applyTo": "应用到",
+    "instructions": "(使用 Enter 选择，Tab 切换焦点)",
+    "restartPrompt": "要查看更改，必须重启 Gemini CLI。按 r 立即退出并应用更改。"
+  }
+}
