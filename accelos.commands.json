@@ -14,10 +14,16 @@
     {
       "name": "init",
       "description": "Initialize a new Accelos project or workspace",
-      "command": "scripts/static-ekg.sh",
-      "arguments": [],
-      "options": {
-      }
+      "command": "../a0/scripts/agentic-ekg.sh",
+      "arguments": [
+        "--workflow",
+        "ekg_generation",
+        "--repo-path",
+        "/Users/utkarshohm/projects/accelos/posthog",
+        "--output-dir",
+        "/Users/utkarshohm/projects/accelos/accelos-cli/dist/.accelos/ekg"
+      ],
+      "options": {}
     },
     {
       "name": "gen-guardrails", 
