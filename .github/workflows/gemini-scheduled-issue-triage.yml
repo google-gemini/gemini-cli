@@ -14,11 +14,8 @@ defaults:
     shell: 'bash'
 
 permissions:
-  contents: 'read'
   id-token: 'write'
   issues: 'write'
-  statuses: 'write'
-  packages: 'read'
 
 jobs:
   triage-issues:
@@ -36,6 +33,7 @@ jobs:
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
 
       - name: 'Find untriaged issues'
         id: 'find_issues'
