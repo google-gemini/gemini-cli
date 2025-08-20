@@ -129,7 +129,7 @@ describe('IDEServer', () => {
       expectedPortFile,
       JSON.stringify({
         port: parseInt(port, 10),
-        workspacePaths: expectedWorkspacePaths,
+        workspacePath: expectedWorkspacePaths,
       }),
     );
   });
@@ -154,7 +154,7 @@ describe('IDEServer', () => {
       expectedPortFile,
       JSON.stringify({
         port: parseInt(port, 10),
-        workspacePaths: '/foo/bar',
+        workspacePath: '/foo/bar',
       }),
     );
   });
@@ -179,7 +179,7 @@ describe('IDEServer', () => {
       expectedPortFile,
       JSON.stringify({
         port: parseInt(port, 10),
-        workspacePaths: '',
+        workspacePath: '',
       }),
     );
   });
@@ -218,7 +218,7 @@ describe('IDEServer', () => {
       expectedPortFile,
       JSON.stringify({
         port: parseInt(port, 10),
-        workspacePaths: expectedWorkspacePaths,
+        workspacePath: expectedWorkspacePaths,
       }),
     );
 
@@ -234,7 +234,7 @@ describe('IDEServer', () => {
       expectedPortFile,
       JSON.stringify({
         port: parseInt(port, 10),
-        workspacePaths: '/baz/qux',
+        workspacePath: '/baz/qux',
       }),
     );
   });
@@ -279,7 +279,7 @@ describe('IDEServer', () => {
         expectedPortFile,
         JSON.stringify({
           port: parseInt(port, 10),
-          workspacePaths: expectedWorkspacePaths,
+          workspacePath: expectedWorkspacePaths,
         }),
       );
     },

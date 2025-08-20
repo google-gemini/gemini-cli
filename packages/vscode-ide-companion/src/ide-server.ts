@@ -30,7 +30,7 @@ function writePortAndWorkspace(
   log: (message: string) => void,
 ): Promise<void> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
-  const workspacePaths =
+  const workspacePath =
     workspaceFolders && workspaceFolders.length > 0
       ? workspaceFolders.map((folder) => folder.uri.fsPath).join(path.delimiter)
       : '';
@@ -41,12 +41,12 @@ function writePortAndWorkspace(
   );
   context.environmentVariableCollection.replace(
     IDE_WORKSPACE_PATH_ENV_VAR,
-    workspacePaths,
+    workspacePath,
   );
 
   log(`Writing port file to: ${portFile}`);
   return fs
-    .writeFile(portFile, JSON.stringify({ port, workspacePaths }))
+    .writeFile(portFile, JSON.stringify({ port, workspacePath }))
     .catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
       log(`Failed to write port to file: ${message}`);
