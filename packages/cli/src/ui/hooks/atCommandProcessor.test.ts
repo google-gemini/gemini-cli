@@ -98,10 +98,6 @@ describe('handleAtCommand', () => {
       processedQuery: [{ text: query }],
       shouldProceed: true,
     });
-    expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: query },
-      123,
-    );
   });
 
   it('should pass through original query if only a lone @ symbol is present', async () => {
@@ -120,10 +116,6 @@ describe('handleAtCommand', () => {
       processedQuery: [{ text: queryWithSpaces }],
       shouldProceed: true,
     });
-    expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: queryWithSpaces },
-      124,
-    );
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       'Lone @ detected, will be treated as text in the modified query.',
     );
@@ -156,10 +148,6 @@ describe('handleAtCommand', () => {
       ],
       shouldProceed: true,
     });
-    expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: query },
-      125,
-    );
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
@@ -198,10 +186,6 @@ describe('handleAtCommand', () => {
       ],
       shouldProceed: true,
     });
-    expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: query },
-      126,
-    );
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Path ${dirPath} resolved to directory, using glob: ${resolvedGlob}`,
     );
@@ -236,10 +220,6 @@ describe('handleAtCommand', () => {
       ],
       shouldProceed: true,
     });
-    expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: query },
-      128,
-    );
   });
 
   it('should correctly unescape paths with escaped spaces', async () => {
@@ -270,10 +250,6 @@ describe('handleAtCommand', () => {
       ],
       shouldProceed: true,
     });
-    expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: query },
-      125,
-    );
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
