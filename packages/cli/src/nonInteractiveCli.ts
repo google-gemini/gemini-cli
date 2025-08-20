@@ -8,7 +8,6 @@ import {
   Config,
   ToolCallRequestInfo,
   executeToolCall,
-  ToolRegistry,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   GeminiEventType,
@@ -39,7 +38,6 @@ export async function runNonInteractive(
     });
 
     const geminiClient = config.getGeminiClient();
-    const toolRegistry: ToolRegistry = config.getToolRegistry();
 
     const abortController = new AbortController();
     let currentMessages: Content[] = [
@@ -100,7 +98,6 @@ export async function runNonInteractive(
           const toolResponse = await executeToolCall(
             config,
             requestInfo,
-            toolRegistry,
             abortController.signal,
           );
 
