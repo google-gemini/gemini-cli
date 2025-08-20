@@ -1,6 +1,4 @@
-# Release Process
-
-This project follows a structured release process to ensure that all packages are versioned and published correctly. The process is designed to be as automated as possible.
+# Gemini CLI Releases
 
 ## Release Cadence and Tags
 
@@ -71,15 +69,15 @@ If a bug or feature fix is found and needed before the next weekly release is ou
   - For a stable release merge via PR the `release/x.y.z` branch back to main to keep version number current.
   - For a preview relase, merge the `relase/x.y.z-preview.n` branch back to the `release/x.y.z-preview.n` branch to make the preview version number current. Then also cherry pick your feature commit back to main.
 
-Release Schedule
+## Release Schedule
 
 <table>
   <tr>
    <td>Date
    </td>
-   <td>Stable UTC 8PM
+   <td>Stable UTC 2000
    </td>
-   <td>Preview UTC Midnight
+   <td>Preview UTC 2359
    </td>
   </tr>
   <tr>
@@ -130,38 +128,6 @@ Release Schedule
    <td>0.7.0-preview.0
    </td>
   </tr>
-  <tr>
-   <td>Sep 30th, 2025
-   </td>
-   <td>0.7.0
-   </td>
-   <td>1.0.0-preview.0
-   </td>
-  </tr>
-  <tr>
-   <td>Oct 7th, 2025
-   </td>
-   <td>1.0.0
-   </td>
-   <td>1.1.0-preview.0
-   </td>
-  </tr>
-  <tr>
-   <td>Oct 14th, 2025
-   </td>
-   <td>1.1.0
-   </td>
-   <td>1.2.0-preview.0
-   </td>
-  </tr>
-  <tr>
-   <td>Oct 21st, 2025
-   </td>
-   <td>1.2.0
-   </td>
-   <td>1.3.0-preview.0
-   </td>
-  </tr>
 </table>
 
 ## How To Release
@@ -177,7 +143,7 @@ Releases are managed through the [release.yml](https://github.com/google-gemini/
     - **Dry Run**: Leave as `true` to test the workflow without publishing, or set to `false` to perform a live release.
 5.  Click **Run workflow**.
 
-### Process
+### TLDR
 
 Each release, wether automated or manual performs the following steps:
 
