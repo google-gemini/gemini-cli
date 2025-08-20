@@ -67,6 +67,27 @@
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Debug Integration Test File",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vitest",
+        "run",
+        "--root",
+        "./integration-tests",
+        "--inspect-brk=9229",
+        "${file}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "GEMINI_SANDBOX": "false"
+      }
     }
   ],
   "inputs": [

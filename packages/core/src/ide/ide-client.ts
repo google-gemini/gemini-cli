@@ -20,6 +20,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { EnvHttpProxyAgent } from 'undici';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -325,6 +326,29 @@ export class IdeClient {
     }
   }
 
+  private createProxyAwareFetch() {
+    // ignore proxy for 'localhost' by deafult to allow connecting to the ide mcp server
+    const existingNoProxy = process.env['NO_PROXY'] || '';
+    const agent = new EnvHttpProxyAgent({
+      noProxy: [existingNoProxy, 'localhost'].filter(Boolean).join(','),
+    });
+    const undiciPromise = import('undici');
+    return async (url: string | URL, init?: RequestInit): Promise<Response> => {
+      const { fetch: fetchFn } = await undiciPromise;
+      const fetchOptions: RequestInit & { dispatcher?: unknown } = {
+        ...init,
+        dispatcher: agent,
+      };
+      const options = fetchOptions as unknown as import('undici').RequestInit;
+      const response = await fetchFn(url, options);
+      return new Response(response.body as ReadableStream<unknown> | null, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      });
+    };
+  }
+
   private registerClientHandlers() {
     if (!this.client) {
       return;
@@ -389,6 +413,9 @@ export class IdeClient {
       });
       transport = new StreamableHTTPClientTransport(
         new URL(`http://${getIdeServerHost()}:${port}/mcp`),
+        {
+          fetch: this.createProxyAwareFetch(),
+        },
       );
       await this.client.connect(transport);
       this.registerClientHandlers();
