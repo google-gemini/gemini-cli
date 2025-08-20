@@ -5,10 +5,19 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  Mock,
+  MockInstance,
+} from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useGeminiStream, mergePartListUnions } from './useGeminiStream.js';
 import { useKeypress } from './useKeypress.js';
+import * as atCommandProcessor from './atCommandProcessor.js';
 import {
   useReactToolScheduler,
   TrackedToolCall,
@@ -20,8 +29,10 @@ import {
   Config,
   EditorType,
   AuthType,
+  GeminiClient,
   GeminiEventType as ServerGeminiEventType,
   AnyToolInvocation,
+  ToolErrorType, // <-- Import ToolErrorType
 } from '@google/gemini-cli-core';
 import { Part, PartListUnion } from '@google/genai';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -83,11 +94,7 @@ vi.mock('./shellCommandProcessor.js', () => ({
   }),
 }));
 
-vi.mock('./atCommandProcessor.js', () => ({
-  handleAtCommand: vi
-    .fn()
-    .mockResolvedValue({ shouldProceed: true, processedQuery: 'mocked' }),
-}));
+vi.mock('./atCommandProcessor.js');
 
 vi.mock('../utils/markdownUtilities.js', () => ({
   findLastSafeSplitPoint: vi.fn((s: string) => s.length),
@@ -259,6 +266,7 @@ describe('useGeminiStream', () => {
   let mockScheduleToolCalls: Mock;
   let mockCancelAllToolCalls: Mock;
   let mockMarkToolsAsSubmitted: Mock;
+  let handleAtCommandSpy: MockInstance;
 
   beforeEach(() => {
     vi.clearAllMocks(); // Clear mocks before each test
@@ -342,6 +350,7 @@ describe('useGeminiStream', () => {
     mockSendMessageStream
       .mockClear()
       .mockReturnValue((async function* () {})());
+    handleAtCommandSpy = vi.spyOn(atCommandProcessor, 'handleAtCommand');
   });
 
   const mockLoadedSettings: LoadedSettings = {
@@ -447,6 +456,7 @@ describe('useGeminiStream', () => {
           callId: 'call1',
           responseParts: [{ text: 'tool 1 response' }],
           error: undefined,
+          errorType: undefined, // FIX: Added missing property
           resultDisplay: 'Tool 1 success display',
         },
         tool: {
@@ -512,7 +522,11 @@ describe('useGeminiStream', () => {
         },
         status: 'success',
         responseSubmittedToGemini: false,
-        response: { callId: 'call1', responseParts: toolCall1ResponseParts },
+        response: {
+          callId: 'call1',
+          responseParts: toolCall1ResponseParts,
+          errorType: undefined, // FIX: Added missing property
+        },
         tool: {
           displayName: 'MockTool',
         },
@@ -530,7 +544,11 @@ describe('useGeminiStream', () => {
         },
         status: 'error',
         responseSubmittedToGemini: false,
-        response: { callId: 'call2', responseParts: toolCall2ResponseParts },
+        response: {
+          callId: 'call2',
+          responseParts: toolCall2ResponseParts,
+          errorType: ToolErrorType.UNHANDLED_EXCEPTION, // FIX: Added missing property
+        },
       } as TrackedCompletedToolCall, // Treat error as a form of completion for submission
     ];
 
@@ -597,7 +615,11 @@ describe('useGeminiStream', () => {
           prompt_id: 'prompt-id-3',
         },
         status: 'cancelled',
-        response: { callId: '1', responseParts: [{ text: 'cancelled' }] },
+        response: {
+          callId: '1',
+          responseParts: [{ text: 'cancelled' }],
+          errorType: undefined, // FIX: Added missing property
+        },
         responseSubmittedToGemini: false,
         tool: {
           displayName: 'mock tool',
@@ -682,6 +704,7 @@ describe('useGeminiStream', () => {
         ],
         resultDisplay: undefined,
         error: undefined,
+        errorType: undefined, // FIX: Added missing property
       },
       responseSubmittedToGemini: false,
     };
@@ -710,6 +733,7 @@ describe('useGeminiStream', () => {
         ],
         resultDisplay: undefined,
         error: undefined,
+        errorType: undefined, // FIX: Added missing property
       },
       responseSubmittedToGemini: false,
     };
@@ -812,6 +836,7 @@ describe('useGeminiStream', () => {
           callId: 'call1',
           responseParts: toolCallResponseParts,
           error: undefined,
+          errorType: undefined, // FIX: Added missing property
           resultDisplay: 'Tool 1 success display',
         },
         endTime: Date.now(),
@@ -1214,6 +1239,7 @@ describe('useGeminiStream', () => {
           responseParts: [{ text: 'Memory saved' }],
           resultDisplay: 'Success: Memory saved',
           error: undefined,
+          errorType: undefined, // FIX: Added missing property
         },
         tool: {
           name: 'save_memory',
@@ -1756,5 +1782,69 @@ describe('useGeminiStream', () => {
         'gemini-2.5-flash',
       );
     });
+  });
+
+  it('should process @include commands, adding user turn after processing to prevent race conditions', async () => {
+    const rawQuery = '@include file.txt Summarize this.';
+    const processedQueryParts = [
+      { text: 'Summarize this with content from @file.txt' },
+      { text: 'File content...' },
+    ];
+    const userMessageTimestamp = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(userMessageTimestamp);
+
+    // Mock the behavior of handleAtCommand
+    handleAtCommandSpy.mockResolvedValue({
+      processedQuery: processedQueryParts,
+      shouldProceed: true,
+    });
+
+    const { result } = renderHook(() =>
+      useGeminiStream(
+        mockConfig.getGeminiClient() as GeminiClient,
+        [],
+        mockAddItem,
+        mockConfig,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false, // shellModeActive
+        vi.fn(), // getPreferredEditor
+        vi.fn(), // onAuthError
+        vi.fn(), // performMemoryRefresh
+        false, // modelSwitched
+        vi.fn(), // setModelSwitched
+        vi.fn(), // onEditorClose
+        vi.fn(), // onCancelSubmit
+      ),
+    );
+
+    // Act: Submit the query
+    await act(async () => {
+      await result.current.submitQuery(rawQuery);
+    });
+
+    // Assert
+    // 1. Verify handleAtCommand was called with the raw query.
+    expect(handleAtCommandSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: rawQuery,
+      }),
+    );
+
+    // 2. Verify the user's turn was added to history *after* processing.
+    expect(mockAddItem).toHaveBeenCalledWith(
+      {
+        type: MessageType.USER,
+        text: rawQuery,
+      },
+      userMessageTimestamp,
+    );
+
+    // 3. Verify the *processed* query was sent to the model, not the raw one.
+    expect(mockSendMessageStream).toHaveBeenCalledWith(
+      processedQueryParts,
+      expect.any(AbortSignal),
+      expect.any(String),
+    );
   });
 });
