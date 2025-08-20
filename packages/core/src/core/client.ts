@@ -527,6 +527,10 @@ export class GeminiClient {
         return turn;
       }
 
+      if (this.config.getSkipNextSpeakerCheck()) {
+        return turn;
+      }
+
       const nextSpeakerCheck = await checkNextSpeaker(
         this.getChat(),
         this,
