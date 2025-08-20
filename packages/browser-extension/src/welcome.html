@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bienvenido a Gemini CLI Browser Companion</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    .welcome-card {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      margin-bottom: 30px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .logo {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 20px;
+      background: linear-gradient(135deg, #4285f4, #34a853);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 36px;
+    }
+
+    h1 {
+      color: #1a73e8;
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      color: #5f6368;
+      font-size: 18px;
+    }
+
+    .steps {
+      margin: 40px 0;
+    }
+
+    .step {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 12px;
+      border-left: 4px solid #4285f4;
+    }
+
+    .step-number {
+      background: #4285f4;
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      margin-right: 20px;
+      flex-shrink: 0;
+    }
+
+    .step-content h3 {
+      color: #1a73e8;
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+
+    .step-content p {
+      color: #5f6368;
+      margin-bottom: 8px;
+    }
+
+    .code-block {
+      background: #2d3748;
+      color: #e2e8f0;
+      padding: 16px;
+      border-radius: 8px;
+      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+      font-size: 14px;
+      margin: 12px 0;
+      overflow-x: auto;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin: 40px 0;
+    }
+
+    .feature {
+      background: #f8f9fa;
+      padding: 24px;
+      border-radius: 12px;
+      text-align: center;
+    }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      background: #e8f0fe;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 24px;
+    }
+
+    .feature h4 {
+      color: #1a73e8;
+      margin-bottom: 8px;
+    }
+
+    .cta-section {
+      text-align: center;
+      margin-top: 40px;
+    }
+
+    .button {
+      display: inline-block;
+      padding: 16px 32px;
+      background: #1a73e8;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 16px;
+      transition: background-color 0.2s;
+      margin: 0 10px 10px 0;
+    }
+
+    .button:hover {
+      background: #1557b0;
+    }
+
+    .button.secondary {
+      background: #5f6368;
+    }
+
+    .button.secondary:hover {
+      background: #3c4043;
+    }
+
+    .footer {
+      text-align: center;
+      color: white;
+      margin-top: 40px;
+    }
+
+    .footer a {
+      color: white;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="welcome-card">
+      <div class="header">
+        <div class="logo">G</div>
+        <h1>¡Bienvenido a Gemini CLI!</h1>
+        <p class="subtitle">Tu asistente de IA ahora disponible en el navegador</p>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3>Instala Gemini CLI</h3>
+            <p>Primero, instala Gemini CLI en tu terminal usando npm:</p>
+            <div class="code-block">npm install -g @google/gemini-cli</div>
+            <p>O ejecútalo directamente sin instalación:</p>
+            <div class="code-block">npx @google/gemini-cli</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3>Ejecuta Gemini CLI</h3>
+            <p>Abre tu terminal y ejecuta el comando:</p>
+            <div class="code-block">gemini</div>
+            <p>Sigue las instrucciones para autenticarte con tu cuenta de Google.</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h3>¡Comienza a usar la extensión!</h3>
+            <p>Una vez que Gemini CLI esté ejecutándose, esta extensión automáticamente:</p>
+            <ul style="margin-left: 20px; color: #5f6368;">
+              <li>Detectará el texto seleccionado en páginas web</li>
+              <li>Proporcionará contexto de la página actual a Gemini CLI</li>
+              <li>Te permitirá interactuar con Gemini directamente desde el navegador</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">🎯</div>
+          <h4>Contexto Inteligente</h4>
+          <p>Gemini CLI conoce la página web que estás viendo y puede ayudarte con su contenido.</p>
+        </div>
+
+        <div class="feature">
+          <div class="feature-icon">✨</div>
+          <h4>Texto Seleccionado</h4>
+          <p>Selecciona cualquier texto en una página web y Gemini CLI podrá analizarlo o responder preguntas sobre él.</p>
+        </div>
+
+        <div class="feature">
+          <div class="feature-icon">🔄</div>
+          <h4>Sincronización Automática</h4>
+          <p>La extensión se mantiene sincronizada con tu sesión de Gemini CLI en tiempo real.</p>
+        </div>
+      </div>
+
+      <div class="cta-section">
+        <a href="https://github.com/google-gemini/gemini-cli#readme" class="button" target="_blank">
+          Ver Documentación
+        </a>
+        <a href="#" class="button secondary" onclick="window.close()">
+          Cerrar
+        </a>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>
+        <a href="https://github.com/google-gemini/gemini-cli" target="_blank">Gemini CLI</a> |
+        <a href="https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md" target="_blank">Privacidad</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 350px;
+      min-height: 400px;
+      margin: 0;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #333;
+      background: #fff;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #e1e1e1;
+    }
+
+    .logo {
+      width: 32px;
+      height: 32px;
+      margin-right: 12px;
+      background: linear-gradient(135deg, #4285f4, #34a853);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1a73e8;
+    }
+
+    .status {
+      margin-bottom: 20px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    .status.connected {
+      background: #e8f5e8;
+      color: #137333;
+      border: 1px solid #c6e7c6;
+    }
+
+    .status.disconnected {
+      background: #fce8e6;
+      color: #d93025;
+      border: 1px solid #f5c6cb;
+    }
+
+    .status.connecting {
+      background: #e3f2fd;
+      color: #1565c0;
+      border: 1px solid #bbdefb;
+    }
+
+    .section {
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #5f6368;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .current-page {
+      background: #f8f9fa;
+      border: 1px solid #e8eaed;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .page-title {
+      font-weight: 500;
+      margin-bottom: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .page-url {
+      color: #5f6368;
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .selected-text {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 12px;
+      max-height: 60px;
+      overflow-y: auto;
+      color: #856404;
+    }
+
+    .button {
+      width: 100%;
+      padding: 12px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .button:hover {
+      background: #1557b0;
+    }
+
+    .button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .footer {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid #e1e1e1;
+      text-align: center;
+      font-size: 12px;
+      color: #5f6368;
+    }
+
+    .footer a {
+      color: #1a73e8;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    .connection-info {
+      font-size: 12px;
+      color: #5f6368;
+      margin-top: 8px;
+    }
+
+    .tab-count {
+      background: #e8f0fe;
+      border: 1px solid #d2e3fc;
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 12px;
+      color: #1565c0;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">G</div>
+    <div class="title">Gemini CLI</div>
+  </div>
+
+  <div id="status" class="status disconnected">
+    <span id="status-text">Checking connection...</span>
+    <div class="connection-info">
+      Make sure Gemini CLI is running in your terminal
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Current Page</div>
+    <div class="current-page">
+      <div class="page-title" id="page-title">Loading...</div>
+      <div class="page-url" id="page-url">-</div>
+    </div>
+  </div>
+
+  <div class="section" id="selected-text-section" style="display: none;">
+    <div class="section-title">Selected Text</div>
+    <div class="selected-text" id="selected-text"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Browser Context</div>
+    <div class="tab-count">
+      <span id="tab-count">0 tabs</span> tracked for Gemini CLI
+    </div>
+  </div>
+
+  <button class="button" id="open-gemini" disabled>
+    Open Gemini CLI Terminal
+  </button>
+
+  <div class="footer">
+    <a href="#" id="help-link">View Documentation</a> |
+    <a href="#" id="settings-link">Settings</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

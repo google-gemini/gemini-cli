@@ -1,0 +1,46 @@
+{
+  "name": "gemini-cli-browser-extension",
+  "displayName": "Gemini CLI Browser Companion",
+  "description": "Enable Gemini CLI with direct access to your browser workspace.",
+  "version": "0.1.15",
+  "private": true,
+  "license": "Apache-2.0",
+  "keywords": [
+    "gemini-cli",
+    "gemini cli",
+    "gemini",
+    "gemini code",
+    "cli",
+    "browser extension",
+    "browser companion",
+    "chrome extension",
+    "firefox extension"
+  ],
+  "scripts": {
+    "build": "npm run compile",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run build && node scripts/package.js",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "test:ci": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.284",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^8.40.0",
+    "@typescript-eslint/parser": "^8.40.0",
+    "esbuild": "^0.25.9",
+    "eslint": "^9.33.0",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.3",
+    "zod": "^3.25.76"
+  }
+}
