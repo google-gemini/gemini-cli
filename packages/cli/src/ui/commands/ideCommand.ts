@@ -213,7 +213,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
           context.ui.addItem(
             {
               type: messageType,
-              text: `Failed to automatically enable IDE integration. To fix this, open a new terminal, run the CLI and enter the command /ide enable.`,
+              text: `Failed to automatically enable IDE integration. To fix this, run the CLI in a new terminal window.`,
             },
             Date.now(),
           );
