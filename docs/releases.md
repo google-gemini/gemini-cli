@@ -49,7 +49,7 @@ Each Tuesday at UTC 2359 we will auto deploy a preview release of the next produ
 
 ## Promote Stable Release
 
-After one week (On the following Tuesday) with all signals a go, we will manually release at 20:00 UTC via the current on-call person.
+After one week (On the following Tuesday) with all signals a go, we will manually release at 2000 UTC via the current on-call person.
 
 - The release action will be used with the source branch as `release/x.y.z-preview.n`
 - The version will be x.y.z
