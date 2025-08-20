@@ -80,19 +80,24 @@ export function useAutoAcceptIndicator({
               );
             }
 
-            awaitingApprovalCalls.forEach(async (call) => {
-              if (call.confirmationDetails?.onConfirm) {
-                try {
-                  await call.confirmationDetails.onConfirm(
-                    ToolConfirmationOutcome.ProceedOnce,
-                  );
-                } catch (error) {
-                  console.error(
-                    `Failed to auto-approve tool call ${call.request.callId}:`,
-                    error,
-                  );
+            // Process all pending tool calls concurrently
+            Promise.all(
+              awaitingApprovalCalls.map(async (call) => {
+                if (call.confirmationDetails?.onConfirm) {
+                  try {
+                    await call.confirmationDetails.onConfirm(
+                      ToolConfirmationOutcome.ProceedOnce,
+                    );
+                  } catch (error) {
+                    console.error(
+                      `Failed to auto-approve tool call ${call.request.callId}:`,
+                      error,
+                    );
+                  }
                 }
-              }
+              }),
+            ).catch((error) => {
+              console.error('Failed to process some tool call approvals:', error);
             });
           }
         } catch (e) {
