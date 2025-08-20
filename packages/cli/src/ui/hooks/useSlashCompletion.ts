@@ -42,48 +42,46 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
   }>(), []);
 
   // Helper function to create or retrieve cached AsyncFzf instance for a command level
-  const getFzfForCommands = useMemo(() => {
-    return (commands: readonly SlashCommand[]) => {
-      if (!commands || commands.length === 0) {
-        return null;
-      }
-      
-      // Check if we already have a cached instance
-      const cached = fzfInstanceCache.get(commands);
-      if (cached) {
-        return cached;
-      }
-      
-      const commandItems: string[] = [];
-      const commandMap = new Map<string, SlashCommand>();
-      
-      commands.forEach(cmd => {
-        if (cmd.description) {
-          commandItems.push(cmd.name);
-          commandMap.set(cmd.name, cmd);
-          
-          if (cmd.altNames) {
-            cmd.altNames.forEach(alt => {
-              commandItems.push(alt);
-              commandMap.set(alt, cmd);
-            });
-          }
+  const getFzfForCommands = useMemo(() => (commands: readonly SlashCommand[]) => {
+    if (!commands || commands.length === 0) {
+      return null;
+    }
+    
+    // Check if we already have a cached instance
+    const cached = fzfInstanceCache.get(commands);
+    if (cached) {
+      return cached;
+    }
+    
+    const commandItems: string[] = [];
+    const commandMap = new Map<string, SlashCommand>();
+    
+    commands.forEach(cmd => {
+      if (cmd.description) {
+        commandItems.push(cmd.name);
+        commandMap.set(cmd.name, cmd);
+        
+        if (cmd.altNames) {
+          cmd.altNames.forEach(alt => {
+            commandItems.push(alt);
+            commandMap.set(alt, cmd);
+          });
         }
-      });
-      
-      if (commandItems.length === 0) {
-        return null;
       }
-      
-      const instance = {
-        fzf: new AsyncFzf(commandItems, { fuzzy: 'v2' }),
-        commandMap
-      };
-      
-      // Cache the instance for future use
-      fzfInstanceCache.set(commands, instance);
-      return instance;
+    });
+    
+    if (commandItems.length === 0) {
+      return null;
+    }
+    
+    const instance = {
+      fzf: new AsyncFzf(commandItems, { fuzzy: 'v2' }),
+      commandMap
     };
+    
+    // Cache the instance for future use
+    fzfInstanceCache.set(commands, instance);
+    return instance;
   }, [fzfInstanceCache]);
 
   useEffect(() => {
@@ -207,9 +205,14 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
           if (fzfInstance) {
             try {
               const fzfResults = await fzfInstance.fzf.find(partial);
-              potentialSuggestions = fzfResults
-                .map((result: FzfResultItem<string>) => fzfInstance.commandMap.get(result.item))
-                .filter((cmd: SlashCommand | undefined): cmd is SlashCommand => cmd !== undefined && !!cmd.description);
+              const uniqueCommands = new Set<SlashCommand>();
+              fzfResults.forEach((result: FzfResultItem<string>) => {
+                const cmd = fzfInstance.commandMap.get(result.item);
+                if (cmd && cmd.description) {
+                  uniqueCommands.add(cmd);
+                }
+              });
+              potentialSuggestions = Array.from(uniqueCommands);
             } catch (error) {
               console.warn('Fuzzy search failed, falling back to prefix matching:', error);
               // Fallback to original prefix-based filtering
