@@ -79,6 +79,7 @@ export function logCliConfiguration(
     file_filtering_respect_git_ignore: event.file_filtering_respect_git_ignore,
     debug_mode: event.debug_enabled,
     mcp_servers: event.mcp_servers,
+    mcp_tools: event.mcp_tools,
   };
 
   const logger = logs.getLogger(SERVICE_NAME);
