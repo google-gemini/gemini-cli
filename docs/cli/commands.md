@@ -61,6 +61,9 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/help`** (or **`/?`**)
   - **Description:** Display help information about Gemini CLI, including available commands and their usage.
 
+- **`/hello`**
+  - **Description:** Prints a friendly greeting.
+
 - **`/mcp`**
   - **Description:** List configured Model Context Protocol (MCP) servers, their connection status, server details, and available tools.
   - **Sub-commands:**
