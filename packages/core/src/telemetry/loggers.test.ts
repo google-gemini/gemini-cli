@@ -63,6 +63,7 @@ describe('loggers', () => {
   };
 
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(true);
     vi.spyOn(logs, 'getLogger').mockReturnValue(mockLogger);
     vi.spyOn(uiTelemetry.uiTelemetryService, 'addEvent').mockImplementation(
@@ -161,6 +162,9 @@ describe('loggers', () => {
           file_filtering_respect_git_ignore: true,
           debug_mode: true,
           mcp_servers: 'test-server',
+          mcp_servers_count: '1',
+          mcp_tools: undefined,
+          mcp_tools_count: undefined,
         },
       });
     });

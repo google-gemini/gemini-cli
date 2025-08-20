@@ -488,11 +488,12 @@ describe('Server Config (config.ts)', () => {
       },
     );
 
-    it('logs the session start event', () => {
-      new Config({
+    it('logs the session start event', async () => {
+      const config = new Config({
         ...baseParams,
         usageStatisticsEnabled: true,
       });
+      await config.initialize();
 
       expect(
         ClearcutLogger.prototype.logStartSessionEvent,
