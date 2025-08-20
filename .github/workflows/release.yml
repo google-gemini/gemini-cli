@@ -27,6 +27,11 @@ on:
         required: false
         type: 'boolean'
         default: false
+      create_preview_release:
+        description: 'Auto apply the preview release tag, input version is ignored.'
+        required: false
+        type: 'boolean'
+        default: false
       force_skip_tests:
         description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
         required: false
@@ -236,5 +241,8 @@ jobs:
         run: |-
           gh issue create \
             --title "Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')" \
+            --body "The release workflow failed. See the full run for details: ${DETAILS_URL}" \
+            --label "kind/bug,release-failure"
+(date +'%Y-%m-%d')" \
             --body "The release workflow failed. See the full run for details: ${DETAILS_URL}" \
             --label "kind/bug,release-failure"
