@@ -28,7 +28,7 @@ function writePortAndWorkspace(
   port: number,
   portFile: string,
   log: (message: string) => void,
-) {
+): Promise<void> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   const workspacePaths =
     workspaceFolders && workspaceFolders.length > 0
@@ -44,13 +44,13 @@ function writePortAndWorkspace(
     workspacePaths,
   );
 
-  fs.writeFile(portFile, JSON.stringify({ port, workspacePaths })).catch(
-    (err) => {
+  log(`Writing port file to: ${portFile}`);
+  return fs
+    .writeFile(portFile, JSON.stringify({ port, workspacePaths }))
+    .catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
       log(`Failed to write port to file: ${message}`);
-    },
-  );
-  log(portFile);
+    });
 }
 
 function sendIdeContextUpdateNotification(
@@ -229,21 +229,31 @@ export class IDEServer {
 
       app.get('/mcp', handleSessionRequest);
 
-      this.server = app.listen(0, () => {
+      this.server = app.listen(0, async () => {
         const address = (this.server as HTTPServer).address();
         if (address && typeof address !== 'string') {
           this.port = address.port;
           this.log(`IDE server listening on port ${this.port}`);
-          writePortAndWorkspace(context, this.port, this.portFile, this.log);
+          await writePortAndWorkspace(
+            context,
+            this.port,
+            this.portFile,
+            this.log,
+          );
         }
         resolve();
       });
     });
   }
 
-  updateWorkspacePath() {
+  async updateWorkspacePath(): Promise<void> {
     if (this.context && this.port) {
-      writePortAndWorkspace(this.context, this.port, this.portFile, this.log);
+      await writePortAndWorkspace(
+        this.context,
+        this.port,
+        this.portFile,
+        this.log,
+      );
     }
   }
 

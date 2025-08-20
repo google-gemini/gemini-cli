@@ -16,14 +16,10 @@ const mocks = vi.hoisted(() => ({
   diffManager: { onDidChange: vi.fn(() => ({ dispose: vi.fn() })) } as any,
 }));
 
-vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof fs>();
-  return {
-    ...actual,
-    writeFile: vi.fn().mockResolvedValue(undefined),
-    unlink: vi.fn().mockResolvedValue(undefined),
-  };
-});
+vi.mock('node:fs/promises', async () => ({
+  writeFile: vi.fn().mockResolvedValue(undefined),
+  unlink: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof os>();
@@ -63,6 +59,21 @@ describe('IDEServer', () => {
   let mockContext: vscode.ExtensionContext;
   let mockLog: (message: string) => void;
 
+  const getPortFromMock = (
+    replaceMock: ReturnType<
+      () => vscode.ExtensionContext['environmentVariableCollection']['replace']
+    >,
+  ) => {
+    const port = vi
+      .mocked(replaceMock)
+      .mock.calls.find((call) => call[0] === 'GEMINI_CLI_IDE_SERVER_PORT')?.[1];
+
+    if (port === undefined) {
+      expect.fail('Port was not set');
+    }
+    return port;
+  };
+
   beforeEach(() => {
     mockLog = vi.fn();
     ideServer = new IDEServer(mockLog, mocks.diffManager);
@@ -90,7 +101,8 @@ describe('IDEServer', () => {
     const replaceMock = mockContext.environmentVariableCollection.replace;
     expect(replaceMock).toHaveBeenCalledTimes(2);
 
-    expect(replaceMock).toHaveBeenCalledWith(
+    expect(replaceMock).toHaveBeenNthCalledWith(
+      1,
       'GEMINI_CLI_IDE_SERVER_PORT',
       expect.stringMatching(/^\\d+$/), // port is a number as a string
     );
@@ -100,19 +112,13 @@ describe('IDEServer', () => {
       '/test/workspace2',
     ].join(path.delimiter);
 
-    expect(replaceMock).toHaveBeenCalledWith(
+    expect(replaceMock).toHaveBeenNthCalledWith(
+      2,
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
       expectedWorkspacePaths,
     );
 
-    const port = vi
-      .mocked(replaceMock)
-      .mock.calls.find((call) => call[0] === 'GEMINI_CLI_IDE_SERVER_PORT')?.[1];
-
-    if (port === undefined) {
-      expect.fail('Port was not set');
-    }
-
+    const port = getPortFromMock(replaceMock);
     const expectedPortFile = path.join(
       '/tmp',
       `gemini-ide-server-${process.ppid}.json`,
@@ -130,51 +136,105 @@ describe('IDEServer', () => {
     vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: '/foo/bar' } }];
 
     await ideServer.start(mockContext);
+    const replaceMock = mockContext.environmentVariableCollection.replace;
 
-    expect(
-      mockContext.environmentVariableCollection.replace,
-    ).toHaveBeenCalledWith('GEMINI_CLI_IDE_WORKSPACE_PATH', '/foo/bar');
+    expect(replaceMock).toHaveBeenCalledWith(
+      'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      '/foo/bar',
+    );
+
+    const port = getPortFromMock(replaceMock);
+    const expectedPortFile = path.join(
+      '/tmp',
+      `gemini-ide-server-${process.ppid}.json`,
+    );
+    expect(fs.writeFile).toHaveBeenCalledWith(
+      expectedPortFile,
+      JSON.stringify({
+        port: parseInt(port, 10),
+        workspacePaths: '/foo/bar',
+      }),
+    );
   });
 
   it('should set an empty string if no folders are open', async () => {
     vscodeMock.workspace.workspaceFolders = [];
 
     await ideServer.start(mockContext);
+    const replaceMock = mockContext.environmentVariableCollection.replace;
 
-    expect(
-      mockContext.environmentVariableCollection.replace,
-    ).toHaveBeenCalledWith('GEMINI_CLI_IDE_WORKSPACE_PATH', '');
+    expect(replaceMock).toHaveBeenCalledWith(
+      'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      '',
+    );
+
+    const port = getPortFromMock(replaceMock);
+    const expectedPortFile = path.join(
+      '/tmp',
+      `gemini-ide-server-${process.ppid}.json`,
+    );
+    expect(fs.writeFile).toHaveBeenCalledWith(
+      expectedPortFile,
+      JSON.stringify({
+        port: parseInt(port, 10),
+        workspacePaths: '',
+      }),
+    );
   });
 
   it('should update the path when workspace folders change', async () => {
     vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: '/foo/bar' } }];
     await ideServer.start(mockContext);
+    const replaceMock = mockContext.environmentVariableCollection.replace;
 
-    expect(
-      mockContext.environmentVariableCollection.replace,
-    ).toHaveBeenCalledWith('GEMINI_CLI_IDE_WORKSPACE_PATH', '/foo/bar');
+    expect(replaceMock).toHaveBeenCalledWith(
+      'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      '/foo/bar',
+    );
 
     // Simulate adding a folder
     vscodeMock.workspace.workspaceFolders = [
       { uri: { fsPath: '/foo/bar' } },
       { uri: { fsPath: '/baz/qux' } },
     ];
-    ideServer.updateWorkspacePath();
+    await ideServer.updateWorkspacePath();
 
-    expect(
-      mockContext.environmentVariableCollection.replace,
-    ).toHaveBeenCalledWith(
+    const expectedWorkspacePaths = ['/foo/bar', '/baz/qux'].join(
+      path.delimiter,
+    );
+    expect(replaceMock).toHaveBeenCalledWith(
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
-      ['/foo/bar', '/baz/qux'].join(path.delimiter),
+      expectedWorkspacePaths,
+    );
+
+    const port = getPortFromMock(replaceMock);
+    const expectedPortFile = path.join(
+      '/tmp',
+      `gemini-ide-server-${process.ppid}.json`,
+    );
+    expect(fs.writeFile).toHaveBeenCalledWith(
+      expectedPortFile,
+      JSON.stringify({
+        port: parseInt(port, 10),
+        workspacePaths: expectedWorkspacePaths,
+      }),
     );
 
     // Simulate removing a folder
     vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: '/baz/qux' } }];
-    ideServer.updateWorkspacePath();
+    await ideServer.updateWorkspacePath();
 
-    expect(
-      mockContext.environmentVariableCollection.replace,
-    ).toHaveBeenCalledWith('GEMINI_CLI_IDE_WORKSPACE_PATH', '/baz/qux');
+    expect(replaceMock).toHaveBeenCalledWith(
+      'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      '/baz/qux',
+    );
+    expect(fs.writeFile).toHaveBeenCalledWith(
+      expectedPortFile,
+      JSON.stringify({
+        port: parseInt(port, 10),
+        workspacePaths: '/baz/qux',
+      }),
+    );
   });
 
   it('should clear env vars and delete port file on stop', async () => {
@@ -200,12 +260,25 @@ describe('IDEServer', () => {
       ];
 
       await ideServer.start(mockContext);
+      const replaceMock = mockContext.environmentVariableCollection.replace;
+      const expectedWorkspacePaths = 'c:\\foo\\bar;d:\\baz\\qux';
 
-      expect(
-        mockContext.environmentVariableCollection.replace,
-      ).toHaveBeenCalledWith(
+      expect(replaceMock).toHaveBeenCalledWith(
         'GEMINI_CLI_IDE_WORKSPACE_PATH',
-        'c:\\foo\\bar;d:\\baz\\qux',
+        expectedWorkspacePaths,
+      );
+
+      const port = getPortFromMock(replaceMock);
+      const expectedPortFile = path.join(
+        '/tmp',
+        `gemini-ide-server-${process.ppid}.json`,
+      );
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        expectedPortFile,
+        JSON.stringify({
+          port: parseInt(port, 10),
+          workspacePaths: expectedWorkspacePaths,
+        }),
       );
     },
   );
