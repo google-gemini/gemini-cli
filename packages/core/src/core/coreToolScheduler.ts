@@ -957,7 +957,7 @@ export class CoreToolScheduler {
           this.setStatusInternal(pendingTool.request.callId, 'scheduled');
         }
       } catch (error) {
-        console.warn(
+        console.error(
           `Error checking confirmation for tool ${pendingTool.request.callId}:`,
           error,
         );

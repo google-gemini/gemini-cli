@@ -27,6 +27,77 @@ import {
 import { Part, PartListUnion } from '@google/genai';
 import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
 
+class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
+  static readonly Name = 'testApprovalTool';
+
+  constructor(private config: Config) {
+    super(
+      TestApprovalTool.Name,
+      'TestApprovalTool',
+      'A tool for testing approval logic',
+      Kind.Edit,
+      {
+        properties: { id: { type: 'string' } },
+        required: ['id'],
+        type: 'object',
+      },
+    );
+  }
+
+  protected createInvocation(params: {
+    id: string;
+  }): ToolInvocation<{ id: string }, ToolResult> {
+    return new TestApprovalInvocation(this.config, params);
+  }
+}
+
+class TestApprovalInvocation extends BaseToolInvocation<
+  { id: string },
+  ToolResult
+> {
+  constructor(
+    private config: Config,
+    params: { id: string },
+  ) {
+    super(params);
+  }
+
+  getDescription(): string {
+    return `Test tool ${this.params.id}`;
+  }
+
+  override async shouldConfirmExecute(): Promise<
+    ToolCallConfirmationDetails | false
+  > {
+    // Need confirmation unless approval mode is AUTO_EDIT
+    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
+      return false;
+    }
+
+    return {
+      type: 'edit',
+      title: `Confirm Test Tool ${this.params.id}`,
+      fileName: `test-${this.params.id}.txt`,
+      filePath: `/test-${this.params.id}.txt`,
+      fileDiff: 'Test diff content',
+      originalContent: '',
+      newContent: 'Test content',
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+        }
+      },
+    };
+  }
+
+  async execute(): Promise<ToolResult> {
+    return {
+      llmContent: `Executed test tool ${this.params.id}`,
+      returnDisplay: `Executed test tool ${this.params.id}`,
+    };
+  }
+}
+
 describe('CoreToolScheduler', () => {
   it('should cancel a tool call if the signal is aborted before confirmation', async () => {
     const mockTool = new MockTool();
@@ -738,81 +809,6 @@ describe('CoreToolScheduler request queueing', () => {
   });
 
   it('should auto-approve remaining tool calls when first tool call is approved with ProceedAlways', async () => {
-    // Create a tool that needs confirmation initially but not after approval mode changes
-    class TestApprovalTool extends BaseDeclarativeTool<
-      { id: string },
-      ToolResult
-    > {
-      static readonly Name = 'testApprovalTool';
-
-      constructor(private config: Config) {
-        super(
-          TestApprovalTool.Name,
-          'TestApprovalTool',
-          'A tool for testing approval logic',
-          Kind.Edit,
-          {
-            properties: { id: { type: 'string' } },
-            required: ['id'],
-            type: 'object',
-          },
-        );
-      }
-
-      protected createInvocation(params: {
-        id: string;
-      }): ToolInvocation<{ id: string }, ToolResult> {
-        return new TestApprovalInvocation(this.config, params);
-      }
-    }
-
-    class TestApprovalInvocation extends BaseToolInvocation<
-      { id: string },
-      ToolResult
-    > {
-      constructor(
-        private config: Config,
-        params: { id: string },
-      ) {
-        super(params);
-      }
-
-      getDescription(): string {
-        return `Test tool ${this.params.id}`;
-      }
-
-      override async shouldConfirmExecute(): Promise<
-        ToolCallConfirmationDetails | false
-      > {
-        // Need confirmation unless approval mode is AUTO_EDIT
-        if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
-          return false;
-        }
-
-        return {
-          type: 'edit',
-          title: `Confirm Test Tool ${this.params.id}`,
-          fileName: `test-${this.params.id}.txt`,
-          filePath: `/test-${this.params.id}.txt`,
-          fileDiff: 'Test diff content',
-          originalContent: '',
-          newContent: 'Test content',
-          onConfirm: async (outcome: ToolConfirmationOutcome) => {
-            if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-              this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-            }
-          },
-        };
-      }
-
-      async execute(): Promise<ToolResult> {
-        return {
-          llmContent: `Executed test tool ${this.params.id}`,
-          returnDisplay: `Executed test tool ${this.params.id}`,
-        };
-      }
-    }
-
     let approvalMode = ApprovalMode.DEFAULT;
     const mockConfig = {
       getSessionId: () => 'test-session-id',
@@ -827,14 +823,13 @@ describe('CoreToolScheduler request queueing', () => {
     const testTool = new TestApprovalTool(mockConfig);
     const toolRegistry = {
       getTool: () => testTool,
-      getToolByName: () => testTool,
       getFunctionDeclarations: () => [],
-      tools: new Map(),
-      discovery: {},
+      getFunctionDeclarationsFiltered: () => [],
       registerTool: () => {},
-      getToolByDisplayName: () => testTool,
-      getTools: () => [],
-      discoverTools: async () => {},
+      discoverAllTools: async () => {},
+      discoverMcpTools: async () => {},
+      discoverToolsForServer: async () => {},
+      removeMcpToolsByServer: () => {},
       getAllTools: () => [],
       getToolsByServer: () => [],
     };
