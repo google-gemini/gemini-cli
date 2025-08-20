@@ -16,6 +16,8 @@ export const EVENT_FLASH_FALLBACK = 'gemini_cli.flash_fallback';
 export const EVENT_NEXT_SPEAKER_CHECK = 'gemini_cli.next_speaker_check';
 export const EVENT_SLASH_COMMAND = 'gemini_cli.slash_command';
 export const EVENT_IDE_CONNECTION = 'gemini_cli.ide_connection';
+export const EVENT_RESEARCH_OPT_IN = 'gemini_cli.research_opt_in';
+export const EVENT_RESEARCH_FEEDBACK = 'gemini_cli.research_feedback';
 export const EVENT_CHAT_COMPRESSION = 'gemini_cli.chat_compression';
 export const METRIC_TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
 export const METRIC_TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
@@ -24,3 +26,19 @@ export const METRIC_API_REQUEST_LATENCY = 'gemini_cli.api.request.latency';
 export const METRIC_TOKEN_USAGE = 'gemini_cli.token.usage';
 export const METRIC_SESSION_COUNT = 'gemini_cli.session.count';
 export const METRIC_FILE_OPERATION_COUNT = 'gemini_cli.file.operation.count';
+
+export const FEEDBACK_CONTENT_MAX_LENGTH = 4096;
+
+/**
+ * Truncates feedback content to a safe length for telemetry logging.
+ * Uses Unicode-aware truncation to avoid splitting multi-byte characters.
+ * 
+ * @param content The feedback content to truncate
+ * @returns The truncated content or undefined if input is undefined
+ */
+export function truncateFeedbackContent(content: string | undefined): string | undefined {
+  if (!content) {
+    return undefined;
+  }
+  return Array.from(content).slice(0, FEEDBACK_CONTENT_MAX_LENGTH).join('');
+}

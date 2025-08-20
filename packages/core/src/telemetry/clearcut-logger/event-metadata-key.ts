@@ -237,4 +237,26 @@ export enum EventMetadataKey {
 
   // Logs tool type whether it is mcp or native.
   GEMINI_CLI_TOOL_TYPE = 62,
+
+  // ==========================================================================
+  // Research Event Keys
+  // ===========================================================================
+
+  // Logs the research opt-in status (true/false)
+  GEMINI_CLI_RESEARCH_OPT_IN_STATUS = 64,
+
+  // Logs the contact email for research participation
+  GEMINI_CLI_RESEARCH_CONTACT_EMAIL = 65,
+
+  // Logs the user ID for research events
+  GEMINI_CLI_RESEARCH_USER_ID = 66,
+
+  // Logs the type of research feedback
+  GEMINI_CLI_RESEARCH_FEEDBACK_TYPE = 67,
+
+  // Logs the content of research feedback
+  GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT = 68,
+
+  // Logs survey responses for research feedback (JSON stringified)
+  GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 69,
 }

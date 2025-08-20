@@ -43,6 +43,7 @@ export * from './utils/textUtils.js';
 export * from './utils/formatters.js';
 export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
+export * from './utils/installationManager.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

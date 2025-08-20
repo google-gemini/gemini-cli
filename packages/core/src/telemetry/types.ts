@@ -385,6 +385,49 @@ export class KittySequenceOverflowEvent {
   }
 }
 
+export class ResearchOptInEvent implements BaseTelemetryEvent {
+  'event.name': 'research_opt_in';
+  'event.timestamp': string;
+  opt_in_status: boolean;
+  contact_email?: string;
+  user_id?: string;
+
+  constructor(
+    opt_in_status: boolean,
+    contact_email?: string,
+    user_id?: string,
+  ) {
+    this['event.name'] = 'research_opt_in';
+    this['event.timestamp'] = new Date().toISOString();
+    this.opt_in_status = opt_in_status;
+    this.contact_email = contact_email;
+    this.user_id = user_id;
+  }
+}
+
+export class ResearchFeedbackEvent implements BaseTelemetryEvent {
+  'event.name': 'research_feedback';
+  'event.timestamp': string;
+  feedback_type: 'survey' | 'conversational' | 'web';
+  feedback_content?: string;
+  survey_responses?: Record<string, unknown>;
+  user_id?: string;
+
+  constructor(
+    feedback_type: 'survey' | 'conversational' | 'web',
+    feedback_content?: string,
+    survey_responses?: Record<string, unknown>,
+    user_id?: string,
+  ) {
+    this['event.name'] = 'research_feedback';
+    this['event.timestamp'] = new Date().toISOString();
+    this.feedback_type = feedback_type;
+    this.feedback_content = feedback_content;
+    this.survey_responses = survey_responses;
+    this.user_id = user_id;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -399,4 +442,6 @@ export type TelemetryEvent =
   | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
-  | SlashCommandEvent;
+  | SlashCommandEvent
+  | ResearchOptInEvent
+  | ResearchFeedbackEvent;

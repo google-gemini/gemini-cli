@@ -28,6 +28,8 @@ export {
   logFlashFallback,
   logSlashCommand,
   logKittySequenceOverflow,
+  logResearchOptIn,
+  logResearchFeedback,
   logChatCompression,
 } from './loggers.js';
 export {
@@ -44,6 +46,8 @@ export {
   SlashCommandEvent,
   makeSlashCommandEvent,
   SlashCommandStatus,
+  ResearchOptInEvent,
+  ResearchFeedbackEvent,
   ChatCompressionEvent,
   makeChatCompressionEvent,
 } from './types.js';

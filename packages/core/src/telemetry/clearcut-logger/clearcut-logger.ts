@@ -18,6 +18,8 @@ import {
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
   KittySequenceOverflowEvent,
+  ResearchOptInEvent,
+  ResearchFeedbackEvent,
   ChatCompressionEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
@@ -28,6 +30,8 @@ import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { DetectedIde, detectIde } from '../../ide/detect-ide.js';
+import { truncateFeedbackContent } from '../constants.js';
+
 
 export enum EventNames {
   START_SESSION = 'start_session',
@@ -45,6 +49,8 @@ export enum EventNames {
   IDE_CONNECTION = 'ide_connection',
   KITTY_SEQUENCE_OVERFLOW = 'kitty_sequence_overflow',
   CHAT_COMPRESSION = 'chat_compression',
+  RESEARCH_OPT_IN = 'research_opt_in',
+  RESEARCH_FEEDBACK = 'research_feedback',
 }
 
 export interface LogResponse {
@@ -223,7 +229,11 @@ export class ClearcutLogger {
     if (email) {
       logEvent.client_email = email;
     } else {
-      logEvent.client_install_id = this.installationManager.getInstallationId();
+      const installId = this.installationManager.getInstallationId();
+      if (installId) {
+        logEvent.client_install_id = installId;
+      }
+      // If installId is undefined, we don't set any identifier
     }
 
     return logEvent;
@@ -666,6 +676,90 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.KITTY_SEQUENCE_OVERFLOW, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logResearchOptInEvent(event: ResearchOptInEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+    ];
+
+    // Add opt_in_status if available
+    if (event.opt_in_status !== undefined) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_OPT_IN_STATUS,
+        value: JSON.stringify(event.opt_in_status),
+      });
+    }
+
+    // Add contact_email if available
+    if (event.contact_email) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_CONTACT_EMAIL,
+        value: JSON.stringify(event.contact_email),
+      });
+    }
+
+    // Add user_id if available
+    if (event.user_id) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_USER_ID,
+        value: JSON.stringify(event.user_id),
+      });
+    }
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.RESEARCH_OPT_IN, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logResearchFeedbackEvent(event: ResearchFeedbackEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+    ];
+
+    // Add feedback_type if available
+    if (event.feedback_type) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_FEEDBACK_TYPE,
+        value: JSON.stringify(event.feedback_type),
+      });
+    }
+
+    // Add feedback_content if available
+    if (event.feedback_content) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT,
+        value: JSON.stringify(truncateFeedbackContent(event.feedback_content)),
+      });
+    }
+
+    // Add user_id if available
+    if (event.user_id) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_USER_ID,
+        value: JSON.stringify(event.user_id),
+      });
+    }
+
+    // Add survey_responses if available
+    if (event.survey_responses) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_SURVEY_RESPONSES,
+        value: safeJsonStringify(event.survey_responses),
+      });
+    }
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.RESEARCH_FEEDBACK, data),
     );
     this.flushIfNeeded();
   }

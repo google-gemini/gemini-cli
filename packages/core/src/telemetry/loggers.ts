@@ -19,6 +19,9 @@ import {
   EVENT_NEXT_SPEAKER_CHECK,
   SERVICE_NAME,
   EVENT_SLASH_COMMAND,
+  EVENT_RESEARCH_OPT_IN,
+  EVENT_RESEARCH_FEEDBACK,
+  truncateFeedbackContent,
   EVENT_CHAT_COMPRESSION,
 } from './constants.js';
 import {
@@ -34,6 +37,8 @@ import {
   LoopDetectedEvent,
   SlashCommandEvent,
   KittySequenceOverflowEvent,
+  ResearchOptInEvent,
+  ResearchFeedbackEvent,
   ChatCompressionEvent,
 } from './types.js';
 import {
@@ -422,6 +427,54 @@ export function logKittySequenceOverflow(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Kitty sequence buffer overflow: ${event.sequence_length} bytes`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logResearchOptIn(
+  config: Config,
+  event: ResearchOptInEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logResearchOptInEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    opt_in_status: event.opt_in_status,
+    ...(event.contact_email && { contact_email: event.contact_email }),
+    ...(event.user_id && { user_id: event.user_id }),
+    'event.name': EVENT_RESEARCH_OPT_IN,
+    'event.timestamp': event['event.timestamp'],
+  };
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Research opt-in: ${event.opt_in_status ? 'enabled' : 'disabled'}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logResearchFeedback(
+  config: Config,
+  event: ResearchFeedbackEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logResearchFeedbackEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    feedback_type: event.feedback_type,
+    ...(event.feedback_content && { feedback_content: truncateFeedbackContent(event.feedback_content) }),
+    ...(event.user_id && { user_id: event.user_id }),
+    'event.name': EVENT_RESEARCH_FEEDBACK,
+    'event.timestamp': event['event.timestamp'],
+    // Convert survey_responses to string to comply with LogAttributes type
+    ...(event.survey_responses && {
+      survey_responses: safeJsonStringify(event.survey_responses),
+    }),
+  };
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Research feedback: ${event.feedback_type}`,
     attributes,
   };
   logger.emit(logRecord);
