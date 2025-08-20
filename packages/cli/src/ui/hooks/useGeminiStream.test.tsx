@@ -1784,7 +1784,6 @@ describe('useGeminiStream', () => {
     });
   });
 
-  // START: New test case to verify @include fix
   it('should process @include commands, adding user turn after processing to prevent race conditions', async () => {
     const rawQuery = '@include file.txt Summarize this.';
     const processedQueryParts = [
@@ -1848,5 +1847,4 @@ describe('useGeminiStream', () => {
       expect.any(String),
     );
   });
-  // END: New test case
 });
