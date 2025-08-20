@@ -10,6 +10,7 @@ import { Ignore, loadIgnoreRules } from './ignore.js';
 import { ResultCache } from './result-cache.js';
 import { crawl } from './crawler.js';
 import { AsyncFzf, FzfResultItem } from 'fzf';
+import { unescapePath } from '../paths.js';
 
 export interface FileSearchOptions {
   projectRoot: string;
@@ -116,7 +117,7 @@ class RecursiveFileSearch implements FileSearch {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
 
-    pattern = pattern || '*';
+    pattern = unescapePath(pattern) || '*';
 
     let filteredCandidates;
     const { files: candidates, isExactMatch } =
