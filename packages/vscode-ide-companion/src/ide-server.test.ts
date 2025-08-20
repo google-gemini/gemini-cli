@@ -12,13 +12,12 @@ import * as path from 'node:path';
 import { IDEServer } from './ide-server.js';
 
 const mocks = vi.hoisted(() => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   diffManager: { onDidChange: vi.fn(() => ({ dispose: vi.fn() })) } as any,
 }));
 
-vi.mock('node:fs/promises', async () => ({
-  writeFile: vi.fn().mockResolvedValue(undefined),
-  unlink: vi.fn().mockResolvedValue(undefined),
+vi.mock('node:fs/promises', () => ({
+  writeFile: vi.fn(() => Promise.resolve(undefined)),
+  unlink: vi.fn(() => Promise.resolve(undefined)),
 }));
 
 vi.mock('node:os', async (importOriginal) => {
@@ -104,7 +103,7 @@ describe('IDEServer', () => {
     expect(replaceMock).toHaveBeenNthCalledWith(
       1,
       'GEMINI_CLI_IDE_SERVER_PORT',
-      expect.stringMatching(/^\\d+$/), // port is a number as a string
+      expect.any(String), // port is a number as a string
     );
 
     const expectedWorkspacePaths = [
