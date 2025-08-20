@@ -43,7 +43,6 @@ describe('runNonInteractive', () => {
   };
 
   beforeEach(async () => {
-    // <-- Made beforeEach async
     mockCoreExecuteToolCall = vi.mocked(executeToolCall);
     mockShutdownTelemetry = vi.mocked(shutdownTelemetry);
 
@@ -58,7 +57,6 @@ describe('runNonInteractive', () => {
     mockToolRegistry = {
       getTool: vi.fn(),
       getFunctionDeclarations: vi.fn().mockReturnValue([]),
-      discoverTools: vi.fn(),
     } as unknown as ToolRegistry;
 
     mockGeminiClient = {
@@ -148,7 +146,6 @@ describe('runNonInteractive', () => {
     expect(mockCoreExecuteToolCall).toHaveBeenCalledWith(
       mockConfig,
       expect.objectContaining({ name: 'testTool' }),
-      mockToolRegistry,
       expect.any(AbortSignal),
     );
     expect(mockGeminiClient.sendMessageStream).toHaveBeenNthCalledWith(
