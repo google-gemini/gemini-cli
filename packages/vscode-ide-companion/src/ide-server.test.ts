@@ -10,9 +10,12 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { IDEServer } from './ide-server.js';
+import { DiffManager } from './diff-manager.js';
 
 const mocks = vi.hoisted(() => ({
-  diffManager: { onDidChange: vi.fn(() => ({ dispose: vi.fn() })) } as any,
+  diffManager: {
+    onDidChange: vi.fn(() => ({ dispose: vi.fn() })),
+  } as unknown as DiffManager,
 }));
 
 vi.mock('node:fs/promises', () => ({
