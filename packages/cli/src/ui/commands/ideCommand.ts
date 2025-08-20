@@ -195,6 +195,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         Date.now(),
       );
       if (result.success) {
+        config.setIdeMode(true);
         context.services.settings.setValue(SettingScope.User, 'ideMode', true);
         // Poll for up to 5 seconds for the extension to activate.
         for (let i = 0; i < 10; i++) {
