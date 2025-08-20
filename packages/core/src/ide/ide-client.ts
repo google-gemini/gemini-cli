@@ -329,8 +329,8 @@ export class IdeClient {
       const portFileContents = await fs.promises.readFile(portFile, 'utf8');
       const ideInfo = JSON.parse(portFileContents);
       return {
-        port: ideInfo.port?.toString(),
-        workspacePath: ideInfo.workspacePath,
+        port: ideInfo?.port?.toString(),
+        workspacePath: ideInfo?.workspacePath,
       };
     } catch (_) {
       return {};
