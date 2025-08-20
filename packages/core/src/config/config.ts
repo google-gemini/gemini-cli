@@ -22,16 +22,11 @@ import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import {
-  MemoryTool,
-  setGeminiMdFilename,
-  GEMINI_CONFIG_DIR as GEMINI_DIR,
-} from '../tools/memoryTool.js';
+import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
-import { getProjectTempDir } from '../utils/paths.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
@@ -43,17 +38,21 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
-import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
 import type { Content, ThinkingConfig } from '@google/genai';
-import { logIdeConnection } from '../telemetry/loggers.js';
+import {
+  FileSystemService,
+  StandardFileSystemService,
+} from '../services/fileSystemService.js';
+import { logCliConfiguration, logIdeConnection } from '../telemetry/loggers.js';
 import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { Storage } from './storage.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -81,6 +80,7 @@ export interface TelemetrySettings {
   enabled?: boolean;
   target?: TelemetryTarget;
   otlpEndpoint?: string;
+  otlpProtocol?: 'grpc' | 'http';
   logPrompts?: boolean;
   outfile?: string;
 }
@@ -199,12 +199,15 @@ export interface ConfigParameters {
   interactive?: boolean;
   trustedFolder?: boolean;
   thinkingConfig?: ThinkingConfig;
+  shouldUseNodePtyShell?: boolean;
+  skipNextSpeakerCheck?: boolean;
 }
 
 export class Config {
   private toolRegistry!: ToolRegistry;
   private promptRegistry!: PromptRegistry;
-  private readonly sessionId: string;
+  private sessionId: string;
+  private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
@@ -264,12 +267,16 @@ export class Config {
   private readonly interactive: boolean;
   private readonly trustedFolder: boolean | undefined;
   private readonly thinkingConfig: ThinkingConfig | undefined;
+  private readonly shouldUseNodePtyShell: boolean;
+  private readonly skipNextSpeakerCheck: boolean;
   private initialized: boolean = false;
+  readonly storage: Storage;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
+    this.fileSystemService = new StandardFileSystemService();
     this.sandbox = params.sandbox;
     this.targetDir = path.resolve(params.targetDir);
     this.workspaceContext = new WorkspaceContext(
@@ -294,6 +301,7 @@ export class Config {
       enabled: params.telemetry?.enabled ?? false,
       target: params.telemetry?.target ?? DEFAULT_TELEMETRY_TARGET,
       otlpEndpoint: params.telemetry?.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT,
+      otlpProtocol: params.telemetry?.otlpProtocol,
       logPrompts: params.telemetry?.logPrompts ?? true,
       outfile: params.telemetry?.outfile,
     };
@@ -330,6 +338,9 @@ export class Config {
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
     this.thinkingConfig = params.thinkingConfig;
+    this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
+    this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
+    this.storage = new Storage(this.targetDir);
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -337,14 +348,6 @@ export class Config {
 
     if (this.telemetrySettings.enabled) {
       initializeTelemetry(this);
-    }
-
-    if (this.getUsageStatisticsEnabled()) {
-      ClearcutLogger.getInstance(this)?.logStartSessionEvent(
-        new StartSessionEvent(this),
-      );
-    } else {
-      console.log('Data collection is disabled.');
     }
   }
 
@@ -363,6 +366,7 @@ export class Config {
     }
     this.promptRegistry = new PromptRegistry();
     this.toolRegistry = await this.createToolRegistry();
+    logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
   }
 
   async refreshAuth(authMethod: AuthType) {
@@ -405,6 +409,10 @@ export class Config {
 
   getSessionId(): string {
     return this.sessionId;
+  }
+
+  setSessionId(sessionId: string): void {
+    this.sessionId = sessionId;
   }
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
@@ -459,7 +467,7 @@ export class Config {
 
   isRestrictiveSandbox(): boolean {
     const sandboxConfig = this.getSandbox();
-    const seatbeltProfile = process.env.SEATBELT_PROFILE;
+    const seatbeltProfile = process.env['SEATBELT_PROFILE'];
     return (
       !!sandboxConfig &&
       sandboxConfig.command === 'sandbox-exec' &&
@@ -480,8 +488,8 @@ export class Config {
     return this.workspaceContext;
   }
 
-  getToolRegistry(): Promise<ToolRegistry> {
-    return Promise.resolve(this.toolRegistry);
+  getToolRegistry(): ToolRegistry {
+    return this.toolRegistry;
   }
 
   getPromptRegistry(): PromptRegistry {
@@ -567,6 +575,10 @@ export class Config {
     return this.telemetrySettings.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT;
   }
 
+  getTelemetryOtlpProtocol(): 'grpc' | 'http' {
+    return this.telemetrySettings.otlpProtocol ?? 'grpc';
+  }
+
   getTelemetryTarget(): TelemetryTarget {
     return this.telemetrySettings.target ?? DEFAULT_TELEMETRY_TARGET;
   }
@@ -577,14 +589,6 @@ export class Config {
 
   getGeminiClient(): GeminiClient {
     return this.geminiClient;
-  }
-
-  getGeminiDir(): string {
-    return path.join(this.targetDir, GEMINI_DIR);
-  }
-
-  getProjectTempDir(): string {
-    return getProjectTempDir(this.getProjectRoot());
   }
 
   getEnableRecursiveFileSearch(): boolean {
@@ -700,6 +704,20 @@ export class Config {
     return this.ideClient;
   }
 
+  /**
+   * Get the current FileSystemService
+   */
+  getFileSystemService(): FileSystemService {
+    return this.fileSystemService;
+  }
+
+  /**
+   * Set a custom FileSystemService
+   */
+  setFileSystemService(fileSystemService: FileSystemService): void {
+    this.fileSystemService = fileSystemService;
+  }
+
   getChatCompression(): ChatCompressionSettings | undefined {
     return this.chatCompression;
   }
@@ -712,9 +730,17 @@ export class Config {
     return this.thinkingConfig;
   }
 
+  getShouldUseNodePtyShell(): boolean {
+    return this.shouldUseNodePtyShell;
+  }
+
+  getSkipNextSpeakerCheck(): boolean {
+    return this.skipNextSpeakerCheck;
+  }
+
   async getGitService(): Promise<GitService> {
     if (!this.gitService) {
-      this.gitService = new GitService(this.targetDir);
+      this.gitService = new GitService(this.targetDir, this.storage);
       await this.gitService.initialize();
     }
     return this.gitService;

@@ -56,6 +56,7 @@ describe('ShellTool', () => {
       getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
       getWorkspaceContext: () => createMockWorkspaceContext('.'),
       getGeminiClient: vi.fn(),
+      getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     shellTool = new ShellTool(mockConfig);
@@ -66,6 +67,7 @@ describe('ShellTool', () => {
       Buffer.from('abcdef', 'hex'),
     );
 
+    // Capture the output callback to simulate streaming events from the service
     mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
       mockShellOutputCallback = callback;
       return {
@@ -127,6 +129,7 @@ describe('ShellTool', () => {
         error: null,
         aborted: false,
         pid: 12345,
+        executionMethod: 'child_process',
         ...result,
       };
       resolveExecutionPromise(fullResult);
@@ -138,7 +141,7 @@ describe('ShellTool', () => {
       resolveShellExecution({ pid: 54321 });
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('54321\n54322\n');
+      vi.mocked(fs.readFileSync).mockReturnValue('54321\n54322\n'); // Service PID and background PID
 
       const result = await promise;
 
@@ -149,6 +152,7 @@ describe('ShellTool', () => {
         expect.any(String),
         expect.any(Function),
         mockAbortSignal,
+        false,
         undefined,
         undefined,
       );
@@ -168,6 +172,7 @@ describe('ShellTool', () => {
         error: null,
         aborted: false,
         pid: 12345,
+        executionMethod: 'child_process',
       });
       await promise;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
@@ -175,6 +180,7 @@ describe('ShellTool', () => {
         expect.any(String),
         expect.any(Function),
         mockAbortSignal,
+        false,
         undefined,
         undefined,
       );
@@ -192,6 +198,7 @@ describe('ShellTool', () => {
         signal: null,
         aborted: false,
         pid: 12345,
+        executionMethod: 'child_process',
       });
 
       const result = await promise;
@@ -232,6 +239,7 @@ describe('ShellTool', () => {
         error: null,
         aborted: false,
         pid: 12345,
+        executionMethod: 'child_process',
       });
 
       const result = await promise;
@@ -251,7 +259,7 @@ describe('ShellTool', () => {
       mockShellExecutionService.mockImplementation(() => {
         throw error;
       });
-      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.existsSync).mockReturnValue(true); // Pretend the file exists
 
       const invocation = shellTool.build({ command: 'a-command' });
       await expect(invocation.execute(mockAbortSignal)).rejects.toThrow(error);
@@ -274,14 +282,17 @@ describe('ShellTool', () => {
         const invocation = shellTool.build({ command: 'stream' });
         const promise = invocation.execute(mockAbortSignal, updateOutputMock);
 
+        // First chunk, should be throttled.
         mockShellOutputCallback({
           type: 'data',
           chunk: 'hello ',
         });
         expect(updateOutputMock).not.toHaveBeenCalled();
 
+        // Advance time past the throttle interval.
         await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
 
+        // Send a second chunk. THIS event triggers the update with the CUMULATIVE content.
         mockShellOutputCallback({
           type: 'data',
           chunk: 'hello world',
@@ -299,6 +310,7 @@ describe('ShellTool', () => {
           error: null,
           aborted: false,
           pid: 12345,
+          executionMethod: 'child_process',
         });
         await promise;
       });
@@ -319,13 +331,16 @@ describe('ShellTool', () => {
         });
         expect(updateOutputMock).toHaveBeenCalledOnce();
 
+        // Advance time past the throttle interval.
         await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
 
+        // Send a SECOND progress event. This one will trigger the flush.
         mockShellOutputCallback({
           type: 'binary_progress',
           bytesReceived: 2048,
         });
 
+        // Now it should be called a second time with the latest progress.
         expect(updateOutputMock).toHaveBeenCalledTimes(2);
         expect(updateOutputMock).toHaveBeenLastCalledWith(
           '[Receiving binary output... 2.0 KB received]',
@@ -339,6 +354,7 @@ describe('ShellTool', () => {
           error: null,
           aborted: false,
           pid: 12345,
+          executionMethod: 'child_process',
         });
         await promise;
       });
@@ -371,6 +387,20 @@ describe('ShellTool', () => {
 
     it('should throw an error if validation fails', () => {
       expect(() => shellTool.build({ command: '' })).toThrow();
+    });
+  });
+
+  describe('getDescription', () => {
+    it('should return the windows description when on windows', () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      const shellTool = new ShellTool(mockConfig);
+      expect(shellTool.description).toMatchSnapshot();
+    });
+
+    it('should return the non-windows description when not on windows', () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      const shellTool = new ShellTool(mockConfig);
+      expect(shellTool.description).toMatchSnapshot();
     });
   });
 });

@@ -24,7 +24,9 @@ import {
   Status as ToolCallStatusType,
   ApprovalMode,
   Kind,
-  BaseTool,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  ToolInvocation,
   AnyDeclarativeTool,
   AnyToolInvocation,
 } from '@google/gemini-cli-core';
@@ -33,13 +35,6 @@ import {
   ToolCallStatus,
   HistoryItemToolGroup,
 } from '../types.js';
-
-vi.mock('./useTerminalSize', () => ({
-  useTerminalSize: () => ({
-    columns: 80,
-    rows: 24,
-  }),
-}));
 
 // Mocks
 vi.mock('@google/gemini-cli-core', async () => {
@@ -60,9 +55,48 @@ const mockConfig = {
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
   getUsageStatisticsEnabled: () => true,
   getDebugMode: () => false,
+  getSessionId: () => 'test-session-id',
+  getContentGeneratorConfig: () => ({
+    model: 'test-model',
+    authType: 'oauth-personal',
+  }),
 };
 
-class MockTool extends BaseTool<object, ToolResult> {
+class MockToolInvocation extends BaseToolInvocation<object, ToolResult> {
+  constructor(
+    private readonly tool: MockTool,
+    params: object,
+  ) {
+    super(params);
+  }
+
+  getDescription(): string {
+    return JSON.stringify(this.params);
+  }
+
+  override shouldConfirmExecute(
+    abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    return this.tool.shouldConfirmExecute(this.params, abortSignal);
+  }
+
+  execute(
+    signal: AbortSignal,
+    updateOutput?: (output: string) => void,
+    terminalColumns?: number,
+    terminalRows?: number,
+  ): Promise<ToolResult> {
+    return this.tool.execute(
+      this.params,
+      signal,
+      updateOutput,
+      terminalColumns,
+      terminalRows,
+    );
+  }
+}
+
+class MockTool extends BaseDeclarativeTool<object, ToolResult> {
   constructor(
     name: string,
     displayName: string,
@@ -80,11 +114,12 @@ class MockTool extends BaseTool<object, ToolResult> {
       canUpdateOutput,
     );
     if (shouldConfirm) {
-      this.shouldConfirmExecute = vi.fn(
+      this.shouldConfirmExecute.mockImplementation(
         async (): Promise<ToolCallConfirmationDetails | false> => ({
           type: 'edit',
           title: 'Mock Tool Requires Confirmation',
           onConfirm: mockOnUserConfirmForToolConfirmation,
+          filePath: 'mock',
           fileName: 'mockToolRequiresConfirmation.ts',
           fileDiff: 'Mock tool requires confirmation',
           originalContent: 'Original content',
@@ -96,6 +131,12 @@ class MockTool extends BaseTool<object, ToolResult> {
 
   execute = vi.fn();
   shouldConfirmExecute = vi.fn();
+
+  protected createInvocation(
+    params: object,
+  ): ToolInvocation<object, ToolResult> {
+    return new MockToolInvocation(this, params);
+  }
 }
 
 const mockTool = new MockTool('mockTool', 'Mock Tool');
@@ -142,6 +183,8 @@ describe('useReactToolScheduler in YOLO Mode', () => {
         onComplete,
         mockConfig as unknown as Config,
         setPendingHistoryItem,
+        () => undefined,
+        () => {},
       ),
     );
 
@@ -160,7 +203,7 @@ describe('useReactToolScheduler in YOLO Mode', () => {
       callId: 'yoloCall',
       name: 'mockToolRequiresConfirmation',
       args: { data: 'any data' },
-    };
+    } as any;
 
     act(() => {
       schedule(request, new AbortController().signal);
@@ -186,8 +229,8 @@ describe('useReactToolScheduler in YOLO Mode', () => {
       request.args,
       expect.any(AbortSignal),
       undefined,
-      80,
-      24,
+      undefined,
+      undefined,
     );
 
     // Check that onComplete was called with success
@@ -270,13 +313,14 @@ describe('useReactToolScheduler', () => {
     (
       mockToolRequiresConfirmation.shouldConfirmExecute as Mock
     ).mockImplementation(
-      async (): Promise<ToolCallConfirmationDetails | null> => ({
-        onConfirm: mockOnUserConfirmForToolConfirmation,
-        fileName: 'mockToolRequiresConfirmation.ts',
-        fileDiff: 'Mock tool requires confirmation',
-        type: 'edit',
-        title: 'Mock Tool Requires Confirmation',
-      }),
+      async (): Promise<ToolCallConfirmationDetails | null> =>
+        ({
+          onConfirm: mockOnUserConfirmForToolConfirmation,
+          fileName: 'mockToolRequiresConfirmation.ts',
+          fileDiff: 'Mock tool requires confirmation',
+          type: 'edit',
+          title: 'Mock Tool Requires Confirmation',
+        }) as any,
     );
 
     vi.useFakeTimers();
@@ -293,6 +337,8 @@ describe('useReactToolScheduler', () => {
         onComplete,
         mockConfig as unknown as Config,
         setPendingHistoryItem,
+        () => undefined,
+        () => {},
       ),
     );
 
@@ -316,7 +362,7 @@ describe('useReactToolScheduler', () => {
       callId: 'call1',
       name: 'mockTool',
       args: { param: 'value' },
-    };
+    } as any;
 
     act(() => {
       schedule(request, new AbortController().signal);
@@ -335,8 +381,8 @@ describe('useReactToolScheduler', () => {
       request.args,
       expect.any(AbortSignal),
       undefined,
-      80,
-      24,
+      undefined,
+      undefined,
     );
     expect(onComplete).toHaveBeenCalledWith([
       expect.objectContaining({
@@ -365,7 +411,7 @@ describe('useReactToolScheduler', () => {
       callId: 'call1',
       name: 'nonexistentTool',
       args: {},
-    };
+    } as any;
 
     act(() => {
       schedule(request, new AbortController().signal);
@@ -402,7 +448,7 @@ describe('useReactToolScheduler', () => {
       callId: 'call1',
       name: 'mockTool',
       args: {},
-    };
+    } as any;
 
     act(() => {
       schedule(request, new AbortController().signal);
@@ -438,7 +484,7 @@ describe('useReactToolScheduler', () => {
       callId: 'call1',
       name: 'mockTool',
       args: {},
-    };
+    } as any;
 
     act(() => {
       schedule(request, new AbortController().signal);
@@ -480,7 +526,7 @@ describe('useReactToolScheduler', () => {
       callId: 'callConfirm',
       name: 'mockToolRequiresConfirmation',
       args: { data: 'sensitive' },
-    };
+    } as any;
 
     act(() => {
       schedule(request, new AbortController().signal);
@@ -536,7 +582,7 @@ describe('useReactToolScheduler', () => {
       callId: 'callConfirmCancel',
       name: 'mockToolRequiresConfirmation',
       args: {},
-    };
+    } as any;
 
     act(() => {
       schedule(request, new AbortController().signal);
@@ -608,7 +654,7 @@ describe('useReactToolScheduler', () => {
       callId: 'liveCall',
       name: 'mockToolWithLiveOutput',
       args: {},
-    };
+    } as any;
 
     act(() => {
       schedule(request, new AbortController().signal);
@@ -693,8 +739,8 @@ describe('useReactToolScheduler', () => {
     const { result } = renderScheduler();
     const schedule = result.current[1];
     const requests: ToolCallRequestInfo[] = [
-      { callId: 'multi1', name: 'tool1', args: { p: 1 } },
-      { callId: 'multi2', name: 'tool2', args: { p: 2 } },
+      { callId: 'multi1', name: 'tool1', args: { p: 1 } } as any,
+      { callId: 'multi2', name: 'tool2', args: { p: 2 } } as any,
     ];
 
     act(() => {
@@ -777,12 +823,12 @@ describe('useReactToolScheduler', () => {
       callId: 'run1',
       name: 'mockTool',
       args: {},
-    };
+    } as any;
     const request2: ToolCallRequestInfo = {
       callId: 'run2',
       name: 'mockTool',
       args: {},
-    };
+    } as any;
 
     act(() => {
       schedule(request1, new AbortController().signal);
@@ -818,7 +864,7 @@ describe('mapToDisplay', () => {
     callId: 'testCallId',
     name: 'testTool',
     args: { foo: 'bar' },
-  };
+  } as any;
 
   const baseTool = new MockTool('testTool', 'Test Tool Display');
 
@@ -834,9 +880,8 @@ describe('mapToDisplay', () => {
       } as PartUnion,
     ],
     resultDisplay: 'Test display output',
-    summary: 'Test summary',
     error: undefined,
-  };
+  } as any;
 
   // Define a more specific type for extraProps for these tests
   // This helps ensure that tool and confirmationDetails are only accessed when they are expected to exist.
@@ -882,7 +927,7 @@ describe('mapToDisplay', () => {
       extraProps: { tool: baseTool, invocation: baseInvocation },
       expectedStatus: ToolCallStatus.Executing,
       expectedName: baseTool.displayName,
-      expectedDescription: baseTool.getDescription(baseRequest.args),
+      expectedDescription: baseInvocation.getDescription(),
     },
     {
       name: 'awaiting_approval',
@@ -897,6 +942,7 @@ describe('mapToDisplay', () => {
           serverName: 'testTool',
           toolName: 'testTool',
           toolDisplayName: 'Test Tool Display',
+          filePath: 'mock',
           fileName: 'test.ts',
           fileDiff: 'Test diff',
           originalContent: 'Original content',
@@ -905,7 +951,7 @@ describe('mapToDisplay', () => {
       },
       expectedStatus: ToolCallStatus.Confirming,
       expectedName: baseTool.displayName,
-      expectedDescription: baseTool.getDescription(baseRequest.args),
+      expectedDescription: baseInvocation.getDescription(),
     },
     {
       name: 'scheduled',
@@ -913,7 +959,7 @@ describe('mapToDisplay', () => {
       extraProps: { tool: baseTool, invocation: baseInvocation },
       expectedStatus: ToolCallStatus.Pending,
       expectedName: baseTool.displayName,
-      expectedDescription: baseTool.getDescription(baseRequest.args),
+      expectedDescription: baseInvocation.getDescription(),
     },
     {
       name: 'executing no live output',
@@ -921,7 +967,7 @@ describe('mapToDisplay', () => {
       extraProps: { tool: baseTool, invocation: baseInvocation },
       expectedStatus: ToolCallStatus.Executing,
       expectedName: baseTool.displayName,
-      expectedDescription: baseTool.getDescription(baseRequest.args),
+      expectedDescription: baseInvocation.getDescription(),
     },
     {
       name: 'executing with live output',
@@ -934,7 +980,7 @@ describe('mapToDisplay', () => {
       expectedStatus: ToolCallStatus.Executing,
       expectedResultDisplay: 'Live test output',
       expectedName: baseTool.displayName,
-      expectedDescription: baseTool.getDescription(baseRequest.args),
+      expectedDescription: baseInvocation.getDescription(),
     },
     {
       name: 'success',
@@ -947,7 +993,7 @@ describe('mapToDisplay', () => {
       expectedStatus: ToolCallStatus.Success,
       expectedResultDisplay: baseResponse.resultDisplay as any,
       expectedName: baseTool.displayName,
-      expectedDescription: baseTool.getDescription(baseRequest.args),
+      expectedDescription: baseInvocation.getDescription(),
     },
     {
       name: 'error tool not found',
@@ -978,7 +1024,7 @@ describe('mapToDisplay', () => {
       expectedStatus: ToolCallStatus.Error,
       expectedResultDisplay: 'Execution failed display',
       expectedName: baseTool.displayName, // Changed from baseTool.name
-      expectedDescription: baseTool.getDescription(baseRequest.args),
+      expectedDescription: baseInvocation.getDescription(),
     },
     {
       name: 'cancelled',
@@ -994,7 +1040,7 @@ describe('mapToDisplay', () => {
       expectedStatus: ToolCallStatus.Canceled,
       expectedResultDisplay: 'Cancelled display',
       expectedName: baseTool.displayName,
-      expectedDescription: baseTool.getDescription(baseRequest.args),
+      expectedDescription: baseInvocation.getDescription(),
     },
   ];
 

@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
 import { render } from 'ink';
-import { AppWrapper } from './ui/App.js';
+import { MainComponent } from './ui/MainComponent.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
@@ -46,7 +45,6 @@ import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.j
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import { SettingsContext } from './ui/contexts/SettingsContext.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -80,7 +78,7 @@ function getNodeMemoryArgs(config: Config): string[] {
     );
   }
 
-  if (process.env.GEMINI_CLI_NO_RELAUNCH) {
+  if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
     return [];
   }
 
@@ -141,7 +139,7 @@ export async function main() {
   if (settings.errors.length > 0) {
     for (const error of settings.errors) {
       let errorMessage = `Error in ${error.path}: ${error.message}`;
-      if (!process.env.NO_COLOR) {
+      if (!process.env['NO_COLOR']) {
         errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
       }
       console.error(errorMessage);
@@ -187,7 +185,7 @@ export async function main() {
 
   // Set a default auth type if one isn't set.
   if (!settings.merged.selectedAuthType) {
-    if (process.env.CLOUD_SHELL === 'true') {
+    if (process.env['CLOUD_SHELL'] === 'true') {
       settings.setValue(
         SettingScope.User,
         'selectedAuthType',
@@ -217,7 +215,7 @@ export async function main() {
   }
 
   // hop into sandbox if we are outside and sandboxing is enabled
-  if (!process.env.SANDBOX) {
+  if (!process.env['SANDBOX']) {
     const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
       ? getNodeMemoryArgs(config)
       : [];
@@ -275,18 +273,20 @@ export async function main() {
     // Detect and enable Kitty keyboard protocol once at startup
     await detectAndEnableKittyProtocol();
     setWindowTitle(basename(workspaceRoot), settings);
+
     const instance = render(
-      <React.StrictMode>
-        <SettingsContext.Provider value={settings}>
-          <AppWrapper
-            config={config}
-            settings={settings}
-            startupWarnings={startupWarnings}
-            version={version}
-          />
-        </SettingsContext.Provider>
-      </React.StrictMode>,
-      { exitOnCtrlC: false },
+      <MainComponent
+        initialConfig={config}
+        settings={settings}
+        startupWarnings={startupWarnings}
+        version={version}
+        workspaceRoot={workspaceRoot}
+        extensions={extensions}
+        argv={argv}
+      />,
+      {
+        exitOnCtrlC: false,
+      },
     );
 
     checkForUpdates()
@@ -338,7 +338,9 @@ export async function main() {
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.hideWindowTitle) {
-    const windowTitle = (process.env.CLI_TITLE || `Gemini - ${title}`).replace(
+    const windowTitle = (
+      process.env['CLI_TITLE'] || `Gemini - ${title}`
+    ).replace(
       // eslint-disable-next-line no-control-regex
       /[\x00-\x1F\x7F]/g,
       '',

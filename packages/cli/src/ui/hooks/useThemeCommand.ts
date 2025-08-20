@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useContext } from 'react';
 import { themeManager } from '../themes/theme-manager.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
-import { type HistoryItem, MessageType } from '../types.js';
+import { HistoryItem, MessageType } from '../types.js';
+import { SettingScope } from '../../config/settings.js';
+import { SettingsContext } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 
 interface UseThemeCommandReturn {
@@ -21,11 +22,12 @@ interface UseThemeCommandReturn {
 }
 
 export const useThemeCommand = (
-  loadedSettings: LoadedSettings,
   setThemeError: (error: string | null) => void,
   addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
 ): UseThemeCommandReturn => {
   const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(false);
+  const settingsContext = useContext(SettingsContext);
+  const loadedSettings = settingsContext!.settings;
 
   // Check for invalid theme configuration on startup
   useEffect(() => {
@@ -39,7 +41,7 @@ export const useThemeCommand = (
   }, [loadedSettings.merged.theme, setThemeError]);
 
   const openThemeDialog = useCallback(() => {
-    if (process.env.NO_COLOR) {
+    if (process.env['NO_COLOR']) {
       addItem(
         {
           type: MessageType.INFO,

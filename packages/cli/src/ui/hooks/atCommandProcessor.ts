@@ -157,7 +157,7 @@ export async function handleAtCommand({
     both: [],
   };
 
-  const toolRegistry = await config.getToolRegistry();
+  const toolRegistry = config.getToolRegistry();
   const readManyFilesTool = toolRegistry.getTool('read_many_files');
   const globTool = toolRegistry.getTool('glob');
 
@@ -362,20 +362,20 @@ export async function handleAtCommand({
 
   // Inform user about ignored paths
   const totalIgnored =
-    ignoredByReason.git.length +
-    ignoredByReason.gemini.length +
-    ignoredByReason.both.length;
+    ignoredByReason['git'].length +
+    ignoredByReason['gemini'].length +
+    ignoredByReason['both'].length;
 
   if (totalIgnored > 0) {
     const messages = [];
-    if (ignoredByReason.git.length) {
-      messages.push(`Git-ignored: ${ignoredByReason.git.join(', ')}`);
+    if (ignoredByReason['git'].length) {
+      messages.push(`Git-ignored: ${ignoredByReason['git'].join(', ')}`);
     }
-    if (ignoredByReason.gemini.length) {
-      messages.push(`Gemini-ignored: ${ignoredByReason.gemini.join(', ')}`);
+    if (ignoredByReason['gemini'].length) {
+      messages.push(`Gemini-ignored: ${ignoredByReason['gemini'].join(', ')}`);
     }
-    if (ignoredByReason.both.length) {
-      messages.push(`Ignored by both: ${ignoredByReason.both.join(', ')}`);
+    if (ignoredByReason['both'].length) {
+      messages.push(`Ignored by both: ${ignoredByReason['both'].join(', ')}`);
     }
 
     const message = `Ignored ${totalIgnored} files:\n${messages.join('\n')}`;

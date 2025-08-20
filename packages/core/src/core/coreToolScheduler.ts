@@ -171,10 +171,10 @@ export function convertToFunctionResponse(
 
   // After this point, contentToProcess is a single Part object.
   if (contentToProcess.functionResponse) {
-    if (contentToProcess.functionResponse.response?.content) {
+    if (contentToProcess.functionResponse.response?.['content']) {
       const stringifiedOutput =
         getResponseTextFromParts(
-          contentToProcess.functionResponse.response.content as Part[],
+          contentToProcess.functionResponse.response['content'] as Part[],
         ) || '';
       return createFunctionResponsePart(callId, toolName, stringifiedOutput);
     }
@@ -226,25 +226,23 @@ const createErrorResponse = (
 });
 
 interface CoreToolSchedulerOptions {
-  toolRegistry: Promise<ToolRegistry>;
+  toolRegistry: ToolRegistry;
   outputUpdateHandler?: OutputUpdateHandler;
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
   getPreferredEditor: () => EditorType | undefined;
   config: Config;
-  getTerminalSize: () => { columns: number; rows: number };
   onEditorClose: () => void;
 }
 
 export class CoreToolScheduler {
-  private toolRegistry: Promise<ToolRegistry>;
+  private toolRegistry: ToolRegistry;
   private toolCalls: ToolCall[] = [];
   private outputUpdateHandler?: OutputUpdateHandler;
   private onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
-  private getTerminalSize: () => { columns: number; rows: number };
   private onEditorClose: () => void;
   private isFinalizingToolCalls = false;
   private isScheduling = false;
@@ -262,7 +260,6 @@ export class CoreToolScheduler {
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
-    this.getTerminalSize = options.getTerminalSize;
     this.onEditorClose = options.onEditorClose;
   }
 
@@ -537,11 +534,10 @@ export class CoreToolScheduler {
         );
       }
       const requestsToProcess = Array.isArray(request) ? request : [request];
-      const toolRegistry = await this.toolRegistry;
 
       const newToolCalls: ToolCall[] = requestsToProcess.map(
         (reqInfo): ToolCall => {
-          const toolInstance = toolRegistry.getTool(reqInfo.name);
+          const toolInstance = this.toolRegistry.getTool(reqInfo.name);
           if (!toolInstance) {
             return {
               status: 'error',
@@ -594,6 +590,14 @@ export class CoreToolScheduler {
         const { request: reqInfo, invocation } = toolCall;
 
         try {
+          if (signal.aborted) {
+            this.setStatusInternal(
+              reqInfo.callId,
+              'cancelled',
+              'Tool call cancelled by user.',
+            );
+            continue;
+          }
           if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
             this.setToolCallOutcome(
               reqInfo.callId,
@@ -689,6 +693,10 @@ export class CoreToolScheduler {
 
     if (toolCall && toolCall.status === 'awaiting_approval') {
       await originalOnConfirm(outcome);
+    }
+
+    if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+      await this.autoApproveCompatiblePendingTools(signal, callId);
     }
 
     this.setToolCallOutcome(callId, outcome);
@@ -823,14 +831,8 @@ export class CoreToolScheduler {
               }
             : undefined;
 
-        const terminalSize = this.getTerminalSize();
         invocation
-          .execute(
-            signal,
-            liveOutputCallback,
-            terminalSize.columns,
-            terminalSize.rows,
-          )
+          .execute(signal, liveOutputCallback)
           .then(async (toolResult: ToolResult) => {
             if (signal.aborted) {
               this.setStatusInternal(
@@ -929,5 +931,36 @@ export class CoreToolScheduler {
         outcome,
       };
     });
+  }
+
+  private async autoApproveCompatiblePendingTools(
+    signal: AbortSignal,
+    triggeringCallId: string,
+  ): Promise<void> {
+    const pendingTools = this.toolCalls.filter(
+      (call) =>
+        call.status === 'awaiting_approval' &&
+        call.request.callId !== triggeringCallId,
+    ) as WaitingToolCall[];
+
+    for (const pendingTool of pendingTools) {
+      try {
+        const stillNeedsConfirmation =
+          await pendingTool.invocation.shouldConfirmExecute(signal);
+
+        if (!stillNeedsConfirmation) {
+          this.setToolCallOutcome(
+            pendingTool.request.callId,
+            ToolConfirmationOutcome.ProceedAlways,
+          );
+          this.setStatusInternal(pendingTool.request.callId, 'scheduled');
+        }
+      } catch (error) {
+        console.error(
+          `Error checking confirmation for tool ${pendingTool.request.callId}:`,
+          error,
+        );
+      }
+    }
   }
 }

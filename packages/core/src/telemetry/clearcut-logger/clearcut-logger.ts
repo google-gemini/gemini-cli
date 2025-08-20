@@ -7,46 +7,45 @@
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import {
   StartSessionEvent,
-  EndSessionEvent,
   UserPromptEvent,
   ToolCallEvent,
   ApiRequestEvent,
   ApiResponseEvent,
   ApiErrorEvent,
-  FlashFallbackEvent,
   LoopDetectedEvent,
   NextSpeakerCheckEvent,
   SlashCommandEvent,
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
   KittySequenceOverflowEvent,
+  ChatCompressionEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
+import { InstallationManager } from '../../utils/installationManager.js';
+import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
-import {
-  getCachedGoogleAccount,
-  getLifetimeGoogleAccounts,
-} from '../../utils/user_account.js';
-import { getInstallationId } from '../../utils/user_id.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { DetectedIde, detectIde } from '../../ide/detect-ide.js';
 
-const start_session_event_name = 'start_session';
-const new_prompt_event_name = 'new_prompt';
-const tool_call_event_name = 'tool_call';
-const api_request_event_name = 'api_request';
-const api_response_event_name = 'api_response';
-const api_error_event_name = 'api_error';
-const end_session_event_name = 'end_session';
-const flash_fallback_event_name = 'flash_fallback';
-const loop_detected_event_name = 'loop_detected';
-const next_speaker_check_event_name = 'next_speaker_check';
-const slash_command_event_name = 'slash_command';
-const malformed_json_response_event_name = 'malformed_json_response';
-const ide_connection_event_name = 'ide_connection';
-const kitty_sequence_overflow_event_name = 'kitty_sequence_overflow';
+export enum EventNames {
+  START_SESSION = 'start_session',
+  NEW_PROMPT = 'new_prompt',
+  TOOL_CALL = 'tool_call',
+  API_REQUEST = 'api_request',
+  API_RESPONSE = 'api_response',
+  API_ERROR = 'api_error',
+  END_SESSION = 'end_session',
+  FLASH_FALLBACK = 'flash_fallback',
+  LOOP_DETECTED = 'loop_detected',
+  NEXT_SPEAKER_CHECK = 'next_speaker_check',
+  SLASH_COMMAND = 'slash_command',
+  MALFORMED_JSON_RESPONSE = 'malformed_json_response',
+  IDE_CONNECTION = 'ide_connection',
+  KITTY_SEQUENCE_OVERFLOW = 'kitty_sequence_overflow',
+  CHAT_COMPRESSION = 'chat_compression',
+}
 
 export interface LogResponse {
   nextRequestWaitMs?: number;
@@ -58,7 +57,7 @@ export interface LogEventEntry {
 }
 
 export interface EventValue {
-  gemini_cli_key: EventMetadataKey | string;
+  gemini_cli_key: EventMetadataKey;
   value: string;
 }
 
@@ -87,11 +86,11 @@ export interface LogRequest {
  * methods might have in their runtimes.
  */
 function determineSurface(): string {
-  if (process.env.SURFACE) {
-    return process.env.SURFACE;
-  } else if (process.env.GITHUB_SHA) {
+  if (process.env['SURFACE']) {
+    return process.env['SURFACE'];
+  } else if (process.env['GITHUB_SHA']) {
     return 'GitHub';
-  } else if (process.env.TERM_PROGRAM === 'vscode') {
+  } else if (process.env['TERM_PROGRAM'] === 'vscode') {
     return detectIde() || DetectedIde.VSCode;
   } else {
     return 'SURFACE_NOT_SET';
@@ -125,6 +124,10 @@ const MAX_RETRY_EVENTS = 100;
 export class ClearcutLogger {
   private static instance: ClearcutLogger;
   private config?: Config;
+  private sessionData: EventValue[] = [];
+  private promptId: string = '';
+  private readonly installationManager: InstallationManager;
+  private readonly userAccountManager: UserAccountManager;
 
   /**
    * Queue of pending events that need to be flushed to the server.  New events
@@ -148,9 +151,12 @@ export class ClearcutLogger {
    */
   private pendingFlush: boolean = false;
 
-  private constructor(config?: Config) {
+  private constructor(config: Config) {
     this.config = config;
     this.events = new FixedDeque<LogEventEntry[]>(Array, MAX_EVENTS);
+    this.promptId = config?.getSessionId() ?? '';
+    this.installationManager = new InstallationManager();
+    this.userAccountManager = new UserAccountManager();
   }
 
   static getInstance(config?: Config): ClearcutLogger | undefined {
@@ -168,7 +174,7 @@ export class ClearcutLogger {
     ClearcutLogger.instance = undefined;
   }
 
-  enqueueLogEvent(event: object): void {
+  enqueueLogEvent(event: LogEvent): void {
     try {
       // Manually handle overflow for FixedDeque, which throws when full.
       const wasAtCapacity = this.events.size >= MAX_EVENTS;
@@ -196,15 +202,20 @@ export class ClearcutLogger {
     }
   }
 
-  createLogEvent(name: string, data: EventValue[]): LogEvent {
-    const email = getCachedGoogleAccount();
+  createLogEvent(eventName: EventNames, data: EventValue[] = []): LogEvent {
+    const email = this.userAccountManager.getCachedGoogleAccount();
 
-    data = addDefaultFields(data);
+    if (eventName !== EventNames.START_SESSION) {
+      data.push(...this.sessionData);
+    }
+    const totalAccounts = this.userAccountManager.getLifetimeGoogleAccounts();
+
+    data = this.addDefaultFields(data, totalAccounts);
 
     const logEvent: LogEvent = {
       console_type: 'GEMINI_CLI',
       application: 102, // GEMINI_CLI
-      event_name: name,
+      event_name: eventName as string,
       event_metadata: [data],
     };
 
@@ -212,7 +223,7 @@ export class ClearcutLogger {
     if (email) {
       logEvent.client_email = email;
     } else {
-      logEvent.client_install_id = getInstallationId();
+      logEvent.client_install_id = this.installationManager.getInstallationId();
     }
 
     return logEvent;
@@ -316,10 +327,6 @@ export class ClearcutLogger {
         value: event.model,
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId() ?? '',
-      },
-      {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_EMBEDDING_MODEL,
         value: event.embedding_model,
@@ -376,43 +383,39 @@ export class ClearcutLogger {
         value: event.telemetry_log_user_prompts_enabled.toString(),
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
-        value: CLI_VERSION,
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_START_SESSION_MCP_SERVERS_COUNT,
+        value: event.mcp_servers_count ? event.mcp_servers_count : '',
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
-        value: GIT_COMMIT_INFO,
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_START_SESSION_MCP_TOOLS_COUNT,
+        value: event.mcp_tools_count ? event.mcp_tools_count : '',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MCP_TOOLS,
+        value: event.mcp_tools ? event.mcp_tools : '',
       },
     ];
+    this.sessionData = data;
 
     // Flush start event immediately
-    this.enqueueLogEvent(this.createLogEvent(start_session_event_name, data));
+    this.enqueueLogEvent(this.createLogEvent(EventNames.START_SESSION, data));
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
   }
 
   logNewPromptEvent(event: UserPromptEvent): void {
+    this.promptId = event.prompt_id;
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_PROMPT_LENGTH,
         value: JSON.stringify(event.prompt_length),
       },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId() ?? '',
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
-        value: JSON.stringify(event.prompt_id),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
-        value: JSON.stringify(event.auth_type),
-      },
     ];
 
-    this.enqueueLogEvent(this.createLogEvent(new_prompt_event_name, data));
+    this.enqueueLogEvent(this.createLogEvent(EventNames.NEW_PROMPT, data));
     this.flushIfNeeded();
   }
 
@@ -421,10 +424,6 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
         value: JSON.stringify(event.function_name),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
-        value: JSON.stringify(event.prompt_id),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_DECISION,
@@ -446,6 +445,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_ERROR_TYPE,
         value: JSON.stringify(event.error_type),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_TYPE,
+        value: JSON.stringify(event.tool_type),
+      },
     ];
 
     if (event.metadata) {
@@ -466,7 +469,7 @@ export class ClearcutLogger {
       }
     }
 
-    const logEvent = this.createLogEvent(tool_call_event_name, data);
+    const logEvent = this.createLogEvent(EventNames.TOOL_CALL, data);
     this.enqueueLogEvent(logEvent);
     this.flushIfNeeded();
   }
@@ -477,13 +480,9 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
         value: JSON.stringify(event.model),
       },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
-        value: JSON.stringify(event.prompt_id),
-      },
     ];
 
-    this.enqueueLogEvent(this.createLogEvent(api_request_event_name, data));
+    this.enqueueLogEvent(this.createLogEvent(EventNames.API_REQUEST, data));
     this.flushIfNeeded();
   }
 
@@ -492,10 +491,6 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_RESPONSE_MODEL,
         value: JSON.stringify(event.model),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
-        value: JSON.stringify(event.prompt_id),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_RESPONSE_STATUS_CODE,
@@ -534,13 +529,9 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT,
         value: JSON.stringify(event.tool_token_count),
       },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
-        value: JSON.stringify(event.auth_type),
-      },
     ];
 
-    this.enqueueLogEvent(this.createLogEvent(api_response_event_name, data));
+    this.enqueueLogEvent(this.createLogEvent(EventNames.API_RESPONSE, data));
     this.flushIfNeeded();
   }
 
@@ -549,10 +540,6 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_MODEL,
         value: JSON.stringify(event.model),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
-        value: JSON.stringify(event.prompt_id),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_TYPE,
@@ -566,29 +553,31 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_DURATION_MS,
         value: JSON.stringify(event.duration_ms),
       },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
-        value: JSON.stringify(event.auth_type),
-      },
     ];
 
-    this.enqueueLogEvent(this.createLogEvent(api_error_event_name, data));
+    this.enqueueLogEvent(this.createLogEvent(EventNames.API_ERROR, data));
     this.flushIfNeeded();
   }
 
-  logFlashFallbackEvent(event: FlashFallbackEvent): void {
+  logChatCompressionEvent(event: ChatCompressionEvent): void {
     const data: EventValue[] = [
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
-        value: JSON.stringify(event.auth_type),
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_COMPRESSION_TOKENS_BEFORE,
+        value: `${event.tokens_before}`,
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId() ?? '',
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_COMPRESSION_TOKENS_AFTER,
+        value: `${event.tokens_after}`,
       },
     ];
 
-    this.enqueueLogEvent(this.createLogEvent(flash_fallback_event_name, data));
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.CHAT_COMPRESSION, data),
+    );
+  }
+
+  logFlashFallbackEvent(): void {
+    this.enqueueLogEvent(this.createLogEvent(EventNames.FLASH_FALLBACK, []));
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
@@ -597,25 +586,17 @@ export class ClearcutLogger {
   logLoopDetectedEvent(event: LoopDetectedEvent): void {
     const data: EventValue[] = [
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
-        value: JSON.stringify(event.prompt_id),
-      },
-      {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_LOOP_DETECTED_TYPE,
         value: JSON.stringify(event.loop_type),
       },
     ];
 
-    this.enqueueLogEvent(this.createLogEvent(loop_detected_event_name, data));
+    this.enqueueLogEvent(this.createLogEvent(EventNames.LOOP_DETECTED, data));
     this.flushIfNeeded();
   }
 
   logNextSpeakerCheck(event: NextSpeakerCheckEvent): void {
     const data: EventValue[] = [
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
-        value: JSON.stringify(event.prompt_id),
-      },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESPONSE_FINISH_REASON,
         value: JSON.stringify(event.finish_reason),
@@ -624,14 +605,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_NEXT_SPEAKER_CHECK_RESULT,
         value: JSON.stringify(event.result),
       },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId() ?? '',
-      },
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(next_speaker_check_event_name, data),
+      this.createLogEvent(EventNames.NEXT_SPEAKER_CHECK, data),
     );
     this.flushIfNeeded();
   }
@@ -658,7 +635,7 @@ export class ClearcutLogger {
       });
     }
 
-    this.enqueueLogEvent(this.createLogEvent(slash_command_event_name, data));
+    this.enqueueLogEvent(this.createLogEvent(EventNames.SLASH_COMMAND, data));
     this.flushIfNeeded();
   }
 
@@ -672,7 +649,7 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(malformed_json_response_event_name, data),
+      this.createLogEvent(EventNames.MALFORMED_JSON_RESPONSE, data),
     );
     this.flushIfNeeded();
   }
@@ -685,7 +662,7 @@ export class ClearcutLogger {
       },
     ];
 
-    this.enqueueLogEvent(this.createLogEvent(ide_connection_event_name, data));
+    this.enqueueLogEvent(this.createLogEvent(EventNames.IDE_CONNECTION, data));
     this.flushIfNeeded();
   }
 
@@ -702,24 +679,59 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(kitty_sequence_overflow_event_name, data),
+      this.createLogEvent(EventNames.KITTY_SEQUENCE_OVERFLOW, data),
     );
     this.flushIfNeeded();
   }
 
-  logEndSessionEvent(event: EndSessionEvent): void {
-    const data: EventValue[] = [
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: event?.session_id?.toString() ?? '',
-      },
-    ];
-
+  logEndSessionEvent(): void {
     // Flush immediately on session end.
-    this.enqueueLogEvent(this.createLogEvent(end_session_event_name, data));
+    this.enqueueLogEvent(this.createLogEvent(EventNames.END_SESSION, []));
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
+  }
+
+  /**
+   * Adds default fields to data, and returns a new data array.  This fields
+   * should exist on all log events.
+   */
+  addDefaultFields(data: EventValue[], totalAccounts: number): EventValue[] {
+    const surface = determineSurface();
+
+    const defaultLogMetadata: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
+        value: JSON.stringify(
+          this.config?.getContentGeneratorConfig()?.authType,
+        ),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
+        value: `${totalAccounts}`,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: surface,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_VERSION,
+        value: CLI_VERSION,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GIT_COMMIT_HASH,
+        value: GIT_COMMIT_INFO,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
+        value: this.promptId,
+      },
+    ];
+    return [...data, ...defaultLogMetadata];
   }
 
   getProxyAgent() {
@@ -735,8 +747,7 @@ export class ClearcutLogger {
   }
 
   shutdown() {
-    const event = new EndSessionEvent(this.config);
-    this.logEndSessionEvent(event);
+    this.logEndSessionEvent();
   }
 
   private requeueFailedEvents(eventsToSend: LogEventEntry[][]): void {
@@ -788,26 +799,6 @@ export class ClearcutLogger {
       );
     }
   }
-}
-
-/**
- * Adds default fields to data, and returns a new data array.  This fields
- * should exist on all log events.
- */
-function addDefaultFields(data: EventValue[]): EventValue[] {
-  const totalAccounts = getLifetimeGoogleAccounts();
-  const surface = determineSurface();
-  const defaultLogMetadata: EventValue[] = [
-    {
-      gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
-      value: `${totalAccounts}`,
-    },
-    {
-      gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
-      value: surface,
-    },
-  ];
-  return [...data, ...defaultLogMetadata];
 }
 
 export const TEST_ONLY = {

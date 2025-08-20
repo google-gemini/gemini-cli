@@ -11,10 +11,10 @@ import {
   ToolInvocation,
   ToolResult,
 } from './tools.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
+import * as fs from 'fs';
 import * as path from 'path';
-import { glob } from 'glob';
+import { glob, escape } from 'glob';
 import { getCurrentGeminiMdFilename } from './memoryTool.js';
 import {
   detectFileType,
@@ -245,18 +245,27 @@ ${finalExclusionPatternsForDescription
       const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
 
       for (const dir of workspaceDirs) {
-        const entriesInDir = await glob(
-          searchPatterns.map((p) => p.replace(/\\/g, '/')),
-          {
-            cwd: dir,
-            ignore: effectiveExcludes,
-            nodir: true,
-            dot: true,
-            absolute: true,
-            nocase: true,
-            signal,
-          },
-        );
+        const processedPatterns = [];
+        for (const p of searchPatterns) {
+          const normalizedP = p.replace(/\\/g, '/');
+          const fullPath = path.join(dir, normalizedP);
+          if (fs.existsSync(fullPath)) {
+            processedPatterns.push(escape(normalizedP));
+          } else {
+            // The path does not exist or is not a file, so we treat it as a glob pattern.
+            processedPatterns.push(normalizedP);
+          }
+        }
+
+        const entriesInDir = await glob(processedPatterns, {
+          cwd: dir,
+          ignore: effectiveExcludes,
+          nodir: true,
+          dot: true,
+          absolute: true,
+          nocase: true,
+          signal,
+        });
         for (const entry of entriesInDir) {
           allEntries.add(entry);
         }
@@ -388,6 +397,7 @@ ${finalExclusionPatternsForDescription
           const fileReadResult = await processSingleFileContent(
             filePath,
             this.config.getTargetDir(),
+            this.config.getFileSystemService(),
           );
 
           if (fileReadResult.error) {
@@ -624,19 +634,6 @@ Use this tool when the user's query implies needing the content of several files
       Kind.Read,
       parameterSchema,
     );
-  }
-
-  protected override validateToolParams(
-    params: ReadManyFilesParams,
-  ): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
-    }
-    return null;
   }
 
   protected createInvocation(

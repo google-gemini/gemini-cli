@@ -17,7 +17,6 @@ import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
-import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
@@ -67,7 +66,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [escPressCount, setEscPressCount] = useState(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const kittyProtocolStatus = useKittyKeyboardProtocol();
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -83,7 +81,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [cursorPosition, setCursorPosition] = useState<[number, number]>([
     0, 0,
   ]);
-  const shellHistory = useShellHistory(config.getProjectRoot());
+  const shellHistory = useShellHistory(config.getProjectRoot(), config.storage);
   const historyData = shellHistory.history;
 
   const completion = useCommandCompletion(
@@ -238,6 +236,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     (key: Key) => {
       /// We want to handle paste even when not focused to support drag and drop.
       if (!focus && !key.paste) {
+        return;
+      }
+
+      if (key.paste) {
+        // Ensure we never accidentally interpret paste as regular input.
+        buffer.handleInput(key);
         return;
       }
 
@@ -529,8 +533,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   useKeypress(handleInput, {
     isActive: true,
-    kittyProtocolEnabled: kittyProtocolStatus.enabled,
-    config,
   });
 
   const linesToRender = buffer.viewportVisualLines;

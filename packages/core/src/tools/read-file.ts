@@ -5,7 +5,6 @@
  */
 
 import path from 'path';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import {
   BaseDeclarativeTool,
@@ -74,6 +73,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     const result = await processSingleFileContent(
       this.params.absolute_path,
       this.config.getTargetDir(),
+      this.config.getFileSystemService(),
       this.params.offset,
       this.params.limit,
     );
@@ -198,18 +198,14 @@ export class ReadFileTool extends BaseDeclarativeTool<
     );
   }
 
-  protected override validateToolParams(
+  protected override validateToolParamValues(
     params: ReadFileToolParams,
   ): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
+    const filePath = params.absolute_path;
+    if (params.absolute_path.trim() === '') {
+      return "The 'absolute_path' parameter must be non-empty.";
     }
 
-    const filePath = params.absolute_path;
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute, but was relative: ${filePath}. You must provide an absolute path.`;
     }
