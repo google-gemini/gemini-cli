@@ -749,7 +749,7 @@ describe('DiscoveredMCPTool', () => {
       const params = { param: 'testValue' };
       const invocation = tool.build(params);
       const description = invocation.getDescription();
-      expect(description).toBe(JSON.stringify(params));
+      expect(description).toBe('{"param":"testValue"}');
     });
   });
 });
