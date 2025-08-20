@@ -30,6 +30,8 @@ import { makeFakeConfig } from '../../test-utils/config.js';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../mocks/msw.js';
 import { makeChatCompressionEvent } from '../types.js';
+import { UserAccountManager } from '../../utils/userAccountManager.js';
+import { InstallationManager } from '../../utils/installationManager.js';
 
 interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
@@ -72,11 +74,11 @@ expect.extend({
   },
 });
 
-vi.mock('../../utils/user_account');
-vi.mock('../../utils/user_id');
+vi.mock('../../utils/userAccountManager.js');
+vi.mock('../../utils/installationManager.js');
 
-const mockUserAccount = vi.mocked(userAccount);
-const mockUserId = vi.mocked(userId);
+const mockUserAccount = vi.mocked(UserAccountManager.prototype);
+const mockInstallMgr = vi.mocked(InstallationManager.prototype);
 
 // TODO(richieforeman): Consider moving this to test setup globally.
 beforeAll(() => {
@@ -114,7 +116,6 @@ describe('ClearcutLogger', () => {
     config = {} as Partial<ConfigParameters>,
     lifetimeGoogleAccounts = 1,
     cachedGoogleAccount = 'test@google.com',
-    installationId = 'test-installation-id',
   } = {}) {
     server.resetHandlers(
       http.post(CLEARCUT_URL, () => HttpResponse.text(EXAMPLE_RESPONSE)),
@@ -132,7 +133,9 @@ describe('ClearcutLogger', () => {
     mockUserAccount.getLifetimeGoogleAccounts.mockReturnValue(
       lifetimeGoogleAccounts,
     );
-    mockUserId.getInstallationId.mockReturnValue(installationId);
+    mockInstallMgr.getInstallationId = vi
+      .fn()
+      .mockReturnValue('test-installation-id');
 
     const logger = ClearcutLogger.getInstance(loggerConfig);
 
@@ -182,9 +185,22 @@ describe('ClearcutLogger', () => {
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
 
-      expect(event?.event_metadata[0][0]).toEqual({
+      expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
         value: '9001',
+      });
+    });
+
+    it('logs the current surface from a github action', () => {
+      const { logger } = setup({});
+
+      vi.stubEnv('GITHUB_SHA', '8675309');
+
+      const event = logger?.createLogEvent(EventNames.CHAT_COMPRESSION, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: 'GitHub',
       });
     });
 
@@ -196,7 +212,7 @@ describe('ClearcutLogger', () => {
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
 
-      expect(event?.event_metadata[0][1]).toEqual({
+      expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
         value: 'ide-1234',
       });
@@ -239,7 +255,7 @@ describe('ClearcutLogger', () => {
         expectedValue: 'cloudshell',
       },
     ])(
-      'logs the current surface for as $expectedValue, preempting vscode detection',
+      'logs the current surface as $expectedValue, preempting vscode detection',
       ({ env, expectedValue }) => {
         const { logger } = setup({});
         for (const [key, value] of Object.entries(env)) {
@@ -247,7 +263,7 @@ describe('ClearcutLogger', () => {
         }
         vi.stubEnv('TERM_PROGRAM', 'vscode');
         const event = logger?.createLogEvent(EventNames.API_ERROR, []);
-        expect(event?.event_metadata[0][1]).toEqual({
+        expect(event?.event_metadata[0][3]).toEqual({
           gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
           value: expectedValue,
         });

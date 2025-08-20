@@ -949,114 +949,37 @@ describe('Settings Loading and Merging', () => {
       delete process.env['WORKSPACE_ENDPOINT'];
     });
 
-    it('should prioritize user env variables over workspace env variables if keys clash after resolution', () => {
-      const userSettingsContent = { configValue: '$SHARED_VAR' };
-      const workspaceSettingsContent = { configValue: '$SHARED_VAR' };
+    it('should correctly resolve and merge env variables from different scopes', () => {
+      process.env['SYSTEM_VAR'] = 'system_value';
+      process.env['USER_VAR'] = 'user_value';
+      process.env['WORKSPACE_VAR'] = 'workspace_value';
+      process.env['SHARED_VAR'] = 'final_value';
+
+      const systemSettingsContent = {
+        configValue: '$SHARED_VAR',
+        systemOnly: '$SYSTEM_VAR',
+      };
+      const userSettingsContent = {
+        configValue: '$SHARED_VAR',
+        userOnly: '$USER_VAR',
+        theme: 'dark',
+      };
+      const workspaceSettingsContent = {
+        configValue: '$SHARED_VAR',
+        workspaceOnly: '$WORKSPACE_VAR',
+        theme: 'light',
+      };
 
       (mockFsExistsSync as Mock).mockReturnValue(true);
-      const originalSharedVar = process.env['SHARED_VAR'];
-      // Temporarily delete to ensure a clean slate for the test's specific manipulations
-      delete process.env['SHARED_VAR'];
-
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH) {
-            process.env['SHARED_VAR'] = 'user_value_for_user_read'; // Set for user settings read
-            return JSON.stringify(userSettingsContent);
-          }
-          if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
-            process.env['SHARED_VAR'] = 'workspace_value_for_workspace_read'; // Set for workspace settings read
-            return JSON.stringify(workspaceSettingsContent);
-          }
-          return '{}';
-        },
-      );
-
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.configValue).toBe(
-        'user_value_for_user_read',
-      );
-      // @ts-expect-error: dynamic property for test
-      expect(settings.workspace.settings.configValue).toBe(
-        'workspace_value_for_workspace_read',
-      );
-      // Merged should take workspace's resolved value
-      // @ts-expect-error: dynamic property for test
-      expect(settings.merged.configValue).toBe(
-        'workspace_value_for_workspace_read',
-      );
-
-      // Restore original environment variable state
-      if (originalSharedVar !== undefined) {
-        process.env['SHARED_VAR'] = originalSharedVar;
-      } else {
-        delete process.env['SHARED_VAR']; // Ensure it's deleted if it wasn't there before
-      }
-    });
-
-    it('should prioritize workspace env variables over user env variables if keys clash after resolution', () => {
-      const userSettingsContent = { configValue: '$SHARED_VAR' };
-      const workspaceSettingsContent = { configValue: '$SHARED_VAR' };
-
-      (mockFsExistsSync as Mock).mockReturnValue(true);
-      const originalSharedVar = process.env['SHARED_VAR'];
-      // Temporarily delete to ensure a clean slate for the test's specific manipulations
-      delete process.env['SHARED_VAR'];
-
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH) {
-            process.env['SHARED_VAR'] = 'user_value_for_user_read'; // Set for user settings read
-            return JSON.stringify(userSettingsContent);
-          }
-          if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
-            process.env['SHARED_VAR'] = 'workspace_value_for_workspace_read'; // Set for workspace settings read
-            return JSON.stringify(workspaceSettingsContent);
-          }
-          return '{}';
-        },
-      );
-
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-
-      expect(settings.user.settings.configValue).toBe(
-        'user_value_for_user_read',
-      );
-      expect(settings.workspace.settings.configValue).toBe(
-        'workspace_value_for_workspace_read',
-      );
-      // Merged should take workspace's resolved value
-      expect(settings.merged.configValue).toBe(
-        'workspace_value_for_workspace_read',
-      );
-
-      // Restore original environment variable state
-      if (originalSharedVar !== undefined) {
-        process.env['SHARED_VAR'] = originalSharedVar;
-      } else {
-        delete process.env['SHARED_VAR']; // Ensure it's deleted if it wasn't there before
-      }
-    });
-
-    it('should prioritize system env variables over workspace env variables if keys clash after resolution', () => {
-      const workspaceSettingsContent = { configValue: '$SHARED_VAR' };
-      const systemSettingsContent = { configValue: '$SHARED_VAR' };
-
-      (mockFsExistsSync as Mock).mockReturnValue(true);
-      const originalSharedVar = process.env['SHARED_VAR'];
-      // Temporarily delete to ensure a clean slate for the test's specific manipulations
-      delete process.env['SHARED_VAR'];
-
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
           if (p === getSystemSettingsPath()) {
-            process.env['SHARED_VAR'] = 'system_value_for_system_read'; // Set for system settings read
             return JSON.stringify(systemSettingsContent);
           }
+          if (p === USER_SETTINGS_PATH) {
+            return JSON.stringify(userSettingsContent);
+          }
           if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
-            process.env['SHARED_VAR'] = 'workspace_value_for_workspace_read'; // Set for workspace settings read
             return JSON.stringify(workspaceSettingsContent);
           }
           return '{}';
@@ -1065,24 +988,35 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
+      // Check resolved values in individual scopes
       // @ts-expect-error: dynamic property for test
-      expect(settings.system.settings.configValue).toBe(
-        'system_value_for_system_read',
-      );
+      expect(settings.system.settings.configValue).toBe('final_value');
       // @ts-expect-error: dynamic property for test
-      expect(settings.workspace.settings.configValue).toBe(
-        'workspace_value_for_workspace_read',
-      );
-      // Merged should take system's resolved value
+      expect(settings.system.settings.systemOnly).toBe('system_value');
       // @ts-expect-error: dynamic property for test
-      expect(settings.merged.configValue).toBe('system_value_for_system_read');
+      expect(settings.user.settings.configValue).toBe('final_value');
+      // @ts-expect-error: dynamic property for test
+      expect(settings.user.settings.userOnly).toBe('user_value');
+      // @ts-expect-error: dynamic property for test
+      expect(settings.workspace.settings.configValue).toBe('final_value');
+      // @ts-expect-error: dynamic property for test
+      expect(settings.workspace.settings.workspaceOnly).toBe('workspace_value');
 
-      // Restore original environment variable state
-      if (originalSharedVar !== undefined) {
-        process.env['SHARED_VAR'] = originalSharedVar;
-      } else {
-        delete process.env['SHARED_VAR']; // Ensure it's deleted if it wasn't there before
-      }
+      // Check merged values (system > workspace > user)
+      // @ts-expect-error: dynamic property for test
+      expect(settings.merged.configValue).toBe('final_value');
+      // @ts-expect-error: dynamic property for test
+      expect(settings.merged.systemOnly).toBe('system_value');
+      // @ts-expect-error: dynamic property for test
+      expect(settings.merged.userOnly).toBe('user_value');
+      // @ts-expect-error: dynamic property for test
+      expect(settings.merged.workspaceOnly).toBe('workspace_value');
+      expect(settings.merged.theme).toBe('light'); // workspace overrides user
+
+      delete process.env['SYSTEM_VAR'];
+      delete process.env['USER_VAR'];
+      delete process.env['WORKSPACE_VAR'];
+      delete process.env['SHARED_VAR'];
     });
 
     it('should correctly merge dnsResolutionOrder with workspace taking precedence', () => {
@@ -1336,6 +1270,7 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.workspace.settings.contextFileName).toBe(
         'MY_AGENTS.md',
       );
+      // This test assumes a trusted workspace, so the workspace setting should apply.
       expect(loadedSettings.merged.contextFileName).toBe('MY_AGENTS.md');
       expect(loadedSettings.merged.theme).toBe('matrix'); // User setting should still be there
       expect(fs.writeFileSync).toHaveBeenCalledWith(

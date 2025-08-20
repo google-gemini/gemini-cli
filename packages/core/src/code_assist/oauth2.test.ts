@@ -5,8 +5,13 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import { getOauthClient, resetOauthClientForTesting } from './oauth2.js';
-import { getCachedGoogleAccount } from '../utils/user_account.js';
+import {
+  getOauthClient,
+  resetOauthClientForTesting,
+  clearCachedCredentialFile,
+  clearOauthClientCache,
+} from './oauth2.js';
+import { UserAccountManager } from '../utils/userAccountManager.js';
 import { OAuth2Client, Compute } from 'google-auth-library';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -175,7 +180,10 @@ describe('oauth2', () => {
     });
 
     // Verify the getCachedGoogleAccount function works
-    expect(getCachedGoogleAccount()).toBe('test-google-account@gmail.com');
+    const userAccountManager = new UserAccountManager();
+    expect(userAccountManager.getCachedGoogleAccount()).toBe(
+      'test-google-account@gmail.com',
+    );
   });
 
   it('should perform login with user code', async () => {
@@ -508,6 +516,81 @@ describe('oauth2', () => {
       // It should be called with the cached credentials, not the GCP access token.
       expect(mockSetCredentials).toHaveBeenCalledTimes(1);
       expect(mockSetCredentials).toHaveBeenCalledWith(cachedCreds);
+    });
+  });
+
+  describe('clearCachedCredentialFile', () => {
+    it('should clear cached credentials and Google account', async () => {
+      const cachedCreds = { refresh_token: 'test-token' };
+      const credsPath = path.join(tempHomeDir, '.gemini', 'oauth_creds.json');
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+      await fs.promises.writeFile(credsPath, JSON.stringify(cachedCreds));
+
+      const googleAccountPath = path.join(
+        tempHomeDir,
+        '.gemini',
+        'google_accounts.json',
+      );
+      const accountData = { active: 'test@example.com', old: [] };
+      await fs.promises.writeFile(
+        googleAccountPath,
+        JSON.stringify(accountData),
+      );
+      const userAccountManager = new UserAccountManager();
+
+      expect(fs.existsSync(credsPath)).toBe(true);
+      expect(fs.existsSync(googleAccountPath)).toBe(true);
+      expect(userAccountManager.getCachedGoogleAccount()).toBe(
+        'test@example.com',
+      );
+
+      await clearCachedCredentialFile();
+      expect(fs.existsSync(credsPath)).toBe(false);
+      expect(userAccountManager.getCachedGoogleAccount()).toBeNull();
+      const updatedAccountData = JSON.parse(
+        fs.readFileSync(googleAccountPath, 'utf-8'),
+      );
+      expect(updatedAccountData.active).toBeNull();
+      expect(updatedAccountData.old).toContain('test@example.com');
+    });
+
+    it('should clear the in-memory OAuth client cache', async () => {
+      const mockSetCredentials = vi.fn();
+      const mockGetAccessToken = vi
+        .fn()
+        .mockResolvedValue({ token: 'test-token' });
+      const mockGetTokenInfo = vi.fn().mockResolvedValue({});
+      const mockOAuth2Client = {
+        setCredentials: mockSetCredentials,
+        getAccessToken: mockGetAccessToken,
+        getTokenInfo: mockGetTokenInfo,
+        on: vi.fn(),
+      } as unknown as OAuth2Client;
+      (OAuth2Client as unknown as Mock).mockImplementation(
+        () => mockOAuth2Client,
+      );
+
+      // Pre-populate credentials to make getOauthClient resolve quickly
+      const credsPath = path.join(tempHomeDir, '.gemini', 'oauth_creds.json');
+      await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+      await fs.promises.writeFile(
+        credsPath,
+        JSON.stringify({ refresh_token: 'token' }),
+      );
+
+      // First call, should create a client
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+      expect(OAuth2Client).toHaveBeenCalledTimes(1);
+
+      // Second call, should use cached client
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+      expect(OAuth2Client).toHaveBeenCalledTimes(1);
+
+      clearOauthClientCache();
+
+      // Third call, after clearing cache, should create a new client
+      await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+      expect(OAuth2Client).toHaveBeenCalledTimes(2);
     });
   });
 });
