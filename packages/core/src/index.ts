@@ -10,6 +10,7 @@ export * from './config/config.js';
 // Export Core Logic
 export * from './core/client.js';
 export * from './core/contentGenerator.js';
+export * from './core/loggingContentGenerator.js';
 export * from './core/geminiChat.js';
 export * from './core/logger.js';
 export * from './core/prompts.js';
@@ -46,6 +47,8 @@ export * from './utils/errorParsing.js';
 // Export services
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
+export * from './services/chatRecordingService.js';
+export * from './services/fileSystemService.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';
@@ -98,3 +101,4 @@ export { OAuthUtils } from './mcp/oauth-utils.js';
 export * from './telemetry/index.js';
 export { sessionId } from './utils/session.js';
 export * from './utils/browser.js';
+export { Storage } from './config/storage.js';

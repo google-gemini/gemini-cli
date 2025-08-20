@@ -14,11 +14,8 @@ defaults:
     shell: 'bash'
 
 permissions:
-  contents: 'read'
   id-token: 'write'
   issues: 'write'
-  statuses: 'write'
-  packages: 'read'
 
 jobs:
   triage-issues:
@@ -36,6 +33,7 @@ jobs:
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
 
       - name: 'Find untriaged issues'
         id: 'find_issues'
@@ -80,7 +78,7 @@ jobs:
       - name: 'Run Gemini Issue Analysis'
         if: |-
           ${{ steps.find_issues.outputs.issues_to_triage != '[]' }}
-        uses: 'google-github-actions/run-gemini-cli@06123c6a203eb7a964ce3be7c48479cc66059f23' # ratchet:google-github-actions/run-gemini-cli@v0
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_issue_analysis'
         env:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
