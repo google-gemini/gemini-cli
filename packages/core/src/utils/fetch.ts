@@ -9,12 +9,13 @@ import { getErrorMessage, isNodeError } from './errors.js';
 const PRIVATE_HOSTNAME_PATTERNS = [
   /^10\./,
   /^127\./,
+  /^169\.254\./,
   /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
   /^192\.168\./,
   /^localhost$/,
   /^\[::1\]$/,
-  /^\[fc00:/,
-  /^\[fe80:/,
+  /^\[f[cd][0-9a-f]/,
+  /^\[fe[89ab][0-9a-f]/,
 ];
 
 export class FetchError extends Error {

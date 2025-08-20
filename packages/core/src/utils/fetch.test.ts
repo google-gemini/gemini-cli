@@ -30,9 +30,18 @@ describe('isPrivateIp', () => {
       expect(isPrivateIp('https://192.168.1.100/admin')).toBe(true);
     });
 
+    it('should detect 169.254.x.x link-local range', () => {
+      expect(isPrivateIp('http://169.254.0.1')).toBe(true);
+      expect(isPrivateIp('https://169.254.255.255')).toBe(true);
+      expect(isPrivateIp('http://169.254.1.1:8080')).toBe(true);
+      expect(isPrivateIp('https://169.254.169.254/path')).toBe(true); // Common metadata service
+    });
+
     it('should not detect IPs outside private ranges', () => {
       expect(isPrivateIp('http://9.255.255.255')).toBe(false); // Just below 10.x
       expect(isPrivateIp('http://11.0.0.1')).toBe(false); // Just above 10.x
+      expect(isPrivateIp('http://169.253.255.255')).toBe(false); // Just below 169.254
+      expect(isPrivateIp('http://169.255.0.1')).toBe(false); // Just above 169.254
       expect(isPrivateIp('http://172.15.255.255')).toBe(false); // Just below 172.16
       expect(isPrivateIp('http://172.32.0.1')).toBe(false); // Just above 172.31
       expect(isPrivateIp('http://192.167.255.255')).toBe(false); // Just below 192.168
@@ -64,22 +73,47 @@ describe('isPrivateIp', () => {
       expect(isPrivateIp('http://[::1]/path')).toBe(true);
     });
 
-    it('should detect IPv6 unique local addresses (fc00: prefix)', () => {
+    it('should detect IPv6 unique local addresses (fc00::/7 - both fc and fd)', () => {
+      // fc range
       expect(isPrivateIp('http://[fc00::1]')).toBe(true);
       expect(isPrivateIp('https://[fc00:1234:5678:9abc::1]')).toBe(true);
       expect(
         isPrivateIp('http://[fc00:ffff:ffff:ffff:ffff:ffff:ffff:ffff]:3000'),
       ).toBe(true);
       expect(isPrivateIp('https://[fc00::]/api')).toBe(true);
+
+      // fd range
+      expect(isPrivateIp('http://[fd00::1]')).toBe(true);
+      expect(isPrivateIp('https://[fd12:3456:789a:bcde::1]:3000')).toBe(true);
+      expect(
+        isPrivateIp('http://[fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]'),
+      ).toBe(true);
     });
 
-    it('should detect IPv6 link-local addresses (fe80::/10)', () => {
+    it('should detect IPv6 link-local addresses (fe80::/10 - fe8x, fe9x, feax, febx)', () => {
+      // fe8x range
       expect(isPrivateIp('http://[fe80::1]')).toBe(true);
       expect(
         isPrivateIp('https://[fe80:0000:0000:0000:0000:0000:0000:0001]'),
       ).toBe(true);
       expect(isPrivateIp('http://[fe80::abcd:ef12:3456:7890]:8080')).toBe(true);
       expect(isPrivateIp('https://[fe80::]/path')).toBe(true);
+
+      // fe9x range
+      expect(isPrivateIp('http://[fe90::1]')).toBe(true);
+      expect(
+        isPrivateIp('https://[fe9f:ffff:ffff:ffff:ffff:ffff:ffff:ffff]'),
+      ).toBe(true);
+
+      // feax range
+      expect(isPrivateIp('http://[fea0::1]')).toBe(true);
+      expect(isPrivateIp('https://[feaf:1234:5678:9abc::1]')).toBe(true);
+
+      // febx range
+      expect(isPrivateIp('http://[feb0::1]')).toBe(true);
+      expect(
+        isPrivateIp('https://[febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff]'),
+      ).toBe(true);
     });
 
     it('should not detect IPv4-mapped IPv6 addresses (not in simplified patterns)', () => {
