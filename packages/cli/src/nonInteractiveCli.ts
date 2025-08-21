@@ -16,6 +16,7 @@ import {
 import { Content, Part, FunctionCall } from '@google/genai';
 
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
+import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
 
 export async function runNonInteractive(
   config: Config,
@@ -40,9 +41,27 @@ export async function runNonInteractive(
     const geminiClient = config.getGeminiClient();
 
     const abortController = new AbortController();
+
+    const { processedQuery, shouldProceed } = await handleAtCommand({
+      query: input,
+      config,
+      addItem: (_item, _timestamp) => 0,
+      onDebugMessage: () => {},
+      messageId: Date.now(),
+      signal: abortController.signal,
+    });
+
+    if (!shouldProceed || !processedQuery) {
+      // An error occurred during @include processing (e.g., file not found).
+      // The error message is already logged by handleAtCommand.
+      console.error('Exiting due to an error processing the @ command.');
+      process.exit(1);
+    }
+
     let currentMessages: Content[] = [
-      { role: 'user', parts: [{ text: input }] },
+      { role: 'user', parts: processedQuery as Part[] },
     ];
+
     let turnCount = 0;
     while (true) {
       turnCount++;
