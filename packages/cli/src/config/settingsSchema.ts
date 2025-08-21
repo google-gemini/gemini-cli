@@ -287,6 +287,16 @@ export const SETTINGS_SCHEMA = {
       'Use node-pty for shell command execution. Fallback to child_process still applies.',
     showInDialog: true,
   },
+  propagateEnvironmentVars: {
+    type: 'boolean',
+    label: 'Propagate Environment Variables',
+    category: 'Shell',
+    requiresRestart: true,
+    default: true,
+    description:
+      'Propagate environment variables from the parent process to the shell.',
+    showInDialog: false,
+  },
 
   selectedAuthType: {
     type: 'string',
