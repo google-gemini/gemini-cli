@@ -1,0 +1,39 @@
+{
+  "required": {
+    "pathToAdd": "请提供至少一个要添加的路径。",
+    "tagForSave": "缺少标签。用法：/chat save <标签>",
+    "tagForResume": "缺少标签。用法：/chat resume <标签>",
+    "tagForDelete": "缺少标签。用法：/chat delete <标签>",
+    "memoryUsage": "用法：/memory add <要记住的文本>"
+  },
+  "notFound": {
+    "checkpoints": "未找到已保存的对话检查点。",
+    "checkpoint": "未找到标签为：{{tag}} 的已保存检查点。",
+    "conversation": "未找到要保存的对话。",
+    "toolRegistry": "无法获取工具注册表。",
+    "readManyFilesTool": "错误：未找到 read_many_files 工具。",
+    "restorableToolCalls": "未找到可恢复的工具调用。",
+    "fileNotFound": "文件未找到：{{filename}}"
+  },
+  "browser": {
+    "openDocs": "请在浏览器中打开以下 URL 查看文档：\n{{url}}",
+    "openingDocs": "在浏览器中打开文档：{{url}}",
+    "openBugReport": "要提交错误报告，请在浏览器中打开以下 URL：\n{{url}}",
+    "openFailed": "无法在浏览器中打开 URL：{{error}}"
+  },
+  "commands": {
+    "invalidAtCommand": "错误：无效的 @ 命令 '{{command}}'。未指定路径。",
+    "unknownCommand": "未知命令：{{command}}",
+    "geminiDirectoryPath": "无法确定 .gemini 目录路径。"
+  },
+  "theme": {
+    "noColorEnv": "由于 NO_COLOR 环境变量，主题配置不可用。"
+  },
+  "ide": {
+    "noInstaller": "{{ide}} 没有可用的安装程序。请从市场手动安装 '{{extensionName}}' 扩展。"
+  },
+  "system": {
+    "unexpectedError": "发生意外错误：{{error}}",
+    "installationFailed": "安装失败。"
+  }
+}

@@ -8,6 +8,7 @@ import * as fsPromises from 'fs/promises';
 import React from 'react';
 import { Text } from 'ink';
 import { Colors } from '../colors.js';
+import i18n from '../../i18n/index.js';
 import {
   CommandContext,
   SlashCommand,
@@ -73,7 +74,7 @@ const listCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: 'No saved conversation checkpoints found.',
+        content: i18n.t('ui:chat.noCheckpoints'),
       };
     }
 
@@ -109,7 +110,7 @@ const saveCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat save <tag>',
+        content: i18n.t('ui:chat.missingTagSave'),
       };
     }
 
@@ -140,7 +141,7 @@ const saveCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'No chat client available to save conversation.',
+        content: i18n.t('ui:chat.noClientAvailable'),
       };
     }
 
@@ -150,13 +151,13 @@ const saveCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint saved with tag: ${decodeTagName(tag)}.`,
+        content: i18n.t('ui:chat.checkpointSaved', { tag: decodeTagName(tag) }),
       };
     } else {
       return {
         type: 'message',
         messageType: 'info',
-        content: 'No conversation found to save.',
+        content: i18n.t('ui:chat.noConversationFound'),
       };
     }
   },
@@ -174,7 +175,7 @@ const resumeCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat resume <tag>',
+        content: i18n.t('ui:chat.missingTagResume'),
       };
     }
 
@@ -186,7 +187,7 @@ const resumeCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `No saved checkpoint found with tag: ${decodeTagName(tag)}.`,
+        content: i18n.t('ui:chat.noCheckpointFound', { tag: decodeTagName(tag) }),
       };
     }
 
@@ -243,7 +244,7 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat delete <tag>',
+        content: i18n.t('ui:chat.missingTagDelete'),
       };
     }
 
@@ -255,13 +256,13 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint '${decodeTagName(tag)}' has been deleted.`,
+        content: i18n.t('ui:chat.checkpointDeleted', { tag: decodeTagName(tag) }),
       };
     } else {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Error: No checkpoint found with tag '${decodeTagName(tag)}'.`,
+        content: i18n.t('ui:chat.deleteError', { tag: decodeTagName(tag) }),
       };
     }
   },

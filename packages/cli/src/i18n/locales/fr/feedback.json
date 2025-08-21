@@ -1,0 +1,35 @@
+{
+  "success": {
+    "directoriesAdded": "Répertoires ajoutés avec succès :\n- {{directories}}",
+    "geminiFilesAdded": "Fichiers GEMINI.md ajoutés avec succès depuis les répertoires suivants s'ils existent :\n- {{directories}}",
+    "checkpointSaved": "Point de contrôle de conversation sauvegardé avec le tag : {{tag}}.",
+    "checkpointDeleted": "Le point de contrôle de conversation '{{tag}}' a été supprimé.",
+    "outputCopied": "Dernière sortie copiée dans le presse-papiers",
+    "projectRestored": "Projet restauré à l'état précédent l'appel d'outil.",
+    "authenticated": "✅ Authentification réussie avec le serveur MCP '{{serverName}}' !",
+    "installed": "Installation réussie."
+  },
+  "info": {
+    "connecting": "🟡 Connexion en cours...",
+    "connected": "🟢 Connecté à {{ide}}",
+    "installing": "Installation du compagnon IDE...",
+    "discovering": "Redécouverte des outils depuis '{{serverName}}'...",
+    "restarting": "Redémarrage des serveurs MCP...",
+    "authStarting": "Démarrage de l'authentification OAuth pour le serveur MCP '{{serverName}}'...",
+    "editorSet": "Préférence d'éditeur définie à \"{{editorType}}\" dans les paramètres {{scope}}.",
+    "editorCleared": "Préférence d'éditeur effacée dans les paramètres {{scope}}."
+  },
+  "status": {
+    "workspaceDirectories": "Répertoires de l'espace de travail actuels :\n{{directoryList}}",
+    "disconnected": "🔴 Déconnecté",
+    "disconnectedWithDetails": "🔴 Déconnecté : {{details}}",
+    "noOutput": "Aucune sortie dans l'historique",
+    "noTextToCopy": "La dernière sortie IA ne contient aucun texte à copier.",
+    "cancelled": "Opération annulée.",
+    "userCancelled": "L'utilisateur a annulé la demande."
+  },
+  "warning": {
+    "loopDetected": "Une boucle potentielle a été détectée. Cela peut arriver à cause d'appels d'outils répétitifs ou d'autres comportements du modèle. La demande a été arrêtée.",
+    "messageWarning": "⚠️  {{message}}"
+  }
+}

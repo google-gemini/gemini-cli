@@ -91,6 +91,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "@xterm/headless": "^5.5.0",
     "i18next": "^25.3.6",
     "node-fetch": "^3.3.2",
     "react-i18next": "^15.6.1",

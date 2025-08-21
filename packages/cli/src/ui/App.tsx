@@ -147,7 +147,7 @@ export const AppWrapper = (props: AppProps) => {
 };
 
 const App = ({ config, startupWarnings = [], version }: AppProps) => {
-  const { t } = useTranslation('ui');
+  const { t } = useTranslation(['ui', 'messages']);
   const isFocused = useFocus();
   useBracketedPaste();
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
@@ -343,7 +343,7 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
     addItem(
       {
         type: MessageType.INFO,
-        text: 'Refreshing hierarchical memory (GEMINI.md or other context files)...',
+        text: t('messages:memory.refreshing'),
       },
       Date.now(),
     );
@@ -368,7 +368,9 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
       addItem(
         {
           type: MessageType.INFO,
-          text: `Memory refreshed successfully. ${memoryContent.length > 0 ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).` : 'No memory content found.'}`,
+          text: memoryContent.length > 0 
+            ? t('messages:memory.refreshedSuccess', { characters: memoryContent.length, fileCount })
+            : t('messages:memory.refreshedEmpty'),
         },
         Date.now(),
       );
@@ -382,13 +384,13 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
       addItem(
         {
           type: MessageType.ERROR,
-          text: `Error refreshing memory: ${errorMessage}`,
+          text: t('messages:memory.refreshError', { error: errorMessage }),
         },
         Date.now(),
       );
       console.error('Error refreshing memory:', error);
     }
-  }, [config, addItem, settings.merged]);
+  }, [config, addItem, settings.merged, t]);
 
   // Watch for model changes (e.g., from Flash fallback)
   useEffect(() => {
@@ -1026,8 +1028,8 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
                 <RadioButtonSelect
                   isFocused={!!confirmationRequest}
                   items={[
-                    { label: 'Yes', value: true },
-                    { label: 'No', value: false },
+                    { label: t('ui:buttons.yes'), value: true },
+                    { label: t('ui:buttons.no'), value: false },
                   ]}
                   onSelect={(value: boolean) => {
                     confirmationRequest.onConfirm(value);
@@ -1175,14 +1177,14 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
                   )}
                   {ctrlCPressedOnce ? (
                     <Text color={Colors.AccentYellow}>
-                      Press Ctrl+C again to exit.
+                      {t('ui:prompts.pressCtrlCToExit')}
                     </Text>
                   ) : ctrlDPressedOnce ? (
                     <Text color={Colors.AccentYellow}>
-                      Press Ctrl+D again to exit.
+                      {t('ui:prompts.pressCtrlDToExit')}
                     </Text>
                   ) : showEscapePrompt ? (
-                    <Text color={Colors.Gray}>Press Esc again to clear.</Text>
+                    <Text color={Colors.Gray}>{t('ui:prompts.pressEscToClear')}</Text>
                   ) : (
                     <ContextSummaryDisplay
                       ideContext={ideContextState}

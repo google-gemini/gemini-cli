@@ -108,5 +108,109 @@
       "tool": "Outil",
       "output": "Sortie"
     }
+  },
+  "prompts": {
+    "pressEscToClear": "Appuyez sur Échap à nouveau pour effacer.",
+    "pressEscToExit": "Appuyez sur Échap pour quitter.",
+    "pressEnterToChoose": "Appuyez sur Entrée pour choisir une option et quitter.",
+    "pressCtrlCToExit": "Appuyez sur Ctrl+C à nouveau pour quitter.",
+    "pressCtrlDToExit": "Appuyez sur Ctrl+D à nouveau pour quitter.",
+    "ctrlOForDetails": "(ctrl+o pour les détails)",
+    "escToDisable": " (échap pour désactiver)"
+  },
+  "status": {
+    "loading": "Chargement...",
+    "codeBeingWritten": "... code en cours d'écriture ...",
+    "generatingMore": "... génération en cours ...",
+    "loadingSuggestions": "Chargement des suggestions...",
+    "noDiffContent": "Aucun contenu de différence.",
+    "noChangesDetected": "Aucun changement détecté."
+  },
+  "stats": {
+    "noToolCalls": "Aucun appel d'outil n'a été effectué dans cette session.",
+    "toolName": "Nom de l'outil",
+    "calls": "Appels",
+    "successRate": "Taux de réussite",
+    "avgDuration": "Durée moy.",
+    "userDecisionSummary": "Résumé des décisions utilisateur",
+    "totalReviewedSuggestions": "Suggestions révisées au total:",
+    "accepted": "» Acceptées:",
+    "rejected": "» Rejetées:",
+    "modified": "» Modifiées:",
+    "overallAgreementRate": "Taux d'accord global:",
+    "savingsHighlight": "Points forts des économies:"
+  },
+  "tools": {
+    "modifyInProgress": "Modification en cours: ",
+    "urlsToFetch": "URLs à récupérer:",
+    "mcpServer": "Serveur MCP: {{serverName}}",
+    "tool": "Outil: {{toolName}}"
+  },
+  "debug": {
+    "consoleTitle": "Console de débogage",
+    "closeHint": "(ctrl+o pour fermer)",
+    "renders": "Rendus: {{count}}"
+  },
+  "buttons": {
+    "yes": "Oui",
+    "no": "Non",
+    "cancel": "Annuler",
+    "allow": "Autoriser",
+    "deny": "Refuser",
+    "continue": "Continuer",
+    "exit": "Quitter"
+  },
+  "confirmations": {
+    "yesAllowOnce": "Oui, autoriser une fois",
+    "yesAllowAlways": "Oui, toujours autoriser",
+    "noEsc": "Non (esc)",
+    "modifyWithExternalEditor": "Modifier avec un éditeur externe",
+    "noSuggestChanges": "Non, suggérer des changements (esc)",
+    "yesAllowAlwaysEllipsis": "Oui, toujours autoriser...",
+    "noDontAskAgain": "Non, ne plus demander",
+    "yesAllowToolFromServer": "Oui, toujours autoriser l'outil \"{{toolName}}\" du serveur \"{{serverName}}\"",
+    "yesAllowAllToolsFromServer": "Oui, toujours autoriser tous les outils du serveur \"{{serverName}}\""
+  },
+  "chat": {
+    "noCheckpoints": "Aucun point de contrôle de conversation sauvegardé trouvé.",
+    "missingTagSave": "Étiquette manquante. Usage: /chat save <étiquette>",
+    "missingTagResume": "Étiquette manquante. Usage: /chat resume <étiquette>",
+    "missingTagDelete": "Étiquette manquante. Usage: /chat delete <étiquette>",
+    "noClientAvailable": "Aucun client de chat disponible pour sauvegarder la conversation.",
+    "checkpointSaved": "Point de contrôle de conversation sauvegardé avec l'étiquette: {{tag}}.",
+    "noConversationFound": "Aucune conversation trouvée à sauvegarder.",
+    "noCheckpointFound": "Aucun point de contrôle sauvegardé trouvé avec l'étiquette: {{tag}}.",
+    "checkpointDeleted": "Le point de contrôle de conversation '{{tag}}' a été supprimé.",
+    "deleteError": "Erreur: Aucun point de contrôle trouvé avec l'étiquette '{{tag}}'."
+  },
+  "copy": {
+    "noHistory": "Aucune sortie dans l'historique",
+    "copySuccess": "Dernière sortie copiée dans le presse-papiers",
+    "copyError": "Échec de la copie dans le presse-papiers.",
+    "noTextToCopy": "La dernière sortie IA ne contient aucun texte à copier."
+  },
+  "ide": {
+    "connected": "🟢 Connecté à {{ideName}}",
+    "connecting": "🟡 Connexion en cours...",
+    "disconnected": "🔴 Déconnecté",
+    "disconnectedWithDetails": "🔴 Déconnecté: {{details}}",
+    "noInstaller": "Aucun installateur disponible pour {{ideName}}. Veuillez installer manuellement l'extension '{{extensionName}}' depuis le marketplace.",
+    "installing": "Installation du compagnon IDE...",
+    "installSuccess": "Installation réussie.",
+    "installFailed": "Échec de l'installation."
+  },
+  "mcp": {
+    "configNotLoaded": "Configuration non chargée.",
+    "toolRegistryError": "Impossible de récupérer le registre d'outils.",
+    "noServersConfigured": "Aucun serveur MCP configuré. Veuillez consulter la documentation MCP dans votre navigateur: {{docsUrl}} ou utilisez la commande /docs",
+    "noOAuthServers": "Aucun serveur MCP configuré avec l'authentification OAuth.",
+    "oauthServersList": "Serveurs MCP avec authentification OAuth:\n{{serverList}}\n\nUtilisez /mcp auth <nom-serveur> pour vous authentifier.",
+    "serverNotFound": "Serveur MCP '{{serverName}}' introuvable.",
+    "startingAuth": "Démarrage de l'authentification OAuth pour le serveur MCP '{{serverName}}'...",
+    "authSuccess": "✅ Authentification réussie avec le serveur MCP '{{serverName}}'!",
+    "rediscoveringTools": "Redécouverte des outils depuis '{{serverName}}'...",
+    "authAndToolsSuccess": "Authentification réussie et outils actualisés pour '{{serverName}}'.",
+    "authError": "Échec de l'authentification pour le serveur MCP '{{serverName}}'.",
+    "restartingServers": "Redémarrage des serveurs MCP..."
   }
 }

@@ -1,0 +1,38 @@
+{
+  "memory": {
+    "refreshing": "Refreshing hierarchical memory (GEMINI.md or other context files)...",
+    "refreshedSuccess": "Memory refreshed successfully. Loaded {{characters}} characters from {{fileCount}} file(s).",
+    "refreshedEmpty": "Memory refreshed successfully. No memory content found.",
+    "refreshError": "Error refreshing memory: {{error}}",
+    "empty": "Memory is currently empty.",
+    "saveAttempt": "Attempting to save to memory: \"{{content}}\"",
+    "refreshingFromFiles": "Refreshing memory from source files...",
+    "currentContent": "Current memory content from {{fileCount}} file(s):\n\n---\n{{content}}\n---"
+  },
+  "configuration": {
+    "notAvailable": "Configuration is not available.",
+    "noClient": "No chat client available to save conversation."
+  },
+  "initialization": {
+    "geminiCreated": "Empty GEMINI.md created. Now analyzing the project to populate it."
+  },
+  "operation": {
+    "cancelled": "Operation cancelled.",
+    "restored": "Restored project to the state before the tool call."
+  },
+  "restore": {
+    "noDirectoryPath": "Could not determine the .gemini directory path.",
+    "noRestorableToolCalls": "No restorable tool calls found.",
+    "availableToolCalls": "Available tool calls to restore:\n\n{{fileList}}",
+    "fileNotFound": "File not found: {{filename}}",
+    "loadHistoryNotAvailable": "loadHistory function is not available.",
+    "readError": "Could not read restorable tool calls. This is the error: {{error}}"
+  },
+  "github": {
+    "setupSuccess": "Successfully downloaded {{count}} workflows and updated .gitignore. Follow the steps in {{readmeUrl}} (skipping the /setup-github step) to complete setup.",
+    "setupDescription": "Setting up GitHub Actions to triage issues and review PRs with Gemini."
+  },
+  "session": {
+    "startTimeUnavailable": "Session start time is unavailable, cannot calculate stats."
+  }
+}

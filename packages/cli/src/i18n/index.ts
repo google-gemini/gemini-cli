@@ -27,8 +27,8 @@ function loadTranslationFile(lang: string, namespace: string): Record<string, un
 }
 
 // Build resources dynamically
-const languages = ['en', 'zh', 'fr'];
-const namespaces = ['help', 'commands', 'dialogs', 'ui', 'errors'];
+const languages = ['en', 'zh', 'fr', 'es'];
+const namespaces = ['help', 'commands', 'dialogs', 'ui', 'errors', 'messages', 'feedback', 'validation', 'tools'];
 
 const resources = languages.reduce((acc, lang) => {
   acc[lang] = namespaces.reduce((nsAcc, ns) => {
@@ -58,7 +58,7 @@ i18n
       escapeValue: false, // React already escapes values
     },
     
-    ns: ['help', 'commands', 'dialogs', 'ui', 'errors'],
+    ns: ['help', 'commands', 'dialogs', 'ui', 'errors', 'messages', 'feedback', 'validation', 'tools'],
     defaultNS: 'help',
     
     debug: false, // Set to true for debugging

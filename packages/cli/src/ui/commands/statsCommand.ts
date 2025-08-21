@@ -11,6 +11,7 @@ import {
   type SlashCommand,
   CommandKind,
 } from './types.js';
+import i18n from '../../i18n/index.js';
 
 export const statsCommand: SlashCommand = {
   name: 'stats',
@@ -24,7 +25,7 @@ export const statsCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: MessageType.ERROR,
-          text: 'Session start time is unavailable, cannot calculate stats.',
+          text: i18n.t('messages:session.startTimeUnavailable'),
         },
         Date.now(),
       );

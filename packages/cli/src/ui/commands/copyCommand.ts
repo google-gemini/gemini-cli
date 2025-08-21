@@ -29,7 +29,7 @@ export const copyCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: 'No output in history',
+        content: i18n.t('ui:copy.noHistory'),
       };
     }
     // Extract text from the parts
@@ -45,7 +45,7 @@ export const copyCommand: SlashCommand = {
         return {
           type: 'message',
           messageType: 'info',
-          content: 'Last output copied to the clipboard',
+          content: i18n.t('ui:copy.copySuccess'),
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -61,7 +61,7 @@ export const copyCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: 'Last AI output contains no text to copy.',
+        content: i18n.t('ui:copy.noTextToCopy'),
       };
     }
   },

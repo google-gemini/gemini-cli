@@ -22,7 +22,6 @@ import { ToolStatsDisplay } from './ToolStatsDisplay.js';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import { Config } from '@google/gemini-cli-core';
 import { Help } from './Help.js';
-import { HelpI18n } from './HelpI18n.js';
 import { SlashCommand } from '../commands/types.js';
 
 interface HistoryItemDisplayProps {
@@ -78,11 +77,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       />
     )}
     {item.type === 'help' && commands && (
-      item.language ? (
-        <HelpI18n commands={commands} language={item.language} />
-      ) : (
-        <Help commands={commands} />
-      )
+      <Help commands={commands} language={item.language} />
     )}
     {item.type === 'stats' && <StatsDisplay duration={item.duration} />}
     {item.type === 'model_stats' && <ModelStatsDisplay />}

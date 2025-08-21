@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
@@ -40,6 +41,7 @@ export const ToolConfirmationMessage: React.FC<
   availableTerminalHeight,
   terminalWidth,
 }) => {
+  const { t } = useTranslation('ui');
   const { onConfirm } = confirmationDetails;
   const childWidth = terminalWidth - 2; // 2 for padding
 
@@ -129,26 +131,26 @@ export const ToolConfirmationMessage: React.FC<
     question = `Apply this change?`;
     options.push(
       {
-        label: 'Yes, allow once',
+        label: t('confirmations.yesAllowOnce'),
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: 'Yes, allow always',
+        label: t('confirmations.yesAllowAlways'),
         value: ToolConfirmationOutcome.ProceedAlways,
       },
     );
     if (config?.getIdeMode()) {
       options.push({
-        label: 'No (esc)',
+        label: t('confirmations.noEsc'),
         value: ToolConfirmationOutcome.Cancel,
       });
     } else {
       options.push({
-        label: 'Modify with external editor',
+        label: t('confirmations.modifyWithExternalEditor'),
         value: ToolConfirmationOutcome.ModifyWithEditor,
       });
       options.push({
-        label: 'No, suggest changes (esc)',
+        label: t('confirmations.noSuggestChanges'),
         value: ToolConfirmationOutcome.Cancel,
       });
     }
@@ -168,15 +170,15 @@ export const ToolConfirmationMessage: React.FC<
     question = `Allow execution of: '${executionProps.rootCommand}'?`;
     options.push(
       {
-        label: `Yes, allow once`,
+        label: t('confirmations.yesAllowOnce'),
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: `Yes, allow always ...`,
+        label: t('confirmations.yesAllowAlwaysEllipsis'),
         value: ToolConfirmationOutcome.ProceedAlways,
       },
       {
-        label: 'No, suggest changes (esc)',
+        label: t('confirmations.noSuggestChanges'),
         value: ToolConfirmationOutcome.Cancel,
       },
     );
@@ -208,15 +210,15 @@ export const ToolConfirmationMessage: React.FC<
     question = `Do you want to proceed?`;
     options.push(
       {
-        label: 'Yes, allow once',
+        label: t('confirmations.yesAllowOnce'),
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: 'Yes, allow always',
+        label: t('confirmations.yesAllowAlways'),
         value: ToolConfirmationOutcome.ProceedAlways,
       },
       {
-        label: 'No, suggest changes (esc)',
+        label: t('confirmations.noSuggestChanges'),
         value: ToolConfirmationOutcome.Cancel,
       },
     );
@@ -253,19 +255,24 @@ export const ToolConfirmationMessage: React.FC<
     question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
     options.push(
       {
-        label: 'Yes, allow once',
+        label: t('confirmations.yesAllowOnce'),
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
+        label: t('confirmations.yesAllowToolFromServer', { 
+          toolName: mcpProps.toolName, 
+          serverName: mcpProps.serverName 
+        }),
         value: ToolConfirmationOutcome.ProceedAlwaysTool, // Cast until types are updated
       },
       {
-        label: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
+        label: t('confirmations.yesAllowAllToolsFromServer', { 
+          serverName: mcpProps.serverName 
+        }),
         value: ToolConfirmationOutcome.ProceedAlwaysServer,
       },
       {
-        label: 'No, suggest changes (esc)',
+        label: t('confirmations.noSuggestChanges'),
         value: ToolConfirmationOutcome.Cancel,
       },
     );

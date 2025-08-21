@@ -1,0 +1,35 @@
+{
+  "success": {
+    "directoriesAdded": "成功添加目录：\n- {{directories}}",
+    "geminiFilesAdded": "成功从以下目录添加 GEMINI.md 文件（如果存在）：\n- {{directories}}",
+    "checkpointSaved": "对话检查点已保存，标签：{{tag}}。",
+    "checkpointDeleted": "对话检查点 '{{tag}}' 已被删除。",
+    "outputCopied": "最后的输出已复制到剪贴板",
+    "projectRestored": "项目已恢复到工具调用之前的状态。",
+    "authenticated": "✅ 成功与 MCP 服务器 '{{serverName}}' 认证！",
+    "installed": "安装成功。"
+  },
+  "info": {
+    "connecting": "🟡 连接中...",
+    "connected": "🟢 已连接到 {{ide}}",
+    "installing": "正在安装 IDE 配套扩展...",
+    "discovering": "正在从 '{{serverName}}' 重新发现工具...",
+    "restarting": "正在重启 MCP 服务器...",
+    "authStarting": "正在为 MCP 服务器 '{{serverName}}' 启动 OAuth 认证...",
+    "editorSet": "编辑器偏好设置为 \"{{editorType}}\" 在 {{scope}} 设置中。",
+    "editorCleared": "编辑器偏好已清除在 {{scope}} 设置中。"
+  },
+  "status": {
+    "workspaceDirectories": "当前工作区目录：\n{{directoryList}}",
+    "disconnected": "🔴 已断开连接",
+    "disconnectedWithDetails": "🔴 已断开连接：{{details}}",
+    "noOutput": "历史记录中没有输出",
+    "noTextToCopy": "最后的 AI 输出不包含可复制的文本。",
+    "cancelled": "操作已取消。",
+    "userCancelled": "用户取消了请求。"
+  },
+  "warning": {
+    "loopDetected": "检测到潜在的循环。这可能由重复的工具调用或其他模型行为引起。请求已被停止。",
+    "messageWarning": "⚠️  {{message}}"
+  }
+}

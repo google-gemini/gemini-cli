@@ -9,6 +9,7 @@ import {
   loadServerHierarchicalMemory,
 } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
+import i18n from '../../i18n/index.js';
 import {
   CommandKind,
   SlashCommand,
@@ -30,8 +31,8 @@ export const memoryCommand: SlashCommand = {
 
         const messageContent =
           memoryContent.length > 0
-            ? `Current memory content from ${fileCount} file(s):\n\n---\n${memoryContent}\n---`
-            : 'Memory is currently empty.';
+            ? i18n.t('messages:memory.currentContent', { fileCount, content: memoryContent })
+            : i18n.t('messages:memory.empty');
 
         context.ui.addItem(
           {
@@ -51,14 +52,14 @@ export const memoryCommand: SlashCommand = {
           return {
             type: 'message',
             messageType: 'error',
-            content: 'Usage: /memory add <text to remember>',
+            content: i18n.t('validation:required.memoryUsage'),
           };
         }
 
         context.ui.addItem(
           {
             type: MessageType.INFO,
-            text: `Attempting to save to memory: "${args.trim()}"`,
+            text: i18n.t('messages:memory.saveAttempt', { content: args.trim() }),
           },
           Date.now(),
         );
@@ -78,7 +79,7 @@ export const memoryCommand: SlashCommand = {
         context.ui.addItem(
           {
             type: MessageType.INFO,
-            text: 'Refreshing memory from source files...',
+            text: i18n.t('messages:memory.refreshingFromFiles'),
           },
           Date.now(),
         );
@@ -104,8 +105,8 @@ export const memoryCommand: SlashCommand = {
 
             const successMessage =
               memoryContent.length > 0
-                ? `Memory refreshed successfully. Loaded ${memoryContent.length} characters from ${fileCount} file(s).`
-                : 'Memory refreshed successfully. No memory content found.';
+                ? i18n.t('messages:memory.refreshedSuccess', { characters: memoryContent.length, fileCount })
+                : i18n.t('messages:memory.refreshedEmpty');
 
             context.ui.addItem(
               {
@@ -120,7 +121,7 @@ export const memoryCommand: SlashCommand = {
           context.ui.addItem(
             {
               type: MessageType.ERROR,
-              text: `Error refreshing memory: ${errorMessage}`,
+              text: i18n.t('messages:memory.refreshError', { error: errorMessage }),
             },
             Date.now(),
           );

@@ -4,16 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SlashCommand } from '../commands/types.js';
+import { useTranslation } from '../../i18n/useTranslation.js';
+import { getCommandDescription } from '../utils/getCommandDescription.js';
 
 interface Help {
   commands: readonly SlashCommand[];
+  language?: 'en' | 'zh' | 'fr' | 'es';
 }
 
-export const Help: React.FC<Help> = ({ commands }) => (
+export const Help: React.FC<Help> = ({ commands, language = 'en' }) => {
+  const { t, i18n } = useTranslation();
+
+  // 同步语言设置
+  useEffect(() => {
+    if (language !== i18n.language) {
+      i18n.changeLanguage(language);
+    }
+  }, [language, i18n]);
+
+  return (
   <Box
     flexDirection="column"
     marginBottom={1}
@@ -23,46 +36,26 @@ export const Help: React.FC<Help> = ({ commands }) => (
   >
     {/* Basics */}
     <Text bold color={Colors.Foreground}>
-      Basics:
+      {t('sections.basics', { ns: 'help' })}
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        Add context
+        {t('basics.addContext', { ns: 'help' })}
       </Text>
-      : Use{' '}
-      <Text bold color={Colors.AccentPurple}>
-        @
-      </Text>{' '}
-      to specify files for context (e.g.,{' '}
-      <Text bold color={Colors.AccentPurple}>
-        @src/myFile.ts
-      </Text>
-      ) to target specific files or folders.
+      : {t('basics.addContextDesc', { ns: 'help' })}
     </Text>
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
-        Shell mode
+        {t('basics.shellMode', { ns: 'help' })}
       </Text>
-      : Execute shell commands via{' '}
-      <Text bold color={Colors.AccentPurple}>
-        !
-      </Text>{' '}
-      (e.g.,{' '}
-      <Text bold color={Colors.AccentPurple}>
-        !npm run start
-      </Text>
-      ) or use natural language (e.g.{' '}
-      <Text bold color={Colors.AccentPurple}>
-        start server
-      </Text>
-      ).
+      : {t('basics.shellModeDesc', { ns: 'help' })}
     </Text>
 
     <Box height={1} />
 
     {/* Commands */}
     <Text bold color={Colors.Foreground}>
-      Commands:
+      {t('sections.commands', { ns: 'help' })}
     </Text>
     {commands
       .filter((command) => command.description)
@@ -73,7 +66,7 @@ export const Help: React.FC<Help> = ({ commands }) => (
               {' '}
               /{command.name}
             </Text>
-            {command.description && ' - ' + command.description}
+            {command.description && ' - ' + getCommandDescription(command.name, command.description)}
           </Text>
           {command.subCommands &&
             command.subCommands.map((subCommand) => (
@@ -82,7 +75,7 @@ export const Help: React.FC<Help> = ({ commands }) => (
                   {'   '}
                   {subCommand.name}
                 </Text>
-                {subCommand.description && ' - ' + subCommand.description}
+                {subCommand.description && ' - ' + getCommandDescription(subCommand.name, subCommand.description, command.name)}
               </Text>
             ))}
         </Box>
@@ -92,83 +85,51 @@ export const Help: React.FC<Help> = ({ commands }) => (
         {' '}
         !{' '}
       </Text>
-      - shell command
+      - {t('shellCommand', { ns: 'help' })}
     </Text>
 
     <Box height={1} />
 
     {/* Shortcuts */}
     <Text bold color={Colors.Foreground}>
-      Keyboard Shortcuts:
+      {t('sections.shortcuts', { ns: 'help' })}
     </Text>
     <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Alt+Left/Right
-      </Text>{' '}
-      - Jump through words in the input
+      {t('shortcuts.altLeftRight', { ns: 'help' })}
     </Text>
     <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Ctrl+C
-      </Text>{' '}
-      - Quit application
+      {t('shortcuts.ctrlC', { ns: 'help' })}
     </Text>
     <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        {process.platform === 'win32' ? 'Ctrl+Enter' : 'Ctrl+J'}
-      </Text>{' '}
       {process.platform === 'linux'
-        ? '- New line (Alt+Enter works for certain linux distros)'
-        : '- New line'}
+        ? t('shortcuts.ctrlJLinux', { key: 'Ctrl+J', ns: 'help' })
+        : t('shortcuts.ctrlJ', { key: process.platform === 'win32' ? 'Ctrl+Enter' : 'Ctrl+J', ns: 'help' })}
     </Text>
     <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Ctrl+L
-      </Text>{' '}
-      - Clear the screen
+      {t('shortcuts.ctrlL', { ns: 'help' })}
     </Text>
     <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        {process.platform === 'darwin' ? 'Ctrl+X / Meta+Enter' : 'Ctrl+X'}
-      </Text>{' '}
-      - Open input in external editor
+      {t('shortcuts.ctrlX', { key: process.platform === 'darwin' ? 'Ctrl+X / Meta+Enter' : 'Ctrl+X', ns: 'help' })}
     </Text>
     <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Ctrl+Y
-      </Text>{' '}
-      - Toggle YOLO mode
+      {t('shortcuts.ctrlY', { ns: 'help' })}
     </Text>
     <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Enter
-      </Text>{' '}
-      - Send message
+      {t('shortcuts.enter', { ns: 'help' })}
     </Text>
     <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Esc
-      </Text>{' '}
-      - Cancel operation / Clear input (double press)
+      {t('shortcuts.esc', { ns: 'help' })}
     </Text>
     <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Shift+Tab
-      </Text>{' '}
-      - Toggle auto-accepting edits
+      {t('shortcuts.shiftTab', { ns: 'help' })}
     </Text>
     <Text color={Colors.Foreground}>
-      <Text bold color={Colors.AccentPurple}>
-        Up/Down
-      </Text>{' '}
-      - Cycle through your prompt history
+      {t('shortcuts.upDown', { ns: 'help' })}
     </Text>
     <Box height={1} />
     <Text color={Colors.Foreground}>
-      For a full list of shortcuts, see{' '}
-      <Text bold color={Colors.AccentPurple}>
-        docs/keyboard-shortcuts.md
-      </Text>
+      {t('fullShortcutsDocs', { docsPath: 'docs/keyboard-shortcuts.md', ns: 'help' })}
     </Text>
   </Box>
-);
+  );
+};

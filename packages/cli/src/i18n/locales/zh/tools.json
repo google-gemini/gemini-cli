@@ -1,0 +1,10 @@
+{
+  "processors": {
+    "contentFromFiles": "\n--- 引用文件的内容 ---",
+    "contentFromFile": "\n来自 @{{filePath}} 的内容：\n",
+    "endOfContent": "\n--- 内容结束 ---"
+  },
+  "restore": {
+    "availableToolCalls": "可恢复的工具调用：\n\n{{toolCalls}}"
+  }
+}

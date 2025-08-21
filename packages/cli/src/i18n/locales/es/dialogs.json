@@ -1,0 +1,73 @@
+{
+  "auth": {
+    "title": "Comenzar",
+    "subtitle": "Autentícate para usar Gemini CLI",
+    "description": "Elige tu método de autenticación preferido:",
+    "methods": {
+      "adc": "Credenciales Predeterminadas de Aplicación (ADC)",
+      "serviceAccount": "Clave de cuenta de servicio",
+      "oauth": "Flujo OAuth",
+      "apiKey": "Clave API"
+    },
+    "buttons": {
+      "selectMethod": "Seleccionar este método",
+      "cancel": "Cancelar",
+      "close": "Cerrar"
+    },
+    "status": {
+      "authenticated": "Autenticado",
+      "notAuthenticated": "No autenticado"
+    }
+  },
+  "settings": {
+    "title": "Configuración",
+    "subtitle": "Configura tus preferencias de Gemini CLI",
+    "sections": {
+      "general": "General",
+      "appearance": "Apariencia",
+      "behavior": "Comportamiento"
+    },
+    "options": {
+      "theme": "Tema",
+      "language": "Idioma",
+      "editor": "Editor",
+      "autoSave": "Guardado automático"
+    },
+    "buttons": {
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "reset": "Restablecer"
+    }
+  },
+  "theme": {
+    "title": "Seleccionar tema",
+    "preview": "Vista previa",
+    "applyTo": "Aplicar al tema",
+    "instructions": "Navega con {{tabInstruction}} y Enter para seleccionar",
+    "tabInstruction": "Tab/Shift+Tab"
+  },
+  "editor": {
+    "title": "Seleccionar editor",
+    "preference": "Preferencia de editor",
+    "description": "Elige tu editor preferido para editar archivos",
+    "currentPreference": "Preferencia actual: {{editor}}"
+  },
+  "folderTrust": {
+    "title": "Carpeta no confiable",
+    "message": "Esta carpeta no está en tu lista de carpetas confiables.",
+    "question": "¿Quieres confiar en esta carpeta?",
+    "buttons": {
+      "trust": "Confiar",
+      "dontTrust": "No confiar"
+    }
+  },
+  "shellConfirmation": {
+    "title": "Confirmación de ejecución de comando",
+    "message": "¿Quieres ejecutar este comando?",
+    "command": "Comando:",
+    "buttons": {
+      "execute": "Ejecutar",
+      "cancel": "Cancelar"
+    }
+  }
+}

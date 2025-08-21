@@ -14,7 +14,7 @@ export const helpCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   description: 'for help on gemini-cli',
   action: async (context) => {
-    const currentLanguage = i18n.language as 'en' | 'zh';
+    const currentLanguage = i18n.language as 'en' | 'zh' | 'fr' | 'es';
     const helpItem: Omit<HistoryItemHelp, 'id'> = {
       type: MessageType.HELP,
       timestamp: new Date(),

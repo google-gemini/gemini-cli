@@ -6,6 +6,7 @@
 
 import { DetectedIde, getIdeInfo } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import {
   RadioButtonSelect,
   RadioSelectItem,
@@ -26,6 +27,8 @@ export function IdeIntegrationNudge({
   ide,
   onComplete,
 }: IdeIntegrationNudgeProps) {
+  const { t } = useTranslation('ui');
+  
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
@@ -46,21 +49,21 @@ export function IdeIntegrationNudge({
 
   const OPTIONS: Array<RadioSelectItem<IdeIntegrationNudgeResult>> = [
     {
-      label: 'Yes',
+      label: t('buttons.yes'),
       value: {
         userSelection: 'yes',
         isExtensionPreInstalled,
       },
     },
     {
-      label: 'No (esc)',
+      label: t('confirmations.noEsc'),
       value: {
         userSelection: 'no',
         isExtensionPreInstalled,
       },
     },
     {
-      label: "No, don't ask again",
+      label: t('confirmations.noDontAskAgain'),
       value: {
         userSelection: 'dismiss',
         isExtensionPreInstalled,

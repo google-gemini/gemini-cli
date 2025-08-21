@@ -1,0 +1,35 @@
+{
+  "success": {
+    "directoriesAdded": "Directorios agregados exitosamente:\n- {{directories}}",
+    "geminiFilesAdded": "Archivos GEMINI.md agregados exitosamente desde los siguientes directorios si existen:\n- {{directories}}",
+    "checkpointSaved": "Punto de control de conversación guardado con etiqueta: {{tag}}.",
+    "checkpointDeleted": "El punto de control de conversación '{{tag}}' ha sido eliminado.",
+    "outputCopied": "Última salida copiada al portapapeles",
+    "projectRestored": "Proyecto restaurado al estado anterior a la llamada de herramienta.",
+    "authenticated": "✅ ¡Autenticación exitosa con el servidor MCP '{{serverName}}'!",
+    "installed": "Instalación exitosa."
+  },
+  "info": {
+    "connecting": "🟡 Conectando...",
+    "connected": "🟢 Conectado a {{ide}}",
+    "installing": "Instalando compañero de IDE...",
+    "discovering": "Redescubriendo herramientas desde '{{serverName}}'...",
+    "restarting": "Reiniciando servidores MCP...",
+    "authStarting": "Iniciando autenticación OAuth para el servidor MCP '{{serverName}}'...",
+    "editorSet": "Preferencia de editor establecida a \"{{editorType}}\" en configuración {{scope}}.",
+    "editorCleared": "Preferencia de editor borrada en configuración {{scope}}."
+  },
+  "status": {
+    "workspaceDirectories": "Directorios de espacio de trabajo actuales:\n{{directoryList}}",
+    "disconnected": "🔴 Desconectado",
+    "disconnectedWithDetails": "🔴 Desconectado: {{details}}",
+    "noOutput": "No hay salida en el historial",
+    "noTextToCopy": "La última salida de IA no contiene texto para copiar.",
+    "cancelled": "Operación cancelada.",
+    "userCancelled": "El usuario canceló la solicitud."
+  },
+  "warning": {
+    "loopDetected": "Se detectó un bucle potencial. Esto puede ocurrir debido a llamadas repetitivas de herramientas u otro comportamiento del modelo. La solicitud ha sido detenida.",
+    "messageWarning": "⚠️  {{message}}"
+  }
+}

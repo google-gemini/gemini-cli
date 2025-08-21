@@ -214,5 +214,109 @@
       "tool": "工具",
       "output": "输出"
     }
+  },
+  "prompts": {
+    "pressEscToClear": "再次按 Esc 清除。",
+    "pressEscToExit": "按 Esc 键退出。",
+    "pressEnterToChoose": "按 Enter 键选择选项并退出。",
+    "pressCtrlCToExit": "再次按 Ctrl+C 退出。",
+    "pressCtrlDToExit": "再次按 Ctrl+D 退出。",
+    "ctrlOForDetails": "(按 ctrl+o 查看详情)",
+    "escToDisable": " (按 esc 禁用)"
+  },
+  "status": {
+    "loading": "加载中...",
+    "codeBeingWritten": "... 正在编写代码 ...",
+    "generatingMore": "... 正在生成更多内容 ...",
+    "loadingSuggestions": "正在加载建议...",
+    "noDiffContent": "没有差异内容。",
+    "noChangesDetected": "未检测到更改。"
+  },
+  "stats": {
+    "noToolCalls": "本次会话中未进行任何工具调用。",
+    "toolName": "工具名称",
+    "calls": "调用次数",
+    "successRate": "成功率",
+    "avgDuration": "平均时长",
+    "userDecisionSummary": "用户决策摘要",
+    "totalReviewedSuggestions": "总审查建议数:",
+    "accepted": "» 已接受:",
+    "rejected": "» 已拒绝:",
+    "modified": "» 已修改:",
+    "overallAgreementRate": "总体同意率:",
+    "savingsHighlight": "节省亮点:"
+  },
+  "tools": {
+    "modifyInProgress": "正在修改中: ",
+    "urlsToFetch": "要获取的 URL:",
+    "mcpServer": "MCP 服务器: {{serverName}}",
+    "tool": "工具: {{toolName}}"
+  },
+  "debug": {
+    "consoleTitle": "调试控制台",
+    "closeHint": "(按 ctrl+o 关闭)",
+    "renders": "渲染次数: {{count}}"
+  },
+  "buttons": {
+    "yes": "是",
+    "no": "否",
+    "cancel": "取消",
+    "allow": "允许",
+    "deny": "拒绝",
+    "continue": "继续",
+    "exit": "退出"
+  },
+  "confirmations": {
+    "yesAllowOnce": "是，允许一次",
+    "yesAllowAlways": "是，总是允许",
+    "noEsc": "否 (按 esc)",
+    "modifyWithExternalEditor": "使用外部编辑器修改",
+    "noSuggestChanges": "否，建议更改 (按 esc)",
+    "yesAllowAlwaysEllipsis": "是，总是允许...",
+    "noDontAskAgain": "否，不再询问",
+    "yesAllowToolFromServer": "是，总是允许来自服务器 \"{{serverName}}\" 的工具 \"{{toolName}}\"",
+    "yesAllowAllToolsFromServer": "是，总是允许来自服务器 \"{{serverName}}\" 的所有工具"
+  },
+  "chat": {
+    "noCheckpoints": "未找到已保存的对话检查点。",
+    "missingTagSave": "缺少标签。用法: /chat save <标签>",
+    "missingTagResume": "缺少标签。用法: /chat resume <标签>",
+    "missingTagDelete": "缺少标签。用法: /chat delete <标签>",
+    "noClientAvailable": "没有可用的聊天客户端来保存对话。",
+    "checkpointSaved": "对话检查点已保存，标签为: {{tag}}。",
+    "noConversationFound": "未找到要保存的对话。",
+    "noCheckpointFound": "未找到标签为 {{tag}} 的已保存检查点。",
+    "checkpointDeleted": "对话检查点 '{{tag}}' 已删除。",
+    "deleteError": "错误: 未找到标签为 '{{tag}}' 的检查点。"
+  },
+  "copy": {
+    "noHistory": "历史记录中没有输出",
+    "copySuccess": "最后输出已复制到剪贴板",
+    "copyError": "复制到剪贴板失败。",
+    "noTextToCopy": "最后的 AI 输出不包含可复制的文本。"
+  },
+  "ide": {
+    "connected": "🟢 已连接到 {{ideName}}",
+    "connecting": "🟡 连接中...",
+    "disconnected": "🔴 已断开连接",
+    "disconnectedWithDetails": "🔴 已断开连接: {{details}}",
+    "noInstaller": "{{ideName}} 没有可用的安装程序。请从市场手动安装 '{{extensionName}}' 扩展。",
+    "installing": "正在安装 IDE 伴侣...",
+    "installSuccess": "安装成功。",
+    "installFailed": "安装失败。"
+  },
+  "mcp": {
+    "configNotLoaded": "配置未加载。",
+    "toolRegistryError": "无法获取工具注册表。",
+    "noServersConfigured": "未配置 MCP 服务器。请在浏览器中查看 MCP 文档: {{docsUrl}} 或使用命令 /docs",
+    "noOAuthServers": "未配置 OAuth 认证的 MCP 服务器。",
+    "oauthServersList": "支持 OAuth 认证的 MCP 服务器:\n{{serverList}}\n\n使用 /mcp auth <服务器名称> 进行认证。",
+    "serverNotFound": "未找到 MCP 服务器 '{{serverName}}'。",
+    "startingAuth": "正在为 MCP 服务器 '{{serverName}}' 启动 OAuth 认证...",
+    "authSuccess": "✅ 已成功认证 MCP 服务器 '{{serverName}}'!",
+    "rediscoveringTools": "正在从 '{{serverName}}' 重新发现工具...",
+    "authAndToolsSuccess": "已成功认证并刷新 '{{serverName}}' 的工具。",
+    "authError": "MCP 服务器 '{{serverName}}' 认证失败。",
+    "restartingServers": "正在重启 MCP 服务器..."
   }
 }

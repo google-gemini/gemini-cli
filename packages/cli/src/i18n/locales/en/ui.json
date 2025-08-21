@@ -214,5 +214,109 @@
       "tool": "Tool",
       "output": "Output"
     }
+  },
+  "prompts": {
+    "pressEscToClear": "Press Esc again to clear.",
+    "pressEscToExit": "Press Esc to exit.",
+    "pressEnterToChoose": "Press Enter to choose an option and exit.",
+    "pressCtrlCToExit": "Press Ctrl+C again to exit.",
+    "pressCtrlDToExit": "Press Ctrl+D again to exit.",
+    "ctrlOForDetails": "(ctrl+o for details)",
+    "escToDisable": " (esc to disable)"
+  },
+  "status": {
+    "loading": "Loading...",
+    "codeBeingWritten": "... code is being written ...",
+    "generatingMore": "... generating more ...",
+    "loadingSuggestions": "Loading suggestions...",
+    "noDiffContent": "No diff content.",
+    "noChangesDetected": "No changes detected."
+  },
+  "stats": {
+    "noToolCalls": "No tool calls have been made in this session.",
+    "toolName": "Tool Name",
+    "calls": "Calls",
+    "successRate": "Success Rate",
+    "avgDuration": "Avg Duration",
+    "userDecisionSummary": "User Decision Summary",
+    "totalReviewedSuggestions": "Total Reviewed Suggestions:",
+    "accepted": "» Accepted:",
+    "rejected": "» Rejected:",
+    "modified": "» Modified:",
+    "overallAgreementRate": "Overall Agreement Rate:",
+    "savingsHighlight": "Savings Highlight:"
+  },
+  "tools": {
+    "modifyInProgress": "Modify in progress: ",
+    "urlsToFetch": "URLs to fetch:",
+    "mcpServer": "MCP Server: {{serverName}}",
+    "tool": "Tool: {{toolName}}"
+  },
+  "debug": {
+    "consoleTitle": "Debug Console",
+    "closeHint": "(ctrl+o to close)",
+    "renders": "Renders: {{count}}"
+  },
+  "buttons": {
+    "yes": "Yes",
+    "no": "No",
+    "cancel": "Cancel",
+    "allow": "Allow",
+    "deny": "Deny",
+    "continue": "Continue",
+    "exit": "Exit"
+  },
+  "confirmations": {
+    "yesAllowOnce": "Yes, allow once",
+    "yesAllowAlways": "Yes, allow always",
+    "noEsc": "No (esc)",
+    "modifyWithExternalEditor": "Modify with external editor",
+    "noSuggestChanges": "No, suggest changes (esc)",
+    "yesAllowAlwaysEllipsis": "Yes, allow always ...",
+    "noDontAskAgain": "No, don't ask again",
+    "yesAllowToolFromServer": "Yes, always allow tool \"{{toolName}}\" from server \"{{serverName}}\"",
+    "yesAllowAllToolsFromServer": "Yes, always allow all tools from server \"{{serverName}}\""
+  },
+  "chat": {
+    "noCheckpoints": "No saved conversation checkpoints found.",
+    "missingTagSave": "Missing tag. Usage: /chat save <tag>",
+    "missingTagResume": "Missing tag. Usage: /chat resume <tag>",
+    "missingTagDelete": "Missing tag. Usage: /chat delete <tag>",
+    "noClientAvailable": "No chat client available to save conversation.",
+    "checkpointSaved": "Conversation checkpoint saved with tag: {{tag}}.",
+    "noConversationFound": "No conversation found to save.",
+    "noCheckpointFound": "No saved checkpoint found with tag: {{tag}}.",
+    "checkpointDeleted": "Conversation checkpoint '{{tag}}' has been deleted.",
+    "deleteError": "Error: No checkpoint found with tag '{{tag}}'."
+  },
+  "copy": {
+    "noHistory": "No output in history",
+    "copySuccess": "Last output copied to the clipboard",
+    "copyError": "Failed to copy to the clipboard.",
+    "noTextToCopy": "Last AI output contains no text to copy."
+  },
+  "ide": {
+    "connected": "🟢 Connected to {{ideName}}",
+    "connecting": "🟡 Connecting...",
+    "disconnected": "🔴 Disconnected",
+    "disconnectedWithDetails": "🔴 Disconnected: {{details}}",
+    "noInstaller": "No installer is available for {{ideName}}. Please install the '{{extensionName}}' extension manually from the marketplace.",
+    "installing": "Installing IDE companion...",
+    "installSuccess": "Successfully installed.",
+    "installFailed": "Installation failed."
+  },
+  "mcp": {
+    "configNotLoaded": "Config not loaded.",
+    "toolRegistryError": "Could not retrieve tool registry.",
+    "noServersConfigured": "No MCP servers configured. Please view MCP documentation in your browser: {{docsUrl}} or use the cli /docs command",
+    "noOAuthServers": "No MCP servers configured with OAuth authentication.",
+    "oauthServersList": "MCP servers with OAuth authentication:\n{{serverList}}\n\nUse /mcp auth <server-name> to authenticate.",
+    "serverNotFound": "MCP server '{{serverName}}' not found.",
+    "startingAuth": "Starting OAuth authentication for MCP server '{{serverName}}'...",
+    "authSuccess": "✅ Successfully authenticated with MCP server '{{serverName}}'!",
+    "rediscoveringTools": "Re-discovering tools from '{{serverName}}'...",
+    "authAndToolsSuccess": "Successfully authenticated and refreshed tools for '{{serverName}}'.",
+    "authError": "Authentication failed for MCP server '{{serverName}}'.",
+    "restartingServers": "Restarting MCP servers..."
   }
 }

@@ -1,0 +1,10 @@
+{
+  "processors": {
+    "contentFromFiles": "\n--- Contenido de archivos referenciados ---",
+    "contentFromFile": "\nContenido de @{{filePath}}:\n",
+    "endOfContent": "\n--- Fin del contenido ---"
+  },
+  "restore": {
+    "availableToolCalls": "Llamadas de herramienta disponibles para restaurar:\n\n{{toolCalls}}"
+  }
+}
