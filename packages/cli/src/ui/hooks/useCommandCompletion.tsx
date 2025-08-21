@@ -230,7 +230,11 @@ export function useCommandCompletion(
         }
       }
 
-      suggestionText += ' ';
+      const lineCodePoints = toCodePoints(buffer.lines[cursorRow] || '');
+      const charAfterCompletion = lineCodePoints[end];
+      if (charAfterCompletion !== ' ') {
+        suggestionText += ' ';
+      }
 
       buffer.replaceRangeByOffset(
         logicalPosToOffset(buffer.lines, cursorRow, start),
