@@ -18,7 +18,6 @@ interface MainContentProps {
   mainAreaWidth: number;
   staticAreaMaxItemHeight: number;
   availableTerminalHeight: number | undefined;
-  pendingHistoryItemRef: React.RefObject<DOMElement | null>;
   nightly: boolean;
 }
 
@@ -28,7 +27,6 @@ export const MainContent = (props: MainContentProps) => {
     mainAreaWidth,
     staticAreaMaxItemHeight,
     availableTerminalHeight,
-    pendingHistoryItemRef,
     nightly,
   } = props;
 
@@ -55,7 +53,7 @@ export const MainContent = (props: MainContentProps) => {
         {(item) => item}
       </Static>
       <OverflowProvider>
-        <Box ref={pendingHistoryItemRef} flexDirection="column">
+        <Box flexDirection="column">
           {pendingHistoryItems.map((item, i) => (
             <HistoryItemDisplay
               key={i}

@@ -43,7 +43,6 @@ export const App = (props: AppProps) => {
   const showAutoAcceptIndicator = useAutoAcceptIndicator({ config });
 
   const mainControlsRef = useRef<DOMElement>(null);
-  const pendingHistoryItemRef = useRef<DOMElement>(null);
 
   const staticExtraHeight = 3;
   const availableTerminalHeight = useMemo(() => {
@@ -145,7 +144,6 @@ export const App = (props: AppProps) => {
           mainAreaWidth={mainAreaWidth}
           staticAreaMaxItemHeight={Math.max(terminalHeight * 4, 100)}
           availableTerminalHeight={availableTerminalHeight}
-          pendingHistoryItemRef={pendingHistoryItemRef}
           nightly={nightly}
         />
 
