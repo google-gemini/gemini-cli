@@ -21,7 +21,6 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import commandExists from 'command-exists';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,6 +39,16 @@ export enum IDEConnectionStatus {
   Disconnected = 'disconnected',
   Connecting = 'connecting',
 }
+
+type StdioConfig = {
+  command: string;
+  args: string[];
+};
+
+type ConnectionConfig = {
+  port?: string;
+  stdio?: StdioConfig;
+};
 
 function getRealPath(path: string): string {
   try {
@@ -107,25 +116,37 @@ export class IdeClient {
       return;
     }
 
-    const portFromFile = await this.getPortFromFile();
-    if (portFromFile) {
-      const connected = await this.establishHttpConnection(portFromFile);
-      if (connected) {
-        return;
+    const configFromFile = await this.getConnectionConfigFromFile();
+    if (configFromFile) {
+      if (configFromFile.port) {
+        const connected = await this.establishHttpConnection(
+          configFromFile.port,
+        );
+        if (connected) {
+          return;
+        }
       }
-    }
-
-    const socketFromEnv = this.getSocketFromEnv();
-    if (socketFromEnv) {
-      const connected = await this.establishSocketConnection(socketFromEnv);
-      if (connected) {
-        return;
+      if (configFromFile.stdio) {
+        const connected = await this.establishStdioConnection(
+          configFromFile.stdio,
+        );
+        if (connected) {
+          return;
+        }
       }
     }
 
     const portFromEnv = this.getPortFromEnv();
     if (portFromEnv) {
       const connected = await this.establishHttpConnection(portFromEnv);
+      if (connected) {
+        return;
+      }
+    }
+
+    const stdioConfigFromEnv = this.getStdioConfigFromEnv();
+    if (stdioConfigFromEnv) {
+      const connected = await this.establishStdioConnection(stdioConfigFromEnv);
       if (connected) {
         return;
       }
@@ -308,15 +329,35 @@ export class IdeClient {
     return port;
   }
 
-  private getSocketFromEnv(): string | undefined {
-    const socket = process.env['GEMINI_CLI_IDE_SERVER_SOCKET'];
-    if (!socket) {
+  private getStdioConfigFromEnv(): StdioConfig | undefined {
+    const command = process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'];
+    if (!command) {
       return undefined;
     }
-    return socket;
+
+    const argsStr = process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'];
+    let args: string[] = [];
+    if (argsStr) {
+      try {
+        const parsedArgs = JSON.parse(argsStr);
+        if (Array.isArray(parsedArgs)) {
+          args = parsedArgs;
+        } else {
+          logger.error(
+            'GEMINI_CLI_IDE_SERVER_STDIO_ARGS must be a JSON array string.',
+          );
+        }
+      } catch (e) {
+        logger.error('Failed to parse GEMINI_CLI_IDE_SERVER_STDIO_ARGS:', e);
+      }
+    }
+
+    return { command, args };
   }
 
-  private async getPortFromFile(): Promise<string | undefined> {
+  private async getConnectionConfigFromFile(): Promise<
+    ConnectionConfig | undefined
+  > {
     try {
       const ideProcessId = await getIdeProcessId();
       const portFile = path.join(
@@ -324,8 +365,8 @@ export class IdeClient {
         `gemini-ide-server-${ideProcessId}.json`,
       );
       const portFileContents = await fs.promises.readFile(portFile, 'utf8');
-      const port = JSON.parse(portFileContents).port;
-      return port.toString();
+      const config = JSON.parse(portFileContents);
+      return config;
     } catch (_) {
       return undefined;
     }
@@ -413,31 +454,18 @@ export class IdeClient {
     }
   }
 
-  private async establishSocketConnection(socket: string): Promise<boolean> {
+  private async establishStdioConnection({
+    command,
+    args,
+  }: StdioConfig): Promise<boolean> {
     let transport: StdioClientTransport | undefined;
     try {
-      logger.debug('Attempting to connect to IDE via UNIX socket');
-      const command = commandExists.sync('socat')
-        ? 'socat'
-        : commandExists.sync('netcat')
-          ? 'netcat'
-          : '';
-
-      if (!command) {
-        logger.error(
-          'Neither "socat" nor "netcat" command found. Cannot connect to IDE via UNIX socket.',
-        );
-        return false;
-      }
-
+      logger.debug('Attempting to connect to IDE via stdio');
       this.client = new Client({
         name: 'stdio-client',
         // TODO(#3487): use the CLI version here.
         version: '1.0.0',
       });
-
-      const args =
-        command === 'socat' ? ['-', `UNIX-CONNECT:${socket}`] : ['-U', socket];
 
       transport = new StdioClientTransport({
         command,
