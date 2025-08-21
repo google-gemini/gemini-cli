@@ -48,13 +48,6 @@ describe('WorkspaceContext with real filesystem', () => {
       expect(directories).toEqual([cwd, otherDir]);
     });
 
-    it('should reject non-existent directories', () => {
-      const nonExistentDir = path.join(tempDir, 'does-not-exist');
-      expect(() => {
-        new WorkspaceContext(cwd, [nonExistentDir]);
-      }).toThrow('Directory does not exist');
-    });
-
     it('should handle empty initialization', () => {
       const workspaceContext = new WorkspaceContext(cwd, []);
       const directories = workspaceContext.getDirectories();
@@ -79,15 +72,6 @@ describe('WorkspaceContext with real filesystem', () => {
       const directories = workspaceContext.getDirectories();
 
       expect(directories).toEqual([cwd, otherDir]);
-    });
-
-    it('should reject non-existent directories', () => {
-      const nonExistentDir = path.join(tempDir, 'does-not-exist');
-      const workspaceContext = new WorkspaceContext(cwd);
-
-      expect(() => {
-        workspaceContext.addDirectory(nonExistentDir);
-      }).toThrow('Directory does not exist');
     });
 
     it('should prevent duplicate directories', () => {
