@@ -370,6 +370,9 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Your API key for the Gemini API.
   - One of several available [authentication methods](./authentication.md).
   - Set this in your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or an `.env` file.
+- **`GEMINI_API_BASE_URL`**:
+  - Your custom Gemini API base url.
+  - Example: `export GEMINI_API_BASE_URL="YOUR_GEMINI_API_BASE_URL"`.
 - **`GEMINI_MODEL`**:
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
