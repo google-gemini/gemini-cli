@@ -12,6 +12,8 @@ import {
   isTelemetrySdkInitialized,
   GeminiEventType,
   parseAndFormatApiError,
+  Logger,
+  Storage,
 } from '@google/gemini-cli-core';
 import { Content, Part, FunctionCall } from '@google/genai';
 
@@ -38,6 +40,19 @@ export async function runNonInteractive(
     });
 
     const geminiClient = config.getGeminiClient();
+    const storage = new Storage(config.getTargetDir());
+    const logger = new Logger(config.getSessionId(), storage);
+    await logger.initialize();
+
+    const resumeChatTag = config.getResumeChat();
+    if (resumeChatTag) {
+      const history = await logger.loadCheckpoint(resumeChatTag);
+      if (history && history.length > 0) {
+        geminiClient.setHistory(history);
+      } else {
+        throw new Error(`Chat history not found for tag: ${resumeChatTag}`);
+      }
+    }
 
     const abortController = new AbortController();
     let currentMessages: Content[] = [
@@ -123,6 +138,10 @@ export async function runNonInteractive(
         currentMessages = [{ role: 'user', parts: toolResponseParts }];
       } else {
         process.stdout.write('\n'); // Ensure a final newline
+        const saveChatTag = config.getSaveChat();
+        if (saveChatTag) {
+          await logger.saveCheckpoint(geminiClient.getHistory(), saveChatTag);
+        }
         return;
       }
     }

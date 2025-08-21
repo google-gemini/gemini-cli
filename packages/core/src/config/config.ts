@@ -200,6 +200,8 @@ export interface ConfigParameters {
   trustedFolder?: boolean;
   shouldUseNodePtyShell?: boolean;
   skipNextSpeakerCheck?: boolean;
+  saveChat?: string;
+  resumeChat?: string;
 }
 
 export class Config {
@@ -267,6 +269,8 @@ export class Config {
   private readonly trustedFolder: boolean | undefined;
   private readonly shouldUseNodePtyShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
+  private readonly saveChat: string | undefined;
+  private readonly resumeChat: string | undefined;
   private initialized: boolean = false;
   readonly storage: Storage;
 
@@ -337,6 +341,8 @@ export class Config {
     this.trustedFolder = params.trustedFolder;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
+    this.saveChat = params.saveChat;
+    this.resumeChat = params.resumeChat;
     this.storage = new Storage(this.targetDir);
 
     if (params.contextFileName) {
@@ -729,6 +735,14 @@ export class Config {
 
   getSkipNextSpeakerCheck(): boolean {
     return this.skipNextSpeakerCheck;
+  }
+
+  getSaveChat(): string | undefined {
+    return this.saveChat;
+  }
+
+  getResumeChat(): string | undefined {
+    return this.resumeChat;
   }
 
   async getGitService(): Promise<GitService> {

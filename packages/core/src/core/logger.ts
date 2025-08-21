@@ -297,6 +297,10 @@ export class Logger {
     }
 
     // 2. Fallback for backward compatibility: check for the old raw path.
+    // Prevent path traversal attacks on the fallback path.
+    if (tag.includes('..')) {
+      throw new Error(`Invalid tag: ${tag}`);
+    }
     const oldPath = path.join(this.geminiDir!, `checkpoint-${tag}.json`);
     try {
       await fs.access(oldPath);

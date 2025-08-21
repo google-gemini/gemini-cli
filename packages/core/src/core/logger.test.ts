@@ -516,6 +516,13 @@ describe('Logger', () => {
       expect(decodeTagName(encodedTag)).toBe(tag);
     });
 
+    it('should throw an error for a malicious tag', async () => {
+      const maliciousTag = '../../../../../../../../../../etc/passwd';
+      await expect(logger.loadCheckpoint(maliciousTag)).rejects.toThrow(
+        `Invalid tag: ${maliciousTag}`,
+      );
+    });
+
     it('should return an empty array if a tagged checkpoint file does not exist', async () => {
       const loaded = await logger.loadCheckpoint('nonexistent-tag');
       expect(loaded).toEqual([]);

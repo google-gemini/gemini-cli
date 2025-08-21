@@ -60,6 +60,8 @@ describe('runNonInteractive', () => {
 
     mockGeminiClient = {
       sendMessageStream: vi.fn(),
+      getHistory: vi.fn().mockReturnValue([]),
+      setHistory: vi.fn(),
     };
 
     mockConfig = {
@@ -71,6 +73,10 @@ describe('runNonInteractive', () => {
       getFullContext: vi.fn().mockReturnValue(false),
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
       getDebugMode: vi.fn().mockReturnValue(false),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      getResumeChat: vi.fn().mockReturnValue(undefined),
+      getSaveChat: vi.fn().mockReturnValue(undefined),
+      getTargetDir: vi.fn().mockReturnValue('/test/dir'),
     } as unknown as Config;
   });
 

@@ -428,6 +428,13 @@ Arguments passed directly when running the CLI can override other configurations
   - The prompt is processed within the interactive session, not before it.
   - Cannot be used when piping input from stdin.
   - Example: `gemini -i "explain this code"`
+- **`--save-chat <tag>`** and **`--resume-chat <tag>`**:
+  - **Description:**
+    - `--save-chat`: Saves the chat history of a non-interactive session. This is useful for keeping a record of conversations that are initiated with the `--prompt` flag.
+    - `--resume-chat`: Resumes a previous chat session in non-interactive modes.
+  - **Usage:**
+    - `gemini --prompt "your prompt here" --save-chat my-session`
+    - `gemini --prompt "your follow up here" --resume-chat my-session`
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
 - **`--sandbox-image`**:

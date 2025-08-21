@@ -53,6 +53,8 @@ export interface CliArgs {
   sandboxImage: string | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
+  saveChat: string | undefined;
+  resumeChat: string | undefined;
   promptInteractive: string | undefined;
   allFiles: boolean | undefined;
   all_files: boolean | undefined;
@@ -94,12 +96,22 @@ export async function parseArguments(): Promise<CliArgs> {
           type: 'string',
           description: 'Prompt. Appended to input on stdin (if any).',
         })
+        .option('save-chat', {
+          type: 'string',
+          description: 'Save the chat history to a tag.',
+        })
+        .option('resume-chat', {
+          type: 'string',
+          description: 'Resume the chat history from a tag.',
+        })
         .option('prompt-interactive', {
           alias: 'i',
           type: 'string',
           description:
             'Execute the provided prompt and continue in interactive mode',
         })
+        .alias('save-chat', 'saveChat')
+        .alias('resume-chat', 'resumeChat')
         .option('sandbox', {
           alias: 's',
           type: 'boolean',
@@ -542,6 +554,8 @@ export async function loadCliConfig(
     trustedFolder,
     shouldUseNodePtyShell: settings.shouldUseNodePtyShell,
     skipNextSpeakerCheck: settings.skipNextSpeakerCheck,
+    saveChat: argv.saveChat,
+    resumeChat: argv.resumeChat,
   });
 }
 
