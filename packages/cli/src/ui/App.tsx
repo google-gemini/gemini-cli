@@ -991,7 +991,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           ) : isFolderTrustDialogOpen ? (
             <FolderTrustDialog
               onSelect={handleFolderTrustSelect}
-              onRestartRequest={() => process.exit(0)}
               isRestarting={isRestarting}
             />
           ) : shellConfirmationRequest ? (

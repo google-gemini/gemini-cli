@@ -74,17 +74,13 @@ function mergeSettings(
   system: Settings,
   user: Settings,
   workspace: Settings,
-  isTrusted?: boolean,
+  isTrusted: boolean,
 ): Settings {
+  const safeWorkspace = isTrusted ? workspace : ({} as Settings);
+
   // folderTrust is not supported at workspace level.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { folderTrust, ...workspaceWithoutFolderTrust } = workspace;
-
-  const isSafeWorkspace = isTrusted ?? true;
-  const safeWorkspace = isSafeWorkspace ? workspace : ({} as Settings);
-  const safeWorkspaceWithoutFolderTrust = isSafeWorkspace
-    ? workspaceWithoutFolderTrust
-    : ({} as Settings);
+  const { folderTrust, ...safeWorkspaceWithoutFolderTrust } = safeWorkspace;
 
   return {
     ...user,
@@ -119,7 +115,7 @@ export class LoadedSettings {
     user: SettingsFile,
     workspace: SettingsFile,
     errors: SettingsError[],
-    isTrusted?: boolean,
+    isTrusted: boolean,
   ) {
     this.system = system;
     this.user = user;
@@ -133,7 +129,7 @@ export class LoadedSettings {
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
   readonly errors: SettingsError[];
-  readonly isTrusted: boolean | undefined;
+  readonly isTrusted: boolean;
 
   private _merged: Settings;
 
@@ -417,7 +413,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
 
   // For the initial trust check, we can only use user and system settings.
   const initialTrustCheckSettings = { ...systemSettings, ...userSettings };
-  const isTrusted = isWorkspaceTrusted(initialTrustCheckSettings);
+  const isTrusted = isWorkspaceTrusted(initialTrustCheckSettings) ?? true;
 
   // Create a temporary merged settings object to pass to loadEnvironment.
   const tempMergedSettings = mergeSettings(
