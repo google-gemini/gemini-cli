@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, darkTheme, ansiTheme } from './theme.js';
+import { lightTheme, darkTheme, ansiTheme, type ColorsTheme } from './theme.js';
 
 export interface SemanticColors {
   text: {
@@ -25,14 +25,47 @@ export interface SemanticColors {
     focused: string;
   };
   ui: {
-    comment: string;
-    symbol: string;
     gradient: string[] | undefined;
   };
   status: {
     error: string;
     success: string;
     warning: string;
+  };
+}
+
+/**
+ * Creates semantic colors from a theme's color palette.
+ * @param colors The theme's color palette.
+ * @returns Semantic colors derived from the theme's colors.
+ */
+export function createSemanticColors(colors: ColorsTheme): SemanticColors {
+  return {
+    text: {
+      primary: colors.Foreground,
+      secondary: colors.Gray,
+      link: colors.AccentBlue,
+      accent: colors.AccentPurple,
+    },
+    background: {
+      primary: colors.Background,
+      diff: {
+        added: colors.DiffAdded,
+        removed: colors.DiffRemoved,
+      },
+    },
+    border: {
+      default: colors.Gray,
+      focused: colors.AccentBlue,
+    },
+    ui: {
+      gradient: colors.GradientColors,
+    },
+    status: {
+      error: colors.AccentRed,
+      success: colors.AccentGreen,
+      warning: colors.AccentYellow,
+    },
   };
 }
 
@@ -55,8 +88,6 @@ export const lightSemanticColors: SemanticColors = {
     focused: lightTheme.AccentBlue,
   },
   ui: {
-    comment: lightTheme.Comment,
-    symbol: lightTheme.Gray,
     gradient: lightTheme.GradientColors,
   },
   status: {
@@ -85,8 +116,6 @@ export const darkSemanticColors: SemanticColors = {
     focused: darkTheme.AccentBlue,
   },
   ui: {
-    comment: darkTheme.Comment,
-    symbol: darkTheme.Gray,
     gradient: darkTheme.GradientColors,
   },
   status: {
@@ -115,8 +144,6 @@ export const ansiSemanticColors: SemanticColors = {
     focused: ansiTheme.AccentBlue,
   },
   ui: {
-    comment: ansiTheme.Comment,
-    symbol: ansiTheme.Gray,
     gradient: ansiTheme.GradientColors,
   },
   status: {

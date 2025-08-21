@@ -7,7 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import Gradient from 'ink-gradient';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { shortAsciiLogo, longAsciiLogo, tinyAsciiLogo } from './AsciiArt.js';
 import { getAsciiArtWidth } from '../utils/textUtils.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -17,6 +17,16 @@ interface HeaderProps {
   version: string;
   nightly: boolean;
 }
+
+const GradientText: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const textElement = <Text color={theme.text.primary}>{children}</Text>;
+  if (theme.ui.gradient && theme.ui.gradient.length > 0) {
+    return <Gradient colors={theme.ui.gradient}>{textElement}</Gradient>;
+  }
+  return textElement;
+};
 
 export const Header: React.FC<HeaderProps> = ({
   customAsciiArt,
@@ -47,22 +57,12 @@ export const Header: React.FC<HeaderProps> = ({
       flexShrink={0}
       flexDirection="column"
     >
-      {Colors.GradientColors ? (
-        <Gradient colors={Colors.GradientColors}>
-          <Text>{displayTitle}</Text>
-        </Gradient>
-      ) : (
-        <Text>{displayTitle}</Text>
-      )}
+      <Box>
+        <GradientText>{displayTitle}</GradientText>
+      </Box>
       {nightly && (
         <Box width="100%" flexDirection="row" justifyContent="flex-end">
-          {Colors.GradientColors ? (
-            <Gradient colors={Colors.GradientColors}>
-              <Text>v{version}</Text>
-            </Gradient>
-          ) : (
-            <Text>v{version}</Text>
-          )}
+          <Text color={theme.text.primary}>v{version}</Text>
         </Box>
       )}
     </Box>

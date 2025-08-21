@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import {
   EDITOR_DISPLAY_NAMES,
   editorSettingsManager,
@@ -103,7 +103,7 @@ export function EditorSettingsDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={Colors.Gray}
+      borderColor={theme.border.default}
       flexDirection="row"
       padding={1}
       width="100%"
@@ -111,7 +111,7 @@ export function EditorSettingsDialog({
       <Box flexDirection="column" width="45%" paddingRight={2}>
         <Text bold={focusedSection === 'editor'}>
           {focusedSection === 'editor' ? '> ' : '  '}Select Editor{' '}
-          <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
+          <Text color={theme.text.secondary}>{otherScopeModifiedMessage}</Text>
         </Text>
         <RadioButtonSelect
           items={editorItems.map((item) => ({
@@ -138,7 +138,7 @@ export function EditorSettingsDialog({
         </Box>
 
         <Box marginTop={1}>
-          <Text color={Colors.Gray}>
+          <Text color={theme.text.secondary}>
             (Use Enter to select, Tab to change focus)
           </Text>
         </Box>
@@ -147,17 +147,17 @@ export function EditorSettingsDialog({
       <Box flexDirection="column" width="55%" paddingLeft={2}>
         <Text bold>Editor Preference</Text>
         <Box flexDirection="column" gap={1} marginTop={1}>
-          <Text color={Colors.Gray}>
+          <Text color={theme.text.secondary}>
             These editors are currently supported. Please note that some editors
             cannot be used in sandbox mode.
           </Text>
-          <Text color={Colors.Gray}>
+          <Text color={theme.text.secondary}>
             Your preferred editor is:{' '}
             <Text
               color={
                 mergedEditorName === 'None'
-                  ? Colors.AccentRed
-                  : Colors.AccentCyan
+                  ? theme.status.error
+                  : theme.text.accent
               }
               bold
             >

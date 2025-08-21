@@ -50,8 +50,6 @@ export interface CustomTheme {
     focused?: string;
   };
   ui?: {
-    comment?: string;
-    symbol?: string;
     gradient?: string[];
   };
   status?: {
@@ -235,7 +233,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       customTheme.background?.diff?.added ?? customTheme.DiffAdded ?? '',
     DiffRemoved:
       customTheme.background?.diff?.removed ?? customTheme.DiffRemoved ?? '',
-    Comment: customTheme.ui?.comment ?? customTheme.Comment ?? '',
+    Comment: customTheme.text?.secondary ?? customTheme.Comment ?? '',
     Gray: customTheme.text?.secondary ?? customTheme.Gray ?? '',
     GradientColors: customTheme.ui?.gradient ?? customTheme.GradientColors,
   };
@@ -397,8 +395,6 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       focused: colors.AccentBlue,
     },
     ui: {
-      comment: colors.Comment,
-      symbol: colors.Gray,
       gradient: colors.GradientColors,
     },
     status: {

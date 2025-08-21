@@ -5,7 +5,7 @@
  */
 
 import { lightTheme, Theme } from './theme.js';
-import { lightSemanticColors } from './semantic-tokens.js';
+import { createSemanticColors } from './semantic-tokens.js';
 
 export const DefaultLight: Theme = new Theme(
   'Default Light',
@@ -104,5 +104,5 @@ export const DefaultLight: Theme = new Theme(
     },
   },
   lightTheme,
-  lightSemanticColors,
+  createSemanticColors(lightTheme),
 );

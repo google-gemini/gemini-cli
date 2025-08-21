@@ -250,7 +250,7 @@ exports[`<StatsDisplay /> > renders only the Performance section in its zero sta
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✔ 0 ✖ 0 )                                                       │
+│  Tool Calls:                 1 ( ✔ 0 ✖ 0 )                                                       │
 │  Success Rate:               0.0%                                                                │
 │                                                                                                  │
 │  Performance                                                                                     │

@@ -5,7 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
-import { darkSemanticColors } from './semantic-tokens.js';
+import { createSemanticColors } from './semantic-tokens.js';
 
 const atomOneDarkColors: ColorsTheme = {
   type: 'dark',
@@ -117,23 +117,23 @@ export const AtomOneDark: Theme = new Theme(
       color: atomOneDarkColors.AccentYellow,
     },
     'hljs-symbol': {
-      color: atomOneDarkColors.AccentBlue,
+      color: atomOneDarkColors.AccentYellow,
     },
     'hljs-bullet': {
-      color: atomOneDarkColors.AccentBlue,
+      color: atomOneDarkColors.AccentYellow,
     },
     'hljs-link': {
-      color: atomOneDarkColors.AccentBlue,
+      color: atomOneDarkColors.AccentCyan,
       textDecoration: 'underline',
     },
     'hljs-meta': {
-      color: atomOneDarkColors.AccentBlue,
+      color: atomOneDarkColors.AccentCyan,
     },
     'hljs-selector-id': {
-      color: atomOneDarkColors.AccentBlue,
+      color: atomOneDarkColors.AccentCyan,
     },
     'hljs-title': {
-      color: atomOneDarkColors.AccentBlue,
+      color: atomOneDarkColors.AccentCyan,
     },
     'hljs-emphasis': {
       fontStyle: 'italic',
@@ -143,5 +143,5 @@ export const AtomOneDark: Theme = new Theme(
     },
   },
   atomOneDarkColors,
-  darkSemanticColors,
+  createSemanticColors(atomOneDarkColors),
 );
