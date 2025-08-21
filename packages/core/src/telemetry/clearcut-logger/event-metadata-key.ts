@@ -240,4 +240,20 @@ export enum EventMetadataKey {
 
   // Logs tool type whether it is mcp or native.
   GEMINI_CLI_TOOL_TYPE = 62,
+
+  // ==========================================================================
+  // File Operation Event Keys
+  // ===========================================================================
+
+  // Logs the operation type of the file operation.
+  GEMINI_CLI_FILE_OPERATION_OPERATION = 63,
+
+  // Logs the number of lines in the file operation.
+  GEMINI_CLI_FILE_OPERATION_LINES = 64,
+
+  // Logs the mimetype of the file in the file operation.
+  GEMINI_CLI_FILE_OPERATION_MIMETYPE = 65,
+
+  // Logs the extension of the file in the file operation.
+  GEMINI_CLI_FILE_OPERATION_EXTENSION = 66,
 }

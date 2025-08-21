@@ -24,11 +24,10 @@ import {
 } from '../utils/fileUtils.js';
 import { PartListUnion } from '@google/genai';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
-import {
-  recordFileOperationMetric,
-  FileOperation,
-} from '../telemetry/metrics.js';
+import { FileOperation } from '../telemetry/metrics.js';
 import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
+import { logFileOperation } from '../telemetry/loggers.js';
+import { FileOperationEvent } from '../telemetry/types.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -474,14 +473,17 @@ ${finalExclusionPatternsForDescription
           const programming_language = getProgrammingLanguage({
             absolute_path: filePath,
           });
-          recordFileOperationMetric(
+          logFileOperation(
             this.config,
-            FileOperation.READ,
-            lines,
-            mimetype,
-            path.extname(filePath),
-            undefined,
-            programming_language,
+            new FileOperationEvent(
+              ReadManyFilesTool.Name,
+              FileOperation.READ,
+              lines,
+              mimetype,
+              path.extname(filePath),
+              undefined,
+              programming_language,
+            ),
           );
         }
       } else {
