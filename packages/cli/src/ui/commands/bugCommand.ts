@@ -37,8 +37,12 @@ export const bugCommand: SlashCommand = {
     const modelVersion = config?.getModel() || 'Unknown';
     const cliVersion = await getCliVersion();
     const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
+    const ideClient =
+      (context.services.config?.getIdeMode() &&
+        context.services.config?.getIdeClient()?.getDetectedIdeDisplayName()) ||
+      '';
 
-    const info = `
+    let info = `
 * **CLI Version:** ${cliVersion}
 * **Git Commit:** ${GIT_COMMIT_INFO}
 * **Session ID:** ${sessionId}
@@ -47,6 +51,9 @@ export const bugCommand: SlashCommand = {
 * **Model Version:** ${modelVersion}
 * **Memory Usage:** ${memoryUsage}
 `;
+    if (ideClient) {
+      info += `* **IDE Client:** ${ideClient}\n`;
+    }
 
     let bugReportUrl =
       'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}';

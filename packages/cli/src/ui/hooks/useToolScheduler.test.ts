@@ -55,6 +55,11 @@ const mockConfig = {
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
   getUsageStatisticsEnabled: () => true,
   getDebugMode: () => false,
+  getSessionId: () => 'test-session-id',
+  getContentGeneratorConfig: () => ({
+    model: 'test-model',
+    authType: 'oauth-personal',
+  }),
 };
 
 class MockToolInvocation extends BaseToolInvocation<object, ToolResult> {
@@ -189,7 +194,6 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     (mockToolRequiresConfirmation.execute as Mock).mockResolvedValue({
       llmContent: expectedOutput,
       returnDisplay: 'YOLO Formatted tool output',
-      summary: 'YOLO summary',
     } as ToolResult);
 
     const { result } = renderSchedulerInYoloMode();
@@ -347,7 +351,6 @@ describe('useReactToolScheduler', () => {
     (mockTool.execute as Mock).mockResolvedValue({
       llmContent: 'Tool output',
       returnDisplay: 'Formatted tool output',
-      summary: 'Formatted summary',
     } as ToolResult);
     (mockTool.shouldConfirmExecute as Mock).mockResolvedValue(null);
 
@@ -512,7 +515,6 @@ describe('useReactToolScheduler', () => {
     (mockToolRequiresConfirmation.execute as Mock).mockResolvedValue({
       llmContent: expectedOutput,
       returnDisplay: 'Confirmed display',
-      summary: 'Confirmed summary',
     } as ToolResult);
 
     const { result } = renderScheduler();
@@ -679,7 +681,6 @@ describe('useReactToolScheduler', () => {
       resolveExecutePromise({
         llmContent: 'Final output',
         returnDisplay: 'Final display',
-        summary: 'Final summary',
       } as ToolResult);
     });
     await act(async () => {
@@ -713,7 +714,6 @@ describe('useReactToolScheduler', () => {
     tool1.execute.mockResolvedValue({
       llmContent: 'Output 1',
       returnDisplay: 'Display 1',
-      summary: 'Summary 1',
     } as ToolResult);
     tool1.shouldConfirmExecute.mockResolvedValue(null);
 
@@ -721,7 +721,6 @@ describe('useReactToolScheduler', () => {
     tool2.execute.mockResolvedValue({
       llmContent: 'Output 2',
       returnDisplay: 'Display 2',
-      summary: 'Summary 2',
     } as ToolResult);
     tool2.shouldConfirmExecute.mockResolvedValue(null);
 
@@ -804,7 +803,6 @@ describe('useReactToolScheduler', () => {
           resolve({
             llmContent: 'done',
             returnDisplay: 'done display',
-            summary: 'done summary',
           }),
         50,
       ),

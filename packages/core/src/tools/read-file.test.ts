@@ -71,6 +71,15 @@ describe('ReadFileTool', () => {
       );
     });
 
+    it('should throw error if path is empty', () => {
+      const params: ReadFileToolParams = {
+        absolute_path: '',
+      };
+      expect(() => tool.build(params)).toThrow(
+        /The 'absolute_path' parameter must be non-empty./,
+      );
+    });
+
     it('should throw error if offset is negative', () => {
       const params: ReadFileToolParams = {
         absolute_path: path.join(tempRootDir, 'test.txt'),
@@ -210,7 +219,7 @@ describe('ReadFileTool', () => {
         returnDisplay: 'Path is a directory.',
         error: {
           message: `Path is a directory, not a file: ${dirPath}`,
-          type: ToolErrorType.INVALID_TOOL_PARAMS,
+          type: ToolErrorType.TARGET_IS_DIRECTORY,
         },
       });
     });

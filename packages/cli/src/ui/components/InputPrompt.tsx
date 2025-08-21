@@ -89,7 +89,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [cursorPosition, setCursorPosition] = useState<[number, number]>([
     0, 0,
   ]);
-  const shellHistory = useShellHistory(config.getProjectRoot());
+  const shellHistory = useShellHistory(config.getProjectRoot(), config.storage);
   const historyData = shellHistory.history;
 
   const completion = useCommandCompletion(
@@ -334,6 +334,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       /// We want to handle paste even when not focused to support drag and drop.
       /// Also allow drag character collection when not focused.
       if (!focus && !key.paste && !isDragCollectingRef.current) {
+        return;
+      }
+
+      if (key.paste) {
+        // Ensure we never accidentally interpret paste as regular input.
+        buffer.handleInput(key);
         return;
       }
 
