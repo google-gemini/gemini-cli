@@ -15,6 +15,7 @@ import {
 } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
+import { ToolErrorType } from './tool-error.js';
 
 /**
  * Parameters for the LS tool
@@ -114,11 +115,19 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
   }
 
   // Helper for consistent error formatting
-  private errorResult(llmContent: string, returnDisplay: string): ToolResult {
+  private errorResult(
+    llmContent: string,
+    returnDisplay: string,
+    type: ToolErrorType,
+  ): ToolResult {
     return {
       llmContent,
       // Keep returnDisplay simpler in core logic
       returnDisplay: `Error: ${returnDisplay}`,
+      error: {
+        message: llmContent,
+        type,
+      },
     };
   }
 
@@ -135,12 +144,14 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
         return this.errorResult(
           `Error: Directory not found or inaccessible: ${this.params.path}`,
           `Directory not found or inaccessible.`,
+          ToolErrorType.FILE_NOT_FOUND,
         );
       }
       if (!stats.isDirectory()) {
         return this.errorResult(
           `Error: Path is not a directory: ${this.params.path}`,
           `Path is not a directory.`,
+          ToolErrorType.PATH_IS_NOT_A_DIRECTORY,
         );
       }
 
@@ -253,7 +264,11 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       };
     } catch (error) {
       const errorMsg = `Error listing directory: ${error instanceof Error ? error.message : String(error)}`;
-      return this.errorResult(errorMsg, 'Failed to list directory.');
+      return this.errorResult(
+        errorMsg,
+        'Failed to list directory.',
+        ToolErrorType.LS_EXECUTION_ERROR,
+      );
     }
   }
 }

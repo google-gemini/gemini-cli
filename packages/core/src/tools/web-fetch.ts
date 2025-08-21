@@ -13,6 +13,7 @@ import {
   ToolInvocation,
   ToolResult,
 } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { ApprovalMode, Config } from '../config/config.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
@@ -73,12 +74,6 @@ class WebFetchToolInvocation extends BaseToolInvocation<
 
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
     const urls = extractUrls(this.params.prompt);
-    if (urls.length === 0) {
-      return {
-        llmContent: 'Error: No URL found in the prompt for fallback.',
-        returnDisplay: 'Error: No URL found in the prompt for fallback.',
-      };
-    }
     // For now, we only support one URL for fallback
     let url = urls[0];
 
@@ -130,6 +125,10 @@ ${textContent}
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_FALLBACK_FAILED,
+        },
       };
     }
   }
@@ -300,6 +299,10 @@ ${sourceListFormatted.join('\n')}`;
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_PROCESSING_ERROR,
+        },
       };
     }
   }
