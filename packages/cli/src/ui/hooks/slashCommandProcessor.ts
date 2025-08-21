@@ -16,6 +16,7 @@ import {
   makeSlashCommandEvent,
   SlashCommandStatus,
   ToolConfirmationOutcome,
+  Storage,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
@@ -82,11 +83,14 @@ export const useSlashCommandProcessor = (
     if (!config?.getProjectRoot()) {
       return;
     }
-    return new GitService(config.getProjectRoot());
+    return new GitService(config.getProjectRoot(), config.storage);
   }, [config]);
 
   const logger = useMemo(() => {
-    const l = new Logger(config?.getSessionId() || '');
+    const l = new Logger(
+      config?.getSessionId() || '',
+      config?.storage ?? new Storage(process.cwd()),
+    );
     // The logger's initialize is async, but we can create the instance
     // synchronously. Commands that use it will await its initialization.
     return l;
@@ -206,7 +210,22 @@ export const useSlashCommandProcessor = (
     ],
   );
 
-  const ideMode = config?.getIdeMode();
+  useEffect(() => {
+    if (!config) {
+      return;
+    }
+
+    const ideClient = config.getIdeClient();
+    const listener = () => {
+      reloadCommands();
+    };
+
+    ideClient.addStatusChangeListener(listener);
+
+    return () => {
+      ideClient.removeStatusChangeListener(listener);
+    };
+  }, [config, reloadCommands]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -228,7 +247,7 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config, ideMode, reloadTrigger]);
+  }, [config, reloadTrigger]);
 
   const handleSlashCommand = useCallback(
     async (

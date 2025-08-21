@@ -29,6 +29,8 @@ Gemini CLI uses `settings.json` files for persistent configuration. There are th
 
 **Note on environment variables in settings:** String values within your `settings.json` files can reference environment variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically resolved when the settings are loaded. For example, if you have an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`.
 
+> **Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI in a corporate environment, please see the [Enterprise Configuration](./enterprise.md) documentation.
+
 ### The `.gemini` directory in your project
 
 In addition to a project settings file, a project's `.gemini` directory can contain other project-specific files related to Gemini CLI's operation, such as:
@@ -127,16 +129,20 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Example:** `"toolCallCommand": "bin/call_tool"`
 
 - **`mcpServers`** (object):
-  - **Description:** Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools. Gemini CLI attempts to connect to each configured MCP server to discover available tools. If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts. Note that the system might strip certain schema properties from MCP tool definitions for compatibility.
+  - **Description:** Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools. Gemini CLI attempts to connect to each configured MCP server to discover available tools. If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts. Note that the system might strip certain schema properties from MCP tool definitions for compatibility. At least one of `command`, `url`, or `httpUrl` must be provided. If multiple are specified, the order of precedence is `httpUrl`, then `url`, then `command`.
   - **Default:** Empty
   - **Properties:**
     - **`<SERVER_NAME>`** (object): The server parameters for the named server.
-      - `command` (string, required): The command to execute to start the MCP server.
+      - `command` (string, optional): The command to execute to start the MCP server via standard I/O.
       - `args` (array of strings, optional): Arguments to pass to the command.
       - `env` (object, optional): Environment variables to set for the server process.
       - `cwd` (string, optional): The working directory in which to start the server.
+      - `url` (string, optional): The URL of an MCP server that uses Server-Sent Events (SSE) for communication.
+      - `httpUrl` (string, optional): The URL of an MCP server that uses streamable HTTP for communication.
+      - `headers` (object, optional): A map of HTTP headers to send with requests to `url` or `httpUrl`.
       - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
       - `trust` (boolean, optional): Trust this server and bypass all tool call confirmations.
+      - `description` (string, optional): A brief description of the server, which may be used for display purposes.
       - `includeTools` (array of strings, optional): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (whitelist behavior). If not specified, all tools from the server are enabled by default.
       - `excludeTools` (array of strings, optional): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
   - **Example:**
@@ -161,6 +167,20 @@ In addition to a project settings file, a project's `.gemini` directory can cont
         "env": {
           "API_KEY": "$MY_API_TOKEN"
         }
+      },
+      "mySseServer": {
+        "url": "http://localhost:8081/events",
+        "headers": {
+          "Authorization": "Bearer $MY_SSE_TOKEN"
+        },
+        "description": "An example SSE-based MCP server."
+      },
+      "myStreamableHttpServer": {
+        "httpUrl": "http://localhost:8082/stream",
+        "headers": {
+          "X-API-Key": "$MY_HTTP_API_KEY"
+        },
+        "description": "An example Streamable HTTP-based MCP server."
       }
     }
     ```
