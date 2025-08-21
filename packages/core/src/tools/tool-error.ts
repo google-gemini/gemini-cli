@@ -27,7 +27,9 @@ export enum ToolErrorType {
 
   // Edit-specific Errors
   EDIT_PREPARATION_FAILURE = 'edit_preparation_failure',
+  EDIT_APPLICATION_FAILURE = 'edit_application_failure',
   EDIT_NO_OCCURRENCE_FOUND = 'edit_no_occurrence_found',
   EDIT_EXPECTED_OCCURRENCE_MISMATCH = 'edit_expected_occurrence_mismatch',
   EDIT_NO_CHANGE = 'edit_no_change',
+  EDIT_AMBIGUOUS_MATCH = 'edit_ambiguous_match',
 }
