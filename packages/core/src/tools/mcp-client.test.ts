@@ -12,6 +12,7 @@ import {
   isEnabled,
   hasValidTypes,
   McpClient,
+  hasNetworkTransport,
 } from './mcp-client.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -564,6 +565,36 @@ describe('mcp-client', () => {
         properties: {},
       };
       expect(hasValidTypes(schema)).toBe(true);
+    });
+  });
+
+  describe('hasNetworkTransport', () => {
+    it('should return true if only url is provided', () => {
+      const config = { url: 'http://example.com' };
+      expect(hasNetworkTransport(config)).toBe(true);
+    });
+
+    it('should return true if only httpUrl is provided', () => {
+      const config = { httpUrl: 'http://example.com' };
+      expect(hasNetworkTransport(config)).toBe(true);
+    });
+
+    it('should return true if both url and httpUrl are provided', () => {
+      const config = {
+        url: 'http://example.com/sse',
+        httpUrl: 'http://example.com/http',
+      };
+      expect(hasNetworkTransport(config)).toBe(true);
+    });
+
+    it('should return false if neither url nor httpUrl is provided', () => {
+      const config = { command: 'do-something' };
+      expect(hasNetworkTransport(config)).toBe(false);
+    });
+
+    it('should return false for an empty config object', () => {
+      const config = {};
+      expect(hasNetworkTransport(config)).toBe(false);
     });
   });
 });
