@@ -96,7 +96,6 @@ describe('InputPrompt', () => {
   const mockedUseCommandCompletion = vi.mocked(useCommandCompletion);
   const mockedUseInputHistory = vi.mocked(useInputHistory);
 
-
   beforeEach(() => {
     vi.resetAllMocks();
 
