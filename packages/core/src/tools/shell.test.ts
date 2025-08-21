@@ -438,7 +438,7 @@ describe('build', () => {
     // Simulate only /root/test exists
     vi.mocked(fs.existsSync).mockImplementation((p) => {
       const normalizedPath =
-        typeof p === 'string' ? p.split(path.sep).join('/') : p;
+        typeof p === 'string' ? p.replace(/[\\/]+/g, '/') : p;
       return normalizedPath === '/root/test';
     });
     const invocation = shellTool.build({
@@ -461,7 +461,7 @@ describe('build', () => {
     // Simulate both /root/test and /users/test/test exist
     vi.mocked(fs.existsSync).mockImplementation((p) => {
       const normalizedPath =
-        typeof p === 'string' ? p.split(path.sep).join('/') : p;
+        typeof p === 'string' ? p.replace(/[\\/]+/g, '/') : p;
       return (
         normalizedPath === '/root/test' || normalizedPath === '/users/test/test'
       );
@@ -507,7 +507,7 @@ describe('build', () => {
     // Only /users/test/subdir exists
     vi.mocked(fs.existsSync).mockImplementation((p) => {
       const normalizedPath =
-        typeof p === 'string' ? p.split(path.sep).join('/') : p;
+        typeof p === 'string' ? p.replace(/[\\/]+/g, '/') : p;
       return normalizedPath === '/users/test/subdir';
     });
     const result = shellTool.validateToolParams({
@@ -547,7 +547,7 @@ describe('build', () => {
         // Mock isPathWithinWorkspace to return false for /users/test/dir (simulating it's outside workspace)
         mockContext.isPathWithinWorkspace = vi.fn().mockImplementation((p) => {
           const normalizedPath =
-            typeof p === 'string' ? p.split(path.sep).join('/') : p;
+            typeof p === 'string' ? p.replace(/[\\/]+/g, '/') : p;
           return normalizedPath !== '/users/test/dir';
         });
         return mockContext;
@@ -557,7 +557,7 @@ describe('build', () => {
     // Directory exists at /users/test/dir but isPathWithinWorkspace returns false for it
     vi.mocked(fs.existsSync).mockImplementation((p) => {
       const normalizedPath =
-        typeof p === 'string' ? p.split(path.sep).join('/') : p;
+        typeof p === 'string' ? p.replace(/[\\/]+/g, '/') : p;
       return normalizedPath === '/users/test/dir';
     });
     const result = shellTool.validateToolParams({
@@ -580,7 +580,7 @@ describe('build', () => {
     // Only /root/foo exists, not /root/foobar
     vi.mocked(fs.existsSync).mockImplementation((p) => {
       const normalizedPath =
-        typeof p === 'string' ? p.split(path.sep).join('/') : p;
+        typeof p === 'string' ? p.replace(/[\\/]+/g, '/') : p;
       return normalizedPath === '/root/foo';
     });
     const result = shellTool.validateToolParams({
@@ -622,13 +622,14 @@ describe('build', () => {
       getWorkspaceContext: () =>
         createMockWorkspaceContext('/root', ['/users/test']),
       getGeminiClient: vi.fn(),
+      getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
 
     // Only /users/test/subdir exists
     vi.mocked(fs.existsSync).mockImplementation((p) => {
       const normalizedPath =
-        typeof p === 'string' ? p.split(path.sep).join('/') : p;
+        typeof p === 'string' ? p.replace(/[\\/]+/g, '/') : p;
       return normalizedPath === '/users/test/subdir';
     });
 
@@ -659,7 +660,7 @@ describe('build', () => {
 
     // Normalize the captured cwd for comparison on Windows
     const normalizedCapturedCwd = capturedCwd
-      ? capturedCwd.split(path.sep).join('/')
+      ? capturedCwd.replace(/[\\/]+/g, '/')
       : capturedCwd;
     expect(normalizedCapturedCwd).toBe('/users/test/subdir');
   });
