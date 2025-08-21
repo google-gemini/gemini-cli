@@ -11,6 +11,10 @@ import fs from 'fs/promises';
 import os from 'os';
 import { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
+import { ToolErrorType } from './tool-error.js';
+import * as glob from 'glob';
+
+vi.mock('glob', { spy: true });
 
 // Mock the child_process module to control grep/git grep behavior
 vi.mock('child_process', () => ({
@@ -222,6 +226,15 @@ describe('GrepTool', () => {
       expect(() => grepTool.build(params)).toThrow(
         /params must have required property 'pattern'/,
       );
+    });
+
+    it('should return a GREP_EXECUTION_ERROR on failure', async () => {
+      vi.mocked(glob.globStream).mockRejectedValue(new Error('Glob failed'));
+      const params: GrepToolParams = { pattern: 'hello' };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      expect(result.error?.type).toBe(ToolErrorType.GREP_EXECUTION_ERROR);
+      vi.mocked(glob.globStream).mockReset();
     });
   });
 

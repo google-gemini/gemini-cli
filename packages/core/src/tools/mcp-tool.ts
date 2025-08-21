@@ -16,6 +16,7 @@ import {
   ToolResult,
 } from './tools.js';
 import { CallableTool, FunctionCall, Part } from '@google/genai';
+import { ToolErrorType } from './tool-error.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -139,9 +140,19 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
 
     // Ensure the response is not an error
     if (this.isMCPToolError(rawResponseParts)) {
-      throw new Error(
-        `MCP tool '${this.serverToolName}' reported tool error with response: ${JSON.stringify(rawResponseParts)}`,
-      );
+      const errorMessage = `MCP tool '${
+        this.serverToolName
+      }' reported tool error with response: ${JSON.stringify(
+        rawResponseParts,
+      )}`;
+      return {
+        llmContent: errorMessage,
+        returnDisplay: `Error: MCP tool '${this.serverToolName}' reported an error.`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.MCP_TOOL_ERROR,
+        },
+      };
     }
 
     const transformedParts = transformMcpContentToParts(rawResponseParts);

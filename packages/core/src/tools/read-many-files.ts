@@ -29,6 +29,7 @@ import {
   recordFileOperationMetric,
   FileOperation,
 } from '../telemetry/metrics.js';
+import { ToolErrorType } from './tool-error.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -232,13 +233,6 @@ ${finalExclusionPatternsForDescription
       : [...exclude];
 
     const searchPatterns = [...inputPatterns, ...include];
-    if (searchPatterns.length === 0) {
-      return {
-        llmContent: 'No search paths or include patterns provided.',
-        returnDisplay: `## Information\n\nNo search paths or include patterns were specified. Nothing to read or concatenate.`,
-      };
-    }
-
     try {
       const allEntries = new Set<string>();
       const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
@@ -352,9 +346,14 @@ ${finalExclusionPatternsForDescription
         });
       }
     } catch (error) {
+      const errorMessage = `Error during file search: ${getErrorMessage(error)}`;
       return {
-        llmContent: `Error during file search: ${getErrorMessage(error)}`,
+        llmContent: errorMessage,
         returnDisplay: `## File Search Error\n\nAn error occurred while searching for files:\n\`\`\`\n${getErrorMessage(error)}\n\`\`\``,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.READ_MANY_FILES_SEARCH_ERROR,
+        },
       };
     }
 
