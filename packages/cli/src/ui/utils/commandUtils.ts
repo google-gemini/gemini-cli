@@ -74,11 +74,15 @@ export const copyToClipboard = async (text: string): Promise<void> => {
           // If xclip fails for any reason, try xsel as a fallback.
           await run('xsel', ['--clipboard', '--input'], linuxOptions);
         } catch (fallbackError) {
-          const xclipNotFound = primaryError instanceof Error && (primaryError as any).code === 'ENOENT';
-          const xselNotFound = fallbackError instanceof Error && (fallbackError as any).code === 'ENOENT';
+          const xclipNotFound =
+            primaryError instanceof Error &&
+            (primaryError as NodeJS.ErrnoException).code === 'ENOENT';
+          const xselNotFound =
+            fallbackError instanceof Error &&
+            (fallbackError as NodeJS.ErrnoException).code === 'ENOENT';
           if (xclipNotFound && xselNotFound) {
             throw new Error(
-              `Please ensure xclip or xsel is installed and configured.`,
+              'Please ensure xclip or xsel is installed and configured.',
             );
           }
 
@@ -98,7 +102,7 @@ export const copyToClipboard = async (text: string): Promise<void> => {
           }
 
           throw new Error(
-            `All copy commands failed. xclip: "${primaryMsg}", xsel: "${fallbackMsg}". `,
+            `All copy commands failed. "${primaryMsg}", "${fallbackMsg}". `,
           );
         }
       }
