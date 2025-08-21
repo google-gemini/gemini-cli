@@ -137,11 +137,8 @@ export async function handleAtCommand({
   );
 
   if (atPathCommandParts.length === 0) {
-    addItem({ type: 'user', text: query }, userMessageTimestamp);
     return { processedQuery: [{ text: query }], shouldProceed: true };
   }
-
-  addItem({ type: 'user', text: query }, userMessageTimestamp);
 
   // Get centralized file discovery service
   const fileDiscovery = config.getFileService();

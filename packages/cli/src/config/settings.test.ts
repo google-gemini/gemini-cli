@@ -27,6 +27,11 @@ vi.mock('./settings.js', async (importActual) => {
   };
 });
 
+// Mock trustedFolders
+vi.mock('./trustedFolders.js', () => ({
+  isWorkspaceTrusted: vi.fn(),
+}));
+
 // NOW import everything else, including the (now effectively re-exported) settings.js
 import * as pathActual from 'path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
 import {
@@ -41,6 +46,7 @@ import {
 } from 'vitest';
 import * as fs from 'fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
+import { isWorkspaceTrusted } from './trustedFolders.js';
 
 // These imports will get the versions from the vi.mock('./settings.js', ...) factory.
 import {
@@ -97,6 +103,7 @@ describe('Settings Loading and Merging', () => {
     (mockFsExistsSync as Mock).mockReturnValue(false);
     (fs.readFileSync as Mock).mockReturnValue('{}'); // Return valid empty JSON
     (mockFsMkdirSync as Mock).mockImplementation(() => undefined);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -1270,7 +1277,6 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.workspace.settings.contextFileName).toBe(
         'MY_AGENTS.md',
       );
-      // This test assumes a trusted workspace, so the workspace setting should apply.
       expect(loadedSettings.merged.contextFileName).toBe('MY_AGENTS.md');
       expect(loadedSettings.merged.theme).toBe('matrix'); // User setting should still be there
       expect(fs.writeFileSync).toHaveBeenCalledWith(
@@ -1420,6 +1426,63 @@ describe('Settings Loading and Merging', () => {
         'WORKSPACE_DEBUG',
         'WORKSPACE_VAR',
       ]);
+    });
+  });
+
+  describe('with workspace trust', () => {
+    it('should merge workspace settings when workspace is trusted', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = { theme: 'dark', sandbox: false };
+      const workspaceSettingsContent = {
+        sandbox: true,
+        contextFileName: 'WORKSPACE.md',
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.sandbox).toBe(true);
+      expect(settings.merged.contextFileName).toBe('WORKSPACE.md');
+      expect(settings.merged.theme).toBe('dark');
+    });
+
+    it('should NOT merge workspace settings when workspace is not trusted', () => {
+      vi.mocked(isWorkspaceTrusted).mockReturnValue(false);
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        theme: 'dark',
+        sandbox: false,
+        contextFileName: 'USER.md',
+      };
+      const workspaceSettingsContent = {
+        sandbox: true,
+        contextFileName: 'WORKSPACE.md',
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.sandbox).toBe(false); // User setting
+      expect(settings.merged.contextFileName).toBe('USER.md'); // User setting
+      expect(settings.merged.theme).toBe('dark'); // User setting
     });
   });
 });
