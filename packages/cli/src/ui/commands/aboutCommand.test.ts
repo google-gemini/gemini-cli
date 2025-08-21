@@ -33,7 +33,7 @@ describe('aboutCommand', () => {
         },
         settings: {
           merged: {
-            selectedAuthType: 'test-auth',
+            selectedAuthType: 'oauth-gca',
           },
         },
       },
@@ -89,7 +89,7 @@ describe('aboutCommand', () => {
         osVersion: 'test-os',
         sandboxEnv: 'no sandbox',
         modelVersion: 'test-model',
-        selectedAuthType: 'test-auth',
+        selectedAuthType: 'oauth-gca',
         gcpProject: 'test-gcp-project',
         ideClient: 'test-ide',
         userTier: undefined,
@@ -132,6 +132,9 @@ describe('aboutCommand', () => {
   });
 
   it('should not show ide client when it is not detected', async () => {
+    // Change to oauth type that doesn't use GCP project
+    mockContext.services.settings.merged.selectedAuthType = 'oauth';
+    
     vi.spyOn(mockContext.services.config!, 'getIdeClient').mockReturnValue({
       getDetectedIdeDisplayName: vi.fn().mockReturnValue(undefined),
     } as Partial<IdeClient> as IdeClient);
@@ -150,8 +153,8 @@ describe('aboutCommand', () => {
         osVersion: 'test-os',
         sandboxEnv: 'no sandbox',
         modelVersion: 'test-model',
-        selectedAuthType: 'test-auth',
-        gcpProject: 'test-gcp-project',
+        selectedAuthType: 'oauth',
+        gcpProject: '',
         ideClient: '',
       }),
       expect.any(Number),

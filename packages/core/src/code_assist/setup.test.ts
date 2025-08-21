@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { setupUser, ProjectIdRequiredError } from './setup.js';
+import { setupUser, ProjectIdRequiredError, ProjectAccessError } from './setup.js';
 import { CodeAssistServer } from '../code_assist/server.js';
 import { OAuth2Client } from 'google-auth-library';
 import { GeminiUserTier, UserTierId } from './types.js';
@@ -200,7 +200,7 @@ describe('setupUser for new user', () => {
     });
   });
 
-  it('should use GOOGLE_CLOUD_PROJECT when onboard response has no project ID', async () => {
+  it('should throw ProjectAccessError when LOGIN_WITH_GOOGLE_GCA onboard response has no project ID', async () => {
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
     mockLoad.mockResolvedValue({
       allowedTiers: [mockPaidTier],
@@ -211,14 +211,9 @@ describe('setupUser for new user', () => {
         cloudaicompanionProject: undefined,
       },
     });
-    const userData = await setupUser(
-      {} as OAuth2Client,
-      AuthType.LOGIN_WITH_GOOGLE_GCA,
-    );
-    expect(userData).toEqual({
-      projectId: 'test-project',
-      userTier: 'standard-tier',
-    });
+    await expect(
+      setupUser({} as OAuth2Client, AuthType.LOGIN_WITH_GOOGLE_GCA),
+    ).rejects.toThrow(ProjectAccessError);
   });
 
   it('should throw ProjectIdRequiredError when no project ID is available', async () => {
