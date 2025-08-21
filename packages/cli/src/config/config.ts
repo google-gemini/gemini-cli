@@ -78,6 +78,7 @@ export interface CliArgs {
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
+  useSmartEdit: boolean | undefined;
   sessionSummary: string | undefined;
 }
 
@@ -182,6 +183,10 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'boolean',
           description: 'Enables checkpointing of file edits',
           default: false,
+        })
+        .option('use-smart-edit', {
+          type: 'boolean',
+          description: 'Enable the smart-edit tool instead of the replace tool',
         })
         .option('experimental-acp', {
           type: 'boolean',
@@ -621,6 +626,7 @@ export async function loadCliConfig(
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     eventEmitter: appEvents,
+    useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
   });
 }
 
