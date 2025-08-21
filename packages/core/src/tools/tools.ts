@@ -260,6 +260,28 @@ export abstract class DeclarativeTool<
       };
     }
   }
+
+  async validateBuildAndExecute(
+    args: TParams,
+    abortSignal: AbortSignal,
+  ): Promise<ToolResult> {
+    try {
+      const validationError = this.validateToolParams(args);
+      if (validationError) {
+        return {
+          llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
+          returnDisplay: validationError,
+        };
+      }
+      return this.buildAndExecute(args, abortSignal);
+    } catch (error) {
+      const errorString = String(error);
+      return {
+        llmContent: `Error: Tool call execution failed. Reason: ${errorString}`,
+        returnDisplay: errorString,
+      };
+    }
+  }
 }
 
 /**
