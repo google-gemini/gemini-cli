@@ -11,7 +11,7 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import * as versionUtils from '../../utils/version.js';
 import { MessageType } from '../types.js';
 
-import { IdeClient } from '../../../../core/src/ide/ide-client.js';
+import type { IdeClient } from '@google/gemini-cli-core';
 
 vi.mock('../../utils/version.js', () => ({
   getCliVersion: vi.fn(),
@@ -29,10 +29,11 @@ describe('aboutCommand', () => {
           getModel: vi.fn(),
           getIdeClient: vi.fn(),
           getIdeMode: vi.fn().mockReturnValue(true),
+          getGeminiClient: vi.fn(),
         },
         settings: {
           merged: {
-            selectedAuthType: 'test-auth',
+            selectedAuthType: 'oauth-gca',
           },
         },
       },
@@ -52,6 +53,11 @@ describe('aboutCommand', () => {
     vi.spyOn(mockContext.services.config!, 'getIdeClient').mockReturnValue({
       getDetectedIdeDisplayName: vi.fn().mockReturnValue('test-ide'),
     } as Partial<IdeClient> as IdeClient);
+    vi.spyOn(mockContext.services.config!, 'getGeminiClient').mockReturnValue({
+      getUserTier: vi.fn().mockReturnValue(undefined),
+    } as unknown as ReturnType<
+      NonNullable<typeof mockContext.services.config>['getGeminiClient']
+    >);
   });
 
   afterEach(() => {
@@ -83,9 +89,10 @@ describe('aboutCommand', () => {
         osVersion: 'test-os',
         sandboxEnv: 'no sandbox',
         modelVersion: 'test-model',
-        selectedAuthType: 'test-auth',
+        selectedAuthType: 'oauth-gca',
         gcpProject: 'test-gcp-project',
         ideClient: 'test-ide',
+        userTier: undefined,
       },
       expect.any(Number),
     );
@@ -129,7 +136,7 @@ describe('aboutCommand', () => {
       getDetectedIdeDisplayName: vi.fn().mockReturnValue(undefined),
     } as Partial<IdeClient> as IdeClient);
 
-    process.env.SANDBOX = '';
+    process.env['SANDBOX'] = '';
     if (!aboutCommand.action) {
       throw new Error('The about command must have an action.');
     }
@@ -143,7 +150,7 @@ describe('aboutCommand', () => {
         osVersion: 'test-os',
         sandboxEnv: 'no sandbox',
         modelVersion: 'test-model',
-        selectedAuthType: 'test-auth',
+        selectedAuthType: 'oauth-gca',
         gcpProject: 'test-gcp-project',
         ideClient: '',
       }),
