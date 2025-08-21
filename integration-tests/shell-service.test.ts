@@ -123,4 +123,34 @@ describe('ShellExecutionService programmatic integration tests', () => {
     const exitedCleanly = result.exitCode === 0 && result.signal === null;
     expect(exitedCleanly, 'Process should not have exited cleanly').toBe(false);
   });
+
+  it('should propagate environment variables to the child process', async () => {
+    const varName = 'GEMINI_CLI_TEST_VAR';
+    const varValue = `test-value`;
+    process.env[varName] = varValue;
+
+    try {
+      const command =
+        process.platform === 'win32' ? `echo %${varName}%` : `echo $${varName}`;
+      const onOutputEvent = vi.fn();
+      const abortController = new AbortController();
+
+      const handle = await ShellExecutionService.execute(
+        command,
+        testDir,
+        onOutputEvent,
+        abortController.signal,
+        false,
+      );
+
+      const result = await handle.result;
+
+      expect(result.error).toBeNull();
+      expect(result.exitCode).toBe(0);
+      expect(result.output).toContain(varValue);
+    } finally {
+      // Clean up the env var to prevent side-effects on other tests.
+      delete process.env[varName];
+    }
+  });
 });
