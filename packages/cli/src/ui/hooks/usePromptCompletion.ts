@@ -227,11 +227,13 @@ export function usePromptCompletion({
   }, [buffer.text, buffer.cursor, ghostText, clearGhostText, isCursorAtEnd]);
 
   // Cleanup on unmount
-  useEffect(() => () => {
+  useEffect(() => {
+    return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-    }, []);
+    };
+  }, []);
 
   const isActive = useMemo(() => {
     if (!isPromptCompletionEnabled) return false;
