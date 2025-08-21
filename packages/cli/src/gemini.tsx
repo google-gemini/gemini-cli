@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { render } from 'ink';
-import { MainComponent } from './ui/MainComponent.js';
+import { AppWrapper } from './ui/App.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
@@ -45,6 +46,7 @@ import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.j
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { SettingsContext } from './ui/contexts/SettingsContext.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -237,7 +239,37 @@ export async function main() {
           process.exit(1);
         }
       }
-      await start_sandbox(sandboxConfig, memoryArgs, config);
+      let stdinData = '';
+      if (!process.stdin.isTTY) {
+        stdinData = await readStdin();
+      }
+
+      // This function is a copy of the one from sandbox.ts
+      // It is moved here to decouple sandbox.ts from the CLI's argument structure.
+      const injectStdinIntoArgs = (
+        args: string[],
+        stdinData?: string,
+      ): string[] => {
+        const finalArgs = [...args];
+        if (stdinData) {
+          const promptIndex = finalArgs.findIndex(
+            (arg) => arg === '--prompt' || arg === '-p',
+          );
+          if (promptIndex > -1 && finalArgs.length > promptIndex + 1) {
+            // If there's a prompt argument, prepend stdin to it
+            finalArgs[promptIndex + 1] =
+              `${stdinData}\n\n${finalArgs[promptIndex + 1]}`;
+          } else {
+            // If there's no prompt argument, add stdin as the prompt
+            finalArgs.push('--prompt', stdinData);
+          }
+        }
+        return finalArgs;
+      };
+
+      const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
+
+      await start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs);
       process.exit(0);
     } else {
       // Not in a sandbox and not entering one, so relaunch with additional
@@ -273,20 +305,18 @@ export async function main() {
     // Detect and enable Kitty keyboard protocol once at startup
     await detectAndEnableKittyProtocol();
     setWindowTitle(basename(workspaceRoot), settings);
-
     const instance = render(
-      <MainComponent
-        initialConfig={config}
-        settings={settings}
-        startupWarnings={startupWarnings}
-        version={version}
-        workspaceRoot={workspaceRoot}
-        extensions={extensions}
-        argv={argv}
-      />,
-      {
-        exitOnCtrlC: false,
-      },
+      <React.StrictMode>
+        <SettingsContext.Provider value={settings}>
+          <AppWrapper
+            config={config}
+            settings={settings}
+            startupWarnings={startupWarnings}
+            version={version}
+          />
+        </SettingsContext.Provider>
+      </React.StrictMode>,
+      { exitOnCtrlC: false },
     );
 
     checkForUpdates()

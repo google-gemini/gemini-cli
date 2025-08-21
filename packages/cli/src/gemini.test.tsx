@@ -35,10 +35,6 @@ vi.mock('./config/settings.js', async (importOriginal) => {
   };
 });
 
-vi.mock('./config/trustedFolders.js', () => ({
-  isWorkspaceTrusted: vi.fn(),
-}));
-
 vi.mock('./config/config.js', () => ({
   loadCliConfig: vi.fn().mockResolvedValue({
     config: {
@@ -153,7 +149,6 @@ describe('gemini.tsx main function', () => {
       userSettingsFile,
       workspaceSettingsFile,
       [settingsError],
-      true,
     );
 
     loadSettingsMock.mockReturnValue(mockLoadedSettings);
