@@ -27,14 +27,6 @@ import {
 import { Part, PartListUnion } from '@google/genai';
 import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
 
-vi.mock('../index.js', async () => {
-  const actual = await vi.importActual('../index.js');
-  return {
-    ...actual,
-    logToolCall: vi.fn(),
-  };
-});
-
 class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
   static readonly Name = 'testApprovalTool';
 
