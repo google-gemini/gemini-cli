@@ -54,7 +54,9 @@ export function SuggestionsDisplay({
 
   // Calculate the maximum width needed for command labels when in slash mode
   const maxLabelWidth = userInput.startsWith('/') 
-    ? Math.max(...visibleSuggestions.map(s => s.label.length)) + 4 // Add 4 characters padding
+    ? visibleSuggestions.length > 0 
+      ? Math.max(...visibleSuggestions.map(s => s.label.length)) + 4 // Add 4 characters padding
+      : 0 // Explicitly handle empty array case to prevent -Infinity
     : 0;
 
   return (
