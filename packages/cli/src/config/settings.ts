@@ -16,6 +16,7 @@ import {
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
+import { isWorkspaceTrusted } from './trustedFolders.js';
 import { Settings, MemoryImportFormat } from './settingsSchema.js';
 
 export type { Settings, MemoryImportFormat };
@@ -73,34 +74,37 @@ function mergeSettings(
   system: Settings,
   user: Settings,
   workspace: Settings,
+  isTrusted: boolean,
 ): Settings {
+  const safeWorkspace = isTrusted ? workspace : ({} as Settings);
+
   // folderTrust is not supported at workspace level.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { folderTrust, ...workspaceWithoutFolderTrust } = workspace;
+  const { folderTrust, ...safeWorkspaceWithoutFolderTrust } = safeWorkspace;
 
   return {
     ...user,
-    ...workspaceWithoutFolderTrust,
+    ...safeWorkspaceWithoutFolderTrust,
     ...system,
     customThemes: {
       ...(user.customThemes || {}),
-      ...(workspace.customThemes || {}),
+      ...(safeWorkspace.customThemes || {}),
       ...(system.customThemes || {}),
     },
     mcpServers: {
       ...(user.mcpServers || {}),
-      ...(workspace.mcpServers || {}),
+      ...(safeWorkspace.mcpServers || {}),
       ...(system.mcpServers || {}),
     },
     includeDirectories: [
       ...(system.includeDirectories || []),
       ...(user.includeDirectories || []),
-      ...(workspace.includeDirectories || []),
+      ...(safeWorkspace.includeDirectories || []),
     ],
     chatCompression: {
       ...(system.chatCompression || {}),
       ...(user.chatCompression || {}),
-      ...(workspace.chatCompression || {}),
+      ...(safeWorkspace.chatCompression || {}),
     },
   };
 }
@@ -111,11 +115,13 @@ export class LoadedSettings {
     user: SettingsFile,
     workspace: SettingsFile,
     errors: SettingsError[],
+    isTrusted: boolean,
   ) {
     this.system = system;
     this.user = user;
     this.workspace = workspace;
     this.errors = errors;
+    this.isTrusted = isTrusted;
     this._merged = this.computeMergedSettings();
   }
 
@@ -123,6 +129,7 @@ export class LoadedSettings {
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
   readonly errors: SettingsError[];
+  readonly isTrusted: boolean;
 
   private _merged: Settings;
 
@@ -135,6 +142,7 @@ export class LoadedSettings {
       this.system.settings,
       this.user.settings,
       this.workspace.settings,
+      this.isTrusted,
     );
   }
 
@@ -403,11 +411,16 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     }
   }
 
+  // For the initial trust check, we can only use user and system settings.
+  const initialTrustCheckSettings = { ...systemSettings, ...userSettings };
+  const isTrusted = isWorkspaceTrusted(initialTrustCheckSettings) ?? true;
+
   // Create a temporary merged settings object to pass to loadEnvironment.
   const tempMergedSettings = mergeSettings(
     systemSettings,
     userSettings,
     workspaceSettings,
+    isTrusted,
   );
 
   // loadEnviroment depends on settings so we have to create a temp version of
@@ -434,6 +447,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
       settings: workspaceSettings,
     },
     settingsErrors,
+    isTrusted,
   );
 
   // Validate chatCompression settings
