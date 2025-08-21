@@ -383,6 +383,9 @@ export const useSlashCommandProcessor = (
                     case 'settings':
                       openSettingsDialog();
                       return { type: 'handled' };
+                    case 'model':
+                      // TODO: Add model dialog support
+                      return { type: 'handled' };
                     case 'help':
                       return { type: 'handled' };
                     default: {

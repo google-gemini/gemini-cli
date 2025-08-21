@@ -13,7 +13,7 @@ describe('modelCommand', () => {
   it('should return a dialog action', () => {
     const context: CommandContext = createMockCommandContext();
 
-    const result = modelCommand.action(context, '');
+    const result = modelCommand.action!(context, '');
 
     expect(result).toEqual({
       type: 'dialog',

@@ -7,9 +7,7 @@
 import { useState, useCallback } from 'react';
 import { Config } from '@google/gemini-cli-core';
 
-export const useModelDialog = (
-  config: Config,
-) => {
+export const useModelDialog = (config: Config) => {
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
 
   const openModelDialog = useCallback(() => {

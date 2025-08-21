@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OpenDialogActionReturn, SlashCommand } from './types.js';
+import { OpenDialogActionReturn, SlashCommand, CommandKind } from './types.js';
 
 export const modelCommand: SlashCommand = {
   name: 'model',
   description: 'change the model',
+  kind: CommandKind.BUILT_IN,
   action: (_context, _args): OpenDialogActionReturn => ({
     type: 'dialog',
     dialog: 'model',
