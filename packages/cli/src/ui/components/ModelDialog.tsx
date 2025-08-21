@@ -11,13 +11,7 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import {
   Config,
   AuthType,
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_BEDROCK_MODEL,
-  DEFAULT_BEDROCK_SMALL_FAST_MODEL,
-  DEFAULT_BEDROCK_OPUS_MODEL,
-  DEFAULT_BEDROCK_SONNET_4_MODEL,
-  DEFAULT_BEDROCK_CLAUDE_35_SONNET_V2_MODEL,
+  getModelsByProvider,
 } from '@google/gemini-cli-core';
 
 interface ModelDialogProps {
@@ -32,49 +26,32 @@ interface ModelOption {
 }
 
 function getModelsForAuthType(authType: AuthType | undefined): ModelOption[] {
-  if (authType === AuthType.USE_AWS_BEDROCK) {
-    return [
-      {
-        label: 'Claude Sonnet 4 (Latest)',
-        value: DEFAULT_BEDROCK_SONNET_4_MODEL,
-        description: 'Latest and most capable Claude model',
-      },
-      {
-        label: 'Claude 4 Opus (Most Powerful)',
-        value: DEFAULT_BEDROCK_OPUS_MODEL,
-        description: 'Most capable model, highest cost',
-      },
-      {
-        label: 'Claude 3.7 Sonnet (Default)',
-        value: DEFAULT_BEDROCK_MODEL,
-        description: 'Default Claude model with enhanced reasoning',
-      },
-      {
-        label: 'Claude 3.5 Sonnet V2',
-        value: DEFAULT_BEDROCK_CLAUDE_35_SONNET_V2_MODEL,
-        description: 'Improved 3.5 Sonnet with better performance',
-      },
-      {
-        label: 'Claude 3.5 Haiku (Fast)',
-        value: DEFAULT_BEDROCK_SMALL_FAST_MODEL,
-        description: 'Fast responses with good capability',
-      },
-    ];
-  }
-
-  // Default Gemini models
-  return [
-    {
-      label: 'Gemini 2.5 Pro',
-      value: DEFAULT_GEMINI_MODEL,
-      description: 'Most capable Gemini model',
-    },
-    {
-      label: 'Gemini 2.5 Flash',
-      value: DEFAULT_GEMINI_FLASH_MODEL,
-      description: 'Fast and efficient',
-    },
-  ];
+  const provider = authType === AuthType.USE_AWS_BEDROCK ? 'bedrock' : 'gemini';
+  const models = getModelsByProvider(provider);
+  
+  // Filter to only show models with descriptions (main models)
+  const mainModels = models.filter(m => m.description);
+  
+  // Sort models by category and capability for better UX
+  const sortedModels = mainModels.sort((a, b) => {
+    // Put powerful models first, then default, then fast
+    const categoryOrder = { powerful: 0, default: 1, fast: 2 };
+    const aOrder = categoryOrder[a.category || 'default'];
+    const bOrder = categoryOrder[b.category || 'default'];
+    
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder;
+    }
+    
+    // Within same category, sort by display name
+    return a.displayName.localeCompare(b.displayName);
+  });
+  
+  return sortedModels.map(model => ({
+    label: model.displayName,
+    value: model.id,
+    description: model.description,
+  }));
 }
 
 export function ModelDialog({

@@ -7,7 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { shortenPath, tildeifyPath } from '@google/gemini-cli-core';
+import { shortenPath, tildeifyPath, getModelDisplayName } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
 import path from 'node:path';
@@ -61,6 +61,9 @@ export const Footer: React.FC<FooterProps> = ({
   const displayPath = isNarrow
     ? path.basename(tildeifyPath(targetDir))
     : shortenPath(tildeifyPath(targetDir), pathLength);
+  
+  // Get user-friendly model name
+  const displayModel = getModelDisplayName(model);
 
   return (
     <Box
@@ -128,7 +131,7 @@ export const Footer: React.FC<FooterProps> = ({
       <Box alignItems="center" paddingTop={isNarrow ? 1 : 0}>
         <Text color={theme.text.accent}>
           {isNarrow ? '' : ' '}
-          {model}{' '}
+          {displayModel}{' '}
           <ContextUsageDisplay
             promptTokenCount={promptTokenCount}
             model={model}

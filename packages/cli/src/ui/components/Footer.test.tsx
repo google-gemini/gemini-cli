@@ -101,7 +101,7 @@ describe('<Footer />', () => {
   it('displays the model name and context percentage', () => {
     const { lastFrame } = renderWithWidth(120);
     expect(lastFrame()).toContain(defaultProps.model);
-    expect(lastFrame()).toMatch(/\(\d+% context[\s\S]*left\)/);
+    expect(lastFrame()).toMatch(/\(~?\d+% context[\s\S]*left\)/);
   });
 
   describe('sandbox and trust info', () => {
