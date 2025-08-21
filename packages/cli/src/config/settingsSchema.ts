@@ -470,6 +470,15 @@ export const SETTINGS_SCHEMA = {
     description: 'The Gemini model to use for conversations.',
     showInDialog: false,
   },
+  modelEndpoint: {
+    type: 'string',
+    label: 'Model Endpoint',
+    category: 'General',
+    requiresRestart: false,
+    default: undefined as string | undefined,
+    description: 'The model endpoint of a fine-tuned Gemini model to use for conversations.',
+    showInDialog: false,
+  },
   hasSeenIdeIntegrationNudge: {
     type: 'boolean',
     label: 'Has Seen IDE Integration Nudge',
