@@ -71,16 +71,9 @@ describe('useActivityMonitoring', () => {
   });
 
   it('should handle custom configuration', () => {
-    const customConfig = {
-      snapshotThrottleMs: 2000,
-      maxEventBuffer: 50,
-    };
-
     const { result } = renderHook(() =>
       useActivityMonitoring(mockConfig, {
         enabled: true,
-        config: customConfig,
-        autoStart: true,
       }),
     );
 
@@ -121,7 +114,7 @@ describe('useActivityMonitoring', () => {
 
   it('should start and stop monitoring manually', async () => {
     const { result } = renderHook(() =>
-      useActivityMonitoring(mockConfig, { autoStart: false }),
+      useActivityMonitoring(mockConfig, { enabled: true }),
     );
 
     await act(() => {
@@ -183,7 +176,6 @@ describe('useActivityRecorder', () => {
 
   it('should record message added activity with metadata', async () => {
     const { result } = renderHook(() => useActivityRecorder(mockConfig));
-    const _metadata = { messageType: 'user', length: 10 };
 
     await act(() => {
       result.current.recordMessageAdded();
@@ -194,10 +186,9 @@ describe('useActivityRecorder', () => {
 
   it('should record tool call activity', async () => {
     const { result } = renderHook(() => useActivityRecorder(mockConfig));
-    const metadata = { toolName: 'read-file', callId: 'call-123' };
 
     await act(() => {
-      result.current.recordToolCall('tool-execution', metadata);
+      result.current.recordToolCall();
     });
 
     expect(mockRecordActivity).toHaveBeenCalled();
@@ -207,8 +198,8 @@ describe('useActivityRecorder', () => {
     const { result } = renderHook(() => useActivityRecorder(mockConfig));
 
     await act(() => {
-      result.current.recordStreamStart('gemini-stream');
-      result.current.recordStreamEnd('gemini-stream-complete');
+      result.current.recordStreamStart();
+      result.current.recordStreamEnd();
     });
 
     expect(mockRecordActivity).toHaveBeenCalledTimes(2);
@@ -216,10 +207,9 @@ describe('useActivityRecorder', () => {
 
   it('should record history updates', async () => {
     const { result } = renderHook(() => useActivityRecorder(mockConfig));
-    const metadata = { itemCount: 5, operation: 'clear' };
 
     await act(() => {
-      result.current.recordHistoryUpdate('history-cleared', metadata);
+      result.current.recordHistoryUpdate();
     });
 
     expect(mockRecordActivity).toHaveBeenCalled();
