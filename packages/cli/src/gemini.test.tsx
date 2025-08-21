@@ -150,6 +150,7 @@ describe('gemini.tsx main function', () => {
       userSettingsFile,
       workspaceSettingsFile,
       [settingsError],
+      true,
     );
 
     loadSettingsMock.mockReturnValue(mockLoadedSettings);
