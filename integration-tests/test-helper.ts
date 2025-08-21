@@ -326,9 +326,7 @@ export class TestRig {
   }
 
   async teardown() {
-    if (this.polly) {
-      await this.polly.stop();
-    }
+    
   }
 
   async cleanup() {

@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "nodenext",
+    "lib": ["es2023", "dom"]
+  },
+  "include": ["./test-entry.ts"]
+}
