@@ -17,6 +17,7 @@ interface MarkdownDisplayProps {
   isPending: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
+  isRawMode?: boolean;
 }
 
 // Constants for Markdown parsing and rendering
@@ -31,8 +32,21 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   isPending,
   availableTerminalHeight,
   terminalWidth,
+  isRawMode,
 }) => {
   if (!text) return <></>;
+
+  if (isRawMode) {
+    return (
+      <RenderCodeBlock
+        content={text.split('\n')}
+        lang="markdown"
+        isPending={isPending}
+        availableTerminalHeight={availableTerminalHeight}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
 
   const lines = text.split('\n');
   const headerRegex = /^ *(#{1,4}) +(.*)/;

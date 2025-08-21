@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { Box, Text } from 'ink';
+import React, { useState } from 'react';
+import { Box, Text, useInput } from 'ink';
 import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
@@ -40,12 +40,19 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   emphasis = 'medium',
   renderOutputAsMarkdown = true,
 }) => {
+  const [isRawMode, setIsRawMode] = useState(false);
   const availableHeight = availableTerminalHeight
     ? Math.max(
         availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
         MIN_LINES_SHOWN + 1, // enforce minimum lines shown
       )
     : undefined;
+
+  useInput((input) => {
+    if (input.toLowerCase() === 'r') {
+      setIsRawMode((prev) => !prev);
+    }
+  });
 
   // Long tool call response in MarkdownDisplay doesn't respect availableTerminalHeight properly,
   // we're forcing it to not render as markdown when the response is too long, it will fallback
@@ -77,30 +84,52 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
       {resultDisplay && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
           <Box flexDirection="column">
-            {typeof resultDisplay === 'string' && renderOutputAsMarkdown && (
-              <Box flexDirection="column">
-                <MarkdownDisplay
-                  text={resultDisplay}
-                  isPending={false}
-                  availableTerminalHeight={availableHeight}
-                  terminalWidth={childWidth}
-                />
-              </Box>
-            )}
-            {typeof resultDisplay === 'string' && !renderOutputAsMarkdown && (
-              <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
-                <Box>
-                  <Text wrap="wrap">{resultDisplay}</Text>
-                </Box>
-              </MaxSizedBox>
-            )}
-            {typeof resultDisplay !== 'string' && (
-              <DiffRenderer
-                diffContent={resultDisplay.fileDiff}
-                filename={resultDisplay.fileName}
+            <Box alignSelf="flex-end">
+              <Text dimColor>
+                {isRawMode ? 'Press `r` to see rendered' : 'Press `r` to see raw'}
+              </Text>
+            </Box>
+            {isRawMode ? (
+              <MarkdownDisplay
+                text={resultDisplay as string}
+                isPending={false}
                 availableTerminalHeight={availableHeight}
                 terminalWidth={childWidth}
+                isRawMode={true}
               />
+            ) : (
+              <>
+                {typeof resultDisplay === 'string' &&
+                  renderOutputAsMarkdown && (
+                    <Box flexDirection="column">
+                      <MarkdownDisplay
+                        text={resultDisplay}
+                        isPending={false}
+                        availableTerminalHeight={availableHeight}
+                        terminalWidth={childWidth}
+                      />
+                    </Box>
+                  )}
+                {typeof resultDisplay === 'string' &&
+                  !renderOutputAsMarkdown && (
+                    <MaxSizedBox
+                      maxHeight={availableHeight}
+                      maxWidth={childWidth}
+                    >
+                      <Box>
+                        <Text wrap="wrap">{resultDisplay}</Text>
+                      </Box>
+                    </MaxSizedBox>
+                  )}
+                {typeof resultDisplay !== 'string' && (
+                  <DiffRenderer
+                    diffContent={resultDisplay.fileDiff}
+                    filename={resultDisplay.fileName}
+                    availableTerminalHeight={availableHeight}
+                    terminalWidth={childWidth}
+                  />
+                )}
+              </>
             )}
           </Box>
         </Box>
