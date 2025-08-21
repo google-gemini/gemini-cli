@@ -82,7 +82,7 @@ async function main() {
     'otelcol-contrib',
     false, // isJaeger = false
   ).catch((e) => {
-    console.error(`��� Error getting otelcol-contrib: ${e.message}`);
+    console.error(`🛑 Error getting otelcol-contrib: ${e.message}`);
     return null;
   });
   if (!otelcolPath) process.exit(1);
