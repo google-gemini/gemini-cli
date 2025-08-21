@@ -14,10 +14,18 @@ vi.mock('fs', () => ({
   default: {
     statSync: vi.fn(),
     readdirSync: vi.fn(),
+    stat: vi.fn(),
+    open: vi.fn(),
+    close: vi.fn(),
+    read: vi.fn(),
   },
   statSync: vi.fn(),
   readdirSync: vi.fn(),
   mkdirSync: vi.fn(),
+  stat: vi.fn(),
+  open: vi.fn(),
+  close: vi.fn(),
+  read: vi.fn(),
 }));
 import { LSTool } from './ls.js';
 import { Config } from '../config/config.js';

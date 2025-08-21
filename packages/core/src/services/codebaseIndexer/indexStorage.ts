@@ -156,6 +156,23 @@ export class IndexStorage {
     }
   }
 
+  async deleteFileIndicesBySha(shas: string[]): Promise<void> {
+    for (const sha of shas) {
+      const metaPath = path.join(this.indexDir, `${sha}.meta.jsonl`);
+      const vecPath = path.join(this.indexDir, `${sha}.bin`);
+      const infoPath = path.join(this.indexDir, `${sha}.info.json`);
+
+      try {
+        await Promise.all([
+          fs.unlink(metaPath).catch(() => {}),
+          fs.unlink(vecPath).catch(() => {}),
+          fs.unlink(infoPath).catch(() => {})
+        ]);
+      } catch {
+      }
+    }
+  }
+
   async validateIndexIntegrity(): Promise<{ valid: boolean; errors: string[] }> {
     const errors: string[] = [];
     

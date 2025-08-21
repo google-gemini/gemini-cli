@@ -74,23 +74,17 @@ export class AutoIndexService {
     }
 
     try {
-      const currentManifest = await this.indexer.loadManifest();
-      
-      if (this.hasChanges(currentManifest)) {
-        const result = await this.indexer.reindexCodebase(this.config.onProgress);
-        
-        if (result.success) {
-          this.config.onUpdate?.(result);
-        }
+      const result = await this.indexer.reindexCodebase(this.config.onProgress);
+
+      if (result.success && result.totalVectors > 0) {
+        this.config.onUpdate?.(result);
       }
     } catch (error) {
       console.warn('Auto-index check failed:', error);
     }
   }
 
-  private hasChanges(currentManifest: any): boolean {
-    return true;
-  }
+
 
   isActive(): boolean {
     return this.isRunning;

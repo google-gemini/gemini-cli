@@ -304,14 +304,16 @@ export class CodebaseIndexer {
         }
       }
 
-      const deletedFiles: string[] = [];
+      const deletedFileShas: string[] = [];
       for (const [sha, fileInfo] of Object.entries(existingManifest.files || {})) {
         if (!currentFileShas.has(sha)) {
-          deletedFiles.push(sha);
+          deletedFileShas.push(sha);
           const fileInfoTyped = fileInfo as { relpath: string; n: number };
           existingVectors -= fileInfoTyped.n;
         }
       }
+
+      await this.storage.deleteFileIndicesBySha(deletedFileShas);
 
       onProgress?.({
         phase: 'processing',
@@ -389,7 +391,7 @@ export class CodebaseIndexer {
         };
       }
 
-      for (const deletedSha of deletedFiles) {
+              for (const deletedSha of deletedFileShas) {
         delete manifestFiles[deletedSha];
       }
 
