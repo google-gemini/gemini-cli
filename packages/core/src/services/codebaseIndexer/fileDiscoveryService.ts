@@ -6,6 +6,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import micromatch from 'micromatch';
 import { FileInfo, ScanStats } from './types.js';
 import { EXCLUDED_DIRS, DEFAULT_SKIP_IF_LARGER_THAN } from './constants.js';
 import { isTextFileElegant } from '../../utils/binaryFileUtils.js';
@@ -47,33 +48,7 @@ class IgnoreFileParser {
   }
 
   private matchesPattern(path: string, pattern: string): boolean {
-    let regexPattern = pattern;
-    
-    regexPattern = regexPattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-    
-    regexPattern = regexPattern.replace(/\*\*/g, '§DOUBLESTAR§');
-    regexPattern = regexPattern.replace(/\*/g, '[^/]*');
-    regexPattern = regexPattern.replace(/§DOUBLESTAR§/g, '.*');
-    regexPattern = regexPattern.replace(/\?/g, '[^/]');
-    
-    if (pattern.startsWith('/')) {
-      regexPattern = '^' + regexPattern.slice(1);
-    } else {
-      regexPattern = '(^|/)' + regexPattern;
-    }
-    
-    if (pattern.endsWith('/')) {
-      regexPattern += '(/|$)';
-    } else {
-      regexPattern += '(/|$)';
-    }
-    
-    try {
-      const regex = new RegExp(regexPattern);
-      return regex.test(path);
-    } catch {
-      return path.includes(pattern.replace(/[*/]/g, ''));
-    }
+    return micromatch.isMatch(path, pattern);
   }
 }
 

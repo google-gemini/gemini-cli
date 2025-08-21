@@ -175,7 +175,7 @@ export class CodebaseIndexer {
         manifestFiles[fileIndex.sha] = {
           relpath: fileIndex.relpath,
           meta: `${fileIndex.sha}.meta.jsonl`,
-          vec: `${fileIndex.sha}.npy`,
+          vec: `${fileIndex.sha}.bin`,
           n: fileIndex.units.length
         };
       }
@@ -265,6 +265,7 @@ export class CodebaseIndexer {
       const newOrModifiedFiles: string[] = [];
       const existingFileIndices: FileIndex[] = [];
       let existingVectors = 0;
+      const currentFileShas = new Set<string>();
 
       const reindexStats: ScanStats = {
         totalFiles: 0,
@@ -277,6 +278,7 @@ export class CodebaseIndexer {
       for (const filePath of files) {
         const relpath = path.relative(this.storage.getBaseDir(), filePath).replace(/\\/g, '/');
         const sha = await this.generateSha(relpath);
+        currentFileShas.add(sha);
         
         if (existingFiles.has(sha)) {
           const existingFileIndex = await this.storage.loadFileIndex(relpath);
@@ -296,6 +298,15 @@ export class CodebaseIndexer {
           newOrModifiedFiles.push(filePath);
           reindexStats.totalFiles++;
           reindexStats.textFiles++;
+        }
+      }
+
+      const deletedFiles: string[] = [];
+      for (const [sha, fileInfo] of Object.entries(existingManifest.files || {})) {
+        if (!currentFileShas.has(sha)) {
+          deletedFiles.push(sha);
+          const fileInfoTyped = fileInfo as { relpath: string; n: number };
+          existingVectors -= fileInfoTyped.n;
         }
       }
 
@@ -370,9 +381,13 @@ export class CodebaseIndexer {
         manifestFiles[fileIndex.sha] = {
           relpath: fileIndex.relpath,
           meta: `${fileIndex.sha}.meta.jsonl`,
-          vec: `${fileIndex.sha}.npy`,
+          vec: `${fileIndex.sha}.bin`,
           n: fileIndex.units.length
         };
+      }
+
+      for (const deletedSha of deletedFiles) {
+        delete manifestFiles[deletedSha];
       }
 
       const totalVectors = existingVectors + newVectors;
@@ -413,6 +428,10 @@ export class CodebaseIndexer {
 
   async getIndexStatus(): Promise<IndexStatus> {
     return this.storage.getIndexStatus();
+  }
+
+  async loadManifest(): Promise<any> {
+    return this.storage.loadManifest();
   }
 
   async deleteIndex(): Promise<void> {

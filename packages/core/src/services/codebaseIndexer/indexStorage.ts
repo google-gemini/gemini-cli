@@ -37,7 +37,7 @@ export class IndexStorage {
   async saveFileIndex(fileIndex: FileIndex): Promise<void> {
     const sha = await this.generateSha(fileIndex.relpath);
     const metaPath = path.join(this.indexDir, `${sha}.meta.jsonl`);
-    const vecPath = path.join(this.indexDir, `${sha}.npy`);
+    const vecPath = path.join(this.indexDir, `${sha}.bin`);
     const infoPath = path.join(this.indexDir, `${sha}.info.json`);
 
     const metaContent = fileIndex.units
@@ -45,8 +45,8 @@ export class IndexStorage {
       .join('\n');
     await fs.writeFile(metaPath, metaContent, 'utf-8');
 
-    const vecContent = JSON.stringify(fileIndex.embeddings);
-    await fs.writeFile(vecPath, vecContent, 'utf-8');
+    const vectorBuffer = this.embeddingsToBuffer(fileIndex.embeddings);
+    await fs.writeFile(vecPath, vectorBuffer);
 
     const fileInfo = {
       mtime: fileIndex.mtime.toISOString(),
@@ -59,13 +59,13 @@ export class IndexStorage {
   async loadFileIndex(relpath: string): Promise<FileIndex | null> {
     const sha = await this.generateSha(relpath);
     const metaPath = path.join(this.indexDir, `${sha}.meta.jsonl`);
-    const vecPath = path.join(this.indexDir, `${sha}.npy`);
+    const vecPath = path.join(this.indexDir, `${sha}.bin`);
     const infoPath = path.join(this.indexDir, `${sha}.info.json`);
 
     try {
-      const [metaContent, vecContent, infoContent] = await Promise.all([
+      const [metaContent, vecBuffer, infoContent] = await Promise.all([
         fs.readFile(metaPath, 'utf-8'),
-        fs.readFile(vecPath, 'utf-8'),
+        fs.readFile(vecPath),
         fs.readFile(infoPath, 'utf-8')
       ]);
 
@@ -74,7 +74,7 @@ export class IndexStorage {
         .filter(line => line.trim())
         .map(line => JSON.parse(line));
 
-      const embeddings: number[][] = JSON.parse(vecContent);
+      const embeddings: number[][] = this.bufferToEmbeddings(vecBuffer);
       const fileInfo = JSON.parse(infoContent);
 
       return {
@@ -93,7 +93,7 @@ export class IndexStorage {
   async fileIndexExists(relpath: string): Promise<boolean> {
     const sha = await this.generateSha(relpath);
     const metaPath = path.join(this.indexDir, `${sha}.meta.jsonl`);
-    const vecPath = path.join(this.indexDir, `${sha}.npy`);
+    const vecPath = path.join(this.indexDir, `${sha}.bin`);
     const infoPath = path.join(this.indexDir, `${sha}.info.json`);
 
     try {
@@ -272,8 +272,8 @@ export class IndexStorage {
           .filter(line => line.trim())
           .map(line => JSON.parse(line));
 
-        const vecContent = await fs.readFile(vecPath, 'utf-8');
-        const fileVectors: number[][] = JSON.parse(vecContent);
+        const vecBuffer = await fs.readFile(vecPath);
+        const fileVectors: number[][] = this.bufferToEmbeddings(vecBuffer);
 
         if (fileMetadata.length !== fileVectors.length) {
           console.warn(`Mismatch in ${fileInfoTyped.relpath}: ${fileMetadata.length} metadata vs ${fileVectors.length} vectors`);
@@ -288,5 +288,51 @@ export class IndexStorage {
     }
 
     return { vectors, metadata };
+  }
+
+  private embeddingsToBuffer(embeddings: number[][]): Buffer {
+    if (embeddings.length === 0) {
+      return Buffer.alloc(0);
+    }
+
+    const vectorCount = embeddings.length;
+    const vectorSize = embeddings[0].length;
+    
+    const headerSize = 8;
+    const dataSize = vectorCount * vectorSize * 4;
+    const totalSize = headerSize + dataSize;
+    
+    const buffer = Buffer.alloc(totalSize);
+    
+    buffer.writeUInt32LE(vectorCount, 0);
+    buffer.writeUInt32LE(vectorSize, 4);
+    
+    const float32Array = new Float32Array(embeddings.flat());
+    const dataBuffer = Buffer.from(float32Array.buffer);
+    dataBuffer.copy(buffer, headerSize);
+    
+    return buffer;
+  }
+
+  private bufferToEmbeddings(buffer: Buffer): number[][] {
+    if (buffer.length === 0) {
+      return [];
+    }
+
+    const vectorCount = buffer.readUInt32LE(0);
+    const vectorSize = buffer.readUInt32LE(4);
+    
+    const headerSize = 8;
+    const dataBuffer = buffer.slice(headerSize);
+    const float32Array = new Float32Array(dataBuffer.buffer, dataBuffer.byteOffset, dataBuffer.length / 4);
+    
+    const embeddings: number[][] = [];
+    for (let i = 0; i < vectorCount; i++) {
+      const start = i * vectorSize;
+      const end = start + vectorSize;
+      embeddings.push(Array.from(float32Array.slice(start, end)));
+    }
+    
+    return embeddings;
   }
 }

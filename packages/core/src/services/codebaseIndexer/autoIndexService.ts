@@ -51,9 +51,9 @@ export class AutoIndexService {
     const status = await this.indexer.getIndexStatus();
     if (!status.exists) {
       await this.indexer.indexCodebase(this.config.onProgress);
-      this.lastManifest = await this.indexer['storage'].loadManifest();
+      this.lastManifest = await this.indexer.loadManifest();
     } else {
-      this.lastManifest = await this.indexer['storage'].loadManifest();
+      this.lastManifest = await this.indexer.loadManifest();
     }
 
     this.intervalId = setInterval(async () => {
@@ -77,13 +77,13 @@ export class AutoIndexService {
     }
 
     try {
-      const currentManifest = await this.indexer['storage'].loadManifest();
+      const currentManifest = await this.indexer.loadManifest();
       
       if (this.hasChanges(currentManifest)) {
         const result = await this.indexer.reindexCodebase(this.config.onProgress);
         
         if (result.success) {
-          this.lastManifest = await this.indexer['storage'].loadManifest();
+          this.lastManifest = await this.indexer.loadManifest();
           this.config.onUpdate?.(result);
         }
       }

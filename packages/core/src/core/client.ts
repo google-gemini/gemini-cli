@@ -15,6 +15,7 @@ import {
 import {
   getDirectoryContextString,
   getEnvironmentContext,
+  getCodebaseIndexStatus,
 } from '../utils/environmentContext.js';
 import {
   Turn,
@@ -515,6 +516,16 @@ export class GeminiClient {
       }
       this.lastSentIdeContext = newIdeContext;
       this.forceFullIdeContext = false;
+    }
+
+    if (!hasPendingToolCall) {
+      const indexStatus = await getCodebaseIndexStatus(this.config);
+      if (indexStatus) {
+        this.getChat().addHistory({
+          role: 'user',
+          parts: [{ text: `Codebase index status:\n${indexStatus}` }],
+        });
+      }
     }
 
     const turn = new Turn(this.getChat(), prompt_id);

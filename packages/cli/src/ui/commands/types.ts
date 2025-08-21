@@ -73,7 +73,7 @@ export interface CommandContext {
       enabled: boolean;
       projectRoot: string;
       lastCheck: number;
-      indexer: any; // CodebaseIndexer instance
+      indexer: import('@google/gemini-cli-core').AutoIndexService;
     };
   };
   // Flag to indicate if an overwrite has been confirmed

@@ -92,6 +92,7 @@
   },
   "dependencies": {
     "node-fetch": "^3.3.2",
+    "npyjs": "^0.7.0",
     "strip-ansi": "^7.1.0"
   },
   "optionalDependencies": {

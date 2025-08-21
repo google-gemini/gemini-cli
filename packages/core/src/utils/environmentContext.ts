@@ -19,7 +19,7 @@ import { CodebaseIndexer } from '../services/codebaseIndexer/codebaseIndexer.js'
  * @param {Config} config - Конфигурация среды выполнения
  * @returns {Promise<string>} Статус индекса в виде строки
  */
-async function getCodebaseIndexStatus(config: Config): Promise<string> {
+export async function getCodebaseIndexStatus(config: Config): Promise<string> {
   try {
     const workspaceContext = config.getWorkspaceContext();
     const workspaceDirectories = workspaceContext.getDirectories();
