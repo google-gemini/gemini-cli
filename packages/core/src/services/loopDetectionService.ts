@@ -10,6 +10,28 @@ import { logLoopDetected } from '../telemetry/loggers.js';
 import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
 import { Config, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 
+/**
+ * Configuration options for loop detection thresholds and behavior.
+ */
+export interface LoopDetectionOptions {
+  /** Number of repeated tool calls before declaring a loop (default: 5) */
+  toolCallLoopThreshold?: number;
+  /** Number of repeated content chunks before declaring a loop (default: 10) */
+  contentLoopThreshold?: number;
+  /** Size of content chunks for analysis (default: 50) */
+  contentChunkSize?: number;
+  /** Maximum length of content history to maintain (default: 1000) */
+  maxHistoryLength?: number;
+  /** Number of turns before activating LLM-based loop check (default: 30) */
+  llmCheckAfterTurns?: number;
+  /** Default interval for LLM-based loop checks (default: 3) */
+  defaultLlmCheckInterval?: number;
+  /** Minimum interval for LLM-based loop checks (default: 5) */
+  minLlmCheckInterval?: number;
+  /** Maximum interval for LLM-based loop checks (default: 15) */
+  maxLlmCheckInterval?: number;
+}
+
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
 const CONTENT_CHUNK_SIZE = 50;
@@ -49,6 +71,7 @@ const MAX_LLM_CHECK_INTERVAL = 15;
  */
 export class LoopDetectionService {
   private readonly config: Config;
+  private readonly options: Required<LoopDetectionOptions>;
   private promptId = '';
 
   // Tool call tracking
@@ -64,11 +87,23 @@ export class LoopDetectionService {
 
   // LLM loop track tracking
   private turnsInCurrentPrompt = 0;
-  private llmCheckInterval = DEFAULT_LLM_CHECK_INTERVAL;
+  private llmCheckInterval: number;
   private lastCheckTurn = 0;
 
-  constructor(config: Config) {
+  constructor(config: Config, options: LoopDetectionOptions = {}) {
     this.config = config;
+    // Merge provided options with defaults
+    this.options = {
+      toolCallLoopThreshold: options.toolCallLoopThreshold ?? TOOL_CALL_LOOP_THRESHOLD,
+      contentLoopThreshold: options.contentLoopThreshold ?? CONTENT_LOOP_THRESHOLD,
+      contentChunkSize: options.contentChunkSize ?? CONTENT_CHUNK_SIZE,
+      maxHistoryLength: options.maxHistoryLength ?? MAX_HISTORY_LENGTH,
+      llmCheckAfterTurns: options.llmCheckAfterTurns ?? LLM_CHECK_AFTER_TURNS,
+      defaultLlmCheckInterval: options.defaultLlmCheckInterval ?? DEFAULT_LLM_CHECK_INTERVAL,
+      minLlmCheckInterval: options.minLlmCheckInterval ?? MIN_LLM_CHECK_INTERVAL,
+      maxLlmCheckInterval: options.maxLlmCheckInterval ?? MAX_LLM_CHECK_INTERVAL,
+    };
+    this.llmCheckInterval = this.options.defaultLlmCheckInterval;
   }
 
   private getToolCallKey(toolCall: { name: string; args: object }): string {
@@ -117,7 +152,7 @@ export class LoopDetectionService {
     this.turnsInCurrentPrompt++;
 
     if (
-      this.turnsInCurrentPrompt >= LLM_CHECK_AFTER_TURNS &&
+      this.turnsInCurrentPrompt >= this.options.llmCheckAfterTurns &&
       this.turnsInCurrentPrompt - this.lastCheckTurn >= this.llmCheckInterval
     ) {
       this.lastCheckTurn = this.turnsInCurrentPrompt;
@@ -135,7 +170,7 @@ export class LoopDetectionService {
       this.lastToolCallKey = key;
       this.toolCallRepetitionCount = 1;
     }
-    if (this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD) {
+    if (this.toolCallRepetitionCount >= this.options.toolCallLoopThreshold) {
       logLoopDetected(
         this.config,
         new LoopDetectedEvent(
@@ -194,13 +229,13 @@ export class LoopDetectionService {
    * When truncating, adjusts all stored indices to maintain their relative positions.
    */
   private truncateAndUpdate(): void {
-    if (this.streamContentHistory.length <= MAX_HISTORY_LENGTH) {
+    if (this.streamContentHistory.length <= this.options.maxHistoryLength) {
       return;
     }
 
     // Calculate how much content to remove from the beginning
     const truncationAmount =
-      this.streamContentHistory.length - MAX_HISTORY_LENGTH;
+      this.streamContentHistory.length - this.options.maxHistoryLength;
     this.streamContentHistory =
       this.streamContentHistory.slice(truncationAmount);
     this.lastContentIndex = Math.max(
@@ -226,7 +261,7 @@ export class LoopDetectionService {
    * Analyzes content in fixed-size chunks to detect repetitive patterns.
    *
    * Uses a sliding window approach:
-   * 1. Extract chunks of fixed size (CONTENT_CHUNK_SIZE)
+   * 1. Extract chunks of fixed size (this.options.contentChunkSize)
    * 2. Hash each chunk for efficient comparison
    * 3. Track positions where identical chunks appear
    * 4. Detect loops when chunks repeat frequently within a short distance
@@ -236,7 +271,7 @@ export class LoopDetectionService {
       // Extract current chunk of text
       const currentChunk = this.streamContentHistory.substring(
         this.lastContentIndex,
-        this.lastContentIndex + CONTENT_CHUNK_SIZE,
+        this.lastContentIndex + this.options.contentChunkSize,
       );
       const chunkHash = createHash('sha256').update(currentChunk).digest('hex');
 
@@ -260,7 +295,7 @@ export class LoopDetectionService {
 
   private hasMoreChunksToProcess(): boolean {
     return (
-      this.lastContentIndex + CONTENT_CHUNK_SIZE <=
+      this.lastContentIndex + this.options.contentChunkSize <=
       this.streamContentHistory.length
     );
   }
@@ -272,7 +307,7 @@ export class LoopDetectionService {
    * 1. Check if we've seen this hash before (new chunks are stored for future comparison)
    * 2. Verify actual content matches to prevent hash collisions
    * 3. Track all positions where this chunk appears
-   * 4. A loop is detected when the same chunk appears CONTENT_LOOP_THRESHOLD times
+   * 4. A loop is detected when the same chunk appears this.options.contentLoopThreshold times
    *    within a small average distance (≤ 1.5 * chunk size)
    */
   private isLoopDetectedForChunk(chunk: string, hash: string): boolean {
@@ -289,16 +324,16 @@ export class LoopDetectionService {
 
     existingIndices.push(this.lastContentIndex);
 
-    if (existingIndices.length < CONTENT_LOOP_THRESHOLD) {
+    if (existingIndices.length < this.options.contentLoopThreshold) {
       return false;
     }
 
     // Analyze the most recent occurrences to see if they're clustered closely together
-    const recentIndices = existingIndices.slice(-CONTENT_LOOP_THRESHOLD);
+    const recentIndices = existingIndices.slice(-this.options.contentLoopThreshold);
     const totalDistance =
       recentIndices[recentIndices.length - 1] - recentIndices[0];
-    const averageDistance = totalDistance / (CONTENT_LOOP_THRESHOLD - 1);
-    const maxAllowedDistance = CONTENT_CHUNK_SIZE * 1.5;
+    const averageDistance = totalDistance / (this.options.contentLoopThreshold - 1);
+    const maxAllowedDistance = this.options.contentChunkSize * 1.5;
 
     return averageDistance <= maxAllowedDistance;
   }
@@ -313,7 +348,7 @@ export class LoopDetectionService {
   ): boolean {
     const originalChunk = this.streamContentHistory.substring(
       originalIndex,
-      originalIndex + CONTENT_CHUNK_SIZE,
+      originalIndex + this.options.contentChunkSize,
     );
     return originalChunk === currentChunk;
   }

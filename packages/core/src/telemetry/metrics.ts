@@ -124,18 +124,33 @@ export function recordToolCallMetrics(
   if (!toolCallCounter || !toolCallLatencyHistogram || !isMetricsInitialized)
     return;
 
-  const metricAttributes: Attributes = {
-    ...getCommonAttributes(config),
-    function_name: functionName,
-    success,
-    decision,
-    tool_type,
-  };
-  toolCallCounter.add(1, metricAttributes);
-  toolCallLatencyHistogram.record(durationMs, {
-    ...getCommonAttributes(config),
-    function_name: functionName,
-  });
+  // Input validation for better reliability
+  if (!functionName || typeof functionName !== 'string') {
+    console.debug('Invalid functionName provided to recordToolCallMetrics');
+    return;
+  }
+  
+  if (durationMs < 0 || !Number.isFinite(durationMs)) {
+    console.debug('Invalid durationMs provided to recordToolCallMetrics:', durationMs);
+    return;
+  }
+
+  try {
+    const metricAttributes: Attributes = {
+      ...getCommonAttributes(config),
+      function_name: functionName,
+      success,
+      decision,
+      tool_type,
+    };
+    toolCallCounter.add(1, metricAttributes);
+    toolCallLatencyHistogram.record(durationMs, {
+      ...getCommonAttributes(config),
+      function_name: functionName,
+    });
+  } catch (error) {
+    console.debug('Error recording tool call metrics:', error);
+  }
 }
 
 export function recordTokenUsageMetrics(
@@ -145,11 +160,27 @@ export function recordTokenUsageMetrics(
   type: 'input' | 'output' | 'thought' | 'cache' | 'tool',
 ): void {
   if (!tokenUsageCounter || !isMetricsInitialized) return;
-  tokenUsageCounter.add(tokenCount, {
-    ...getCommonAttributes(config),
-    model,
-    type,
-  });
+  
+  // Input validation for better reliability
+  if (!model || typeof model !== 'string') {
+    console.debug('Invalid model provided to recordTokenUsageMetrics');
+    return;
+  }
+  
+  if (tokenCount < 0 || !Number.isFinite(tokenCount)) {
+    console.debug('Invalid tokenCount provided to recordTokenUsageMetrics:', tokenCount);
+    return;
+  }
+  
+  try {
+    tokenUsageCounter.add(tokenCount, {
+      ...getCommonAttributes(config),
+      model,
+      type,
+    });
+  } catch (error) {
+    console.debug('Error recording token usage metrics:', error);
+  }
 }
 
 export function recordApiResponseMetrics(
@@ -165,16 +196,32 @@ export function recordApiResponseMetrics(
     !isMetricsInitialized
   )
     return;
-  const metricAttributes: Attributes = {
-    ...getCommonAttributes(config),
-    model,
-    status_code: statusCode ?? (error ? 'error' : 'ok'),
-  };
-  apiRequestCounter.add(1, metricAttributes);
-  apiRequestLatencyHistogram.record(durationMs, {
-    ...getCommonAttributes(config),
-    model,
-  });
+    
+  // Input validation for better reliability
+  if (!model || typeof model !== 'string') {
+    console.debug('Invalid model provided to recordApiResponseMetrics');
+    return;
+  }
+  
+  if (durationMs < 0 || !Number.isFinite(durationMs)) {
+    console.debug('Invalid durationMs provided to recordApiResponseMetrics:', durationMs);
+    return;
+  }
+  
+  try {
+    const metricAttributes: Attributes = {
+      ...getCommonAttributes(config),
+      model,
+      status_code: statusCode ?? (error ? 'error' : 'ok'),
+    };
+    apiRequestCounter.add(1, metricAttributes);
+    apiRequestLatencyHistogram.record(durationMs, {
+      ...getCommonAttributes(config),
+      model,
+    });
+  } catch (error) {
+    console.debug('Error recording API response metrics:', error);
+  }
 }
 
 export function recordApiErrorMetrics(
