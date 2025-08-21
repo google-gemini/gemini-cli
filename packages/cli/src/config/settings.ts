@@ -11,6 +11,7 @@ import * as dotenv from 'dotenv';
 import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
+  Storage,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -20,13 +21,14 @@ import { Settings, MemoryImportFormat } from './settingsSchema.js';
 export type { Settings, MemoryImportFormat };
 
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
-export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
-export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
+
+export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
+export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
 export function getSystemSettingsPath(): string {
-  if (process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH) {
-    return process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
+  if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
+    return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
   }
   if (platform() === 'darwin') {
     return '/Library/Application Support/GeminiCli/settings.json';
@@ -35,10 +37,6 @@ export function getSystemSettingsPath(): string {
   } else {
     return '/etc/gemini-cli/settings.json';
   }
-}
-
-export function getWorkspaceSettingsPath(workspaceDir: string): string {
-  return path.join(workspaceDir, SETTINGS_DIRECTORY_NAME, 'settings.json');
 }
 
 export type { DnsResolutionOrder } from './settingsSchema.js';
@@ -70,6 +68,43 @@ export interface SettingsFile {
   settings: Settings;
   path: string;
 }
+
+function mergeSettings(
+  system: Settings,
+  user: Settings,
+  workspace: Settings,
+): Settings {
+  // folderTrust is not supported at workspace level.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { folderTrust, ...workspaceWithoutFolderTrust } = workspace;
+
+  return {
+    ...user,
+    ...workspaceWithoutFolderTrust,
+    ...system,
+    customThemes: {
+      ...(user.customThemes || {}),
+      ...(workspace.customThemes || {}),
+      ...(system.customThemes || {}),
+    },
+    mcpServers: {
+      ...(user.mcpServers || {}),
+      ...(workspace.mcpServers || {}),
+      ...(system.mcpServers || {}),
+    },
+    includeDirectories: [
+      ...(system.includeDirectories || []),
+      ...(user.includeDirectories || []),
+      ...(workspace.includeDirectories || []),
+    ],
+    chatCompression: {
+      ...(system.chatCompression || {}),
+      ...(user.chatCompression || {}),
+      ...(workspace.chatCompression || {}),
+    },
+  };
+}
+
 export class LoadedSettings {
   constructor(
     system: SettingsFile,
@@ -96,44 +131,11 @@ export class LoadedSettings {
   }
 
   private computeMergedSettings(): Settings {
-    const system = this.system.settings;
-    const user = this.user.settings;
-    const workspace = this.workspace.settings;
-
-    // folderTrust is not supported at workspace level.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { folderTrust, ...workspaceWithoutFolderTrust } = workspace;
-
-    return {
-      ...user,
-      ...workspaceWithoutFolderTrust,
-      ...system,
-      customThemes: {
-        ...(user.customThemes || {}),
-        ...(workspace.customThemes || {}),
-        ...(system.customThemes || {}),
-      },
-      mcpServers: {
-        ...(user.mcpServers || {}),
-        ...(workspace.mcpServers || {}),
-        ...(system.mcpServers || {}),
-      },
-      includeDirectories: [
-        ...(system.includeDirectories || []),
-        ...(user.includeDirectories || []),
-        ...(workspace.includeDirectories || []),
-      ],
-      preapprovedShellCommandRegexes: [
-        ...(system.preapprovedShellCommandRegexes || []),
-        ...(user.preapprovedShellCommandRegexes || []),
-        ...(workspace.preapprovedShellCommandRegexes || []),
-      ],
-      chatCompression: {
-        ...(system.chatCompression || {}),
-        ...(user.chatCompression || {}),
-        ...(workspace.chatCompression || {}),
-      },
-    };
+    return mergeSettings(
+      this.system.settings,
+      this.user.settings,
+      this.workspace.settings,
+    );
   }
 
   forScope(scope: SettingScope): SettingsFile {
@@ -241,16 +243,16 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   if (envFilePath && fs.existsSync(envFilePath)) {
     const envFileContent = fs.readFileSync(envFilePath);
     const parsedEnv = dotenv.parse(envFileContent);
-    if (parsedEnv.GOOGLE_CLOUD_PROJECT) {
+    if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
       // .env file takes precedence in Cloud Shell
-      process.env.GOOGLE_CLOUD_PROJECT = parsedEnv.GOOGLE_CLOUD_PROJECT;
+      process.env['GOOGLE_CLOUD_PROJECT'] = parsedEnv['GOOGLE_CLOUD_PROJECT'];
     } else {
       // If not in .env, set to default and override global
-      process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
+      process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
     }
   } else {
     // If no .env file, set to default and override global
-    process.env.GOOGLE_CLOUD_PROJECT = 'cloudshell-gca';
+    process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
   }
 }
 
@@ -258,14 +260,16 @@ export function loadEnvironment(settings?: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
   // Cloud Shell environment variable handling
-  if (process.env.CLOUD_SHELL === 'true') {
+  if (process.env['CLOUD_SHELL'] === 'true') {
     setUpCloudShellEnvironment(envFilePath);
   }
 
   // If no settings provided, try to load workspace settings for exclusions
   let resolvedSettings = settings;
   if (!resolvedSettings) {
-    const workspaceSettingsPath = getWorkspaceSettingsPath(process.cwd());
+    const workspaceSettingsPath = new Storage(
+      process.cwd(),
+    ).getWorkspaceSettingsPath();
     try {
       if (fs.existsSync(workspaceSettingsPath)) {
         const workspaceContent = fs.readFileSync(
@@ -338,16 +342,15 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   // We expect homedir to always exist and be resolvable.
   const realHomeDir = fs.realpathSync(resolvedHomeDir);
 
-  const workspaceSettingsPath = getWorkspaceSettingsPath(workspaceDir);
+  const workspaceSettingsPath = new Storage(
+    workspaceDir,
+  ).getWorkspaceSettingsPath();
 
   // Load system settings
   try {
     if (fs.existsSync(systemSettingsPath)) {
       const systemContent = fs.readFileSync(systemSettingsPath, 'utf-8');
-      const parsedSystemSettings = JSON.parse(
-        stripJsonComments(systemContent),
-      ) as Settings;
-      systemSettings = resolveEnvVarsInObject(parsedSystemSettings);
+      systemSettings = JSON.parse(stripJsonComments(systemContent)) as Settings;
     }
   } catch (error: unknown) {
     settingsErrors.push({
@@ -360,10 +363,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   try {
     if (fs.existsSync(USER_SETTINGS_PATH)) {
       const userContent = fs.readFileSync(USER_SETTINGS_PATH, 'utf-8');
-      const parsedUserSettings = JSON.parse(
-        stripJsonComments(userContent),
-      ) as Settings;
-      userSettings = resolveEnvVarsInObject(parsedUserSettings);
+      userSettings = JSON.parse(stripJsonComments(userContent)) as Settings;
       // Support legacy theme names
       if (userSettings.theme && userSettings.theme === 'VS') {
         userSettings.theme = DefaultLight.name;
@@ -383,10 +383,9 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     try {
       if (fs.existsSync(workspaceSettingsPath)) {
         const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
-        const parsedWorkspaceSettings = JSON.parse(
+        workspaceSettings = JSON.parse(
           stripJsonComments(projectContent),
         ) as Settings;
-        workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
         if (workspaceSettings.theme && workspaceSettings.theme === 'VS') {
           workspaceSettings.theme = DefaultLight.name;
         } else if (
@@ -403,6 +402,22 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
       });
     }
   }
+
+  // Create a temporary merged settings object to pass to loadEnvironment.
+  const tempMergedSettings = mergeSettings(
+    systemSettings,
+    userSettings,
+    workspaceSettings,
+  );
+
+  // loadEnviroment depends on settings so we have to create a temp version of
+  // the settings to avoid a cycle
+  loadEnvironment(tempMergedSettings);
+
+  // Now that the environment is loaded, resolve variables in the settings.
+  systemSettings = resolveEnvVarsInObject(systemSettings);
+  userSettings = resolveEnvVarsInObject(userSettings);
+  workspaceSettings = resolveEnvVarsInObject(workspaceSettings);
 
   // Create LoadedSettings first
   const loadedSettings = new LoadedSettings(
@@ -433,9 +448,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
     );
     delete loadedSettings.merged.chatCompression;
   }
-
-  // Load environment with merged settings
-  loadEnvironment(loadedSettings.merged);
 
   return loadedSettings;
 }
