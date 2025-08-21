@@ -340,7 +340,7 @@ export class Config {
       batchSize: params.codebaseIndexing?.batchSize ?? 32,
       maxTextChars: params.codebaseIndexing?.maxTextChars ?? 8192,
       mergeThreshold: params.codebaseIndexing?.mergeThreshold ?? 40,
-      skipIfLargerThan: params.codebaseIndexing?.skipIfLargerThan ?? 1024 * 1024,
+      skipIfLargerThan: params.codebaseIndexing?.skipIfLargerThan ?? 50 * 1024 * 1024,
       autoIndexingEnabled: params.codebaseIndexing?.autoIndexingEnabled ?? false,
       autoIndexingInterval: params.codebaseIndexing?.autoIndexingInterval ?? 5000,
     };

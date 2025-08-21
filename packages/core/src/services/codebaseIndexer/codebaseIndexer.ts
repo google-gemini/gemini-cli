@@ -60,6 +60,9 @@ export class CodebaseIndexer {
     this.abortController = new AbortController();
     
     try {
+      if (await this.storage.indexExists()) {
+        await this.storage.deleteIndex();
+      }
       await this.storage.createIndexDirectory();
 
       onProgress?.({

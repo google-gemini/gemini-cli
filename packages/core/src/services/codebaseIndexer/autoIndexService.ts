@@ -19,7 +19,7 @@ export class AutoIndexService {
   private config: AutoIndexConfig;
   private indexer: CodebaseIndexer;
   private intervalId: NodeJS.Timeout | null = null;
-  private lastManifest: any = null;
+
   private isRunning = false;
 
   constructor(config: AutoIndexConfig) {
@@ -51,9 +51,6 @@ export class AutoIndexService {
     const status = await this.indexer.getIndexStatus();
     if (!status.exists) {
       await this.indexer.indexCodebase(this.config.onProgress);
-      this.lastManifest = await this.indexer.loadManifest();
-    } else {
-      this.lastManifest = await this.indexer.loadManifest();
     }
 
     this.intervalId = setInterval(async () => {
@@ -83,7 +80,6 @@ export class AutoIndexService {
         const result = await this.indexer.reindexCodebase(this.config.onProgress);
         
         if (result.success) {
-          this.lastManifest = await this.indexer.loadManifest();
           this.config.onUpdate?.(result);
         }
       }
@@ -93,29 +89,7 @@ export class AutoIndexService {
   }
 
   private hasChanges(currentManifest: any): boolean {
-    if (!this.lastManifest) {
-      return true;
-    }
-
-    const lastFileCount = Object.keys(this.lastManifest.files || {}).length;
-    const currentFileCount = Object.keys(currentManifest.files || {}).length;
-
-    if (lastFileCount !== currentFileCount) {
-      return true;
-    }
-
-    for (const [sha, fileInfo] of Object.entries(currentManifest.files || {})) {
-      const lastFileInfo = this.lastManifest.files?.[sha];
-      if (!lastFileInfo) {
-        return true;
-      }
-
-      if (lastFileInfo.n !== (fileInfo as any).n) {
-        return true;
-      }
-    }
-
-    return false;
+    return true;
   }
 
   isActive(): boolean {

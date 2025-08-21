@@ -62,7 +62,6 @@ export function isWithinRoot(
  * @returns Promise that resolves to true if the file appears to be binary.
  */
 export async function isBinaryFile(filePath: string): Promise<boolean> {
-  // Используем элегантную проверку вместо костылей
   return await isBinaryFileElegant(filePath);
 }
 

@@ -75,7 +75,7 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Default:** See individual properties below
   - **Properties:**
     - **`embedEndpoint`** (string): The endpoint URL for the embedding service used to generate vector embeddings for code files.
-      - **Default:** `"http://localhost:11434"`
+      - **Default:** `"http://localhost:11434/v1/embeddings"`
       - **Example:** `"embedEndpoint": "https://api.openai.com/v1/embeddings"`
     - **`apiKey`** (string, optional): API key for the embedding service. Can reference environment variables using `$VAR_NAME` syntax.
       - **Default:** `undefined`
@@ -90,7 +90,7 @@ In addition to a project settings file, a project's `.gemini` directory can cont
       - **Default:** `40`
       - **Example:** `"mergeThreshold": 50`
     - **`skipIfLargerThan`** (number): Skip files larger than this size (in bytes) during indexing.
-      - **Default:** `1048576` (1MB)
+      - **Default:** `52428800` (50MB)
       - **Example:** `"skipIfLargerThan": 2097152` (2MB)
     - **`autoIndexingEnabled`** (boolean): Whether to enable automatic index updates when files change during a session.
       - **Default:** `false`
