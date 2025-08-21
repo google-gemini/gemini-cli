@@ -21,6 +21,7 @@ describe('<MarkdownDisplay />', () => {
     { path: '', settings: {} },
     { path: '', settings: {} },
     { path: '', settings: {} },
+    { path: '', settings: {} },
     [],
   );
 
@@ -216,6 +217,7 @@ Another paragraph.
   it('hides line numbers in code blocks when showLineNumbers is false', () => {
     const text = '```javascript\nconst x = 1;\n```';
     const settings = new LoadedSettings(
+      { path: '', settings: {} },
       { path: '', settings: {} },
       { path: '', settings: { showLineNumbers: false } },
       { path: '', settings: {} },

@@ -128,6 +128,10 @@ describe('SettingsDialog', () => {
         path: '/system/settings.json',
       },
       {
+        settings: {},
+        path: '/system/system-defaults.json',
+      },
+      {
         settings: {
           customThemes: {},
           mcpServers: {},

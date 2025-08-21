@@ -35,6 +35,10 @@ describe('AuthDialog', () => {
         path: '',
       },
       {
+        settings: {},
+        path: '',
+      },
+      {
         settings: {
           selectedAuthType: AuthType.USE_GEMINI,
         },
@@ -74,6 +78,10 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
+          settings: {},
+          path: '',
+        },
+        {
           settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
@@ -107,6 +115,10 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
+          settings: {},
+          path: '',
+        },
+        {
           settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
@@ -137,6 +149,10 @@ describe('AuthDialog', () => {
             customThemes: {},
             mcpServers: {},
           },
+          path: '',
+        },
+        {
+          settings: {},
           path: '',
         },
         {
@@ -174,6 +190,10 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
+          settings: {},
+          path: '',
+        },
+        {
           settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
@@ -200,6 +220,10 @@ describe('AuthDialog', () => {
             customThemes: {},
             mcpServers: {},
           },
+          path: '',
+        },
+        {
+          settings: {},
           path: '',
         },
         {
@@ -234,6 +258,10 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
+          settings: {},
+          path: '',
+        },
+        {
           settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
@@ -262,6 +290,10 @@ describe('AuthDialog', () => {
     const settings: LoadedSettings = new LoadedSettings(
       {
         settings: { customThemes: {}, mcpServers: {} },
+        path: '',
+      },
+      {
+        settings: {},
         path: '',
       },
       {
@@ -304,6 +336,10 @@ describe('AuthDialog', () => {
         path: '',
       },
       {
+        settings: {},
+        path: '',
+      },
+      {
         settings: {
           selectedAuthType: undefined,
           customThemes: {},
@@ -343,6 +379,10 @@ describe('AuthDialog', () => {
     const settings: LoadedSettings = new LoadedSettings(
       {
         settings: { customThemes: {}, mcpServers: {} },
+        path: '',
+      },
+      {
+        settings: {},
         path: '',
       },
       {
