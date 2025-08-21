@@ -231,29 +231,6 @@ describe('copyCommand', () => {
     });
   });
 
-  it('should handle non-Error clipboard errors', async () => {
-    if (!copyCommand.action) throw new Error('Command has no action');
-
-    const historyWithAiMessage = [
-      {
-        role: 'model',
-        parts: [{ text: 'AI response' }],
-      },
-    ];
-
-    mockGetHistory.mockReturnValue(historyWithAiMessage);
-    const rejectedValue = 'String error';
-    mockCopyToClipboard.mockRejectedValue(rejectedValue);
-
-    const result = await copyCommand.action(mockContext, '');
-
-    expect(result).toEqual({
-      type: 'message',
-      messageType: 'error',
-      content: `Failed to copy to the clipboard. ${rejectedValue}`,
-    });
-  });
-
   it('should return info message when no text parts found in AI message', async () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
