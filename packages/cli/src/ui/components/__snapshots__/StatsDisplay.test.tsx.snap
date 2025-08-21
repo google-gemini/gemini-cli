@@ -7,7 +7,7 @@ exports[`<StatsDisplay /> > Code Changes Display > displays Code Changes when li
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 1 ( ✔ 1 ✖ 0 )                                                       │
+│  Tool Calls:                 1 ( ✓ 1 x 0 )                                                       │
 │  Success Rate:               100.0%                                                              │
 │  Code Changes:               +42 -18                                                             │
 │                                                                                                  │
@@ -28,7 +28,7 @@ exports[`<StatsDisplay /> > Code Changes Display > hides Code Changes when no li
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 1 ( ✔ 1 ✖ 0 )                                                       │
+│  Tool Calls:                 1 ( ✓ 1 x 0 )                                                       │
 │  Success Rate:               100.0%                                                              │
 │                                                                                                  │
 │  Performance                                                                                     │
@@ -48,7 +48,7 @@ exports[`<StatsDisplay /> > Conditional Color Tests > renders success rate in gr
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 10 ( ✔ 10 ✖ 0 )                                                     │
+│  Tool Calls:                 10 ( ✓ 10 x 0 )                                                     │
 │  Success Rate:               100.0%                                                              │
 │                                                                                                  │
 │  Performance                                                                                     │
@@ -68,7 +68,7 @@ exports[`<StatsDisplay /> > Conditional Color Tests > renders success rate in re
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 10 ( ✔ 5 ✖ 5 )                                                      │
+│  Tool Calls:                 10 ( ✓ 5 x 5 )                                                      │
 │  Success Rate:               50.0%                                                               │
 │                                                                                                  │
 │  Performance                                                                                     │
@@ -88,7 +88,7 @@ exports[`<StatsDisplay /> > Conditional Color Tests > renders success rate in ye
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 10 ( ✔ 9 ✖ 1 )                                                      │
+│  Tool Calls:                 10 ( ✓ 9 x 1 )                                                      │
 │  Success Rate:               90.0%                                                               │
 │                                                                                                  │
 │  Performance                                                                                     │
@@ -108,7 +108,7 @@ exports[`<StatsDisplay /> > Conditional Rendering Tests > hides Efficiency secti
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✔ 0 ✖ 0 )                                                       │
+│  Tool Calls:                 0 ( ✓ 0 x 0 )                                                       │
 │  Success Rate:               0.0%                                                                │
 │                                                                                                  │
 │  Performance                                                                                     │
@@ -132,7 +132,7 @@ exports[`<StatsDisplay /> > Conditional Rendering Tests > hides User Agreement w
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 2 ( ✔ 1 ✖ 1 )                                                       │
+│  Tool Calls:                 2 ( ✓ 1 x 1 )                                                       │
 │  Success Rate:               50.0%                                                               │
 │                                                                                                  │
 │  Performance                                                                                     │
@@ -152,7 +152,7 @@ exports[`<StatsDisplay /> > Title Rendering > renders the custom title when a ti
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✔ 0 ✖ 0 )                                                       │
+│  Tool Calls:                 0 ( ✓ 0 x 0 )                                                       │
 │  Success Rate:               0.0%                                                                │
 │                                                                                                  │
 │  Performance                                                                                     │
@@ -172,7 +172,7 @@ exports[`<StatsDisplay /> > Title Rendering > renders the default title when no 
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✔ 0 ✖ 0 )                                                       │
+│  Tool Calls:                 0 ( ✓ 0 x 0 )                                                       │
 │  Success Rate:               0.0%                                                                │
 │                                                                                                  │
 │  Performance                                                                                     │
@@ -192,7 +192,7 @@ exports[`<StatsDisplay /> > renders a table with two models correctly 1`] = `
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✔ 0 ✖ 0 )                                                       │
+│  Tool Calls:                 0 ( ✓ 0 x 0 )                                                       │
 │  Success Rate:               0.0%                                                                │
 │                                                                                                  │
 │  Performance                                                                                     │
@@ -221,7 +221,7 @@ exports[`<StatsDisplay /> > renders all sections when all data is present 1`] = 
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 2 ( ✔ 1 ✖ 1 )                                                       │
+│  Tool Calls:                 2 ( ✓ 1 x 1 )                                                       │
 │  Success Rate:               50.0%                                                               │
 │  User Agreement:             100.0% (1 reviewed)                                                 │
 │                                                                                                  │
@@ -250,7 +250,7 @@ exports[`<StatsDisplay /> > renders only the Performance section in its zero sta
 │                                                                                                  │
 │  Interaction Summary                                                                             │
 │  Session ID:                 test-session-id                                                     │
-│  Tool Calls:                 0 ( ✔ 0 ✖ 0 )                                                       │
+│  Tool Calls:                 0 ( ✓ 0 x 0 )                                                       │
 │  Success Rate:               0.0%                                                                │
 │                                                                                                  │
 │  Performance                                                                                     │
