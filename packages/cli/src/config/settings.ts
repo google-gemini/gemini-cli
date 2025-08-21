@@ -43,7 +43,10 @@ export function getSystemDefaultsPath(): string {
   if (process.env['GEMINI_CLI_SYSTEM_DEFAULTS_PATH']) {
     return process.env['GEMINI_CLI_SYSTEM_DEFAULTS_PATH'];
   }
-  return path.join(path.dirname(getSystemSettingsPath()), 'system-defaults.json');
+  return path.join(
+    path.dirname(getSystemSettingsPath()),
+    'system-defaults.json',
+  );
 }
 
 export type { DnsResolutionOrder } from './settingsSchema.js';
@@ -393,7 +396,10 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   // Load system defaults
   try {
     if (fs.existsSync(systemDefaultsPath)) {
-      const systemDefaultsContent = fs.readFileSync(systemDefaultsPath, 'utf-8');
+      const systemDefaultsContent = fs.readFileSync(
+        systemDefaultsPath,
+        'utf-8',
+      );
       const parsedSystemDefaults = JSON.parse(
         stripJsonComments(systemDefaultsContent),
       ) as Settings;
