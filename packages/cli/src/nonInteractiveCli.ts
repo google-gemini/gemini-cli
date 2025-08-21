@@ -8,16 +8,15 @@ import {
   Config,
   ToolCallRequestInfo,
   executeToolCall,
-  ToolRegistry,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   GeminiEventType,
-  ToolErrorType,
   parseAndFormatApiError,
 } from '@google/gemini-cli-core';
 import { Content, Part, FunctionCall } from '@google/genai';
 
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
+import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
 
 export async function runNonInteractive(
   config: Config,
@@ -40,12 +39,29 @@ export async function runNonInteractive(
     });
 
     const geminiClient = config.getGeminiClient();
-    const toolRegistry: ToolRegistry = await config.getToolRegistry();
 
     const abortController = new AbortController();
+
+    const { processedQuery, shouldProceed } = await handleAtCommand({
+      query: input,
+      config,
+      addItem: (_item, _timestamp) => 0,
+      onDebugMessage: () => {},
+      messageId: Date.now(),
+      signal: abortController.signal,
+    });
+
+    if (!shouldProceed || !processedQuery) {
+      // An error occurred during @include processing (e.g., file not found).
+      // The error message is already logged by handleAtCommand.
+      console.error('Exiting due to an error processing the @ command.');
+      process.exit(1);
+    }
+
     let currentMessages: Content[] = [
-      { role: 'user', parts: [{ text: input }] },
+      { role: 'user', parts: processedQuery as Part[] },
     ];
+
     let turnCount = 0;
     while (true) {
       turnCount++;
@@ -101,7 +117,6 @@ export async function runNonInteractive(
           const toolResponse = await executeToolCall(
             config,
             requestInfo,
-            toolRegistry,
             abortController.signal,
           );
 
@@ -109,8 +124,6 @@ export async function runNonInteractive(
             console.error(
               `Error executing tool ${fc.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
             );
-            if (toolResponse.errorType === ToolErrorType.UNHANDLED_EXCEPTION)
-              process.exit(1);
           }
 
           if (toolResponse.responseParts) {

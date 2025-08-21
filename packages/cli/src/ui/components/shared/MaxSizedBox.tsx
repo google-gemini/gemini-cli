@@ -321,7 +321,7 @@ function visitBoxRow(element: React.ReactNode): Row {
       const segment: StyledText = { text, props: parentProps ?? {} };
 
       // Check the 'wrap' property from the merged props to decide the segment type.
-      if (parentProps === undefined || parentProps.wrap === 'wrap') {
+      if (parentProps === undefined || parentProps['wrap'] === 'wrap') {
         hasSeenWrapped = true;
         row.segments.push(segment);
       } else {

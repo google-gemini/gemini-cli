@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -152,7 +153,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return this.displayName;
+    return safeJsonStringify(this.params);
   }
 }
 
@@ -271,7 +272,7 @@ function transformResourceLinkBlock(block: McpResourceLinkBlock): Part {
  */
 function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
   const funcResponse = sdkResponse?.[0]?.functionResponse;
-  const mcpContent = funcResponse?.response?.content as McpContentBlock[];
+  const mcpContent = funcResponse?.response?.['content'] as McpContentBlock[];
   const toolName = funcResponse?.name || 'unknown tool';
 
   if (!Array.isArray(mcpContent)) {
@@ -308,8 +309,9 @@ function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
  * @returns A formatted string representing the tool's output.
  */
 function getStringifiedResultForDisplay(rawResponse: Part[]): string {
-  const mcpContent = rawResponse?.[0]?.functionResponse?.response
-    ?.content as McpContentBlock[];
+  const mcpContent = rawResponse?.[0]?.functionResponse?.response?.[
+    'content'
+  ] as McpContentBlock[];
 
   if (!Array.isArray(mcpContent)) {
     return '```json\n' + JSON.stringify(rawResponse, null, 2) + '\n```';
