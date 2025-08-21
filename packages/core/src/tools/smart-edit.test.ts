@@ -31,7 +31,7 @@ import {
   applyReplacement,
   SmartEditTool,
   EditToolParams,
-  performReplacement,
+  calculateReplacement,
 } from './smart-edit.js';
 import { FileDiff, ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
@@ -154,12 +154,12 @@ describe('SmartEditTool', () => {
     });
   });
 
-  describe('performReplacement', () => {
+  describe('calculateReplacement', () => {
     const abortSignal = new AbortController().signal;
 
     it('should perform an exact replacement', async () => {
       const content = 'hello world';
-      const result = await performReplacement({
+      const result = await calculateReplacement({
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -175,7 +175,7 @@ describe('SmartEditTool', () => {
 
     it('should perform a flexible, whitespace-insensitive replacement', async () => {
       const content = '  hello\n    world\n';
-      const result = await performReplacement({
+      const result = await calculateReplacement({
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -191,7 +191,7 @@ describe('SmartEditTool', () => {
 
     it('should return 0 occurrences if no match is found', async () => {
       const content = 'hello world';
-      const result = await performReplacement({
+      const result = await calculateReplacement({
         params: {
           file_path: 'test.txt',
           instruction: 'test',

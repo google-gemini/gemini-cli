@@ -74,7 +74,7 @@ function restoreTrailingNewline(
   return modifiedContent;
 }
 
-async function performExactReplacement(
+async function calculateExactReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult | null> {
   const { currentContent, params } = context;
@@ -102,7 +102,7 @@ async function performExactReplacement(
   return null;
 }
 
-async function performFlexibleReplacement(
+async function calculateFlexibleReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult | null> {
   const { currentContent, params } = context;
@@ -160,7 +160,7 @@ async function performFlexibleReplacement(
   return null;
 }
 
-export async function performReplacement(
+export async function calculateReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult> {
   const { currentContent, params } = context;
@@ -177,12 +177,12 @@ export async function performReplacement(
     };
   }
 
-  const exactResult = await performExactReplacement(context);
+  const exactResult = await calculateExactReplacement(context);
   if (exactResult) {
     return exactResult;
   }
 
-  const flexibleResult = await performFlexibleReplacement(context);
+  const flexibleResult = await calculateFlexibleReplacement(context);
   if (flexibleResult) {
     return flexibleResult;
   }
@@ -312,7 +312,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       };
     }
 
-    const secondAttemptResult = await performReplacement({
+    const secondAttemptResult = await calculateReplacement({
       params: {
         ...params,
         old_string: fixedEdit.search,
@@ -432,7 +432,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       };
     }
 
-    const replacementResult = await performReplacement({
+    const replacementResult = await calculateReplacement({
       params,
       currentContent,
       abortSignal,
