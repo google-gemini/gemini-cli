@@ -21,7 +21,6 @@ import {
   ToolResult,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import {
@@ -80,7 +79,9 @@ export async function getCorrectedFileContent(
   let correctedContent = proposedContent;
 
   try {
-    originalContent = fs.readFileSync(filePath, 'utf8');
+    originalContent = await config
+      .getFileSystemService()
+      .readTextFile(filePath);
     fileExists = true; // File exists and was read
   } catch (err) {
     if (isNodeError(err) && err.code === 'ENOENT') {
@@ -261,7 +262,9 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         fs.mkdirSync(dirName, { recursive: true });
       }
 
-      fs.writeFileSync(file_path, fileContent, 'utf8');
+      await this.config
+        .getFileSystemService()
+        .writeTextFile(file_path, fileContent);
 
       // Generate diff for display result
       const fileName = path.basename(file_path);
@@ -413,17 +416,9 @@ export class WriteFileTool
     );
   }
 
-  protected override validateToolParams(
+  protected override validateToolParamValues(
     params: WriteFileToolParams,
   ): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
-    }
-
     const filePath = params.file_path;
 
     if (!filePath) {

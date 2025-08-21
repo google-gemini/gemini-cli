@@ -19,6 +19,7 @@ import { Config } from '../config/config.js';
 
 import { UserTierId } from '../code_assist/types.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
+import { InstallationManager } from '../utils/installationManager.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -60,10 +61,10 @@ export function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
 ): ContentGeneratorConfig {
-  const geminiApiKey = process.env.GEMINI_API_KEY || undefined;
-  const googleApiKey = process.env.GOOGLE_API_KEY || undefined;
-  const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT || undefined;
-  const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION || undefined;
+  const geminiApiKey = process.env['GEMINI_API_KEY'] || undefined;
+  const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
+  const googleCloudProject = process.env['GOOGLE_CLOUD_PROJECT'] || undefined;
+  const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
 
   // Use runtime model from config if available; otherwise, fall back to parameter or default
   const effectiveModel = config.getModel() || DEFAULT_GEMINI_MODEL;
@@ -107,16 +108,17 @@ export async function createContentGenerator(
   gcConfig: Config,
   sessionId?: string,
 ): Promise<ContentGenerator> {
-  const version = process.env.CLI_VERSION || process.version;
-  const httpOptions = {
-    headers: {
-      'User-Agent': `GeminiCLI/${version} (${process.platform}; ${process.arch})`,
-    },
+  const version = process.env['CLI_VERSION'] || process.version;
+  const userAgent = `GeminiCLI/${version} (${process.platform}; ${process.arch})`;
+  const baseHeaders: Record<string, string> = {
+    'User-Agent': userAgent,
   };
+
   if (
     config.authType === AuthType.LOGIN_WITH_GOOGLE ||
     config.authType === AuthType.CLOUD_SHELL
   ) {
+    const httpOptions = { headers: baseHeaders };
     return new LoggingContentGenerator(
       await createCodeAssistContentGenerator(
         httpOptions,
@@ -132,6 +134,17 @@ export async function createContentGenerator(
     config.authType === AuthType.USE_GEMINI ||
     config.authType === AuthType.USE_VERTEX_AI
   ) {
+    let headers: Record<string, string> = { ...baseHeaders };
+    if (gcConfig?.getUsageStatisticsEnabled()) {
+      const installationManager = new InstallationManager();
+      const installationId = installationManager.getInstallationId();
+      headers = {
+        ...headers,
+        'x-gemini-api-privileged-user-id': `${installationId}`,
+      };
+    }
+    const httpOptions = { headers };
+
     const googleGenAI = new GoogleGenAI({
       apiKey: config.apiKey === '' ? undefined : config.apiKey,
       vertexai: config.vertexai,

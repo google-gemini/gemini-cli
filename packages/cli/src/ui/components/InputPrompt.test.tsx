@@ -160,6 +160,11 @@ describe('InputPrompt', () => {
       setActiveSuggestionIndex: vi.fn(),
       setShowSuggestions: vi.fn(),
       handleAutocomplete: vi.fn(),
+      promptCompletion: {
+        text: '',
+        accept: vi.fn(),
+        clear: vi.fn(),
+      },
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
 
@@ -1207,6 +1212,43 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockBuffer.handleInput).not.toHaveBeenCalled();
+      unmount();
+    });
+  });
+
+  describe('multiline paste', () => {
+    it.each([
+      {
+        description: 'with \n newlines',
+        pastedText: 'This \n is \n a \n multiline \n paste.',
+      },
+      {
+        description: 'with extra slashes before \n newlines',
+        pastedText: 'This \\\n is \\\n a \\\n multiline \\\n paste.',
+      },
+      {
+        description: 'with \r\n newlines',
+        pastedText: 'This\r\nis\r\na\r\nmultiline\r\npaste.',
+      },
+    ])('should handle multiline paste $description', async ({ pastedText }) => {
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Simulate a bracketed paste event from the terminal
+      stdin.write(`\x1b[200~${pastedText}\x1b[201~`);
+      await wait();
+
+      // Verify that the buffer's handleInput was called once with the full text
+      expect(props.buffer.handleInput).toHaveBeenCalledTimes(1);
+      expect(props.buffer.handleInput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paste: true,
+          sequence: pastedText,
+        }),
+      );
+
       unmount();
     });
   });

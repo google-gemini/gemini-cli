@@ -20,6 +20,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { EnvHttpProxyAgent } from 'undici';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -63,6 +64,7 @@ export class IdeClient {
   private readonly currentIde: DetectedIde | undefined;
   private readonly currentIdeDisplayName: string | undefined;
   private diffResponses = new Map<string, (result: DiffUpdateResult) => void>();
+  private statusListeners = new Set<(state: IDEConnectionState) => void>();
 
   private constructor() {
     this.currentIde = detectIde();
@@ -76,6 +78,14 @@ export class IdeClient {
       IdeClient.instance = new IdeClient();
     }
     return IdeClient.instance;
+  }
+
+  addStatusChangeListener(listener: (state: IDEConnectionState) => void) {
+    this.statusListeners.add(listener);
+  }
+
+  removeStatusChangeListener(listener: (state: IDEConnectionState) => void) {
+    this.statusListeners.delete(listener);
   }
 
   async connect(): Promise<void> {
@@ -94,8 +104,13 @@ export class IdeClient {
 
     this.setState(IDEConnectionStatus.Connecting);
 
+    const ideInfoFromFile = await this.getIdeInfoFromFile();
+    const workspacePath =
+      ideInfoFromFile.workspacePath ??
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+
     const { isValid, error } = IdeClient.validateWorkspacePath(
-      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'],
+      workspacePath,
       this.currentIdeDisplayName,
       process.cwd(),
     );
@@ -105,7 +120,7 @@ export class IdeClient {
       return;
     }
 
-    const portFromFile = await this.getPortFromFile();
+    const portFromFile = ideInfoFromFile.port;
     if (portFromFile) {
       const connected = await this.establishConnection(portFromFile);
       if (connected) {
@@ -237,6 +252,9 @@ export class IdeClient {
     // disconnected, so that the first detail message is preserved.
     if (!isAlreadyDisconnected) {
       this.state = { status, details };
+      for (const listener of this.statusListeners) {
+        listener(this.state);
+      }
       if (details) {
         if (logToConsole) {
           logger.error(details);
@@ -298,7 +316,10 @@ export class IdeClient {
     return port;
   }
 
-  private async getPortFromFile(): Promise<string | undefined> {
+  private async getIdeInfoFromFile(): Promise<{
+    port?: string;
+    workspacePath?: string;
+  }> {
     try {
       const ideProcessId = await getIdeProcessId();
       const portFile = path.join(
@@ -306,11 +327,37 @@ export class IdeClient {
         `gemini-ide-server-${ideProcessId}.json`,
       );
       const portFileContents = await fs.promises.readFile(portFile, 'utf8');
-      const port = JSON.parse(portFileContents).port;
-      return port.toString();
+      const ideInfo = JSON.parse(portFileContents);
+      return {
+        port: ideInfo?.port?.toString(),
+        workspacePath: ideInfo?.workspacePath,
+      };
     } catch (_) {
-      return undefined;
+      return {};
     }
+  }
+
+  private createProxyAwareFetch() {
+    // ignore proxy for 'localhost' by deafult to allow connecting to the ide mcp server
+    const existingNoProxy = process.env['NO_PROXY'] || '';
+    const agent = new EnvHttpProxyAgent({
+      noProxy: [existingNoProxy, 'localhost'].filter(Boolean).join(','),
+    });
+    const undiciPromise = import('undici');
+    return async (url: string | URL, init?: RequestInit): Promise<Response> => {
+      const { fetch: fetchFn } = await undiciPromise;
+      const fetchOptions: RequestInit & { dispatcher?: unknown } = {
+        ...init,
+        dispatcher: agent,
+      };
+      const options = fetchOptions as unknown as import('undici').RequestInit;
+      const response = await fetchFn(url, options);
+      return new Response(response.body as ReadableStream<unknown> | null, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      });
+    };
   }
 
   private registerClientHandlers() {
@@ -377,6 +424,9 @@ export class IdeClient {
       });
       transport = new StreamableHTTPClientTransport(
         new URL(`http://${getIdeServerHost()}:${port}/mcp`),
+        {
+          fetch: this.createProxyAwareFetch(),
+        },
       );
       await this.client.connect(transport);
       this.registerClientHandlers();
