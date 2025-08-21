@@ -87,6 +87,7 @@ interface MockServerConfig {
   getGeminiClient: Mock<() => GeminiClient | undefined>;
   getUserTier: Mock<() => Promise<string | undefined>>;
   getIdeClient: Mock<() => { getCurrentIde: Mock<() => string | undefined> }>;
+  getScreenReader: Mock<() => boolean>;
 }
 
 // Mock @google/gemini-cli-core and its Config class
@@ -168,6 +169,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
           getConnectionStatus: vi.fn(() => 'connected'),
         })),
         isTrustedFolder: vi.fn(() => true),
+        getScreenReader: vi.fn(() => false),
       };
     });
 
