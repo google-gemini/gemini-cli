@@ -14,7 +14,6 @@ import {
   getDecisionFromOutcome,
   ToolCallDecision,
 } from './tool-call-decision.js';
-import { getProgrammingLanguage } from './telemetry-utils.js';
 import { FileOperation } from './metrics.js';
 export { ToolCallDecision };
 import { ToolRegistry } from '../tools/tool-registry.js';
@@ -132,7 +131,6 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   error?: string;
   error_type?: string;
   prompt_id: string;
-  programming_language?: string;
   tool_type: 'native' | 'mcp';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
@@ -150,7 +148,6 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     this.error = call.response.error?.message;
     this.error_type = call.response.errorType;
     this.prompt_id = call.request.prompt_id;
-    this.programming_language = getProgrammingLanguage(call.request.args);
     this.tool_type =
       typeof call.tool !== 'undefined' && call.tool instanceof DiscoveredMCPTool
         ? 'mcp'

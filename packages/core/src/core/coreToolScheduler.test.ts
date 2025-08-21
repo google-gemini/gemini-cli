@@ -22,8 +22,6 @@ import {
   Config,
   Kind,
   ApprovalMode,
-  logToolCall,
-  ToolCallEvent,
   ToolRegistry,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
@@ -983,120 +981,5 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Verify approval mode was changed
     expect(approvalMode).toBe(ApprovalMode.AUTO_EDIT);
-  });
-});
-
-describe('CoreToolScheduler programming_language logging', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should log programming_language for relevant tool calls', async () => {
-    const mockTool = new MockTool();
-    mockTool.executeFn.mockResolvedValue({ llmContent: '' });
-    const declarativeTool = mockTool;
-    const toolRegistry = {
-      getTool: () => declarativeTool,
-      getToolByName: () => declarativeTool,
-      getFunctionDeclarations: () => [],
-      tools: new Map(),
-      discovery: {} as Record<string, unknown>,
-      registerTool: () => {},
-      getToolByDisplayName: () => declarativeTool,
-      getTools: () => [],
-      discoverTools: async () => {},
-      getAllTools: () => [],
-      getToolsByServer: () => [],
-    };
-
-    const onAllToolCallsComplete = vi.fn();
-    const mockConfig = {
-      getSessionId: () => 'test-session-id',
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      getApprovalMode: () => ApprovalMode.YOLO,
-    } as unknown as Config;
-
-    const scheduler = new CoreToolScheduler({
-      config: mockConfig,
-      toolRegistry: toolRegistry as unknown as ToolRegistry,
-      onAllToolCallsComplete,
-      onToolCallsUpdate: () => {},
-      getPreferredEditor: () => 'vscode',
-      onEditorClose: vi.fn(),
-    });
-
-    const abortController = new AbortController();
-    const requests = [
-      {
-        callId: '1',
-        name: 'write_file',
-        args: { file_path: 'test.ts', content: '' },
-        isClientInitiated: false,
-        prompt_id: 'prompt-1',
-      },
-      {
-        callId: '2',
-        name: 'read_file',
-        args: { absolute_path: 'test.py' },
-        isClientInitiated: false,
-        prompt_id: 'prompt-1',
-      },
-      {
-        callId: '3',
-        name: 'glob',
-        args: { pattern: '**/*' },
-        isClientInitiated: false,
-        prompt_id: 'prompt-1',
-      },
-      {
-        callId: '4',
-        name: 'replace',
-        args: { file_path: 'test.js', old_string: 'foo', new_string: 'bar' },
-        isClientInitiated: false,
-        prompt_id: 'prompt-1',
-      },
-    ];
-
-    // Wrap the onAllToolCallsComplete callback in a promise
-    const completionPromise = new Promise<void>((resolve) => {
-      onAllToolCallsComplete.mockImplementation(() => {
-        resolve();
-      });
-    });
-
-    await scheduler.schedule(requests, abortController.signal);
-
-    await completionPromise;
-
-    expect(logToolCall).toHaveBeenCalledTimes(4);
-
-    const loggedEvents = vi
-      .mocked(logToolCall)
-      .mock.calls.map((call: [unknown, ToolCallEvent]) => call[1]);
-
-    const writeFileEvent = loggedEvents.find(
-      (e: ToolCallEvent) => e.function_name === 'write_file',
-    );
-    expect(writeFileEvent).toBeDefined();
-    expect(writeFileEvent).toHaveProperty('programming_language', 'TypeScript');
-
-    const readFileEvent = loggedEvents.find(
-      (e: ToolCallEvent) => e.function_name === 'read_file',
-    );
-    expect(readFileEvent).toBeDefined();
-    expect(readFileEvent).toHaveProperty('programming_language', 'Python');
-
-    const replaceEvent = loggedEvents.find(
-      (e: ToolCallEvent) => e.function_name === 'replace',
-    );
-    expect(replaceEvent).toBeDefined();
-    expect(replaceEvent).toHaveProperty('programming_language', 'JavaScript');
-
-    const globEvent = loggedEvents.find(
-      (e: ToolCallEvent) => e.function_name === 'glob',
-    );
-    expect(globEvent).toBeDefined();
-    expect(globEvent).not.toHaveProperty('undefined');
   });
 });

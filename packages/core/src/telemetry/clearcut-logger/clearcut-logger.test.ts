@@ -26,7 +26,6 @@ import {
   ContentGeneratorConfig,
 } from '../../core/contentGenerator.js';
 import { ConfigParameters } from '../../config/config.js';
-import { ToolCallEvent, ToolCallDecision } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import { http, HttpResponse } from 'msw';
@@ -540,64 +539,6 @@ describe('ClearcutLogger', () => {
         getEvents(logger!)[0][0].source_extension_json,
       ) as { event_id: string };
       expect(firstRequeuedEvent.event_id).toBe('failed_5');
-    });
-  });
-
-  describe('logToolCallEvent with programming_language', () => {
-    it('should include programming_language when provided', () => {
-      const { logger } = setup();
-      const createLogEventSpy = vi.spyOn(logger!, 'createLogEvent');
-      const toolCallEvent: ToolCallEvent = {
-        'event.name': 'tool_call',
-        'event.timestamp': new Date().toISOString(),
-        function_name: 'write_file',
-        function_args: { file_path: 'test.ts', content: '...' },
-        duration_ms: 100,
-        success: true,
-        programming_language: 'TypeScript',
-        prompt_id: 'prompt-id-1',
-        decision: ToolCallDecision.AUTO_ACCEPT,
-        tool_type: 'native',
-      };
-
-      logger!.logToolCallEvent(toolCallEvent);
-
-      expect(createLogEventSpy).toHaveBeenCalled();
-      const eventData = createLogEventSpy.mock.calls[0][1];
-      const programmingLanguageEntry = eventData?.find(
-        (entry) =>
-          entry.gemini_cli_key ===
-          EventMetadataKey.GEMINI_CLI_PROGRAMMING_LANGUAGE,
-      );
-      expect(programmingLanguageEntry).toBeDefined();
-      expect(programmingLanguageEntry?.value).toBe('TypeScript');
-    });
-
-    it('should not include programming_language when not provided', () => {
-      const { logger } = setup();
-      const createLogEventSpy = vi.spyOn(logger!, 'createLogEvent');
-      const toolCallEvent: ToolCallEvent = {
-        'event.name': 'tool_call',
-        'event.timestamp': new Date().toISOString(),
-        function_name: 'glob',
-        function_args: { pattern: '**/*' },
-        duration_ms: 50,
-        success: true,
-        prompt_id: 'prompt-id-2',
-        decision: ToolCallDecision.AUTO_ACCEPT,
-        tool_type: 'native',
-      };
-
-      logger!.logToolCallEvent(toolCallEvent);
-
-      expect(createLogEventSpy).toHaveBeenCalled();
-      const eventData = createLogEventSpy.mock.calls[0][1];
-      const programmingLanguageEntry = eventData?.find(
-        (entry) =>
-          entry.gemini_cli_key ===
-          EventMetadataKey.GEMINI_CLI_PROGRAMMING_LANGUAGE,
-      );
-      expect(programmingLanguageEntry).toBeUndefined();
     });
   });
 });
