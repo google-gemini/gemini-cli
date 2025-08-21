@@ -61,25 +61,28 @@ interface ReplacementResult {
   finalNewString: string;
 }
 
-export async function performFuzzyReplacement(
+function restoreTrailingNewline(
+  originalContent: string,
+  modifiedContent: string,
+): string {
+  const hadTrailingNewline = originalContent.endsWith('\n');
+  if (hadTrailingNewline && !modifiedContent.endsWith('\n')) {
+    return modifiedContent + '\n';
+  } else if (!hadTrailingNewline && modifiedContent.endsWith('\n')) {
+    return modifiedContent.replace(/\n$/, '');
+  }
+  return modifiedContent;
+}
+
+async function performExactReplacement(
   context: ReplacementContext,
-): Promise<ReplacementResult> {
+): Promise<ReplacementResult | null> {
   const { currentContent, params } = context;
   const { old_string, new_string } = params;
-  const hadTrailingNewline = currentContent.endsWith('\n');
 
   const normalizedCode = currentContent;
   const normalizedSearch = old_string.replace(/\r\n/g, '\n');
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
-
-  if (normalizedSearch === '') {
-    return {
-      newContent: currentContent,
-      occurrences: 0,
-      finalOldString: normalizedSearch,
-      finalNewString: normalizedReplace,
-    };
-  }
 
   const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
   if (exactOccurrences > 0) {
@@ -87,11 +90,7 @@ export async function performFuzzyReplacement(
       normalizedSearch,
       normalizedReplace,
     );
-    if (hadTrailingNewline && !modifiedCode.endsWith('\n')) {
-      modifiedCode += '\n';
-    } else if (!hadTrailingNewline && modifiedCode.endsWith('\n')) {
-      modifiedCode = modifiedCode.replace(/\n$/, '');
-    }
+    modifiedCode = restoreTrailingNewline(currentContent, modifiedCode);
     return {
       newContent: modifiedCode,
       occurrences: exactOccurrences,
@@ -99,6 +98,19 @@ export async function performFuzzyReplacement(
       finalNewString: normalizedReplace,
     };
   }
+
+  return null;
+}
+
+async function performFlexibleReplacement(
+  context: ReplacementContext,
+): Promise<ReplacementResult | null> {
+  const { currentContent, params } = context;
+  const { old_string, new_string } = params;
+
+  const normalizedCode = currentContent;
+  const normalizedSearch = old_string.replace(/\r\n/g, '\n');
+  const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
   const sourceLines = normalizedCode.match(/.*(?:\n|$)/g)?.slice(0, -1) ?? [];
   const searchLinesStripped = normalizedSearch
@@ -123,7 +135,11 @@ export async function performFuzzyReplacement(
       const newBlockWithIndent = replaceLines.map(
         (line: string) => `${indentation}${line}`,
       );
-      sourceLines.splice(i, searchLinesStripped.length, newBlockWithIndent.join('\n'));
+      sourceLines.splice(
+        i,
+        searchLinesStripped.length,
+        newBlockWithIndent.join('\n'),
+      );
       i += replaceLines.length;
     } else {
       i++;
@@ -132,17 +148,43 @@ export async function performFuzzyReplacement(
 
   if (flexibleOccurrences > 0) {
     let modifiedCode = sourceLines.join('');
-    if (hadTrailingNewline && !modifiedCode.endsWith('\n')) {
-      modifiedCode += '\n';
-    } else if (!hadTrailingNewline && modifiedCode.endsWith('\n')) {
-      modifiedCode = modifiedCode.replace(/\n$/, '');
-    }
+    modifiedCode = restoreTrailingNewline(currentContent, modifiedCode);
     return {
       newContent: modifiedCode,
       occurrences: flexibleOccurrences,
       finalOldString: normalizedSearch,
       finalNewString: normalizedReplace,
     };
+  }
+
+  return null;
+}
+
+export async function performReplacement(
+  context: ReplacementContext,
+): Promise<ReplacementResult> {
+  const { currentContent, params } = context;
+  const { old_string, new_string } = params;
+  const normalizedSearch = old_string.replace(/\r\n/g, '\n');
+  const normalizedReplace = new_string.replace(/\r\n/g, '\n');
+
+  if (normalizedSearch === '') {
+    return {
+      newContent: currentContent,
+      occurrences: 0,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+    };
+  }
+
+  const exactResult = await performExactReplacement(context);
+  if (exactResult) {
+    return exactResult;
+  }
+
+  const flexibleResult = await performFlexibleReplacement(context);
+  if (flexibleResult) {
+    return flexibleResult;
   }
 
   return {
@@ -240,6 +282,74 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     return [{ path: this.params.file_path }];
   }
 
+  private async attemptSelfCorrection(
+    params: EditToolParams,
+    currentContent: string,
+    initialError: { display: string; raw: string; type: ToolErrorType },
+    abortSignal: AbortSignal,
+  ): Promise<CalculatedEdit> {
+    const fixedEdit = await FixLLMEditWithInstruction(
+      params.instruction,
+      params.old_string,
+      params.new_string,
+      initialError.raw,
+      currentContent,
+      this.config.getGeminiClient(),
+      abortSignal,
+    );
+
+    if (fixedEdit.noChangesRequired) {
+      return {
+        currentContent,
+        newContent: currentContent,
+        occurrences: 0,
+        isNewFile: false,
+        error: {
+          display: `No changes required. The file already meets the specified conditions.`,
+          raw: `A secondary check determined that no changes were necessary to fulfill the instruction. Explanation: ${fixedEdit.explanation}. Original error with the parameters given: ${initialError.raw}`,
+          type: ToolErrorType.EDIT_NO_CHANGE,
+        },
+      };
+    }
+
+    const secondAttemptResult = await performReplacement({
+      params: {
+        ...params,
+        old_string: fixedEdit.search,
+        new_string: fixedEdit.replace,
+      },
+      currentContent,
+      abortSignal,
+    });
+
+    const secondError = getErrorReplaceResult(
+      params,
+      secondAttemptResult.occurrences,
+      1, // expectedReplacements is always 1 for smart_edit
+      secondAttemptResult.finalOldString,
+      secondAttemptResult.finalNewString,
+    );
+
+    if (secondError) {
+      // The fix failed, return the original error
+      return {
+        currentContent,
+        newContent: currentContent,
+        occurrences: 0,
+        isNewFile: false,
+        error: initialError,
+      };
+    }
+
+    return {
+      currentContent,
+      newContent: secondAttemptResult.newContent,
+      occurrences: secondAttemptResult.occurrences,
+      isNewFile: false,
+      error: undefined,
+    };
+  }
+
   /**
    * Calculates the potential outcome of an edit operation.
    * @param params Parameters for the edit operation
@@ -253,129 +363,106 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     const expectedReplacements = 1;
     let currentContent: string | null = null;
     let fileExists = false;
-    let isNewFile = false;
-    let finalNewString = params.new_string;
-    let finalOldString = params.old_string;
-    let occurrences = 0;
-    let error:
-      | { display: string; raw: string; type: ToolErrorType }
-      | undefined = undefined;
 
     try {
       currentContent = await this.config
         .getFileSystemService()
         .readTextFile(params.file_path);
-      // Normalize line endings to LF for consistent processing.
       currentContent = currentContent.replace(/\r\n/g, '\n');
       fileExists = true;
     } catch (err: unknown) {
       if (!isNodeError(err) || err.code !== 'ENOENT') {
-        // Rethrow unexpected FS errors (permissions, etc.)
         throw err;
       }
       fileExists = false;
     }
 
-    if (params.old_string === '' && !fileExists) {
-      // Creating a new file
-      isNewFile = true;
-    } else if (!fileExists) {
-      // Trying to edit a nonexistent file (and old_string is not empty)
-      error = {
-        display: `File not found. Cannot apply edit. Use an empty old_string to create a new file.`,
-        raw: `File not found: ${params.file_path}`,
-        type: ToolErrorType.FILE_NOT_FOUND,
-      };
-    } else if (fileExists && params.old_string === '') {
-      // Error: Trying to create a file that already exists
-      error = {
-        display: `Failed to edit. Attempted to create a file that already exists.`,
-        raw: `File already exists, cannot create: ${params.file_path}`,
-        type: ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
-      };
-    } else if (currentContent !== null) {
-      const replacementResult = await performFuzzyReplacement({
-        params,
+    const isNewFile = params.old_string === '' && !fileExists;
+
+    if (isNewFile) {
+      return {
         currentContent,
-        abortSignal,
-      });
-
-      finalOldString = replacementResult.finalOldString;
-      finalNewString = replacementResult.finalNewString;
-      occurrences = replacementResult.occurrences;
-
-      error = getErrorReplaceResult(
-        params,
-        occurrences,
-        expectedReplacements,
-        finalOldString,
-        finalNewString,
-      );
-
-      if (error !== undefined) {
-        const fixedEdit = await FixLLMEditWithInstruction(
-          params.instruction,
-          finalOldString,
-          finalNewString,
-          error.raw,
-          currentContent,
-          this.config.getGeminiClient(),
-          abortSignal,
-        );
-        if (fixedEdit.noChangesRequired) {
-          error = {
-            display: `No changes required. The file already meets the specified conditions.`,
-            raw: `A secondary check determined that no changes were necessary to fulfill the instruction. Explanation: ${fixedEdit.explanation}. Original error with the parameters given: ${error.raw}`,
-            type: ToolErrorType.EDIT_NO_CHANGE,
-          };
-        } else {
-          const replacementResult = await performFuzzyReplacement({
-            params: {
-              ...params,
-              old_string: fixedEdit.search,
-              new_string: fixedEdit.replace,
-            },
-            currentContent,
-            abortSignal,
-          });
-          const errorFixed = getErrorReplaceResult(
-            params,
-            replacementResult.occurrences,
-            expectedReplacements,
-            replacementResult.finalOldString,
-            replacementResult.finalNewString,
-          );
-          if (errorFixed === undefined) {
-            finalOldString = replacementResult.finalOldString;
-            finalNewString = replacementResult.finalNewString;
-            occurrences = replacementResult.occurrences;
-            error = undefined;
-          }
-        }
-      }
-    } else {
-      // Should not happen if fileExists and no exception was thrown, but defensively:
-      error = {
-        display: `Failed to read content of file.`,
-        raw: `Failed to read content of existing file: ${params.file_path}`,
-        type: ToolErrorType.READ_CONTENT_FAILURE,
+        newContent: params.new_string,
+        occurrences: 1,
+        isNewFile: true,
+        error: undefined,
       };
     }
 
-    const newContent = applyReplacement(
+    // after this point, it's not a new file/edit
+    if (!fileExists) {
+      return {
+        currentContent,
+        newContent: '',
+        occurrences: 0,
+        isNewFile: false,
+        error: {
+          display: `File not found. Cannot apply edit. Use an empty old_string to create a new file.`,
+          raw: `File not found: ${params.file_path}`,
+          type: ToolErrorType.FILE_NOT_FOUND,
+        },
+      };
+    }
+
+    if (currentContent === null) {
+      return {
+        currentContent,
+        newContent: '',
+        occurrences: 0,
+        isNewFile: false,
+        error: {
+          display: `Failed to read content of file.`,
+          raw: `Failed to read content of existing file: ${params.file_path}`,
+          type: ToolErrorType.READ_CONTENT_FAILURE,
+        },
+      };
+    }
+
+    if (params.old_string === '') {
+      return {
+        currentContent,
+        newContent: currentContent,
+        occurrences: 0,
+        isNewFile: false,
+        error: {
+          display: `Failed to edit. Attempted to create a file that already exists.`,
+          raw: `File already exists, cannot create: ${params.file_path}`,
+          type: ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
+        },
+      };
+    }
+
+    const replacementResult = await performReplacement({
+      params,
       currentContent,
-      finalOldString,
-      finalNewString,
-      isNewFile,
+      abortSignal,
+    });
+
+    const initialError = getErrorReplaceResult(
+      params,
+      replacementResult.occurrences,
+      expectedReplacements,
+      replacementResult.finalOldString,
+      replacementResult.finalNewString,
     );
 
-    return {
+    if (!initialError) {
+      return {
+        currentContent,
+        newContent: replacementResult.newContent,
+        occurrences: replacementResult.occurrences,
+        isNewFile: false,
+        error: undefined,
+      };
+    }
+
+    // If there was an error, try to self-correct.
+    return this.attemptSelfCorrection(
+      params,
       currentContent,
-      newContent,
-      occurrences,
-      error,
-      isNewFile,
-    };
+      initialError,
+      abortSignal,
+    );
   }
 
   /**
