@@ -197,7 +197,7 @@ async function trackStartupPerformance<T>(
   }
 
   // Add Chrome DevTools integration for debug builds
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env['NODE_ENV'] === 'development') {
     performance.mark(`${phase}-start`);
     performance.mark(`${phase}-end`);
     performance.measure(phase, `${phase}-start`, `${phase}-end`);
@@ -480,9 +480,6 @@ export async function main() {
       has_question: (input?.length ?? 0) > 0,
     });
   }
-
-  const shouldBeInteractive =
-    !!argv.promptInteractive || (process.stdin.isTTY && input?.length === 0);
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {

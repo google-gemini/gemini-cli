@@ -67,9 +67,7 @@ describe('Telemetry Metrics', () => {
   let initializeMetricsModule: typeof import('./metrics.js').initializeMetrics;
   let recordTokenUsageMetricsModule: typeof import('./metrics.js').recordTokenUsageMetrics;
   let recordFileOperationMetricModule: typeof import('./metrics.js').recordFileOperationMetric;
-<<<<<<< HEAD
   let recordChatCompressionMetricsModule: typeof import('./metrics.js').recordChatCompressionMetrics;
-=======
   let recordStartupPerformanceModule: typeof import('./metrics.js').recordStartupPerformance;
   let recordMemoryUsageModule: typeof import('./metrics.js').recordMemoryUsage;
   let recordCpuUsageModule: typeof import('./metrics.js').recordCpuUsage;
@@ -80,8 +78,6 @@ describe('Telemetry Metrics', () => {
   let recordPerformanceScoreModule: typeof import('./metrics.js').recordPerformanceScore;
   let recordPerformanceRegressionModule: typeof import('./metrics.js').recordPerformanceRegression;
   let recordBaselineComparisonModule: typeof import('./metrics.js').recordBaselineComparison;
->>>>>>> b07f651b (feat(telemetry): add comprehensive documentation and test coverage)
-
   beforeEach(async () => {
     vi.resetModules();
     vi.doMock('@opentelemetry/api', () => {
@@ -94,10 +90,8 @@ describe('Telemetry Metrics', () => {
     initializeMetricsModule = metricsJsModule.initializeMetrics;
     recordTokenUsageMetricsModule = metricsJsModule.recordTokenUsageMetrics;
     recordFileOperationMetricModule = metricsJsModule.recordFileOperationMetric;
-<<<<<<< HEAD
     recordChatCompressionMetricsModule =
       metricsJsModule.recordChatCompressionMetrics;
-=======
     recordStartupPerformanceModule = metricsJsModule.recordStartupPerformance;
     recordMemoryUsageModule = metricsJsModule.recordMemoryUsage;
     recordCpuUsageModule = metricsJsModule.recordCpuUsage;
@@ -110,8 +104,6 @@ describe('Telemetry Metrics', () => {
     recordPerformanceRegressionModule =
       metricsJsModule.recordPerformanceRegression;
     recordBaselineComparisonModule = metricsJsModule.recordBaselineComparison;
->>>>>>> b07f651b (feat(telemetry): add comprehensive documentation and test coverage)
-
     const otelApiModule = await import('@opentelemetry/api');
 
     mockCounterAddFn.mockClear();
