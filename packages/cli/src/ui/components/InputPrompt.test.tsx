@@ -96,41 +96,6 @@ describe('InputPrompt', () => {
   const mockedUseCommandCompletion = vi.mocked(useCommandCompletion);
   const mockedUseInputHistory = vi.mocked(useInputHistory);
 
-  const createTestMockBuffer = (overrides: Partial<TextBuffer>): TextBuffer => {
-    const lines = overrides.text?.split('\n') || [''];
-    return {
-      text: '',
-      cursor: [0, 0],
-      lines: [''],
-      setText: vi.fn(),
-      move: vi.fn(),
-      moveToOffset: vi.fn(),
-      replaceRangeByOffset: vi.fn(),
-      viewportVisualLines: [''],
-      allVisualLines: [''],
-      visualCursor: [0, 0],
-      visualScrollRow: 0,
-      handleInput: vi.fn(),
-      killLineRight: vi.fn(),
-      killLineLeft: vi.fn(),
-      openInExternalEditor: vi.fn(),
-      newline: vi.fn(),
-      backspace: vi.fn(),
-      preferredCol: null,
-      selectionAnchor: null,
-      insert: vi.fn(),
-      del: vi.fn(),
-      undo: vi.fn(),
-      redo: vi.fn(),
-      replaceRange: vi.fn(),
-      deleteWordLeft: vi.fn(),
-      deleteWordRight: vi.fn(),
-      ...overrides,
-      lines,
-      viewportVisualLines: lines,
-      allVisualLines: lines,
-    } as unknown as TextBuffer;
-  };
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -155,9 +120,9 @@ describe('InputPrompt', () => {
       visualScrollRow: 0,
       handleInput: vi.fn(),
       move: vi.fn(),
-      moveToOffset: (offset: number) => {
+      moveToOffset: vi.fn((offset: number) => {
         mockBuffer.cursor = [0, offset];
-      },
+      }),
       killLineRight: vi.fn(),
       killLineLeft: vi.fn(),
       openInExternalEditor: vi.fn(),
@@ -1502,28 +1467,10 @@ describe('InputPrompt', () => {
   });
 
   describe('Ctrl+E keyboard shortcut', () => {
-    it.each([
-      {
-        description: 'multiline input, not end of buffer',
-        text: 'line 1\nline 2\nline 3',
-        cursor: [1, 2], // cursor at line 2, position 2
-      },
-      {
-        description: 'single line input',
-        text: 'single line text',
-        cursor: [0, 5], // cursor at position 5
-      },
-    ])('should move cursor to end of current line for $description', async ({ text, cursor }) => {
-      const moveMock = vi.fn();
-      const moveToOffsetMock = vi.fn();
-      
-      props.buffer = createTestMockBuffer({
-        text,
-        cursor,
-        visualCursor: cursor,
-        move: moveMock,
-        moveToOffset: moveToOffsetMock,
-      });
+    it('should move cursor to end of current line in multiline input', async () => {
+      props.buffer.text = 'line 1\nline 2\nline 3';
+      props.buffer.cursor = [1, 2];
+      props.buffer.lines = ['line 1', 'line 2', 'line 3'];
       
       const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
       await wait();
@@ -1531,9 +1478,24 @@ describe('InputPrompt', () => {
       stdin.write('\x05'); // Ctrl+E
       await wait();
 
-      expect(moveMock).toHaveBeenCalledWith('end');
-      expect(moveToOffsetMock).not.toHaveBeenCalled();
+      expect(props.buffer.move).toHaveBeenCalledWith('end');
+      expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should move cursor to end of current line for single line input', async () => {
+      props.buffer.text = 'single line text';
+      props.buffer.cursor = [0, 5];
+      props.buffer.lines = ['single line text'];
       
+      const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
+      await wait();
+
+      stdin.write('\x05'); // Ctrl+E
+      await wait();
+
+      expect(props.buffer.move).toHaveBeenCalledWith('end');
+      expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
       unmount();
     });
   });
