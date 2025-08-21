@@ -399,33 +399,19 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       const programming_language = getProgrammingLanguage({
         file_path: this.params.file_path,
       });
-      if (editData.isNewFile) {
-        logFileOperation(
-          this.config,
-          new FileOperationEvent(
-            EditTool.Name,
-            FileOperation.CREATE,
-            lines,
-            mimetype,
-            extension,
-            diffStat,
-            programming_language,
-          ),
-        );
-      } else {
-        logFileOperation(
-          this.config,
-          new FileOperationEvent(
-            EditTool.Name,
-            FileOperation.UPDATE,
-            lines,
-            mimetype,
-            extension,
-            diffStat,
-            programming_language,
-          ),
-        );
-      }
+
+      logFileOperation(
+        this.config,
+        new FileOperationEvent(
+          EditTool.Name,
+          editData.isNewFile ? FileOperation.CREATE : FileOperation.UPDATE,
+          lines,
+          mimetype,
+          extension,
+          diffStat,
+          programming_language,
+        ),
+      );
 
       return {
         llmContent: llmSuccessMessageParts.join(' '),
