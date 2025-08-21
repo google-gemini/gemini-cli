@@ -4,15 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MCPServerConfig, GeminiCLIExtension } from '@google/gemini-cli-core';
+import {
+  MCPServerConfig,
+  GeminiCLIExtension,
+  Storage,
+} from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
-export const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 
 export interface Extension {
+  path: string;
   config: ExtensionConfig;
   contextFiles: string[];
 }
@@ -42,7 +46,8 @@ export function loadExtensions(workspaceDir: string): Extension[] {
 }
 
 function loadExtensionsFromDir(dir: string): Extension[] {
-  const extensionsDir = path.join(dir, EXTENSIONS_DIRECTORY_NAME);
+  const storage = new Storage(dir);
+  const extensionsDir = storage.getExtensionsDir();
   if (!fs.existsSync(extensionsDir)) {
     return [];
   }
@@ -90,6 +95,7 @@ function loadExtension(extensionDir: string): Extension | null {
       .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
     return {
+      path: extensionDir,
       config,
       contextFiles,
     };
@@ -121,6 +127,7 @@ export function annotateActiveExtensions(
       name: extension.config.name,
       version: extension.config.version,
       isActive: true,
+      path: extension.path,
     }));
   }
 
@@ -136,6 +143,7 @@ export function annotateActiveExtensions(
       name: extension.config.name,
       version: extension.config.version,
       isActive: false,
+      path: extension.path,
     }));
   }
 
@@ -153,6 +161,7 @@ export function annotateActiveExtensions(
       name: extension.config.name,
       version: extension.config.version,
       isActive,
+      path: extension.path,
     });
   }
 

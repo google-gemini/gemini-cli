@@ -1,0 +1,35 @@
+# See https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'daily'
+    target-branch: 'main'
+    commit-message:
+      prefix: 'chore(deps)'
+      include: 'scope'
+    reviewers:
+      - 'google-gemini/gemini-cli-askmode-approvers'
+    groups:
+      # Group all non-major updates together.
+      # This is to reduce the number of PRs that need to be reviewed.
+      # Major updates will still be created as separate PRs.
+      npm-minor-patch:
+        applies-to: 'version-updates'
+        update-types:
+          - 'minor'
+          - 'patch'
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'daily'
+    target-branch: 'main'
+    commit-message:
+      prefix: 'chore(deps)'
+      include: 'scope'
+    reviewers:
+      - 'google-gemini/gemini-cli-askmode-approvers'
+    open-pull-requests-limit: 0

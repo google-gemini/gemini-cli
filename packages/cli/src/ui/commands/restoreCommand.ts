@@ -10,6 +10,7 @@ import {
   type CommandContext,
   type SlashCommand,
   type SlashCommandActionReturn,
+  CommandKind,
 } from './types.js';
 import { Config } from '@google/gemini-cli-core';
 
@@ -21,9 +22,7 @@ async function restoreAction(
   const { config, git: gitService } = services;
   const { addItem, loadHistory } = ui;
 
-  const checkpointDir = config?.getProjectTempDir()
-    ? path.join(config.getProjectTempDir(), 'checkpoints')
-    : undefined;
+  const checkpointDir = config?.storage.getProjectTempCheckpointsDir();
 
   if (!checkpointDir) {
     return {
@@ -124,9 +123,7 @@ async function completion(
 ): Promise<string[]> {
   const { services } = context;
   const { config } = services;
-  const checkpointDir = config?.getProjectTempDir()
-    ? path.join(config.getProjectTempDir(), 'checkpoints')
-    : undefined;
+  const checkpointDir = config?.storage.getProjectTempCheckpointsDir();
   if (!checkpointDir) {
     return [];
   }
@@ -149,6 +146,7 @@ export const restoreCommand = (config: Config | null): SlashCommand | null => {
     name: 'restore',
     description:
       'Restore a tool call. This will reset the conversation and file history to the state it was in when the tool call was suggested',
+    kind: CommandKind.BUILT_IN,
     action: restoreAction,
     completion,
   };

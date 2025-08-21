@@ -6,7 +6,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
+import { Storage } from '../config/storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 
 /**
@@ -28,6 +28,7 @@ export interface MCPOAuthCredentials {
   token: MCPOAuthToken;
   clientId?: string;
   tokenUrl?: string;
+  mcpServerUrl?: string;
   updatedAt: number;
 }
 
@@ -35,17 +36,13 @@ export interface MCPOAuthCredentials {
  * Class for managing MCP OAuth token storage and retrieval.
  */
 export class MCPOAuthTokenStorage {
-  private static readonly TOKEN_FILE = 'mcp-oauth-tokens.json';
-  private static readonly CONFIG_DIR = '.gemini';
-
   /**
    * Get the path to the token storage file.
    *
    * @returns The full path to the token storage file
    */
   private static getTokenFilePath(): string {
-    const homeDir = os.homedir();
-    return path.join(homeDir, this.CONFIG_DIR, this.TOKEN_FILE);
+    return Storage.getMcpOAuthTokensPath();
   }
 
   /**
@@ -91,12 +88,14 @@ export class MCPOAuthTokenStorage {
    * @param token The OAuth token to save
    * @param clientId Optional client ID used for this token
    * @param tokenUrl Optional token URL used for this token
+   * @param mcpServerUrl Optional MCP server URL
    */
   static async saveToken(
     serverName: string,
     token: MCPOAuthToken,
     clientId?: string,
     tokenUrl?: string,
+    mcpServerUrl?: string,
   ): Promise<void> {
     await this.ensureConfigDir();
 
@@ -107,6 +106,7 @@ export class MCPOAuthTokenStorage {
       token,
       clientId,
       tokenUrl,
+      mcpServerUrl,
       updatedAt: Date.now(),
     };
 
