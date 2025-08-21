@@ -52,6 +52,11 @@ export function SuggestionsDisplay({
   );
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
+  // Calculate the maximum width needed for command labels when in slash mode
+  const maxLabelWidth = userInput.startsWith('/') 
+    ? Math.max(...visibleSuggestions.map(s => s.label.length)) + 4 // Add 4 characters padding
+    : 0;
+
   return (
     <Box flexDirection="column" paddingX={1} width={width}>
       {scrollOffset > 0 && <Text color={Colors.Foreground}>▲</Text>}
@@ -74,7 +79,7 @@ export function SuggestionsDisplay({
             <Box flexDirection="row">
               {userInput.startsWith('/') ? (
                 // only use box model for (/) command mode
-                <Box width={20} flexShrink={0}>
+                <Box width={maxLabelWidth} flexShrink={0}>
                   {labelElement}
                 </Box>
               ) : (
