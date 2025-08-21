@@ -19,7 +19,12 @@ import { getIdeProcessId } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { detectIde, DetectedIde, getIdeInfo } from './detect-ide.js';
+import {
+  detectIde,
+  DetectedIde,
+  getIdeInfo,
+  type IdeInfo,
+} from './detect-ide.js';
 import * as os from 'node:os';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -47,7 +52,8 @@ describe('IdeClient', () => {
 
   beforeEach(() => {
     // Reset singleton instance for test isolation
-    (IdeClient as any).instance = undefined;
+    (IdeClient as unknown as { instance: IdeClient | undefined }).instance =
+      undefined;
 
     // Mock environment variables
     process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
@@ -58,7 +64,9 @@ describe('IdeClient', () => {
     // Mock dependencies
     vi.spyOn(process, 'cwd').mockReturnValue('/test/workspace/sub-dir');
     vi.mocked(detectIde).mockReturnValue(DetectedIde.VSCode);
-    vi.mocked(getIdeInfo).mockReturnValue({ displayName: 'VS Code' } as any);
+    vi.mocked(getIdeInfo).mockReturnValue({
+      displayName: 'VS Code',
+    } as IdeInfo);
     vi.mocked(getIdeProcessId).mockResolvedValue(12345);
     vi.mocked(os.tmpdir).mockReturnValue('/tmp');
 
@@ -68,13 +76,13 @@ describe('IdeClient', () => {
       close: vi.fn(),
       setNotificationHandler: vi.fn(),
       callTool: vi.fn(),
-    } as any;
+    } as unknown as Mocked<Client>;
     mockHttpTransport = {
       close: vi.fn(),
-    } as any;
+    } as unknown as Mocked<StreamableHTTPClientTransport>;
     mockStdioTransport = {
       close: vi.fn(),
-    } as any;
+    } as unknown as Mocked<StdioClientTransport>;
 
     vi.mocked(Client).mockReturnValue(mockClient);
     vi.mocked(StreamableHTTPClientTransport).mockReturnValue(mockHttpTransport);
