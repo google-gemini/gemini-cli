@@ -79,6 +79,9 @@ export function logCliConfiguration(
     file_filtering_respect_git_ignore: event.file_filtering_respect_git_ignore,
     debug_mode: event.debug_enabled,
     mcp_servers: event.mcp_servers,
+    mcp_servers_count: event.mcp_servers_count,
+    mcp_tools: event.mcp_tools,
+    mcp_tools_count: event.mcp_tools_count,
   };
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -148,6 +151,7 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     event.duration_ms,
     event.success,
     event.decision,
+    event.tool_type,
   );
 }
 
@@ -174,7 +178,7 @@ export function logFlashFallback(
   config: Config,
   event: FlashFallbackEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logFlashFallbackEvent(event);
+  ClearcutLogger.getInstance(config)?.logFlashFallbackEvent();
   if (!isTelemetrySdkInitialized()) return;
 
   const attributes: LogAttributes = {

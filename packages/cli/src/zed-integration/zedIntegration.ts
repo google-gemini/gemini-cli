@@ -10,7 +10,6 @@ import {
   AuthType,
   Config,
   GeminiChat,
-  ToolRegistry,
   logToolCall,
   ToolResult,
   convertToFunctionResponse,
@@ -22,6 +21,7 @@ import {
   isWithinRoot,
   getErrorStatus,
   MCPServerConfig,
+  DiscoveredMCPTool,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -344,6 +344,10 @@ class Session {
         duration_ms: durationMs,
         success: false,
         error: error.message,
+        tool_type:
+          typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
+            ? 'mcp'
+            : 'native',
       });
 
       return [
@@ -361,7 +365,7 @@ class Session {
       return errorResponse(new Error('Missing function name'));
     }
 
-    const toolRegistry: ToolRegistry = await this.config.getToolRegistry();
+    const toolRegistry = this.config.getToolRegistry();
     const tool = toolRegistry.getTool(fc.name as string);
 
     if (!tool) {
@@ -457,6 +461,10 @@ class Session {
         duration_ms: durationMs,
         success: true,
         prompt_id: promptId,
+        tool_type:
+          typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
+            ? 'mcp'
+            : 'native',
       });
 
       return convertToFunctionResponse(fc.name, callId, toolResult.llmContent);
@@ -522,7 +530,7 @@ class Session {
     const contentLabelsForDisplay: string[] = [];
     const ignoredPaths: string[] = [];
 
-    const toolRegistry = await this.config.getToolRegistry();
+    const toolRegistry = this.config.getToolRegistry();
     const readManyFilesTool = toolRegistry.getTool('read_many_files');
     const globTool = toolRegistry.getTool('glob');
 

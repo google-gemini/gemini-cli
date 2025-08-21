@@ -19,7 +19,6 @@ import {
   ToolResultDisplay,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import { Config, ApprovalMode } from '../config/config.js';
@@ -475,13 +474,11 @@ Expectation for required parameters:
    * @param params Parameters to validate
    * @returns Error message string or null if valid
    */
-  override validateToolParams(params: EditToolParams): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
+  protected override validateToolParamValues(
+    params: EditToolParams,
+  ): string | null {
+    if (!params.file_path) {
+      return "The 'file_path' parameter must be non-empty.";
     }
 
     if (!path.isAbsolute(params.file_path)) {
