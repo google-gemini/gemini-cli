@@ -98,12 +98,10 @@ describe('readStdin', () => {
       .mockReturnValueOnce(null);
 
     const promise = readStdin();
-    console.log('read stdin');
 
     // Trigger readable event
     onReadableHandler();
 
-    console.log('test expectation');
     expect(clearTimeoutSpy).toHaveBeenCalledOnce();
 
     // Trigger end to resolve
