@@ -30,6 +30,7 @@ interface FooterProps {
   showErrorDetails: boolean;
   showMemoryUsage?: boolean;
   promptTokenCount: number;
+  hasActualTokenCounts?: boolean;
   nightly: boolean;
   vimMode?: string;
   isTrustedFolder?: boolean;
@@ -46,6 +47,7 @@ export const Footer: React.FC<FooterProps> = ({
   showErrorDetails,
   showMemoryUsage,
   promptTokenCount,
+  hasActualTokenCounts = false,
   nightly,
   vimMode,
   isTrustedFolder,
@@ -130,6 +132,7 @@ export const Footer: React.FC<FooterProps> = ({
           <ContextUsageDisplay
             promptTokenCount={promptTokenCount}
             model={model}
+            hasActualTokenCounts={hasActualTokenCounts}
           />
         </Text>
         {corgiMode && (

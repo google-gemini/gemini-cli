@@ -30,6 +30,8 @@ export interface SessionStatsState {
   metrics: SessionMetrics;
   lastPromptTokenCount: number;
   promptCount: number;
+  lastTokenCountForContext: number; // More accurate token count for context display
+  hasActualTokenCounts: boolean; // Whether we have actual vs estimated counts
 }
 
 export interface ComputedSessionStats {
@@ -73,6 +75,8 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
     metrics: uiTelemetryService.getMetrics(),
     lastPromptTokenCount: 0,
     promptCount: 0,
+    lastTokenCountForContext: 0,
+    hasActualTokenCounts: false,
   });
 
   useEffect(() => {
@@ -87,6 +91,8 @@ export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
         ...prevState,
         metrics,
         lastPromptTokenCount,
+        lastTokenCountForContext: uiTelemetryService.getLastTokenCountForContext(),
+        hasActualTokenCounts: uiTelemetryService.hasActualTokenCounts(),
       }));
     };
 

@@ -1265,7 +1265,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 settings.merged.showMemoryUsage ||
                 false
               }
-              promptTokenCount={sessionStats.lastPromptTokenCount}
+              promptTokenCount={sessionStats.lastTokenCountForContext}
+              hasActualTokenCounts={sessionStats.hasActualTokenCounts}
               nightly={nightly}
               vimMode={vimModeEnabled ? vimMode : undefined}
               isTrustedFolder={isTrustedFolderState}

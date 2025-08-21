@@ -109,6 +109,8 @@ const createInitialMetrics = (): SessionMetrics => ({
 export class UiTelemetryService extends EventEmitter {
   #metrics: SessionMetrics = createInitialMetrics();
   #lastPromptTokenCount = 0;
+  #lastActualTokenCount = 0; // Cache actual token count from API responses
+  #useActualTokenCount = false; // Flag to indicate if we have actual counts
 
   addEvent(event: UiEvent) {
     switch (event['event.name']) {
@@ -140,8 +142,27 @@ export class UiTelemetryService extends EventEmitter {
     return this.#lastPromptTokenCount;
   }
 
+  /**
+   * Get the most accurate available token count for context display
+   * Prefers actual API counts over estimates when available
+   */
+  getLastTokenCountForContext(): number {
+    return this.#useActualTokenCount && this.#lastActualTokenCount > 0
+      ? this.#lastActualTokenCount
+      : this.#lastPromptTokenCount;
+  }
+
+  /**
+   * Check if we have actual token counts available (vs estimates)
+   */
+  hasActualTokenCounts(): boolean {
+    return this.#useActualTokenCount;
+  }
+
   resetLastPromptTokenCount(): void {
     this.#lastPromptTokenCount = 0;
+    this.#lastActualTokenCount = 0;
+    this.#useActualTokenCount = false;
     this.emit('update', {
       metrics: this.#metrics,
       lastPromptTokenCount: this.#lastPromptTokenCount,
@@ -168,6 +189,22 @@ export class UiTelemetryService extends EventEmitter {
     modelMetrics.tokens.thoughts += event.thoughts_token_count;
     modelMetrics.tokens.tool += event.tool_token_count;
 
+    // Cache actual token count from API response for accurate context display
+    if (event.input_token_count > 0) {
+      const previousEstimate = this.#lastPromptTokenCount; // This might be from estimation
+      this.#lastActualTokenCount = event.input_token_count;
+      this.#useActualTokenCount = true;
+      
+      // Log comparison between estimated vs actual for debugging
+      if (previousEstimate > 0 && previousEstimate !== event.input_token_count) {
+        const estimationAccuracy = (event.input_token_count / previousEstimate * 100).toFixed(1);
+        const difference = event.input_token_count - previousEstimate;
+        const differenceSign = difference > 0 ? '+' : '';
+        console.debug(`[UiTelemetry] Token estimation vs actual - Model: ${event.model}, Estimated: ${previousEstimate}, Actual: ${event.input_token_count}, Accuracy: ${estimationAccuracy}%, Difference: ${differenceSign}${difference}`);
+      }
+    }
+    
+    // Update the last prompt token count to the actual count
     this.#lastPromptTokenCount = event.input_token_count;
   }
 

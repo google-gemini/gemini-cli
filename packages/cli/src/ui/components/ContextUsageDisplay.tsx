@@ -11,15 +11,21 @@ import { tokenLimit } from '@google/gemini-cli-core';
 export const ContextUsageDisplay = ({
   promptTokenCount,
   model,
+  hasActualTokenCounts = false,
 }: {
   promptTokenCount: number;
   model: string;
+  hasActualTokenCounts?: boolean;
 }) => {
   const percentage = promptTokenCount / tokenLimit(model);
+  const contextLeft = ((1 - percentage) * 100).toFixed(0);
+  
+  // Show indicator if using estimates vs actual counts
+  const indicator = hasActualTokenCounts ? '' : '~';
 
   return (
     <Text color={Colors.Gray}>
-      ({((1 - percentage) * 100).toFixed(0)}% context left)
+      ({indicator}{contextLeft}% context left)
     </Text>
   );
 };

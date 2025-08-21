@@ -123,6 +123,15 @@ export class BedrockProvider implements ContentGenerator {
           '[BedrockProvider] Received response:',
           JSON.stringify(response, null, 2),
         );
+        
+        // Log actual token usage
+        if (response.usage) {
+          console.debug('[BedrockProvider] Actual token usage from API:', {
+            inputTokens: response.usage.input_tokens,
+            outputTokens: response.usage.output_tokens,
+            totalTokens: (response.usage.input_tokens || 0) + (response.usage.output_tokens || 0),
+          });
+        }
       }
 
       return this.convertResponse(response, this.isJsonMode(request));
@@ -171,6 +180,10 @@ export class BedrockProvider implements ContentGenerator {
       // Use Anthropic's token counting if available in the future
       // For now, use a more accurate estimation based on Claude's tokenization
       const totalTokens = this.estimateTokens(messages);
+      
+      if (this.config.getDebugMode()) {
+        console.debug(`[BedrockProvider] countTokens: ${totalTokens} estimated tokens for ${messages.length} messages`);
+      }
 
       return {
         totalTokens,
@@ -413,12 +426,16 @@ export class BedrockProvider implements ContentGenerator {
 
   /**
    * Estimate tokens for Bedrock messages
+   * Uses Claude-specific token estimation based on empirical testing
    */
   private estimateTokens(messages: BedrockMessageParam[]): number {
-    // More accurate estimation for Claude models
-    // Claude uses a similar tokenization to GPT models
-    // Average of ~3.5 characters per token for English text
+    // Claude tokenization is more conservative than GPT models
+    // Based on testing, Claude uses approximately:
+    // - 4 characters per token for typical English text
+    // - Higher ratios for code and structured content
+    // - Fixed costs for images and special tokens
     let totalChars = 0;
+    let totalTokens = 0;
 
     for (const message of messages) {
       if (typeof message.content === 'string') {
@@ -426,16 +443,59 @@ export class BedrockProvider implements ContentGenerator {
       } else if (Array.isArray(message.content)) {
         for (const block of message.content) {
           if (block.type === 'text' && block.text) {
-            totalChars += block.text.length;
+            const text = block.text;
+            // Different estimation based on content type
+            if (this.isCodeLikeContent(text)) {
+              // Code content typically has fewer tokens per character
+              totalTokens += Math.ceil(text.length / 3.2);
+            } else {
+              // Regular text uses ~4 characters per token for Claude
+              totalChars += text.length;
+            }
           } else if (block.type === 'image') {
-            // Images typically use ~750 tokens
-            totalChars += 750 * 3.5;
+            // Images have a fixed token cost in Claude
+            totalTokens += 750;
+          } else if (block.type === 'tool_use') {
+            // Tool use blocks have overhead + JSON content
+            const toolContent = JSON.stringify(block);
+            totalTokens += Math.ceil(toolContent.length / 3.0) + 20; // JSON overhead
+          } else if (block.type === 'tool_result') {
+            // Tool results are typically structured data
+            const resultContent = JSON.stringify(block);
+            totalTokens += Math.ceil(resultContent.length / 3.5) + 10; // Result overhead
           }
         }
       }
     }
 
-    return Math.ceil(totalChars / 3.5);
+    // Add estimated tokens from regular text content
+    totalTokens += Math.ceil(totalChars / 4.0);
+
+    if (this.config.getDebugMode()) {
+      console.debug(`[BedrockProvider] Token estimation: ${totalTokens} tokens (${totalChars} chars)`);
+    }
+
+    return totalTokens;
+  }
+
+  /**
+   * Detect if content appears to be code or structured data
+   */
+  private isCodeLikeContent(text: string): boolean {
+    // Simple heuristics to detect code content
+    const codeIndicators = [
+      /^\s*[{}[\]]/m,           // Starts with brackets/braces
+      /[;{}]\s*$/m,             // Ends with semicolon or braces
+      /function\s+\w+\s*\(/,    // Function definitions
+      /class\s+\w+/,            // Class definitions
+      /import\s+.*from/,        // Import statements
+      /^\s*\/\/|^\s*\/\*/m,     // Comments
+      /\w+\.\w+\(/,            // Method calls
+      /=>\s*[{(]/,             // Arrow functions
+      /<[a-zA-Z][^>]*>/,       // XML/HTML tags
+    ];
+
+    return codeIndicators.some(pattern => pattern.test(text));
   }
 
   /**

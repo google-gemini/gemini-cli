@@ -117,9 +117,10 @@ export class BedrockStreamHandler {
                 event.usage.output_tokens || 0;
 
               if (this.config.getDebugMode()) {
-                console.debug('[BedrockStreamHandler] Token usage update:', {
+                console.debug('[BedrockStreamHandler] Actual token usage received:', {
                   inputTokens: this.cumulativeUsage.inputTokens,
                   outputTokens: this.cumulativeUsage.outputTokens,
+                  totalTokens: this.cumulativeUsage.inputTokens + this.cumulativeUsage.outputTokens,
                 });
               }
             }
