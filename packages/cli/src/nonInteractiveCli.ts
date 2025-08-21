@@ -56,7 +56,6 @@ export async function runNonInteractive(
       // The error message is already logged by handleAtCommand.
       console.error('Exiting due to an error processing the @ command.');
       process.exit(1);
-      return;
     }
 
     let currentMessages: Content[] = [
