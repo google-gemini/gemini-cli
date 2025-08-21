@@ -308,6 +308,14 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "showLineNumbers": false
     ```
 
+- **`enforcedAuthType`** (string):
+  - **Description:** An authentication type that is enforced; useful for enterprises. Supported values are `oauth-personal`, `gemini-api-key`, and `vertex-ai`. See the [Authentication docs](./authentication.md) for more details.
+  - **Default:** `undefined`
+  - **Example:**
+    ```json
+    "enforcedAuthType": "vertex-ai"
+    ```
+
 ### Example `settings.json`:
 
 ```json

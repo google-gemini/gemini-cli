@@ -12,6 +12,7 @@ import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../../config/auth.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { Button } from './shared/Button.js';
 
 interface AuthDialogProps {
   onSelect: (authMethod: AuthType | undefined, scope: SettingScope) => void;
@@ -41,9 +42,9 @@ export function AuthDialog({
       return initialErrorMessage;
     }
 
-    const defaultAuthType = parseDefaultAuthType(
-      process.env['GEMINI_DEFAULT_AUTH_TYPE'],
-    );
+    const defaultAuthType = settings.merged.enforcedAuthType
+      ? settings.merged.enforcedAuthType
+      : parseDefaultAuthType(process.env['GEMINI_DEFAULT_AUTH_TYPE']);
 
     if (process.env['GEMINI_DEFAULT_AUTH_TYPE'] && defaultAuthType === null) {
       return (
@@ -129,6 +130,43 @@ export function AuthDialog({
     },
     { isActive: true },
   );
+
+  if (settings.merged.enforcedAuthType) {
+    return (
+      <Box
+        borderStyle="round"
+        borderColor={Colors.Gray}
+        flexDirection="column"
+        padding={1}
+        width="100%"
+      >
+        <Text bold>Authentication Enforced</Text>
+        <Box marginTop={1}>
+          <Text>
+            Your configuration is enforcing a specific authentication method:{' '}
+            {settings.merged.enforcedAuthType}
+          </Text>
+        </Box>
+        {settings.merged.enforcedAuthType !==
+          settings.merged.selectedAuthType && (
+          <Box marginTop={1}>
+            <Button
+              onSelect={() =>
+                onSelect(settings.merged.enforcedAuthType!, SettingScope.User)
+              }
+            >
+              Switch to {settings.merged.enforcedAuthType}
+            </Button>
+          </Box>
+        )}
+        {errorMessage && (
+          <Box marginTop={1}>
+            <Text color={Colors.AccentRed}>{errorMessage}</Text>
+          </Box>
+        )}
+      </Box>
+    );
+  }
 
   return (
     <Box

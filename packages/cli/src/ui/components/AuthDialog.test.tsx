@@ -383,4 +383,147 @@ describe('AuthDialog', () => {
     expect(onSelect).toHaveBeenCalledWith(undefined, SettingScope.User);
     unmount();
   });
+
+  describe('enforcedAuthType', () => {
+    it('should display the enforced auth type message if enforcedAuthType is set', () => {
+      const settings: LoadedSettings = new LoadedSettings(
+        {
+          settings: {
+            enforcedAuthType: AuthType.LOGIN_WITH_GOOGLE,
+            customThemes: {},
+            mcpServers: {},
+          },
+          path: '',
+        },
+        {
+          settings: {
+            selectedAuthType: AuthType.LOGIN_WITH_GOOGLE,
+            customThemes: {},
+            mcpServers: {},
+          },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        [],
+      );
+
+      const { lastFrame } = renderWithProviders(
+        <AuthDialog onSelect={() => {}} settings={settings} />,
+      );
+
+      expect(lastFrame()).toContain('Authentication Enforced');
+      expect(lastFrame()).toContain(
+        'Your configuration is enforcing a specific authentication method: oauth-personal',
+      );
+    });
+
+    it('should not display the switch button if the selected auth type matches the enforced one', () => {
+      const settings: LoadedSettings = new LoadedSettings(
+        {
+          settings: {
+            enforcedAuthType: AuthType.LOGIN_WITH_GOOGLE,
+            customThemes: {},
+            mcpServers: {},
+          },
+          path: '',
+        },
+        {
+          settings: {
+            selectedAuthType: AuthType.LOGIN_WITH_GOOGLE,
+            customThemes: {},
+            mcpServers: {},
+          },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        [],
+      );
+
+      const { lastFrame } = renderWithProviders(
+        <AuthDialog onSelect={() => {}} settings={settings} />,
+      );
+
+      expect(lastFrame()).not.toContain('Switch to login-with-google');
+    });
+
+    it('should display the switch button if the selected auth type does not match the enforced one', () => {
+      const settings: LoadedSettings = new LoadedSettings(
+        {
+          settings: {
+            enforcedAuthType: AuthType.LOGIN_WITH_GOOGLE,
+            customThemes: {},
+            mcpServers: {},
+          },
+          path: '',
+        },
+        {
+          settings: {
+            selectedAuthType: AuthType.USE_GEMINI,
+            customThemes: {},
+            mcpServers: {},
+          },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        [],
+      );
+
+      const { lastFrame } = renderWithProviders(
+        <AuthDialog onSelect={() => {}} settings={settings} />,
+      );
+
+      expect(lastFrame()).toContain('Switch to oauth-personal');
+    });
+
+    it('should call onSelect with the enforced auth type when the switch button is clicked', async () => {
+      const onSelect = vi.fn();
+      const settings: LoadedSettings = new LoadedSettings(
+        {
+          settings: {
+            enforcedAuthType: AuthType.LOGIN_WITH_GOOGLE,
+            customThemes: {},
+            mcpServers: {},
+          },
+          path: '',
+        },
+        {
+          settings: {
+            selectedAuthType: AuthType.USE_GEMINI,
+            customThemes: {},
+            mcpServers: {},
+          },
+          path: '',
+        },
+        {
+          settings: { customThemes: {}, mcpServers: {} },
+          path: '',
+        },
+        [],
+      );
+
+      const { stdin, unmount } = renderWithProviders(
+        <AuthDialog onSelect={onSelect} settings={settings} />,
+      );
+      await wait();
+
+      // Simulate pressing enter key
+      stdin.write('\r');
+      await wait();
+
+      expect(onSelect).toHaveBeenCalledWith(
+        AuthType.LOGIN_WITH_GOOGLE,
+        SettingScope.User,
+      );
+      unmount();
+    });
+  });
 });

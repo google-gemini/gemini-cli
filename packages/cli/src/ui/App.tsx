@@ -279,7 +279,19 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   } = useAuthCommand(settings, setAuthError, config);
 
   useEffect(() => {
-    if (settings.merged.selectedAuthType && !settings.merged.useExternalAuth) {
+    if (
+      settings.merged.enforcedAuthType &&
+      settings.merged.selectedAuthType &&
+      settings.merged.enforcedAuthType !== settings.merged.selectedAuthType
+    ) {
+      setAuthError(
+        `Authentication is enforced to be ${settings.merged.enforcedAuthType}, but you are currently using ${settings.merged.selectedAuthType}.`,
+      );
+      openAuthDialog();
+    } else if (
+      settings.merged.selectedAuthType &&
+      !settings.merged.useExternalAuth
+    ) {
       const error = validateAuthMethod(settings.merged.selectedAuthType);
       if (error) {
         setAuthError(error);
@@ -288,6 +300,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     }
   }, [
     settings.merged.selectedAuthType,
+    settings.merged.enforcedAuthType,
     settings.merged.useExternalAuth,
     openAuthDialog,
     setAuthError,
