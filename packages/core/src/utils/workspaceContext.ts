@@ -26,11 +26,6 @@ export class WorkspaceContext {
    * @param directory The initial working directory (usually cwd)
    * @param additionalDirectories Optional array of additional directories to include
    */
-  /**
-   * Creates a new WorkspaceContext with the given initial directory and optional additional directories.
-   * @param directory The initial working directory (usually cwd)
-   * @param additionalDirectories Optional array of additional directories to include
-   */
   constructor(directory: string, additionalDirectories: string[] = []) {
     this.addDirectory(directory);
     for (const additionalDirectory of additionalDirectories) {

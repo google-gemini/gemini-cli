@@ -254,9 +254,9 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Example:**
     ```json
     "includeDirectories": [
-    "/path/to/another/project",
-    "../shared-library",
-    "~/common-utils"
+      "/path/to/another/project",
+      "../shared-library",
+      "~/common-utils"
     ]
     ```
 
