@@ -15,7 +15,11 @@ import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
-import { usePromptCompletion, PromptCompletion, PROMPT_COMPLETION_MIN_LENGTH } from './usePromptCompletion.js';
+import {
+  usePromptCompletion,
+  PromptCompletion,
+  PROMPT_COMPLETION_MIN_LENGTH,
+} from './usePromptCompletion.js';
 import { Config } from '@google/gemini-cli-core';
 import { useCompletion } from './useCompletion.js';
 
@@ -123,15 +127,16 @@ export function useCommandCompletion(
           };
         }
       }
-      
+
       // Check for prompt completion - only if enabled
       const trimmedText = buffer.text.trim();
-      const isPromptCompletionEnabled = config?.getEnablePromptCompletion() ?? false;
-      
+      const isPromptCompletionEnabled =
+        config?.getEnablePromptCompletion() ?? false;
+
       if (
         isPromptCompletionEnabled &&
         trimmedText.length >= PROMPT_COMPLETION_MIN_LENGTH &&
-        !trimmedText.startsWith('/') && 
+        !trimmedText.startsWith('/') &&
         !trimmedText.includes('@')
       ) {
         return {
@@ -141,7 +146,7 @@ export function useCommandCompletion(
           completionEnd: trimmedText.length,
         };
       }
-      
+
       return {
         completionMode: CompletionMode.IDLE,
         query: null,

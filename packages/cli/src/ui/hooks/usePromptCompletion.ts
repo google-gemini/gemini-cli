@@ -31,15 +31,19 @@ export interface UsePromptCompletionOptions {
   enabled: boolean;
 }
 
-const useDebounce = (callback: () => void, delay: number, deps: React.DependencyList) => {
+const useDebounce = (
+  callback: () => void,
+  delay: number,
+  deps: React.DependencyList,
+) => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   useEffect(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
     timeoutRef.current = setTimeout(callback, delay);
-    
+
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -56,11 +60,13 @@ export function usePromptCompletion({
   const [ghostText, setGhostText] = useState<string>('');
   const [isLoadingGhostText, setIsLoadingGhostText] = useState<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const [justSelectedSuggestion, setJustSelectedSuggestion] = useState<boolean>(false);
+  const [justSelectedSuggestion, setJustSelectedSuggestion] =
+    useState<boolean>(false);
   const lastSelectedTextRef = useRef<string>('');
   const lastRequestedTextRef = useRef<string>('');
 
-  const isPromptCompletionEnabled = enabled && (config?.getEnablePromptCompletion() ?? false);
+  const isPromptCompletionEnabled =
+    enabled && (config?.getEnablePromptCompletion() ?? false);
 
   const clearGhostText = useCallback(() => {
     setGhostText('');
@@ -84,15 +90,15 @@ export function usePromptCompletion({
   const generatePromptSuggestions = useCallback(async () => {
     const trimmedText = buffer.text.trim();
     const geminiClient = config?.getGeminiClient();
-    
+
     if (trimmedText === lastRequestedTextRef.current) {
       return;
     }
-    
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    
+
     if (
       trimmedText.length < PROMPT_COMPLETION_MIN_LENGTH ||
       !geminiClient ||
@@ -107,7 +113,7 @@ export function usePromptCompletion({
 
     lastRequestedTextRef.current = trimmedText;
     setIsLoadingGhostText(true);
-    
+
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
 
@@ -120,16 +126,15 @@ export function usePromptCompletion({
               text: `You are a professional prompt engineering assistant. Complete the user's partial prompt with expert precision and clarity. User's input: "${trimmedText}" Continue this prompt by adding specific, actionable details that align with the user's intent. Focus on: clear, precise language; structured requirements; professional terminology; measurable outcomes. Length Guidelines: Keep suggestions concise (ideally 10-20 characters); prioritize brevity while maintaining clarity; use essential keywords only; avoid redundant phrases. Start your response with the exact user text ("${trimmedText}") followed by your completion. Provide practical, implementation-focused suggestions rather than creative interpretations. Format: Plain text only. Single completion. Match the user's language. Emphasize conciseness over elaboration.`,
             },
           ],
-
         },
       ];
-      
+
       const generationConfig: GenerateContentConfig = {
         temperature: 0.3,
         maxOutputTokens: 16000,
         thinkingConfig: {
           thinkingBudget: 0,
-        }
+        },
       };
 
       const response = await geminiClient.generateContent(
@@ -145,11 +150,14 @@ export function usePromptCompletion({
 
       if (response) {
         const responseText = getResponseText(response);
-        
+
         if (responseText) {
           const suggestionText = responseText.trim();
 
-          if (suggestionText.length > 0 && suggestionText.startsWith(trimmedText)) {
+          if (
+            suggestionText.length > 0 &&
+            suggestionText.startsWith(trimmedText)
+          ) {
             setGhostText(suggestionText);
           } else {
             clearGhostText();
@@ -157,7 +165,12 @@ export function usePromptCompletion({
         }
       }
     } catch (error) {
-      if (!(signal.aborted || (error instanceof Error && error.name === 'AbortError'))) {
+      if (
+        !(
+          signal.aborted ||
+          (error instanceof Error && error.name === 'AbortError')
+        )
+      ) {
         console.error('prompt completion error:', error);
         // Clear the last requested text to allow retry only on real errors
         lastRequestedTextRef.current = '';
@@ -177,7 +190,7 @@ export function usePromptCompletion({
     if (cursorRow !== totalLines - 1) {
       return false;
     }
-    
+
     const lastLine = buffer.lines[cursorRow] || '';
     return cursorCol === lastLine.length;
   }, [buffer.cursor, buffer.lines]);
@@ -187,33 +200,45 @@ export function usePromptCompletion({
       clearGhostText();
       return;
     }
-    
+
     const trimmedText = buffer.text.trim();
-    
+
     if (justSelectedSuggestion && trimmedText === lastSelectedTextRef.current) {
       return;
     }
-    
+
     if (trimmedText !== lastSelectedTextRef.current) {
       setJustSelectedSuggestion(false);
       lastSelectedTextRef.current = '';
     }
-    
+
     generatePromptSuggestions();
-  }, [generatePromptSuggestions, justSelectedSuggestion, isCursorAtEnd, clearGhostText]);
-  
-  useDebounce(handlePromptCompletion, PROMPT_COMPLETION_DEBOUNCE_MS, [buffer.text, buffer.cursor]);
+  }, [
+    generatePromptSuggestions,
+    justSelectedSuggestion,
+    isCursorAtEnd,
+    clearGhostText,
+  ]);
+
+  useDebounce(handlePromptCompletion, PROMPT_COMPLETION_DEBOUNCE_MS, [
+    buffer.text,
+    buffer.cursor,
+  ]);
 
   // Ghost text validation - clear if it doesn't match current text or cursor not at end
   useEffect(() => {
     const currentText = buffer.text.trim();
-    
+
     if (ghostText && !isCursorAtEnd()) {
       clearGhostText();
       return;
     }
-    
-    if (ghostText && currentText.length > 0 && !ghostText.startsWith(currentText)) {
+
+    if (
+      ghostText &&
+      currentText.length > 0 &&
+      !ghostText.startsWith(currentText)
+    ) {
       clearGhostText();
     }
   }, [buffer.text, buffer.cursor, ghostText, clearGhostText, isCursorAtEnd]);
@@ -229,13 +254,13 @@ export function usePromptCompletion({
 
   const isActive = useMemo(() => {
     if (!isPromptCompletionEnabled) return false;
-    
+
     if (!isCursorAtEnd()) return false;
-    
+
     const trimmedText = buffer.text.trim();
     return (
-      trimmedText.length >= PROMPT_COMPLETION_MIN_LENGTH && 
-      !trimmedText.startsWith('/') && 
+      trimmedText.length >= PROMPT_COMPLETION_MIN_LENGTH &&
+      !trimmedText.startsWith('/') &&
       !trimmedText.includes('@')
     );
   }, [buffer.text, isPromptCompletionEnabled, isCursorAtEnd]);
