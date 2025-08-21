@@ -9,6 +9,7 @@ This document outlines configuration patterns and best practices for deploying a
 The most powerful tools for enterprise administration are the system-wide settings files. These files allow you to define a baseline configuration (`system-defaults.json`) and a set of overrides (`settings.json`) that apply to all users on a machine. For a complete overview of configuration options, see the [Configuration documentation](./configuration.md).
 
 Settings are merged from four files. The precedence order for single-value settings (like `theme`) is:
+
 1. System Defaults (`system-defaults.json`)
 2. User Settings (`~/.gemini/settings.json`)
 3. Workspace Settings (`<project>/.gemini/settings.json`)
@@ -21,6 +22,7 @@ This means the System Overrides file has the final say. For settings that are ar
 Here is how settings from different levels are combined.
 
 - **System Defaults `system-defaults.json`:**
+
   ```json
   {
     "theme": "default-corporate-theme",
@@ -29,6 +31,7 @@ Here is how settings from different levels are combined.
   ```
 
 - **User `settings.json` (`~/.gemini/settings.json`):**
+
   ```json
   {
     "theme": "user-preferred-dark-theme",
@@ -45,6 +48,7 @@ Here is how settings from different levels are combined.
   ```
 
 - **Workspace `settings.json` (`<project>/.gemini/settings.json`):**
+
   ```json
   {
     "theme": "project-specific-light-theme",
