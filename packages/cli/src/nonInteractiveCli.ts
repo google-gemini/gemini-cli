@@ -125,7 +125,7 @@ export async function runNonInteractive(
         // Create a deep copy for the final results to avoid mutation issues
         const finalToolCallRecords: ToolCallRecord[] = toolCallRecords.map(record => ({
           ...record,
-          args: { ...record.args },
+          args: JSON.parse(JSON.stringify(record.args)),
         }));
 
         for (let i = 0; i < functionCalls.length; i++) {
