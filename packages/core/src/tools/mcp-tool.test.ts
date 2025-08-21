@@ -17,6 +17,7 @@ import {
 import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
 import { ToolResult, ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
 import { CallableTool, Part } from '@google/genai';
+import { ToolErrorType } from './tool-error.js';
 
 // Mock @google/genai mcpToTool and CallableTool
 // We only need to mock the parts of CallableTool that DiscoveredMCPTool uses.
@@ -189,7 +190,7 @@ describe('DiscoveredMCPTool', () => {
       { isErrorValue: true, description: 'true (bool)' },
       { isErrorValue: 'true', description: '"true" (str)' },
     ])(
-      'should consider a ToolResult with isError $description to be a failure',
+      'should return a structured error if MCP tool reports an error',
       async ({ isErrorValue }) => {
         const tool = new DiscoveredMCPTool(
           mockCallableToolInstance,
@@ -210,16 +211,18 @@ describe('DiscoveredMCPTool', () => {
           },
         ];
         mockCallTool.mockResolvedValue(mockMcpToolResponseParts);
-        const expectedError = new Error(
-          `MCP tool '${serverToolName}' reported tool error with response: ${JSON.stringify(
-            mockMcpToolResponseParts,
-          )}`,
-        );
+        const expectedErrorMessage = `MCP tool '${serverToolName}' reported tool error with response: ${JSON.stringify(
+          mockMcpToolResponseParts,
+        )}`;
 
         const invocation = tool.build(params);
-        await expect(
-          invocation.execute(new AbortController().signal),
-        ).rejects.toThrow(expectedError);
+        const result = await invocation.execute(new AbortController().signal);
+
+        expect(result.error?.type).toBe(ToolErrorType.MCP_TOOL_ERROR);
+        expect(result.llmContent).toBe(expectedErrorMessage);
+        expect(result.returnDisplay).toContain(
+          `Error: MCP tool '${serverToolName}' reported an error.`,
+        );
       },
     );
 

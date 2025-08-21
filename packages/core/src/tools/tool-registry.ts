@@ -20,6 +20,7 @@ import { connectAndDiscover } from './mcp-client.js';
 import { McpClientManager } from './mcp-client-manager.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
+import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
 type ToolParams = Record<string, unknown>;
@@ -106,6 +107,10 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
       return {
         llmContent,
         returnDisplay: llmContent,
+        error: {
+          message: llmContent,
+          type: ToolErrorType.DISCOVERED_TOOL_EXECUTION_ERROR,
+        },
       };
     }
 

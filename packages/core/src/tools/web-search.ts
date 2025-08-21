@@ -12,6 +12,7 @@ import {
   ToolInvocation,
   ToolResult,
 } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 
 import { getErrorMessage } from '../utils/errors.js';
 import { Config } from '../config/config.js';
@@ -153,6 +154,10 @@ class WebSearchToolInvocation extends BaseToolInvocation<
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error performing web search.`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_SEARCH_FAILED,
+        },
       };
     }
   }

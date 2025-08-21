@@ -24,6 +24,7 @@ import fs from 'node:fs';
 import { MockTool } from '../test-utils/tools.js';
 
 import { McpClientManager } from './mcp-client-manager.js';
+import { ToolErrorType } from './tool-error.js';
 
 vi.mock('node:fs');
 
@@ -309,6 +310,81 @@ describe('ToolRegistry', () => {
           },
         },
       });
+    });
+
+    it('should return a DISCOVERED_TOOL_EXECUTION_ERROR on tool failure', async () => {
+      const discoveryCommand = 'my-discovery-command';
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue('my-call-command');
+
+      const toolDeclaration: FunctionDeclaration = {
+        name: 'failing-tool',
+        description: 'A tool that fails',
+        parametersJsonSchema: {
+          type: 'object',
+          properties: {},
+        },
+      };
+
+      const mockSpawn = vi.mocked(spawn);
+      // --- Discovery Mock ---
+      const discoveryProcess = {
+        stdout: { on: vi.fn(), removeListener: vi.fn() },
+        stderr: { on: vi.fn(), removeListener: vi.fn() },
+        on: vi.fn(),
+      };
+      mockSpawn.mockReturnValueOnce(discoveryProcess as any);
+
+      discoveryProcess.stdout.on.mockImplementation((event, callback) => {
+        if (event === 'data') {
+          callback(
+            Buffer.from(
+              JSON.stringify([{ functionDeclarations: [toolDeclaration] }]),
+            ),
+          );
+        }
+      });
+      discoveryProcess.on.mockImplementation((event, callback) => {
+        if (event === 'close') {
+          callback(0);
+        }
+      });
+
+      await toolRegistry.discoverAllTools();
+      const discoveredTool = toolRegistry.getTool('failing-tool');
+      expect(discoveredTool).toBeDefined();
+
+      // --- Execution Mock ---
+      const executionProcess = {
+        stdout: { on: vi.fn(), removeListener: vi.fn() },
+        stderr: { on: vi.fn(), removeListener: vi.fn() },
+        stdin: { write: vi.fn(), end: vi.fn() },
+        on: vi.fn(),
+        connected: true,
+        disconnect: vi.fn(),
+        removeListener: vi.fn(),
+      };
+      mockSpawn.mockReturnValueOnce(executionProcess as any);
+
+      executionProcess.stderr.on.mockImplementation((event, callback) => {
+        if (event === 'data') {
+          callback(Buffer.from('Something went wrong'));
+        }
+      });
+      executionProcess.on.mockImplementation((event, callback) => {
+        if (event === 'close') {
+          callback(1); // Non-zero exit code
+        }
+      });
+
+      const invocation = (discoveredTool as DiscoveredTool).build({});
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error?.type).toBe(
+        ToolErrorType.DISCOVERED_TOOL_EXECUTION_ERROR,
+      );
+      expect(result.llmContent).toContain('Stderr: Something went wrong');
+      expect(result.llmContent).toContain('Exit Code: 1');
     });
 
     it('should discover tools using MCP servers defined in getMcpServers', async () => {
