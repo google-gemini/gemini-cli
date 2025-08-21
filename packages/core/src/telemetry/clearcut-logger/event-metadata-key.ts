@@ -241,19 +241,28 @@ export enum EventMetadataKey {
   // Logs tool type whether it is mcp or native.
   GEMINI_CLI_TOOL_TYPE = 62,
 
+  // Logs count of MCP servers in Start Session Event
+  GEMINI_CLI_START_SESSION_MCP_SERVERS_COUNT = 63,
+
+  // Logs count of MCP tools in Start Session Event
+  GEMINI_CLI_START_SESSION_MCP_TOOLS_COUNT = 64,
+
+  // Logs name of MCP tools as comma seperated string
+  GEMINI_CLI_START_SESSION_MCP_TOOLS = 65,
+
   // ==========================================================================
   // File Operation Event Keys
   // ===========================================================================
 
   // Logs the operation type of the file operation.
-  GEMINI_CLI_FILE_OPERATION_OPERATION = 63,
+  GEMINI_CLI_FILE_OPERATION_OPERATION = 66,
 
   // Logs the number of lines in the file operation.
-  GEMINI_CLI_FILE_OPERATION_LINES = 64,
+  GEMINI_CLI_FILE_OPERATION_LINES = 67,
 
   // Logs the mimetype of the file in the file operation.
-  GEMINI_CLI_FILE_OPERATION_MIMETYPE = 65,
+  GEMINI_CLI_FILE_OPERATION_MIMETYPE = 68,
 
   // Logs the extension of the file in the file operation.
-  GEMINI_CLI_FILE_OPERATION_EXTENSION = 66,
+  GEMINI_CLI_FILE_OPERATION_EXTENSION = 69,
 }

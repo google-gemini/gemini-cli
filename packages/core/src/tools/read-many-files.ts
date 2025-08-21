@@ -21,6 +21,7 @@ import {
   processSingleFileContent,
   DEFAULT_ENCODING,
   getSpecificMimeType,
+  ProcessedFileReadResult,
 } from '../utils/fileUtils.js';
 import { PartListUnion } from '@google/genai';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
@@ -84,9 +85,7 @@ type FileProcessingResult =
       success: true;
       filePath: string;
       relativePathForDisplay: string;
-      fileReadResult: NonNullable<
-        Awaited<ReturnType<typeof processSingleFileContent>>
-      >;
+      fileReadResult: ProcessedFileReadResult;
       reason?: undefined;
     }
   | {
