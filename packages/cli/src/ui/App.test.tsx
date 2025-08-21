@@ -87,6 +87,7 @@ interface MockServerConfig {
   getGeminiClient: Mock<() => GeminiClient | undefined>;
   getUserTier: Mock<() => Promise<string | undefined>>;
   getIdeClient: Mock<() => { getCurrentIde: Mock<() => string | undefined> }>;
+  getScreenReader: Mock<() => boolean>;
 }
 
 // Mock @google/gemini-cli-core and its Config class
@@ -147,6 +148,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getShowMemoryUsage: vi.fn(() => opts.showMemoryUsage ?? false),
         getAccessibility: vi.fn(() => opts.accessibility ?? {}),
         getProjectRoot: vi.fn(() => opts.targetDir),
+        getEnablePromptCompletion: vi.fn(() => false),
         getGeminiClient: vi.fn(() => ({
           getUserTier: vi.fn(),
         })),
@@ -167,6 +169,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
           getConnectionStatus: vi.fn(() => 'connected'),
         })),
         isTrustedFolder: vi.fn(() => true),
+        getScreenReader: vi.fn(() => false),
       };
     });
 
@@ -211,6 +214,7 @@ vi.mock('./hooks/useFolderTrust', () => ({
   useFolderTrust: vi.fn(() => ({
     isFolderTrustDialogOpen: false,
     handleFolderTrustSelect: vi.fn(),
+    isRestarting: false,
   })),
 }));
 
@@ -301,6 +305,7 @@ describe('App UI', () => {
       userSettingsFile,
       workspaceSettingsFile,
       [],
+      true,
     );
   };
 

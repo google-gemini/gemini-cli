@@ -144,6 +144,7 @@ describe('SettingsDialog', () => {
         path: '/workspace/settings.json',
       },
       [],
+      true,
     );
 
   describe('Initial Rendering', () => {
