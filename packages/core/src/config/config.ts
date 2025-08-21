@@ -211,6 +211,7 @@ export interface ConfigParameters {
   enablePromptCompletion?: boolean;
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
+  enablePromptCompletion?: boolean;
 }
 
 export class Config {
@@ -802,6 +803,10 @@ export class Config {
 
   getSkipNextSpeakerCheck(): boolean {
     return this.skipNextSpeakerCheck;
+  }
+
+  getUseSmartEdit(): boolean {
+    return this.useSmartEdit;
   }
 
   getScreenReader(): boolean {

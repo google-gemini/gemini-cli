@@ -77,6 +77,7 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
+  useSmartEdit: boolean | undefined;
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
   sessionSummary: string | undefined;
