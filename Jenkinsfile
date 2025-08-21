@@ -16,6 +16,9 @@ pipeline {
         NPM_CONFIG_PREFER_OFFLINE = 'true'
         // Security: prevent npm from logging tokens
         NPM_CONFIG_LOGLEVEL = 'warn'
+        // Enable colors in CI
+        FORCE_COLOR = '1'
+        NPM_CONFIG_COLOR = 'always'
     }
     
     parameters {
@@ -47,12 +50,14 @@ pipeline {
         skipDefaultCheckout()
         // Prevent concurrent builds on same branch
         disableConcurrentBuilds()
+        // Enable ANSI colors
+        ansiColor('xterm')
     }
     
     stages {
         stage('Checkout & Setup') {
             steps {
-                echo '📥 Checking out source code...'
+                echo '\033[34m[INFO]\033[0m Checking out source code...'
                 checkout scm
                 
                 script {
@@ -73,19 +78,19 @@ pipeline {
                     env.IS_PREVIEW = (params.BUILD_TYPE == 'PREVIEW_RELEASE').toString()
                 }
                 
-                echo "🔍 Build Information:"
-                echo "  • Git commit: ${env.GIT_COMMIT_SHORT}"
-                echo "  • Branch: ${env.BRANCH_NAME} (${env.GIT_BRANCH_CLEAN})"
-                echo "  • Version: ${env.BUILD_VERSION}"
-                echo "  • Build type: ${params.BUILD_TYPE}"
-                echo "  • Will publish: ${env.SHOULD_PUBLISH}"
-                echo "  • Timestamp: ${env.BUILD_TIMESTAMP}"
+                echo '\033[36m[BUILD INFO]\033[0m Build Information:'
+                echo "  Git commit: ${env.GIT_COMMIT_SHORT}"
+                echo "  Branch: ${env.BRANCH_NAME} (${env.GIT_BRANCH_CLEAN})"
+                echo "  Version: ${env.BUILD_VERSION}"
+                echo "  Build type: ${params.BUILD_TYPE}"
+                echo "  Will publish: ${env.SHOULD_PUBLISH}"
+                echo "  Timestamp: ${env.BUILD_TIMESTAMP}"
             }
         }
         
         stage('Environment Setup') {
             steps {
-                echo '🔧 Setting up build environment...'
+                echo '\033[34m[INFO]\033[0m Setting up build environment...'
                 
                 // Install Alpine packages needed for git operations
                 sh '''
@@ -108,21 +113,21 @@ always-auth=true
                 // Verify NPM access (without exposing token)
                 sh '''
                     npm whoami
-                    echo "✅ NPM authentication verified"
+                    echo "\033[32m[SUCCESS]\033[0m NPM authentication verified"
                 '''
             }
         }
         
         stage('Dependencies') {
             steps {
-                echo '📦 Installing dependencies...'
+                echo '\033[34m[INFO]\033[0m Installing dependencies...'
                 
                 // Install with CI optimizations
                 sh 'npm ci'
                 
                 // Show package info
                 sh '''
-                    echo "📋 Dependency Summary:"
+                    echo "\033[36m[INFO]\033[0m Dependency Summary:"
                     echo "Workspaces:"
                     npm run --workspaces --if-present --silent exec -- pwd
                     echo ""
@@ -136,7 +141,7 @@ always-auth=true
             parallel {
                 stage('Enhanced Build') {
                     steps {
-                        echo '🔨 Running enhanced build process...'
+                        echo '\033[34m[INFO]\033[0m Running enhanced build process...'
                         
                         script {
                             def buildFlags = []
@@ -164,14 +169,14 @@ always-auth=true
                 
                 stage('Security Scan') {
                     steps {
-                        echo '🔒 Running security checks...'
+                        echo '\033[34m[INFO]\033[0m Running security checks...'
                         
                         script {
                             try {
                                 sh 'npm audit --audit-level=high --only=prod'
-                                echo "✅ No high-severity vulnerabilities found"
+                                echo '\033[32m[SUCCESS]\033[0m No high-severity vulnerabilities found'
                             } catch (Exception e) {
-                                echo "⚠️ Security audit found issues: ${e.getMessage()}"
+                                echo "\033[33m[WARNING]\033[0m Security audit found issues: ${e.getMessage()}"
                                 // Don't fail build for audit issues, just warn
                             }
                         }
@@ -182,7 +187,7 @@ always-auth=true
         
         stage('Test Results & Coverage') {
             steps {
-                echo '📊 Processing test results...'
+                echo '\033[34m[INFO]\033[0m Processing test results...'
                 
                 // Publish test results
                 publishTestResults testResultsPattern: '**/junit.xml', allowEmptyResults: true
@@ -226,10 +231,10 @@ always-auth=true
         
         stage('Build Verification') {
             steps {
-                echo '✅ Verifying build artifacts...'
+                echo '\033[34m[INFO]\033[0m Verifying build artifacts...'
                 
                 sh '''
-                    echo "🔍 Checking build outputs:"
+                    echo "\033[36m[INFO]\033[0m Checking build outputs:"
                     echo ""
                     echo "Core package build:"
                     ls -la packages/core/dist/ || echo "  No core dist found"
@@ -240,13 +245,13 @@ always-auth=true
                     echo "Bundle output:"
                     ls -la bundle/ || echo "  No bundle found"
                     echo ""
-                    echo "✅ Build verification complete"
+                    echo "\033[32m[SUCCESS]\033[0m Build verification complete"
                 '''
                 
                 // Set success description for CI-only builds
                 script {
                     if (params.BUILD_TYPE == 'CI_ONLY') {
-                        currentBuild.description = "✅ CI Build - ${env.BUILD_VERSION} (${env.GIT_COMMIT_SHORT})"
+                        currentBuild.description = "CI Build - ${env.BUILD_VERSION} (${env.GIT_COMMIT_SHORT})"
                     }
                 }
             }
@@ -259,25 +264,25 @@ always-auth=true
             steps {
                 script {
                     def publishMessage = """
-🚀 **Publication Ready**
+PUBLICATION READY
 
-**Current Version:** ${env.BUILD_VERSION}
-**Build Type:** ${params.BUILD_TYPE}
-**Git Commit:** ${env.GIT_COMMIT_SHORT}
-**Branch:** ${env.BRANCH_NAME}
+Current Version: ${env.BUILD_VERSION}
+Build Type: ${params.BUILD_TYPE}
+Git Commit: ${env.GIT_COMMIT_SHORT}
+Branch: ${env.BRANCH_NAME}
 
 """
                     
                     if (params.BUILD_TYPE == 'PREVIEW_RELEASE') {
                         publishMessage += """
-**Preview Tag:** ${params.PREVIEW_TAG}
-**Preview Version:** ${env.BUILD_VERSION}-${params.PREVIEW_TAG}.${env.BUILD_TIMESTAMP}
+Preview Tag: ${params.PREVIEW_TAG}
+Preview Version: ${env.BUILD_VERSION}-${params.PREVIEW_TAG}.${env.BUILD_TIMESTAMP}
 
 This will publish a preview release to NPM with the ${params.PREVIEW_TAG} tag.
 """
                     } else {
                         publishMessage += """
-**Release Type:** Production Release
+Release Type: Production Release
 
 This will:
 1. Bump the patch version
@@ -286,7 +291,7 @@ This will:
 """
                     }
                     
-                    publishMessage += "\n**Do you want to proceed with publication?**"
+                    publishMessage += "\nDo you want to proceed with publication?"
                     
                     // Manual approval for publication
                     def approved = input(
@@ -302,12 +307,12 @@ This will:
                     )
                     
                     if (!approved.CONFIRM_PUBLISH) {
-                        echo "❌ Publication cancelled by user"
+                        echo '\033[31m[ERROR]\033[0m Publication cancelled by user'
                         currentBuild.result = 'ABORTED'
                         error('Publication cancelled by user choice')
                     }
                     
-                    echo "✅ Publication approved - proceeding..."
+                    echo '\033[32m[SUCCESS]\033[0m Publication approved - proceeding...'
                     env.PUBLICATION_APPROVED = 'true'
                 }
             }
@@ -321,7 +326,7 @@ This will:
                 }
             }
             steps {
-                echo '📦 Preparing for publication...'
+                echo '\033[34m[INFO]\033[0m Preparing for publication...'
                 
                 script {
                     if (params.BUILD_TYPE == 'PREVIEW_RELEASE') {
@@ -353,7 +358,7 @@ This will:
                 }
                 
                 // Publish packages
-                echo '🚀 Publishing to NPM...'
+                echo '\033[34m[INFO]\033[0m Publishing to NPM...'
                 sh """
                     echo "Publishing core package..."
                     cd packages/core
@@ -363,7 +368,7 @@ This will:
                     cd ../cli
                     npm publish --access public --tag ${env.PUBLISH_TAG}
                     
-                    echo "✅ Packages published successfully"
+                    echo "\033[32m[SUCCESS]\033[0m Packages published successfully"
                 """
                 
                 // Create git tag for production releases
@@ -376,19 +381,19 @@ This will:
                                 git config user.name "Jenkins CI"
                                 git config user.email "ci@company.com"
                                 git tag -a ${tagName} -m "Release ${tagName} - Gemini CLI with AWS Bedrock support"
-                                echo "✅ Created git tag: ${tagName}"
+                                echo "\033[32m[SUCCESS]\033[0m Created git tag: ${tagName}"
                             """
                             
                             env.GIT_TAG = tagName
                         } catch (Exception e) {
-                            echo "⚠️ Git tagging failed (non-critical): ${e.getMessage()}"
+                            echo "\033[33m[WARNING]\033[0m Git tagging failed (non-critical): ${e.getMessage()}"
                         }
                     }
                 }
                 
                 // Set final build description
                 script {
-                    def description = "🚀 Published v${env.FINAL_VERSION}"
+                    def description = "Published v${env.FINAL_VERSION}"
                     if (params.BUILD_TYPE == 'PREVIEW_RELEASE') {
                         description += " (${params.PREVIEW_TAG})"
                     }
@@ -402,7 +407,7 @@ This will:
     
     post {
         always {
-            echo '🧹 Cleanup and reporting...'
+            echo '\033[34m[INFO]\033[0m Cleanup and reporting...'
             
             // Secure cleanup
             sh '''
@@ -433,40 +438,36 @@ This will:
         success {
             script {
                 def message = """
-🎉 **Build Successful!**
+\033[32m[SUCCESS]\033[0m Build Successful!
 
-**Type:** ${params.BUILD_TYPE}
-**Branch:** ${env.BRANCH_NAME}
-**Commit:** ${env.GIT_COMMIT_SHORT}
-**Duration:** ${currentBuild.durationString}
+Type: ${params.BUILD_TYPE}
+Branch: ${env.BRANCH_NAME}
+Commit: ${env.GIT_COMMIT_SHORT}
+Duration: ${currentBuild.durationString}
 """
                 
                 if (env.FINAL_VERSION) {
-                    message += "\n**Published Version:** ${env.FINAL_VERSION}"
+                    message += "\nPublished Version: ${env.FINAL_VERSION}"
                     if (env.PUBLISH_TAG != 'latest') {
                         message += " (${env.PUBLISH_TAG})"
                     }
                 } else {
-                    message += "\n**Status:** CI validation completed - no publication"
+                    message += "\nStatus: CI validation completed - no publication"
                 }
                 
-                message += "\n\n🚀 **Gemini CLI with AWS Bedrock support is ready!**"
+                message += "\n\nGemini CLI with AWS Bedrock support is ready!"
                 
                 if (params.BUILD_TYPE == 'PREVIEW_RELEASE') {
                     message += """
 
-**Installation:**
-```bash
+Installation:
 npm install @google/gemini-cli@${params.PREVIEW_TAG}
-```
 """
                 } else if (env.FINAL_VERSION && params.BUILD_TYPE == 'FULL_RELEASE') {
                     message += """
 
-**Installation:**
-```bash
+Installation:
 npm install -g @google/gemini-cli@latest
-```
 """
                 }
                 
@@ -477,13 +478,13 @@ npm install -g @google/gemini-cli@latest
         failure {
             script {
                 def message = """
-💥 **Build Failed**
+\033[31m[ERROR]\033[0m Build Failed
 
-**Type:** ${params.BUILD_TYPE}
-**Branch:** ${env.BRANCH_NAME}
-**Commit:** ${env.GIT_COMMIT_SHORT}
-**Failed Stage:** ${env.STAGE_NAME ?: 'Unknown'}
-**Duration:** ${currentBuild.durationString}
+Type: ${params.BUILD_TYPE}
+Branch: ${env.BRANCH_NAME}
+Commit: ${env.GIT_COMMIT_SHORT}
+Failed Stage: ${env.STAGE_NAME ?: 'Unknown'}
+Duration: ${currentBuild.durationString}
 
 Please check the build logs for detailed error information.
 """
@@ -493,11 +494,11 @@ Please check the build logs for detailed error information.
         }
         
         aborted {
-            echo '⏹️ Build was aborted (likely due to user cancellation of publication)'
+            echo '\033[33m[WARNING]\033[0m Build was aborted (likely due to user cancellation of publication)'
         }
         
         unstable {
-            echo '⚠️ Build completed with warnings - check test results and quality gates'
+            echo '\033[33m[WARNING]\033[0m Build completed with warnings - check test results and quality gates'
         }
     }
 }

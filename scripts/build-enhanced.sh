@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Enhanced Gemini CLI Build with Bedrock Support (CI-Compatible)"
+echo "Enhanced Gemini CLI Build with Bedrock Support (CI-Compatible)"
 
 # Colors for output
 RED='\033[0;31m'
@@ -9,27 +9,28 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Function to print colored output
 print_status() {
-    echo -e "${BLUE}===>${NC} $1"
+    echo -e "${BLUE}[INFO]${NC} $1"
 }
 
 print_success() {
-    echo -e "${GREEN}✅${NC} $1"
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
 print_warning() {
-    echo -e "${YELLOW}⚠️${NC} $1"
+    echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
 print_error() {
-    echo -e "${RED}❌${NC} $1"
+    echo -e "${RED}[ERROR]${NC} $1"
 }
 
 print_section() {
-    echo -e "${PURPLE}#${NC} $1"
+    echo -e "${PURPLE}[SECTION]${NC} $1"
 }
 
 # Parse command line arguments
@@ -235,38 +236,38 @@ print_section "Build Summary"
 
 # Final success message
 echo ""
-echo "🎉 Enhanced build completed successfully!"
+print_success "Enhanced build completed successfully!"
 echo ""
-echo "Summary:"
-echo "  ✅ Dependencies installed"
-echo "  ✅ Packages built" 
-echo "  ✅ TypeScript check passed"
+echo -e "${CYAN}[SUMMARY]${NC} Build Summary:"
+echo "  * Dependencies installed"
+echo "  * Packages built" 
+echo "  * TypeScript check passed"
 if [ "$RUN_FORMAT_CHECK" = true ]; then
-    echo "  ✅ Format check passed"
+    echo "  * Format check passed"
 fi
 if [ "$STRICT_MODE" = true ]; then
-    echo "  ✅ Strict linting passed"
+    echo "  * Strict linting passed"
 else
-    echo "  ✅ Standard linting passed"
+    echo "  * Standard linting passed"
 fi
 if [ "$RUN_CI_TESTS" = true ]; then
-    echo "  ✅ CI tests with coverage passed"
+    echo "  * CI tests with coverage passed"
 else
-    echo "  ✅ Standard tests passed"
+    echo "  * Standard tests passed"
 fi
-echo "  ✅ Bedrock tests passed"
+echo "  * Bedrock tests passed"
 if [ "$RUN_INTEGRATION_TESTS" = true ]; then
-    echo "  ✅ Integration tests completed"
+    echo "  * Integration tests completed"
 fi
 echo ""
-echo "🚀 Ready for deployment!"
+print_success "Ready for deployment!"
 echo ""
-echo "Detected configuration:"
-echo "  • Node.js: $(node -v)"
-echo "  • npm: $NPM_VERSION"
-echo "  • Git branch: $GIT_BRANCH"
-echo "  • Git commit: $GIT_COMMIT"
-echo "  • Format check: $RUN_FORMAT_CHECK"
-echo "  • CI tests: $RUN_CI_TESTS"
-echo "  • Integration tests: $RUN_INTEGRATION_TESTS"
-echo "  • Strict mode: $STRICT_MODE"
+echo -e "${CYAN}[CONFIG]${NC} Detected configuration:"
+echo "  Node.js: $(node -v)"
+echo "  npm: $NPM_VERSION"
+echo "  Git branch: $GIT_BRANCH"
+echo "  Git commit: $GIT_COMMIT"
+echo "  Format check: $RUN_FORMAT_CHECK"
+echo "  CI tests: $RUN_CI_TESTS"
+echo "  Integration tests: $RUN_INTEGRATION_TESTS"
+echo "  Strict mode: $STRICT_MODE"

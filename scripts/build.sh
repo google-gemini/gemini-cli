@@ -1,30 +1,31 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Building Gemini CLI with Bedrock Support"
+echo "Building Gemini CLI with Bedrock Support"
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Function to print colored output
 print_status() {
-    echo -e "${BLUE}===>${NC} $1"
+    echo -e "${BLUE}[INFO]${NC} $1"
 }
 
 print_success() {
-    echo -e "${GREEN}✅${NC} $1"
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
 print_warning() {
-    echo -e "${YELLOW}⚠️${NC} $1"
+    echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
 print_error() {
-    echo -e "${RED}❌${NC} $1"
+    echo -e "${RED}[ERROR]${NC} $1"
 }
 
 # Check Node version
@@ -101,14 +102,14 @@ fi
 
 # Final success message
 echo ""
-echo "🎉 Build completed successfully!"
+print_success "Build completed successfully!"
 echo ""
-echo "Summary:"
-echo "  ✅ Dependencies installed"
-echo "  ✅ Packages built" 
-echo "  ✅ TypeScript check passed"
-echo "  ✅ Core tests passed"
-echo "  ✅ Bedrock tests passed" 
-echo "  ✅ Linting passed"
+echo -e "${CYAN}[SUMMARY]${NC} Build Summary:"
+echo "  * Dependencies installed"
+echo "  * Packages built" 
+echo "  * TypeScript check passed"
+echo "  * Core tests passed"
+echo "  * Bedrock tests passed" 
+echo "  * Linting passed"
 echo ""
-echo "🚀 Ready for deployment!"
+print_success "Ready for deployment!"
