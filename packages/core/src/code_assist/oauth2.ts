@@ -17,16 +17,14 @@ import * as net from 'net';
 import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import * as os from 'os';
 import { Config } from '../config/config.js';
 import { getErrorMessage } from '../utils/errors.js';
-import {
-  cacheGoogleAccount,
-  getCachedGoogleAccount,
-  clearCachedGoogleAccount,
-} from '../utils/user_account.js';
+import { UserAccountManager } from '../utils/userAccountManager.js';
 import { AuthType } from '../core/contentGenerator.js';
 import readline from 'node:readline';
+import { Storage } from '../config/storage.js';
+
+const userAccountManager = new UserAccountManager();
 
 //  OAuth Client ID used to initiate OAuth2Client class.
 const OAUTH_CLIENT_ID =
@@ -52,9 +50,6 @@ const SIGN_IN_SUCCESS_URL =
   'https://developers.google.com/gemini-code-assist/auth_success_gemini';
 const SIGN_IN_FAILURE_URL =
   'https://developers.google.com/gemini-code-assist/auth_failure_gemini';
-
-const GEMINI_DIR = '.gemini';
-const CREDENTIAL_FILENAME = 'oauth_creds.json';
 
 /**
  * An Authentication URL for updating the credentials of a Oauth2Client
@@ -99,7 +94,7 @@ async function initOauthClient(
   if (await loadCachedCredentials(client)) {
     // Found valid cached credentials.
     // Check if we need to retrieve Google Account ID or Email
-    if (!getCachedGoogleAccount()) {
+    if (!userAccountManager.getCachedGoogleAccount()) {
       try {
         await fetchAndCacheUserInfo(client);
       } catch {
@@ -352,7 +347,7 @@ export function getAvailablePort(): Promise<number> {
 
 async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
   const pathsToTry = [
-    getCachedCredentialPath(),
+    Storage.getOAuthCredsPath(),
     process.env['GOOGLE_APPLICATION_CREDENTIALS'],
   ].filter((p): p is string => !!p);
 
@@ -380,24 +375,26 @@ async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
 }
 
 async function cacheCredentials(credentials: Credentials) {
-  const filePath = getCachedCredentialPath();
+  const filePath = Storage.getOAuthCredsPath();
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 
   const credString = JSON.stringify(credentials, null, 2);
   await fs.writeFile(filePath, credString, { mode: 0o600 });
 }
 
-function getCachedCredentialPath(): string {
-  return path.join(os.homedir(), GEMINI_DIR, CREDENTIAL_FILENAME);
+export function clearOauthClientCache() {
+  oauthClientPromises.clear();
 }
 
 export async function clearCachedCredentialFile() {
   try {
-    await fs.rm(getCachedCredentialPath(), { force: true });
+    await fs.rm(Storage.getOAuthCredsPath(), { force: true });
     // Clear the Google Account ID cache when credentials are cleared
-    await clearCachedGoogleAccount();
-  } catch (_) {
-    /* empty */
+    await userAccountManager.clearCachedGoogleAccount();
+    // Clear the in-memory OAuth client cache to force re-authentication
+    clearOauthClientCache();
+  } catch (e) {
+    console.error('Failed to clear cached credentials:', e);
   }
 }
 
@@ -427,9 +424,7 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
     }
 
     const userInfo = await response.json();
-    if (userInfo.email) {
-      await cacheGoogleAccount(userInfo.email);
-    }
+    await userAccountManager.cacheGoogleAccount(userInfo.email);
   } catch (error) {
     console.error('Error retrieving user info:', error);
   }
