@@ -12,6 +12,7 @@ import {
   isEnabled,
   hasValidTypes,
   McpClient,
+  getRefDefinition,
 } from './mcp-client.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -59,6 +60,7 @@ describe('mcp-client', () => {
           ],
         }),
       } as unknown as GenAiLib.CallableTool);
+
       const mockedToolRegistry = {
         registerTool: vi.fn(),
       } as unknown as ToolRegistry;
@@ -188,6 +190,7 @@ describe('mcp-client', () => {
       consoleErrorSpy.mockRestore();
     });
   });
+
   describe('appendMcpServerCommand', () => {
     it('should do nothing if no MCP servers or command are configured', () => {
       const out = populateMcpServerCommand({}, undefined);
@@ -564,6 +567,442 @@ describe('mcp-client', () => {
         properties: {},
       };
       expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    describe('$ref handling', () => {
+      it('should return true for a schema with definitions containing types', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            user: { $ref: '#/definitions/User' },
+          },
+          definitions: {
+            User: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                age: { type: 'number' },
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should return false for a schema with invalid reference', () => {
+        const schema = {
+          $ref: '#/definitions/User',
+        };
+        expect(hasValidTypes(schema)).toBe(false);
+      });
+
+      it('should return false for a schema with local $ref reference has no type', () => {
+        const schema = {
+          $ref: '#/definitions/User',
+          definitions: {
+            User: {
+              properties: {
+                name: {
+                  type: 'string',
+                },
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(false);
+      });
+
+      it('should return false for a schema with external $ref reference', () => {
+        const schema = {
+          $ref: 'https://example.com/schema.json#/definitions/User',
+        };
+        expect(hasValidTypes(schema)).toBe(false);
+      });
+
+      it('should return true for a schema with nested $ref in properties', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            user: { $ref: '#/definitions/User' },
+            address: { $ref: '#/definitions/Address' },
+          },
+          definitions: {
+            User: { type: 'object' },
+            Address: { type: 'object' },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should return true for a schema with $ref in array items', () => {
+        const schema = {
+          type: 'array',
+          items: { $ref: '#/definitions/User' },
+          definitions: {
+            User: { type: 'object' },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should return true for a schema with $ref in anyOf', () => {
+        const schema = {
+          anyOf: [
+            { $ref: '#/definitions/StringType' },
+            { $ref: '#/definitions/NumberType' },
+          ],
+          definitions: {
+            StringType: { type: 'string' },
+            NumberType: { type: 'number' },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should return true for a schema with $ref in allOf', () => {
+        const schema = {
+          allOf: [
+            { $ref: '#/definitions/BaseUser' },
+            { $ref: '#/definitions/ExtendedUser' },
+          ],
+          definitions: {
+            BaseUser: { type: 'object' },
+            ExtendedUser: { type: 'object' },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should return true for a schema with $ref in oneOf', () => {
+        const schema = {
+          oneOf: [
+            { $ref: '#/definitions/Admin' },
+            { $ref: '#/definitions/User' },
+          ],
+          definitions: {
+            Admin: { type: 'object' },
+            User: { type: 'object' },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should return true for a schema with definitions containing types', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            user: { $ref: '#/definitions/User' },
+          },
+          definitions: {
+            User: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                age: { type: 'number' },
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should return true for a schema with $defs containing types', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            user: { $ref: '#/$defs/User' },
+          },
+          $defs: {
+            User: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                age: { type: 'number' },
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should return true for a schema with components containing types', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            user: { $ref: '#/components/schemas/User' },
+          },
+          components: {
+            schemas: {
+              User: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  age: { type: 'number' },
+                },
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should return true for a complex schema with mixed $ref and inline types', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            user: { $ref: '#/definitions/User' },
+            tags: {
+              type: 'array',
+              items: { $ref: '#/definitions/Tag' },
+            },
+            metadata: {
+              type: 'object',
+              properties: {
+                created: { type: 'string' },
+                updated: { type: 'string' },
+              },
+            },
+          },
+          definitions: {
+            User: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                email: { type: 'string' },
+              },
+            },
+            Tag: {
+              type: 'string',
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should handle circular references without infinite recursion', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            user: { $ref: '#/definitions/User' },
+          },
+          definitions: {
+            User: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                friend: { $ref: '#/definitions/User' }, // circular reference
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should handle complex circular references', () => {
+        const schema = {
+          type: 'object',
+          properties: {
+            nodeA: { $ref: '#/definitions/NodeA' },
+          },
+          definitions: {
+            NodeA: {
+              type: 'object',
+              properties: {
+                value: { type: 'string' },
+                nodeB: { $ref: '#/definitions/NodeB' },
+              },
+            },
+            NodeB: {
+              type: 'object',
+              properties: {
+                value: { type: 'number' },
+                nodeA: { $ref: '#/definitions/NodeA' }, // circular reference back to NodeA
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should handle self-referencing schema', () => {
+        const schema = {
+          $ref: '#/definitions/Tree',
+          definitions: {
+            Tree: {
+              type: 'object',
+              properties: {
+                value: { type: 'string' },
+                children: {
+                  type: 'array',
+                  items: { $ref: '#/definitions/Tree' }, // self-reference
+                },
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+
+      it('should handle circular references in anyOf', () => {
+        const schema = {
+          anyOf: [{ $ref: '#/definitions/NodeA' }, { type: 'string' }],
+          definitions: {
+            NodeA: {
+              type: 'object',
+              properties: {
+                next: { $ref: '#/definitions/NodeA' }, // circular reference
+              },
+            },
+          },
+        };
+        expect(hasValidTypes(schema)).toBe(true);
+      });
+    });
+  });
+
+  describe('getRefDefinition', () => {
+    it('should resolve a simple reference path', () => {
+      const schema = {
+        definitions: {
+          User: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              age: { type: 'number' },
+            },
+          },
+        },
+      };
+      const result = getRefDefinition('#/definitions/User', schema);
+      expect(result).toEqual({
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          age: { type: 'number' },
+        },
+      });
+    });
+
+    it('should resolve a nested reference path', () => {
+      const schema = {
+        definitions: {
+          User: {
+            properties: {
+              profile: {
+                $ref: '#/definitions/Profile',
+              },
+            },
+          },
+          Profile: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+            },
+          },
+        },
+      };
+      const result = getRefDefinition(
+        '#/definitions/User/properties/profile',
+        schema,
+      );
+      expect(result).toEqual({
+        $ref: '#/definitions/Profile',
+      });
+    });
+
+    it('should return null for external reference path', () => {
+      const schema = {
+        definitions: {
+          User: {
+            type: 'object',
+          },
+        },
+      };
+      const result = getRefDefinition(
+        'https://example.com/profile#/definitions/User',
+        schema,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('should return null for non-existent path', () => {
+      const schema = {
+        definitions: {
+          User: {
+            type: 'object',
+          },
+        },
+      };
+      const result = getRefDefinition('#/definitions/NonExistent', schema);
+      expect(result).toBeNull();
+    });
+
+    it('should return null for invalid path format', () => {
+      const schema = {
+        definitions: {
+          User: {
+            type: 'object',
+          },
+        },
+      };
+      const result = getRefDefinition('invalid/path', schema);
+      expect(result).toBeNull();
+    });
+
+    it('should handle empty root schema', () => {
+      const result = getRefDefinition('#/definitions/User', {});
+      expect(result).toBeNull();
+    });
+
+    it('should handle undefined root schema', () => {
+      const result = getRefDefinition('#/definitions/User', undefined);
+      expect(result).toBeNull();
+    });
+
+    it('should resolve reference in $defs', () => {
+      const schema = {
+        $defs: {
+          Config: {
+            type: 'object',
+            properties: {
+              timeout: { type: 'number' },
+            },
+          },
+        },
+      };
+      const result = getRefDefinition('#/$defs/Config', schema);
+      expect(result).toEqual({
+        type: 'object',
+        properties: {
+          timeout: { type: 'number' },
+        },
+      });
+    });
+
+    it('should resolve reference in components/schemas', () => {
+      const schema = {
+        components: {
+          schemas: {
+            ApiRequest: {
+              type: 'object',
+              properties: {
+                endpoint: { type: 'string' },
+              },
+            },
+          },
+        },
+      };
+      const result = getRefDefinition(
+        '#/components/schemas/ApiRequest',
+        schema,
+      );
+      expect(result).toEqual({
+        type: 'object',
+        properties: {
+          endpoint: { type: 'string' },
+        },
+      });
     });
   });
 });
