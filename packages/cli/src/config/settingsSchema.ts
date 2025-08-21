@@ -542,7 +542,7 @@ export const SETTINGS_SCHEMA = {
     requiresRestart: false,
     default: undefined as string | undefined,
     description: 'Email address for research study invitations (optional)',
-  }
+  },
   enablePromptCompletion: {
     type: 'boolean',
     label: 'Enable Prompt Completion',
