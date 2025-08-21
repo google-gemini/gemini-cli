@@ -30,29 +30,11 @@ export class WorkspaceContext {
    * Creates a new WorkspaceContext with the given initial directory and optional additional directories.
    * @param directory The initial working directory (usually cwd)
    * @param additionalDirectories Optional array of additional directories to include
-   *        Each entry can be a string or { path: string, optional?: boolean }
    */
-  constructor(
-    directory: string,
-    additionalDirectories: Array<
-      string | { path: string; optional?: boolean }
-    > = [],
-  ) {
+  constructor(directory: string, additionalDirectories: string[] = []) {
     this.addDirectory(directory);
     for (const additionalDirectory of additionalDirectories) {
-      if (typeof additionalDirectory === 'string') {
-        this.addDirectory(additionalDirectory);
-      } else if (
-        additionalDirectory &&
-        typeof additionalDirectory === 'object' &&
-        'path' in additionalDirectory
-      ) {
-        this.addDirectory(
-          additionalDirectory.path,
-          process.cwd(),
-          additionalDirectory.optional === true,
-        );
-      }
+      this.addDirectory(additionalDirectory);
     }
     this.initialDirectories = new Set(this.directories);
   }
@@ -85,13 +67,8 @@ export class WorkspaceContext {
    * Adds a directory to the workspace.
    * @param directory The directory path to add (can be relative or absolute)
    * @param basePath Optional base path for resolving relative paths (defaults to cwd)
-   * @param optional If true, missing directories are warned and skipped
    */
-  addDirectory(
-    directory: string,
-    basePath: string = process.cwd(),
-    optional: boolean = false,
-  ): void {
+  addDirectory(directory: string, basePath: string = process.cwd()): void {
     try {
       const resolved = this.resolveAndValidateDir(directory, basePath);
       if (this.directories.has(resolved)) {
@@ -100,13 +77,9 @@ export class WorkspaceContext {
       this.directories.add(resolved);
       this.notifyDirectoriesChanged();
     } catch (err) {
-      if (optional) {
-        console.warn(
-          `[WARN] Skipping optional unreadable directory: ${directory} (${err instanceof Error ? err.message : String(err)})`,
-        );
-      } else {
-        throw err;
-      }
+      console.warn(
+        `[WARN] Skipping unreadable directory: ${directory} (${err instanceof Error ? err.message : String(err)})`,
+      );
     }
   }
 

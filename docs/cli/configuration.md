@@ -249,14 +249,14 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     ```
 
 - **`includeDirectories`** (array of strings):
-  - **Description:** Specifies an array of additional absolute or relative paths to include in the workspace context. Each entry can be a string, or an object with a `path` and optional `optional` flag. If `optional` is set to `true`, missing directories will only trigger a warning and be skipped; otherwise, missing directories will cause an error. Paths can use `~` to refer to the user's home directory. This setting can be combined with the `--include-directories` command-line flag.
+  - **Description:** Specifies an array of additional absolute or relative paths to include in the workspace context. Missing directories will be skipped with a warning by default. Paths can use `~` to refer to the user's home directory. This setting can be combined with the `--include-directories` command-line flag.
   - **Default:** `[]`
   - **Example:**
     ```json
     "includeDirectories": [
-      "/path/to/another/project",
-      { "path": "../shared-library", "optional": true },
-      { "path": "~/common-utils" }
+    "/path/to/another/project",
+    "../shared-library",
+    "~/common-utils"
     ]
     ```
 

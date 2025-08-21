@@ -362,32 +362,13 @@ export async function loadCliConfig(
   };
 
   const includeDirectories = (settings.includeDirectories || [])
-    .reduce(
-      (
-        acc: Array<string | { path: string; optional?: boolean }>,
-        p: string | { path: string; optional?: boolean } | null | undefined,
-      ) => {
-        if (typeof p === 'string') {
-          acc.push(resolvePath(p));
-        } else if (p?.path && typeof p.path === 'string') {
-          acc.push({ ...p, path: resolvePath(p.path) });
-        }
-        return acc;
-      },
-      [],
-    )
+    .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
-
-  const includeDirectoriesForMemory = includeDirectories.map((p) =>
-    typeof p === 'string' ? p : p.path,
-  );
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
     cwd,
-    settings.loadMemoryFromIncludeDirectories
-      ? includeDirectoriesForMemory
-      : [],
+    settings.loadMemoryFromIncludeDirectories ? includeDirectories : [],
     debugMode,
     fileService,
     settings,

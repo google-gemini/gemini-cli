@@ -416,53 +416,23 @@ describe('WorkspaceContext with optional directories', () => {
     vi.restoreAllMocks();
   });
 
-  it('should handle a mix of string and object directories', () => {
-    const workspaceContext = new WorkspaceContext(cwd, [
-      existingDir1,
-      { path: existingDir2 },
-    ]);
-    const directories = workspaceContext.getDirectories();
-    expect(directories).toEqual([cwd, existingDir1, existingDir2]);
-  });
-
-  it('should throw an error for a missing non-optional directory (as object)', () => {
-    expect(() => {
-      new WorkspaceContext(cwd, [{ path: nonExistentDir }]);
-    }).toThrow(`Directory does not exist: ${nonExistentDir}`);
-  });
-
-  it('should throw an error for a missing non-optional directory (implicit)', () => {
-    expect(() => {
-      new WorkspaceContext(cwd, [{ path: nonExistentDir, optional: false }]);
-    }).toThrow(`Directory does not exist: ${nonExistentDir}`);
-  });
-
   it('should skip a missing optional directory and log a warning', () => {
     const workspaceContext = new WorkspaceContext(cwd, [
-      { path: nonExistentDir, optional: true },
+      nonExistentDir,
       existingDir1,
     ]);
     const directories = workspaceContext.getDirectories();
     expect(directories).toEqual([cwd, existingDir1]);
     expect(console.warn).toHaveBeenCalledTimes(1);
     expect(console.warn).toHaveBeenCalledWith(
-      `[WARN] Skipping optional unreadable directory: ${nonExistentDir} (Directory does not exist: ${nonExistentDir})`,
+      `[WARN] Skipping unreadable directory: ${nonExistentDir} (Directory does not exist: ${nonExistentDir})`,
     );
   });
 
   it('should include an existing optional directory', () => {
-    const workspaceContext = new WorkspaceContext(cwd, [
-      { path: existingDir1, optional: true },
-    ]);
+    const workspaceContext = new WorkspaceContext(cwd, [existingDir1]);
     const directories = workspaceContext.getDirectories();
     expect(directories).toEqual([cwd, existingDir1]);
     expect(console.warn).not.toHaveBeenCalled();
-  });
-
-  it('should handle invalid input gracefully', () => {
-    // @ts-expect-error testing invalid input
-    const workspaceContext = new WorkspaceContext(cwd, [null, undefined, {}]);
-    const directories = workspaceContext.getDirectories();
-    expect(directories).toEqual([cwd]);
   });
 });
