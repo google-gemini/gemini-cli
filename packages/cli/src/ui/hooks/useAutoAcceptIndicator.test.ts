@@ -518,6 +518,104 @@ describe('useAutoAcceptIndicator', () => {
     expect(mockOnConfirm).toHaveBeenCalledTimes(2); // Both awaiting_approval calls should be approved
   });
 
+  it('should call onApprovalModeChange when switching to YOLO mode', async () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+
+    const mockOnApprovalModeChange = vi.fn();
+
+    renderHook(() =>
+      useAutoAcceptIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+        onApprovalModeChange: mockOnApprovalModeChange,
+      }),
+    );
+
+    await act(async () => {
+      capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
+      // Allow promises to resolve
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.YOLO,
+    );
+    expect(mockOnApprovalModeChange).toHaveBeenCalledWith(ApprovalMode.YOLO);
+  });
+
+  it('should call onApprovalModeChange when switching to DEFAULT mode', async () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.YOLO);
+
+    const mockOnApprovalModeChange = vi.fn();
+
+    renderHook(() =>
+      useAutoAcceptIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+        onApprovalModeChange: mockOnApprovalModeChange,
+      }),
+    );
+
+    await act(async () => {
+      capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key); // This should toggle from YOLO to DEFAULT
+      // Allow promises to resolve
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.DEFAULT,
+    );
+    expect(mockOnApprovalModeChange).toHaveBeenCalledWith(ApprovalMode.DEFAULT);
+  });
+
+  it('should not call onApprovalModeChange when callback is not provided', async () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+
+    renderHook(() =>
+      useAutoAcceptIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+      }),
+    );
+
+    await act(async () => {
+      capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
+      // Allow promises to resolve
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.YOLO,
+    );
+    // Should not throw an error when callback is not provided
+  });
+
+  it('should handle multiple mode changes correctly', async () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+
+    const mockOnApprovalModeChange = vi.fn();
+
+    renderHook(() =>
+      useAutoAcceptIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+        onApprovalModeChange: mockOnApprovalModeChange,
+      }),
+    );
+
+    // Switch to YOLO
+    await act(async () => {
+      capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    // Switch to AUTO_EDIT
+    await act(async () => {
+      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockOnApprovalModeChange).toHaveBeenCalledTimes(2);
+    expect(mockOnApprovalModeChange).toHaveBeenNthCalledWith(1, ApprovalMode.YOLO);
+    expect(mockOnApprovalModeChange).toHaveBeenNthCalledWith(2, ApprovalMode.AUTO_EDIT);
+  });
+
   it('should auto-approve only edit tool calls when switching to AUTO_EDIT mode', async () => {
     mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
 

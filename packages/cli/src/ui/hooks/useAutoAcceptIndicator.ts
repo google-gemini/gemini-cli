@@ -24,12 +24,14 @@ export interface UseAutoAcceptIndicatorArgs {
       onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
     };
   }>;
+  onApprovalModeChange?: (mode: ApprovalMode) => void;
 }
 
 export function useAutoAcceptIndicator({
   config,
   addItem,
   pendingToolCalls = [],
+  onApprovalModeChange,
 }: UseAutoAcceptIndicatorArgs): ApprovalMode {
   const currentConfigValue = config.getApprovalMode();
   const [showAutoAcceptIndicator, setShowAutoAcceptIndicator] =
@@ -100,6 +102,9 @@ export function useAutoAcceptIndicator({
               console.error('Failed to process some tool call approvals:', error);
             });
           }
+
+          // Notify the central handler about the approval mode change
+          onApprovalModeChange?.(nextApprovalMode);
         } catch (e) {
           if (addItem) {
             addItem(
