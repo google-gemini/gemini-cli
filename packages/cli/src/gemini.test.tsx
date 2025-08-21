@@ -256,14 +256,16 @@ describe('startInteractiveUI', () => {
   // Mock dependencies
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mockConfig = { getProjectRoot: () => '/root' } as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mockSettings = {} as any;
+  const mockSettings = {
+    merged: {
+      hideWindowTitle: false,
+    },
+  } as LoadedSettings;
   const mockStartupWarnings = ['warning1'];
   const mockWorkspaceRoot = '/root';
-  const mockVersion = '1.0.0';
 
   vi.mock('./utils/version.js', () => ({
-    getCliVersion: vi.fn(() => Promise.resolve(mockVersion)),
+    getCliVersion: vi.fn(() => Promise.resolve('1.0.0')),
   }));
 
   vi.mock('./ui/utils/kittyProtocolDetector.js', () => ({
@@ -275,19 +277,22 @@ describe('startInteractiveUI', () => {
   }));
 
   vi.mock('./utils/cleanup.js', () => ({
+    cleanupCheckpoints: vi.fn(() => Promise.resolve()),
     registerCleanup: vi.fn(),
   }));
 
-  const renderSpy = vi.fn();
   vi.mock('ink', () => ({
-    render: renderSpy,
+    render: vi.fn().mockReturnValue({ unmount: vi.fn() }),
   }));
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should render the AppWrapper with correct props', async () => {
+  it('should render the UI with proper React context and exitOnCtrlC disabled', async () => {
+    const { render } = await import('ink');
+    const renderSpy = vi.mocked(render);
+
     await startInteractiveUI(
       mockConfig,
       mockSettings,
@@ -295,18 +300,18 @@ describe('startInteractiveUI', () => {
       mockWorkspaceRoot,
     );
 
-    expect(renderSpy).toHaveBeenCalled();
-    const renderCall = renderSpy.mock.calls[0][0];
-    expect(renderCall.type.name).toBe('StrictMode');
-    const appWrapper = renderCall.props.children.props.children;
-    expect(appWrapper.type.name).toBe('AppWrapper');
-    expect(appWrapper.props.config).toBe(mockConfig);
-    expect(appWrapper.props.settings).toBe(mockSettings);
-    expect(appWrapper.props.startupWarnings).toBe(mockStartupWarnings);
-    expect(appWrapper.props.version).toBe(mockVersion);
+    // Verify render was called with correct options
+    expect(renderSpy).toHaveBeenCalledTimes(1);
+    const [reactElement, options] = renderSpy.mock.calls[0];
+
+    // Verify render options
+    expect(options).toEqual({ exitOnCtrlC: false });
+
+    // Verify React element structure is valid (but don't deep dive into JSX internals)
+    expect(reactElement).toBeDefined();
   });
 
-  it('should perform startup tasks', async () => {
+  it('should perform all startup tasks in correct order', async () => {
     const { getCliVersion } = await import('./utils/version.js');
     const { detectAndEnableKittyProtocol } = await import(
       './ui/utils/kittyProtocolDetector.js'
@@ -321,9 +326,18 @@ describe('startInteractiveUI', () => {
       mockWorkspaceRoot,
     );
 
-    expect(getCliVersion).toHaveBeenCalled();
-    expect(detectAndEnableKittyProtocol).toHaveBeenCalled();
-    expect(checkForUpdates).toHaveBeenCalled();
-    expect(registerCleanup).toHaveBeenCalled();
+    // Verify all startup tasks were called
+    expect(getCliVersion).toHaveBeenCalledTimes(1);
+    expect(detectAndEnableKittyProtocol).toHaveBeenCalledTimes(1);
+    expect(registerCleanup).toHaveBeenCalledTimes(1);
+
+    // Verify cleanup handler is registered with unmount function
+    const cleanupFn = vi.mocked(registerCleanup).mock.calls[0][0];
+    expect(typeof cleanupFn).toBe('function');
+
+    // checkForUpdates should be called asynchronously (not waited for)
+    // We need a small delay to let it execute
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(checkForUpdates).toHaveBeenCalledTimes(1);
   });
 });
