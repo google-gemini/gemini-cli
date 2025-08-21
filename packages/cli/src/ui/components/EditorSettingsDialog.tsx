@@ -16,6 +16,7 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { EditorType, isEditorAvailable } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useTranslation } from '../../i18n/useTranslation.js';
 
 interface EditorDialogProps {
   onSelect: (editorType: EditorType | undefined, scope: SettingScope) => void;
@@ -28,6 +29,7 @@ export function EditorSettingsDialog({
   settings,
   onExit,
 }: EditorDialogProps): React.JSX.Element {
+  const { t } = useTranslation('dialogs');
   const [selectedScope, setSelectedScope] = useState<SettingScope>(
     SettingScope.User,
   );
@@ -62,8 +64,8 @@ export function EditorSettingsDialog({
   }
 
   const scopeItems = [
-    { label: 'User Settings', value: SettingScope.User },
-    { label: 'Workspace Settings', value: SettingScope.Workspace },
+    { label: t('editor.scopes.user'), value: SettingScope.User },
+    { label: t('editor.scopes.workspace'), value: SettingScope.Workspace },
   ];
 
   const handleEditorSelect = (editorType: EditorType | 'not_set') => {
@@ -85,13 +87,14 @@ export function EditorSettingsDialog({
       ? SettingScope.Workspace
       : SettingScope.User;
   if (settings.forScope(otherScope).settings.preferredEditor !== undefined) {
+    const scopeName = otherScope === SettingScope.User ? t('editor.scopes.user') : t('editor.scopes.workspace');
     otherScopeModifiedMessage =
       settings.forScope(selectedScope).settings.preferredEditor !== undefined
-        ? `(Also modified in ${otherScope})`
-        : `(Modified in ${otherScope})`;
+        ? t('editor.scopeMessages.alsoModified', { scope: scopeName })
+        : t('editor.scopeMessages.modified', { scope: scopeName });
   }
 
-  let mergedEditorName = 'None';
+  let mergedEditorName = t('editor.none');
   if (
     settings.merged.preferredEditor &&
     isEditorAvailable(settings.merged.preferredEditor)
@@ -110,7 +113,7 @@ export function EditorSettingsDialog({
     >
       <Box flexDirection="column" width="45%" paddingRight={2}>
         <Text bold={focusedSection === 'editor'}>
-          {focusedSection === 'editor' ? '> ' : '  '}Select Editor{' '}
+          {focusedSection === 'editor' ? '> ' : '  '}{t('editor.title')}{' '}
           <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
         </Text>
         <RadioButtonSelect
@@ -127,7 +130,7 @@ export function EditorSettingsDialog({
 
         <Box marginTop={1} flexDirection="column">
           <Text bold={focusedSection === 'scope'}>
-            {focusedSection === 'scope' ? '> ' : '  '}Apply To
+            {focusedSection === 'scope' ? '> ' : '  '}{t('editor.applyTo')}
           </Text>
           <RadioButtonSelect
             items={scopeItems}
@@ -139,23 +142,22 @@ export function EditorSettingsDialog({
 
         <Box marginTop={1}>
           <Text color={Colors.Gray}>
-            (Use Enter to select, Tab to change focus)
+            {t('editor.instructions')}
           </Text>
         </Box>
       </Box>
 
       <Box flexDirection="column" width="55%" paddingLeft={2}>
-        <Text bold>Editor Preference</Text>
+        <Text bold>{t('editor.preference')}</Text>
         <Box flexDirection="column" gap={1} marginTop={1}>
           <Text color={Colors.Gray}>
-            These editors are currently supported. Please note that some editors
-            cannot be used in sandbox mode.
+            {t('editor.description')}
           </Text>
           <Text color={Colors.Gray}>
-            Your preferred editor is:{' '}
+            {t('editor.currentPreference', { editor: '' })}
             <Text
               color={
-                mergedEditorName === 'None'
+                mergedEditorName === t('editor.none')
                   ? Colors.AccentRed
                   : Colors.AccentCyan
               }
@@ -163,7 +165,6 @@ export function EditorSettingsDialog({
             >
               {mergedEditorName}
             </Text>
-            .
           </Text>
         </Box>
       </Box>

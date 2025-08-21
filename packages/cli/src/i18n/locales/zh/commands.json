@@ -83,5 +83,25 @@
     "vim": "切换 Vim 模式",
     "setup-github": "设置 GitHub Actions",
     "terminal-setup": "配置终端多行输入键绑定"
+  },
+  "tools": {
+    "title": "可用的 Gemini CLI 工具：",
+    "noTools": "没有可用的工具",
+    "registryError": "无法获取工具注册表。"
+  },
+  "extensions": {
+    "title": "已激活的扩展：",
+    "noExtensions": "没有已激活的扩展。"
+  },
+  "copy": {
+    "failed": "复制到剪贴板失败。"
+  },
+  "compress": {
+    "failed": "压缩聊天历史失败。",
+    "failedWithError": "压缩聊天历史失败：{{error}}",
+    "alreadyInProgress": "正在压缩中，请等待上一个请求完成"
+  },
+  "mcp": {
+    "authFailed": "与 MCP 服务器 '{{serverName}}' 认证失败：{{error}}"
   }
 }

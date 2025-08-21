@@ -10,6 +10,7 @@ import {
   CommandKind,
 } from './types.js';
 import { MessageType } from '../types.js';
+import i18n from '../../i18n/index.js';
 
 export const toolsCommand: SlashCommand = {
   name: 'tools',
@@ -29,7 +30,7 @@ export const toolsCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: MessageType.ERROR,
-          text: 'Could not retrieve tool registry.',
+          text: i18n.t('tools.registryError', { ns: 'commands' }),
         },
         Date.now(),
       );
@@ -40,7 +41,7 @@ export const toolsCommand: SlashCommand = {
     // Filter out MCP tools by checking for the absence of a serverName property
     const geminiTools = tools.filter((tool) => !('serverName' in tool));
 
-    let message = 'Available Gemini CLI tools:\n\n';
+    let message = i18n.t('tools.title', { ns: 'commands' }) + '\n\n';
 
     if (geminiTools.length > 0) {
       geminiTools.forEach((tool) => {
@@ -60,7 +61,7 @@ export const toolsCommand: SlashCommand = {
         }
       });
     } else {
-      message += '  No tools available\n';
+      message += '  ' + i18n.t('tools.noTools', { ns: 'commands' }) + '\n';
     }
     message += '\n';
 

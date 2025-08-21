@@ -194,5 +194,25 @@
   },
   "contextUsage": {
     "remaining": "{{percent}}% context left"
+  },
+  "modelStats": {
+    "title": "Model Stats For Nerds",
+    "noApiCalls": "No API calls have been made in this session.",
+    "metric": "Metric",
+    "sections": {
+      "api": "API",
+      "tokens": "Tokens"
+    },
+    "metrics": {
+      "requests": "Requests",
+      "errors": "Errors",
+      "avgLatency": "Avg Latency",
+      "total": "Total",
+      "prompt": "Prompt",
+      "cached": "Cached",
+      "thoughts": "Thoughts",
+      "tool": "Tool",
+      "output": "Output"
+    }
   }
 }

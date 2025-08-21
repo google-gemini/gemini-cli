@@ -34,6 +34,7 @@ import {
 } from '../../utils/settingsUtils.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useTranslation } from '../../i18n/useTranslation.js';
 import chalk from 'chalk';
 import { cpSlice, cpLen } from '../utils/textUtils.js';
 
@@ -50,6 +51,8 @@ export function SettingsDialog({
   onSelect,
   onRestartRequest,
 }: SettingsDialogProps): React.JSX.Element {
+  const { t } = useTranslation('dialogs');
+  
   // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
 
@@ -604,7 +607,7 @@ export function SettingsDialog({
     >
       <Box flexDirection="column" flexGrow={1}>
         <Text bold color={Colors.AccentBlue}>
-          Settings
+          {t('settings.title')}
         </Text>
         <Box height={1} />
         {showScrollUp && <Text color={Colors.Gray}>▲</Text>}
@@ -725,7 +728,7 @@ export function SettingsDialog({
 
         <Box marginTop={1} flexDirection="column">
           <Text bold={focusSection === 'scope'} wrap="truncate">
-            {focusSection === 'scope' ? '> ' : '  '}Apply To
+            {focusSection === 'scope' ? '> ' : '  '}{t('settings.applyTo')}
           </Text>
           <RadioButtonSelect
             items={scopeItems}
@@ -739,12 +742,11 @@ export function SettingsDialog({
 
         <Box height={1} />
         <Text color={Colors.Gray}>
-          (Use Enter to select, Tab to change focus)
+          {t('settings.instructions')}
         </Text>
         {showRestartPrompt && (
           <Text color={Colors.AccentYellow}>
-            To see changes, Gemini CLI must be restarted. Press r to exit and
-            apply changes now.
+            {t('settings.restartPrompt')}
           </Text>
         )}
       </Box>

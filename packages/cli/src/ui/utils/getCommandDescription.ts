@@ -7,31 +7,33 @@
 import i18n from '../../i18n/index.js';
 
 /**
- * Get internationalized command description with fallback to original description
+ * Get internationalized command description - consistent with UI component pattern
+ * This function mimics the t() function used in UI components but works outside React context
  */
 export function getCommandDescription(commandName: string, originalDescription: string, parentCommand?: string): string {
   try {
-    // Try to get translation from commands namespace
+    // Use same pattern as UI components: t('descriptions.commandName', { ns: 'commands' })
     let translationKey: string;
     
     if (parentCommand) {
       // For subcommands, try parent.child format first
       translationKey = `${parentCommand}.${commandName}`;
     } else {
-      // For main commands, use descriptions.commandName
+      // For main commands, use descriptions.commandName (same as UI pattern)
       translationKey = `descriptions.${commandName}`;
     }
     
+    // Call i18n.t() directly - same as what t() does in UI components
     const translatedDesc = i18n.t(translationKey, { ns: 'commands' });
     
-    // If translation exists and is not the key itself, use it
+    // Check if translation exists (same validation as UI components)
     if (translatedDesc && 
         translatedDesc !== translationKey && 
         translatedDesc !== `commands:${translationKey}`) {
       return translatedDesc;
     }
     
-    // If parent command failed, try without parent
+    // Fallback for subcommands
     if (parentCommand) {
       const fallbackKey = `descriptions.${commandName}`;
       const fallbackDesc = i18n.t(fallbackKey, { ns: 'commands' });
@@ -42,9 +44,9 @@ export function getCommandDescription(commandName: string, originalDescription: 
       }
     }
   } catch (error) {
-    // Ignore translation errors and fall back
+    // Graceful fallback on translation errors
   }
   
-  // Fallback to original description
+  // Fallback to original English description
   return originalDescription;
 }

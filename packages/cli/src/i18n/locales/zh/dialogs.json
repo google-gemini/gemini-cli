@@ -22,5 +22,48 @@
     "applyTo": "应用到",
     "instructions": "(使用 Enter 选择，Tab 切换焦点)",
     "restartPrompt": "要查看更改，必须重启 Gemini CLI。按 r 立即退出并应用更改。"
+  },
+  "folderTrust": {
+    "title": "您信任此文件夹吗？",
+    "description": "信任文件夹允许 Gemini 执行其建议的命令。这是一项安全功能，可防止在不受信任的目录中意外执行。",
+    "options": {
+      "trustFolder": "信任文件夹",
+      "trustParent": "信任父文件夹",
+      "dontTrust": "不信任 (esc)"
+    }
+  },
+  "shellConfirm": {
+    "title": "Shell 命令执行",
+    "description": "自定义命令想要运行以下 shell 命令：",
+    "question": "您要继续吗？",
+    "options": {
+      "allowOnce": "是，允许一次",
+      "allowAlways": "是，本次会话始终允许",
+      "cancel": "否 (esc)"
+    }
+  },
+  "theme": {
+    "title": "选择主题",
+    "preview": "预览",
+    "applyTo": "应用到",
+    "instructions": "(使用 Enter 选择{{tabInstruction}})",
+    "tabInstruction": "，Tab 切换焦点"
+  },
+  "editor": {
+    "title": "选择编辑器",
+    "applyTo": "应用到",
+    "preference": "编辑器偏好",
+    "instructions": "(使用 Enter 选择，Tab 切换焦点)",
+    "description": "目前支持这些编辑器。请注意，某些编辑器无法在沙盒模式下使用。",
+    "currentPreference": "您的首选编辑器是：{{editor}}。",
+    "scopeMessages": {
+      "alsoModified": "(在 {{scope}} 中也已修改)",
+      "modified": "(在 {{scope}} 中已修改)"
+    },
+    "scopes": {
+      "user": "用户设置",
+      "workspace": "工作区设置"
+    },
+    "none": "无"
   }
 }

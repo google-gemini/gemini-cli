@@ -10,6 +10,7 @@ import {
   CommandKind,
 } from './types.js';
 import { MessageType } from '../types.js';
+import i18n from '../../i18n/index.js';
 
 export const extensionsCommand: SlashCommand = {
   name: 'extensions',
@@ -23,7 +24,7 @@ export const extensionsCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: MessageType.INFO,
-          text: 'No active extensions.',
+          text: i18n.t('extensions.noExtensions', { ns: 'commands' }),
         },
         Date.now(),
       );
@@ -33,7 +34,7 @@ export const extensionsCommand: SlashCommand = {
     const extensionLines = activeExtensions.map(
       (ext) => `  - \u001b[36m${ext.name} (v${ext.version})\u001b[0m`,
     );
-    const message = `Active extensions:\n\n${extensionLines.join('\n')}\n`;
+    const message = `${i18n.t('extensions.title', { ns: 'commands' })}\n\n${extensionLines.join('\n')}\n`;
 
     context.ui.addItem(
       {

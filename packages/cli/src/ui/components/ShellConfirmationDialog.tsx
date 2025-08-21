@@ -14,6 +14,7 @@ import {
   RadioSelectItem,
 } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useTranslation } from '../../i18n/useTranslation.js';
 
 export interface ShellConfirmationRequest {
   commands: string[];
@@ -30,6 +31,7 @@ export interface ShellConfirmationDialogProps {
 export const ShellConfirmationDialog: React.FC<
   ShellConfirmationDialogProps
 > = ({ request }) => {
+  const { t } = useTranslation('dialogs');
   const { commands, onConfirm } = request;
 
   useKeypress(
@@ -53,15 +55,15 @@ export const ShellConfirmationDialog: React.FC<
 
   const options: Array<RadioSelectItem<ToolConfirmationOutcome>> = [
     {
-      label: 'Yes, allow once',
+      label: t('shellConfirm.options.allowOnce'),
       value: ToolConfirmationOutcome.ProceedOnce,
     },
     {
-      label: 'Yes, allow always for this session',
+      label: t('shellConfirm.options.allowAlways'),
       value: ToolConfirmationOutcome.ProceedAlways,
     },
     {
-      label: 'No (esc)',
+      label: t('shellConfirm.options.cancel'),
       value: ToolConfirmationOutcome.Cancel,
     },
   ];
@@ -76,8 +78,8 @@ export const ShellConfirmationDialog: React.FC<
       marginLeft={1}
     >
       <Box flexDirection="column" marginBottom={1}>
-        <Text bold>Shell Command Execution</Text>
-        <Text>A custom command wants to run the following shell commands:</Text>
+        <Text bold>{t('shellConfirm.title')}</Text>
+        <Text>{t('shellConfirm.description')}</Text>
         <Box
           flexDirection="column"
           borderStyle="round"
@@ -94,7 +96,7 @@ export const ShellConfirmationDialog: React.FC<
       </Box>
 
       <Box marginBottom={1}>
-        <Text>Do you want to proceed?</Text>
+        <Text>{t('shellConfirm.question')}</Text>
       </Box>
 
       <RadioButtonSelect items={options} onSelect={handleSelect} isFocused />

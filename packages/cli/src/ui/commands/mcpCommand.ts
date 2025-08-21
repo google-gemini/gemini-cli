@@ -11,6 +11,7 @@ import {
   CommandKind,
   MessageActionReturn,
 } from './types.js';
+import i18n from '../../i18n/index.js';
 import {
   DiscoveredMCPPrompt,
   DiscoveredMCPTool,
@@ -429,7 +430,7 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Failed to authenticate with MCP server '${serverName}': ${getErrorMessage(error)}`,
+        content: i18n.t('mcp.authFailed', { serverName, error: getErrorMessage(error), ns: 'commands' }),
       };
     }
   },

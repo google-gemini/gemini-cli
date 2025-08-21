@@ -1,0 +1,36 @@
+{
+  "title": "Aide Gemini CLI",
+  "basics": {
+    "title": "Bases",
+    "addContext": "Ajouter du contexte : Utilisez @ pour spécifier des fichiers pour le contexte",
+    "commands": "Commandes : /help, /auth, /quit, /theme, /settings, /stats, /tools, /extensions, /mcp, /memory, /chat, /copy, /compress, /clear, /about, /docs, /bug",
+    "commandsShort": "Commandes : /help, /auth, /quit..."
+  },
+  "shortcuts": {
+    "title": "Raccourcis clavier",
+    "multiline": "Entrée multiligne : {{shortcut}}",
+    "cancel": "Annuler : Ctrl+C",
+    "quit": "Quitter : {{shortcut}}",
+    "clearScreen": "Effacer l'écran : Ctrl+L",
+    "toggleStats": "Basculer les stats : {{shortcut}}",
+    "showContext": "Afficher le contexte : Ctrl+G"
+  },
+  "examples": {
+    "title": "Exemples",
+    "askAboutCode": "Poser des questions sur votre code :",
+    "modifyCode": "Modifier votre code :",
+    "runCommands": "Exécuter des commandes :",
+    "workWithGit": "Travailler avec git :"
+  },
+  "keyboardShortcuts": {
+    "multilineMac": "Cmd+Entrée",
+    "multilineOther": "Ctrl+Entrée", 
+    "quitMac": "Cmd+D",
+    "quitOther": "Ctrl+D",
+    "toggleStatsMac": "Cmd+K",
+    "toggleStatsOther": "Ctrl+K"
+  },
+  "footer": {
+    "moreInfo": "pour plus d'informations."
+  }
+}

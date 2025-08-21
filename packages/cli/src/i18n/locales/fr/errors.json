@@ -1,0 +1,29 @@
+{
+  "network": {
+    "connectionFailed": "Échec de la connexion réseau",
+    "timeout": "Délai d'attente dépassé",
+    "serverError": "Erreur du serveur: {{status}}"
+  },
+  "auth": {
+    "authenticationRequired": "Authentification requise",
+    "invalidCredentials": "Identifiants invalides",
+    "tokenExpired": "Token expiré",
+    "permissionDenied": "Permission refusée"
+  },
+  "file": {
+    "fileNotFound": "Fichier non trouvé: {{path}}",
+    "cannotRead": "Impossible de lire le fichier: {{path}}",
+    "cannotWrite": "Impossible d'écrire le fichier: {{path}}",
+    "invalidPath": "Chemin invalide: {{path}}"
+  },
+  "command": {
+    "unknownCommand": "Commande inconnue: {{command}}",
+    "invalidArguments": "Arguments invalides pour {{command}}",
+    "executionFailed": "Échec de l'exécution de la commande: {{command}}"
+  },
+  "general": {
+    "unexpectedError": "Une erreur inattendue s'est produite",
+    "operationCancelled": "Opération annulée",
+    "notSupported": "Opération non supportée"
+  }
+}

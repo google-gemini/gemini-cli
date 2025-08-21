@@ -10,6 +10,7 @@ import {
   SlashCommand,
   SlashCommandActionReturn,
 } from './types.js';
+import i18n from '../../i18n/index.js';
 
 export const copyCommand: SlashCommand = {
   name: 'copy',
@@ -53,7 +54,7 @@ export const copyCommand: SlashCommand = {
         return {
           type: 'message',
           messageType: 'error',
-          content: 'Failed to copy to the clipboard.',
+          content: i18n.t('copy.failed', { ns: 'commands' }),
         };
       }
     } else {

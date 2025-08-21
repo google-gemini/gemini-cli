@@ -27,7 +27,7 @@ function loadTranslationFile(lang: string, namespace: string): Record<string, un
 }
 
 // Build resources dynamically
-const languages = ['en', 'zh'];
+const languages = ['en', 'zh', 'fr'];
 const namespaces = ['help', 'commands', 'dialogs', 'ui', 'errors'];
 
 const resources = languages.reduce((acc, lang) => {

@@ -12,6 +12,7 @@ import {
   RadioSelectItem,
 } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useTranslation } from '../../i18n/useTranslation.js';
 
 export enum FolderTrustChoice {
   TRUST_FOLDER = 'trust_folder',
@@ -26,6 +27,7 @@ interface FolderTrustDialogProps {
 export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   onSelect,
 }) => {
+  const { t } = useTranslation('dialogs');
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
@@ -37,15 +39,15 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
 
   const options: Array<RadioSelectItem<FolderTrustChoice>> = [
     {
-      label: 'Trust folder',
+      label: t('folderTrust.options.trustFolder'),
       value: FolderTrustChoice.TRUST_FOLDER,
     },
     {
-      label: 'Trust parent folder',
+      label: t('folderTrust.options.trustParent'),
       value: FolderTrustChoice.TRUST_PARENT,
     },
     {
-      label: "Don't trust (esc)",
+      label: t('folderTrust.options.dontTrust'),
       value: FolderTrustChoice.DO_NOT_TRUST,
     },
   ];
@@ -60,11 +62,9 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
       marginLeft={1}
     >
       <Box flexDirection="column" marginBottom={1}>
-        <Text bold>Do you trust this folder?</Text>
+        <Text bold>{t('folderTrust.title')}</Text>
         <Text>
-          Trusting a folder allows Gemini to execute commands it suggests. This
-          is a security feature to prevent accidental execution in untrusted
-          directories.
+          {t('folderTrust.description')}
         </Text>
       </Box>
 

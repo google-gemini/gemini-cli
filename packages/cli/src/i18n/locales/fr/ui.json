@@ -1,0 +1,112 @@
+{
+  "footer": {
+    "noSandbox": "pas de bac à sable",
+    "seeDocsHint": "(voir /docs)",
+    "untrusted": "non fiable"
+  },
+  "input": {
+    "defaultPlaceholder": "  Tapez votre message ou @chemin/vers/fichier",
+    "vimPlaceholder": "  Appuyez sur 'i' pour le mode INSERTION et 'Esc' pour le mode NORMAL."
+  },
+  "about": {
+    "title": "À propos de Gemini CLI",
+    "cliVersion": "Version CLI",
+    "gitCommit": "Commit Git",
+    "model": "Modèle",
+    "sandbox": "Bac à sable",
+    "os": "OS",
+    "authMethod": "Méthode d'authentification",
+    "gcpProject": "Projet GCP",
+    "ideClient": "Client IDE"
+  },
+  "sessionSummary": {
+    "title": "Agent en cours d'arrêt. Au revoir !",
+    "interactionSummary": "Résumé des interactions",
+    "performance": "Performance",
+    "sessionId": "ID de session:",
+    "toolCalls": "Appels d'outils:",
+    "successRate": "Taux de réussite:",
+    "wallTime": "Temps total:",
+    "agentActive": "Agent actif:",
+    "apiTime": "Temps API:",
+    "toolTime": "Temps outils:",
+    "modelUsage": "Utilisation du modèle",
+    "reqs": "Req",
+    "inputTokens": "Tokens d'entrée", 
+    "outputTokens": "Tokens de sortie"
+  },
+  "errors": {
+    "unknownCommand": "Commande inconnue: {{command}}"
+  },
+  "loading": {
+    "waitingForConfirmation": "En attente de la confirmation de l'utilisateur...",
+    "phrases": [
+      "Je me sens chanceux",
+      "Expédition de l'excellence...",
+      "Remise des empattements...", 
+      "Navigation dans la moisissure visqueuse...",
+      "Consultation des esprits numériques...",
+      "Réticulation des splines...",
+      "Réchauffement des hamsters IA...",
+      "Consultation du coquillage magique...",
+      "Génération de réplique spirituelle...",
+      "Polissage des algorithmes...",
+      "Ne précipitez pas la perfection (ni mon code)...",
+      "Infusion d'octets frais...",
+      "Comptage des électrons...",
+      "Activation des processeurs cognitifs...",
+      "Vérification des erreurs de syntaxe dans l'univers...",
+      "Un moment, optimisation de l'humour...",
+      "Mélange des punchlines...",
+      "Démêlage des réseaux de neurones...",
+      "Compilation de brillance...",
+      "Chargement de esprit.exe...",
+      "Invocation du nuage de sagesse...",
+      "Préparation d'une réponse spirituelle...",
+      "Juste une seconde, je débogue la réalité..."
+    ]
+  },
+  "context": {
+    "using": "Utilisation:",
+    "file": "fichier",
+    "files": "fichiers",
+    "openFile": "fichier ouvert",
+    "openFiles": "fichiers ouverts",
+    "viewHint": "(ctrl+g pour voir)"
+  },
+  "tips": {
+    "title": "Conseils pour commencer:",
+    "tip1": "Posez des questions, modifiez des fichiers ou exécutez des commandes.",
+    "tip2": "Soyez spécifique pour de meilleurs résultats.",
+    "tip3Before": "Créez",
+    "tip3After": "fichiers pour personnaliser vos interactions avec Gemini.",
+    "tip4": "pour plus d'informations."
+  },
+  "auth": {
+    "timeout": "Délai d'authentification expiré. Veuillez réessayer.",
+    "waiting": "En attente d'authentification... (Appuyez sur ESC ou CTRL+C pour annuler)"
+  },
+  "contextUsage": {
+    "remaining": "{{percent}}% de contexte restant"
+  },
+  "modelStats": {
+    "title": "Statistiques du modèle pour les nerds",
+    "noApiCalls": "Aucun appel API n'a été effectué dans cette session.",
+    "metric": "Métrique",
+    "sections": {
+      "api": "API",
+      "tokens": "Tokens"
+    },
+    "metrics": {
+      "requests": "Requêtes",
+      "errors": "Erreurs",
+      "avgLatency": "Latence moy.",
+      "total": "Total",
+      "prompt": "Prompt",
+      "cached": "En cache",
+      "thoughts": "Pensées",
+      "tool": "Outil",
+      "output": "Sortie"
+    }
+  }
+}

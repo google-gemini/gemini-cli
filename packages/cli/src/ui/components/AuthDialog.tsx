@@ -12,6 +12,7 @@ import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../../config/auth.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useTranslation } from '../../i18n/useTranslation.js';
 
 interface AuthDialogProps {
   onSelect: (authMethod: AuthType | undefined, scope: SettingScope) => void;
@@ -36,6 +37,7 @@ export function AuthDialog({
   settings,
   initialErrorMessage,
 }: AuthDialogProps): React.JSX.Element {
+  const { t } = useTranslation('dialogs');
   const [errorMessage, setErrorMessage] = useState<string | null>(() => {
     if (initialErrorMessage) {
       return initialErrorMessage;
@@ -46,38 +48,38 @@ export function AuthDialog({
     );
 
     if (process.env['GEMINI_DEFAULT_AUTH_TYPE'] && defaultAuthType === null) {
-      return (
-        `Invalid value for GEMINI_DEFAULT_AUTH_TYPE: "${process.env['GEMINI_DEFAULT_AUTH_TYPE']}". ` +
-        `Valid values are: ${Object.values(AuthType).join(', ')}.`
-      );
+      return t('auth.errors.invalidAuthType', {
+        value: process.env['GEMINI_DEFAULT_AUTH_TYPE'],
+        validValues: Object.values(AuthType).join(', ')
+      });
     }
 
     if (
       process.env['GEMINI_API_KEY'] &&
       (!defaultAuthType || defaultAuthType === AuthType.USE_GEMINI)
     ) {
-      return 'Existing API key detected (GEMINI_API_KEY). Select "Gemini API Key" option to use it.';
+      return t('auth.errors.existingApiKey');
     }
     return null;
   });
   const items = [
     {
-      label: 'Login with Google',
+      label: t('auth.options.google'),
       value: AuthType.LOGIN_WITH_GOOGLE,
     },
     ...(process.env['CLOUD_SHELL'] === 'true'
       ? [
           {
-            label: 'Use Cloud Shell user credentials',
+            label: t('auth.options.cloudShell'),
             value: AuthType.CLOUD_SHELL,
           },
         ]
       : []),
     {
-      label: 'Use Gemini API Key',
+      label: t('auth.options.geminiKey'),
       value: AuthType.USE_GEMINI,
     },
-    { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
+    { label: t('auth.options.vertexAI'), value: AuthType.USE_VERTEX_AI },
   ];
 
   const initialAuthIndex = items.findIndex((item) => {
@@ -119,9 +121,7 @@ export function AuthDialog({
         }
         if (settings.merged.selectedAuthType === undefined) {
           // Prevent exiting if no auth method is set
-          setErrorMessage(
-            'You must select an auth method to proceed. Press Ctrl+C twice to exit.',
-          );
+          setErrorMessage(t('auth.errors.authRequired'));
           return;
         }
         onSelect(undefined, SettingScope.User);
@@ -138,9 +138,9 @@ export function AuthDialog({
       padding={1}
       width="100%"
     >
-      <Text bold>Get started</Text>
+      <Text bold>{t('auth.title')}</Text>
       <Box marginTop={1}>
-        <Text>How would you like to authenticate for this project?</Text>
+        <Text>{t('auth.description')}</Text>
       </Box>
       <Box marginTop={1}>
         <RadioButtonSelect
@@ -155,16 +155,14 @@ export function AuthDialog({
         </Box>
       )}
       <Box marginTop={1}>
-        <Text color={Colors.Gray}>(Use Enter to select)</Text>
+        <Text color={Colors.Gray}>{t('auth.instructions')}</Text>
       </Box>
       <Box marginTop={1}>
-        <Text>Terms of Services and Privacy Notice for Gemini CLI</Text>
+        <Text>{t('auth.terms')}</Text>
       </Box>
       <Box marginTop={1}>
         <Text color={Colors.AccentBlue}>
-          {
-            'https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md'
-          }
+          {t('auth.termsUrl')}
         </Text>
       </Box>
     </Box>

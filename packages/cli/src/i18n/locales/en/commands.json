@@ -85,5 +85,25 @@
     "vim": "Toggle Vim mode",
     "setup-github": "Set up GitHub Actions",
     "terminal-setup": "Configure terminal keybindings for multiline input (VS Code, Cursor, Windsurf)"
+  },
+  "tools": {
+    "title": "Available Gemini CLI tools:",
+    "noTools": "No tools available",
+    "registryError": "Could not retrieve tool registry."
+  },
+  "extensions": {
+    "title": "Active extensions:",
+    "noExtensions": "No active extensions."
+  },
+  "copy": {
+    "failed": "Failed to copy to the clipboard."
+  },
+  "compress": {
+    "failed": "Failed to compress chat history.",
+    "failedWithError": "Failed to compress chat history: {{error}}",
+    "alreadyInProgress": "Already compressing, wait for previous request to complete"
+  },
+  "mcp": {
+    "authFailed": "Failed to authenticate with MCP server '{{serverName}}': {{error}}"
   }
 }

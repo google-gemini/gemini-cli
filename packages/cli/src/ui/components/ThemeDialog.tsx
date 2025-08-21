@@ -17,6 +17,7 @@ import {
   getScopeMessageForSetting,
 } from '../../utils/dialogScopeUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useTranslation } from '../../i18n/useTranslation.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
@@ -37,6 +38,7 @@ export function ThemeDialog({
   availableTerminalHeight,
   terminalWidth,
 }: ThemeDialogProps): React.JSX.Element {
+  const { t } = useTranslation('dialogs');
   const [selectedScope, setSelectedScope] = useState<SettingScope>(
     SettingScope.User,
   );
@@ -219,7 +221,7 @@ export function ThemeDialog({
         {/* Left Column: Selection */}
         <Box flexDirection="column" width="45%" paddingRight={2}>
           <Text bold={currentFocusedSection === 'theme'} wrap="truncate">
-            {currentFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
+            {currentFocusedSection === 'theme' ? '> ' : '  '}{t('theme.title')}{' '}
             <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
           </Text>
           <RadioButtonSelect
@@ -238,7 +240,7 @@ export function ThemeDialog({
           {showScopeSelection && (
             <Box marginTop={1} flexDirection="column">
               <Text bold={currentFocusedSection === 'scope'} wrap="truncate">
-                {currentFocusedSection === 'scope' ? '> ' : '  '}Apply To
+                {currentFocusedSection === 'scope' ? '> ' : '  '}{t('theme.applyTo')}
               </Text>
               <RadioButtonSelect
                 items={scopeItems}
@@ -254,7 +256,7 @@ export function ThemeDialog({
 
         {/* Right Column: Preview */}
         <Box flexDirection="column" width="55%" paddingLeft={2}>
-          <Text bold>Preview</Text>
+          <Text bold>{t('theme.preview')}</Text>
           {/* Get the Theme object for the highlighted theme, fall back to default if not found */}
           {(() => {
             const previewTheme =
@@ -301,8 +303,9 @@ def fibonacci(n):
       </Box>
       <Box marginTop={1}>
         <Text color={Colors.Gray} wrap="truncate">
-          (Use Enter to select
-          {showScopeSelection ? ', Tab to change focus' : ''})
+          {t('theme.instructions', {
+            tabInstruction: showScopeSelection ? t('theme.tabInstruction') : ''
+          })}
         </Text>
       </Box>
     </Box>

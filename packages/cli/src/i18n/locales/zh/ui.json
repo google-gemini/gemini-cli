@@ -194,5 +194,25 @@
   },
   "contextUsage": {
     "remaining": "对话空间剩余{{percent}}%"
+  },
+  "modelStats": {
+    "title": "模型统计数据（极客版）",
+    "noApiCalls": "本次会话中未进行任何 API 调用。",
+    "metric": "指标",
+    "sections": {
+      "api": "API",
+      "tokens": "令牌"
+    },
+    "metrics": {
+      "requests": "请求数",
+      "errors": "错误数",
+      "avgLatency": "平均延迟",
+      "total": "总计",
+      "prompt": "提示",
+      "cached": "缓存",
+      "thoughts": "思考",
+      "tool": "工具",
+      "output": "输出"
+    }
   }
 }
