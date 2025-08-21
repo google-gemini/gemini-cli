@@ -21,7 +21,7 @@ import { AppHeader } from './components/AppHeader.js';
 import { Notifications } from './components/Notifications.js';
 import { MainContent } from './components/MainContent.js';
 import { DialogManager } from './components/DialogManager.js';
-import { InputArea } from './components/InputArea.js';
+import { Composer } from './components/Composer.js';
 import { useUIState } from './contexts/UIStateContext.js';
 import { useUIActions } from './contexts/UIActionsContext.js';
 import { useConfig } from './contexts/ConfigContext.js';
@@ -158,7 +158,7 @@ export const App = (props: AppProps) => {
               mainAreaWidth={mainAreaWidth}
             />
           ) : (
-            <InputArea
+            <Composer
               contextFileNames={contextFileNames}
               showAutoAcceptIndicator={showAutoAcceptIndicator}
               footerProps={{

@@ -24,13 +24,13 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
 
-interface InputAreaProps {
+interface ComposerProps {
   contextFileNames: string[];
   showAutoAcceptIndicator: ApprovalMode;
   footerProps: Omit<FooterProps, 'vimMode'>;
 }
 
-export const InputArea = (props: InputAreaProps) => {
+export const Composer = (props: ComposerProps) => {
   const { contextFileNames, showAutoAcceptIndicator, footerProps } = props;
 
   const config = useConfig();

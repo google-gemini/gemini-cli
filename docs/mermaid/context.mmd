@@ -29,7 +29,7 @@ graph LR
         ConsumerAppHeader["AppHeader"]
         ConsumerDialogManager["DialogManager"]
         ConsumerHistoryItem["HistoryItemDisplay"]
-        ConsumerInputArea["InputArea"]
+        ConsumerComposer["Composer"]
         ConsumerMainContent["MainContent"]
         ConsumerNotifications["Notifications"]
     end
@@ -50,7 +50,7 @@ graph LR
     CtxSession -.-> ConsumerApp
 
     CtxVim -.-> ConsumerAppContainer
-    CtxVim -.-> ConsumerInputArea
+    CtxVim -.-> ConsumerComposer
     CtxVim -.-> ConsumerApp
 
     CtxSettings -.-> ConsumerAppContainer
@@ -63,22 +63,22 @@ graph LR
 
     CtxConfig -.-> ConsumerAppHeader
     CtxConfig -.-> ConsumerHistoryItem
-    CtxConfig -.-> ConsumerInputArea
+    CtxConfig -.-> ConsumerComposer
     CtxConfig -.-> ConsumerDialogManager
 
 
 
     CtxUIState -.-> ConsumerApp
     CtxUIState -.-> ConsumerMainContent
-    CtxUIState -.-> ConsumerInputArea
+    CtxUIState -.-> ConsumerComposer
     CtxUIState -.-> ConsumerDialogManager
 
-    CtxUIActions -.-> ConsumerInputArea
+    CtxUIActions -.-> ConsumerComposer
     CtxUIActions -.-> ConsumerDialogManager
 
     %% --- Apply Styles ---
     %% New Elements (Green)
-    class B,CtxApp,CtxConfig,CtxUIState,CtxUIActions,ConsumerAppHeader,ConsumerDialogManager,ConsumerInputArea,ConsumerMainContent,ConsumerNotifications new
+    class B,CtxApp,CtxConfig,CtxUIState,CtxUIActions,ConsumerAppHeader,ConsumerDialogManager,ConsumerComposer,ConsumerMainContent,ConsumerNotifications new
 
     %% Heavily Changed Elements (Blue)
     class A,ConsumerApp,ConsumerAppContainer,ConsumerHistoryItem changed

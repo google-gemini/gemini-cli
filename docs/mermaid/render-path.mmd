@@ -25,7 +25,7 @@ graph TD
     subgraph "UI Containers"
         direction LR
         C -.-> D["MainContent"]
-        C -.-> G["InputArea"]
+        C -.-> G["Composer"]
         C -.-> F["DialogManager"]
         C -.-> E["Notifications"]
     end
@@ -37,7 +37,7 @@ graph TD
         D -.-> L["ShowMoreLines"]
     end
 
-    subgraph "InputArea"
+    subgraph "Composer"
         direction TB
         G -.-> K_Prompt["InputPrompt"]
         G -.-> K_Footer["Footer"]
@@ -55,7 +55,7 @@ graph TD
     %% --- Link Styles ---
     %% MainContent Branch (Blue)
     linkStyle 2,6,7,8 stroke:#64b5f6,stroke-width:2px
-    %% InputArea Branch (Green)
+    %% Composer Branch (Green)
     linkStyle 3,9,10 stroke:#81c784,stroke-width:2px
     %% DialogManager Branch (Orange)
     linkStyle 4,11 stroke:#ffb74d,stroke-width:2px
