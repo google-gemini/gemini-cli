@@ -326,7 +326,7 @@ export const SETTINGS_SCHEMA = {
         label: 'Skip Files Larger Than',
         category: 'Codebase Indexing',
         requiresRestart: false,
-        default: 1024 * 1024, // 1MB
+        default: 50 * 1024 * 1024,
         description: 'Skip files larger than this size (in bytes)',
         showInDialog: true,
       },
