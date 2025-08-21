@@ -485,7 +485,7 @@ export class ClearcutLogger {
         value: JSON.stringify(event.tool_name),
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_OPERATION,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_TYPE,
         value: JSON.stringify(event.operation),
       },
       {

@@ -255,7 +255,7 @@ export enum EventMetadataKey {
   // ===========================================================================
 
   // Logs the operation type of the file operation.
-  GEMINI_CLI_FILE_OPERATION_OPERATION = 66,
+  GEMINI_CLI_FILE_OPERATION_TYPE = 66,
 
   // Logs the number of lines in the file operation.
   GEMINI_CLI_FILE_OPERATION_LINES = 67,
