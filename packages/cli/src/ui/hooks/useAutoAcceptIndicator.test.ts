@@ -542,6 +542,31 @@ describe('useAutoAcceptIndicator', () => {
     expect(mockOnApprovalModeChange).toHaveBeenCalledWith(ApprovalMode.YOLO);
   });
 
+  it('should call onApprovalModeChange when switching to AUTO_EDIT mode', async () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+
+    const mockOnApprovalModeChange = vi.fn();
+
+    renderHook(() =>
+      useAutoAcceptIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+        onApprovalModeChange: mockOnApprovalModeChange,
+      }),
+    );
+
+    await act(async () => {
+      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
+      // Allow promises to resolve
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.AUTO_EDIT,
+    );
+    expect(mockOnApprovalModeChange).toHaveBeenCalledWith(
+      ApprovalMode.AUTO_EDIT,
+    );
+  });
   it('should call onApprovalModeChange when switching to DEFAULT mode', async () => {
     mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.YOLO);
 
