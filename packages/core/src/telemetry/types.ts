@@ -39,8 +39,8 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   telemetry_enabled: boolean;
   telemetry_log_user_prompts_enabled: boolean;
   file_filtering_respect_git_ignore: boolean;
-  mcp_servers_count?: string;
-  mcp_tools_count?: string;
+  mcp_servers_count: number;
+  mcp_tools_count?: number;
   mcp_tools?: string;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
@@ -70,14 +70,12 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       config.getTelemetryLogPromptsEnabled();
     this.file_filtering_respect_git_ignore =
       config.getFileFilteringRespectGitIgnore();
-    this.mcp_servers_count = mcpServers
-      ? Object.keys(mcpServers).length.toString()
-      : '';
+    this.mcp_servers_count = mcpServers ? Object.keys(mcpServers).length : 0;
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
         .filter((tool) => tool instanceof DiscoveredMCPTool);
-      this.mcp_tools_count = mcpTools.length.toString();
+      this.mcp_tools_count = mcpTools.length;
       this.mcp_tools = mcpTools
         .map((tool) => (tool as DiscoveredMCPTool).name)
         .join(',');
