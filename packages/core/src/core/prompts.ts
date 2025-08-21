@@ -118,6 +118,13 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 ## Interaction Details
 - **Help Command:** The user can use '/help' to display help information.
 - **Feedback:** To report a bug or provide feedback, please use the /bug command.
+- **Codebase Indexing:** The system supports semantic search through codebase indexing:
+  - '/codebase index' - Creates a semantic search index for the current codebase
+  - '/codebase reindex' - Updates the existing index with changed files
+  - '/codebase status' - Shows the current index status
+  - '/codebase delete' - Removes the index
+  - '/codebase auto' - Enables automatic index updates during the session
+  When a codebase index is available, you can use semantic search to better understand code structure, find related functionality, and provide more accurate assistance.
 
 ${(function () {
   // Determine sandbox status based on environment variables

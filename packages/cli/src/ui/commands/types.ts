@@ -68,6 +68,13 @@ export interface CommandContext {
     stats: SessionStatsState;
     /** A transient list of shell commands the user has approved for this session. */
     sessionShellAllowlist: Set<string>;
+    /** Auto-indexing configuration for the current session */
+    autoIndexing?: {
+      enabled: boolean;
+      projectRoot: string;
+      lastCheck: number;
+      indexer: any; // CodebaseIndexer instance
+    };
   };
   // Flag to indicate if an overwrite has been confirmed
   overwriteConfirmed?: boolean;

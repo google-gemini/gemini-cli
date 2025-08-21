@@ -33,6 +33,7 @@
     "@opentelemetry/sdk-node": "^0.203.0",
     "@types/glob": "^8.1.0",
     "@types/html-to-text": "^9.0.4",
+    "@xterm/headless": "5.5.0",
     "ajv": "^8.17.1",
     "chardet": "^2.1.0",
     "diff": "^7.0.0",
@@ -44,6 +45,7 @@
     "html-to-text": "^9.0.5",
     "https-proxy-agent": "^7.0.6",
     "ignore": "^7.0.0",
+    "isbinaryfile": "^5.0.4",
     "marked": "^15.0.12",
     "micromatch": "^4.0.8",
     "mnemonist": "^0.40.3",
@@ -53,17 +55,17 @@
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0",
     "undici": "^7.10.0",
-    "ws": "^8.18.0",
-    "@xterm/headless": "5.5.0"
+    "uuid": "^10.0.0",
+    "ws": "^8.18.0"
   },
   "optionalDependencies": {
     "@lydell/node-pty": "1.1.0",
-    "node-pty": "^1.0.0",
     "@lydell/node-pty-darwin-arm64": "1.1.0",
     "@lydell/node-pty-darwin-x64": "1.1.0",
     "@lydell/node-pty-linux-x64": "1.1.0",
     "@lydell/node-pty-win32-arm64": "1.1.0",
-    "@lydell/node-pty-win32-x64": "1.1.0"
+    "@lydell/node-pty-win32-x64": "1.1.0",
+    "node-pty": "^1.0.0"
   },
   "devDependencies": {
     "@google/gemini-cli-test-utils": "file:../test-utils",
@@ -72,6 +74,7 @@
     "@types/micromatch": "^4.0.8",
     "@types/minimatch": "^5.1.2",
     "@types/picomatch": "^4.0.1",
+    "@types/uuid": "^10.0.0",
     "@types/ws": "^8.5.10",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"

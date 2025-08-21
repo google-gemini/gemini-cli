@@ -24,6 +24,7 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
+import { SemanticSearchTool } from '../tools/semantic-search.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
@@ -176,6 +177,16 @@ export interface ConfigParameters {
     respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
   };
+  codebaseIndexing?: {
+    embedEndpoint?: string;
+    apiKey?: string;
+    batchSize?: number;
+    maxTextChars?: number;
+    mergeThreshold?: number;
+    skipIfLargerThan?: number;
+    autoIndexingEnabled?: boolean;
+    autoIndexingInterval?: number;
+  };
   checkpointing?: boolean;
   proxy?: string;
   cwd: string;
@@ -234,6 +245,16 @@ export class Config {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
     enableRecursiveFileSearch: boolean;
+  };
+  private readonly codebaseIndexing: {
+    embedEndpoint: string;
+    apiKey?: string;
+    batchSize: number;
+    maxTextChars: number;
+    mergeThreshold: number;
+    skipIfLargerThan: number;
+    autoIndexingEnabled: boolean;
+    autoIndexingInterval: number;
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
@@ -312,6 +333,16 @@ export class Config {
       respectGeminiIgnore: params.fileFiltering?.respectGeminiIgnore ?? true,
       enableRecursiveFileSearch:
         params.fileFiltering?.enableRecursiveFileSearch ?? true,
+    };
+    this.codebaseIndexing = {
+      embedEndpoint: params.codebaseIndexing?.embedEndpoint ?? 'http://localhost:11434/v1/embeddings',
+      apiKey: params.codebaseIndexing?.apiKey,
+      batchSize: params.codebaseIndexing?.batchSize ?? 32,
+      maxTextChars: params.codebaseIndexing?.maxTextChars ?? 8192,
+      mergeThreshold: params.codebaseIndexing?.mergeThreshold ?? 40,
+      skipIfLargerThan: params.codebaseIndexing?.skipIfLargerThan ?? 1024 * 1024,
+      autoIndexingEnabled: params.codebaseIndexing?.autoIndexingEnabled ?? false,
+      autoIndexingInterval: params.codebaseIndexing?.autoIndexingInterval ?? 5000,
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
@@ -609,6 +640,42 @@ export class Config {
     };
   }
 
+  getCodebaseIndexingConfig() {
+    return this.codebaseIndexing;
+  }
+
+  getCodebaseIndexingEmbedEndpoint(): string {
+    return this.codebaseIndexing.embedEndpoint;
+  }
+
+  getCodebaseIndexingApiKey(): string | undefined {
+    return this.codebaseIndexing.apiKey;
+  }
+
+  getCodebaseIndexingBatchSize(): number {
+    return this.codebaseIndexing.batchSize;
+  }
+
+  getCodebaseIndexingMaxTextChars(): number {
+    return this.codebaseIndexing.maxTextChars;
+  }
+
+  getCodebaseIndexingMergeThreshold(): number {
+    return this.codebaseIndexing.mergeThreshold;
+  }
+
+  getCodebaseIndexingSkipIfLargerThan(): number {
+    return this.codebaseIndexing.skipIfLargerThan;
+  }
+
+  getCodebaseIndexingAutoIndexingEnabled(): boolean {
+    return this.codebaseIndexing.autoIndexingEnabled;
+  }
+
+  getCodebaseIndexingAutoIndexingInterval(): number {
+    return this.codebaseIndexing.autoIndexingInterval;
+  }
+
   getCheckpointingEnabled(): boolean {
     return this.checkpointing;
   }
@@ -793,6 +860,7 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
+    registerCoreTool(SemanticSearchTool, this);
 
     await registry.discoverAllTools();
     return registry;

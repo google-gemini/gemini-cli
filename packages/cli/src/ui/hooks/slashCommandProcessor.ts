@@ -403,6 +403,14 @@ export const useSlashCommandProcessor = (
                   return { type: 'handled' };
                 }
                 case 'quit':
+                  // Останавливаем автоматическое обновление индекса
+                  if (fullCommandContext.session.autoIndexing?.enabled) {
+                    const autoIndexService = fullCommandContext.session.autoIndexing.indexer;
+                    if (autoIndexService && typeof autoIndexService.stop === 'function') {
+                      autoIndexService.stop();
+                    }
+                  }
+                  
                   setQuittingMessages(result.messages);
                   setTimeout(async () => {
                     await runExitCleanup();

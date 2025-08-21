@@ -515,6 +515,17 @@ export async function loadCliConfig(
       enableRecursiveFileSearch:
         settings.fileFiltering?.enableRecursiveFileSearch,
     },
+    // Codebase indexing settings
+    codebaseIndexing: {
+      embedEndpoint: settings.codebaseIndexing?.embedEndpoint,
+      apiKey: settings.codebaseIndexing?.apiKey,
+      batchSize: settings.codebaseIndexing?.batchSize,
+      maxTextChars: settings.codebaseIndexing?.maxTextChars,
+      mergeThreshold: settings.codebaseIndexing?.mergeThreshold,
+      skipIfLargerThan: settings.codebaseIndexing?.skipIfLargerThan,
+      autoIndexingEnabled: settings.codebaseIndexing?.autoIndexingEnabled,
+      autoIndexingInterval: settings.codebaseIndexing?.autoIndexingInterval,
+    },
     checkpointing: argv.checkpointing || settings.checkpointing?.enabled,
     proxy:
       argv.proxy ||

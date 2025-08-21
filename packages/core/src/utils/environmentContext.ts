@@ -7,12 +7,48 @@
 import { Part } from '@google/genai';
 import { Config } from '../config/config.js';
 import { getFolderStructure } from './getFolderStructure.js';
+import { CodebaseIndexer } from '../services/codebaseIndexer/codebaseIndexer.js';
 
 /**
  * Generates a string describing the current workspace directories and their structures.
  * @param {Config} config - The runtime configuration and services.
  * @returns {Promise<string>} A promise that resolves to the directory context string.
  */
+/**
+ * Получает информацию о статусе индекса кодовой базы
+ * @param {Config} config - Конфигурация среды выполнения
+ * @returns {Promise<string>} Статус индекса в виде строки
+ */
+async function getCodebaseIndexStatus(config: Config): Promise<string> {
+  try {
+    const workspaceContext = config.getWorkspaceContext();
+    const workspaceDirectories = workspaceContext.getDirectories();
+    
+    if (workspaceDirectories.length === 0) {
+      return '';
+    }
+
+    // Используем первую директорию рабочего пространства для проверки индекса
+    const projectRoot = workspaceDirectories[0];
+    const indexer = CodebaseIndexer.fromConfig(projectRoot, config);
+    const status = await indexer.getIndexStatus();
+
+    if (!status.exists) {
+      return `\nCodebase Index: No semantic search index found. Use '/codebase index' to create one for enhanced code understanding.`;
+    }
+
+    const sizeMB = status.sizeBytes ? (status.sizeBytes / (1024 * 1024)).toFixed(1) : 'unknown';
+    const lastUpdated = status.lastUpdated ? status.lastUpdated.toLocaleDateString() : 'unknown';
+    const fileCount = status.fileCount || 0;
+    const vectorCount = status.vectorCount || 0;
+
+    return `\nCodebase Index: Available (${fileCount} files, ${vectorCount} vectors, ${sizeMB} MB, updated ${lastUpdated}). You can use semantic search to understand the codebase structure and relationships.`;
+  } catch (error) {
+    // Не показываем ошибки пользователю, просто молча пропускаем
+    return '';
+  }
+}
+
 export async function getDirectoryContextString(
   config: Config,
 ): Promise<string> {
@@ -37,10 +73,12 @@ export async function getDirectoryContextString(
     workingDirPreamble = `I'm currently working in the following directories:\n${dirList}`;
   }
 
+  const indexStatus = await getCodebaseIndexStatus(config);
+
   return `${workingDirPreamble}
 Here is the folder structure of the current working directories:
 
-${folderStructure}`;
+${folderStructure}${indexStatus}`;
 }
 
 /**

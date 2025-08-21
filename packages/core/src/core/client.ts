@@ -222,6 +222,21 @@ export class GeminiClient {
     });
   }
 
+  /**
+   * Обновляет контекст чата с актуальной информацией о статусе индекса
+   */
+  async refreshIndexContext(): Promise<void> {
+    if (!this.chat) {
+      return;
+    }
+
+    // Используем getDirectoryContextString, который теперь включает статус индекса
+    this.getChat().addHistory({
+      role: 'user',
+      parts: [{ text: `Index status updated:\n${await getDirectoryContextString(this.config)}` }],
+    });
+  }
+
   async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
     const envParts = await getEnvironmentContext(this.config);

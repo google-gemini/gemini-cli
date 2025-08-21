@@ -10,6 +10,7 @@ import { PartUnion } from '@google/genai';
 import mime from 'mime-types';
 import { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
+import { isBinaryFileElegant } from './binaryFileUtils.js';
 
 // Constants for text file processing
 const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
@@ -61,57 +62,8 @@ export function isWithinRoot(
  * @returns Promise that resolves to true if the file appears to be binary.
  */
 export async function isBinaryFile(filePath: string): Promise<boolean> {
-  let fileHandle: fs.promises.FileHandle | undefined;
-  try {
-    fileHandle = await fs.promises.open(filePath, 'r');
-
-    // Read up to 4KB or file size, whichever is smaller
-    const stats = await fileHandle.stat();
-    const fileSize = stats.size;
-    if (fileSize === 0) {
-      // Empty file is not considered binary for content checking
-      return false;
-    }
-    const bufferSize = Math.min(4096, fileSize);
-    const buffer = Buffer.alloc(bufferSize);
-    const result = await fileHandle.read(buffer, 0, buffer.length, 0);
-    const bytesRead = result.bytesRead;
-
-    if (bytesRead === 0) return false;
-
-    let nonPrintableCount = 0;
-    for (let i = 0; i < bytesRead; i++) {
-      if (buffer[i] === 0) return true; // Null byte is a strong indicator
-      if (buffer[i] < 9 || (buffer[i] > 13 && buffer[i] < 32)) {
-        nonPrintableCount++;
-      }
-    }
-    // If >30% non-printable characters, consider it binary
-    return nonPrintableCount / bytesRead > 0.3;
-  } catch (error) {
-    // Log error for debugging while maintaining existing behavior
-    console.warn(
-      `Failed to check if file is binary: ${filePath}`,
-      error instanceof Error ? error.message : String(error),
-    );
-    // If any error occurs (e.g. file not found, permissions),
-    // treat as not binary here; let higher-level functions handle existence/access errors.
-    return false;
-  } finally {
-    // Safely close the file handle if it was successfully opened
-    if (fileHandle) {
-      try {
-        await fileHandle.close();
-      } catch (closeError) {
-        // Log close errors for debugging while continuing with cleanup
-        console.warn(
-          `Failed to close file handle for: ${filePath}`,
-          closeError instanceof Error ? closeError.message : String(closeError),
-        );
-        // The important thing is that we attempted to clean up
-      }
-    }
-  }
+  // Используем элегантную проверку вместо костылей
+  return await isBinaryFileElegant(filePath);
 }
 
 /**
