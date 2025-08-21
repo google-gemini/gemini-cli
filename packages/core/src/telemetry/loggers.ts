@@ -157,7 +157,10 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
   );
 }
 
-export function logFileOperation(config: Config, event: FileOperationEvent): void {
+export function logFileOperation(
+  config: Config,
+  event: FileOperationEvent,
+): void {
   ClearcutLogger.getInstance(config)?.logFileOperationEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 

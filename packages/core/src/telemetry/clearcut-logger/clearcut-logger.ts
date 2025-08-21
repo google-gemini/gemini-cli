@@ -525,7 +525,9 @@ export class ClearcutLogger {
       };
 
       for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {
-        if (event.diff_stat[key as keyof typeof event.diff_stat] !== undefined) {
+        if (
+          event.diff_stat[key as keyof typeof event.diff_stat] !== undefined
+        ) {
           data.push({
             gemini_cli_key,
             value: JSON.stringify(

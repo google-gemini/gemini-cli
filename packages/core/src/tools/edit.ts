@@ -396,7 +396,9 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       const lines = editData.newContent.split('\n').length;
       const mimetype = getSpecificMimeType(this.params.file_path);
       const extension = path.extname(this.params.file_path);
-      const programming_language = getProgrammingLanguage({ file_path: this.params.file_path });
+      const programming_language = getProgrammingLanguage({
+        file_path: this.params.file_path,
+      });
       if (editData.isNewFile) {
         logFileOperation(
           this.config,
