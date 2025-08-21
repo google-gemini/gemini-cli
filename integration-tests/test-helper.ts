@@ -436,19 +436,30 @@ export class TestRig {
   ): Promise<boolean> {
     const startTime = Date.now();
     let attempts = 0;
+    
     while (Date.now() - startTime < timeout) {
       attempts++;
-      const result = predicate();
-      if (env.VERBOSE === 'true' && attempts % 5 === 0) {
-        console.log(
-          `Poll attempt ${attempts}: ${result ? 'success' : 'waiting...'}`,
-        );
+      
+      try {
+        const result = predicate();
+        if (env.VERBOSE === 'true' && attempts % 5 === 0) {
+          console.log(
+            `Poll attempt ${attempts}: ${result ? 'success' : 'waiting...'}`,
+          );
+        }
+        if (result) {
+          return true;
+        }
+      } catch (error) {
+        if (env.VERBOSE === 'true') {
+          console.log(`Poll attempt ${attempts} failed with error:`, error);
+        }
+        // Continue polling despite predicate errors
       }
-      if (result) {
-        return true;
-      }
+      
       await new Promise((resolve) => setTimeout(resolve, interval));
     }
+    
     if (env.VERBOSE === 'true') {
       console.log(`Poll timed out after ${attempts} attempts`);
     }

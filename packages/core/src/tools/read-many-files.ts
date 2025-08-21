@@ -478,11 +478,15 @@ ${finalExclusionPatternsForDescription
           );
         }
       } else {
-        // Handle Promise rejection (unexpected errors)
+        // Handle Promise rejection (unexpected errors during file processing)
+        const errorMessage = result.reason instanceof Error 
+          ? result.reason.message 
+          : String(result.reason);
         skippedFiles.push({
           path: 'unknown',
-          reason: `Unexpected error: ${result.reason}`,
+          reason: `Promise rejection during file processing: ${errorMessage}`,
         });
+        console.debug('File processing promise rejected:', result.reason);
       }
     }
 
