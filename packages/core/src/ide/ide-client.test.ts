@@ -26,6 +26,7 @@ import {
   type IdeInfo,
 } from './detect-ide.js';
 import * as os from 'node:os';
+import * as path from 'node:path';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal();
@@ -102,7 +103,7 @@ describe('IdeClient', () => {
       await ideClient.connect();
 
       expect(fs.promises.readFile).toHaveBeenCalledWith(
-        '/tmp/gemini-ide-server-12345.json',
+        path.join('/tmp', 'gemini-ide-server-12345.json'),
         'utf8',
       );
       expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
