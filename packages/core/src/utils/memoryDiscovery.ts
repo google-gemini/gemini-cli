@@ -38,7 +38,6 @@ interface GeminiFileContent {
   content: string | null;
 }
 
-
 async function findProjectRoot(startDir: string): Promise<string | null> {
   let currentDir = path.resolve(startDir);
   while (true) {
@@ -105,7 +104,7 @@ async function getGeminiMdFilePathsInternal(
 
   for (let i = 0; i < dirsArray.length; i += CONCURRENT_LIMIT) {
     const batch = dirsArray.slice(i, i + CONCURRENT_LIMIT);
-    const batchPromises = batch.map((dir) => 
+    const batchPromises = batch.map((dir) =>
       getGeminiMdFilePathsInternalForEachDir(
         dir,
         userHomePath,
@@ -114,11 +113,11 @@ async function getGeminiMdFilePathsInternal(
         extensionContextFilePaths,
         fileFilteringOptions,
         maxDirs,
-      )
+      ),
     );
-    
+
     const batchResults = await Promise.allSettled(batchPromises);
-    
+
     for (const result of batchResults) {
       if (result.status === 'fulfilled') {
         pathsArrays.push(result.value);
@@ -255,41 +254,44 @@ async function readGeminiMdFiles(
 
   for (let i = 0; i < filePaths.length; i += CONCURRENT_LIMIT) {
     const batch = filePaths.slice(i, i + CONCURRENT_LIMIT);
-    const batchPromises = batch.map(async (filePath): Promise<GeminiFileContent> => {
-      try {
-        const content = await fs.readFile(filePath, 'utf-8');
+    const batchPromises = batch.map(
+      async (filePath): Promise<GeminiFileContent> => {
+        try {
+          const content = await fs.readFile(filePath, 'utf-8');
 
-        // Process imports in the content
-        const processedResult = await processImports(
-          content,
-          path.dirname(filePath),
-          debugMode,
-          undefined,
-          undefined,
-          importFormat,
-        );
-        if (debugMode)
-          logger.debug(
-            `Successfully read and processed imports: ${filePath} (Length: ${processedResult.content.length})`,
+          // Process imports in the content
+          const processedResult = await processImports(
+            content,
+            path.dirname(filePath),
+            debugMode,
+            undefined,
+            undefined,
+            importFormat,
           );
+          if (debugMode)
+            logger.debug(
+              `Successfully read and processed imports: ${filePath} (Length: ${processedResult.content.length})`,
+            );
 
-        return { filePath, content: processedResult.content };
-      } catch (error: unknown) {
-        const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
-        if (!isTestEnv) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          logger.warn(
-            `Warning: Could not read ${getAllGeminiMdFilenames()} file at ${filePath}. Error: ${message}`,
-          );
+          return { filePath, content: processedResult.content };
+        } catch (error: unknown) {
+          const isTestEnv =
+            process.env['NODE_ENV'] === 'test' || process.env['VITEST'];
+          if (!isTestEnv) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            logger.warn(
+              `Warning: Could not read ${getAllGeminiMdFilenames()} file at ${filePath}. Error: ${message}`,
+            );
+          }
+          if (debugMode) logger.debug(`Failed to read: ${filePath}`);
+          return { filePath, content: null }; // Still include it with null content
         }
-        if (debugMode) logger.debug(`Failed to read: ${filePath}`);
-        return { filePath, content: null }; // Still include it with null content
-      }
-    });
+      },
+    );
 
     const batchResults = await Promise.allSettled(batchPromises);
-    
+
     for (const result of batchResults) {
       if (result.status === 'fulfilled') {
         results.push(result.value);

@@ -373,7 +373,7 @@ describe('loadServerHierarchicalMemory', () => {
     // Create multiple test directories with GEMINI.md files
     const numDirs = 5;
     const createdFiles: string[] = [];
-    
+
     for (let i = 0; i < numDirs; i++) {
       const dirPath = await createEmptyDir(
         path.join(testRootDir, `project-${i}`),
@@ -388,14 +388,14 @@ describe('loadServerHierarchicalMemory', () => {
     // Load memory from all directories
     const result = await loadServerHierarchicalMemory(
       cwd,
-      createdFiles.map(f => path.dirname(f)),
+      createdFiles.map((f) => path.dirname(f)),
       false,
       new FileDiscoveryService(projectRoot),
     );
 
     // Should have loaded all files
     expect(result.fileCount).toBe(numDirs);
-    
+
     // Content should include all project contents
     for (let i = 0; i < numDirs; i++) {
       expect(result.memoryContent).toContain(`Content from project ${i}`);
@@ -404,13 +404,9 @@ describe('loadServerHierarchicalMemory', () => {
 
   it('should preserve order and prevent duplicates when processing multiple directories', async () => {
     // Create overlapping directory structure
-    const parentDir = await createEmptyDir(
-      path.join(testRootDir, 'parent'),
-    );
-    const childDir = await createEmptyDir(
-      path.join(parentDir, 'child'),
-    );
-    
+    const parentDir = await createEmptyDir(path.join(testRootDir, 'parent'));
+    const childDir = await createEmptyDir(path.join(parentDir, 'child'));
+
     await createTestFile(
       path.join(parentDir, DEFAULT_CONTEXT_FILENAME),
       'Parent content',
@@ -432,10 +428,14 @@ describe('loadServerHierarchicalMemory', () => {
     expect(result.fileCount).toBe(2);
     expect(result.memoryContent).toContain('Parent content');
     expect(result.memoryContent).toContain('Child content');
-    
+
     // Check that files are not duplicated
-    const parentOccurrences = (result.memoryContent.match(/Parent content/g) || []).length;
-    const childOccurrences = (result.memoryContent.match(/Child content/g) || []).length;
+    const parentOccurrences = (
+      result.memoryContent.match(/Parent content/g) || []
+    ).length;
+    const childOccurrences = (
+      result.memoryContent.match(/Child content/g) || []
+    ).length;
     expect(parentOccurrences).toBe(1);
     expect(childOccurrences).toBe(1);
   });
