@@ -147,6 +147,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getShowMemoryUsage: vi.fn(() => opts.showMemoryUsage ?? false),
         getAccessibility: vi.fn(() => opts.accessibility ?? {}),
         getProjectRoot: vi.fn(() => opts.targetDir),
+        getEnablePromptCompletion: vi.fn(() => false),
         getGeminiClient: vi.fn(() => ({
           getUserTier: vi.fn(),
         })),

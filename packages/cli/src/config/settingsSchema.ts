@@ -524,6 +524,16 @@ export const SETTINGS_SCHEMA = {
     description: 'Skip the next speaker check.',
     showInDialog: true,
   },
+  enablePromptCompletion: {
+    type: 'boolean',
+    label: 'Enable Prompt Completion',
+    category: 'General',
+    requiresRestart: true,
+    default: false,
+    description:
+      'Enable AI-powered prompt completion suggestions while typing.',
+    showInDialog: true,
+  },
 } as const;
 
 type InferSettings<T extends SettingsSchema> = {
