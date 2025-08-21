@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   CoreToolScheduler,
   ToolCall,
@@ -107,10 +107,6 @@ class TestApprovalInvocation extends BaseToolInvocation<
 }
 
 describe('CoreToolScheduler', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should cancel a tool call if the signal is aborted before confirmation', async () => {
     const mockTool = new MockTool();
     mockTool.shouldConfirm = true;
@@ -172,10 +168,6 @@ describe('CoreToolScheduler', () => {
 });
 
 describe('CoreToolScheduler with payload', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should update args and diff and execute tool when payload is provided', async () => {
     const mockTool = new MockModifiableTool();
     const declarativeTool = mockTool;
@@ -558,10 +550,6 @@ describe('CoreToolScheduler edit cancellation', () => {
 });
 
 describe('CoreToolScheduler YOLO mode', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should execute tool requiring confirmation directly without waiting', async () => {
     // Arrange
     const mockTool = new MockTool();
@@ -654,10 +642,6 @@ describe('CoreToolScheduler YOLO mode', () => {
 });
 
 describe('CoreToolScheduler request queueing', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should queue a request if another is running', async () => {
     let resolveFirstCall: (result: ToolResult) => void;
     const firstCallPromise = new Promise<ToolResult>((resolve) => {
