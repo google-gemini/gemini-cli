@@ -33,7 +33,7 @@ describe('aboutCommand', () => {
         },
         settings: {
           merged: {
-            selectedAuthType: 'oauth-gca',
+            selectedAuthType: 'test-auth',
           },
         },
       },
@@ -89,7 +89,7 @@ describe('aboutCommand', () => {
         osVersion: 'test-os',
         sandboxEnv: 'no sandbox',
         modelVersion: 'test-model',
-        selectedAuthType: 'oauth-gca',
+        selectedAuthType: 'test-auth',
         gcpProject: 'test-gcp-project',
         ideClient: 'test-ide',
         userTier: undefined,
@@ -150,7 +150,7 @@ describe('aboutCommand', () => {
         osVersion: 'test-os',
         sandboxEnv: 'no sandbox',
         modelVersion: 'test-model',
-        selectedAuthType: 'oauth-gca',
+        selectedAuthType: 'test-auth',
         gcpProject: 'test-gcp-project',
         ideClient: '',
       }),
