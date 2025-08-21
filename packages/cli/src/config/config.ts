@@ -23,6 +23,10 @@ import {
   FileDiscoveryService,
   TelemetryTarget,
   FileFilteringOptions,
+  ShellTool,
+  EditTool,
+  WriteFileTool,
+  MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -30,6 +34,8 @@ import { Extension, annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
+
+import { isWorkspaceTrusted } from './trustedFolders.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -53,20 +59,20 @@ export interface CliArgs {
   showMemoryUsage: boolean | undefined;
   show_memory_usage: boolean | undefined;
   yolo: boolean | undefined;
+  approvalMode: string | undefined;
   telemetry: boolean | undefined;
   checkpointing: boolean | undefined;
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
+  telemetryOtlpProtocol: string | undefined;
   telemetryLogPrompts: boolean | undefined;
   telemetryOutfile: string | undefined;
   allowedMcpServerNames: string[] | undefined;
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
-  ideModeFeature: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
-  loadMemoryFromIncludeDirectories: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -81,7 +87,7 @@ export async function parseArguments(): Promise<CliArgs> {
           alias: 'm',
           type: 'string',
           description: `Model`,
-          default: process.env.GEMINI_MODEL,
+          default: process.env['GEMINI_MODEL'],
         })
         .option('prompt', {
           alias: 'p',
@@ -145,6 +151,12 @@ export async function parseArguments(): Promise<CliArgs> {
             'Automatically accept all actions (aka YOLO mode, see https://www.youtube.com/watch?v=xvFZjo5PgG0 for more details)?',
           default: false,
         })
+        .option('approval-mode', {
+          type: 'string',
+          choices: ['default', 'auto_edit', 'yolo'],
+          description:
+            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools)',
+        })
         .option('telemetry', {
           type: 'boolean',
           description:
@@ -160,6 +172,12 @@ export async function parseArguments(): Promise<CliArgs> {
           type: 'string',
           description:
             'Set the OTLP endpoint for telemetry. Overrides environment variables and settings files.',
+        })
+        .option('telemetry-otlp-protocol', {
+          type: 'string',
+          choices: ['grpc', 'http'],
+          description:
+            'Set the OTLP protocol for telemetry (grpc or http). Overrides settings files.',
         })
         .option('telemetry-log-prompts', {
           type: 'boolean',
@@ -197,10 +215,6 @@ export async function parseArguments(): Promise<CliArgs> {
           type: 'boolean',
           description: 'List all available extensions and exit.',
         })
-        .option('ide-mode-feature', {
-          type: 'boolean',
-          description: 'Run in IDE mode?',
-        })
         .option('proxy', {
           type: 'string',
           description:
@@ -215,16 +229,16 @@ export async function parseArguments(): Promise<CliArgs> {
             // Handle comma-separated values
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
         })
-        .option('load-memory-from-include-directories', {
-          type: 'boolean',
-          description:
-            'If true, when refreshing memory, GEMINI.md files should be loaded from all directories that are added. If false, GEMINI.md files should only be loaded from the primary working directory.',
-          default: false,
-        })
+
         .check((argv) => {
-          if (argv.prompt && argv.promptInteractive) {
+          if (argv.prompt && argv['promptInteractive']) {
             throw new Error(
               'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
+            );
+          }
+          if (argv.yolo && argv['approvalMode']) {
+            throw new Error(
+              'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
             );
           }
           return true;
@@ -300,20 +314,22 @@ export async function loadCliConfig(
   extensions: Extension[],
   sessionId: string,
   argv: CliArgs,
+  cwd: string = process.cwd(),
 ): Promise<Config> {
   const debugMode =
     argv.debug ||
-    [process.env.DEBUG, process.env.DEBUG_MODE].some(
+    [process.env['DEBUG'], process.env['DEBUG_MODE']].some(
       (v) => v === 'true' || v === '1',
     ) ||
     false;
   const memoryImportFormat = settings.memoryImportFormat || 'tree';
 
   const ideMode = settings.ideMode ?? false;
-  const ideModeFeature =
-    argv.ideModeFeature ?? settings.ideModeFeature ?? false;
 
   const folderTrustFeature = settings.folderTrustFeature ?? false;
+  const folderTrustSetting = settings.folderTrust ?? true;
+  const folderTrust = folderTrustFeature && folderTrustSetting;
+  const trustedFolder = isWorkspaceTrusted(settings);
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -339,7 +355,7 @@ export async function loadCliConfig(
     (e) => e.contextFiles,
   );
 
-  const fileService = new FileDiscoveryService(process.cwd());
+  const fileService = new FileDiscoveryService(cwd);
 
   const fileFiltering = {
     ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
@@ -352,7 +368,7 @@ export async function loadCliConfig(
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
   const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
-    process.cwd(),
+    cwd,
     settings.loadMemoryFromIncludeDirectories ? includeDirectories : [],
     debugMode,
     fileService,
@@ -363,17 +379,70 @@ export async function loadCliConfig(
   );
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
-  const excludeTools = mergeExcludeTools(settings, activeExtensions);
+  const question = argv.promptInteractive || argv.prompt || '';
+
+  // Determine approval mode with backward compatibility
+  let approvalMode: ApprovalMode;
+  if (argv.approvalMode) {
+    // New --approval-mode flag takes precedence
+    switch (argv.approvalMode) {
+      case 'yolo':
+        approvalMode = ApprovalMode.YOLO;
+        break;
+      case 'auto_edit':
+        approvalMode = ApprovalMode.AUTO_EDIT;
+        break;
+      case 'default':
+        approvalMode = ApprovalMode.DEFAULT;
+        break;
+      default:
+        throw new Error(
+          `Invalid approval mode: ${argv.approvalMode}. Valid values are: yolo, auto_edit, default`,
+        );
+    }
+  } else {
+    // Fallback to legacy --yolo flag behavior
+    approvalMode =
+      argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
+  }
+
+  const interactive =
+    !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
+  // In non-interactive mode, exclude tools that require a prompt.
+  const extraExcludes: string[] = [];
+  if (!interactive && !argv.experimentalAcp) {
+    switch (approvalMode) {
+      case ApprovalMode.DEFAULT:
+        // In default non-interactive mode, all tools that require approval are excluded.
+        extraExcludes.push(ShellTool.Name, EditTool.Name, WriteFileTool.Name);
+        break;
+      case ApprovalMode.AUTO_EDIT:
+        // In auto-edit non-interactive mode, only tools that still require a prompt are excluded.
+        extraExcludes.push(ShellTool.Name);
+        break;
+      case ApprovalMode.YOLO:
+        // No extra excludes for YOLO mode.
+        break;
+      default:
+        // This should never happen due to validation earlier, but satisfies the linter
+        break;
+    }
+  }
+
+  const excludeTools = mergeExcludeTools(
+    settings,
+    activeExtensions,
+    extraExcludes.length > 0 ? extraExcludes : undefined,
+  );
   const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
 
   if (!argv.allowedMcpServerNames) {
     if (settings.allowMCPServers) {
-      const allowedNames = new Set(settings.allowMCPServers.filter(Boolean));
-      if (allowedNames.size > 0) {
-        mcpServers = Object.fromEntries(
-          Object.entries(mcpServers).filter(([key]) => allowedNames.has(key)),
-        );
-      }
+      mcpServers = allowedMcpServers(
+        mcpServers,
+        settings.allowMCPServers,
+        blockedMcpServers,
+      );
     }
 
     if (settings.excludeMCPServers) {
@@ -387,29 +456,11 @@ export async function loadCliConfig(
   }
 
   if (argv.allowedMcpServerNames) {
-    const allowedNames = new Set(argv.allowedMcpServerNames.filter(Boolean));
-    if (allowedNames.size > 0) {
-      mcpServers = Object.fromEntries(
-        Object.entries(mcpServers).filter(([key, server]) => {
-          const isAllowed = allowedNames.has(key);
-          if (!isAllowed) {
-            blockedMcpServers.push({
-              name: key,
-              extensionName: server.extensionName || '',
-            });
-          }
-          return isAllowed;
-        }),
-      );
-    } else {
-      blockedMcpServers.push(
-        ...Object.entries(mcpServers).map(([key, server]) => ({
-          name: key,
-          extensionName: server.extensionName || '',
-        })),
-      );
-      mcpServers = {};
-    }
+    mcpServers = allowedMcpServers(
+      mcpServers,
+      argv.allowedMcpServerNames,
+      blockedMcpServers,
+    );
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
@@ -418,14 +469,12 @@ export async function loadCliConfig(
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
-    targetDir: process.cwd(),
+    targetDir: cwd,
     includeDirectories,
     loadMemoryFromIncludeDirectories:
-      argv.loadMemoryFromIncludeDirectories ||
-      settings.loadMemoryFromIncludeDirectories ||
-      false,
+      settings.loadMemoryFromIncludeDirectories || false,
     debugMode,
-    question: argv.promptInteractive || argv.prompt || '',
+    question,
     fullContext: argv.allFiles || argv.all_files || false,
     coreTools: settings.coreTools || undefined,
     excludeTools,
@@ -435,7 +484,7 @@ export async function loadCliConfig(
     mcpServers,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
-    approvalMode: argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT,
+    approvalMode,
     showMemoryUsage:
       argv.showMemoryUsage ||
       argv.show_memory_usage ||
@@ -448,8 +497,13 @@ export async function loadCliConfig(
         settings.telemetry?.target) as TelemetryTarget,
       otlpEndpoint:
         argv.telemetryOtlpEndpoint ??
-        process.env.OTEL_EXPORTER_OTLP_ENDPOINT ??
+        process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ??
         settings.telemetry?.otlpEndpoint,
+      otlpProtocol: (['grpc', 'http'] as const).find(
+        (p) =>
+          p ===
+          (argv.telemetryOtlpProtocol ?? settings.telemetry?.otlpProtocol),
+      ),
       logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
       outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
     },
@@ -464,26 +518,63 @@ export async function loadCliConfig(
     checkpointing: argv.checkpointing || settings.checkpointing?.enabled,
     proxy:
       argv.proxy ||
-      process.env.HTTPS_PROXY ||
-      process.env.https_proxy ||
-      process.env.HTTP_PROXY ||
-      process.env.http_proxy,
-    cwd: process.cwd(),
+      process.env['HTTPS_PROXY'] ||
+      process.env['https_proxy'] ||
+      process.env['HTTP_PROXY'] ||
+      process.env['http_proxy'],
+    cwd,
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
     model: argv.model || settings.model || DEFAULT_GEMINI_MODEL,
     extensionContextFilePaths,
     maxSessionTurns: settings.maxSessionTurns ?? -1,
-    experimentalAcp: argv.experimentalAcp || false,
+    experimentalZedIntegration: argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,
     extensions: allExtensions,
     blockedMcpServers,
-    noBrowser: !!process.env.NO_BROWSER,
+    noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.summarizeToolOutput,
     ideMode,
-    ideModeFeature,
+    chatCompression: settings.chatCompression,
     folderTrustFeature,
+    folderTrust,
+    interactive,
+    trustedFolder,
+    shouldUseNodePtyShell: settings.shouldUseNodePtyShell,
+    skipNextSpeakerCheck: settings.skipNextSpeakerCheck,
+    enablePromptCompletion: settings.enablePromptCompletion ?? false,
   });
+}
+
+function allowedMcpServers(
+  mcpServers: { [x: string]: MCPServerConfig },
+  allowMCPServers: string[],
+  blockedMcpServers: Array<{ name: string; extensionName: string }>,
+) {
+  const allowedNames = new Set(allowMCPServers.filter(Boolean));
+  if (allowedNames.size > 0) {
+    mcpServers = Object.fromEntries(
+      Object.entries(mcpServers).filter(([key, server]) => {
+        const isAllowed = allowedNames.has(key);
+        if (!isAllowed) {
+          blockedMcpServers.push({
+            name: key,
+            extensionName: server.extensionName || '',
+          });
+        }
+        return isAllowed;
+      }),
+    );
+  } else {
+    blockedMcpServers.push(
+      ...Object.entries(mcpServers).map(([key, server]) => ({
+        name: key,
+        extensionName: server.extensionName || '',
+      })),
+    );
+    mcpServers = {};
+  }
+  return mcpServers;
 }
 
 function mergeMcpServers(settings: Settings, extensions: Extension[]) {
@@ -510,8 +601,12 @@ function mergeMcpServers(settings: Settings, extensions: Extension[]) {
 function mergeExcludeTools(
   settings: Settings,
   extensions: Extension[],
+  extraExcludes?: string[] | undefined,
 ): string[] {
-  const allExcludeTools = new Set(settings.excludeTools || []);
+  const allExcludeTools = new Set([
+    ...(settings.excludeTools || []),
+    ...(extraExcludes || []),
+  ]);
   for (const extension of extensions) {
     for (const tool of extension.config.excludeTools || []) {
       allExcludeTools.add(tool);

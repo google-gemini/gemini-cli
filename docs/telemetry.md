@@ -58,13 +58,27 @@ You can export all telemetry data to a file for local inspection.
 To enable file export, use the `--telemetry-outfile` flag with a path to your desired output file. This must be run using `--telemetry-target=local`.
 
 ```bash
-gemini --telemetry --telemetry-target=local --telemetry-outfile=/path/to/telemetry.log "your prompt"
+# Set your desired output file path
+TELEMETRY_FILE=".gemini/telemetry.log"
+
+# Run Gemini CLI with local telemetry
+# NOTE: --telemetry-otlp-endpoint="" is required to override the default
+# OTLP exporter and ensure telemetry is written to the local file.
+gemini --telemetry \
+  --telemetry-target=local \
+  --telemetry-otlp-endpoint="" \
+  --telemetry-outfile="$TELEMETRY_FILE" \
+  --prompt "What is OpenTelemetry?"
 ```
 
 ## Running an OTEL Collector
 
 An OTEL Collector is a service that receives, processes, and exports telemetry data.
-The CLI sends data using the OTLP/gRPC protocol.
+The CLI can send data using either the OTLP/gRPC or OTLP/HTTP protocol.
+You can specify which protocol to use via the `--telemetry-otlp-protocol` flag
+or the `telemetry.otlpProtocol` setting in your `settings.json` file. See the
+[configuration docs](./cli/configuration.md#--telemetry-otlp-protocol) for more
+details.
 
 Learn more about OTEL exporter standard configuration in [documentation][otel-config-docs].
 
@@ -173,9 +187,10 @@ Logs are timestamped records of specific events. The following events are logged
     - `function_args`
     - `duration_ms`
     - `success` (boolean)
-    - `decision` (string: "accept", "reject", or "modify", if applicable)
+    - `decision` (string: "accept", "reject", "auto_accept", or "modify", if applicable)
     - `error` (if applicable)
     - `error_type` (if applicable)
+    - `metadata` (if applicable, dictionary of string -> any)
 
 - `gemini_cli.api_request`: This event occurs when making a request to Gemini API.
   - **Attributes**:
@@ -225,6 +240,7 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `function_name`
     - `success` (boolean)
     - `decision` (string: "accept", "reject", or "modify", if applicable)
+    - `tool_type` (string: "mcp", or "native", if applicable)
 
 - `gemini_cli.tool.call.latency` (Histogram, ms): Measures tool call latency.
   - **Attributes**:
@@ -252,3 +268,12 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `lines` (Int, if applicable): Number of lines in the file.
     - `mimetype` (string, if applicable): Mimetype of the file.
     - `extension` (string, if applicable): File extension of the file.
+    - `ai_added_lines` (Int, if applicable): Number of lines added/changed by AI.
+    - `ai_removed_lines` (Int, if applicable): Number of lines removed/changed by AI.
+    - `user_added_lines` (Int, if applicable): Number of lines added/changed by user in AI proposed changes.
+    - `user_removed_lines` (Int, if applicable): Number of lines removed/changed by user in AI proposed changes.
+
+- `gemini_cli.chat_compression` (Counter, Int): Counts chat compression operations
+  - **Attributes**:
+    - `tokens_before`: (Int): Number of tokens in context prior to compression
+    - `tokens_after`: (Int): Number of tokens in context after compression

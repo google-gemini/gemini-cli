@@ -65,7 +65,7 @@ describe('runNonInteractive', () => {
     mockConfig = {
       initialize: vi.fn().mockResolvedValue(undefined),
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
-      getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
+      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getMaxSessionTurns: vi.fn().mockReturnValue(10),
       getIdeMode: vi.fn().mockReturnValue(false),
       getFullContext: vi.fn().mockReturnValue(false),
@@ -137,7 +137,6 @@ describe('runNonInteractive', () => {
     expect(mockCoreExecuteToolCall).toHaveBeenCalledWith(
       mockConfig,
       expect.objectContaining({ name: 'testTool' }),
-      mockToolRegistry,
       expect.any(AbortSignal),
     );
     expect(mockGeminiClient.sendMessageStream).toHaveBeenNthCalledWith(
@@ -150,7 +149,7 @@ describe('runNonInteractive', () => {
     expect(processStdoutSpy).toHaveBeenCalledWith('\n');
   });
 
-  it('should handle error during tool execution', async () => {
+  it('should handle error during tool execution and should send error back to the model', async () => {
     const toolCallEvent: ServerGeminiStreamEvent = {
       type: GeminiEventType.ToolCallRequest,
       value: {
@@ -162,20 +161,52 @@ describe('runNonInteractive', () => {
       },
     };
     mockCoreExecuteToolCall.mockResolvedValue({
-      error: new Error('Tool execution failed badly'),
-      errorType: ToolErrorType.UNHANDLED_EXCEPTION,
+      error: new Error('Execution failed'),
+      errorType: ToolErrorType.EXECUTION_FAILED,
+      responseParts: {
+        functionResponse: {
+          name: 'errorTool',
+          response: {
+            output: 'Error: Execution failed',
+          },
+        },
+      },
+      resultDisplay: 'Execution failed',
     });
-    mockGeminiClient.sendMessageStream.mockReturnValue(
-      createStreamFromEvents([toolCallEvent]),
-    );
+    const finalResponse: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Content,
+        value: 'Sorry, let me try again.',
+      },
+    ];
+    mockGeminiClient.sendMessageStream
+      .mockReturnValueOnce(createStreamFromEvents([toolCallEvent]))
+      .mockReturnValueOnce(createStreamFromEvents(finalResponse));
 
     await runNonInteractive(mockConfig, 'Trigger tool error', 'prompt-id-3');
 
     expect(mockCoreExecuteToolCall).toHaveBeenCalled();
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Error executing tool errorTool: Tool execution failed badly',
+      'Error executing tool errorTool: Execution failed',
     );
-    expect(processExitSpy).toHaveBeenCalledWith(1);
+    expect(processExitSpy).not.toHaveBeenCalled();
+    expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(2);
+    expect(mockGeminiClient.sendMessageStream).toHaveBeenNthCalledWith(
+      2,
+      [
+        {
+          functionResponse: {
+            name: 'errorTool',
+            response: {
+              output: 'Error: Execution failed',
+            },
+          },
+        },
+      ],
+      expect.any(AbortSignal),
+      'prompt-id-3',
+    );
+    expect(processStdoutSpy).toHaveBeenCalledWith('Sorry, let me try again.');
   });
 
   it('should exit with error if sendMessageStream throws initially', async () => {

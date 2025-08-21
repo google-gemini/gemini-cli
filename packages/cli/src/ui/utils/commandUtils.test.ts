@@ -5,12 +5,13 @@
  */
 
 import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
-import { spawn } from 'child_process';
+import { spawn, SpawnOptions } from 'child_process';
 import { EventEmitter } from 'events';
 import {
   isAtCommand,
   isSlashCommand,
   copyToClipboard,
+  getUrlOpenCommand,
 } from './commandUtils.js';
 
 // Mock child_process
@@ -185,6 +186,9 @@ describe('commandUtils', () => {
 
       it('should successfully copy text to clipboard using xclip', async () => {
         const testText = 'Hello, world!';
+        const linuxOptions: SpawnOptions = {
+          stdio: ['pipe', 'inherit', 'pipe'],
+        };
 
         setTimeout(() => {
           mockChild.emit('close', 0);
@@ -192,10 +196,11 @@ describe('commandUtils', () => {
 
         await copyToClipboard(testText);
 
-        expect(mockSpawn).toHaveBeenCalledWith('xclip', [
-          '-selection',
-          'clipboard',
-        ]);
+        expect(mockSpawn).toHaveBeenCalledWith(
+          'xclip',
+          ['-selection', 'clipboard'],
+          linuxOptions,
+        );
         expect(mockChild.stdin.write).toHaveBeenCalledWith(testText);
         expect(mockChild.stdin.end).toHaveBeenCalled();
       });
@@ -203,6 +208,9 @@ describe('commandUtils', () => {
       it('should fall back to xsel when xclip fails', async () => {
         const testText = 'Hello, world!';
         let callCount = 0;
+        const linuxOptions: SpawnOptions = {
+          stdio: ['pipe', 'inherit', 'pipe'],
+        };
 
         mockSpawn.mockImplementation(() => {
           const child = Object.assign(new EventEmitter(), {
@@ -231,14 +239,18 @@ describe('commandUtils', () => {
         await copyToClipboard(testText);
 
         expect(mockSpawn).toHaveBeenCalledTimes(2);
-        expect(mockSpawn).toHaveBeenNthCalledWith(1, 'xclip', [
-          '-selection',
-          'clipboard',
-        ]);
-        expect(mockSpawn).toHaveBeenNthCalledWith(2, 'xsel', [
-          '--clipboard',
-          '--input',
-        ]);
+        expect(mockSpawn).toHaveBeenNthCalledWith(
+          1,
+          'xclip',
+          ['-selection', 'clipboard'],
+          linuxOptions,
+        );
+        expect(mockSpawn).toHaveBeenNthCalledWith(
+          2,
+          'xsel',
+          ['--clipboard', '--input'],
+          linuxOptions,
+        );
       });
 
       it('should throw error when both xclip and xsel fail', async () => {
@@ -339,6 +351,44 @@ describe('commandUtils', () => {
         await copyToClipboard(specialText);
 
         expect(mockChild.stdin.write).toHaveBeenCalledWith(specialText);
+      });
+    });
+  });
+
+  describe('getUrlOpenCommand', () => {
+    describe('on macOS (darwin)', () => {
+      beforeEach(() => {
+        mockProcess.platform = 'darwin';
+      });
+      it('should return open', () => {
+        expect(getUrlOpenCommand()).toBe('open');
+      });
+    });
+
+    describe('on Windows (win32)', () => {
+      beforeEach(() => {
+        mockProcess.platform = 'win32';
+      });
+      it('should return start', () => {
+        expect(getUrlOpenCommand()).toBe('start');
+      });
+    });
+
+    describe('on Linux (linux)', () => {
+      beforeEach(() => {
+        mockProcess.platform = 'linux';
+      });
+      it('should return xdg-open', () => {
+        expect(getUrlOpenCommand()).toBe('xdg-open');
+      });
+    });
+
+    describe('on unmatched OS', () => {
+      beforeEach(() => {
+        mockProcess.platform = 'unmatched';
+      });
+      it('should return xdg-open', () => {
+        expect(getUrlOpenCommand()).toBe('xdg-open');
       });
     });
   });

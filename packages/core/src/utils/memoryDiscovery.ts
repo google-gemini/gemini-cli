@@ -58,8 +58,9 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
         (error as { code: string }).code === 'ENOENT';
 
       // Only log unexpected errors in non-test environments
-      // process.env.NODE_ENV === 'test' or VITEST are common test indicators
-      const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST;
+      // process.env['NODE_ENV'] === 'test' or VITEST are common test indicators
+      const isTestEnv =
+        process.env['NODE_ENV'] === 'test' || process.env['VITEST'];
 
       if (!isENOENT && !isTestEnv) {
         if (typeof error === 'object' && error !== null && 'code' in error) {
@@ -267,7 +268,6 @@ async function readGeminiMdFiles(
           undefined,
           importFormat,
         );
-
         if (debugMode)
           logger.debug(
             `Successfully read and processed imports: ${filePath} (Length: ${processedResult.content.length})`,

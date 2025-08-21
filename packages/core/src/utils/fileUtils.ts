@@ -8,6 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PartUnion } from '@google/genai';
 import mime from 'mime-types';
+import { FileSystemService } from '../services/fileSystemService.js';
+import { ToolErrorType } from '../tools/tool-error.js';
 
 // Constants for text file processing
 const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
@@ -199,6 +201,7 @@ export interface ProcessedFileReadResult {
   llmContent: PartUnion; // string for text, Part for image/pdf/unreadable binary
   returnDisplay: string;
   error?: string; // Optional error message for the LLM if file processing failed
+  errorType?: ToolErrorType; // Structured error type
   isTruncated?: boolean; // For text files, indicates if content was truncated
   originalLineCount?: number; // For text files
   linesShown?: [number, number]; // For text files [startLine, endLine] (1-based for display)
@@ -215,6 +218,7 @@ export interface ProcessedFileReadResult {
 export async function processSingleFileContent(
   filePath: string,
   rootDirectory: string,
+  fileSystemService: FileSystemService,
   offset?: number,
   limit?: number,
 ): Promise<ProcessedFileReadResult> {
@@ -222,31 +226,32 @@ export async function processSingleFileContent(
     if (!fs.existsSync(filePath)) {
       // Sync check is acceptable before async read
       return {
-        llmContent: '',
+        llmContent:
+          'Could not read file because no file was found at the specified path.',
         returnDisplay: 'File not found.',
         error: `File not found: ${filePath}`,
+        errorType: ToolErrorType.FILE_NOT_FOUND,
       };
     }
     const stats = await fs.promises.stat(filePath);
     if (stats.isDirectory()) {
       return {
-        llmContent: '',
+        llmContent:
+          'Could not read file because the provided path is a directory, not a file.',
         returnDisplay: 'Path is a directory.',
         error: `Path is a directory, not a file: ${filePath}`,
+        errorType: ToolErrorType.TARGET_IS_DIRECTORY,
       };
     }
 
-    const fileSizeInBytes = stats.size;
-    // 20MB limit
-    const maxFileSize = 20 * 1024 * 1024;
-
-    if (fileSizeInBytes > maxFileSize) {
-      throw new Error(
-        `File size exceeds the 20MB limit: ${filePath} (${(
-          fileSizeInBytes /
-          (1024 * 1024)
-        ).toFixed(2)}MB)`,
-      );
+    const fileSizeInMB = stats.size / (1024 * 1024);
+    if (fileSizeInMB > 20) {
+      return {
+        llmContent: 'File size exceeds the 20MB limit.',
+        returnDisplay: 'File size exceeds the 20MB limit.',
+        error: `File size exceeds the 20MB limit: ${filePath} (${fileSizeInMB.toFixed(2)}MB)`,
+        errorType: ToolErrorType.FILE_TOO_LARGE,
+      };
     }
 
     const fileType = await detectFileType(filePath);
@@ -269,14 +274,14 @@ export async function processSingleFileContent(
             returnDisplay: `Skipped large SVG file (>1MB): ${relativePathForDisplay}`,
           };
         }
-        const content = await fs.promises.readFile(filePath, 'utf8');
+        const content = await fileSystemService.readTextFile(filePath);
         return {
           llmContent: content,
           returnDisplay: `Read SVG as text: ${relativePathForDisplay}`,
         };
       }
       case 'text': {
-        const content = await fs.promises.readFile(filePath, 'utf8');
+        const content = await fileSystemService.readTextFile(filePath);
         const lines = content.split('\n');
         const originalLineCount = lines.length;
 
@@ -361,6 +366,7 @@ export async function processSingleFileContent(
       llmContent: `Error reading file ${displayPath}: ${errorMessage}`,
       returnDisplay: `Error reading file ${displayPath}: ${errorMessage}`,
       error: `Error reading file ${filePath}: ${errorMessage}`,
+      errorType: ToolErrorType.READ_CONTENT_FAILURE,
     };
   }
 }
