@@ -75,13 +75,13 @@ export type HistoryItemUser = HistoryItemBase & {
 export type HistoryItemGemini = HistoryItemBase & {
   type: 'gemini';
   text: string;
-  thought?: ThoughtSummary | null;
+  
 };
 
 export type HistoryItemGeminiContent = HistoryItemBase & {
   type: 'gemini_content';
   text: string;
-  thought?: ThoughtSummary | null;
+  
 };
 
 export type HistoryItemInfo = HistoryItemBase & {
