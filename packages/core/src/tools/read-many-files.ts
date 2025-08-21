@@ -11,7 +11,6 @@ import {
   ToolInvocation,
   ToolResult,
 } from './tools.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -22,6 +21,7 @@ import {
   processSingleFileContent,
   DEFAULT_ENCODING,
   getSpecificMimeType,
+  ProcessedFileReadResult,
 } from '../utils/fileUtils.js';
 import { PartListUnion } from '@google/genai';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
@@ -29,6 +29,7 @@ import {
   recordFileOperationMetric,
   FileOperation,
 } from '../telemetry/metrics.js';
+import { ToolErrorType } from './tool-error.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -85,9 +86,7 @@ type FileProcessingResult =
       success: true;
       filePath: string;
       relativePathForDisplay: string;
-      fileReadResult: NonNullable<
-        Awaited<ReturnType<typeof processSingleFileContent>>
-      >;
+      fileReadResult: ProcessedFileReadResult;
       reason?: undefined;
     }
   | {
@@ -234,13 +233,6 @@ ${finalExclusionPatternsForDescription
       : [...exclude];
 
     const searchPatterns = [...inputPatterns, ...include];
-    if (searchPatterns.length === 0) {
-      return {
-        llmContent: 'No search paths or include patterns provided.',
-        returnDisplay: `## Information\n\nNo search paths or include patterns were specified. Nothing to read or concatenate.`,
-      };
-    }
-
     try {
       const allEntries = new Set<string>();
       const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
@@ -354,9 +346,14 @@ ${finalExclusionPatternsForDescription
         });
       }
     } catch (error) {
+      const errorMessage = `Error during file search: ${getErrorMessage(error)}`;
       return {
-        llmContent: `Error during file search: ${getErrorMessage(error)}`,
+        llmContent: errorMessage,
         returnDisplay: `## File Search Error\n\nAn error occurred while searching for files:\n\`\`\`\n${getErrorMessage(error)}\n\`\`\``,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.READ_MANY_FILES_SEARCH_ERROR,
+        },
       };
     }
 
@@ -635,19 +632,6 @@ Use this tool when the user's query implies needing the content of several files
       Kind.Read,
       parameterSchema,
     );
-  }
-
-  protected override validateToolParams(
-    params: ReadManyFilesParams,
-  ): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
-    }
-    return null;
   }
 
   protected createInvocation(

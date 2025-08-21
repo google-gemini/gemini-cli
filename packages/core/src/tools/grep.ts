@@ -17,11 +17,11 @@ import {
   ToolInvocation,
   ToolResult,
 } from './tools.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { Config } from '../config/config.js';
+import { ToolErrorType } from './tool-error.js';
 
 // --- Interfaces ---
 
@@ -199,6 +199,10 @@ class GrepToolInvocation extends BaseToolInvocation<
       return {
         llmContent: `Error during grep search operation: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.GREP_EXECUTION_ERROR,
+        },
       };
     }
   }
@@ -614,15 +618,9 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
    * @param params Parameters to validate
    * @returns An error message string if invalid, null otherwise
    */
-  override validateToolParams(params: GrepToolParams): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
-    }
-
+  protected override validateToolParamValues(
+    params: GrepToolParams,
+  ): string | null {
     try {
       new RegExp(params.pattern);
     } catch (error) {
