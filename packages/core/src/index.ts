@@ -45,6 +45,7 @@ export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
 
 // Export services
+export * from './services/chatRecordingService.js';
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
 export * from './services/chatRecordingService.js';

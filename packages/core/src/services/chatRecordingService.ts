@@ -243,10 +243,8 @@ export class ChatRecordingService {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      if (this.config.getDebugMode()) {
         console.error('Error saving thought:', error);
         throw error;
-      }
     }
   }
 
