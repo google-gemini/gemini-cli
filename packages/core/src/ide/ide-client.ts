@@ -18,6 +18,7 @@ import {
 import { getIdeProcessId } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { EnvHttpProxyAgent } from 'undici';
@@ -39,6 +40,16 @@ export enum IDEConnectionStatus {
   Disconnected = 'disconnected',
   Connecting = 'connecting',
 }
+
+type StdioConfig = {
+  command: string;
+  args: string[];
+};
+
+type ConnectionConfig = {
+  port?: string;
+  stdio?: StdioConfig;
+};
 
 function getRealPath(path: string): string {
   try {
@@ -104,9 +115,9 @@ export class IdeClient {
 
     this.setState(IDEConnectionStatus.Connecting);
 
-    const ideInfoFromFile = await this.getIdeInfoFromFile();
+    const configFromFile = await this.getConnectionConfigFromFile();
     const workspacePath =
-      ideInfoFromFile.workspacePath ??
+      configFromFile?.workspacePath ??
       process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
 
     const { isValid, error } = IdeClient.validateWorkspacePath(
@@ -120,17 +131,36 @@ export class IdeClient {
       return;
     }
 
-    const portFromFile = ideInfoFromFile.port;
-    if (portFromFile) {
-      const connected = await this.establishConnection(portFromFile);
-      if (connected) {
-        return;
+    if (configFromFile) {
+      if (configFromFile.port) {
+        const connected = await this.establishHttpConnection(
+          configFromFile.port,
+        );
+        if (connected) {
+          return;
+        }
+      }
+      if (configFromFile.stdio) {
+        const connected = await this.establishStdioConnection(
+          configFromFile.stdio,
+        );
+        if (connected) {
+          return;
+        }
       }
     }
 
     const portFromEnv = this.getPortFromEnv();
     if (portFromEnv) {
-      const connected = await this.establishConnection(portFromEnv);
+      const connected = await this.establishHttpConnection(portFromEnv);
+      if (connected) {
+        return;
+      }
+    }
+
+    const stdioConfigFromEnv = this.getStdioConfigFromEnv();
+    if (stdioConfigFromEnv) {
+      const connected = await this.establishStdioConnection(stdioConfigFromEnv);
       if (connected) {
         return;
       }
@@ -316,10 +346,35 @@ export class IdeClient {
     return port;
   }
 
-  private async getIdeInfoFromFile(): Promise<{
-    port?: string;
-    workspacePath?: string;
-  }> {
+  private getStdioConfigFromEnv(): StdioConfig | undefined {
+    const command = process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'];
+    if (!command) {
+      return undefined;
+    }
+
+    const argsStr = process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'];
+    let args: string[] = [];
+    if (argsStr) {
+      try {
+        const parsedArgs = JSON.parse(argsStr);
+        if (Array.isArray(parsedArgs)) {
+          args = parsedArgs;
+        } else {
+          logger.error(
+            'GEMINI_CLI_IDE_SERVER_STDIO_ARGS must be a JSON array string.',
+          );
+        }
+      } catch (e) {
+        logger.error('Failed to parse GEMINI_CLI_IDE_SERVER_STDIO_ARGS:', e);
+      }
+    }
+
+    return { command, args };
+  }
+
+  private async getConnectionConfigFromFile(): Promise<
+    (ConnectionConfig & { workspacePath?: string }) | undefined
+  > {
     try {
       const ideProcessId = await getIdeProcessId();
       const portFile = path.join(
@@ -327,13 +382,9 @@ export class IdeClient {
         `gemini-ide-server-${ideProcessId}.json`,
       );
       const portFileContents = await fs.promises.readFile(portFile, 'utf8');
-      const ideInfo = JSON.parse(portFileContents);
-      return {
-        port: ideInfo?.port?.toString(),
-        workspacePath: ideInfo?.workspacePath,
-      };
+      return JSON.parse(portFileContents);
     } catch (_) {
-      return {};
+      return undefined;
     }
   }
 
@@ -414,9 +465,10 @@ export class IdeClient {
     );
   }
 
-  private async establishConnection(port: string): Promise<boolean> {
+  private async establishHttpConnection(port: string): Promise<boolean> {
     let transport: StreamableHTTPClientTransport | undefined;
     try {
+      logger.debug('Attempting to connect to IDE via HTTP SSE');
       this.client = new Client({
         name: 'streamable-http-client',
         // TODO(#3487): use the CLI version here.
@@ -428,6 +480,39 @@ export class IdeClient {
           fetch: this.createProxyAwareFetch(),
         },
       );
+      await this.client.connect(transport);
+      this.registerClientHandlers();
+      this.setState(IDEConnectionStatus.Connected);
+      return true;
+    } catch (_error) {
+      if (transport) {
+        try {
+          await transport.close();
+        } catch (closeError) {
+          logger.debug('Failed to close transport:', closeError);
+        }
+      }
+      return false;
+    }
+  }
+
+  private async establishStdioConnection({
+    command,
+    args,
+  }: StdioConfig): Promise<boolean> {
+    let transport: StdioClientTransport | undefined;
+    try {
+      logger.debug('Attempting to connect to IDE via stdio');
+      this.client = new Client({
+        name: 'stdio-client',
+        // TODO(#3487): use the CLI version here.
+        version: '1.0.0',
+      });
+
+      transport = new StdioClientTransport({
+        command,
+        args,
+      });
       await this.client.connect(transport);
       this.registerClientHandlers();
       this.setState(IDEConnectionStatus.Connected);
