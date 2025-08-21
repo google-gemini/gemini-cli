@@ -96,6 +96,42 @@ describe('InputPrompt', () => {
   const mockedUseCommandCompletion = vi.mocked(useCommandCompletion);
   const mockedUseInputHistory = vi.mocked(useInputHistory);
 
+  const createTestMockBuffer = (overrides: Partial<TextBuffer>): TextBuffer => {
+    const lines = overrides.text?.split('\n') || [''];
+    return {
+      text: '',
+      cursor: [0, 0],
+      lines: [''],
+      setText: vi.fn(),
+      move: vi.fn(),
+      moveToOffset: vi.fn(),
+      replaceRangeByOffset: vi.fn(),
+      viewportVisualLines: [''],
+      allVisualLines: [''],
+      visualCursor: [0, 0],
+      visualScrollRow: 0,
+      handleInput: vi.fn(),
+      killLineRight: vi.fn(),
+      killLineLeft: vi.fn(),
+      openInExternalEditor: vi.fn(),
+      newline: vi.fn(),
+      backspace: vi.fn(),
+      preferredCol: null,
+      selectionAnchor: null,
+      insert: vi.fn(),
+      del: vi.fn(),
+      undo: vi.fn(),
+      redo: vi.fn(),
+      replaceRange: vi.fn(),
+      deleteWordLeft: vi.fn(),
+      deleteWordRight: vi.fn(),
+      ...overrides,
+      lines,
+      viewportVisualLines: lines,
+      allVisualLines: lines,
+    } as unknown as TextBuffer;
+  };
+
   beforeEach(() => {
     vi.resetAllMocks();
 
@@ -1478,41 +1514,16 @@ describe('InputPrompt', () => {
         cursor: [0, 5], // cursor at position 5
       },
     ])('should move cursor to end of current line for $description', async ({ text, cursor }) => {
-      const bufferSetMock = vi.fn();
       const moveMock = vi.fn();
       const moveToOffsetMock = vi.fn();
       
-      const lines = text.split('\n');
-      mockBuffer = {
+      props.buffer = createTestMockBuffer({
         text,
         cursor,
-        lines,
-        setText: bufferSetMock,
+        visualCursor: cursor,
         move: moveMock,
         moveToOffset: moveToOffsetMock,
-        replaceRangeByOffset: vi.fn(),
-        viewportVisualLines: lines,
-        allVisualLines: lines,
-        visualCursor: cursor,
-        visualScrollRow: 0,
-        handleInput: vi.fn(),
-        killLineRight: vi.fn(),
-        killLineLeft: vi.fn(),
-        openInExternalEditor: vi.fn(),
-        newline: vi.fn(),
-        backspace: vi.fn(),
-        preferredCol: null,
-        selectionAnchor: null,
-        insert: vi.fn(),
-        del: vi.fn(),
-        undo: vi.fn(),
-        redo: vi.fn(),
-        replaceRange: vi.fn(),
-        deleteWordLeft: vi.fn(),
-        deleteWordRight: vi.fn(),
-      } as unknown as TextBuffer;
-
-      props.buffer = mockBuffer;
+      });
       
       const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
       await wait();
