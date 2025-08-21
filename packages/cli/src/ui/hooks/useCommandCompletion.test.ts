@@ -84,7 +84,9 @@ const setupMocks = ({
 
 describe('useCommandCompletion', () => {
   const mockCommandContext = {} as CommandContext;
-  const mockConfig = {} as Config;
+  const mockConfig = {
+    getEnablePromptCompletion: () => false,
+  } as Config;
   const testDirs: string[] = [];
   const testRootDir = '/';
 
@@ -511,7 +513,7 @@ describe('useCommandCompletion', () => {
       });
 
       expect(result.current.textBuffer.text).toBe(
-        '@src/file1.txt  is a good file',
+        '@src/file1.txt is a good file',
       );
     });
   });
