@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { setupUser, ProjectIdRequiredError, ProjectAccessError } from './setup.js';
+import {
+  setupUser,
+  ProjectIdRequiredError,
+  ProjectAccessError,
+} from './setup.js';
 import { CodeAssistServer } from '../code_assist/server.js';
 import { OAuth2Client } from 'google-auth-library';
 import { GeminiUserTier, UserTierId } from './types.js';
