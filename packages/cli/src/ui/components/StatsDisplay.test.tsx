@@ -50,6 +50,10 @@ describe('<StatsDisplay />', () => {
         totalDecisions: { accept: 0, reject: 0, modify: 0 },
         byName: {},
       },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
     };
 
     const { lastFrame } = renderWithMockedStats(zeroMetrics);
@@ -96,6 +100,10 @@ describe('<StatsDisplay />', () => {
         totalDecisions: { accept: 0, reject: 0, modify: 0 },
         byName: {},
       },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
     };
 
     const { lastFrame } = renderWithMockedStats(metrics);
@@ -139,6 +147,10 @@ describe('<StatsDisplay />', () => {
           },
         },
       },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
     };
 
     const { lastFrame } = renderWithMockedStats(metrics);
@@ -171,6 +183,10 @@ describe('<StatsDisplay />', () => {
               decisions: { accept: 0, reject: 0, modify: 0 },
             },
           },
+        },
+        files: {
+          totalLinesAdded: 0,
+          totalLinesRemoved: 0,
         },
       };
 
@@ -206,6 +222,10 @@ describe('<StatsDisplay />', () => {
           totalDecisions: { accept: 0, reject: 0, modify: 0 },
           byName: {},
         },
+        files: {
+          totalLinesAdded: 0,
+          totalLinesRemoved: 0,
+        },
       };
 
       const { lastFrame } = renderWithMockedStats(metrics);
@@ -228,6 +248,10 @@ describe('<StatsDisplay />', () => {
           totalDecisions: { accept: 0, reject: 0, modify: 0 },
           byName: {},
         },
+        files: {
+          totalLinesAdded: 0,
+          totalLinesRemoved: 0,
+        },
       };
       const { lastFrame } = renderWithMockedStats(metrics);
       expect(lastFrame()).toMatchSnapshot();
@@ -243,6 +267,10 @@ describe('<StatsDisplay />', () => {
           totalDurationMs: 0,
           totalDecisions: { accept: 0, reject: 0, modify: 0 },
           byName: {},
+        },
+        files: {
+          totalLinesAdded: 0,
+          totalLinesRemoved: 0,
         },
       };
       const { lastFrame } = renderWithMockedStats(metrics);
@@ -260,9 +288,65 @@ describe('<StatsDisplay />', () => {
           totalDecisions: { accept: 0, reject: 0, modify: 0 },
           byName: {},
         },
+        files: {
+          totalLinesAdded: 0,
+          totalLinesRemoved: 0,
+        },
       };
       const { lastFrame } = renderWithMockedStats(metrics);
       expect(lastFrame()).toMatchSnapshot();
+    });
+  });
+
+  describe('Code Changes Display', () => {
+    it('displays Code Changes when line counts are present', () => {
+      const metrics: SessionMetrics = {
+        models: {},
+        tools: {
+          totalCalls: 1,
+          totalSuccess: 1,
+          totalFail: 0,
+          totalDurationMs: 100,
+          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          byName: {},
+        },
+        files: {
+          totalLinesAdded: 42,
+          totalLinesRemoved: 18,
+        },
+      };
+
+      const { lastFrame } = renderWithMockedStats(metrics);
+      const output = lastFrame();
+
+      expect(output).toContain('Code Changes:');
+      expect(output).toContain('+42');
+      expect(output).toContain('-18');
+      expect(output).toMatchSnapshot();
+    });
+
+    it('hides Code Changes when no lines are added or removed', () => {
+      const metrics: SessionMetrics = {
+        models: {},
+        tools: {
+          totalCalls: 1,
+          totalSuccess: 1,
+          totalFail: 0,
+          totalDurationMs: 100,
+          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          byName: {},
+        },
+        files: {
+          totalLinesAdded: 0,
+          totalLinesRemoved: 0,
+        },
+      };
+
+      const { lastFrame } = renderWithMockedStats(metrics);
+      const output = lastFrame();
+
+      expect(output).not.toContain('Code Changes:');
+      expect(output).toMatchSnapshot();
     });
   });
 
@@ -276,6 +360,10 @@ describe('<StatsDisplay />', () => {
         totalDurationMs: 0,
         totalDecisions: { accept: 0, reject: 0, modify: 0 },
         byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     };
 
