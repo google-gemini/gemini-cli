@@ -13,6 +13,7 @@ import {
   CommandKind,
 } from './types.js';
 import { Config } from '@google/gemini-cli-core';
+import i18n from '../../i18n/index.js';
 
 async function restoreAction(
   context: CommandContext,
@@ -28,7 +29,7 @@ async function restoreAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Could not determine the .gemini directory path.',
+      content: i18n.t('messages:restore.noDirectoryPath'),
     };
   }
 
@@ -43,7 +44,7 @@ async function restoreAction(
         return {
           type: 'message',
           messageType: 'info',
-          content: 'No restorable tool calls found.',
+          content: i18n.t('messages:restore.noRestorableToolCalls'),
         };
       }
       const truncatedFiles = jsonFiles.map((file) => {
@@ -58,7 +59,7 @@ async function restoreAction(
       return {
         type: 'message',
         messageType: 'info',
-        content: `Available tool calls to restore:\n\n${fileList}`,
+        content: i18n.t('messages:restore.availableToolCalls', { fileList }),
       };
     }
 
@@ -68,7 +69,7 @@ async function restoreAction(
       return {
         type: 'message',
         messageType: 'error',
-        content: `File not found: ${selectedFile}`,
+        content: i18n.t('messages:restore.fileNotFound', { filename: selectedFile }),
       };
     }
 
@@ -82,7 +83,7 @@ async function restoreAction(
         return {
           type: 'message',
           messageType: 'error',
-          content: 'loadHistory function is not available.',
+          content: i18n.t('messages:restore.loadHistoryNotAvailable'),
         };
       }
       loadHistory(toolCallData.history);
@@ -97,7 +98,7 @@ async function restoreAction(
       addItem(
         {
           type: 'info',
-          text: 'Restored project to the state before the tool call.',
+          text: i18n.t('messages:operation.restored'),
         },
         Date.now(),
       );
@@ -112,7 +113,7 @@ async function restoreAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: `Could not read restorable tool calls. This is the error: ${error}`,
+      content: i18n.t('messages:restore.readError', { error }),
     };
   }
 }

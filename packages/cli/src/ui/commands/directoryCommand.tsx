@@ -9,6 +9,7 @@ import { MessageType } from '../types.js';
 import * as os from 'os';
 import * as path from 'path';
 import { loadServerHierarchicalMemory } from '@google/gemini-cli-core';
+import i18n from '../../i18n/index.js';
 
 export function expandHomeDir(p: string): string {
   if (!p) {
@@ -45,7 +46,7 @@ export const directoryCommand: SlashCommand = {
           addItem(
             {
               type: MessageType.ERROR,
-              text: 'Configuration is not available.',
+              text: i18n.t('messages:configuration.notAvailable'),
             },
             Date.now(),
           );
@@ -62,7 +63,7 @@ export const directoryCommand: SlashCommand = {
           addItem(
             {
               type: MessageType.ERROR,
-              text: 'Please provide at least one path to add.',
+              text: i18n.t('validation:required.pathToAdd'),
             },
             Date.now(),
           );
@@ -114,7 +115,7 @@ export const directoryCommand: SlashCommand = {
           addItem(
             {
               type: MessageType.INFO,
-              text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
+              text: i18n.t('feedback:success.geminiFilesAdded', { directories: added.join('\n- ') }),
             },
             Date.now(),
           );
@@ -130,7 +131,7 @@ export const directoryCommand: SlashCommand = {
           addItem(
             {
               type: MessageType.INFO,
-              text: `Successfully added directories:\n- ${added.join('\n- ')}`,
+              text: i18n.t('feedback:success.directoriesAdded', { directories: added.join('\n- ') }),
             },
             Date.now(),
           );
@@ -158,7 +159,7 @@ export const directoryCommand: SlashCommand = {
           addItem(
             {
               type: MessageType.ERROR,
-              text: 'Configuration is not available.',
+              text: i18n.t('messages:configuration.notAvailable'),
             },
             Date.now(),
           );
@@ -170,7 +171,7 @@ export const directoryCommand: SlashCommand = {
         addItem(
           {
             type: MessageType.INFO,
-            text: `Current workspace directories:\n${directoryList}`,
+            text: i18n.t('feedback:status.workspaceDirectories', { directoryList }),
           },
           Date.now(),
         );

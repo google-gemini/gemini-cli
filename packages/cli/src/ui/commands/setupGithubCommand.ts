@@ -10,6 +10,7 @@ import { Writable } from 'node:stream';
 import { ProxyAgent } from 'undici';
 
 import { CommandContext } from '../../ui/commands/types.js';
+import i18n from '../../i18n/index.js';
 import {
   getGitRepoRoot,
   getLatestGitHubRelease,
@@ -192,9 +193,11 @@ export const setupGithubCommand: SlashCommand = {
     // Print out a message
     const commands = [];
     commands.push('set -eEuo pipefail');
-    commands.push(
-      `echo "Successfully downloaded ${workflows.length} workflows and updated .gitignore. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
-    );
+    const successMessage = i18n.t('messages:github.setupSuccess', { 
+      count: workflows.length, 
+      readmeUrl 
+    });
+    commands.push(`echo "${successMessage}"`);
     commands.push(...getOpenUrlsCommands(readmeUrl));
 
     const command = `(${commands.join(' && ')})`;
@@ -202,8 +205,7 @@ export const setupGithubCommand: SlashCommand = {
       type: 'tool',
       toolName: 'run_shell_command',
       toolArgs: {
-        description:
-          'Setting up GitHub Actions to triage issues and review PRs with Gemini.',
+        description: i18n.t('messages:github.setupDescription'),
         command,
       },
     };

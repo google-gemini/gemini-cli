@@ -7,12 +7,14 @@
 import { Box, Newline, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useTranslation } from 'react-i18next';
 
 interface GeminiPrivacyNoticeProps {
   onExit: () => void;
 }
 
 export const GeminiPrivacyNotice = ({ onExit }: GeminiPrivacyNoticeProps) => {
+  const { t } = useTranslation('ui');
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
@@ -56,7 +58,7 @@ export const GeminiPrivacyNotice = ({ onExit }: GeminiPrivacyNoticeProps) => {
         https://ai.google.dev/gemini-api/terms
       </Text>
       <Newline />
-      <Text color={Colors.Gray}>Press Esc to exit.</Text>
+      <Text color={Colors.Gray}>{t('prompts.pressEscToExit')}</Text>
     </Box>
   );
 };

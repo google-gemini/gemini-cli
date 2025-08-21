@@ -11,6 +11,7 @@ import crypto from 'crypto';
 import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
+import { useTranslation } from 'react-i18next';
 
 interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -107,8 +108,9 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   terminalWidth,
   theme,
 }) => {
+  const { t } = useTranslation('ui');
   if (!diffContent || typeof diffContent !== 'string') {
-    return <Text color={Colors.AccentYellow}>No diff content.</Text>;
+    return <Text color={Colors.AccentYellow}>{t('status.noDiffContent')}</Text>;
   }
 
   const parsedLines = parseDiffWithLineNumbers(diffContent);
@@ -116,7 +118,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   if (parsedLines.length === 0) {
     return (
       <Box borderStyle="round" borderColor={Colors.Gray} padding={1}>
-        <Text dimColor>No changes detected.</Text>
+        <Text dimColor>{t('status.noChangesDetected')}</Text>
       </Box>
     );
   }
@@ -171,6 +173,7 @@ const renderDiffContent = (
   availableTerminalHeight: number | undefined,
   terminalWidth: number,
 ) => {
+  const { t } = useTranslation('ui');
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
     ...line,
@@ -185,7 +188,7 @@ const renderDiffContent = (
   if (displayableLines.length === 0) {
     return (
       <Box borderStyle="round" borderColor={Colors.Gray} padding={1}>
-        <Text dimColor>No changes detected.</Text>
+        <Text dimColor>{t('status.noChangesDetected')}</Text>
       </Box>
     );
   }

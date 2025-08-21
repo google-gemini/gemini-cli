@@ -11,6 +11,7 @@ import { CloudPaidPrivacyNotice } from './CloudPaidPrivacyNotice.js';
 import { Config } from '@google/gemini-cli-core';
 import { Colors } from '../colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useTranslation } from 'react-i18next';
 
 interface CloudFreePrivacyNoticeProps {
   config: Config;
@@ -21,6 +22,7 @@ export const CloudFreePrivacyNotice = ({
   config,
   onExit,
 }: CloudFreePrivacyNoticeProps) => {
+  const { t } = useTranslation('ui');
   const { privacyState, updateDataCollectionOptIn } =
     usePrivacySettings(config);
 
@@ -34,7 +36,7 @@ export const CloudFreePrivacyNotice = ({
   );
 
   if (privacyState.isLoading) {
-    return <Text color={Colors.Gray}>Loading...</Text>;
+    return <Text color={Colors.Gray}>{t('status.loading')}</Text>;
   }
 
   if (privacyState.error) {
@@ -43,7 +45,7 @@ export const CloudFreePrivacyNotice = ({
         <Text color={Colors.AccentRed}>
           Error loading Opt-in settings: {privacyState.error}
         </Text>
-        <Text color={Colors.Gray}>Press Esc to exit.</Text>
+        <Text color={Colors.Gray}>{t('prompts.pressEscToExit')}</Text>
       </Box>
     );
   }
@@ -111,7 +113,7 @@ export const CloudFreePrivacyNotice = ({
         https://policies.google.com/privacy
       </Text>
       <Newline />
-      <Text color={Colors.Gray}>Press Enter to choose an option and exit.</Text>
+      <Text color={Colors.Gray}>{t('prompts.pressEnterToChoose')}</Text>
     </Box>
   );
 };
