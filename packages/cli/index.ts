@@ -9,6 +9,14 @@
 import './src/gemini.js';
 import { main } from './src/gemini.js';
 
+export {
+  loadSettings,
+  saveSettings,
+  SettingScope,
+  Settings,
+} from './src/config/settings.js';
+export { themeManager, ThemeDisplay } from './src/ui/themes/theme-manager.js';
+
 // --- Global Entry Point ---
 main().catch((error) => {
   console.error('An unexpected critical error occurred:');

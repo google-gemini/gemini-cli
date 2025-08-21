@@ -1,0 +1,99 @@
+{
+  "name": "electron-app",
+  "version": "1.0.0",
+  "description": "Electron app for gemini-cli",
+  "homepage": "./",
+  "author": {
+    "name": "Google",
+    "email": "gemini-cli@google.com"
+  },
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "npx electron-vite dev",
+    "build": "npx electron-vite build",
+    "start": "npx electron-vite preview",
+    "prepackage": "rm -rf dist && mkdir -p dist/cli dist/core && cp -r ../../packages/cli/dist/* dist/cli && cp -r ../../packages/core/dist/* dist/core",
+    "package": "npm run build && npm run prepackage && electron-builder && mkdir -p ../../packaged_app && cp dist/electron/*.{deb,dmg,exe,AppImage} ../../packaged_app/",
+    "lint": "eslint . --ext .ts,.tsx",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@google/gemini-cli": "file:../cli",
+    "@google/gemini-cli-core": "file:../core",
+    "@monaco-editor/react": "^4.7.0",
+    "@xterm/xterm": "^5.5.0",
+    "lucide-react": "^0.539.0",
+    "monaco-editor": "^0.52.2",
+    "node-pty": "^1.1.0-beta34",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "xterm-addon-fit": "^0.8.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^3.1.1",
+    "electron": "37.2.6",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^4.0.0",
+    "jsdom": "^24.0.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.11",
+    "vitest": "^3.2.4"
+  },
+  "build": {
+    "productName": "Gemini CLI",
+    "appId": "com.google.gemini-cli",
+    "directories": {
+      "output": "dist/electron"
+    },
+    "asarUnpack": [
+      "**/node_modules/node-pty/**",
+      "**/node_modules/ajv/**/*"
+    ],
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/cli",
+        "to": "cli"
+      },
+      {
+        "from": "dist/core",
+        "to": "core"
+      },
+      {
+        "from": "src/resources",
+        "to": "resources"
+      }
+    ],
+    "mac": {
+      "icon": "src/resources/icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "win": {
+      "icon": "src/resources/icon.png",
+      "target": "nsis"
+    },
+    "linux": {
+      "icon": "src/resources/icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    }
+  }
+}

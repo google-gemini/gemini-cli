@@ -28,10 +28,17 @@ import { chatCommand } from './chatCommand.js';
 import { Stats } from 'fs';
 import { HistoryItemWithoutId } from '../types.js';
 
-vi.mock('fs/promises', () => ({
-  stat: vi.fn(),
-  readdir: vi.fn().mockResolvedValue(['file1.txt', 'file2.txt'] as string[]),
-}));
+vi.mock('fs/promises', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+    },
+    stat: vi.fn(),
+    readdir: vi.fn().mockResolvedValue(['file1.txt', 'file2.txt'] as string[]),
+  };
+});
 
 describe('chatCommand', () => {
   const mockFs = fsPromises as Mocked<typeof fsPromises>;
