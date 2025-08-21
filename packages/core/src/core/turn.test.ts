@@ -106,7 +106,21 @@ describe('Turn', () => {
 
       expect(events).toEqual([
         { type: GeminiEventType.Content, value: 'Hello' },
+        {
+          type: GeminiEventType.Finished,
+          value: {
+            reason: undefined,
+            usageMetadata: undefined,
+          },
+        },
         { type: GeminiEventType.Content, value: ' world' },
+        {
+          type: GeminiEventType.Finished,
+          value: {
+            reason: undefined,
+            usageMetadata: undefined,
+          },
+        },
       ]);
       expect(turn.getDebugResponses().length).toBe(2);
     });
@@ -136,7 +150,7 @@ describe('Turn', () => {
         events.push(event);
       }
 
-      expect(events.length).toBe(2);
+      expect(events.length).toBe(3);
       const event1 = events[0] as ServerGeminiToolCallRequestEvent;
       expect(event1.type).toBe(GeminiEventType.ToolCallRequest);
       expect(event1.value).toEqual(
@@ -191,6 +205,13 @@ describe('Turn', () => {
       }
       expect(events).toEqual([
         { type: GeminiEventType.Content, value: 'First part' },
+        {
+          type: GeminiEventType.Finished,
+          value: {
+            reason: undefined,
+            usageMetadata: undefined,
+          },
+        },
         { type: GeminiEventType.UserCancelled },
       ]);
       expect(turn.getDebugResponses().length).toBe(1);
@@ -248,7 +269,7 @@ describe('Turn', () => {
         events.push(event);
       }
 
-      expect(events.length).toBe(3);
+      expect(events.length).toBe(4);
       const event1 = events[0] as ServerGeminiToolCallRequestEvent;
       expect(event1.type).toBe(GeminiEventType.ToolCallRequest);
       expect(event1.value).toEqual(
@@ -296,6 +317,13 @@ describe('Turn', () => {
               finishReason: 'STOP',
             },
           ],
+          usageMetadata: {
+            promptTokenCount: 17,
+            candidatesTokenCount: 50,
+            cachedContentTokenCount: 10,
+            thoughtsTokenCount: 5,
+            toolUsePromptTokenCount: 2,
+          },
         } as unknown as GenerateContentResponse;
       })();
       mockSendMessageStream.mockResolvedValue(mockResponseStream);
@@ -311,7 +339,19 @@ describe('Turn', () => {
 
       expect(events).toEqual([
         { type: GeminiEventType.Content, value: 'Partial response' },
-        { type: GeminiEventType.Finished, value: 'STOP' },
+        {
+          type: GeminiEventType.Finished,
+          value: {
+            reason: 'STOP',
+            usageMetadata: {
+              promptTokenCount: 17,
+              candidatesTokenCount: 50,
+              cachedContentTokenCount: 10,
+              thoughtsTokenCount: 5,
+              toolUsePromptTokenCount: 2,
+            },
+          },
+        },
       ]);
     });
 
@@ -346,7 +386,10 @@ describe('Turn', () => {
           type: GeminiEventType.Content,
           value: 'This is a long response that was cut off...',
         },
-        { type: GeminiEventType.Finished, value: 'MAX_TOKENS' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: 'MAX_TOKENS', usageMetadata: undefined },
+        },
       ]);
     });
 
@@ -374,11 +417,14 @@ describe('Turn', () => {
 
       expect(events).toEqual([
         { type: GeminiEventType.Content, value: 'Content blocked' },
-        { type: GeminiEventType.Finished, value: 'SAFETY' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: 'SAFETY', usageMetadata: undefined },
+        },
       ]);
     });
 
-    it('should not yield finished event when there is no finish reason', async () => {
+    it('should yield finished event with undefined reason when there is no finish reason', async () => {
       const mockResponseStream = (async function* () {
         yield {
           candidates: [
@@ -405,8 +451,11 @@ describe('Turn', () => {
           type: GeminiEventType.Content,
           value: 'Response without finish reason',
         },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: undefined },
+        },
       ]);
-      // No Finished event should be emitted
     });
 
     it('should handle multiple responses with different finish reasons', async () => {
@@ -441,8 +490,109 @@ describe('Turn', () => {
 
       expect(events).toEqual([
         { type: GeminiEventType.Content, value: 'First part' },
+        {
+          type: GeminiEventType.Finished,
+          value: {
+            reason: undefined,
+            usageMetadata: undefined,
+          },
+        },
         { type: GeminiEventType.Content, value: 'Second part' },
-        { type: GeminiEventType.Finished, value: 'OTHER' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: 'OTHER', usageMetadata: undefined },
+        },
+      ]);
+    });
+
+    it('should include comprehensive usage metadata in finished events', async () => {
+      const mockResponseStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'Response with metadata' }] },
+              finishReason: 'STOP',
+            },
+          ],
+          usageMetadata: {
+            promptTokenCount: 25,
+            candidatesTokenCount: 40,
+            cachedContentTokenCount: 15,
+            thoughtsTokenCount: 8,
+            toolUsePromptTokenCount: 5,
+            totalTokenCount: 93,
+          },
+        } as unknown as GenerateContentResponse;
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      const reqParts: Part[] = [{ text: 'Test with full metadata' }];
+      for await (const event of turn.run(
+        reqParts,
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([
+        { type: GeminiEventType.Content, value: 'Response with metadata' },
+        {
+          type: GeminiEventType.Finished,
+          value: {
+            reason: 'STOP',
+            usageMetadata: {
+              promptTokenCount: 25,
+              candidatesTokenCount: 40,
+              cachedContentTokenCount: 15,
+              thoughtsTokenCount: 8,
+              toolUsePromptTokenCount: 5,
+              totalTokenCount: 93,
+            },
+          },
+        },
+      ]);
+    });
+
+    it('should handle partial usage metadata gracefully', async () => {
+      const mockResponseStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'Response with partial metadata' }] },
+              finishReason: 'STOP',
+            },
+          ],
+          usageMetadata: {
+            promptTokenCount: 10,
+            candidatesTokenCount: 15,
+            // Missing some optional fields
+          },
+        } as unknown as GenerateContentResponse;
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      const reqParts: Part[] = [{ text: 'Test with partial metadata' }];
+      for await (const event of turn.run(
+        reqParts,
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([
+        { type: GeminiEventType.Content, value: 'Response with partial metadata' },
+        {
+          type: GeminiEventType.Finished,
+          value: {
+            reason: 'STOP',
+            usageMetadata: {
+              promptTokenCount: 10,
+              candidatesTokenCount: 15,
+            },
+          },
+        },
       ]);
     });
 
