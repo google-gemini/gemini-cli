@@ -15,6 +15,11 @@ import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
+import {
+  usePromptCompletion,
+  PromptCompletion,
+  PROMPT_COMPLETION_MIN_LENGTH,
+} from './usePromptCompletion.js';
 import { Config } from '@google/gemini-cli-core';
 import { useCompletion } from './useCompletion.js';
 
@@ -22,6 +27,7 @@ export enum CompletionMode {
   IDLE = 'IDLE',
   AT = 'AT',
   SLASH = 'SLASH',
+  PROMPT = 'PROMPT',
 }
 
 export interface UseCommandCompletionReturn {
@@ -37,6 +43,7 @@ export interface UseCommandCompletionReturn {
   navigateUp: () => void;
   navigateDown: () => void;
   handleAutocomplete: (indexToUse: number) => void;
+  promptCompletion: PromptCompletion;
 }
 
 export function useCommandCompletion(
@@ -93,12 +100,7 @@ export function useCommandCompletion(
             backslashCount++;
           }
           if (backslashCount % 2 === 0) {
-            return {
-              completionMode: CompletionMode.IDLE,
-              query: null,
-              completionStart: -1,
-              completionEnd: -1,
-            };
+            break;
           }
         } else if (char === '@') {
           let end = codePoints.length;
@@ -125,13 +127,33 @@ export function useCommandCompletion(
           };
         }
       }
+
+      // Check for prompt completion - only if enabled
+      const trimmedText = buffer.text.trim();
+      const isPromptCompletionEnabled =
+        config?.getEnablePromptCompletion() ?? false;
+
+      if (
+        isPromptCompletionEnabled &&
+        trimmedText.length >= PROMPT_COMPLETION_MIN_LENGTH &&
+        !trimmedText.startsWith('/') &&
+        !trimmedText.includes('@')
+      ) {
+        return {
+          completionMode: CompletionMode.PROMPT,
+          query: trimmedText,
+          completionStart: 0,
+          completionEnd: trimmedText.length,
+        };
+      }
+
       return {
         completionMode: CompletionMode.IDLE,
         query: null,
         completionStart: -1,
         completionEnd: -1,
       };
-    }, [cursorRow, cursorCol, buffer.lines]);
+    }, [cursorRow, cursorCol, buffer.lines, buffer.text, config]);
 
   useAtCompletion({
     enabled: completionMode === CompletionMode.AT,
@@ -150,6 +172,12 @@ export function useCommandCompletion(
     setSuggestions,
     setIsLoadingSuggestions,
     setIsPerfectMatch,
+  });
+
+  const promptCompletion = usePromptCompletion({
+    buffer,
+    config,
+    enabled: completionMode === CompletionMode.PROMPT,
   });
 
   useEffect(() => {
@@ -202,7 +230,11 @@ export function useCommandCompletion(
         }
       }
 
-      suggestionText += ' ';
+      const lineCodePoints = toCodePoints(buffer.lines[cursorRow] || '');
+      const charAfterCompletion = lineCodePoints[end];
+      if (charAfterCompletion !== ' ') {
+        suggestionText += ' ';
+      }
 
       buffer.replaceRangeByOffset(
         logicalPosToOffset(buffer.lines, cursorRow, start),
@@ -234,5 +266,6 @@ export function useCommandCompletion(
     navigateUp,
     navigateDown,
     handleAutocomplete,
+    promptCompletion,
   };
 }

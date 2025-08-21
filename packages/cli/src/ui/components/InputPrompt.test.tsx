@@ -160,6 +160,11 @@ describe('InputPrompt', () => {
       setActiveSuggestionIndex: vi.fn(),
       setShowSuggestions: vi.fn(),
       handleAutocomplete: vi.fn(),
+      promptCompletion: {
+        text: '',
+        accept: vi.fn(),
+        clear: vi.fn(),
+      },
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
 
