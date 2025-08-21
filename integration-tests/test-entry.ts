@@ -15,11 +15,6 @@ const sanitizedName = sanitizeTestName(testName);
 const polly = new Polly(sanitizedName, {
   adapters: ['fetch'],
   persister: 'fs',
-  persisterOptions: {
-    fs: {
-      recordingsDir: join(env.INTEGRATION_TEST_FILE_DIR!, sanitizedName, 'polly-recordings'),
-    },
-  },
   recordIfMissing: true,
   matchRequestsBy: {
     headers: {

@@ -11,12 +11,6 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { env } from 'process';
 import fs from 'fs';
-import { Polly } from '@pollyjs/core';
-import FSPersister from '@pollyjs/persister-fs';
-import FetchAdapter from '@pollyjs/adapter-fetch';
-
-Polly.register(FetchAdapter);
-Polly.register(FSPersister);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -120,7 +114,6 @@ export class TestRig {
   testDir: string | null;
   testName?: string;
   _lastRunStdout?: string;
-  polly?: Polly;
 
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
@@ -142,17 +135,6 @@ export class TestRig {
     const sanitizedName = sanitizeTestName(testName);
     this.testDir = join(env.INTEGRATION_TEST_FILE_DIR!, sanitizedName);
     mkdirSync(this.testDir, { recursive: true });
-
-    this.polly = new Polly(sanitizedName, {
-      adapters: ['fetch'],
-      persister: 'fs',
-      recordIfMissing: true,
-      matchRequestsBy: {
-        headers: {
-          exclude: ['user-agent', 'accept', 'accept-encoding', 'connection'],
-        },
-      },
-    });
 
     // Create a settings file to point the CLI to the local collector
     const geminiDir = join(this.testDir, '.gemini');
@@ -199,14 +181,20 @@ export class TestRig {
     promptOrOptions: string | { prompt?: string; stdin?: string },
     ...args: string[]
   ): Promise<string> {
-    let command = `node ${this.bundlePath} --yolo`;
+    let command = `npx tsx ${join(__dirname, 'test-entry.ts')} --yolo`;
     const execOptions: {
       cwd: string;
       encoding: 'utf-8';
       input?: string;
+      env: Record<string, string>;
     } = {
       cwd: this.testDir!,
       encoding: 'utf-8',
+      env: {
+        ...process.env,
+        GEMINI_TEST_NAME: this.testName!,
+        INTEGRATION_TEST_FILE_DIR: env.INTEGRATION_TEST_FILE_DIR!,
+      },
     };
 
     if (typeof promptOrOptions === 'string') {
@@ -231,6 +219,7 @@ export class TestRig {
     const child = spawn(node, commandArgs as string[], {
       cwd: this.testDir!,
       stdio: 'pipe',
+      env: execOptions.env,
     });
 
     let stdout = '';
