@@ -25,7 +25,7 @@ import * as os from 'node:os';
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal();
   return {
-    ...actual,
+    ...(actual as object),
     promises: {
       readFile: vi.fn(),
     },
@@ -88,9 +88,7 @@ describe('IdeClient', () => {
   describe('connect', () => {
     it('should connect using HTTP when port is provided in config file', async () => {
       const config = { port: '8080' };
-      vi.mocked(fs.promises.readFile).mockResolvedValue(
-        JSON.stringify(config),
-      );
+      vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
 
       const ideClient = IdeClient.getInstance();
       await ideClient.connect();
@@ -110,9 +108,7 @@ describe('IdeClient', () => {
 
     it('should connect using stdio when stdio config is provided in file', async () => {
       const config = { stdio: { command: 'test-cmd', args: ['--foo'] } };
-      vi.mocked(fs.promises.readFile).mockResolvedValue(
-        JSON.stringify(config),
-      );
+      vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
 
       const ideClient = IdeClient.getInstance();
       await ideClient.connect();
@@ -132,9 +128,7 @@ describe('IdeClient', () => {
         port: '8080',
         stdio: { command: 'test-cmd', args: ['--foo'] },
       };
-      vi.mocked(fs.promises.readFile).mockResolvedValue(
-        JSON.stringify(config),
-      );
+      vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
 
       const ideClient = IdeClient.getInstance();
       await ideClient.connect();
@@ -186,9 +180,7 @@ describe('IdeClient', () => {
 
     it('should prioritize file config over environment variables', async () => {
       const config = { port: '8080' };
-      vi.mocked(fs.promises.readFile).mockResolvedValue(
-        JSON.stringify(config),
-      );
+      vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
       process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '9090';
 
       const ideClient = IdeClient.getInstance();
