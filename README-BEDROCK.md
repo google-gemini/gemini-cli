@@ -34,6 +34,7 @@ export BEDROCK_MODEL=anthropic.claude-3-sonnet-20240229-v1:0
 - `anthropic.claude-3-opus-20240229-v1:0` - Claude 3 Opus
 
 ### Cross-Region Inference Profiles (Recommended)
+
 - `us.anthropic.claude-3-7-sonnet-20250219-v1:0`
 - `us.anthropic.claude-sonnet-4-20250514-v1:0`
 - `us.anthropic.claude-opus-4-20250514-v1:0`
@@ -45,6 +46,7 @@ export BEDROCK_MODEL=anthropic.claude-3-sonnet-20240229-v1:0
 To use AWS Bedrock instead of the default Gemini API:
 
 1. Set up your AWS credentials and region:
+
 ```bash
 export AWS_REGION=us-east-1
 export AWS_ACCESS_KEY_ID=your-access-key
@@ -52,12 +54,14 @@ export AWS_SECRET_ACCESS_KEY=your-secret-key
 ```
 
 2. Configure the CLI:
+
 ```bash
 # Set auth type to AWS Bedrock
 gemini config set selectedAuthType aws-bedrock
 ```
 
 3. Run the CLI:
+
 ```bash
 # Interactive mode
 gemini
@@ -169,6 +173,7 @@ gemini --debug "Your prompt here"
 ```
 
 This will log:
+
 - AWS credential detection
 - Bedrock request details
 - Tool format conversions
@@ -177,6 +182,7 @@ This will log:
 ## Cost Considerations
 
 AWS Bedrock charges based on:
+
 - Input tokens processed
 - Output tokens generated
 - Model selection (Opus is more expensive than Haiku)
@@ -186,6 +192,7 @@ Monitor your AWS billing dashboard to track usage.
 ## Troubleshooting
 
 ### "No AWS credentials found"
+
 ```bash
 # Check your AWS credentials
 aws sts get-caller-identity
@@ -199,6 +206,7 @@ export AWS_SECRET_ACCESS_KEY=your-secret
 ```
 
 ### "Access denied" errors
+
 1. Check IAM permissions for `bedrock:InvokeModel`
 2. Ensure model access is enabled in Bedrock console:
    - Go to AWS Bedrock console
@@ -207,6 +215,7 @@ export AWS_SECRET_ACCESS_KEY=your-secret
    - Wait for approval (usually instant)
 
 ### "Invalid model" errors
+
 - Verify the model ID is correct
 - Check if the model is available in your region
 - Consider using cross-region inference profiles (starting with `us.`)
@@ -245,6 +254,7 @@ All components maintain strict TypeScript typing with zero `any` types.
 ## Differences from Upstream
 
 This fork:
+
 - Adds AWS Bedrock as an authentication option alongside existing options
 - Supports Claude models through Bedrock while maintaining Gemini compatibility
 - Requires AWS credentials when using Bedrock authentication
@@ -253,6 +263,7 @@ This fork:
 ## Contributing
 
 When contributing:
+
 1. Keep changes minimal to ease upstream merges
 2. Test with multiple Claude models
 3. Ensure AWS credential handling is secure
