@@ -27,7 +27,7 @@ export function tokenLimit(model: Model): TokenCount {
       return 1_048_576;
     case 'gemini-2.0-flash-preview-image-generation':
       return 32_000;
-    
+
     // Claude models on Bedrock - all have 200k context window
     case 'us.anthropic.claude-3-7-sonnet-20250219-v1:0':
     case 'us.anthropic.claude-3-5-haiku-20241022-v1:0':
@@ -40,7 +40,7 @@ export function tokenLimit(model: Model): TokenCount {
     case 'anthropic.claude-3-sonnet-20240229-v1:0':
     case 'anthropic.claude-3-haiku-20240307-v1:0':
       return 200_000;
-    
+
     default:
       return DEFAULT_TOKEN_LIMIT;
   }
