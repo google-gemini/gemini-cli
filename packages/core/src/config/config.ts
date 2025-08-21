@@ -22,16 +22,11 @@ import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import {
-  MemoryTool,
-  setGeminiMdFilename,
-  GEMINI_CONFIG_DIR as GEMINI_DIR,
-} from '../tools/memoryTool.js';
+import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
-import { getProjectTempDir } from '../utils/paths.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
@@ -57,6 +52,7 @@ import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
 import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { Storage } from './storage.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -204,6 +200,7 @@ export interface ConfigParameters {
   trustedFolder?: boolean;
   shouldUseNodePtyShell?: boolean;
   skipNextSpeakerCheck?: boolean;
+  enablePromptCompletion?: boolean;
 }
 
 export class Config {
@@ -271,7 +268,9 @@ export class Config {
   private readonly trustedFolder: boolean | undefined;
   private readonly shouldUseNodePtyShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
+  private readonly enablePromptCompletion: boolean = false;
   private initialized: boolean = false;
+  readonly storage: Storage;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -340,6 +339,8 @@ export class Config {
     this.trustedFolder = params.trustedFolder;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
+    this.storage = new Storage(this.targetDir);
+    this.enablePromptCompletion = params.enablePromptCompletion ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -348,8 +349,6 @@ export class Config {
     if (this.telemetrySettings.enabled) {
       initializeTelemetry(this);
     }
-
-    logCliConfiguration(this, new StartSessionEvent(this));
   }
 
   /**
@@ -367,6 +366,7 @@ export class Config {
     }
     this.promptRegistry = new PromptRegistry();
     this.toolRegistry = await this.createToolRegistry();
+    logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
   }
 
   async refreshAuth(authMethod: AuthType) {
@@ -591,14 +591,6 @@ export class Config {
     return this.geminiClient;
   }
 
-  getGeminiDir(): string {
-    return path.join(this.targetDir, GEMINI_DIR);
-  }
-
-  getProjectTempDir(): string {
-    return getProjectTempDir(this.getProjectRoot());
-  }
-
   getEnableRecursiveFileSearch(): boolean {
     return this.fileFiltering.enableRecursiveFileSearch;
   }
@@ -742,9 +734,13 @@ export class Config {
     return this.skipNextSpeakerCheck;
   }
 
+  getEnablePromptCompletion(): boolean {
+    return this.enablePromptCompletion;
+  }
+
   async getGitService(): Promise<GitService> {
     if (!this.gitService) {
-      this.gitService = new GitService(this.targetDir);
+      this.gitService = new GitService(this.targetDir, this.storage);
       await this.gitService.initialize();
     }
     return this.gitService;
