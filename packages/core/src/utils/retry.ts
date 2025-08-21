@@ -48,15 +48,18 @@ function defaultShouldRetry(error: Error | unknown): boolean {
     }
     return false;
   }
-  
+
   // Fallback to message checking only if no status code is found
   if (error instanceof Error && error.message) {
     // Only check for explicit status mentions, not any 5XX pattern
     if (error.message.includes('429')) return true;
-    if (error.message.includes('status 500') || 
-        error.message.includes('status 502') || 
-        error.message.includes('status 503') || 
-        error.message.includes('status 504')) return true;
+    if (
+      error.message.includes('status 500') ||
+      error.message.includes('status 502') ||
+      error.message.includes('status 503') ||
+      error.message.includes('status 504')
+    )
+      return true;
   }
   return false;
 }
@@ -336,10 +339,12 @@ function logRetryAttempt(
         `Attempt ${attempt} failed with 429 error (no Retry-After header). Retrying with backoff...`,
         error,
       );
-    } else if (error.message.includes('status 500') || 
-               error.message.includes('status 502') || 
-               error.message.includes('status 503') || 
-               error.message.includes('status 504')) {
+    } else if (
+      error.message.includes('status 500') ||
+      error.message.includes('status 502') ||
+      error.message.includes('status 503') ||
+      error.message.includes('status 504')
+    ) {
       console.error(
         `Attempt ${attempt} failed with 5xx error. Retrying with backoff...`,
         error,

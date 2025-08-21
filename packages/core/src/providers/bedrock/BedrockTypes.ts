@@ -19,6 +19,7 @@ import type {
   MessageCreateParamsStreaming,
   MessageStreamEvent,
   Tool as AnthropicTool,
+  // eslint-disable-next-line import/no-internal-modules
 } from '@anthropic-ai/sdk/resources/messages';
 import type { Content, Tool } from '@google/genai';
 
@@ -126,7 +127,13 @@ export interface BedrockStreamDelta {
 }
 
 export interface BedrockStreamChunk {
-  type: 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'message_start' | 'message_delta' | 'message_stop';
+  type:
+    | 'content_block_start'
+    | 'content_block_delta'
+    | 'content_block_stop'
+    | 'message_start'
+    | 'message_delta'
+    | 'message_stop';
   index?: number;
   delta?: BedrockStreamDelta;
   content_block?: BedrockStreamContentBlock;
@@ -149,12 +156,8 @@ export class BedrockError extends Error {
   readonly code?: string;
   readonly statusCode?: number;
   readonly status?: number; // For compatibility with retry logic
-  
-  constructor(
-    message: string,
-    code?: string,
-    statusCode?: number,
-  ) {
+
+  constructor(message: string, code?: string, statusCode?: number) {
     super(message);
     this.name = 'BedrockError';
     this.code = code;

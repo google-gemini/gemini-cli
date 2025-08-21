@@ -5,7 +5,9 @@
  */
 
 import { GenerateContentResponse } from '@google/genai';
+// eslint-disable-next-line import/no-internal-modules
 import { Stream } from '@anthropic-ai/sdk/streaming';
+// eslint-disable-next-line import/no-internal-modules
 import type { MessageStreamEvent } from '@anthropic-ai/sdk/resources/messages';
 import { Config } from '../../config/config.js';
 
@@ -24,11 +26,11 @@ export class BedrockStreamHandler {
    * Convert Bedrock stream to Gemini-compatible async generator
    */
   async *handleStream(
-    stream: Stream<MessageStreamEvent>
+    stream: Stream<MessageStreamEvent>,
   ): AsyncGenerator<GenerateContentResponse> {
     // Reset cumulative usage for each new stream
     this.cumulativeUsage = { inputTokens: 0, outputTokens: 0 };
-    
+
     let currentToolUse: {
       id?: string;
       name?: string;
@@ -39,14 +41,20 @@ export class BedrockStreamHandler {
     try {
       for await (const event of stream) {
         if (this.config.getDebugMode()) {
-          console.debug('[BedrockStreamHandler] Stream event:', JSON.stringify(event, null, 2));
+          console.debug(
+            '[BedrockStreamHandler] Stream event:',
+            JSON.stringify(event, null, 2),
+          );
         }
 
         switch (event.type) {
           case 'content_block_delta':
             if (event.delta?.type === 'text_delta' && event.delta.text) {
               yield this.createTextResponse(event.delta.text);
-            } else if (event.delta?.type === 'input_json_delta' && event.delta.partial_json) {
+            } else if (
+              event.delta?.type === 'input_json_delta' &&
+              event.delta.partial_json
+            ) {
               // Accumulate tool input JSON
               accumulatedInput += event.delta.partial_json;
             }
@@ -69,14 +77,25 @@ export class BedrockStreamHandler {
               // End of tool use block - parse and yield the complete tool call
               let parsedInput = {};
               try {
-                parsedInput = accumulatedInput ? JSON.parse(accumulatedInput) : {};
+                parsedInput = accumulatedInput
+                  ? JSON.parse(accumulatedInput)
+                  : {};
               } catch (error) {
-                console.error('[BedrockStreamHandler] Failed to parse tool input:', error);
-                console.error('[BedrockStreamHandler] Accumulated input:', accumulatedInput);
+                console.error(
+                  '[BedrockStreamHandler] Failed to parse tool input:',
+                  error,
+                );
+                console.error(
+                  '[BedrockStreamHandler] Accumulated input:',
+                  accumulatedInput,
+                );
                 // Fall back to empty object on parse error
                 parsedInput = {};
               }
-              yield this.createToolCallResponse(currentToolUse.name, parsedInput);
+              yield this.createToolCallResponse(
+                currentToolUse.name,
+                parsedInput,
+              );
               // Reset for next tool use
               currentToolUse = {};
               accumulatedInput = '';
@@ -94,12 +113,13 @@ export class BedrockStreamHandler {
             // Message delta contains cumulative token usage
             if ('usage' in event && event.usage) {
               this.cumulativeUsage.inputTokens = event.usage.input_tokens || 0;
-              this.cumulativeUsage.outputTokens = event.usage.output_tokens || 0;
-              
+              this.cumulativeUsage.outputTokens =
+                event.usage.output_tokens || 0;
+
               if (this.config.getDebugMode()) {
                 console.debug('[BedrockStreamHandler] Token usage update:', {
                   inputTokens: this.cumulativeUsage.inputTokens,
-                  outputTokens: this.cumulativeUsage.outputTokens
+                  outputTokens: this.cumulativeUsage.outputTokens,
                 });
               }
             }
@@ -108,7 +128,10 @@ export class BedrockStreamHandler {
           case 'message_stop':
             // End of message stream
             if (this.config.getDebugMode()) {
-              console.debug('[BedrockStreamHandler] Stream completed with final token usage:', this.cumulativeUsage);
+              console.debug(
+                '[BedrockStreamHandler] Stream completed with final token usage:',
+                this.cumulativeUsage,
+              );
             }
             // Don't yield an empty chunk - usage metadata is already attached to content chunks
             break;
@@ -117,7 +140,10 @@ export class BedrockStreamHandler {
             // TypeScript exhaustive check - this should never happen
             const _exhaustiveCheck: never = event;
             if (this.config.getDebugMode()) {
-              console.debug('[BedrockStreamHandler] Unhandled event:', _exhaustiveCheck);
+              console.debug(
+                '[BedrockStreamHandler] Unhandled event:',
+                _exhaustiveCheck,
+              );
             }
           }
         }
@@ -132,61 +158,85 @@ export class BedrockStreamHandler {
    * Create a text response in Gemini format
    */
   private createTextResponse(text: string): GenerateContentResponse {
-    const response = Object.assign(Object.create(GenerateContentResponse.prototype), {
-      candidates: [{
-        index: 0,
-        content: {
-          role: 'model',
-          parts: [{ text }],
-        },
-      }],
-    }) as GenerateContentResponse;
-    
+    const response = Object.assign(
+      Object.create(GenerateContentResponse.prototype),
+      {
+        candidates: [
+          {
+            index: 0,
+            content: {
+              role: 'model',
+              parts: [{ text }],
+            },
+          },
+        ],
+      },
+    ) as GenerateContentResponse;
+
     // Attach current usage metadata if available
-    if (this.cumulativeUsage.inputTokens > 0 || this.cumulativeUsage.outputTokens > 0) {
+    if (
+      this.cumulativeUsage.inputTokens > 0 ||
+      this.cumulativeUsage.outputTokens > 0
+    ) {
       response.usageMetadata = BedrockStreamHandler.createUsageMetadata(
         this.cumulativeUsage.inputTokens,
-        this.cumulativeUsage.outputTokens
+        this.cumulativeUsage.outputTokens,
       );
     }
-    
+
     return response;
   }
 
   /**
    * Create a tool call response in Gemini format
    */
-  private createToolCallResponse(name: string, args: unknown): GenerateContentResponse {
-    const response = Object.assign(Object.create(GenerateContentResponse.prototype), {
-      candidates: [{
-        index: 0,
-        content: {
-          role: 'model',
-          parts: [{
-            functionCall: {
-              name,
-              args: args as Record<string, unknown>,
+  private createToolCallResponse(
+    name: string,
+    args: unknown,
+  ): GenerateContentResponse {
+    const response = Object.assign(
+      Object.create(GenerateContentResponse.prototype),
+      {
+        candidates: [
+          {
+            index: 0,
+            content: {
+              role: 'model',
+              parts: [
+                {
+                  functionCall: {
+                    name,
+                    args: args as Record<string, unknown>,
+                  },
+                },
+              ],
             },
-          }],
-        },
-      }],
-    }) as GenerateContentResponse;
-    
+          },
+        ],
+      },
+    ) as GenerateContentResponse;
+
     // Attach current usage metadata if available
-    if (this.cumulativeUsage.inputTokens > 0 || this.cumulativeUsage.outputTokens > 0) {
+    if (
+      this.cumulativeUsage.inputTokens > 0 ||
+      this.cumulativeUsage.outputTokens > 0
+    ) {
       response.usageMetadata = BedrockStreamHandler.createUsageMetadata(
         this.cumulativeUsage.inputTokens,
-        this.cumulativeUsage.outputTokens
+        this.cumulativeUsage.outputTokens,
       );
     }
-    
+
     return response;
   }
 
   /**
    * Create usage metadata response
    */
-  static createUsageMetadata(inputTokens?: number, outputTokens?: number): GenerateContentResponse['usageMetadata'] {
+  static createUsageMetadata(
+    inputTokens?: number,
+    outputTokens?: number,
+  ): GenerateContentResponse['usageMetadata'] {
     return {
       promptTokenCount: inputTokens || 0,
       candidatesTokenCount: outputTokens || 0,
