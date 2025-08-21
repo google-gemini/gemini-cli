@@ -70,7 +70,6 @@ describe('handleAtCommand', () => {
       }),
       getDebugMode: () => false,
       getUsageStatisticsEnabled: () => false,
-      getSessionId: () => 'mock-session-id',
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig);
