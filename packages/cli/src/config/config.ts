@@ -18,6 +18,7 @@ import {
   getCurrentGeminiMdFilename,
   ApprovalMode,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_BEDROCK_MODEL,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
@@ -27,6 +28,7 @@ import {
   EditTool,
   WriteFileTool,
   MCPServerConfig,
+  AuthType,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
 
@@ -525,7 +527,10 @@ export async function loadCliConfig(
     cwd,
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
-    model: argv.model || settings.model || DEFAULT_GEMINI_MODEL,
+    model: argv.model || settings.model || 
+           (settings.selectedAuthType === AuthType.USE_AWS_BEDROCK 
+             ? DEFAULT_BEDROCK_MODEL 
+             : DEFAULT_GEMINI_MODEL),
     extensionContextFilePaths,
     maxSessionTurns: settings.maxSessionTurns ?? -1,
     experimentalZedIntegration: argv.experimentalAcp || false,
