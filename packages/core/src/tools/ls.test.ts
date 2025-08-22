@@ -31,6 +31,7 @@ import { LSTool } from './ls.js';
 import { Config } from '../config/config.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { ToolErrorType } from './tool-error.js';
 
 describe('LSTool', () => {
   let lsTool: LSTool;
@@ -296,6 +297,7 @@ describe('LSTool', () => {
 
       expect(result.llmContent).toContain('Path is not a directory');
       expect(result.returnDisplay).toBe('Error: Path is not a directory.');
+      expect(result.error?.type).toBe(ToolErrorType.PATH_IS_NOT_A_DIRECTORY);
     });
 
     it('should handle non-existent paths', async () => {
@@ -310,6 +312,7 @@ describe('LSTool', () => {
 
       expect(result.llmContent).toContain('Error listing directory');
       expect(result.returnDisplay).toBe('Error: Failed to list directory.');
+      expect(result.error?.type).toBe(ToolErrorType.LS_EXECUTION_ERROR);
     });
 
     it('should sort directories first, then files alphabetically', async () => {
@@ -365,6 +368,7 @@ describe('LSTool', () => {
       expect(result.llmContent).toContain('Error listing directory');
       expect(result.llmContent).toContain('permission denied');
       expect(result.returnDisplay).toBe('Error: Failed to list directory.');
+      expect(result.error?.type).toBe(ToolErrorType.LS_EXECUTION_ERROR);
     });
 
     it('should throw for invalid params at build time', async () => {
