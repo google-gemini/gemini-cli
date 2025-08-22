@@ -16,6 +16,7 @@ import React, {
   useContext,
   useEffect,
   useRef,
+  useState,
 } from 'react';
 import readline from 'readline';
 import { PassThrough } from 'stream';
@@ -32,6 +33,9 @@ import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 const ESC = '\u001B';
 export const PASTE_MODE_PREFIX = `${ESC}[200~`;
 export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
+
+const DRAG_START_TIMEOUT_MS = 200;
+const DRAG_COMPLETION_TIMEOUT_MS = 200;
 
 export interface Key {
   name: string;
@@ -76,6 +80,10 @@ export function KeypressProvider({
   const { stdin, setRawMode } = useStdin();
   const subscribers = useRef<Set<KeypressHandler>>(new Set()).current;
 
+  const [, setDragBuffer] = useState('');
+  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isDragCollectingRef = useRef(false);
+
   const subscribe = useCallback(
     (handler: KeypressHandler) => {
       subscribers.add(handler);
@@ -91,6 +99,9 @@ export function KeypressProvider({
   );
 
   useEffect(() => {
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+    }
     setRawMode(true);
 
     const keypressStream = new PassThrough();
@@ -192,6 +203,78 @@ export function KeypressProvider({
 
       if (isPaste) {
         pasteBuffer = Buffer.concat([pasteBuffer, Buffer.from(key.sequence)]);
+        return;
+      }
+
+      const FOCUS_EVENT_IN_EDITOR = '\u001b[I'; // When editor has focus in macos
+      const FOCUS_EVENT_OUT_OF_EDITOR = "'"; // When editor does NOT have focus (macOS Finder.app)
+
+      const resetDragState = () => {
+        if (dragTimeoutRef.current) {
+          clearTimeout(dragTimeoutRef.current);
+          dragTimeoutRef.current = null;
+        }
+        isDragCollectingRef.current = false;
+        setDragBuffer('');
+      };
+
+      const isDragFocusEvent = (sequence: string) =>
+        sequence === FOCUS_EVENT_IN_EDITOR ||
+        sequence === FOCUS_EVENT_OUT_OF_EDITOR;
+
+      // Handle normal paste operations first
+      if (key.paste) {
+        if (isDragCollectingRef.current) {
+          resetDragState();
+        }
+      }
+
+      if (isDragFocusEvent(key.sequence) && !key.paste) {
+        isDragCollectingRef.current = true;
+        setDragBuffer('');
+
+        if (dragTimeoutRef.current) {
+          clearTimeout(dragTimeoutRef.current);
+        }
+        dragTimeoutRef.current = setTimeout(() => {
+          resetDragState();
+        }, DRAG_START_TIMEOUT_MS);
+
+        return;
+      }
+
+      if (
+        isDragCollectingRef.current &&
+        key.sequence &&
+        key.sequence.length === 1 &&
+        !key.paste
+      ) {
+        setDragBuffer((prev: string) => {
+          const newBuffer = prev + key.sequence;
+
+          if (dragTimeoutRef.current) {
+            clearTimeout(dragTimeoutRef.current);
+          }
+
+          // Set completion timeout - longer delay for long paths
+          dragTimeoutRef.current = setTimeout(() => {
+            const trimmedPath = newBuffer.trim();
+            if (trimmedPath) {
+              broadcast({
+                name: '',
+                ctrl: false,
+                meta: false,
+                shift: false,
+                paste: true,
+                sequence: trimmedPath,
+              });
+            }
+            resetDragState();
+          }, DRAG_COMPLETION_TIMEOUT_MS);
+
+          return newBuffer;
+        });
+
         return;
       }
 

@@ -67,14 +67,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const DRAG_START_TIMEOUT_MS = 500;
-  const DRAG_COMPLETION_TIMEOUT_MS = 200;
-
-  const [isDragCollecting, setIsDragCollecting] = useState(false);
-  const [dragBuffer, setDragBuffer] = useState('');
-  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isDragCollectingRef = useRef(false);
-
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
   );
@@ -132,9 +124,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     () => () => {
       if (escapeTimerRef.current) {
         clearTimeout(escapeTimerRef.current);
-      }
-      if (dragTimeoutRef.current) {
-        clearTimeout(dragTimeoutRef.current);
       }
     },
     [],
@@ -245,95 +234,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
-      // Terminal drag-and-drop focus event sequences
-      const FOCUS_EVENT_IN_EDITOR = '\u001b[I'; // When editor has focus
-      const FOCUS_EVENT_OUT_OF_EDITOR = "'"; // When editor does NOT have focus (macOS Finder.app)
-
-      // Helper function to reset drag collection state
-      const resetDragState = () => {
-        if (dragTimeoutRef.current) {
-          clearTimeout(dragTimeoutRef.current);
-          dragTimeoutRef.current = null;
-        }
-        setIsDragCollecting(false);
-        isDragCollectingRef.current = false;
-        setDragBuffer('');
-      };
-
-      // Check if this is a drag-and-drop focus event from any terminal
-      const isDragFocusEvent = (sequence: string) => {
-        return (
-          sequence === FOCUS_EVENT_IN_EDITOR ||
-          sequence === FOCUS_EVENT_OUT_OF_EDITOR
-        );
-      };
-
-      // Handle normal paste operations first
-      if (key.paste) {
-        if (isDragCollectingRef.current) {
-          resetDragState();
-        }
-        // Continue with normal paste handling
-      }
-
-      // Detect focus event that might start a drag operation (only if NOT a paste)
-      if (isDragFocusEvent(key.sequence) && !key.paste && !shellModeActive) {
-        setIsDragCollecting(true);
-        isDragCollectingRef.current = true;
-        setDragBuffer('');
-
-        if (dragTimeoutRef.current) {
-          clearTimeout(dragTimeoutRef.current);
-        }
-        dragTimeoutRef.current = setTimeout(() => {
-          resetDragState();
-        }, DRAG_START_TIMEOUT_MS);
-
-        return;
-      }
-
-      // Collect individual characters during drag operation
-      if (
-        isDragCollectingRef.current &&
-        key.sequence &&
-        key.sequence.length === 1 &&
-        !key.paste
-      ) {
-        setDragBuffer((prev) => {
-          const newBuffer = prev + key.sequence;
-
-          // Reset collection timeout for each character
-          if (dragTimeoutRef.current) {
-            clearTimeout(dragTimeoutRef.current);
-          }
-
-          // Set completion timeout - longer delay for long paths
-          dragTimeoutRef.current = setTimeout(() => {
-            const trimmedPath = newBuffer.trim();
-            if (trimmedPath) {
-              // Insert as paste to trigger path processing in text-buffer
-              buffer.insert(trimmedPath, { paste: true });
-            }
-            resetDragState();
-          }, DRAG_COMPLETION_TIMEOUT_MS);
-
-          return newBuffer;
-        });
-
-        return;
-      }
-
-      // Any non-character key during drag collection cancels it
-      if (
-        isDragCollectingRef.current &&
-        (!key.sequence || key.sequence.length !== 1)
-      ) {
-        resetDragState();
-      }
-
       /// We want to handle paste even when not focused to support drag and drop.
-      /// Also allow drag character collection when not focused.
-      if (!focus && !key.paste && !isDragCollectingRef.current) {
+      if (!focus && !key.paste) {
         return;
       }
 
@@ -626,8 +528,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,
-      isDragCollecting,
-      dragBuffer,
     ],
   );
 
