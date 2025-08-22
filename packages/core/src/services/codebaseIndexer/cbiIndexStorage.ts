@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
 import { FileIndex, IndexStatus } from './types.js';
 
 const MAGIC_NUMBER = 0xC0DEB1D0;
@@ -171,53 +172,100 @@ export class CBIIndexStorage {
     const stringHeap: string[] = [];
     const fileInfos: FileInfo[] = [];
     const blockMetadatas: BlockMetadata[] = [];
-    const allVectors: number[][] = [];
 
     let currentVectorId = 0;
     let stringOffset = 0;
 
-    for (let fileId = 0; fileId < fileIndices.length; fileId++) {
-      const fileIndex = fileIndices[fileId];
-      
-      const pathOffset = stringOffset;
-      stringHeap.push(fileIndex.relpath);
-      stringOffset += Buffer.byteLength(fileIndex.relpath, 'utf8');
+    // Create a temporary file for vectors to avoid loading all vectors into memory
+    const tempVectorPath = path.join(os.tmpdir(), `vectors-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.bin`);
+    const vectorFd = await fs.open(tempVectorPath, 'w');
 
-      const firstVectorId = currentVectorId;
-      const numVectors = fileIndex.embeddings.length;
+    try {
+      for (let fileId = 0; fileId < fileIndices.length; fileId++) {
+        const fileIndex = fileIndices[fileId];
+        
+        const pathOffset = stringOffset;
+        stringHeap.push(fileIndex.relpath);
+        stringOffset += Buffer.byteLength(fileIndex.relpath, 'utf8');
 
-      fileInfos.push({
-        mtime: Math.floor(fileIndex.mtime.getTime() / 1000),
-        size: fileIndex.size,
-        path_offset: pathOffset,
-        first_vector_id: firstVectorId,
-        num_vectors: numVectors
-      });
+        const firstVectorId = currentVectorId;
+        const numVectors = fileIndex.embeddings.length;
 
-      for (let i = 0; i < fileIndex.units.length; i++) {
-        const unit = fileIndex.units[i];
-        const textOffset = stringOffset;
-        stringHeap.push(unit.text);
-        stringOffset += Buffer.byteLength(unit.text, 'utf8');
-
-        blockMetadatas.push({
-          file_id: fileId,
-          lineno: unit.lineno,
-          start_char: unit.start_char,
-          text_offset: textOffset,
-          text_len: Buffer.byteLength(unit.text, 'utf8')
+        fileInfos.push({
+          mtime: Math.floor(fileIndex.mtime.getTime() / 1000),
+          size: fileIndex.size,
+          path_offset: pathOffset,
+          first_vector_id: firstVectorId,
+          num_vectors: numVectors
         });
 
-        allVectors.push(fileIndex.embeddings[i]);
-        currentVectorId++;
+        for (let i = 0; i < fileIndex.units.length; i++) {
+          const unit = fileIndex.units[i];
+          const textOffset = stringOffset;
+          stringHeap.push(unit.text);
+          stringOffset += Buffer.byteLength(unit.text, 'utf8');
+
+          blockMetadatas.push({
+            file_id: fileId,
+            lineno: unit.lineno,
+            start_char: unit.start_char,
+            text_offset: textOffset,
+            text_len: Buffer.byteLength(unit.text, 'utf8')
+          });
+
+          // Stream vector to temp file instead of collecting in array
+          const vectorBuffer = Buffer.alloc(vectorDim * VECTOR_FLOAT_SIZE);
+          fileIndex.embeddings[i].forEach((val, idx) => vectorBuffer.writeFloatLE(val, idx * VECTOR_FLOAT_SIZE));
+          await fs.appendFile(vectorFd, vectorBuffer);
+
+          currentVectorId++;
+        }
+
+        // Progress update per file
+        onProgress?.(fileId + 1, totalFiles);
+      }
+
+      // Create vector accessor function for streaming HNSW building
+      const getVector = async (vectorId: number): Promise<number[]> => {
+        const offset = vectorId * vectorDim * VECTOR_FLOAT_SIZE;
+        const buffer = Buffer.alloc(vectorDim * VECTOR_FLOAT_SIZE);
+        await vectorFd.read(buffer, 0, buffer.length, offset);
+        return Array.from({ length: vectorDim }, (_, idx) => buffer.readFloatLE(idx * VECTOR_FLOAT_SIZE));
+      };
+
+      // Build HNSW index using streaming approach
+      const hnswGraph = await this.buildHNSWIndexStreaming(getVector, totalVectors, vectorDim, onProgress);
+
+      // For serialization, we need vectors but can process them in chunks to limit memory usage
+      const allVectors: number[][] = [];
+      const chunkSize = 1000; // Process vectors in chunks to limit memory usage
+      
+      for (let i = 0; i < totalVectors; i += chunkSize) {
+        const chunkEnd = Math.min(i + chunkSize, totalVectors);
+        const chunk: number[][] = [];
+        for (let j = i; j < chunkEnd; j++) {
+          chunk.push(await getVector(j));
+        }
+        allVectors.push(...chunk);
+        
+        // Allow garbage collection between chunks
+        if (global.gc) {
+          global.gc();
+        }
+      }
+
+      const header = this.createHeader(vectorDim, totalVectors, totalFiles, fileInfos, blockMetadatas, stringHeap, allVectors, hnswGraph);
+      const indexBuffer = this.serializeIndex(header, fileInfos, blockMetadatas, stringHeap, allVectors, hnswGraph);
+
+      await fs.writeFile(this.indexPath, indexBuffer);
+    } finally {
+      await vectorFd.close();
+      try {
+        await fs.unlink(tempVectorPath); // Cleanup temp file
+      } catch (error) {
+        // Ignore cleanup errors
       }
     }
-
-    const hnswGraph = this.buildHNSWIndex(allVectors, onProgress);
-    const header = this.createHeader(vectorDim, totalVectors, totalFiles, fileInfos, blockMetadatas, stringHeap, allVectors, hnswGraph);
-    const indexBuffer = this.serializeIndex(header, fileInfos, blockMetadatas, stringHeap, allVectors, hnswGraph);
-
-    await fs.writeFile(this.indexPath, indexBuffer);
   }
 
   async searchVectors(queryVector: number[], topK: number = 8): Promise<Array<{ score: number; vectorId: number; metadata: any }>> {
@@ -536,8 +584,15 @@ export class CBIIndexStorage {
     return size;
   }
 
-  private buildHNSWIndex(vectors: number[][], onProgress?: (current: number, total: number) => void): HNSWGraph {
-    if (vectors.length === 0) {
+
+
+  private async buildHNSWIndexStreaming(
+    getVector: (vectorId: number) => Promise<number[]>,
+    totalVectors: number,
+    vectorDim: number,
+    onProgress?: (current: number, total: number) => void
+  ): Promise<HNSWGraph> {
+    if (totalVectors === 0) {
       return {
         nodes: [],
         max_level: 0,
@@ -548,7 +603,7 @@ export class CBIIndexStorage {
       };
     }
 
-    if (vectors.length < HNSW_SIMPLE_GRAPH_THRESHOLD) {
+    if (totalVectors < HNSW_SIMPLE_GRAPH_THRESHOLD) {
       return {
         nodes: [],
         max_level: 0,
@@ -559,13 +614,44 @@ export class CBIIndexStorage {
       };
     }
 
-    const m = Math.min(HNSW_DEFAULT_M, Math.max(HNSW_MIN_M, Math.floor(Math.log(vectors.length) / Math.log(4))));
-    const ef_construction = Math.min(HNSW_DEFAULT_EF_CONSTRUCTION, Math.max(HNSW_MIN_EF_CONSTRUCTION, vectors.length / 10));
+    const m = Math.min(HNSW_DEFAULT_M, Math.max(HNSW_MIN_M, Math.floor(Math.log(totalVectors) / Math.log(4))));
+    const ef_construction = Math.min(HNSW_DEFAULT_EF_CONSTRUCTION, Math.max(HNSW_MIN_EF_CONSTRUCTION, totalVectors / 10));
     const ef_search = HNSW_DEFAULT_EF_SEARCH;
-    const max_level = Math.max(0, Math.floor(Math.log(vectors.length) / Math.log(m)));
+    const max_level = Math.max(0, Math.floor(Math.log(totalVectors) / Math.log(m)));
+
+    // Simple LRU cache to reduce disk I/O during HNSW construction
+    const cacheSize = Math.min(1000, Math.floor(totalVectors * 0.1));
+    const vectorCache = new Map<number, number[]>();
+    const cacheOrder: number[] = [];
+
+    const cachedGetVector = async (vectorId: number): Promise<number[]> => {
+      if (vectorCache.has(vectorId)) {
+        // Move to end (most recently used)
+        const index = cacheOrder.indexOf(vectorId);
+        if (index > -1) {
+          cacheOrder.splice(index, 1);
+          cacheOrder.push(vectorId);
+        }
+        return vectorCache.get(vectorId)!;
+      }
+
+      const vector = await getVector(vectorId);
+      
+      // Add to cache
+      vectorCache.set(vectorId, vector);
+      cacheOrder.push(vectorId);
+      
+      // Evict oldest if cache is full
+      if (vectorCache.size > cacheSize) {
+        const oldest = cacheOrder.shift()!;
+        vectorCache.delete(oldest);
+      }
+      
+      return vector;
+    };
 
     const nodes: HNSWNode[] = [];
-    for (let i = 0; i < vectors.length; i++) {
+    for (let i = 0; i < totalVectors; i++) {
       const level = Math.floor(Math.random() * (max_level + 1));
       nodes.push({
         id: i,
@@ -584,20 +670,24 @@ export class CBIIndexStorage {
       ef_search
     };
 
-    const batchSize = Math.max(1, Math.floor(vectors.length / 50));
-    for (let i = 1; i < vectors.length; i++) {
-      this.insertIntoHNSW(graph, vectors, i);
+    const batchSize = Math.max(1, Math.floor(totalVectors / 50));
+    for (let i = 1; i < totalVectors; i++) {
+      await this.insertIntoHNSWStreaming(graph, cachedGetVector, i);
       
       if (i % batchSize === 0) {
-        onProgress?.(i, vectors.length);
+        onProgress?.(i, totalVectors);
       }
     }
 
     return graph;
   }
 
-  private insertIntoHNSW(graph: HNSWGraph, vectors: number[][], vectorId: number): void {
-    const queryVector = vectors[vectorId];
+  private async insertIntoHNSWStreaming(
+    graph: HNSWGraph,
+    getVector: (vectorId: number) => Promise<number[]>,
+    vectorId: number
+  ): Promise<void> {
+    const queryVector = await getVector(vectorId);
     const node = graph.nodes[vectorId];
     const currentLevel = node.level;
 
@@ -605,7 +695,7 @@ export class CBIIndexStorage {
     let currentMaxLevel = graph.nodes[currentEntryPoint].level;
 
     for (let level = currentMaxLevel; level > currentLevel; level--) {
-      const neighbors = this.searchLayer(graph, vectors, queryVector, [currentEntryPoint], 1, level);
+      const neighbors = await this.searchLayerStreamingLocal(graph, getVector, queryVector, [currentEntryPoint], 1, level);
       if (neighbors.length > 0) {
         currentEntryPoint = neighbors[0];
       }
@@ -613,8 +703,8 @@ export class CBIIndexStorage {
 
     for (let level = Math.min(currentLevel, currentMaxLevel); level >= 0; level--) {
       const ef = Math.min(graph.ef_construction, Math.max(10, graph.nodes.length / 20));
-      const neighbors = this.searchLayer(graph, vectors, queryVector, [currentEntryPoint], ef, level);
-      const selectedNeighbors = this.selectNeighbors(graph, vectors, queryVector, neighbors, graph.m, level);
+      const neighbors = await this.searchLayerStreamingLocal(graph, getVector, queryVector, [currentEntryPoint], ef, level);
+      const selectedNeighbors = await this.selectNeighborsStreamingLocal(graph, getVector, queryVector, neighbors, graph.m, level);
       
       for (const neighborId of selectedNeighbors) {
         this.addBidirectionalConnection(graph, vectorId, neighborId, level);
@@ -630,14 +720,21 @@ export class CBIIndexStorage {
     }
   }
 
-  private searchLayer(graph: HNSWGraph, vectors: number[][], queryVector: number[], entryPoints: number[], ef: number, level: number): number[] {
+  private async searchLayerStreamingLocal(
+    graph: HNSWGraph,
+    getVector: (vectorId: number) => Promise<number[]>,
+    queryVector: number[],
+    entryPoints: number[],
+    ef: number,
+    level: number
+  ): Promise<number[]> {
     const visited = new Set<number>();
     const candidates = new Set<number>();
     const results: number[] = [];
 
     for (const entryPoint of entryPoints) {
-      candidates.add(entryPoint);
       visited.add(entryPoint);
+      candidates.add(entryPoint);
     }
 
     while (candidates.size > 0) {
@@ -645,7 +742,8 @@ export class CBIIndexStorage {
       let bestDistance = Infinity;
 
       for (const candidate of candidates) {
-        const distance = this.cosineDistance(queryVector, vectors[candidate]);
+        const candidateVector = await getVector(candidate);
+        const distance = this.cosineDistance(queryVector, candidateVector);
         if (distance < bestDistance) {
           bestDistance = distance;
           bestCandidate = candidate;
@@ -659,13 +757,11 @@ export class CBIIndexStorage {
 
       if (results.length >= ef) break;
 
-      const node = graph.nodes[bestCandidate];
-      if (node.level >= level) {
-        for (const neighborId of node.neighbors[level]) {
-          if (!visited.has(neighborId)) {
-            visited.add(neighborId);
-            candidates.add(neighborId);
-          }
+      const neighbors = graph.nodes[bestCandidate].neighbors[level] || [];
+      for (const neighbor of neighbors) {
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          candidates.add(neighbor);
         }
       }
     }
@@ -673,15 +769,31 @@ export class CBIIndexStorage {
     return results;
   }
 
-  private selectNeighbors(graph: HNSWGraph, vectors: number[][], queryVector: number[], candidates: number[], m: number, level: number): number[] {
-    const distances = candidates.map(id => ({
-      id,
-      distance: this.cosineDistance(queryVector, vectors[id])
+  private async selectNeighborsStreamingLocal(
+    graph: HNSWGraph,
+    getVector: (vectorId: number) => Promise<number[]>,
+    queryVector: number[],
+    candidates: number[],
+    m: number,
+    level: number
+  ): Promise<number[]> {
+    if (candidates.length <= m) {
+      return candidates;
+    }
+
+    const distances = await Promise.all(candidates.map(async id => {
+      const vector = await getVector(id);
+      return {
+        id,
+        distance: this.cosineDistance(queryVector, vector)
+      };
     }));
 
     distances.sort((a, b) => a.distance - b.distance);
     return distances.slice(0, m).map(d => d.id);
   }
+
+
 
   private addBidirectionalConnection(graph: HNSWGraph, id1: number, id2: number, level: number): void {
     const node1 = graph.nodes[id1];
@@ -1087,7 +1199,7 @@ export class CBIIndexStorage {
         }
       }
 
-      await this.buildHNSWIndexStreaming(targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle, onProgress);
+      await this.buildHNSWIndexForUpdate(targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle, onProgress);
       
       await targetHandle.sync();
       await fs.rename(tempIndexPath, this.indexPath);
@@ -1097,7 +1209,7 @@ export class CBIIndexStorage {
     }
   }
 
-  private async buildHNSWIndexStreaming(
+  private async buildHNSWIndexForUpdate(
     targetHandle: fs.FileHandle,
     newHeader: IndexHeader,
     keptFileMapping: Map<number, { fileInfo: FileInfo, vectorIds: number[] }>,
@@ -1178,7 +1290,7 @@ export class CBIIndexStorage {
     const batchSize = Math.max(1, Math.floor(totalVectors / 50));
     for (let i = 1; i < totalVectors; i++) {
       const vector = await this.loadVectorById(i, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
-      await this.insertIntoHNSWStreaming(graph, vector, i, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+      await this.insertIntoHNSWForUpdate(graph, vector, i, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
       
       if (i % batchSize === 0) {
         onProgress?.(i, totalVectors);
@@ -1222,7 +1334,7 @@ export class CBIIndexStorage {
     throw new Error(`Vector ID ${vectorId} not found`);
   }
 
-  private async insertIntoHNSWStreaming(
+  private async insertIntoHNSWForUpdate(
     graph: HNSWGraph, 
     queryVector: number[], 
     vectorId: number,
@@ -1240,7 +1352,7 @@ export class CBIIndexStorage {
     let currentMaxLevel = graph.nodes[currentEntryPoint].level;
 
     for (let level = currentMaxLevel; level > currentLevel; level--) {
-      const neighbors = await this.searchLayerStreaming(graph, queryVector, [currentEntryPoint], 1, level, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+      const neighbors = await this.searchLayerForUpdate(graph, queryVector, [currentEntryPoint], 1, level, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
       if (neighbors.length > 0) {
         currentEntryPoint = neighbors[0];
       }
@@ -1248,8 +1360,8 @@ export class CBIIndexStorage {
 
     for (let level = Math.min(currentLevel, currentMaxLevel); level >= 0; level--) {
       const ef = Math.min(graph.ef_construction, Math.max(10, graph.nodes.length / 20));
-      const neighbors = await this.searchLayerStreaming(graph, queryVector, [currentEntryPoint], ef, level, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
-      const selectedNeighbors = await this.selectNeighborsStreaming(graph, queryVector, neighbors, graph.m, level, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+      const neighbors = await this.searchLayerForUpdate(graph, queryVector, [currentEntryPoint], ef, level, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+      const selectedNeighbors = await this.selectNeighborsForUpdate(graph, queryVector, neighbors, graph.m, level, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
       
       for (const neighborId of selectedNeighbors) {
         this.addBidirectionalConnection(graph, vectorId, neighborId, level);
@@ -1265,7 +1377,7 @@ export class CBIIndexStorage {
     }
   }
 
-  private async searchLayerStreaming(
+  private async searchLayerForUpdate(
     graph: HNSWGraph, 
     queryVector: number[], 
     entryPoints: number[], 
@@ -1321,7 +1433,7 @@ export class CBIIndexStorage {
     return results;
   }
 
-  private async selectNeighborsStreaming(
+  private async selectNeighborsForUpdate(
     graph: HNSWGraph, 
     queryVector: number[], 
     candidates: number[], 
