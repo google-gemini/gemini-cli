@@ -45,6 +45,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       [],
+      true,
     );
 
     const { lastFrame } = renderWithProviders(
@@ -82,6 +83,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -115,6 +117,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -148,6 +151,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -182,6 +186,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -211,6 +216,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -242,6 +248,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -277,6 +284,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       [],
+      true,
     );
 
     const { lastFrame, stdin, unmount } = renderWithProviders(
@@ -316,6 +324,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       [],
+      true,
     );
 
     const { lastFrame, stdin, unmount } = renderWithProviders(
@@ -358,6 +367,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       [],
+      true,
     );
 
     const { stdin, unmount } = renderWithProviders(

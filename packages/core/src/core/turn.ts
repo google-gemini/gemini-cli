@@ -5,6 +5,7 @@
  */
 
 import {
+  Part,
   PartListUnion,
   GenerateContentResponse,
   FunctionCall,
@@ -74,7 +75,7 @@ export interface ToolCallRequestInfo {
 
 export interface ToolCallResponseInfo {
   callId: string;
-  responseParts: PartListUnion;
+  responseParts: Part[];
   resultDisplay: ToolResultDisplay | undefined;
   error: Error | undefined;
   errorType: ToolErrorType | undefined;
@@ -247,14 +248,15 @@ export class Turn {
         }
       }
     } catch (e) {
-      const error = toFriendlyError(e);
-      if (error instanceof UnauthorizedError) {
-        throw error;
-      }
       if (signal.aborted) {
         yield { type: GeminiEventType.UserCancelled };
         // Regular cancellation error, fail gracefully.
         return;
+      }
+
+      const error = toFriendlyError(e);
+      if (error instanceof UnauthorizedError) {
+        throw error;
       }
 
       const contextForReport = [...this.chat.getHistory(/*curated*/ true), req];

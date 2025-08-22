@@ -20,6 +20,7 @@ import * as Diff from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { tildeifyPath } from '../utils/paths.js';
 import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
+import { ToolErrorType } from './tool-error.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
   name: 'save_memory',
@@ -273,6 +274,10 @@ class MemoryToolInvocation extends BaseToolInvocation<
           error: `Failed to save memory. Detail: ${errorMessage}`,
         }),
         returnDisplay: `Error saving memory: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.MEMORY_TOOL_EXECUTION_ERROR,
+        },
       };
     }
   }

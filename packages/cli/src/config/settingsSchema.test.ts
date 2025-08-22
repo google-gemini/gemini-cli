@@ -52,6 +52,7 @@ describe('SettingsSchema', () => {
         'model',
         'hasSeenIdeIntegrationNudge',
         'folderTrustFeature',
+        'useRipgrep',
       ];
 
       expectedSettings.forEach((setting) => {

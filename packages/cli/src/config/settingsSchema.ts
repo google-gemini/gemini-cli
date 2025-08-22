@@ -206,6 +206,16 @@ export const SETTINGS_SCHEMA = {
         description: 'Disable loading phrases for accessibility',
         showInDialog: true,
       },
+      screenReader: {
+        type: 'boolean',
+        label: 'Screen Reader Mode',
+        category: 'Accessibility',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Render output in plain-text to be more screen reader accessible',
+        showInDialog: true,
+      },
     },
   },
   checkpointing: {
@@ -262,6 +272,15 @@ export const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: true,
         description: 'Enable recursive file search functionality',
+        showInDialog: true,
+      },
+      disableFuzzySearch: {
+        type: 'boolean',
+        label: 'Disable Fuzzy Search',
+        category: 'File Filtering',
+        requiresRestart: true,
+        default: false,
+        description: 'Disable fuzzy search when searching for files.',
         showInDialog: true,
       },
     },
@@ -449,7 +468,8 @@ export const SETTINGS_SCHEMA = {
     category: 'General',
     requiresRestart: false,
     default: [] as string[],
-    description: 'Additional directories to include in the workspace context.',
+    description:
+      'Additional directories to include in the workspace context. Missing directories will be skipped with a warning.',
     showInDialog: false,
   },
   loadMemoryFromIncludeDirectories: {
@@ -522,6 +542,26 @@ export const SETTINGS_SCHEMA = {
     requiresRestart: false,
     default: false,
     description: 'Skip the next speaker check.',
+    showInDialog: true,
+  },
+  useRipgrep: {
+    type: 'boolean',
+    label: 'Use Ripgrep',
+    category: 'Tools',
+    requiresRestart: false,
+    default: false,
+    description:
+      'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
+    showInDialog: true,
+  },
+  enablePromptCompletion: {
+    type: 'boolean',
+    label: 'Enable Prompt Completion',
+    category: 'General',
+    requiresRestart: true,
+    default: false,
+    description:
+      'Enable AI-powered prompt completion suggestions while typing.',
     showInDialog: true,
   },
 } as const;

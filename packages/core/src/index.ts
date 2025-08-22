@@ -41,6 +41,7 @@ export * from './utils/shell-utils.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
 export * from './utils/formatters.js';
+export * from './utils/generateContentResponseUtilities.js';
 export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
 
@@ -72,6 +73,7 @@ export * from './prompts/mcp-prompts.js';
 export * from './tools/read-file.js';
 export * from './tools/ls.js';
 export * from './tools/grep.js';
+export * from './tools/ripGrep.js';
 export * from './tools/glob.js';
 export * from './tools/edit.js';
 export * from './tools/write-file.js';

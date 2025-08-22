@@ -25,6 +25,21 @@ import { hasCycleInSchema } from '../tools/tools.js';
 import { StructuredError } from './turn.js';
 
 /**
+ * Options for retrying due to invalid content from the model.
+ */
+interface ContentRetryOptions {
+  /** Total number of attempts to make (1 initial + N retries). */
+  maxAttempts: number;
+  /** The base delay in milliseconds for linear backoff. */
+  initialDelayMs: number;
+}
+
+const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
+  maxAttempts: 3, // 1 initial call + 2 retries
+  initialDelayMs: 500,
+};
+
+/**
  * Returns true if the response is valid, false otherwise.
  */
 function isValidResponse(response: GenerateContentResponse): boolean {
@@ -98,13 +113,21 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
       }
       if (isValid) {
         curatedHistory.push(...modelOutput);
-      } else {
-        // Remove the last user input when model content is invalid.
-        curatedHistory.pop();
       }
     }
   }
   return curatedHistory;
+}
+
+/**
+ * Custom error to signal that a stream completed without valid content,
+ * which should trigger a retry.
+ */
+export class EmptyStreamError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'EmptyStreamError';
+  }
 }
 
 /**
@@ -305,65 +328,121 @@ export class GeminiChat {
     prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     await this.sendPromise;
+
+    let streamDoneResolver: () => void;
+    const streamDonePromise = new Promise<void>((resolve) => {
+      streamDoneResolver = resolve;
+    });
+    this.sendPromise = streamDonePromise;
+
     const userContent = createUserContent(params.message);
-    const requestContents = this.getHistory(true).concat(userContent);
 
-    try {
-      const apiCall = () => {
-        const modelToUse = this.config.getModel();
+    // Add user content to history ONCE before any attempts.
+    this.history.push(userContent);
+    const requestContents = this.getHistory(true);
 
-        // Prevent Flash model calls immediately after quota error
-        if (
-          this.config.getQuotaErrorOccurred() &&
-          modelToUse === DEFAULT_GEMINI_FLASH_MODEL
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
+    return (async function* () {
+      try {
+        let lastError: unknown = new Error('Request failed after all retries.');
+
+        for (
+          let attempt = 0;
+          attempt <= INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
+          attempt++
         ) {
-          throw new Error(
-            'Please submit a new query to continue with the Flash model.',
-          );
+          try {
+            const stream = await self.makeApiCallAndProcessStream(
+              requestContents,
+              params,
+              prompt_id,
+              userContent,
+            );
+
+            for await (const chunk of stream) {
+              yield chunk;
+            }
+
+            lastError = null;
+            break;
+          } catch (error) {
+            lastError = error;
+            const isContentError = error instanceof EmptyStreamError;
+
+            if (isContentError) {
+              // Check if we have more attempts left.
+              if (attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts - 1) {
+                await new Promise((res) =>
+                  setTimeout(
+                    res,
+                    INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs *
+                      (attempt + 1),
+                  ),
+                );
+                continue;
+              }
+            }
+            break;
+          }
         }
 
-        return this.contentGenerator.generateContentStream(
-          {
-            model: modelToUse,
-            contents: requestContents,
-            config: { ...this.generationConfig, ...params.config },
-          },
-          prompt_id,
-        );
-      };
-
-      // Note: Retrying streams can be complex. If generateContentStream itself doesn't handle retries
-      // for transient issues internally before yielding the async generator, this retry will re-initiate
-      // the stream. For simple 429/500 errors on initial call, this is fine.
-      // If errors occur mid-stream, this setup won't resume the stream; it will restart it.
-      const streamResponse = await retryWithBackoff(apiCall, {
-        shouldRetry: (error: unknown) => {
-          // Check for known error messages and codes.
-          if (error instanceof Error && error.message) {
-            if (isSchemaDepthError(error.message)) return false;
-            if (error.message.includes('429')) return true;
-            if (error.message.match(/5\d{2}/)) return true;
+        if (lastError) {
+          // If the stream fails, remove the user message that was added.
+          if (self.history[self.history.length - 1] === userContent) {
+            self.history.pop();
           }
-          return false; // Don't retry other errors by default
+          throw lastError;
+        }
+      } finally {
+        streamDoneResolver!();
+      }
+    })();
+  }
+
+  private async makeApiCallAndProcessStream(
+    requestContents: Content[],
+    params: SendMessageParameters,
+    prompt_id: string,
+    userContent: Content,
+  ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    const apiCall = () => {
+      const modelToUse = this.config.getModel();
+
+      if (
+        this.config.getQuotaErrorOccurred() &&
+        modelToUse === DEFAULT_GEMINI_FLASH_MODEL
+      ) {
+        throw new Error(
+          'Please submit a new query to continue with the Flash model.',
+        );
+      }
+
+      return this.contentGenerator.generateContentStream(
+        {
+          model: modelToUse,
+          contents: requestContents,
+          config: { ...this.generationConfig, ...params.config },
         },
-        onPersistent429: async (authType?: string, error?: unknown) =>
-          await this.handleFlashFallback(authType, error),
-        authType: this.config.getContentGeneratorConfig()?.authType,
-      });
+        prompt_id,
+      );
+    };
 
-      // Resolve the internal tracking of send completion promise - `sendPromise`
-      // for both success and failure response. The actual failure is still
-      // propagated by the `await streamResponse`.
-      this.sendPromise = Promise.resolve(streamResponse)
-        .then(() => undefined)
-        .catch(() => undefined);
+    const streamResponse = await retryWithBackoff(apiCall, {
+      shouldRetry: (error: unknown) => {
+        if (error instanceof Error && error.message) {
+          if (isSchemaDepthError(error.message)) return false;
+          if (error.message.includes('429')) return true;
+          if (error.message.match(/5\d{2}/)) return true;
+        }
+        return false;
+      },
+      onPersistent429: async (authType?: string, error?: unknown) =>
+        await this.handleFlashFallback(authType, error),
+      authType: this.config.getContentGeneratorConfig()?.authType,
+    });
 
-      const result = this.processStreamResponse(streamResponse, userContent);
-      return result;
-    } catch (error) {
-      this.sendPromise = Promise.resolve();
-      throw error;
-    }
+    return this.processStreamResponse(streamResponse, userContent);
   }
 
   /**
@@ -407,8 +486,6 @@ export class GeminiChat {
 
   /**
    * Adds a new entry to the chat history.
-   *
-   * @param content - The content to add to the history.
    */
   addHistory(content: Content): void {
     this.history.push(content);
@@ -451,41 +528,41 @@ export class GeminiChat {
 
   private async *processStreamResponse(
     streamResponse: AsyncGenerator<GenerateContentResponse>,
-    inputContent: Content,
-  ) {
-    const outputContent: Content[] = [];
-    const chunks: GenerateContentResponse[] = [];
-    let errorOccurred = false;
+    userInput: Content,
+  ): AsyncGenerator<GenerateContentResponse> {
+    const modelResponseParts: Part[] = [];
+    let isStreamInvalid = false;
+    let hasReceivedAnyChunk = false;
 
-    try {
-      for await (const chunk of streamResponse) {
-        if (isValidResponse(chunk)) {
-          chunks.push(chunk);
-          const content = chunk.candidates?.[0]?.content;
-          if (content !== undefined) {
-            if (this.isThoughtContent(content)) {
-              yield chunk;
-              continue;
-            }
-            outputContent.push(content);
+    for await (const chunk of streamResponse) {
+      hasReceivedAnyChunk = true;
+      if (isValidResponse(chunk)) {
+        const content = chunk.candidates?.[0]?.content;
+        if (content) {
+          // Filter out thought parts from being added to history.
+          if (!this.isThoughtContent(content) && content.parts) {
+            modelResponseParts.push(...content.parts);
           }
         }
-        yield chunk;
+      } else {
+        isStreamInvalid = true;
       }
-    } catch (error) {
-      errorOccurred = true;
-      throw error;
+      yield chunk; // Yield every chunk to the UI immediately.
     }
 
-    if (!errorOccurred) {
-      const allParts: Part[] = [];
-      for (const content of outputContent) {
-        if (content.parts) {
-          allParts.push(...content.parts);
-        }
-      }
+    // Now that the stream is finished, make a decision.
+    // Throw an error if the stream was invalid OR if it was completely empty.
+    if (isStreamInvalid || !hasReceivedAnyChunk) {
+      throw new EmptyStreamError(
+        'Model stream was invalid or completed without valid content.',
+      );
     }
-    this.recordHistory(inputContent, outputContent);
+
+    // Use recordHistory to correctly save the conversation turn.
+    const modelOutput: Content[] = [
+      { role: 'model', parts: modelResponseParts },
+    ];
+    this.recordHistory(userInput, modelOutput);
   }
 
   private recordHistory(
@@ -493,88 +570,65 @@ export class GeminiChat {
     modelOutput: Content[],
     automaticFunctionCallingHistory?: Content[],
   ) {
+    const newHistoryEntries: Content[] = [];
+
+    // Part 1: Handle the user's part of the turn.
+    if (
+      automaticFunctionCallingHistory &&
+      automaticFunctionCallingHistory.length > 0
+    ) {
+      newHistoryEntries.push(
+        ...extractCuratedHistory(automaticFunctionCallingHistory),
+      );
+    } else {
+      // Guard for streaming calls where the user input might already be in the history.
+      if (
+        this.history.length === 0 ||
+        this.history[this.history.length - 1] !== userInput
+      ) {
+        newHistoryEntries.push(userInput);
+      }
+    }
+
+    // Part 2: Handle the model's part of the turn, filtering out thoughts.
     const nonThoughtModelOutput = modelOutput.filter(
       (content) => !this.isThoughtContent(content),
     );
 
     let outputContents: Content[] = [];
-    if (
-      nonThoughtModelOutput.length > 0 &&
-      nonThoughtModelOutput.every((content) => content.role !== undefined)
-    ) {
+    if (nonThoughtModelOutput.length > 0) {
       outputContents = nonThoughtModelOutput;
-    } else if (nonThoughtModelOutput.length === 0 && modelOutput.length > 0) {
-      // This case handles when the model returns only a thought.
-      // We don't want to add an empty model response in this case.
-    } else {
-      // When not a function response appends an empty content when model returns empty response, so that the
-      // history is always alternating between user and model.
-      // Workaround for: https://b.corp.google.com/issues/420354090
-      if (!isFunctionResponse(userInput)) {
-        outputContents.push({
-          role: 'model',
-          parts: [],
-        } as Content);
-      }
-    }
-    if (
-      automaticFunctionCallingHistory &&
-      automaticFunctionCallingHistory.length > 0
+    } else if (
+      modelOutput.length === 0 &&
+      !isFunctionResponse(userInput) &&
+      !automaticFunctionCallingHistory
     ) {
-      this.history.push(
-        ...extractCuratedHistory(automaticFunctionCallingHistory),
-      );
-    } else {
-      this.history.push(userInput);
+      // Add an empty model response if the model truly returned nothing.
+      outputContents.push({ role: 'model', parts: [] } as Content);
     }
 
-    // Consolidate adjacent model roles in outputContents
+    // Part 3: Consolidate the parts of this turn's model response.
     const consolidatedOutputContents: Content[] = [];
-    for (const content of outputContents) {
-      if (this.isThoughtContent(content)) {
-        continue;
-      }
-      const lastContent =
-        consolidatedOutputContents[consolidatedOutputContents.length - 1];
-      if (this.isTextContent(lastContent) && this.isTextContent(content)) {
-        // If both current and last are text, combine their text into the lastContent's first part
-        // and append any other parts from the current content.
-        lastContent.parts[0].text += content.parts[0].text || '';
-        if (content.parts.length > 1) {
-          lastContent.parts.push(...content.parts.slice(1));
+    if (outputContents.length > 0) {
+      for (const content of outputContents) {
+        const lastContent =
+          consolidatedOutputContents[consolidatedOutputContents.length - 1];
+        if (this.hasTextContent(lastContent) && this.hasTextContent(content)) {
+          lastContent.parts[0].text += content.parts[0].text || '';
+          if (content.parts.length > 1) {
+            lastContent.parts.push(...content.parts.slice(1));
+          }
+        } else {
+          consolidatedOutputContents.push(content);
         }
-      } else {
-        consolidatedOutputContents.push(content);
       }
     }
 
-    if (consolidatedOutputContents.length > 0) {
-      const lastHistoryEntry = this.history[this.history.length - 1];
-      const canMergeWithLastHistory =
-        !automaticFunctionCallingHistory ||
-        automaticFunctionCallingHistory.length === 0;
-
-      if (
-        canMergeWithLastHistory &&
-        this.isTextContent(lastHistoryEntry) &&
-        this.isTextContent(consolidatedOutputContents[0])
-      ) {
-        // If both current and last are text, combine their text into the lastHistoryEntry's first part
-        // and append any other parts from the current content.
-        lastHistoryEntry.parts[0].text +=
-          consolidatedOutputContents[0].parts[0].text || '';
-        if (consolidatedOutputContents[0].parts.length > 1) {
-          lastHistoryEntry.parts.push(
-            ...consolidatedOutputContents[0].parts.slice(1),
-          );
-        }
-        consolidatedOutputContents.shift(); // Remove the first element as it's merged
-      }
-      this.history.push(...consolidatedOutputContents);
-    }
+    // Part 4: Add the new turn (user and model parts) to the main history.
+    this.history.push(...newHistoryEntries, ...consolidatedOutputContents);
   }
 
-  private isTextContent(
+  private hasTextContent(
     content: Content | undefined,
   ): content is Content & { parts: [{ text: string }, ...Part[]] } {
     return !!(

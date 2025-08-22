@@ -8,12 +8,14 @@ import { GenerateContentResponseUsageMetadata } from '@google/genai';
 import { Config } from '../config/config.js';
 import { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { FileDiff } from '../tools/tools.js';
+import { DiffStat, FileDiff } from '../tools/tools.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   getDecisionFromOutcome,
   ToolCallDecision,
 } from './tool-call-decision.js';
+import { FileOperation } from './metrics.js';
+export { ToolCallDecision };
 import { ToolRegistry } from '../tools/tool-registry.js';
 
 export interface BaseTelemetryEvent {
@@ -39,8 +41,8 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   telemetry_enabled: boolean;
   telemetry_log_user_prompts_enabled: boolean;
   file_filtering_respect_git_ignore: boolean;
-  mcp_servers_count?: string;
-  mcp_tools_count?: string;
+  mcp_servers_count: number;
+  mcp_tools_count?: number;
   mcp_tools?: string;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
@@ -70,14 +72,12 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       config.getTelemetryLogPromptsEnabled();
     this.file_filtering_respect_git_ignore =
       config.getFileFilteringRespectGitIgnore();
-    this.mcp_servers_count = mcpServers
-      ? Object.keys(mcpServers).length.toString()
-      : '';
+    this.mcp_servers_count = mcpServers ? Object.keys(mcpServers).length : 0;
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
         .filter((tool) => tool instanceof DiscoveredMCPTool);
-      this.mcp_tools_count = mcpTools.length.toString();
+      this.mcp_tools_count = mcpTools.length;
       this.mcp_tools = mcpTools
         .map((tool) => (tool as DiscoveredMCPTool).name)
         .join(',');
@@ -401,6 +401,38 @@ export class KittySequenceOverflowEvent {
   }
 }
 
+export class FileOperationEvent implements BaseTelemetryEvent {
+  'event.name': 'file_operation';
+  'event.timestamp': string;
+  tool_name: string;
+  operation: FileOperation;
+  lines?: number;
+  mimetype?: string;
+  extension?: string;
+  diff_stat?: DiffStat;
+  programming_language?: string;
+
+  constructor(
+    tool_name: string,
+    operation: FileOperation,
+    lines?: number,
+    mimetype?: string,
+    extension?: string,
+    diff_stat?: DiffStat,
+    programming_language?: string,
+  ) {
+    this['event.name'] = 'file_operation';
+    this['event.timestamp'] = new Date().toISOString();
+    this.tool_name = tool_name;
+    this.operation = operation;
+    this.lines = lines;
+    this.mimetype = mimetype;
+    this.extension = extension;
+    this.diff_stat = diff_stat;
+    this.programming_language = programming_language;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -415,4 +447,5 @@ export type TelemetryEvent =
   | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
-  | SlashCommandEvent;
+  | SlashCommandEvent
+  | FileOperationEvent;

@@ -16,6 +16,7 @@ import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
+import { RipGrepTool } from '../tools/ripGrep.js';
 import { GlobTool } from '../tools/glob.js';
 import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
@@ -62,6 +63,7 @@ export enum ApprovalMode {
 
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
+  screenReader?: boolean;
 }
 
 export interface BugCommandSettings {
@@ -175,6 +177,7 @@ export interface ConfigParameters {
     respectGitIgnore?: boolean;
     respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
+    disableFuzzySearch?: boolean;
   };
   checkpointing?: boolean;
   proxy?: string;
@@ -198,8 +201,10 @@ export interface ConfigParameters {
   chatCompression?: ChatCompressionSettings;
   interactive?: boolean;
   trustedFolder?: boolean;
+  useRipgrep?: boolean;
   shouldUseNodePtyShell?: boolean;
   skipNextSpeakerCheck?: boolean;
+  enablePromptCompletion?: boolean;
 }
 
 export class Config {
@@ -233,6 +238,7 @@ export class Config {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
     enableRecursiveFileSearch: boolean;
+    disableFuzzySearch: boolean;
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
@@ -265,8 +271,10 @@ export class Config {
   private readonly chatCompression: ChatCompressionSettings | undefined;
   private readonly interactive: boolean;
   private readonly trustedFolder: boolean | undefined;
+  private readonly useRipgrep: boolean;
   private readonly shouldUseNodePtyShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
+  private readonly enablePromptCompletion: boolean = false;
   private initialized: boolean = false;
   readonly storage: Storage;
 
@@ -310,6 +318,7 @@ export class Config {
       respectGeminiIgnore: params.fileFiltering?.respectGeminiIgnore ?? true,
       enableRecursiveFileSearch:
         params.fileFiltering?.enableRecursiveFileSearch ?? true,
+      disableFuzzySearch: params.fileFiltering?.disableFuzzySearch ?? false,
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
@@ -335,9 +344,11 @@ export class Config {
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
+    this.useRipgrep = params.useRipgrep ?? false;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
     this.storage = new Storage(this.targetDir);
+    this.enablePromptCompletion = params.enablePromptCompletion ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -592,6 +603,10 @@ export class Config {
     return this.fileFiltering.enableRecursiveFileSearch;
   }
 
+  getFileFilteringDisableFuzzySearch(): boolean {
+    return this.fileFiltering.disableFuzzySearch;
+  }
+
   getFileFilteringRespectGitIgnore(): boolean {
     return this.fileFiltering.respectGitIgnore;
   }
@@ -723,12 +738,24 @@ export class Config {
     return this.interactive;
   }
 
+  getUseRipgrep(): boolean {
+    return this.useRipgrep;
+  }
+
   getShouldUseNodePtyShell(): boolean {
     return this.shouldUseNodePtyShell;
   }
 
   getSkipNextSpeakerCheck(): boolean {
     return this.skipNextSpeakerCheck;
+  }
+
+  getScreenReader(): boolean {
+    return this.accessibility.screenReader ?? false;
+  }
+
+  getEnablePromptCompletion(): boolean {
+    return this.enablePromptCompletion;
   }
 
   async getGitService(): Promise<GitService> {
@@ -777,7 +804,13 @@ export class Config {
 
     registerCoreTool(LSTool, this);
     registerCoreTool(ReadFileTool, this);
-    registerCoreTool(GrepTool, this);
+
+    if (this.getUseRipgrep()) {
+      registerCoreTool(RipGrepTool, this);
+    } else {
+      registerCoreTool(GrepTool, this);
+    }
+
     registerCoreTool(GlobTool, this);
     registerCoreTool(EditTool, this);
     registerCoreTool(WriteFileTool, this);

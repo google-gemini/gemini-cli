@@ -6,7 +6,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
+import os, { EOL } from 'os';
 import crypto from 'crypto';
 import { Config } from '../config/config.js';
 import {
@@ -192,7 +192,7 @@ class ShellToolInvocation extends BaseToolInvocation<
         if (fs.existsSync(tempFilePath)) {
           const pgrepLines = fs
             .readFileSync(tempFilePath, 'utf8')
-            .split('\n')
+            .split(EOL)
             .filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {

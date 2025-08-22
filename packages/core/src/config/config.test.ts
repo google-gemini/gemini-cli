@@ -594,4 +594,38 @@ describe('Server Config (config.ts)', () => {
       expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
     });
   });
+
+  describe('UseRipgrep Configuration', () => {
+    it('should default useRipgrep to false when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getUseRipgrep()).toBe(false);
+    });
+
+    it('should set useRipgrep to true when provided as true', () => {
+      const paramsWithRipgrep: ConfigParameters = {
+        ...baseParams,
+        useRipgrep: true,
+      };
+      const config = new Config(paramsWithRipgrep);
+      expect(config.getUseRipgrep()).toBe(true);
+    });
+
+    it('should set useRipgrep to false when explicitly provided as false', () => {
+      const paramsWithRipgrep: ConfigParameters = {
+        ...baseParams,
+        useRipgrep: false,
+      };
+      const config = new Config(paramsWithRipgrep);
+      expect(config.getUseRipgrep()).toBe(false);
+    });
+
+    it('should default useRipgrep to false when undefined', () => {
+      const paramsWithUndefinedRipgrep: ConfigParameters = {
+        ...baseParams,
+        useRipgrep: undefined,
+      };
+      const config = new Config(paramsWithUndefinedRipgrep);
+      expect(config.getUseRipgrep()).toBe(false);
+    });
+  });
 });

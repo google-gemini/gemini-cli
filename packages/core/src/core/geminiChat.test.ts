@@ -12,7 +12,7 @@ import {
   Part,
   GenerateContentResponse,
 } from '@google/genai';
-import { GeminiChat } from './geminiChat.js';
+import { GeminiChat, EmptyStreamError } from './geminiChat.js';
 import { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 
@@ -112,7 +112,13 @@ describe('GeminiChat', () => {
         response,
       );
 
-      await chat.sendMessageStream({ message: 'hello' }, 'prompt-id-1');
+      const stream = await chat.sendMessageStream(
+        { message: 'hello' },
+        'prompt-id-1',
+      );
+      for await (const _ of stream) {
+        // consume stream to trigger internal logic
+      }
 
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledWith(
         {
@@ -474,5 +480,388 @@ describe('GeminiChat', () => {
       expect(history[0]).toEqual(content1);
       expect(history[1]).toEqual(content2);
     });
+  });
+
+  describe('sendMessageStream with retries', () => {
+    it('should retry on invalid content and succeed on the second attempt', async () => {
+      // Use mockImplementationOnce to provide a fresh, promise-wrapped generator for each attempt.
+      vi.mocked(mockModelsModule.generateContentStream)
+        .mockImplementationOnce(async () =>
+          // First call returns an invalid stream
+          (async function* () {
+            yield {
+              candidates: [{ content: { parts: [{ text: '' }] } }], // Invalid empty text part
+            } as unknown as GenerateContentResponse;
+          })(),
+        )
+        .mockImplementationOnce(async () =>
+          // Second call returns a valid stream
+          (async function* () {
+            yield {
+              candidates: [
+                { content: { parts: [{ text: 'Successful response' }] } },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
+
+      const stream = await chat.sendMessageStream(
+        { message: 'test' },
+        'prompt-id-retry-success',
+      );
+      const chunks = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      // Assertions
+      expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(2);
+      expect(
+        chunks.some(
+          (c) =>
+            c.candidates?.[0]?.content?.parts?.[0]?.text ===
+            'Successful response',
+        ),
+      ).toBe(true);
+
+      // Check that history was recorded correctly once, with no duplicates.
+      const history = chat.getHistory();
+      expect(history.length).toBe(2);
+      expect(history[0]).toEqual({
+        role: 'user',
+        parts: [{ text: 'test' }],
+      });
+      expect(history[1]).toEqual({
+        role: 'model',
+        parts: [{ text: 'Successful response' }],
+      });
+    });
+
+    it('should fail after all retries on persistent invalid content', async () => {
+      vi.mocked(mockModelsModule.generateContentStream).mockImplementation(
+        async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    parts: [{ text: '' }],
+                    role: 'model',
+                  },
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+      );
+
+      // This helper function consumes the stream and allows us to test for rejection.
+      async function consumeStreamAndExpectError() {
+        const stream = await chat.sendMessageStream(
+          { message: 'test' },
+          'prompt-id-retry-fail',
+        );
+        for await (const _ of stream) {
+          // Must loop to trigger the internal logic that throws.
+        }
+      }
+
+      await expect(consumeStreamAndExpectError()).rejects.toThrow(
+        EmptyStreamError,
+      );
+
+      // Should be called 3 times (initial + 2 retries)
+      expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(3);
+
+      // History should be clean, as if the failed turn never happened.
+      const history = chat.getHistory();
+      expect(history.length).toBe(0);
+    });
+  });
+  it('should correctly retry and append to an existing history mid-conversation', async () => {
+    // 1. Setup
+    const initialHistory: Content[] = [
+      { role: 'user', parts: [{ text: 'First question' }] },
+      { role: 'model', parts: [{ text: 'First answer' }] },
+    ];
+    chat.setHistory(initialHistory);
+
+    // 2. Mock the API
+    vi.mocked(mockModelsModule.generateContentStream)
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [{ content: { parts: [{ text: '' }] } }],
+          } as unknown as GenerateContentResponse;
+        })(),
+      )
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [{ content: { parts: [{ text: 'Second answer' }] } }],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+    // 3. Send a new message
+    const stream = await chat.sendMessageStream(
+      { message: 'Second question' },
+      'prompt-id-retry-existing',
+    );
+    for await (const _ of stream) {
+      // consume stream
+    }
+
+    // 4. Assert the final history
+    const history = chat.getHistory();
+    expect(history.length).toBe(4);
+
+    // Explicitly verify the structure of each part to satisfy TypeScript
+    const turn1 = history[0];
+    if (!turn1?.parts?.[0] || !('text' in turn1.parts[0])) {
+      throw new Error('Test setup error: First turn is not a valid text part.');
+    }
+    expect(turn1.parts[0].text).toBe('First question');
+
+    const turn2 = history[1];
+    if (!turn2?.parts?.[0] || !('text' in turn2.parts[0])) {
+      throw new Error(
+        'Test setup error: Second turn is not a valid text part.',
+      );
+    }
+    expect(turn2.parts[0].text).toBe('First answer');
+
+    const turn3 = history[2];
+    if (!turn3?.parts?.[0] || !('text' in turn3.parts[0])) {
+      throw new Error('Test setup error: Third turn is not a valid text part.');
+    }
+    expect(turn3.parts[0].text).toBe('Second question');
+
+    const turn4 = history[3];
+    if (!turn4?.parts?.[0] || !('text' in turn4.parts[0])) {
+      throw new Error(
+        'Test setup error: Fourth turn is not a valid text part.',
+      );
+    }
+    expect(turn4.parts[0].text).toBe('Second answer');
+  });
+
+  describe('concurrency control', () => {
+    it('should queue a subsequent sendMessage call until the first one completes', async () => {
+      // 1. Create promises to manually control when the API calls resolve
+      let firstCallResolver: (value: GenerateContentResponse) => void;
+      const firstCallPromise = new Promise<GenerateContentResponse>(
+        (resolve) => {
+          firstCallResolver = resolve;
+        },
+      );
+
+      let secondCallResolver: (value: GenerateContentResponse) => void;
+      const secondCallPromise = new Promise<GenerateContentResponse>(
+        (resolve) => {
+          secondCallResolver = resolve;
+        },
+      );
+
+      // A standard response body for the mock
+      const mockResponse = {
+        candidates: [
+          {
+            content: { parts: [{ text: 'response' }], role: 'model' },
+          },
+        ],
+      } as unknown as GenerateContentResponse;
+
+      // 2. Mock the API to return our controllable promises in order
+      vi.mocked(mockModelsModule.generateContent)
+        .mockReturnValueOnce(firstCallPromise)
+        .mockReturnValueOnce(secondCallPromise);
+
+      // 3. Start the first message call. Do not await it yet.
+      const firstMessagePromise = chat.sendMessage(
+        { message: 'first' },
+        'prompt-1',
+      );
+
+      // Give the event loop a chance to run the async call up to the `await`
+      await new Promise(process.nextTick);
+
+      // 4. While the first call is "in-flight", start the second message call.
+      const secondMessagePromise = chat.sendMessage(
+        { message: 'second' },
+        'prompt-2',
+      );
+
+      // 5. CRUCIAL CHECK: At this point, only the first API call should have been made.
+      // The second call should be waiting on `sendPromise`.
+      expect(mockModelsModule.generateContent).toHaveBeenCalledTimes(1);
+      expect(mockModelsModule.generateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contents: expect.arrayContaining([
+            expect.objectContaining({ parts: [{ text: 'first' }] }),
+          ]),
+        }),
+        'prompt-1',
+      );
+
+      // 6. Unblock the first API call and wait for the first message to fully complete.
+      firstCallResolver!(mockResponse);
+      await firstMessagePromise;
+
+      // Give the event loop a chance to unblock and run the second call.
+      await new Promise(process.nextTick);
+
+      // 7. CRUCIAL CHECK: Now, the second API call should have been made.
+      expect(mockModelsModule.generateContent).toHaveBeenCalledTimes(2);
+      expect(mockModelsModule.generateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contents: expect.arrayContaining([
+            expect.objectContaining({ parts: [{ text: 'second' }] }),
+          ]),
+        }),
+        'prompt-2',
+      );
+
+      // 8. Clean up by resolving the second call.
+      secondCallResolver!(mockResponse);
+      await secondMessagePromise;
+    });
+  });
+  it('should retry if the model returns a completely empty stream (no chunks)', async () => {
+    // 1. Mock the API to return an empty stream first, then a valid one.
+    vi.mocked(mockModelsModule.generateContentStream)
+      .mockImplementationOnce(
+        // First call resolves to an async generator that yields nothing.
+        async () => (async function* () {})(),
+      )
+      .mockImplementationOnce(
+        // Second call returns a valid stream.
+        async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    parts: [{ text: 'Successful response after empty' }],
+                  },
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+      );
+
+    // 2. Call the method and consume the stream.
+    const stream = await chat.sendMessageStream(
+      { message: 'test empty stream' },
+      'prompt-id-empty-stream',
+    );
+    const chunks = [];
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+
+    // 3. Assert the results.
+    expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(2);
+    expect(
+      chunks.some(
+        (c) =>
+          c.candidates?.[0]?.content?.parts?.[0]?.text ===
+          'Successful response after empty',
+      ),
+    ).toBe(true);
+
+    const history = chat.getHistory();
+    expect(history.length).toBe(2);
+
+    // Explicitly verify the structure of each part to satisfy TypeScript
+    const turn1 = history[0];
+    if (!turn1?.parts?.[0] || !('text' in turn1.parts[0])) {
+      throw new Error('Test setup error: First turn is not a valid text part.');
+    }
+    expect(turn1.parts[0].text).toBe('test empty stream');
+
+    const turn2 = history[1];
+    if (!turn2?.parts?.[0] || !('text' in turn2.parts[0])) {
+      throw new Error(
+        'Test setup error: Second turn is not a valid text part.',
+      );
+    }
+    expect(turn2.parts[0].text).toBe('Successful response after empty');
+  });
+  it('should queue a subsequent sendMessageStream call until the first stream is fully consumed', async () => {
+    // 1. Create a promise to manually control the stream's lifecycle
+    let continueFirstStream: () => void;
+    const firstStreamContinuePromise = new Promise<void>((resolve) => {
+      continueFirstStream = resolve;
+    });
+
+    // 2. Mock the API to return controllable async generators
+    const firstStreamGenerator = (async function* () {
+      yield {
+        candidates: [
+          { content: { parts: [{ text: 'first response part 1' }] } },
+        ],
+      } as unknown as GenerateContentResponse;
+      await firstStreamContinuePromise; // Pause the stream
+      yield {
+        candidates: [{ content: { parts: [{ text: ' part 2' }] } }],
+      } as unknown as GenerateContentResponse;
+    })();
+
+    const secondStreamGenerator = (async function* () {
+      yield {
+        candidates: [{ content: { parts: [{ text: 'second response' }] } }],
+      } as unknown as GenerateContentResponse;
+    })();
+
+    vi.mocked(mockModelsModule.generateContentStream)
+      .mockResolvedValueOnce(firstStreamGenerator)
+      .mockResolvedValueOnce(secondStreamGenerator);
+
+    // 3. Start the first stream and consume only the first chunk to pause it
+    const firstStream = await chat.sendMessageStream(
+      { message: 'first' },
+      'prompt-1',
+    );
+    const firstStreamIterator = firstStream[Symbol.asyncIterator]();
+    await firstStreamIterator.next();
+
+    // 4. While the first stream is paused, start the second call. It will block.
+    const secondStreamPromise = chat.sendMessageStream(
+      { message: 'second' },
+      'prompt-2',
+    );
+
+    // 5. Assert that only one API call has been made so far.
+    expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(1);
+
+    // 6. Unblock and fully consume the first stream to completion.
+    continueFirstStream!();
+    await firstStreamIterator.next(); // Consume the rest of the stream
+    await firstStreamIterator.next(); // Finish the iterator
+
+    // 7. Now that the first stream is done, await the second promise to get its generator.
+    const secondStream = await secondStreamPromise;
+
+    // 8. Start consuming the second stream, which triggers its internal API call.
+    const secondStreamIterator = secondStream[Symbol.asyncIterator]();
+    await secondStreamIterator.next();
+
+    // 9. The second API call should now have been made.
+    expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(2);
+
+    // 10. FIX: Fully consume the second stream to ensure recordHistory is called.
+    await secondStreamIterator.next(); // This finishes the iterator.
+
+    // 11. Final check on history.
+    const history = chat.getHistory();
+    expect(history.length).toBe(4);
+
+    const turn4 = history[3];
+    if (!turn4?.parts?.[0] || !('text' in turn4.parts[0])) {
+      throw new Error(
+        'Test setup error: Fourth turn is not a valid text part.',
+      );
+    }
+    expect(turn4.parts[0].text).toBe('second response');
   });
 });

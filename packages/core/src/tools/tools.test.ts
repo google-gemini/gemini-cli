@@ -101,7 +101,6 @@ describe('DeclarativeTool', () => {
       const successResult: ToolResult = {
         llmContent: 'Success!',
         returnDisplay: 'Success!',
-        summary: 'Tool executed successfully',
       };
       const executeFn = vi.fn().mockResolvedValue(successResult);
       const invocation = new TestToolInvocation({}, executeFn);

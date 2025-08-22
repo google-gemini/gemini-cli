@@ -5,10 +5,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { setupUser, ProjectIdRequiredError } from './setup.js';
+import {
+  setupUser,
+  ProjectIdRequiredError,
+  ProjectAccessError,
+} from './setup.js';
 import { CodeAssistServer } from '../code_assist/server.js';
 import { OAuth2Client } from 'google-auth-library';
 import { GeminiUserTier, UserTierId } from './types.js';
+import { AuthType } from '../core/contentGenerator.js';
 
 vi.mock('../code_assist/server.js');
 
@@ -58,8 +63,9 @@ describe('setupUser for existing user', () => {
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
     mockLoad.mockResolvedValue({
       currentTier: mockPaidTier,
+      cloudaicompanionProject: 'test-project',
     });
-    await setupUser({} as OAuth2Client);
+    await setupUser({} as OAuth2Client, AuthType.LOGIN_WITH_GOOGLE_GCA);
     expect(CodeAssistServer).toHaveBeenCalledWith(
       {},
       'test-project',
@@ -75,7 +81,10 @@ describe('setupUser for existing user', () => {
       cloudaicompanionProject: 'server-project',
       currentTier: mockPaidTier,
     });
-    const projectId = await setupUser({} as OAuth2Client);
+    const projectId = await setupUser(
+      {} as OAuth2Client,
+      AuthType.LOGIN_WITH_GOOGLE_GCA,
+    );
     expect(CodeAssistServer).toHaveBeenCalledWith(
       {},
       'test-project',
@@ -96,9 +105,9 @@ describe('setupUser for existing user', () => {
       throw new ProjectIdRequiredError();
     });
 
-    await expect(setupUser({} as OAuth2Client)).rejects.toThrow(
-      ProjectIdRequiredError,
-    );
+    await expect(
+      setupUser({} as OAuth2Client, AuthType.LOGIN_WITH_GOOGLE_GCA),
+    ).rejects.toThrow(ProjectIdRequiredError);
   });
 });
 
@@ -135,7 +144,10 @@ describe('setupUser for new user', () => {
     mockLoad.mockResolvedValue({
       allowedTiers: [mockPaidTier],
     });
-    const userData = await setupUser({} as OAuth2Client);
+    const userData = await setupUser(
+      {} as OAuth2Client,
+      AuthType.LOGIN_WITH_GOOGLE_GCA,
+    );
     expect(CodeAssistServer).toHaveBeenCalledWith(
       {},
       'test-project',
@@ -165,7 +177,10 @@ describe('setupUser for new user', () => {
     mockLoad.mockResolvedValue({
       allowedTiers: [mockFreeTier],
     });
-    const userData = await setupUser({} as OAuth2Client);
+    const userData = await setupUser(
+      {} as OAuth2Client,
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
     expect(CodeAssistServer).toHaveBeenCalledWith(
       {},
       undefined,
@@ -189,7 +204,7 @@ describe('setupUser for new user', () => {
     });
   });
 
-  it('should use GOOGLE_CLOUD_PROJECT when onboard response has no project ID', async () => {
+  it('should throw ProjectAccessError when LOGIN_WITH_GOOGLE_GCA onboard response has no project ID', async () => {
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
     mockLoad.mockResolvedValue({
       allowedTiers: [mockPaidTier],
@@ -200,11 +215,9 @@ describe('setupUser for new user', () => {
         cloudaicompanionProject: undefined,
       },
     });
-    const userData = await setupUser({} as OAuth2Client);
-    expect(userData).toEqual({
-      projectId: 'test-project',
-      userTier: 'standard-tier',
-    });
+    await expect(
+      setupUser({} as OAuth2Client, AuthType.LOGIN_WITH_GOOGLE_GCA),
+    ).rejects.toThrow(ProjectAccessError);
   });
 
   it('should throw ProjectIdRequiredError when no project ID is available', async () => {
@@ -216,8 +229,8 @@ describe('setupUser for new user', () => {
       done: true,
       response: {},
     });
-    await expect(setupUser({} as OAuth2Client)).rejects.toThrow(
-      ProjectIdRequiredError,
-    );
+    await expect(
+      setupUser({} as OAuth2Client, AuthType.LOGIN_WITH_GOOGLE_GCA),
+    ).rejects.toThrow(ProjectIdRequiredError);
   });
 });

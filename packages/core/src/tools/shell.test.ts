@@ -32,6 +32,7 @@ import {
 } from '../services/shellExecutionService.js';
 import * as fs from 'fs';
 import * as os from 'os';
+import { EOL } from 'os';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import * as summarizer from '../utils/summarizer.js';
@@ -141,7 +142,7 @@ describe('ShellTool', () => {
       resolveShellExecution({ pid: 54321 });
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('54321\n54322\n'); // Service PID and background PID
+      vi.mocked(fs.readFileSync).mockReturnValue(`54321${EOL}54322${EOL}`); // Service PID and background PID
 
       const result = await promise;
 
