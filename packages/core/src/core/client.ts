@@ -243,7 +243,6 @@ export class GeminiClient {
     ];
     try {
       const userMemory = this.config.getUserMemory();
-      const availableToolNames = this.config.getAvailableToolNames();
       const systemInstruction = getCoreSystemPrompt(userMemory, availableToolNames);
       const generateContentConfigWithThinking = isThinkingSupported(
         this.config.getModel(),

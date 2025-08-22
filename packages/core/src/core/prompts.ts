@@ -202,31 +202,31 @@ user: is 13 a prime number?
 model: true
 </example>
 
-${availableToolNames && availableToolNames.includes(LSTool.Name) ? `
+${!availableToolNames || availableToolNames.includes(LSTool.Name) ? `
 <example>
 user: list files here.
 model: [tool_call: ${LSTool.Name} for path '/path/to/project']
 </example>
 ` : ''}
 
-${availableToolNames && availableToolNames.includes(ShellTool.Name) ? `
+${!availableToolNames || availableToolNames.includes(ShellTool.Name) ? `
 <example>
 user: start the server implemented in server.js
 model: [tool_call: ${ShellTool.Name} for 'node server.js &' because it must run in the background]
 </example>
 ` : ''}
 
-${availableToolNames && (availableToolNames.includes(GlobTool.Name) || availableToolNames.includes(ReadFileTool.Name) || availableToolNames.includes(WriteFileTool.Name) || availableToolNames.includes(EditTool.Name) || availableToolNames.includes(ShellTool.Name)) ? `
+${!availableToolNames || (availableToolNames.includes(GlobTool.Name) || availableToolNames.includes(ReadFileTool.Name) || availableToolNames.includes(WriteFileTool.Name) || availableToolNames.includes(EditTool.Name) || availableToolNames.includes(ShellTool.Name)) ? `
 <example>
 user: Refactor the auth logic in src/auth.py to use the requests library instead of urllib.
 model: Okay, I can refactor 'src/auth.py'.
 First, I'll analyze the code and check for a test safety net before planning any changes.
-${availableToolNames.includes(GlobTool.Name) ? `[tool_call: ${GlobTool.Name} for path 'tests/test_auth.py']` : ''}
-${availableToolNames.includes(ReadFileTool.Name) ? `[tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/tests/test_auth.py']` : ''}
+${!availableToolNames || availableToolNames.includes(GlobTool.Name) ? `[tool_call: ${GlobTool.Name} for path 'tests/test_auth.py']` : ''}
+${!availableToolNames || availableToolNames.includes(ReadFileTool.Name) ? `[tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/tests/test_auth.py']` : ''}
 (After analysis)
 Great, 'tests/test_auth.py' exists and covers the core authentication logic. With this safety net in place, I can safely plan the refactoring.
 I'll also confirm 'requests' is a dependency.
-${availableToolNames.includes(ReadFileTool.Name) ? `[tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/requirements.txt']` : ''}
+${!availableToolNames || availableToolNames.includes(ReadFileTool.Name) ? `[tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/requirements.txt']` : ''}
 (After analysis)
 Looks good, 'requests' is available.
 
@@ -239,11 +239,11 @@ Here's the plan:
 Should I proceed?
 user: Yes
 model:
-${availableToolNames.includes(WriteFileTool.Name) && availableToolNames.includes(EditTool.Name) ? `[tool_call: ${WriteFileTool.Name} or ${EditTool.Name} to apply the refactoring to 'src/auth.py']` : 
-   availableToolNames.includes(WriteFileTool.Name) ? `[tool_call: ${WriteFileTool.Name} to apply the refactoring to 'src/auth.py']` :
-   availableToolNames.includes(EditTool.Name) ? `[tool_call: ${EditTool.Name} to apply the refactoring to 'src/auth.py']` : ''}
+${(!availableToolNames || availableToolNames.includes(WriteFileTool.Name)) && (!availableToolNames || availableToolNames.includes(EditTool.Name)) ? `[tool_call: ${WriteFileTool.Name} or ${EditTool.Name} to apply the refactoring to 'src/auth.py']` : 
+   (!availableToolNames || availableToolNames.includes(WriteFileTool.Name)) ? `[tool_call: ${WriteFileTool.Name} to apply the refactoring to 'src/auth.py']` :
+   (!availableToolNames || availableToolNames.includes(EditTool.Name)) ? `[tool_call: ${EditTool.Name} to apply the refactoring to 'src/auth.py']` : ''}
 Refactoring complete. Running verification...
-${availableToolNames.includes(ShellTool.Name) ? `[tool_call: ${ShellTool.Name} for 'ruff check src/auth.py && pytest']` : ''}
+${!availableToolNames || availableToolNames.includes(ShellTool.Name) ? `[tool_call: ${ShellTool.Name} for 'ruff check src/auth.py && pytest']` : ''}
 (After verification passes)
 All checks passed. This is a stable checkpoint.
 ${(function () {
@@ -255,45 +255,45 @@ ${(function () {
 </example>
 ` : ''}
 
-${availableToolNames && availableToolNames.includes(ShellTool.Name) ? `
+${!availableToolNames || availableToolNames.includes(ShellTool.Name) ? `
 <example>
 user: Delete the temp directory.
 model: I can run \`rm -rf /path/to/project/temp\`. This will permanently delete the directory and all its contents.
 </example>
 ` : ''}
 
-${availableToolNames && (availableToolNames.includes(ReadFileTool.Name) || availableToolNames.includes(GlobTool.Name) || availableToolNames.includes(ReadManyFilesTool.Name) || availableToolNames.includes(WriteFileTool.Name) || availableToolNames.includes(ShellTool.Name)) ? `
+${!availableToolNames || (availableToolNames.includes(ReadFileTool.Name) || availableToolNames.includes(GlobTool.Name) || availableToolNames.includes(ReadManyFilesTool.Name) || availableToolNames.includes(WriteFileTool.Name) || availableToolNames.includes(ShellTool.Name)) ? `
 <example>
 user: Write tests for someFile.ts
 model:
 Okay, I can write those tests. First, I'll read \`someFile.ts\` to understand its functionality.
-${availableToolNames.includes(ReadFileTool.Name) && availableToolNames.includes(GlobTool.Name) ? `[tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/someFile.ts' or use ${GlobTool.Name} to find \`someFile.ts\` if its location is unknown]` :
-  availableToolNames.includes(ReadFileTool.Name) ? `[tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/someFile.ts']` :
-  availableToolNames.includes(GlobTool.Name) ? `[tool_call: ${GlobTool.Name} to find \`someFile.ts\`]` : ''}
+${(!availableToolNames || availableToolNames.includes(ReadFileTool.Name)) && (!availableToolNames || availableToolNames.includes(GlobTool.Name)) ? `[tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/someFile.ts' or use ${GlobTool.Name} to find \`someFile.ts\` if its location is unknown]` :
+  (!availableToolNames || availableToolNames.includes(ReadFileTool.Name)) ? `[tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/someFile.ts']` :
+  (!availableToolNames || availableToolNames.includes(GlobTool.Name)) ? `[tool_call: ${GlobTool.Name} to find \`someFile.ts\`]` : ''}
 Now I'll look for existing or related test files to understand current testing conventions and dependencies.
-${availableToolNames.includes(ReadManyFilesTool.Name) ? `[tool_call: ${ReadManyFilesTool.Name} for paths ['**/*.test.ts', 'src/**/*.spec.ts'] assuming someFile.ts is in the src directory]` : ''}
+${!availableToolNames || availableToolNames.includes(ReadManyFilesTool.Name) ? `[tool_call: ${ReadManyFilesTool.Name} for paths ['**/*.test.ts', 'src/**/*.spec.ts'] assuming someFile.ts is in the src directory]` : ''}
 (After reviewing existing tests and the file content)
-${availableToolNames.includes(WriteFileTool.Name) ? `[tool_call: ${WriteFileTool.Name} to create /path/to/someFile.test.ts with the test code]` : ''}
+${!availableToolNames || availableToolNames.includes(WriteFileTool.Name) ? `[tool_call: ${WriteFileTool.Name} to create /path/to/someFile.test.ts with the test code]` : ''}
 I've written the tests. Now I'll run the project's test command to verify them.
-${availableToolNames.includes(ShellTool.Name) ? `[tool_call: ${ShellTool.Name} for 'npm run test']` : ''}
+${!availableToolNames || availableToolNames.includes(ShellTool.Name) ? `[tool_call: ${ShellTool.Name} for 'npm run test']` : ''}
 </example>
 ` : ''}
 
-${availableToolNames && (availableToolNames.includes(GrepTool.Name) || availableToolNames.includes(ReadFileTool.Name)) ? `
+${!availableToolNames || (availableToolNames.includes(GrepTool.Name) || availableToolNames.includes(ReadFileTool.Name)) ? `
 <example>
 user: How do I update the user's profile information in this system?
 model:
 I'm not immediately sure how user profile information is updated. I'll search the codebase for terms like 'UserProfile', 'updateProfile', or 'editUser' to find relevant files or API endpoints.
-${availableToolNames.includes(GrepTool.Name) ? `[tool_call: ${GrepTool.Name} for pattern 'UserProfile|updateProfile|editUser']` : ''}
+${!availableToolNames || availableToolNames.includes(GrepTool.Name) ? `[tool_call: ${GrepTool.Name} for pattern 'UserProfile|updateProfile|editUser']` : ''}
 (After reviewing search results, assuming a relevant file like '/path/to/UserProfileService.java' was found)
 Okay, \`/path/to/UserProfileService.java\` seems like the most relevant file. I'll read its content to understand how updates are handled.
-${availableToolNames.includes(ReadFileTool.Name) ? `[tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/UserProfileService.java']` : ''}
+${!availableToolNames || availableToolNames.includes(ReadFileTool.Name) ? `[tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/UserProfileService.java']` : ''}
 (After reading the file)
 It appears the \`updateUserProfile\` method in \`UserProfileService.java\` is responsible for this. It expects a user ID and a \`UserProfileDTO\` object...
 </example>
 ` : ''}
 
-${availableToolNames && availableToolNames.includes(GlobTool.Name) ? `
+${!availableToolNames || availableToolNames.includes(GlobTool.Name) ? `
 <example>
 user: Where are all the 'app.config' files in this project? I need to check their settings.
 model:
