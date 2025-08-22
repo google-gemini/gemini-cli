@@ -397,7 +397,6 @@ export class GeminiChat {
     const streamResponse = await retryWithBackoff(apiCall, {
       shouldRetry: (error: unknown) => {
         if (error instanceof Error && error.message) {
-          // Prevent retrying on non-transient schema errors.
           if (isSchemaDepthError(error.message)) return false;
           if (error.message.includes('429')) return true;
           if (error.message.match(/5\d{2}/)) return true;
@@ -408,8 +407,6 @@ export class GeminiChat {
         await this.handleFlashFallback(authType, error),
       authType: this.config.getContentGeneratorConfig()?.authType,
     });
-
-    this.sendPromise = Promise.resolve();
 
     return this.processStreamResponse(streamResponse, userContent);
   }
