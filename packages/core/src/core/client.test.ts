@@ -526,7 +526,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-2');
+      const result = await client.tryCompressChat('prompt-id-2', false);
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -599,7 +599,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-3');
+      const result = await client.tryCompressChat('prompt-id-3', false);
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -651,7 +651,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-3');
+      const result = await client.tryCompressChat('prompt-id-3', false);
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
