@@ -726,4 +726,65 @@ describe('GeminiChat', () => {
       await secondMessagePromise;
     });
   });
+  it('should retry if the model returns a completely empty stream (no chunks)', async () => {
+    // 1. Mock the API to return an empty stream first, then a valid one.
+    vi.mocked(mockModelsModule.generateContentStream)
+      .mockImplementationOnce(
+        // First call resolves to an async generator that yields nothing.
+        async () => (async function* () {})(),
+      )
+      .mockImplementationOnce(
+        // Second call returns a valid stream.
+        async () =>
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: {
+                    parts: [{ text: 'Successful response after empty' }],
+                  },
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+      );
+
+    // 2. Call the method and consume the stream.
+    const stream = await chat.sendMessageStream(
+      { message: 'test empty stream' },
+      'prompt-id-empty-stream',
+    );
+    const chunks = [];
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+
+    // 3. Assert the results.
+    expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(2);
+    expect(
+      chunks.some(
+        (c) =>
+          c.candidates?.[0]?.content?.parts?.[0]?.text ===
+          'Successful response after empty',
+      ),
+    ).toBe(true);
+
+    const history = chat.getHistory();
+    expect(history.length).toBe(2);
+
+    // Explicitly verify the structure of each part to satisfy TypeScript
+    const turn1 = history[0];
+    if (!turn1?.parts?.[0] || !('text' in turn1.parts[0])) {
+      throw new Error('Test setup error: First turn is not a valid text part.');
+    }
+    expect(turn1.parts[0].text).toBe('test empty stream');
+
+    const turn2 = history[1];
+    if (!turn2?.parts?.[0] || !('text' in turn2.parts[0])) {
+      throw new Error(
+        'Test setup error: Second turn is not a valid text part.',
+      );
+    }
+    expect(turn2.parts[0].text).toBe('Successful response after empty');
+  });
 });
