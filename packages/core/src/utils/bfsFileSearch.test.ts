@@ -4,145 +4,229 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fsPromises from 'fs/promises';
-import * as gitUtils from './gitUtils.js';
+import * as path from 'path';
+import * as os from 'os';
 import { bfsFileSearch } from './bfsFileSearch.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
-vi.mock('fs');
-vi.mock('fs/promises');
-vi.mock('./gitUtils.js');
-
-const createMockDirent = (name: string, isFile: boolean): fs.Dirent => {
-  const dirent = new fs.Dirent();
-  dirent.name = name;
-  dirent.isFile = () => isFile;
-  dirent.isDirectory = () => !isFile;
-  return dirent;
-};
-
-// Type for the specific overload we're using
-type ReaddirWithFileTypes = (
-  path: fs.PathLike,
-  options: { withFileTypes: true },
-) => Promise<fs.Dirent[]>;
-
 describe('bfsFileSearch', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
+  let testRootDir: string;
+
+  async function createEmptyDir(...pathSegments: string[]) {
+    const fullPath = path.join(testRootDir, ...pathSegments);
+    await fsPromises.mkdir(fullPath, { recursive: true });
+    return fullPath;
+  }
+
+  async function createTestFile(content: string, ...pathSegments: string[]) {
+    const fullPath = path.join(testRootDir, ...pathSegments);
+    await fsPromises.mkdir(path.dirname(fullPath), { recursive: true });
+    await fsPromises.writeFile(fullPath, content);
+    return fullPath;
+  }
+
+  beforeEach(async () => {
+    testRootDir = await fsPromises.mkdtemp(
+      path.join(os.tmpdir(), 'bfs-file-search-test-'),
+    );
+  });
+
+  afterEach(async () => {
+    await fsPromises.rm(testRootDir, { recursive: true, force: true });
   });
 
   it('should find a file in the root directory', async () => {
-    const mockFs = vi.mocked(fsPromises);
-    const mockReaddir = mockFs.readdir as unknown as ReaddirWithFileTypes;
-    vi.mocked(mockReaddir).mockResolvedValue([
-      createMockDirent('file1.txt', true),
-      createMockDirent('file2.txt', true),
-    ]);
-
-    const result = await bfsFileSearch('/test', { fileName: 'file1.txt' });
-    expect(result).toEqual(['/test/file1.txt']);
+    const targetFilePath = await createTestFile('content', 'target.txt');
+    const result = await bfsFileSearch(testRootDir, { fileName: 'target.txt' });
+    expect(result).toEqual([targetFilePath]);
   });
 
-  it('should find a file in a subdirectory', async () => {
-    const mockFs = vi.mocked(fsPromises);
-    const mockReaddir = mockFs.readdir as unknown as ReaddirWithFileTypes;
-    vi.mocked(mockReaddir).mockImplementation(async (dir) => {
-      if (dir === '/test') {
-        return [createMockDirent('subdir', false)];
-      }
-      if (dir === '/test/subdir') {
-        return [createMockDirent('file1.txt', true)];
-      }
-      return [];
-    });
-
-    const result = await bfsFileSearch('/test', { fileName: 'file1.txt' });
-    expect(result).toEqual(['/test/subdir/file1.txt']);
+  it('should find a file in a nested directory', async () => {
+    const targetFilePath = await createTestFile(
+      'content',
+      'a',
+      'b',
+      'target.txt',
+    );
+    const result = await bfsFileSearch(testRootDir, { fileName: 'target.txt' });
+    expect(result).toEqual([targetFilePath]);
   });
 
-  it('should ignore specified directories', async () => {
-    const mockFs = vi.mocked(fsPromises);
-    const mockReaddir = mockFs.readdir as unknown as ReaddirWithFileTypes;
-    vi.mocked(mockReaddir).mockImplementation(async (dir) => {
-      if (dir === '/test') {
-        return [
-          createMockDirent('subdir1', false),
-          createMockDirent('subdir2', false),
-        ];
-      }
-      if (dir === '/test/subdir1') {
-        return [createMockDirent('file1.txt', true)];
-      }
-      if (dir === '/test/subdir2') {
-        return [createMockDirent('file1.txt', true)];
-      }
-      return [];
-    });
-
-    const result = await bfsFileSearch('/test', {
-      fileName: 'file1.txt',
-      ignoreDirs: ['subdir2'],
-    });
-    expect(result).toEqual(['/test/subdir1/file1.txt']);
+  it('should find multiple files with the same name', async () => {
+    const targetFilePath1 = await createTestFile('content1', 'a', 'target.txt');
+    const targetFilePath2 = await createTestFile('content2', 'b', 'target.txt');
+    const result = await bfsFileSearch(testRootDir, { fileName: 'target.txt' });
+    result.sort();
+    expect(result).toEqual([targetFilePath1, targetFilePath2].sort());
   });
 
-  it('should respect maxDirs limit', async () => {
-    const mockFs = vi.mocked(fsPromises);
-    const mockReaddir = mockFs.readdir as unknown as ReaddirWithFileTypes;
-    vi.mocked(mockReaddir).mockImplementation(async (dir) => {
-      if (dir === '/test') {
-        return [
-          createMockDirent('subdir1', false),
-          createMockDirent('subdir2', false),
-        ];
-      }
-      if (dir === '/test/subdir1') {
-        return [createMockDirent('file1.txt', true)];
-      }
-      if (dir === '/test/subdir2') {
-        return [createMockDirent('file1.txt', true)];
-      }
-      return [];
-    });
-
-    const result = await bfsFileSearch('/test', {
-      fileName: 'file1.txt',
-      maxDirs: 2,
-    });
-    expect(result).toEqual(['/test/subdir1/file1.txt']);
+  it('should return an empty array if no file is found', async () => {
+    await createTestFile('content', 'other.txt');
+    const result = await bfsFileSearch(testRootDir, { fileName: 'target.txt' });
+    expect(result).toEqual([]);
   });
 
-  it('should respect .gitignore files', async () => {
-    const mockFs = vi.mocked(fsPromises);
-    const mockGitUtils = vi.mocked(gitUtils);
-    mockGitUtils.isGitRepository.mockReturnValue(true);
-    const mockReaddir = mockFs.readdir as unknown as ReaddirWithFileTypes;
-    vi.mocked(mockReaddir).mockImplementation(async (dir) => {
-      if (dir === '/test') {
-        return [
-          createMockDirent('.gitignore', true),
-          createMockDirent('subdir1', false),
-          createMockDirent('subdir2', false),
-        ];
-      }
-      if (dir === '/test/subdir1') {
-        return [createMockDirent('file1.txt', true)];
-      }
-      if (dir === '/test/subdir2') {
-        return [createMockDirent('file1.txt', true)];
-      }
-      return [];
+  it('should ignore directories specified in ignoreDirs', async () => {
+    await createTestFile('content', 'ignored', 'target.txt');
+    const targetFilePath = await createTestFile(
+      'content',
+      'not-ignored',
+      'target.txt',
+    );
+    const result = await bfsFileSearch(testRootDir, {
+      fileName: 'target.txt',
+      ignoreDirs: ['ignored'],
     });
-    vi.mocked(fs).readFileSync.mockReturnValue('subdir2');
+    expect(result).toEqual([targetFilePath]);
+  });
 
-    const fileService = new FileDiscoveryService('/test');
-    const result = await bfsFileSearch('/test', {
-      fileName: 'file1.txt',
-      fileService,
+  it('should respect the maxDirs limit and not find the file', async () => {
+    await createTestFile('content', 'a', 'b', 'c', 'target.txt');
+    const result = await bfsFileSearch(testRootDir, {
+      fileName: 'target.txt',
+      maxDirs: 3,
     });
-    expect(result).toEqual(['/test/subdir1/file1.txt']);
+    expect(result).toEqual([]);
+  });
+
+  it('should respect the maxDirs limit and find the file', async () => {
+    const targetFilePath = await createTestFile(
+      'content',
+      'a',
+      'b',
+      'c',
+      'target.txt',
+    );
+    const result = await bfsFileSearch(testRootDir, {
+      fileName: 'target.txt',
+      maxDirs: 4,
+    });
+    expect(result).toEqual([targetFilePath]);
+  });
+
+  describe('with FileDiscoveryService', () => {
+    let projectRoot: string;
+
+    beforeEach(async () => {
+      projectRoot = await createEmptyDir('project');
+    });
+
+    it('should ignore gitignored files', async () => {
+      await createEmptyDir('project', '.git');
+      await createTestFile('node_modules/', 'project', '.gitignore');
+      await createTestFile('content', 'project', 'node_modules', 'target.txt');
+      const targetFilePath = await createTestFile(
+        'content',
+        'project',
+        'not-ignored',
+        'target.txt',
+      );
+
+      const fileService = new FileDiscoveryService(projectRoot);
+      const result = await bfsFileSearch(projectRoot, {
+        fileName: 'target.txt',
+        fileService,
+        fileFilteringOptions: {
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        },
+      });
+
+      expect(result).toEqual([targetFilePath]);
+    });
+
+    it('should ignore geminiignored files', async () => {
+      await createTestFile('node_modules/', 'project', '.geminiignore');
+      await createTestFile('content', 'project', 'node_modules', 'target.txt');
+      const targetFilePath = await createTestFile(
+        'content',
+        'project',
+        'not-ignored',
+        'target.txt',
+      );
+
+      const fileService = new FileDiscoveryService(projectRoot);
+      const result = await bfsFileSearch(projectRoot, {
+        fileName: 'target.txt',
+        fileService,
+        fileFilteringOptions: {
+          respectGitIgnore: false,
+          respectGeminiIgnore: true,
+        },
+      });
+
+      expect(result).toEqual([targetFilePath]);
+    });
+
+    it('should not ignore files if respect flags are false', async () => {
+      await createEmptyDir('project', '.git');
+      await createTestFile('node_modules/', 'project', '.gitignore');
+      const target1 = await createTestFile(
+        'content',
+        'project',
+        'node_modules',
+        'target.txt',
+      );
+      const target2 = await createTestFile(
+        'content',
+        'project',
+        'not-ignored',
+        'target.txt',
+      );
+
+      const fileService = new FileDiscoveryService(projectRoot);
+      const result = await bfsFileSearch(projectRoot, {
+        fileName: 'target.txt',
+        fileService,
+        fileFilteringOptions: {
+          respectGitIgnore: false,
+          respectGeminiIgnore: false,
+        },
+      });
+
+      expect(result.sort()).toEqual([target1, target2].sort());
+    });
+  });
+
+  it('should find all files in a complex directory structure', async () => {
+    // Create a complex directory structure to test correctness at scale
+    // without flaky performance checks.
+    const numDirs = 50;
+    const numFilesPerDir = 2;
+    const numTargetDirs = 10;
+
+    const dirCreationPromises: Array<Promise<unknown>> = [];
+    for (let i = 0; i < numDirs; i++) {
+      dirCreationPromises.push(createEmptyDir(`dir${i}`));
+      dirCreationPromises.push(createEmptyDir(`dir${i}`, 'subdir1'));
+      dirCreationPromises.push(createEmptyDir(`dir${i}`, 'subdir2'));
+      dirCreationPromises.push(createEmptyDir(`dir${i}`, 'subdir1', 'deep'));
+    }
+    await Promise.all(dirCreationPromises);
+
+    const fileCreationPromises: Array<Promise<string>> = [];
+    for (let i = 0; i < numTargetDirs; i++) {
+      // Add target files in some directories
+      fileCreationPromises.push(
+        createTestFile('content', `dir${i}`, 'GEMINI.md'),
+      );
+      fileCreationPromises.push(
+        createTestFile('content', `dir${i}`, 'subdir1', 'GEMINI.md'),
+      );
+    }
+    const expectedFiles = await Promise.all(fileCreationPromises);
+
+    const result = await bfsFileSearch(testRootDir, {
+      fileName: 'GEMINI.md',
+      // Provide a generous maxDirs limit to ensure it doesn't prematurely stop
+      // in this large test case. Total dirs created is 200.
+      maxDirs: 250,
+    });
+
+    // Verify we found the exact files we created
+    expect(result.length).toBe(numTargetDirs * numFilesPerDir);
+    expect(result.sort()).toEqual(expectedFiles.sort());
   });
 });

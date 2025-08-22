@@ -4,9 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GaxiosError } from 'gaxios';
 import { useState, useEffect, useCallback } from 'react';
-import { Config, CodeAssistServer, UserTierId } from '@google/gemini-cli-core';
+import {
+  Config,
+  CodeAssistServer,
+  UserTierId,
+  LoggingContentGenerator,
+} from '@google/gemini-cli-core';
 
 export interface PrivacyState {
   isLoading: boolean;
@@ -81,7 +85,13 @@ export const usePrivacySettings = (config: Config) => {
 };
 
 function getCodeAssistServer(config: Config): CodeAssistServer {
-  const server = config.getGeminiClient().getContentGenerator();
+  let server = config.getGeminiClient().getContentGenerator();
+
+  // Unwrap LoggingContentGenerator if present
+  if (server instanceof LoggingContentGenerator) {
+    server = server.getWrapped();
+  }
+
   // Neither of these cases should ever happen.
   if (!(server instanceof CodeAssistServer)) {
     throw new Error('Oauth not being used');
@@ -113,13 +123,18 @@ async function getRemoteDataCollectionOptIn(
   try {
     const resp = await server.getCodeAssistGlobalUserSetting();
     return resp.freeTierDataCollectionOptin;
-  } catch (e) {
-    if (e instanceof GaxiosError) {
-      if (e.response?.status === 404) {
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const gaxiosError = error as {
+        response?: {
+          status?: unknown;
+        };
+      };
+      if (gaxiosError.response?.status === 404) {
         return true;
       }
     }
-    throw e;
+    throw error;
   }
 }
 

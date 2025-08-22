@@ -5,6 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
+import { darkSemanticColors } from './semantic-tokens.js';
 
 const draculaColors: ColorsTheme = {
   type: 'dark',
@@ -17,6 +18,8 @@ const draculaColors: ColorsTheme = {
   AccentGreen: '#50fa7b',
   AccentYellow: '#f1fa8c',
   AccentRed: '#ff5555',
+  DiffAdded: '#11431d',
+  DiffRemoved: '#6e1818',
   Comment: '#6272a4',
   Gray: '#6272a4',
   GradientColors: ['#ff79c6', '#8be9fd'],
@@ -117,4 +120,5 @@ export const Dracula: Theme = new Theme(
     },
   },
   draculaColors,
+  darkSemanticColors,
 );

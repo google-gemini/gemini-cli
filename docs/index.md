@@ -18,6 +18,7 @@ This documentation is organized into the following sections:
   - **[Configuration](./cli/configuration.md):** Information on configuring the CLI.
   - **[Checkpointing](./checkpointing.md):** Documentation for the checkpointing feature.
   - **[Extensions](./extension.md):** How to extend the CLI with new functionality.
+  - **[IDE Integration](./ide-integration.md):** Connect the CLI to your editor.
   - **[Telemetry](./telemetry.md):** Overview of telemetry in the CLI.
 - **Core Details:** Documentation for `packages/core`.
   - **[Core Introduction](./core/index.md):** Overview of the core component.
@@ -31,8 +32,9 @@ This documentation is organized into the following sections:
   - **[Web Search Tool](./tools/web-search.md):** Documentation for the `google_web_search` tool.
   - **[Memory Tool](./tools/memory.md):** Documentation for the `save_memory` tool.
 - **[Contributing & Development Guide](../CONTRIBUTING.md):** Information for contributors and developers, including setup, building, testing, and coding conventions.
-- **[NPM Workspaces and Publishing](./npm.md):** Details on how the project's packages are managed and published.
+- **[NPM](./npm.md):** Details on how the project's packages are structured
 - **[Troubleshooting Guide](./troubleshooting.md):** Find solutions to common problems and FAQs.
 - **[Terms of Service and Privacy Notice](./tos-privacy.md):** Information on the terms of service and privacy notices applicable to your use of Gemini CLI.
+- **[Releases](./releases.md):** Information on the project's releases and deployment cadence.
 
 We hope this documentation helps you make the most of the Gemini CLI!
