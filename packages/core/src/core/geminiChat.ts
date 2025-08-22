@@ -67,6 +67,76 @@ function validateHistory(history: Content[]) {
   }
 }
 
+export function concatenateHistory(history: Content[]): Content[] {
+  if (history.length === 0) {
+    return [];
+  }
+
+  const concatenatedHistory: Content[] = [];
+  let currentGroup: Content[] = [];
+
+  const processGroup = (group: Content[]) => {
+    if (group.length === 0) {
+      return;
+    }
+
+    const role = group[0].role;
+    // Ensure parts array exists before trying to flatMap
+    const allParts = group.flatMap((c) => c.parts || []);
+
+    // A type guard to safely check if a part is a non-empty text part.
+    // This tells TypeScript that if this function returns true, the part is of type { text: string }.
+    const isTextPart = (part: Part): part is { text: string } =>
+      'text' in part && typeof part.text === 'string' && part.text !== '';
+
+    // Use the type guard in the filter. `textParts` is now correctly typed.
+    const textParts = allParts.filter(isTextPart);
+    const otherParts = allParts.filter((part) => !isTextPart(part));
+
+    const newParts: Part[] = [];
+
+    // If there are text parts to combine, process them
+    if (textParts.length > 0) {
+      let combinedText: string;
+      if (textParts.length === 1) {
+        // No need for '!' because TypeScript now knows `text` exists.
+        combinedText = textParts[0].text;
+      } else {
+        // `part` here is also correctly typed.
+        const processedTexts = textParts.map(
+          (part, index) => `## Part ${index + 1}\n\n${part.text}`,
+        );
+        combinedText = processedTexts.join('\n\n');
+      }
+      newParts.push({ text: combinedText });
+    }
+
+    // This is now safe as both arrays are correctly typed as Part[].
+    newParts.push(...otherParts);
+
+    // Add the fully processed Content object to our results
+    if (newParts.length > 0) {
+      concatenatedHistory.push({
+        role,
+        parts: newParts,
+      });
+    }
+  };
+
+  for (const content of history) {
+    if (currentGroup.length > 0 && currentGroup[0].role !== content.role) {
+      processGroup(currentGroup);
+      currentGroup = [content];
+    } else {
+      currentGroup.push(content);
+    }
+  }
+
+  processGroup(currentGroup);
+
+  return concatenatedHistory;
+}
+
 /**
  * Extracts the curated (valid) history from a comprehensive history.
  *
@@ -204,7 +274,9 @@ export class GeminiChat {
   ): Promise<GenerateContentResponse> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
-    const requestContents = this.getHistory(true).concat(userContent);
+    const requestContents = concatenateHistory(
+      this.getHistory(true).concat(userContent),
+    );
 
     let response: GenerateContentResponse;
 
@@ -306,7 +378,9 @@ export class GeminiChat {
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
-    const requestContents = this.getHistory(true).concat(userContent);
+    const requestContents = concatenateHistory(
+      this.getHistory(true).concat(userContent),
+    );
 
     try {
       const apiCall = () => {

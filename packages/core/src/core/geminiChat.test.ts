@@ -12,7 +12,8 @@ import {
   Part,
   GenerateContentResponse,
 } from '@google/genai';
-import { GeminiChat } from './geminiChat.js';
+// Assuming concatenateHistory is exported from geminiChat.js
+import { GeminiChat, concatenateHistory } from './geminiChat.js';
 import { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 
@@ -473,6 +474,148 @@ describe('GeminiChat', () => {
       expect(history.length).toBe(2);
       expect(history[0]).toEqual(content1);
       expect(history[1]).toEqual(content2);
+    });
+  });
+
+  describe('concatenateHistory', () => {
+    it('should return an empty array if history is empty', () => {
+      const history: Content[] = [];
+      const result = concatenateHistory(history);
+      expect(result).toEqual([]);
+    });
+
+    it('should not change history with alternating roles', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there' }] },
+        { role: 'user', parts: [{ text: 'How are you?' }] },
+      ];
+      const result = concatenateHistory(history);
+      expect(result).toEqual(history);
+    });
+
+    it('should merge two consecutive user messages with markdown headers', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'First part.' }] },
+        { role: 'user', parts: [{ text: 'Second part.' }] },
+      ];
+      const result = concatenateHistory(history);
+      const expected: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: '## Part 1\n\nFirst part.\n\n## Part 2\n\nSecond part.',
+            },
+          ],
+        },
+      ];
+      expect(result).toEqual(expected);
+    });
+
+    it('should merge multiple consecutive model messages', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Question' }] },
+        { role: 'model', parts: [{ text: 'Answer part 1.' }] },
+        { role: 'model', parts: [{ text: 'Answer part 2.' }] },
+        { role: 'model', parts: [{ text: 'Answer part 3.' }] },
+      ];
+      const result = concatenateHistory(history);
+      const expected: Content[] = [
+        { role: 'user', parts: [{ text: 'Question' }] },
+        {
+          role: 'model',
+          parts: [
+            {
+              text: '## Part 1\n\nAnswer part 1.\n\n## Part 2\n\nAnswer part 2.\n\n## Part 3\n\nAnswer part 3.',
+            },
+          ],
+        },
+      ];
+      expect(result).toEqual(expected);
+    });
+
+    it('should handle multiple groups of merges', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'U1' }] },
+        { role: 'user', parts: [{ text: 'U2' }] },
+        { role: 'model', parts: [{ text: 'M1' }] },
+        { role: 'model', parts: [{ text: 'M2' }] },
+        { role: 'user', parts: [{ text: 'U3' }] },
+      ];
+      const result = concatenateHistory(history);
+      const expected: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: '## Part 1\n\nU1\n\n## Part 2\n\nU2' }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: '## Part 1\n\nM1\n\n## Part 2\n\nM2' }],
+        },
+        { role: 'user', parts: [{ text: 'U3' }] },
+      ];
+      expect(result).toEqual(expected);
+    });
+
+    it('should preserve non-text parts and append them after the merged text', () => {
+      const functionCallPart = {
+        functionCall: { name: 'tool_code', args: {} },
+      };
+      const history: Content[] = [
+        { role: 'model', parts: [{ text: 'Thinking...' }] },
+        {
+          role: 'model',
+          parts: [functionCallPart, { text: 'OK, using tool.' }],
+        },
+      ];
+      const result = concatenateHistory(history);
+      const expected: Content[] = [
+        {
+          role: 'model',
+          parts: [
+            {
+              text: '## Part 1\n\nThinking...\n\n## Part 2\n\nOK, using tool.',
+            },
+            functionCallPart,
+          ],
+        },
+      ];
+      expect(result).toEqual(expected);
+    });
+
+    it('should not add headers if only one text part exists in a group', () => {
+      const functionCallPart = {
+        functionCall: { name: 'tool_code', args: {} },
+      };
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Please use the tool.' }] },
+        { role: 'user', parts: [functionCallPart] },
+      ];
+      const result = concatenateHistory(history);
+      const expected: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Please use the tool.' }, functionCallPart],
+        },
+      ];
+      expect(result).toEqual(expected);
+    });
+
+    it('should correctly handle empty or undefined parts arrays', () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'user', parts: [] },
+        { role: 'user', parts: [{ text: 'World' }] },
+      ];
+      const result = concatenateHistory(history);
+      const expected: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: '## Part 1\n\nHello\n\n## Part 2\n\nWorld' }],
+        },
+      ];
+      expect(result).toEqual(expected);
     });
   });
 });
