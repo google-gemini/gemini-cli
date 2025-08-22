@@ -274,6 +274,15 @@ export const SETTINGS_SCHEMA = {
         description: 'Enable recursive file search functionality',
         showInDialog: true,
       },
+      disableFuzzySearch: {
+        type: 'boolean',
+        label: 'Disable Fuzzy Search',
+        category: 'File Filtering',
+        requiresRestart: true,
+        default: false,
+        description: 'Disable fuzzy search when searching for files.',
+        showInDialog: true,
+      },
     },
   },
 
@@ -532,6 +541,16 @@ export const SETTINGS_SCHEMA = {
     requiresRestart: false,
     default: false,
     description: 'Skip the next speaker check.',
+    showInDialog: true,
+  },
+  useRipgrep: {
+    type: 'boolean',
+    label: 'Use Ripgrep',
+    category: 'Tools',
+    requiresRestart: false,
+    default: false,
+    description:
+      'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
     showInDialog: true,
   },
   enablePromptCompletion: {
