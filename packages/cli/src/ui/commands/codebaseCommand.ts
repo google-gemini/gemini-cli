@@ -49,7 +49,7 @@ async function handleIndexingOperation(
   operation: 'index' | 'reindex',
   initialMessage: string,
   errorPrefix: string
-): Promise<void> {
+): Promise<IndexResult> {
   const { config, context, projectRoot } = indexingContext;
   
   const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
@@ -96,6 +96,7 @@ async function handleIndexingOperation(
         text: errorMessage
       }, Date.now());
     }
+    return result;
   } catch (error) {
     context.ui.setPendingItem(null);
     const errorMessage = `${errorPrefix}: ${error instanceof Error ? error.message : String(error)}`;
@@ -103,6 +104,14 @@ async function handleIndexingOperation(
       type: 'gemini',
       text: errorMessage
     }, Date.now());
+    return {
+      success: false,
+      stats: { totalFiles: 0, textFiles: 0, binaryFiles: 0, largeFiles: 0, excludedFiles: 0 },
+      totalVectors: 0,
+      indexSize: 0,
+      duration: 0,
+      errors: [errorMessage]
+    };
   }
 }
 
@@ -277,12 +286,20 @@ const autoCommand: SlashCommand = {
     const status = await indexer.getIndexStatus();
 
     if (!status.exists) {
-      await handleIndexingOperation(
+      const result = await handleIndexingOperation(
         { config, context, projectRoot },
         'index',
         'No index found. Creating initial index...',
         '❌ Failed to create initial index'
       );
+      
+      if (!result.success) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: '❌ Failed to create initial index. Auto-indexing cannot be enabled.',
+        };
+      }
     }
 
     context.ui.addItem({
