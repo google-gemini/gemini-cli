@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { WebSearchTool, WebSearchToolParams } from './web-search.js';
 import { Config } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
+import { ToolErrorType } from './tool-error.js';
 
 // Mock GeminiClient and Config constructor
 vi.mock('../core/client.js');
@@ -112,7 +113,7 @@ describe('WebSearchTool', () => {
       expect(result.returnDisplay).toBe('No information found.');
     });
 
-    it('should handle API errors gracefully', async () => {
+    it('should return a WEB_SEARCH_FAILED error on failure', async () => {
       const params: WebSearchToolParams = { query: 'error query' };
       const testError = new Error('API Failure');
       (mockGeminiClient.generateContent as Mock).mockRejectedValue(testError);
@@ -120,6 +121,7 @@ describe('WebSearchTool', () => {
       const invocation = tool.build(params);
       const result = await invocation.execute(abortSignal);
 
+      expect(result.error?.type).toBe(ToolErrorType.WEB_SEARCH_FAILED);
       expect(result.llmContent).toContain('Error:');
       expect(result.llmContent).toContain('API Failure');
       expect(result.returnDisplay).toBe('Error performing web search.');

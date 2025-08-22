@@ -11,23 +11,25 @@ import {
   ToolInvocation,
   ToolResult,
 } from './tools.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
+import * as fs from 'fs';
 import * as path from 'path';
-import { glob } from 'glob';
+import { glob, escape } from 'glob';
 import { getCurrentGeminiMdFilename } from './memoryTool.js';
 import {
   detectFileType,
   processSingleFileContent,
   DEFAULT_ENCODING,
   getSpecificMimeType,
+  ProcessedFileReadResult,
 } from '../utils/fileUtils.js';
 import { PartListUnion } from '@google/genai';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
-import {
-  recordFileOperationMetric,
-  FileOperation,
-} from '../telemetry/metrics.js';
+import { FileOperation } from '../telemetry/metrics.js';
+import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
+import { logFileOperation } from '../telemetry/loggers.js';
+import { FileOperationEvent } from '../telemetry/types.js';
+import { ToolErrorType } from './tool-error.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -84,9 +86,7 @@ type FileProcessingResult =
       success: true;
       filePath: string;
       relativePathForDisplay: string;
-      fileReadResult: NonNullable<
-        Awaited<ReturnType<typeof processSingleFileContent>>
-      >;
+      fileReadResult: ProcessedFileReadResult;
       reason?: undefined;
     }
   | {
@@ -143,6 +143,7 @@ const DEFAULT_EXCLUDES: string[] = [
 ];
 
 const DEFAULT_OUTPUT_SEPARATOR_FORMAT = '--- {filePath} ---';
+const DEFAULT_OUTPUT_TERMINATOR = '\n--- End of content ---';
 
 class ReadManyFilesToolInvocation extends BaseToolInvocation<
   ReadManyFilesParams,
@@ -233,30 +234,32 @@ ${finalExclusionPatternsForDescription
       : [...exclude];
 
     const searchPatterns = [...inputPatterns, ...include];
-    if (searchPatterns.length === 0) {
-      return {
-        llmContent: 'No search paths or include patterns provided.',
-        returnDisplay: `## Information\n\nNo search paths or include patterns were specified. Nothing to read or concatenate.`,
-      };
-    }
-
     try {
       const allEntries = new Set<string>();
       const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
 
       for (const dir of workspaceDirs) {
-        const entriesInDir = await glob(
-          searchPatterns.map((p) => p.replace(/\\/g, '/')),
-          {
-            cwd: dir,
-            ignore: effectiveExcludes,
-            nodir: true,
-            dot: true,
-            absolute: true,
-            nocase: true,
-            signal,
-          },
-        );
+        const processedPatterns = [];
+        for (const p of searchPatterns) {
+          const normalizedP = p.replace(/\\/g, '/');
+          const fullPath = path.join(dir, normalizedP);
+          if (fs.existsSync(fullPath)) {
+            processedPatterns.push(escape(normalizedP));
+          } else {
+            // The path does not exist or is not a file, so we treat it as a glob pattern.
+            processedPatterns.push(normalizedP);
+          }
+        }
+
+        const entriesInDir = await glob(processedPatterns, {
+          cwd: dir,
+          ignore: effectiveExcludes,
+          nodir: true,
+          dot: true,
+          absolute: true,
+          nocase: true,
+          signal,
+        });
         for (const entry of entriesInDir) {
           allEntries.add(entry);
         }
@@ -344,9 +347,14 @@ ${finalExclusionPatternsForDescription
         });
       }
     } catch (error) {
+      const errorMessage = `Error during file search: ${getErrorMessage(error)}`;
       return {
-        llmContent: `Error during file search: ${getErrorMessage(error)}`,
+        llmContent: errorMessage,
         returnDisplay: `## File Search Error\n\nAn error occurred while searching for files:\n\`\`\`\n${getErrorMessage(error)}\n\`\`\``,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.READ_MANY_FILES_SEARCH_ERROR,
+        },
       };
     }
 
@@ -388,6 +396,7 @@ ${finalExclusionPatternsForDescription
           const fileReadResult = await processSingleFileContent(
             filePath,
             this.config.getTargetDir(),
+            this.config.getFileSystemService(),
           );
 
           if (fileReadResult.error) {
@@ -460,12 +469,20 @@ ${finalExclusionPatternsForDescription
               ? fileReadResult.llmContent.split('\n').length
               : undefined;
           const mimetype = getSpecificMimeType(filePath);
-          recordFileOperationMetric(
+          const programming_language = getProgrammingLanguage({
+            absolute_path: filePath,
+          });
+          logFileOperation(
             this.config,
-            FileOperation.READ,
-            lines,
-            mimetype,
-            path.extname(filePath),
+            new FileOperationEvent(
+              ReadManyFilesTool.Name,
+              FileOperation.READ,
+              lines,
+              mimetype,
+              path.extname(filePath),
+              undefined,
+              programming_language,
+            ),
           );
         }
       } else {
@@ -518,7 +535,9 @@ ${finalExclusionPatternsForDescription
       displayMessage += `No files were read and concatenated based on the criteria.\n`;
     }
 
-    if (contentParts.length === 0) {
+    if (contentParts.length > 0) {
+      contentParts.push(DEFAULT_OUTPUT_TERMINATOR);
+    } else {
       contentParts.push(
         'No files matching the criteria were found or all were skipped.',
       );
@@ -620,23 +639,10 @@ This tool is useful when you need to understand or analyze a collection of files
 - Gathering context from multiple configuration files.
 - When the user asks to "read all files in X directory" or "show me the content of all Y files".
 
-Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. Ensure paths are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
+Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. The tool inserts a '--- End of content ---' after the last file. Ensure paths are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
       Kind.Read,
       parameterSchema,
     );
-  }
-
-  protected override validateToolParams(
-    params: ReadManyFilesParams,
-  ): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
-    }
-    return null;
   }
 
   protected createInvocation(

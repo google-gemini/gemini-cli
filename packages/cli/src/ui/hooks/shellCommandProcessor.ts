@@ -101,7 +101,9 @@ export const useShellCommandProcessor = (
         commandToExecute = `{ ${command} }; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
       }
 
-      const execPromise = new Promise<void>((resolve) => {
+      const executeCommand = async (
+        resolve: (value: void | PromiseLike<void>) => void,
+      ) => {
         let lastUpdateTime = Date.now();
         let cumulativeStdout = '';
         let isBinaryStream = false;
@@ -133,7 +135,7 @@ export const useShellCommandProcessor = (
         onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
 
         try {
-          const { pid, result } = ShellExecutionService.execute(
+          const { pid, result } = await ShellExecutionService.execute(
             commandToExecute,
             targetDir,
             (event) => {
@@ -141,7 +143,7 @@ export const useShellCommandProcessor = (
                 case 'data':
                   // Do not process text data if we've already switched to binary mode.
                   if (isBinaryStream) break;
-                  cumulativeStdout = event.chunk;
+                  cumulativeStdout += event.chunk;
                   break;
                 case 'binary_detected':
                   isBinaryStream = true;
@@ -185,6 +187,7 @@ export const useShellCommandProcessor = (
               }
             },
             abortSignal,
+            config.getShouldUseNodePtyShell(),
           );
 
           executionPid = pid;
@@ -288,6 +291,10 @@ export const useShellCommandProcessor = (
 
           resolve(); // Resolve the promise to unblock `onExec`
         }
+      };
+
+      const execPromise = new Promise<void>((resolve) => {
+        executeCommand(resolve);
       });
 
       onExec(execPromise);

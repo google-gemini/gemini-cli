@@ -24,6 +24,7 @@ import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
+import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { Header } from './components/Header.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
@@ -80,6 +81,7 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useVimMode, VimModeProvider } from './contexts/VimModeContext.js';
 import { useVim } from './hooks/vim.js';
 import { useKeypress, Key } from './hooks/useKeypress.js';
+import { KeypressProvider } from './contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './hooks/useKittyKeyboardProtocol.js';
 import { keyMatchers, Command } from './keyMatchers.js';
 import * as fs from 'fs';
@@ -101,6 +103,8 @@ import { appEvents, AppEvent } from '../utils/events.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
+// Maximum number of queued messages to display in UI to prevent performance issues
+const MAX_DISPLAYED_QUEUED_MESSAGES = 3;
 
 interface AppProps {
   config: Config;
@@ -109,13 +113,21 @@ interface AppProps {
   version: string;
 }
 
-export const AppWrapper = (props: AppProps) => (
-  <SessionStatsProvider>
-    <VimModeProvider settings={props.settings}>
-      <App {...props} />
-    </VimModeProvider>
-  </SessionStatsProvider>
-);
+export const AppWrapper = (props: AppProps) => {
+  const kittyProtocolStatus = useKittyKeyboardProtocol();
+  return (
+    <KeypressProvider
+      kittyProtocolEnabled={kittyProtocolStatus.enabled}
+      config={props.config}
+    >
+      <SessionStatsProvider>
+        <VimModeProvider settings={props.settings}>
+          <App {...props} />
+        </VimModeProvider>
+      </SessionStatsProvider>
+    </KeypressProvider>
+  );
+};
 
 const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const isFocused = useFocus();
@@ -255,10 +267,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
 
-  const { isFolderTrustDialogOpen, handleFolderTrustSelect } = useFolderTrust(
-    settings,
-    setIsTrustedFolder,
-  );
+  const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
+    useFolderTrust(settings, setIsTrustedFolder);
 
   const {
     isAuthDialogOpen,
@@ -537,12 +547,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const [userMessages, setUserMessages] = useState<string[]>([]);
 
-  const handleUserCancel = useCallback(() => {
-    const lastUserMessage = userMessages.at(-1);
-    if (lastUserMessage) {
-      buffer.setText(lastUserMessage);
-    }
-  }, [buffer, userMessages]);
+  // Stable reference for cancel handler to avoid circular dependency
+  const cancelHandlerRef = useRef<() => void>(() => {});
 
   const {
     streamingState,
@@ -565,18 +571,39 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
     refreshStatic,
-    handleUserCancel,
+    () => cancelHandlerRef.current(),
   );
 
-  // Input handling
+  // Message queue for handling input during streaming
+  const { messageQueue, addMessage, clearQueue, getQueuedMessagesText } =
+    useMessageQueue({
+      streamingState,
+      submitQuery,
+    });
+
+  // Update the cancel handler with message queue support
+  cancelHandlerRef.current = useCallback(() => {
+    const lastUserMessage = userMessages.at(-1);
+    let textToSet = lastUserMessage || '';
+
+    // Append queued messages if any exist
+    const queuedText = getQueuedMessagesText();
+    if (queuedText) {
+      textToSet = textToSet ? `${textToSet}\n\n${queuedText}` : queuedText;
+      clearQueue();
+    }
+
+    if (textToSet) {
+      buffer.setText(textToSet);
+    }
+  }, [buffer, userMessages, getQueuedMessagesText, clearQueue]);
+
+  // Input handling - queue messages for processing
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
-      const trimmedValue = submittedValue.trim();
-      if (trimmedValue.length > 0) {
-        submitQuery(trimmedValue);
-      }
+      addMessage(submittedValue);
     },
-    [submitQuery],
+    [addMessage],
   );
 
   const handleIdePromptComplete = useCallback(
@@ -611,13 +638,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
   const showAutoAcceptIndicator = useAutoAcceptIndicator({ config });
-  const kittyProtocolStatus = useKittyKeyboardProtocol();
 
   const handleExit = useCallback(
     (
       pressedOnce: boolean,
       setPressedOnce: (value: boolean) => void,
-      timerRef: React.MutableRefObject<NodeJS.Timeout | null>,
+      timerRef: ReturnType<typeof useRef<NodeJS.Timeout | null>>,
     ) => {
       if (pressedOnce) {
         if (timerRef.current) {
@@ -706,8 +732,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   useKeypress(handleGlobalKeypress, {
     isActive: true,
-    kittyProtocolEnabled: kittyProtocolStatus.enabled,
-    config,
   });
 
   useEffect(() => {
@@ -716,7 +740,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     }
   }, [config, config.getGeminiMdFileCount]);
 
-  const logger = useLogger();
+  const logger = useLogger(config.storage);
 
   useEffect(() => {
     const fetchUserMessages = async () => {
@@ -755,7 +779,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, [history, logger]);
 
   const isInputActive =
-    streamingState === StreamingState.Idle && !initError && !isProcessing;
+    (streamingState === StreamingState.Idle ||
+      streamingState === StreamingState.Responding) &&
+    !initError &&
+    !isProcessing;
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -896,10 +923,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           key={staticKey}
           items={[
             <Box flexDirection="column" key="header">
-              {!settings.merged.hideBanner && (
+              {!(settings.merged.hideBanner || config.getScreenReader()) && (
                 <Header version={version} nightly={nightly} />
               )}
-              {!settings.merged.hideTips && <Tips config={config} />}
+              {!(settings.merged.hideTips || config.getScreenReader()) && (
+                <Tips config={config} />
+              )}
             </Box>,
             ...history.map((h) => (
               <HistoryItemDisplay
@@ -962,7 +991,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               onComplete={handleIdePromptComplete}
             />
           ) : isFolderTrustDialogOpen ? (
-            <FolderTrustDialog onSelect={handleFolderTrustSelect} />
+            <FolderTrustDialog
+              onSelect={handleFolderTrustSelect}
+              isRestarting={isRestarting}
+            />
           ) : shellConfirmationRequest ? (
             <ShellConfirmationDialog request={shellConfirmationRequest} />
           ) : confirmationRequest ? (
@@ -970,6 +1002,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               {confirmationRequest.prompt}
               <Box paddingY={1}>
                 <RadioButtonSelect
+                  isFocused={!!confirmationRequest}
                   items={[
                     { label: 'Yes', value: true },
                     { label: 'No', value: false },
@@ -1062,17 +1095,52 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               <LoadingIndicator
                 thought={
                   streamingState === StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.disableLoadingPhrases
+                  config.getAccessibility()?.disableLoadingPhrases ||
+                  config.getScreenReader()
                     ? undefined
                     : thought
                 }
                 currentLoadingPhrase={
-                  config.getAccessibility()?.disableLoadingPhrases
+                  config.getAccessibility()?.disableLoadingPhrases ||
+                  config.getScreenReader()
                     ? undefined
                     : currentLoadingPhrase
                 }
                 elapsedTime={elapsedTime}
               />
+
+              {/* Display queued messages below loading indicator */}
+              {messageQueue.length > 0 && (
+                <Box flexDirection="column" marginTop={1}>
+                  {messageQueue
+                    .slice(0, MAX_DISPLAYED_QUEUED_MESSAGES)
+                    .map((message, index) => {
+                      // Ensure multi-line messages are collapsed for the preview.
+                      // Replace all whitespace (including newlines) with a single space.
+                      const preview = message.replace(/\s+/g, ' ');
+
+                      return (
+                        // Ensure the Box takes full width so truncation calculates correctly
+                        <Box key={index} paddingLeft={2} width="100%">
+                          {/* Use wrap="truncate" to ensure it fits the terminal width and doesn't wrap */}
+                          <Text dimColor wrap="truncate">
+                            {preview}
+                          </Text>
+                        </Box>
+                      );
+                    })}
+                  {messageQueue.length > MAX_DISPLAYED_QUEUED_MESSAGES && (
+                    <Box paddingLeft={2}>
+                      <Text dimColor>
+                        ... (+
+                        {messageQueue.length -
+                          MAX_DISPLAYED_QUEUED_MESSAGES}{' '}
+                        more)
+                      </Text>
+                    </Box>
+                  )}
+                </Box>
+              )}
 
               <Box
                 marginTop={1}
@@ -1082,7 +1150,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 alignItems={isNarrow ? 'flex-start' : 'center'}
               >
                 <Box>
-                  {process.env.GEMINI_SYSTEM_MD && (
+                  {process.env['GEMINI_SYSTEM_MD'] && (
                     <Text color={Colors.AccentRed}>|⌐■_■| </Text>
                   )}
                   {ctrlCPressedOnce ? (
@@ -1186,23 +1254,27 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               )}
             </Box>
           )}
-          <Footer
-            model={currentModel}
-            targetDir={config.getTargetDir()}
-            debugMode={config.getDebugMode()}
-            branchName={branchName}
-            debugMessage={debugMessage}
-            corgiMode={corgiMode}
-            errorCount={errorCount}
-            showErrorDetails={showErrorDetails}
-            showMemoryUsage={
-              config.getDebugMode() || settings.merged.showMemoryUsage || false
-            }
-            promptTokenCount={sessionStats.lastPromptTokenCount}
-            nightly={nightly}
-            vimMode={vimModeEnabled ? vimMode : undefined}
-            isTrustedFolder={isTrustedFolderState}
-          />
+          {!settings.merged.hideFooter && (
+            <Footer
+              model={currentModel}
+              targetDir={config.getTargetDir()}
+              debugMode={config.getDebugMode()}
+              branchName={branchName}
+              debugMessage={debugMessage}
+              corgiMode={corgiMode}
+              errorCount={errorCount}
+              showErrorDetails={showErrorDetails}
+              showMemoryUsage={
+                config.getDebugMode() ||
+                settings.merged.showMemoryUsage ||
+                false
+              }
+              promptTokenCount={sessionStats.lastPromptTokenCount}
+              nightly={nightly}
+              vimMode={vimModeEnabled ? vimMode : undefined}
+              isTrustedFolder={isTrustedFolderState}
+            />
+          )}
         </Box>
       </Box>
     </StreamingContext.Provider>

@@ -6,8 +6,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { glob } from 'glob';
-import { SchemaValidator } from '../utils/schemaValidator.js';
+import { glob, escape } from 'glob';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -17,6 +16,7 @@ import {
 } from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
 import { Config } from '../config/config.js';
+import { ToolErrorType } from './tool-error.js';
 
 // Subset of 'Path' interface provided by 'glob' that we can implement for testing
 export interface GlobPath {
@@ -116,9 +116,14 @@ class GlobToolInvocation extends BaseToolInvocation<
           this.params.path,
         );
         if (!workspaceContext.isPathWithinWorkspace(searchDirAbsolute)) {
+          const rawError = `Error: Path "${this.params.path}" is not within any workspace directory`;
           return {
-            llmContent: `Error: Path "${this.params.path}" is not within any workspace directory`,
+            llmContent: rawError,
             returnDisplay: `Path is not within workspace`,
+            error: {
+              message: rawError,
+              type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+            },
           };
         }
         searchDirectories = [searchDirAbsolute];
@@ -137,7 +142,13 @@ class GlobToolInvocation extends BaseToolInvocation<
       let allEntries: GlobPath[] = [];
 
       for (const searchDir of searchDirectories) {
-        const entries = (await glob(this.params.pattern, {
+        let pattern = this.params.pattern;
+        const fullPath = path.join(searchDir, pattern);
+        if (fs.existsSync(fullPath)) {
+          pattern = escape(pattern);
+        }
+
+        const entries = (await glob(pattern, {
           cwd: searchDir,
           withFileTypes: true,
           nodir: true,
@@ -229,9 +240,14 @@ class GlobToolInvocation extends BaseToolInvocation<
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       console.error(`GlobLogic execute Error: ${errorMessage}`, error);
+      const rawError = `Error during glob search operation: ${errorMessage}`;
       return {
-        llmContent: `Error during glob search operation: ${errorMessage}`,
+        llmContent: rawError,
         returnDisplay: `Error: An unexpected error occurred.`,
+        error: {
+          message: rawError,
+          type: ToolErrorType.GLOB_EXECUTION_ERROR,
+        },
       };
     }
   }
@@ -281,15 +297,9 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
   /**
    * Validates the parameters for the tool.
    */
-  override validateToolParams(params: GlobToolParams): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
-    }
-
+  protected override validateToolParamValues(
+    params: GlobToolParams,
+  ): string | null {
     const searchDirAbsolute = path.resolve(
       this.config.getTargetDir(),
       params.path || '.',
