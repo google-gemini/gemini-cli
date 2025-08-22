@@ -24,19 +24,21 @@ describe('themeInstaller', () => {
 
   it('should reject non-marketplace URLs', async () => {
     const result = await themeInstaller.run(mockContext, 'https://example.com');
-    
+
     expect(result).toEqual({
       type: 'submit_prompt',
-      content: expect.stringContaining("doesn't appear to be a valid VS Code marketplace URL"),
+      content: expect.stringContaining(
+        "doesn't appear to be a valid VS Code marketplace URL",
+      ),
     });
   });
 
   it('should reject marketplace URLs without itemName parameter', async () => {
     const result = await themeInstaller.run(
-      mockContext, 
-      'https://marketplace.visualstudio.com/items'
+      mockContext,
+      'https://marketplace.visualstudio.com/items',
     );
-    
+
     expect(result).toEqual({
       type: 'submit_prompt',
       content: expect.stringContaining('missing the itemName parameter'),
@@ -45,10 +47,10 @@ describe('themeInstaller', () => {
 
   it('should reject marketplace URLs with invalid itemName format', async () => {
     const result = await themeInstaller.run(
-      mockContext, 
-      'https://marketplace.visualstudio.com/items?itemName=invalid'
+      mockContext,
+      'https://marketplace.visualstudio.com/items?itemName=invalid',
     );
-    
+
     expect(result).toEqual({
       type: 'submit_prompt',
       content: expect.stringContaining("doesn't follow the expected format"),
@@ -57,25 +59,25 @@ describe('themeInstaller', () => {
 
   it('should accept valid marketplace URLs', async () => {
     const result = await themeInstaller.run(
-      mockContext, 
-      'https://marketplace.visualstudio.com/items?itemName=arcticicestudio.nord-visual-studio-code'
+      mockContext,
+      'https://marketplace.visualstudio.com/items?itemName=arcticicestudio.nord-visual-studio-code',
     );
-    
+
     expect(result).toEqual({
       type: 'submit_prompt',
-      content: expect.stringContaining('I\'ll help you install a VS Code theme'),
+      content: expect.stringContaining("I'll help you install a VS Code theme"),
     });
   });
 
   it('should accept marketplace URLs with additional parameters', async () => {
     const result = await themeInstaller.run(
-      mockContext, 
-      'https://marketplace.visualstudio.com/items?itemName=arcticicestudio.nord-visual-studio-code&utm_source=example'
+      mockContext,
+      'https://marketplace.visualstudio.com/items?itemName=arcticicestudio.nord-visual-studio-code&utm_source=example',
     );
-    
+
     expect(result).toEqual({
       type: 'submit_prompt',
-      content: expect.stringContaining('I\'ll help you install a VS Code theme'),
+      content: expect.stringContaining("I'll help you install a VS Code theme"),
     });
   });
 

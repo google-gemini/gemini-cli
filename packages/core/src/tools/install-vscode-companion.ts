@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ToolResult, ToolCallConfirmationDetails, ToolInvocation } from './tools.js';
+import type {
+  ToolResult,
+  ToolCallConfirmationDetails,
+  ToolInvocation,
+} from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type { Config } from '../config/config.js';
 import { detectIde, getIdeInfo, DetectedIde } from '../ide/detect-ide.js';
@@ -15,7 +19,10 @@ export type InstallVSCodeCompanionParams = Record<string, never>;
 /**
  * Tool for installing the Gemini CLI VS Code companion extension.
  */
-class InstallVSCodeCompanionInvocation extends BaseToolInvocation<InstallVSCodeCompanionParams, ToolResult> {
+class InstallVSCodeCompanionInvocation extends BaseToolInvocation<
+  InstallVSCodeCompanionParams,
+  ToolResult
+> {
   constructor(_config: Config, params: InstallVSCodeCompanionParams) {
     super(params);
   }
@@ -49,9 +56,15 @@ class InstallVSCodeCompanionInvocation extends BaseToolInvocation<InstallVSCodeC
     }
     const result = await installer.install();
     if (result.success) {
-      return { llmContent: result.message, returnDisplay: `✅ ${result.message}` };
+      return {
+        llmContent: result.message,
+        returnDisplay: `✅ ${result.message}`,
+      };
     }
-    return { llmContent: result.message, returnDisplay: `❌ ${result.message}` };
+    return {
+      llmContent: result.message,
+      returnDisplay: `❌ ${result.message}`,
+    };
   }
 }
 

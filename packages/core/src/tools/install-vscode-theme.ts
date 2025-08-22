@@ -14,10 +14,17 @@ import type {
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 
-import type { InstallVSCodeThemeToolParams, VSCodeTheme } from './theme-types.js';
+import type {
+  InstallVSCodeThemeToolParams,
+  VSCodeTheme,
+} from './theme-types.js';
 import { convertVSCodeThemeToCustomTheme } from './theme-converter.js';
 import { createDefaultTheme, generateThemeWithAI } from './theme-generator.js';
-import { extractExtensionId, downloadVsix, extractThemeFromVsix } from './theme-extractor.js';
+import {
+  extractExtensionId,
+  downloadVsix,
+  extractThemeFromVsix,
+} from './theme-extractor.js';
 import { saveThemeToFile } from './theme-storage.js';
 import { createSimpleColorPreview } from './theme-display.js';
 
@@ -28,7 +35,10 @@ class InstallVSCodeThemeToolInvocation extends BaseToolInvocation<
   InstallVSCodeThemeToolParams,
   ToolResult
 > {
-  constructor(params: InstallVSCodeThemeToolParams, private readonly config: Config | undefined) {
+  constructor(
+    params: InstallVSCodeThemeToolParams,
+    private readonly config: Config | undefined,
+  ) {
     super(params);
   }
 
@@ -51,15 +61,14 @@ class InstallVSCodeThemeToolInvocation extends BaseToolInvocation<
     return [{ path: '~/.gemini/themes' }];
   }
 
-  async execute(
-    signal: AbortSignal,
-  ): Promise<ToolResult> {
+  async execute(signal: AbortSignal): Promise<ToolResult> {
     const params = this.params;
     try {
       const extensionId = extractExtensionId(params.marketplaceUrl);
       if (!extensionId) {
         return {
-          llmContent: 'Error: Could not extract extension ID from marketplace URL',
+          llmContent:
+            'Error: Could not extract extension ID from marketplace URL',
           returnDisplay:
             '❌ **Error**: Could not extract extension ID from the marketplace URL. Please ensure the URL is valid.',
         };
@@ -68,29 +77,49 @@ class InstallVSCodeThemeToolInvocation extends BaseToolInvocation<
       const vsixUrl = `https://marketplace.visualstudio.com/_apis/public/gallery/publishers/${extensionId.publisher}/vsextensions/${extensionId.name}/latest/vspackage`;
       const vsixBuffer = await downloadVsix(vsixUrl, signal);
 
-  let themeData: VSCodeTheme | null = null;
-  let extractionMethod = '';
+      let themeData: VSCodeTheme | null = null;
+      let extractionMethod = '';
 
-      console.log(`Attempting to extract theme from VSIX for ${extensionId.name}...`);
-      themeData = await extractThemeFromVsix(vsixBuffer, signal, extensionId.name);
+      console.log(
+        `Attempting to extract theme from VSIX for ${extensionId.name}...`,
+      );
+      themeData = await extractThemeFromVsix(
+        vsixBuffer,
+        signal,
+        extensionId.name,
+      );
       if (themeData) {
         extractionMethod = 'VSIX Extraction';
-        console.log(`✅ Successfully extracted theme from VSIX: ${themeData.name}`);
+        console.log(
+          `✅ Successfully extracted theme from VSIX: ${themeData.name}`,
+        );
       } else {
         console.log(`⚠️ VSIX extraction failed. Attempting AI generation...`);
         const defaultTemplate = createDefaultTheme(extensionId.name);
         let aiTheme: VSCodeTheme | null = null;
         try {
-          aiTheme = await generateThemeWithAI(extensionId.name, signal, this.config);
+          aiTheme = await generateThemeWithAI(
+            extensionId.name,
+            signal,
+            this.config,
+          );
         } catch (e) {
-          console.warn('⚠️ AI generation threw error, falling back to default theme.', e);
+          console.warn(
+            '⚠️ AI generation threw error, falling back to default theme.',
+            e,
+          );
         }
         if (aiTheme) {
           // Heuristic: if aiTheme matches default template exactly, we assume fallback not true AI.
-          const isDefault = JSON.stringify(aiTheme.colors) === JSON.stringify(defaultTemplate.colors) &&
-            JSON.stringify(aiTheme.tokenColors) === JSON.stringify(defaultTemplate.tokenColors);
+          const isDefault =
+            JSON.stringify(aiTheme.colors) ===
+              JSON.stringify(defaultTemplate.colors) &&
+            JSON.stringify(aiTheme.tokenColors) ===
+              JSON.stringify(defaultTemplate.tokenColors);
           themeData = aiTheme;
-          extractionMethod = isDefault ? 'Default Theme Fallback' : 'AI Generated';
+          extractionMethod = isDefault
+            ? 'Default Theme Fallback'
+            : 'AI Generated';
           console.log(`📦 Using ${extractionMethod}: ${themeData.name}`);
         } else {
           themeData = defaultTemplate;
@@ -102,7 +131,7 @@ class InstallVSCodeThemeToolInvocation extends BaseToolInvocation<
       if (!themeData) {
         return {
           llmContent: 'Error: Could not extract theme data',
-            returnDisplay:
+          returnDisplay:
             '❌ **Error**: Could not extract theme data. VSIX extraction failed and no fallback theme could be created.',
         };
       }
@@ -152,7 +181,9 @@ export class InstallVSCodeThemeTool extends BaseDeclarativeTool<
     );
   }
 
-  override validateToolParams(params: InstallVSCodeThemeToolParams): string | null {
+  override validateToolParams(
+    params: InstallVSCodeThemeToolParams,
+  ): string | null {
     if (!params.marketplaceUrl) return 'Marketplace URL is required';
     if (!params.marketplaceUrl.includes('marketplace.visualstudio.com'))
       return 'URL must be a valid VS Code marketplace URL';
@@ -165,4 +196,3 @@ export class InstallVSCodeThemeTool extends BaseDeclarativeTool<
     return new InstallVSCodeThemeToolInvocation(params, this.config);
   }
 }
-

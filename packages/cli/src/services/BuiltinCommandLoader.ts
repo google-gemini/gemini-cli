@@ -78,8 +78,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       toolsCommand,
       settingsCommand,
       vimCommand,
-  installCommand,
-  ...(isGitHubRepository() ? [setupGithubCommand] : []),
+      installCommand,
       setupGithubCommand,
       terminalSetupCommand,
     ];

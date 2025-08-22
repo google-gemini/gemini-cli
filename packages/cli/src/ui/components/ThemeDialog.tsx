@@ -9,7 +9,10 @@ import { Box, Text, useInput } from 'ink';
 
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
-import { type CombinedThemes, loadFileBasedThemes } from '../themes/theme-loader.js';
+import {
+  type CombinedThemes,
+  loadFileBasedThemes,
+} from '../themes/theme-loader.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
@@ -22,7 +25,10 @@ import {
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
-  onSelect: (themeName: string | undefined, scope: SettingScope) => void | Promise<void>;
+  onSelect: (
+    themeName: string | undefined,
+    scope: SettingScope,
+  ) => void | Promise<void>;
 
   /** Callback function when a theme is highlighted */
   onHighlight: (themeName: string | undefined) => void;
@@ -49,7 +55,9 @@ export function ThemeDialog({
   >(settings.merged.theme || DEFAULT_THEME.name);
 
   // State for combined themes (settings + file-based)
-  const [combinedThemes, setCombinedThemes] = useState<CombinedThemes | null>(null);
+  const [combinedThemes, setCombinedThemes] = useState<CombinedThemes | null>(
+    null,
+  );
   const [_isLoadingThemes, setIsLoadingThemes] = useState(true);
 
   // Load themes from merged settings plus file-based storage (single catalog)
@@ -123,9 +131,8 @@ export function ThemeDialog({
       if (fromWorkspace) sources.push('Workspace');
       if (fromSystem) sources.push('System');
 
-      const typeDisplay = sources.length > 0
-        ? `Custom (${sources.join(', ')})`
-        : 'Custom';
+      const typeDisplay =
+        sources.length > 0 ? `Custom (${sources.join(', ')})` : 'Custom';
 
       return {
         label: name,
@@ -138,9 +145,9 @@ export function ThemeDialog({
 
   // Calculate initial theme index after themes are loaded
   const selectedThemeName = settings.merged.theme || DEFAULT_THEME.name;
-  const initialThemeIndex = combinedThemes ? themeItems.findIndex(
-    (item) => item.value === selectedThemeName,
-  ) : -1;
+  const initialThemeIndex = combinedThemes
+    ? themeItems.findIndex((item) => item.value === selectedThemeName)
+    : -1;
   // If not found, fall back to the first theme
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
 
@@ -195,7 +202,6 @@ export function ThemeDialog({
     }
   });
 
-
   // Generate scope message for theme setting
   const otherScopeModifiedMessage = getScopeMessageForSetting(
     'theme',
@@ -214,8 +220,8 @@ export function ThemeDialog({
   const colorizeCodeWidth = Math.max(
     Math.floor(
       (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
-      PREVIEW_PANE_WIDTH_PERCENTAGE *
-      PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+        PREVIEW_PANE_WIDTH_PERCENTAGE *
+        PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
     ),
     1,
   );

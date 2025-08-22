@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandKind, SlashCommand, SlashCommandActionReturn, CommandContext } from './types.js';
+import {
+  CommandKind,
+  SlashCommand,
+  SlashCommandActionReturn,
+  CommandContext,
+} from './types.js';
 import { themeInstaller, type Installer } from './installers/themeInstaller.js';
 
 export const installCommand: SlashCommand = {
@@ -15,8 +20,8 @@ export const installCommand: SlashCommand = {
     context: CommandContext,
     args: string,
   ): Promise<SlashCommandActionReturn> => {
-  // Registry of available installers. Keep lightweight and local for now.
-  const installers: Installer[] = [themeInstaller];
+    // Registry of available installers. Keep lightweight and local for now.
+    const installers: Installer[] = [themeInstaller];
 
     if (!args.trim()) {
       return {
@@ -51,8 +56,7 @@ Example: /install https://marketplace.visualstudio.com/items?itemName=arcticices
     // Fallback (shouldn't happen with current theme installer present)
     return {
       type: 'submit_prompt',
-      content:
-        `I couldn't find a suitable installer for your input. Please provide a VS Code marketplace URL.`,
+      content: `I couldn't find a suitable installer for your input. Please provide a VS Code marketplace URL.`,
     };
   },
-}; 
+};

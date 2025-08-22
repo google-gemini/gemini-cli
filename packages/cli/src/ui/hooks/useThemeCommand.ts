@@ -33,9 +33,11 @@ export const useThemeCommand = (
       try {
         // First, load custom themes from both settings and files
         if (loadedSettings.merged.customThemes) {
-          await themeManager.loadCustomThemes(loadedSettings.merged.customThemes);
+          await themeManager.loadCustomThemes(
+            loadedSettings.merged.customThemes,
+          );
         }
-        
+
         // Then, apply the configured theme if it exists and is valid
         const effectiveTheme = loadedSettings.merged.theme;
         if (effectiveTheme) {
@@ -53,9 +55,13 @@ export const useThemeCommand = (
         console.warn('Failed to load custom themes on startup:', error);
       }
     };
-    
+
     loadThemesAndApply();
-  }, [loadedSettings.merged.customThemes, loadedSettings.merged.theme, setThemeError]);
+  }, [
+    loadedSettings.merged.customThemes,
+    loadedSettings.merged.theme,
+    setThemeError,
+  ]);
 
   const openThemeDialog = useCallback(() => {
     if (process.env['NO_COLOR']) {
@@ -113,7 +119,9 @@ export const useThemeCommand = (
 
         // Ensure themeManager has combined latest before applying (idempotent safe)
         if (loadedSettings.merged.customThemes) {
-          await themeManager.loadCustomThemes(loadedSettings.merged.customThemes);
+          await themeManager.loadCustomThemes(
+            loadedSettings.merged.customThemes,
+          );
         }
         applyTheme(loadedSettings.merged.theme);
         setThemeError(null);
