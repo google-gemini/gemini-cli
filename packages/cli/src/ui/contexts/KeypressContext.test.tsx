@@ -333,8 +333,8 @@ describe('KeypressContext - Kitty Protocol', () => {
       const keyHandler = vi.fn();
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider 
-          kittyProtocolEnabled={true} 
+        <KeypressProvider
+          kittyProtocolEnabled={true}
           debugKeystrokeLogging={false}
         >
           {children}
@@ -354,7 +354,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       expect(keyHandler).toHaveBeenCalled();
       expect(consoleLogSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining('[DEBUG] Kitty')
+        expect.stringContaining('[DEBUG] Kitty'),
       );
     });
 
@@ -362,8 +362,8 @@ describe('KeypressContext - Kitty Protocol', () => {
       const keyHandler = vi.fn();
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider 
-          kittyProtocolEnabled={true} 
+        <KeypressProvider
+          kittyProtocolEnabled={true}
           debugKeystrokeLogging={true}
         >
           {children}
@@ -383,11 +383,11 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         '[DEBUG] Kitty buffer accumulating:',
-        expect.stringContaining('\x1b[27u')
+        expect.stringContaining('\x1b[27u'),
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
         '[DEBUG] Kitty sequence parsed successfully:',
-        expect.stringContaining('\x1b[27u')
+        expect.stringContaining('\x1b[27u'),
       );
     });
 
@@ -395,8 +395,8 @@ describe('KeypressContext - Kitty Protocol', () => {
       const keyHandler = vi.fn();
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider 
-          kittyProtocolEnabled={true} 
+        <KeypressProvider
+          kittyProtocolEnabled={true}
           debugKeystrokeLogging={true}
         >
           {children}
@@ -417,7 +417,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         '[DEBUG] Kitty buffer overflow, clearing:',
-        expect.any(String)
+        expect.any(String),
       );
     });
 
@@ -425,8 +425,8 @@ describe('KeypressContext - Kitty Protocol', () => {
       const keyHandler = vi.fn();
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider 
-          kittyProtocolEnabled={true} 
+        <KeypressProvider
+          kittyProtocolEnabled={true}
           debugKeystrokeLogging={true}
         >
           {children}
@@ -441,23 +441,23 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send incomplete kitty sequence
       act(() => {
-        stdin.pressKey({ 
-          name: undefined, 
-          ctrl: false, 
-          meta: false, 
-          shift: false, 
-          sequence: '\x1b[1'
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          sequence: '\x1b[1',
         });
       });
 
       // Send Ctrl+C
       act(() => {
-        stdin.pressKey({ 
-          name: 'c', 
-          ctrl: true, 
-          meta: false, 
-          shift: false, 
-          sequence: '\x03' 
+        stdin.pressKey({
+          name: 'c',
+          ctrl: true,
+          meta: false,
+          shift: false,
+          sequence: '\x03',
         });
       });
 
@@ -470,8 +470,8 @@ describe('KeypressContext - Kitty Protocol', () => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'c',
-          ctrl: true
-        })
+          ctrl: true,
+        }),
       );
     });
 
@@ -479,8 +479,8 @@ describe('KeypressContext - Kitty Protocol', () => {
       const keyHandler = vi.fn();
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <KeypressProvider 
-          kittyProtocolEnabled={true} 
+        <KeypressProvider
+          kittyProtocolEnabled={true}
           debugKeystrokeLogging={true}
         >
           {children}
@@ -496,25 +496,25 @@ describe('KeypressContext - Kitty Protocol', () => {
       // Send incomplete kitty sequence
       const sequence = '\x1b[12';
       act(() => {
-        stdin.pressKey({ 
-          name: undefined, 
-          ctrl: false, 
-          meta: false, 
-          shift: false, 
-          sequence
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          sequence,
         });
       });
 
       // Verify debug logging for accumulation
       expect(consoleLogSpy).toHaveBeenCalledWith(
         '[DEBUG] Kitty buffer accumulating:',
-        sequence
+        sequence,
       );
 
       // Verify warning for char codes
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         'Kitty sequence buffer has char codes:',
-        [CHAR_CODE_ESC, CHAR_CODE_LEFT_BRACKET, CHAR_CODE_1, CHAR_CODE_2]
+        [CHAR_CODE_ESC, CHAR_CODE_LEFT_BRACKET, CHAR_CODE_1, CHAR_CODE_2],
       );
     });
   });

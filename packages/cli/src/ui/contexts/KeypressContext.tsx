@@ -248,7 +248,10 @@ export function KeypressProvider({
         key.sequence === `${ESC}${KITTY_CTRL_C}`
       ) {
         if (kittySequenceBuffer && debugKeystrokeLogging) {
-          console.log('[DEBUG] Kitty buffer cleared on Ctrl+C:', kittySequenceBuffer);
+          console.log(
+            '[DEBUG] Kitty buffer cleared on Ctrl+C:',
+            kittySequenceBuffer,
+          );
         }
         kittySequenceBuffer = '';
         if (key.sequence === `${ESC}${KITTY_CTRL_C}`) {
@@ -277,15 +280,21 @@ export function KeypressProvider({
             !key.sequence.startsWith(FOCUS_OUT))
         ) {
           kittySequenceBuffer += key.sequence;
-          
+
           if (debugKeystrokeLogging) {
-            console.log('[DEBUG] Kitty buffer accumulating:', kittySequenceBuffer);
+            console.log(
+              '[DEBUG] Kitty buffer accumulating:',
+              kittySequenceBuffer,
+            );
           }
-          
+
           const kittyKey = parseKittySequence(kittySequenceBuffer);
           if (kittyKey) {
             if (debugKeystrokeLogging) {
-              console.log('[DEBUG] Kitty sequence parsed successfully:', kittySequenceBuffer);
+              console.log(
+                '[DEBUG] Kitty sequence parsed successfully:',
+                kittySequenceBuffer,
+              );
             }
             kittySequenceBuffer = '';
             broadcast(kittyKey);
@@ -301,7 +310,10 @@ export function KeypressProvider({
 
           if (kittySequenceBuffer.length > MAX_KITTY_SEQUENCE_LENGTH) {
             if (debugKeystrokeLogging) {
-              console.log('[DEBUG] Kitty buffer overflow, clearing:', kittySequenceBuffer);
+              console.log(
+                '[DEBUG] Kitty buffer overflow, clearing:',
+                kittySequenceBuffer,
+              );
             }
             if (config) {
               const event = new KittySequenceOverflowEvent(
@@ -420,7 +432,14 @@ export function KeypressProvider({
         pasteBuffer = Buffer.alloc(0);
       }
     };
-  }, [stdin, setRawMode, kittyProtocolEnabled, config, subscribers, debugKeystrokeLogging]);
+  }, [
+    stdin,
+    setRawMode,
+    kittyProtocolEnabled,
+    config,
+    subscribers,
+    debugKeystrokeLogging,
+  ]);
 
   return (
     <KeypressContext.Provider value={{ subscribe, unsubscribe }}>

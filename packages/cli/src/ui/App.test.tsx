@@ -1534,7 +1534,7 @@ describe('App UI', () => {
       currentUnmount = unmount;
 
       const output = lastFrame();
-      
+
       expect(output).toBeDefined();
       expect(mockSettingsWithDebug.merged.debugKeystrokeLogging).toBe(true);
     });
@@ -1550,7 +1550,7 @@ describe('App UI', () => {
       currentUnmount = unmount;
 
       const output = lastFrame();
-      
+
       expect(output).toBeDefined();
       expect(mockSettings.merged.debugKeystrokeLogging).toBeUndefined();
     });
