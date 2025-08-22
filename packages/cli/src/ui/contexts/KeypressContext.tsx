@@ -33,6 +33,8 @@ import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 const ESC = '\u001B';
 export const PASTE_MODE_PREFIX = `${ESC}[200~`;
 export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
+export const MAC_DRAG_MODE_PREFIX = `${ESC}[I`;
+export const MAC_FOCUS_EVENT_OUT_OF_EDITOR = "'"; // When editor does NOT have focus (macOS Finder.app)
 
 const DRAG_START_TIMEOUT_MS = 200;
 const DRAG_COMPLETION_TIMEOUT_MS = 500;
@@ -206,9 +208,6 @@ export function KeypressProvider({
         return;
       }
 
-      const FOCUS_EVENT_IN_EDITOR = '\u001b[I'; // When editor has focus in macos
-      const FOCUS_EVENT_OUT_OF_EDITOR = "'"; // When editor does NOT have focus (macOS Finder.app)
-
       const resetDragState = () => {
         if (dragTimeoutRef.current) {
           clearTimeout(dragTimeoutRef.current);
@@ -219,8 +218,8 @@ export function KeypressProvider({
       };
 
       const isDragFocusEvent = (sequence: string) =>
-        sequence === FOCUS_EVENT_IN_EDITOR ||
-        sequence === FOCUS_EVENT_OUT_OF_EDITOR;
+        sequence === MAC_DRAG_MODE_PREFIX ||
+        sequence === MAC_FOCUS_EVENT_OUT_OF_EDITOR;
 
       // Handle normal paste operations first
       if (key.paste) {
