@@ -160,9 +160,7 @@ export class CBIIndexStorage {
         sizeBytes: stats.size
       };
     } catch {
-      return { exists: true };
-    }
-  }
+      return { exists: false };
 
   async saveIndex(fileIndices: FileIndex[], onProgress?: (current: number, total: number) => void): Promise<void> {
     const totalVectors = fileIndices.reduce((sum, fi) => sum + fi.embeddings.length, 0);
