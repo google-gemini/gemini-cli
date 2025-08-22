@@ -5,13 +5,16 @@
  */
 
 import { render } from 'ink-testing-library';
-import { CompressionMessage, CompressionDisplayProps } from './CompressionMessage.js';
+import {
+  CompressionMessage,
+  CompressionDisplayProps,
+} from './CompressionMessage.js';
 import { CompressionProps } from '../../types.js';
 import { describe, it, expect } from 'vitest';
 
 describe('<CompressionMessage />', () => {
   const createCompressionProps = (
-    overrides: Partial<CompressionProps> = {}
+    overrides: Partial<CompressionProps> = {},
   ): CompressionDisplayProps => ({
     compression: {
       isPending: false,
@@ -42,7 +45,9 @@ describe('<CompressionMessage />', () => {
       const output = lastFrame();
 
       expect(output).toContain('✦');
-      expect(output).toContain('Chat history compressed from 100 to 50 tokens.');
+      expect(output).toContain(
+        'Chat history compressed from 100 to 50 tokens.',
+      );
     });
   });
 
@@ -57,7 +62,9 @@ describe('<CompressionMessage />', () => {
       const output = lastFrame();
 
       expect(output).toContain('✦');
-      expect(output).toContain('Skipping compression for small history as the process would have increased its size.');
+      expect(output).toContain(
+        'Skipping compression for small history as the process would have increased its size.',
+      );
     });
 
     it('renders skip message when token counts are equal', () => {
@@ -69,16 +76,30 @@ describe('<CompressionMessage />', () => {
       const { lastFrame } = render(<CompressionMessage {...props} />);
       const output = lastFrame();
 
-      expect(output).toContain('Skipping compression for small history as the process would have increased its size.');
+      expect(output).toContain(
+        'Skipping compression for small history as the process would have increased its size.',
+      );
     });
   });
 
   describe('message content validation', () => {
     it('displays correct compression statistics', () => {
       const testCases = [
-        { original: 200, new: 80, expected: 'compressed from 200 to 80 tokens' },
-        { original: 500, new: 150, expected: 'compressed from 500 to 150 tokens' },
-        { original: 1500, new: 400, expected: 'compressed from 1500 to 400 tokens' },
+        {
+          original: 200,
+          new: 80,
+          expected: 'compressed from 200 to 80 tokens',
+        },
+        {
+          original: 500,
+          new: 150,
+          expected: 'compressed from 500 to 150 tokens',
+        },
+        {
+          original: 1500,
+          new: 400,
+          expected: 'compressed from 1500 to 400 tokens',
+        },
       ];
 
       testCases.forEach(({ original, new: newTokens, expected }) => {
@@ -109,7 +130,9 @@ describe('<CompressionMessage />', () => {
         const { lastFrame } = render(<CompressionMessage {...props} />);
         const output = lastFrame();
 
-        expect(output).toContain('Skipping compression for small history as the process would have increased its size.');
+        expect(output).toContain(
+          'Skipping compression for small history as the process would have increased its size.',
+        );
         expect(output).not.toContain('compressed from');
       });
     });
