@@ -153,7 +153,7 @@ export async function startInteractiveUI(
         />
       </SettingsContext.Provider>
     </React.StrictMode>,
-    { exitOnCtrlC: false },
+    { exitOnCtrlC: false, isScreenReaderEnabled: config.getScreenReader() },
   );
 
   checkForUpdates()
