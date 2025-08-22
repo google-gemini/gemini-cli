@@ -462,7 +462,6 @@ describe('MemoryMonitor', () => {
       });
     });
 
-
     describe('destroy', () => {
       it('should stop monitoring and cleanup resources', () => {
         const monitor = new MemoryMonitor();
