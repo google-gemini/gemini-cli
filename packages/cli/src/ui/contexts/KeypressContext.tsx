@@ -35,7 +35,7 @@ export const PASTE_MODE_PREFIX = `${ESC}[200~`;
 export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
 
 const DRAG_START_TIMEOUT_MS = 200;
-const DRAG_COMPLETION_TIMEOUT_MS = 200;
+const DRAG_COMPLETION_TIMEOUT_MS = 500;
 
 export interface Key {
   name: string;
@@ -256,7 +256,6 @@ export function KeypressProvider({
             clearTimeout(dragTimeoutRef.current);
           }
 
-          // Set completion timeout - longer delay for long paths
           dragTimeoutRef.current = setTimeout(() => {
             const trimmedPath = newBuffer.trim();
             if (trimmedPath) {
