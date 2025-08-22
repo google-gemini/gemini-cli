@@ -50,7 +50,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
       return '';
     }
     const openFileWord = openFileCount > 1 ? t('ui:context.openFiles') : t('ui:context.openFile');
-    return `${openFileCount}${openFileWord} ${t('ui:context.viewHint')}`;
+    return `${openFileCount} ${openFileWord} ${t('ui:context.viewHint')}`;
   })();
 
   const geminiMdText = (() => {

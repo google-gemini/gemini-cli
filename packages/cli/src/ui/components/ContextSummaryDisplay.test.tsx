@@ -14,12 +14,22 @@ vi.mock('../hooks/useTerminalSize.js', () => ({
   useTerminalSize: vi.fn(),
 }));
 
+// Create a mock function that can be reconfigured for different languages
+const mockT = vi.fn((key: string) => {
+  const translations: Record<string, string> = {
+    'ui:context.using': 'Using:',
+    'ui:context.openFile': 'open file',
+    'ui:context.openFiles': 'open files',
+    'ui:context.file': 'file',
+    'ui:context.files': 'files',
+    'ui:context.viewHint': '(ctrl+g to view)',
+  };
+  return translations[key] || key;
+});
+
 vi.mock('../../i18n/useTranslation.js', () => ({
   useTranslation: vi.fn(() => ({
-    t: vi.fn((key: string) => {
-      if (key === 'ui:context.using') return 'Using:';
-      return key;
-    }),
+    t: mockT,
   })),
 }));
 
@@ -41,7 +51,7 @@ describe('<ContextSummaryDisplay />', () => {
     showToolDescriptions: false,
     ideContext: {
       workspaceState: {
-        openFiles: [{ path: '/a/b/c' }],
+        openFiles: [{ path: '/a/b/c', timestamp: Date.now() }],
       },
     },
   };
@@ -90,5 +100,124 @@ describe('<ContextSummaryDisplay />', () => {
     const expectedLines = ['Using:', '  - 1 open file (ctrl+g to view)'];
     const actualLines = lastFrame().split('\n');
     expect(actualLines).toEqual(expectedLines);
+  });
+});
+
+describe('<ContextSummaryDisplay /> - Multi-language Support', () => {
+  const baseProps = {
+    geminiMdFileCount: 1,
+    contextFileNames: ['GEMINI.md'],
+    mcpServers: { 'test-server': { command: 'test' } },
+    showToolDescriptions: false,
+    ideContext: {
+      workspaceState: {
+        openFiles: [{ path: '/a/b/c', timestamp: Date.now() }],
+      },
+    },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('Chinese Language (zh)', () => {
+    beforeEach(() => {
+      // Configure mock for Chinese translations
+      mockT.mockImplementation((key: string) => {
+        const chineseTranslations: Record<string, string> = {
+          'ui:context.using': '正在使用:',
+          'ui:context.openFile': '个打开文件',
+          'ui:context.openFiles': '个打开文件',
+          'ui:context.file': '文件',
+          'ui:context.files': '文件',
+          'ui:context.viewHint': '(按 ctrl+g 查看)',
+        };
+        return chineseTranslations[key] || key;
+      });
+    });
+
+    it('should render on a single line in Chinese on a wide screen', () => {
+      const { lastFrame } = renderWithWidth(120, baseProps);
+      const output = lastFrame();
+      expect(output).toContain(
+        '正在使用: 1 个打开文件 (按 ctrl+g 查看) | 1 GEMINI.md 文件 | 1 MCP server (ctrl+t to view)',
+      );
+      // Check for absence of newlines
+      expect(output.includes('\n')).toBe(false);
+    });
+
+    it('should render on multiple lines in Chinese on a narrow screen', () => {
+      const { lastFrame } = renderWithWidth(60, baseProps);
+      const output = lastFrame();
+      const expectedLines = [
+        '正在使用:',
+        '  - 1 个打开文件 (按 ctrl+g 查看)',
+        '  - 1 GEMINI.md 文件',
+        '  - 1 MCP server (ctrl+t to view)',
+      ];
+      const actualLines = output.split('\n');
+      expect(actualLines).toEqual(expectedLines);
+    });
+
+    it('should handle multiple open files in Chinese', () => {
+      const propsWithMultipleFiles = {
+        ...baseProps,
+        ideContext: {
+          workspaceState: {
+            openFiles: [
+              { path: '/a/b/c', timestamp: Date.now() },
+              { path: '/d/e/f', timestamp: Date.now() },
+              { path: '/g/h/i', timestamp: Date.now() },
+            ],
+          },
+        },
+      };
+      const { lastFrame } = renderWithWidth(60, propsWithMultipleFiles);
+      const output = lastFrame();
+      expect(output).toContain('3 个打开文件');
+    });
+  });
+
+  describe('English Language (en) - Regression Test', () => {
+    beforeEach(() => {
+      // Reset to English translations
+      mockT.mockImplementation((key: string) => {
+        const englishTranslations: Record<string, string> = {
+          'ui:context.using': 'Using:',
+          'ui:context.openFile': 'open file',
+          'ui:context.openFiles': 'open files',
+          'ui:context.file': 'file',
+          'ui:context.files': 'files',
+          'ui:context.viewHint': '(ctrl+g to view)',
+        };
+        return englishTranslations[key] || key;
+      });
+    });
+
+    it('should still render correctly in English after adding multi-language support', () => {
+      const { lastFrame } = renderWithWidth(120, baseProps);
+      const output = lastFrame();
+      expect(output).toContain(
+        'Using: 1 open file (ctrl+g to view) | 1 GEMINI.md file | 1 MCP server (ctrl+t to view)',
+      );
+    });
+  });
+
+  describe('Translation Key Fallback', () => {
+    beforeEach(() => {
+      // Configure mock to test fallback behavior
+      mockT.mockImplementation((key: string) => {
+        // Simulate missing translations - return the key itself
+        return key;
+      });
+    });
+
+    it('should gracefully handle missing translations by showing translation keys', () => {
+      const { lastFrame } = renderWithWidth(120, baseProps);
+      const output = lastFrame();
+      expect(output).toContain('ui:context.using');
+      expect(output).toContain('ui:context.openFile');
+      expect(output).toContain('ui:context.viewHint');
+    });
   });
 });

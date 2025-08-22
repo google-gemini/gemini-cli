@@ -1,22 +1,20 @@
 {
   "auth": {
     "title": "Comenzar",
-    "subtitle": "Autentícate para usar Gemini CLI",
-    "description": "Elige tu método de autenticación preferido:",
-    "methods": {
-      "adc": "Credenciales Predeterminadas de Aplicación (ADC)",
-      "serviceAccount": "Clave de cuenta de servicio",
-      "oauth": "Flujo OAuth",
-      "apiKey": "Clave API"
+    "description": "¿Cómo te gustaría autenticarte para este proyecto?",
+    "instructions": "(Usa Enter para seleccionar)",
+    "terms": "Términos de Servicio y Aviso de Privacidad para Gemini CLI",
+    "termsUrl": "https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md",
+    "options": {
+      "google": "Iniciar sesión con Google",
+      "cloudShell": "Usar credenciales de usuario de Cloud Shell",
+      "geminiKey": "Usar clave API de Gemini",
+      "vertexAI": "Vertex AI"
     },
-    "buttons": {
-      "selectMethod": "Seleccionar este método",
-      "cancel": "Cancelar",
-      "close": "Cerrar"
-    },
-    "status": {
-      "authenticated": "Autenticado",
-      "notAuthenticated": "No autenticado"
+    "errors": {
+      "invalidAuthType": "Valor inválido para GEMINI_DEFAULT_AUTH_TYPE: \"{{value}}\". Los valores válidos son: {{validValues}}.",
+      "existingApiKey": "Se detectó una clave API existente (GEMINI_API_KEY). Selecciona la opción \"Clave API de Gemini\" para usarla.",
+      "authRequired": "Debes seleccionar un método de autenticación para continuar. Presiona Ctrl+C dos veces para salir."
     }
   },
   "settings": {

@@ -37,6 +37,7 @@ vi.mock('../../i18n/useTranslation.js', () => ({
         'ui:sessionSummary.reqs': 'Reqs',
         'ui:sessionSummary.inputTokens': 'Input Tokens',
         'ui:sessionSummary.outputTokens': 'Output Tokens',
+        'modelStats.noApiCalls': 'No API calls have been made in this session.',
       };
       return translations[key] || key;
     }),
