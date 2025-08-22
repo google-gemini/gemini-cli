@@ -205,6 +205,7 @@ export interface ConfigParameters {
   shouldUseNodePtyShell?: boolean;
   skipNextSpeakerCheck?: boolean;
   enablePromptCompletion?: boolean;
+  truncateToolOutput?: boolean;
 }
 
 export class Config {
@@ -275,6 +276,7 @@ export class Config {
   private readonly shouldUseNodePtyShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private readonly enablePromptCompletion: boolean = false;
+  private readonly truncateToolOutput: boolean;
   private initialized: boolean = false;
   readonly storage: Storage;
 
@@ -347,6 +349,7 @@ export class Config {
     this.useRipgrep = params.useRipgrep ?? false;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
+    this.truncateToolOutput = params.truncateToolOutput ?? false;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
 
@@ -756,6 +759,10 @@ export class Config {
 
   getEnablePromptCompletion(): boolean {
     return this.enablePromptCompletion;
+  }
+
+  getTruncateToolOutput(): boolean {
+    return this.truncateToolOutput;
   }
 
   async getGitService(): Promise<GitService> {

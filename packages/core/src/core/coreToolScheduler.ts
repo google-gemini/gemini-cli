@@ -30,6 +30,8 @@ import {
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
 import * as Diff from 'diff';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -238,6 +240,57 @@ const createErrorResponse = (
   resultDisplay: error.message,
   errorType,
 });
+
+const TRUNCATION_THRESHOLD = 1_000_000;
+const TRUNCATION_LINES = 1_000;
+
+export async function truncateAndSaveToFile(
+  content: string,
+  callId: string,
+  projectTempDir: string,
+): Promise<{ content: string; outputFile?: string }> {
+  if (content.length <= TRUNCATION_THRESHOLD) {
+    return { content };
+  }
+
+  const lines = content.split('\n');
+  let truncatedContent: string;
+
+  // Determine the truncated content for display based on its structure.
+  if (lines.length > TRUNCATION_LINES) {
+    // Content has many lines; truncate by line count.
+    truncatedContent = lines.slice(-TRUNCATION_LINES).join('\n');
+  } else {
+    // Content has few lines (or one very long line); truncate by character count.
+    const maxChars = TRUNCATION_LINES * 80; // Approximate 80 chars per line
+    truncatedContent = content.slice(-maxChars);
+  }
+
+  // Sanitize callId to prevent path traversal.
+  const safeFileName = `${path.basename(callId)}.txt`;
+  const outputFile = path.join(projectTempDir, safeFileName);
+  try {
+    await fs.writeFile(outputFile, content);
+
+    return {
+      content: `Tool output was too large and has been truncated.
+The full output has been saved to: ${outputFile}
+To read the complete output, use the read_file tool with the absolute file path above. For large files, you can use the offset and limit parameters to read specific sections:
+- read_file tool with offset=0, limit=100 to see the first 100 lines
+- read_file tool with offset=N to skip N lines from the beginning
+- read_file tool with limit=M to read only M lines at a time
+This allows you to efficiently examine different parts of the output without loading the entire file.
+Last ${TRUNCATION_LINES} lines of output:
+...\n${truncatedContent}`,
+      outputFile,
+    };
+  } catch (_error) {
+    return {
+      content:
+        truncatedContent + `\n[Note: Could not save full output to file]`,
+    };
+  }
+}
 
 interface CoreToolSchedulerOptions {
   config: Config;
@@ -859,10 +912,23 @@ export class CoreToolScheduler {
             }
 
             if (toolResult.error === undefined) {
+              let content = toolResult.llmContent;
+              let outputFile: string | undefined = undefined;
+              if (
+                typeof content === 'string' &&
+                this.config.getTruncateToolOutput()
+              ) {
+                ({ content, outputFile } = await truncateAndSaveToFile(
+                  content,
+                  callId,
+                  this.config.storage.getProjectTempDir(),
+                ));
+              }
+
               const response = convertToFunctionResponse(
                 toolName,
                 callId,
-                toolResult.llmContent,
+                content,
               );
               const successResponse: ToolCallResponseInfo = {
                 callId,
@@ -870,6 +936,7 @@ export class CoreToolScheduler {
                 resultDisplay: toolResult.returnDisplay,
                 error: undefined,
                 errorType: undefined,
+                outputFile,
               };
               this.setStatusInternal(callId, 'success', successResponse);
             } else {

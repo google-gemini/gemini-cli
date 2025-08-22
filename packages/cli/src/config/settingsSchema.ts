@@ -564,6 +564,16 @@ export const SETTINGS_SCHEMA = {
       'Enable AI-powered prompt completion suggestions while typing.',
     showInDialog: true,
   },
+  truncateToolOutput: {
+    type: 'boolean',
+    label: 'Truncate Tool Output',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description:
+      'Truncate tool output if it is too large and save it to a file.',
+    showInDialog: true,
+  },
 } as const;
 
 type InferSettings<T extends SettingsSchema> = {

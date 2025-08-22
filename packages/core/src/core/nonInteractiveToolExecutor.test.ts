@@ -40,6 +40,7 @@ describe('executeToolCall', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getTruncateToolOutput: () => false,
     } as unknown as Config;
 
     abortController = new AbortController();
@@ -72,6 +73,7 @@ describe('executeToolCall', () => {
       callId: 'call1',
       error: undefined,
       errorType: undefined,
+      outputFile: undefined,
       resultDisplay: 'Success!',
       responseParts: [
         {
@@ -265,6 +267,7 @@ describe('executeToolCall', () => {
       callId: 'call6',
       error: undefined,
       errorType: undefined,
+      outputFile: undefined,
       resultDisplay: 'Image processed',
       responseParts: [
         {
