@@ -51,7 +51,6 @@ export enum AuthType {
 
 export type ContentGeneratorConfig = {
   model: string;
-  modelEndpoint?: string | undefined;
   apiKey?: string;
   vertexai?: boolean;
   authType?: AuthType | undefined;

@@ -427,7 +427,7 @@ export class Config {
   }
 
   getModel(): string {
-    return this.contentGeneratorConfig?.modelEndpoint || this.modelEndpoint || this.contentGeneratorConfig?.model || this.model;
+    return this.modelEndpoint || this.contentGeneratorConfig?.model || this.model;
   }
 
   setModel(newModel: string): void {
