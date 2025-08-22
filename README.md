@@ -159,6 +159,7 @@ export GOOGLE_CLOUD_PROJECT_ID="my-gcp-project"     # fallback
 The CLI will first read `GOOGLE_CLOUD_PROJECT`, and if that’s not set, it will fall back to `GOOGLE_CLOUD_PROJECT_ID`.
 
 For other authentication methods, including Google Workspace accounts, see the [authentication](./docs/cli/authentication.md) guide.
+
 ### Option 3: Vertex AI
 
 **✨ Best for:** Enterprise teams and production workloads
