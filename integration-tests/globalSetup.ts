@@ -14,13 +14,16 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import * as os from 'os';
 
+import {
+  GEMINI_CONFIG_DIR,
+  DEFAULT_CONTEXT_FILENAME,
+} from '../packages/core/src/tools/memoryTool.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
 const integrationTestsDir = join(rootDir, '.integration-tests');
 let runDir = ''; // Make runDir accessible in teardown
 
-const GEMINI_CONFIG_DIR = '.gemini';
-const DEFAULT_CONTEXT_FILENAME = 'GEMINI.md';
 const memoryFilePath = join(
   os.homedir(),
   GEMINI_CONFIG_DIR,
@@ -31,7 +34,10 @@ let originalMemoryContent: string | null = null;
 export async function setup() {
   try {
     originalMemoryContent = await readFile(memoryFilePath, 'utf-8');
-  } catch {
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw e;
+    }
     // File doesn't exist, which is fine.
   }
 
@@ -75,6 +81,7 @@ export async function teardown() {
   }
 
   if (originalMemoryContent !== null) {
+    await mkdir(dirname(memoryFilePath), { recursive: true });
     await writeFile(memoryFilePath, originalMemoryContent, 'utf-8');
   } else {
     try {
