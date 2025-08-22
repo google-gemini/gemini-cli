@@ -274,6 +274,3 @@ jobs:
               issue_number: parseInt(process.env.ISSUE_NUMBER),
               body: 'There is a problem with the Gemini CLI issue triaging. Please check the [action logs](${process.env.RUN_URL}) for details.'
             })
-
-  
-            
