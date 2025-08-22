@@ -20,9 +20,9 @@ export type PackageJson = BasePackageJson & {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let packageJson: PackageJson | undefined;
+let packageJson: PackageJson | null = null;
 
-export async function getPackageJson(): Promise<PackageJson | undefined> {
+export async function getPackageJson(): Promise<PackageJson | null> {
   if (packageJson) {
     return packageJson;
   }
@@ -30,7 +30,7 @@ export async function getPackageJson(): Promise<PackageJson | undefined> {
   const result = await readPackageUp({ cwd: __dirname });
   if (!result) {
     // TODO: Maybe bubble this up as an error.
-    return;
+    return null;
   }
 
   packageJson = result.packageJson;
