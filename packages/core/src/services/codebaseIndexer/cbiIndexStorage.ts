@@ -1346,7 +1346,7 @@ export class CBIIndexStorage {
       const graph = this.parseHNSWGraph(annBuffer, 0);
 
       if (graph.nodes.length === 0) {
-        return [];
+        return this.searchVectors(queryVector, topK);
       }
 
       const candidates = await this.searchLayerWithFileAccess(graph, queryVector, [graph.entry_point], header.ef_search || 50, 0, fileHandle, header);
