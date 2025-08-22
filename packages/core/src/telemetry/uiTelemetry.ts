@@ -140,6 +140,14 @@ export class UiTelemetryService extends EventEmitter {
     return this.#lastPromptTokenCount;
   }
 
+  setLastPromptTokenCount(tokenCount: number): void {
+    this.#lastPromptTokenCount = tokenCount;
+    this.emit('update', {
+      metrics: this.#metrics,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+    });
+  }
+
   resetLastPromptTokenCount(): void {
     this.#lastPromptTokenCount = 0;
     this.emit('update', {
