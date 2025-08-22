@@ -22,7 +22,6 @@ import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { Config } from '../config/config.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
-import { COMMON_IGNORE_PATTERNS } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
 
 // --- Interfaces ---
