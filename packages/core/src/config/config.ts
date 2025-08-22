@@ -522,6 +522,19 @@ export class Config {
   getExcludeTools(): string[] | undefined {
     return this.excludeTools;
   }
+  
+  /**
+   * Gets the names of all available (non-excluded) tools from the tool registry.
+   * @returns Array of tool names that are available for use
+   */
+  getAvailableToolNames(): string[] {
+    const allTools = this.toolRegistry.getAllTools();
+    const excludeTools = this.getExcludeTools() || [];
+    
+    return allTools
+      .filter(tool => !excludeTools.includes(tool.name))
+      .map(tool => tool.name);
+  }
 
   getToolDiscoveryCommand(): string | undefined {
     return this.toolDiscoveryCommand;

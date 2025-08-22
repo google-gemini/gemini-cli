@@ -202,7 +202,8 @@ export class GeminiClient {
 
   async setTools(): Promise<void> {
     const toolRegistry = this.config.getToolRegistry();
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    const availableToolNames = this.config.getAvailableToolNames();
+    const toolDeclarations = toolRegistry.getFunctionDeclarationsFiltered(availableToolNames);
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     this.getChat().setTools(tools);
   }
@@ -226,7 +227,8 @@ export class GeminiClient {
     this.forceFullIdeContext = true;
     const envParts = await getEnvironmentContext(this.config);
     const toolRegistry = this.config.getToolRegistry();
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    const availableToolNames = this.config.getAvailableToolNames();
+    const toolDeclarations = toolRegistry.getFunctionDeclarationsFiltered(availableToolNames);
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     const history: Content[] = [
       {
@@ -241,7 +243,8 @@ export class GeminiClient {
     ];
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const availableToolNames = this.config.getAvailableToolNames();
+      const systemInstruction = getCoreSystemPrompt(userMemory, availableToolNames);
       const generateContentConfigWithThinking = isThinkingSupported(
         this.config.getModel(),
       )
@@ -572,7 +575,8 @@ export class GeminiClient {
       model || this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const availableToolNames = this.config.getAvailableToolNames();
+      const systemInstruction = getCoreSystemPrompt(userMemory, availableToolNames);
       const requestConfig = {
         abortSignal,
         ...this.generateContentConfig,
@@ -682,7 +686,8 @@ export class GeminiClient {
 
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const availableToolNames = this.config.getAvailableToolNames();
+      const systemInstruction = getCoreSystemPrompt(userMemory, availableToolNames);
 
       const requestConfig: GenerateContentConfig = {
         abortSignal,
