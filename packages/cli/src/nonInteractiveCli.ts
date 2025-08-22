@@ -111,16 +111,7 @@ export async function runNonInteractive(
           }
 
           if (toolResponse.responseParts) {
-            const parts = Array.isArray(toolResponse.responseParts)
-              ? toolResponse.responseParts
-              : [toolResponse.responseParts];
-            for (const part of parts) {
-              if (typeof part === 'string') {
-                toolResponseParts.push({ text: part });
-              } else if (part) {
-                toolResponseParts.push(part);
-              }
-            }
+            toolResponseParts.push(...toolResponse.responseParts);
           }
         }
         currentMessages = [{ role: 'user', parts: toolResponseParts }];

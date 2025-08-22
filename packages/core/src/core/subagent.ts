@@ -502,7 +502,7 @@ export class SubAgentScope {
 
         toolResponse = {
           callId,
-          responseParts: `Emitted variable ${valName} successfully`,
+          responseParts: [{ text: `Emitted variable ${valName} successfully` }],
           resultDisplay: `Emitted variable ${valName} successfully`,
           error: undefined,
         };
@@ -521,16 +521,7 @@ export class SubAgentScope {
       }
 
       if (toolResponse.responseParts) {
-        const parts = Array.isArray(toolResponse.responseParts)
-          ? toolResponse.responseParts
-          : [toolResponse.responseParts];
-        for (const part of parts) {
-          if (typeof part === 'string') {
-            toolResponseParts.push({ text: part });
-          } else if (part) {
-            toolResponseParts.push(part);
-          }
-        }
+        toolResponseParts.push(...toolResponse.responseParts);
       }
     }
     // If all tool calls failed, inform the model so it can re-evaluate.

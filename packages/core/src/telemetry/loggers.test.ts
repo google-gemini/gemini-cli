@@ -495,7 +495,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -562,7 +562,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -628,7 +628,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -696,7 +696,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -762,7 +762,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: {
             name: 'test-error-type',
