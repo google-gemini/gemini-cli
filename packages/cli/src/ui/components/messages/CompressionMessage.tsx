@@ -40,11 +40,6 @@ export const CompressionMessage: React.FC<CompressionDisplayProps> = ({
   };
 
   const text = getCompressionText();
-  const color = isPending
-    ? Colors.AccentPurple
-    : newTokens >= originalTokens
-      ? Colors.AccentYellow
-      : Colors.AccentGreen;
 
   return (
     <Box flexDirection="row">
