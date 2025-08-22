@@ -17,6 +17,10 @@ import { EventEmitter } from 'events';
 import {
   KITTY_KEYCODE_ENTER,
   KITTY_KEYCODE_NUMPAD_ENTER,
+  CHAR_CODE_ESC,
+  CHAR_CODE_LEFT_BRACKET,
+  CHAR_CODE_1,
+  CHAR_CODE_2,
 } from '../utils/platformConstants.js';
 
 // Mock the 'ink' module to control stdin
@@ -457,6 +461,11 @@ describe('KeypressContext - Kitty Protocol', () => {
         });
       });
 
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[DEBUG] Kitty buffer cleared on Ctrl+C:',
+        '\x1b[1',
+      );
+
       // Verify Ctrl+C was handled
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -485,20 +494,27 @@ describe('KeypressContext - Kitty Protocol', () => {
       });
 
       // Send incomplete kitty sequence
+      const sequence = '\x1b[12';
       act(() => {
         stdin.pressKey({ 
           name: undefined, 
           ctrl: false, 
           meta: false, 
           shift: false, 
-          sequence: '\x1b[12'
+          sequence
         });
       });
 
-      // Verify debug logging
+      // Verify debug logging for accumulation
       expect(consoleLogSpy).toHaveBeenCalledWith(
         '[DEBUG] Kitty buffer accumulating:',
-        expect.any(String)
+        sequence
+      );
+
+      // Verify warning for char codes
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Kitty sequence buffer has char codes:',
+        [CHAR_CODE_ESC, CHAR_CODE_LEFT_BRACKET, CHAR_CODE_1, CHAR_CODE_2]
       );
     });
   });
