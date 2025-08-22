@@ -5,7 +5,12 @@
  */
 
 import { useEffect, useReducer, useRef } from 'react';
-import { Config, FileSearch, escapePath } from '@google/gemini-cli-core';
+import {
+  Config,
+  FileSearch,
+  FileSearchFactory,
+  escapePath,
+} from '@google/gemini-cli-core';
 import {
   Suggestion,
   MAX_SUGGESTIONS_TO_SHOW,
@@ -156,7 +161,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
   useEffect(() => {
     const initialize = async () => {
       try {
-        const searcher = new FileSearch({
+        const searcher = FileSearchFactory.create({
           projectRoot: cwd,
           ignoreDirs: [],
           useGitignore:
@@ -165,9 +170,10 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
             config?.getFileFilteringOptions()?.respectGeminiIgnore ?? true,
           cache: true,
           cacheTtl: 30, // 30 seconds
-          maxDepth: !(config?.getEnableRecursiveFileSearch() ?? true)
-            ? 0
-            : undefined,
+          enableRecursiveFileSearch:
+            config?.getEnableRecursiveFileSearch() ?? true,
+          disableFuzzySearch:
+            config?.getFileFilteringDisableFuzzySearch() ?? false,
         });
         await searcher.initialize();
         fileSearch.current = searcher;

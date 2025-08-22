@@ -53,8 +53,8 @@ export const removeCommand: CommandModule = {
         choices: ['user', 'project'],
       }),
   handler: async (argv) => {
-    await removeMcpServer(argv.name as string, {
-      scope: argv.scope as string,
+    await removeMcpServer(argv['name'] as string, {
+      scope: argv['scope'] as string,
     });
   },
 };
