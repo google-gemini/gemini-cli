@@ -202,7 +202,7 @@ export async function start_sandbox(
         process.exit(1);
       }
 
-      const profile = (process.env.SEATBELT_PROFILE ??= 'permissive-open');
+      const profile = (process.env['SEATBELT_PROFILE'] ??= 'permissive-open');
       let profileFile = fileURLToPath(
         new URL(`sandbox-macos-${profile}.sb`, import.meta.url),
       );
