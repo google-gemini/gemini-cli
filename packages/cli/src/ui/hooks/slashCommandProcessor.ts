@@ -395,33 +395,35 @@ export const useSlashCommandProcessor = (
                   }
                 case 'load_history': {
                   const geminiClient = config?.getGeminiClient();
-                  await geminiClient?.setHistory(result.clientHistory);
+                  if (!geminiClient) {
+                    throw new Error('Cannot load history: Gemini client is not initialized.');
+                  }
+
+                  await geminiClient.setHistory(result.clientHistory);
                   fullCommandContext.ui.clear();
                   result.history.forEach((item, index) => {
                     fullCommandContext.ui.addItem(item, index);
                   });
-                  
+
                   // Calculate and set token count for the loaded history
-                  if (geminiClient) {
-                    try {
-                      const history = geminiClient.getHistory();
+                  try {
+                    const history = geminiClient.getHistory();
+                    const model = config?.getModel();
+
+                    if (history.length > 0 && model) {
                       const contentGenerator = geminiClient.getContentGenerator();
-                      const model = config?.getModel();
-                      
-                      if (history.length > 0 && model) {
-                        const { totalTokens } = await contentGenerator.countTokens({
-                          model,
-                          contents: history,
-                        });
-                        
-                        if (totalTokens !== undefined) {
-                          uiTelemetryService.setLastPromptTokenCount(totalTokens);
-                        }
+                      const { totalTokens } = await contentGenerator.countTokens({
+                        model,
+                        contents: history,
+                      });
+
+                      if (totalTokens !== undefined) {
+                        uiTelemetryService.setLastPromptTokenCount(totalTokens);
                       }
-                    } catch (error) {
-                      // If token counting fails, silently continue without setting the count
-                      console.warn('Could not calculate token count after loading history:', error);
                     }
+                  } catch (error) {
+                    // If token counting fails, silently continue without setting the count
+                    console.warn('Could not calculate token count after loading history:', error);
                   }
                   
                   return { type: 'handled' };
