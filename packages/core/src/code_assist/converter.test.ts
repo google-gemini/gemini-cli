@@ -417,5 +417,27 @@ describe('converter', () => {
         },
       ]);
     });
+
+    it('should convert invalid text content to valid text part with thought', () => {
+      const contentWithInvalidText: ContentListUnion = {
+        role: 'model',
+        parts: [
+          {
+            text: 123, // Invalid - should be string
+            thought: 'Processing number',
+          } as Part & { thought: string; text: number },
+        ],
+      };
+      expect(toContents(contentWithInvalidText)).toEqual([
+        {
+          role: 'model',
+          parts: [
+            {
+              text: '123\n[Thought: Processing number]',
+            },
+          ],
+        },
+      ]);
+    });
   });
 });

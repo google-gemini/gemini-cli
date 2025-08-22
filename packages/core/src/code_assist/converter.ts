@@ -225,14 +225,25 @@ function toPart(part: PartUnion): Part {
       return newPart;
     }
 
-    const restOfPart = { ...part };
+    const restOfPart = { ...part } as Part;
     delete (restOfPart as Record<string, unknown>)['thought'];
 
-    if (Object.keys(restOfPart).length === 0) {
-      return { text: thoughtText };
+    const hasApiContent =
+      'functionCall' in restOfPart ||
+      'functionResponse' in restOfPart ||
+      'inlineData' in restOfPart ||
+      'fileData' in restOfPart;
+
+    if (hasApiContent) {
+      return restOfPart;
     }
 
-    return restOfPart;
+    // If no other valid API content, this must be a text part.
+    // Convert thought to text, preserving any existing text-like content.
+    if (restOfPart.text) {
+      return { text: `${String(restOfPart.text)}\n${thoughtText}` };
+    }
+    return { text: thoughtText };
   }
 
   return part;
