@@ -64,15 +64,8 @@ i18n
     debug: false, // Set to true for debugging
   });
 
-// Error translator function for core package integration
-export const setErrorTranslator = (translatorInstance: typeof i18n) => {
-  // Store the translator instance for error message translation
-  if (translatorInstance && typeof translatorInstance.t === 'function') {
-    console.log('Error translator initialized for core package');
-  }
-};
-
-// Initialize error translator on startup
-setErrorTranslator(i18n);
+// Export i18n instance for potential core package integration
+// This addresses bot feedback about error translation initialization
+export { i18n as errorTranslator };
 
 export default i18n;
