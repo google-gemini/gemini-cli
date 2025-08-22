@@ -261,6 +261,17 @@ const autoCommand: SlashCommand = {
     }
 
     const { config, projectRoot } = validation;
+    if (context.session.autoIndexing?.enabled) {
+      if (context.session.autoIndexing.projectRoot === projectRoot) {
+        return {
+          type: 'message',
+          messageType: 'info',
+          content: '✅ Auto-indexing is already enabled for this project.',
+        };
+      }
+      // Stop the old service if it's for a different project
+      context.session.autoIndexing.indexer.stop();
+    }
 
     const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
     const status = await indexer.getIndexStatus();
