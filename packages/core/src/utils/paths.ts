@@ -10,8 +10,6 @@ import * as crypto from 'crypto';
 
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
-const TMP_DIR_NAME = 'tmp';
-const COMMANDS_DIR_NAME = 'commands';
 
 /**
  * Special characters that need to be escaped in file paths for shell compatibility.
@@ -175,28 +173,21 @@ export function getProjectHash(projectRoot: string): string {
 }
 
 /**
- * Generates a unique temporary directory path for a project.
- * @param projectRoot The absolute path to the project's root directory.
- * @returns The path to the project's temporary directory.
+ * Checks if a path is a subpath of another path.
+ * @param parentPath The parent path.
+ * @param childPath The child path.
+ * @returns True if childPath is a subpath of parentPath, false otherwise.
  */
-export function getProjectTempDir(projectRoot: string): string {
-  const hash = getProjectHash(projectRoot);
-  return path.join(os.homedir(), GEMINI_DIR, TMP_DIR_NAME, hash);
-}
+export function isSubpath(parentPath: string, childPath: string): boolean {
+  const isWindows = os.platform() === 'win32';
+  const pathModule = isWindows ? path.win32 : path;
 
-/**
- * Returns the absolute path to the user-level commands directory.
- * @returns The path to the user's commands directory.
- */
-export function getUserCommandsDir(): string {
-  return path.join(os.homedir(), GEMINI_DIR, COMMANDS_DIR_NAME);
-}
+  // On Windows, path.relative is case-insensitive. On POSIX, it's case-sensitive.
+  const relative = pathModule.relative(parentPath, childPath);
 
-/**
- * Returns the absolute path to the project-level commands directory.
- * @param projectRoot The absolute path to the project's root directory.
- * @returns The path to the project's commands directory.
- */
-export function getProjectCommandsDir(projectRoot: string): string {
-  return path.join(projectRoot, GEMINI_DIR, COMMANDS_DIR_NAME);
+  return (
+    !relative.startsWith(`..${pathModule.sep}`) &&
+    relative !== '..' &&
+    !pathModule.isAbsolute(relative)
+  );
 }

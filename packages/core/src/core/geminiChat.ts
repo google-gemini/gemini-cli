@@ -428,7 +428,7 @@ export class GeminiChat {
       isSchemaDepthError(error.message) ||
       isInvalidArgumentError(error.message)
     ) {
-      const tools = (await this.config.getToolRegistry()).getAllTools();
+      const tools = this.config.getToolRegistry().getAllTools();
       const cyclicSchemaTools: string[] = [];
       for (const tool of tools) {
         if (
@@ -536,10 +536,15 @@ export class GeminiChat {
       }
       const lastContent =
         consolidatedOutputContents[consolidatedOutputContents.length - 1];
-      if (this.isTextContent(lastContent) && this.isTextContent(content)) {
-        // If both current and last are text, combine their text into the lastContent's first part
-        // and append any other parts from the current content.
-        lastContent.parts[0].text += content.parts[0].text || '';
+      if (
+        lastContent &&
+        this.isLastPartText(lastContent) &&
+        this.isFirstPartText(content)
+      ) {
+        // If the last part of the previous content and the first part of the current content are text,
+        // combine their text and append any other parts from the current content.
+        lastContent.parts[lastContent.parts.length - 1].text +=
+          content.parts[0].text || '';
         if (content.parts.length > 1) {
           lastContent.parts.push(...content.parts.slice(1));
         }
@@ -556,12 +561,13 @@ export class GeminiChat {
 
       if (
         canMergeWithLastHistory &&
-        this.isTextContent(lastHistoryEntry) &&
-        this.isTextContent(consolidatedOutputContents[0])
+        lastHistoryEntry &&
+        this.isLastPartText(lastHistoryEntry) &&
+        this.isFirstPartText(consolidatedOutputContents[0])
       ) {
-        // If both current and last are text, combine their text into the lastHistoryEntry's first part
-        // and append any other parts from the current content.
-        lastHistoryEntry.parts[0].text +=
+        // If the last part of the last history entry and the first part of the current content are text,
+        // combine their text and append any other parts from the current content.
+        lastHistoryEntry.parts[lastHistoryEntry.parts.length - 1].text +=
           consolidatedOutputContents[0].parts[0].text || '';
         if (consolidatedOutputContents[0].parts.length > 1) {
           lastHistoryEntry.parts.push(
@@ -574,16 +580,48 @@ export class GeminiChat {
     }
   }
 
-  private isTextContent(
+  private isFirstPartText(
     content: Content | undefined,
   ): content is Content & { parts: [{ text: string }, ...Part[]] } {
-    return !!(
-      content &&
-      content.role === 'model' &&
-      content.parts &&
-      content.parts.length > 0 &&
-      typeof content.parts[0].text === 'string' &&
-      content.parts[0].text !== ''
+    if (
+      !content ||
+      content.role !== 'model' ||
+      !content.parts ||
+      content.parts.length === 0
+    ) {
+      return false;
+    }
+    const firstPart = content.parts[0];
+    return (
+      typeof firstPart.text === 'string' &&
+      !('functionCall' in firstPart) &&
+      !('functionResponse' in firstPart) &&
+      !('inlineData' in firstPart) &&
+      !('fileData' in firstPart) &&
+      !('thought' in firstPart)
+    );
+  }
+
+  private isLastPartText(
+    content: Content | undefined,
+  ): content is Content & { parts: [...Part[], { text: string }] } {
+    if (
+      !content ||
+      content.role !== 'model' ||
+      !content.parts ||
+      content.parts.length === 0
+    ) {
+      return false;
+    }
+    const lastPart = content.parts[content.parts.length - 1];
+    return (
+      typeof lastPart.text === 'string' &&
+      lastPart.text !== '' &&
+      !('functionCall' in lastPart) &&
+      !('functionResponse' in lastPart) &&
+      !('inlineData' in lastPart) &&
+      !('fileData' in lastPart) &&
+      !('thought' in lastPart)
     );
   }
 

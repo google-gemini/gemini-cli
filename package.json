@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.18",
+  "version": "0.1.21",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.18"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.21"
   },
   "scripts": {
     "start": "node scripts/start.js",
@@ -24,6 +24,7 @@
     "auth": "npm run auth:npm && npm run auth:docker",
     "generate": "node scripts/generate-git-commit-info.js",
     "build": "node scripts/build.js",
+    "build-and-start": "npm run build && npm run start",
     "build:vscode": "node scripts/build_vscode_companion.js",
     "build:all": "npm run build && npm run build:sandbox && npm run build:vscode",
     "build:packages": "npm run build --workspaces",
@@ -32,15 +33,15 @@
     "test": "npm run test --workspaces --if-present",
     "test:ci": "npm run test:ci --workspaces --if-present && npm run test:scripts",
     "test:scripts": "vitest run --config ./scripts/tests/vitest.config.ts",
-    "test:e2e": "npm run test:integration:sandbox:none -- --verbose --keep-output",
+    "test:e2e": "cross-env VERBOSE=true KEEP_OUTPUT=true npm run test:integration:sandbox:none",
     "test:integration:all": "npm run test:integration:sandbox:none && npm run test:integration:sandbox:docker && npm run test:integration:sandbox:podman",
-    "test:integration:sandbox:none": "GEMINI_SANDBOX=false node integration-tests/run-tests.js",
-    "test:integration:sandbox:docker": "GEMINI_SANDBOX=docker node integration-tests/run-tests.js",
-    "test:integration:sandbox:podman": "GEMINI_SANDBOX=podman node integration-tests/run-tests.js",
+    "test:integration:sandbox:none": "GEMINI_SANDBOX=false vitest run --root ./integration-tests",
+    "test:integration:sandbox:docker": "npm run build:sandbox && GEMINI_SANDBOX=docker vitest run --root ./integration-tests",
+    "test:integration:sandbox:podman": "GEMINI_SANDBOX=podman vitest run --root ./integration-tests",
     "lint": "eslint . --ext .ts,.tsx && eslint integration-tests",
     "lint:fix": "eslint . --fix && eslint integration-tests --fix",
     "lint:ci": "eslint . --ext .ts,.tsx --max-warnings 0 && eslint integration-tests --max-warnings 0",
-    "format": "prettier --write .",
+    "format": "prettier --experimental-cli --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "preflight": "npm run clean && npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci",
     "prepare": "npm run bundle",
@@ -79,12 +80,28 @@
     "json": "^11.0.0",
     "lodash": "^4.17.21",
     "memfs": "^4.17.2",
+    "mnemonist": "^0.40.3",
     "mock-fs": "^5.5.0",
+    "msw": "^2.10.4",
     "prettier": "^3.5.3",
     "react-devtools-core": "^4.28.5",
+    "tsx": "^4.20.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
-    "yargs": "^17.7.2",
-    "mnemonist": "^0.40.3"
+    "yargs": "^17.7.2"
+  },
+  "dependencies": {
+    "@lvce-editor/ripgrep": "^2.1.0",
+    "node-fetch": "^3.3.2",
+    "strip-ansi": "^7.1.0"
+  },
+  "optionalDependencies": {
+    "@lydell/node-pty": "1.1.0",
+    "@lydell/node-pty-darwin-arm64": "1.1.0",
+    "@lydell/node-pty-darwin-x64": "1.1.0",
+    "@lydell/node-pty-linux-x64": "1.1.0",
+    "@lydell/node-pty-win32-arm64": "1.1.0",
+    "@lydell/node-pty-win32-x64": "1.1.0",
+    "node-pty": "^1.0.0"
   }
 }

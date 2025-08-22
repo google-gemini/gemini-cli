@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Newline, Text, useInput } from 'ink';
+import { Box, Newline, Text } from 'ink';
 import { Colors } from '../colors.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface CloudPaidPrivacyNoticeProps {
   onExit: () => void;
@@ -14,11 +15,14 @@ interface CloudPaidPrivacyNoticeProps {
 export const CloudPaidPrivacyNotice = ({
   onExit,
 }: CloudPaidPrivacyNoticeProps) => {
-  useInput((input, key) => {
-    if (key.escape) {
-      onExit();
-    }
-  });
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape') {
+        onExit();
+      }
+    },
+    { isActive: true },
+  );
 
   return (
     <Box flexDirection="column" marginBottom={1}>
