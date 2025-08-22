@@ -290,7 +290,7 @@ describe('editor utils', () => {
             '-c',
             'wincmd l | setlocal statusline=%#StatusBold#NEW\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ i/esc(toggle\\ edit\\ mode)',
             '-c',
-            'autocmd WinClosed * wqa',
+            'autocmd BufWritePost * wqa',
             'old.txt',
             'new.txt',
           ],
