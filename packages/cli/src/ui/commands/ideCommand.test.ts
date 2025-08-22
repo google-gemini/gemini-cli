@@ -20,7 +20,14 @@ import * as core from '@google/gemini-cli-core';
 
 vi.mock('child_process');
 vi.mock('glob');
-vi.mock('@google/gemini-cli-core');
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original = await importOriginal<typeof core>();
+  return {
+    ...original,
+    getOauthClient: vi.fn(original.getOauthClient),
+    getIdeInstaller: vi.fn(original.getIdeInstaller),
+  };
+});
 
 describe('ideCommand', () => {
   let mockContext: CommandContext;
@@ -40,7 +47,6 @@ describe('ideCommand', () => {
     } as unknown as CommandContext;
 
     mockConfig = {
-      getIdeModeFeature: vi.fn(),
       getIdeMode: vi.fn(),
       getIdeClient: vi.fn(() => ({
         reconnect: vi.fn(),
@@ -60,32 +66,48 @@ describe('ideCommand', () => {
     vi.restoreAllMocks();
   });
 
-  it('should return null if ideModeFeature is not enabled', () => {
-    vi.mocked(mockConfig.getIdeModeFeature).mockReturnValue(false);
-    const command = ideCommand(mockConfig);
+  it('should return null if config is not provided', () => {
+    const command = ideCommand(null);
     expect(command).toBeNull();
   });
 
-  it('should return the ide command if ideModeFeature is enabled', () => {
-    vi.mocked(mockConfig.getIdeModeFeature).mockReturnValue(true);
+  it('should return the ide command', () => {
     vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
     vi.mocked(mockConfig.getIdeClient).mockReturnValue({
       getCurrentIde: () => DetectedIde.VSCode,
       getDetectedIdeDisplayName: () => 'VS Code',
+      getConnectionStatus: () => ({
+        status: core.IDEConnectionStatus.Disconnected,
+      }),
     } as ReturnType<Config['getIdeClient']>);
     const command = ideCommand(mockConfig);
     expect(command).not.toBeNull();
     expect(command?.name).toBe('ide');
     expect(command?.subCommands).toHaveLength(3);
-    expect(command?.subCommands?.[0].name).toBe('disable');
+    expect(command?.subCommands?.[0].name).toBe('enable');
     expect(command?.subCommands?.[1].name).toBe('status');
     expect(command?.subCommands?.[2].name).toBe('install');
+  });
+
+  it('should show disable command when connected', () => {
+    vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
+    vi.mocked(mockConfig.getIdeClient).mockReturnValue({
+      getCurrentIde: () => DetectedIde.VSCode,
+      getDetectedIdeDisplayName: () => 'VS Code',
+      getConnectionStatus: () => ({
+        status: core.IDEConnectionStatus.Connected,
+      }),
+    } as ReturnType<Config['getIdeClient']>);
+    const command = ideCommand(mockConfig);
+    expect(command).not.toBeNull();
+    const subCommandNames = command?.subCommands?.map((cmd) => cmd.name);
+    expect(subCommandNames).toContain('disable');
+    expect(subCommandNames).not.toContain('enable');
   });
 
   describe('status subcommand', () => {
     const mockGetConnectionStatus = vi.fn();
     beforeEach(() => {
-      vi.mocked(mockConfig.getIdeModeFeature).mockReturnValue(true);
       vi.mocked(mockConfig.getIdeClient).mockReturnValue({
         getConnectionStatus: mockGetConnectionStatus,
         getCurrentIde: () => DetectedIde.VSCode,
@@ -162,11 +184,12 @@ describe('ideCommand', () => {
   describe('install subcommand', () => {
     const mockInstall = vi.fn();
     beforeEach(() => {
-      vi.mocked(mockConfig.getIdeModeFeature).mockReturnValue(true);
       vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
       vi.mocked(mockConfig.getIdeClient).mockReturnValue({
         getCurrentIde: () => DetectedIde.VSCode,
-        getConnectionStatus: vi.fn(),
+        getConnectionStatus: () => ({
+          status: core.IDEConnectionStatus.Disconnected,
+        }),
         getDetectedIdeDisplayName: () => 'VS Code',
       } as unknown as ReturnType<Config['getIdeClient']>);
       vi.mocked(core.getIdeInstaller).mockReturnValue({
@@ -204,7 +227,7 @@ describe('ideCommand', () => {
         }),
         expect.any(Number),
       );
-    });
+    }, 10000);
 
     it('should show an error if installation fails', async () => {
       mockInstall.mockResolvedValue({

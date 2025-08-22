@@ -124,18 +124,18 @@ describe('Color Utils', () => {
 
   describe('CSS_NAME_TO_HEX_MAP', () => {
     it('should contain expected CSS color mappings', () => {
-      expect(CSS_NAME_TO_HEX_MAP.darkkhaki).toBe('#bdb76b');
-      expect(CSS_NAME_TO_HEX_MAP.coral).toBe('#ff7f50');
-      expect(CSS_NAME_TO_HEX_MAP.teal).toBe('#008080');
-      expect(CSS_NAME_TO_HEX_MAP.tomato).toBe('#ff6347');
-      expect(CSS_NAME_TO_HEX_MAP.turquoise).toBe('#40e0d0');
+      expect(CSS_NAME_TO_HEX_MAP['darkkhaki']).toBe('#bdb76b');
+      expect(CSS_NAME_TO_HEX_MAP['coral']).toBe('#ff7f50');
+      expect(CSS_NAME_TO_HEX_MAP['teal']).toBe('#008080');
+      expect(CSS_NAME_TO_HEX_MAP['tomato']).toBe('#ff6347');
+      expect(CSS_NAME_TO_HEX_MAP['turquoise']).toBe('#40e0d0');
     });
 
     it('should not contain Ink-supported color names', () => {
-      expect(CSS_NAME_TO_HEX_MAP.black).toBeUndefined();
-      expect(CSS_NAME_TO_HEX_MAP.red).toBeUndefined();
-      expect(CSS_NAME_TO_HEX_MAP.green).toBeUndefined();
-      expect(CSS_NAME_TO_HEX_MAP.blue).toBeUndefined();
+      expect(CSS_NAME_TO_HEX_MAP['black']).toBeUndefined();
+      expect(CSS_NAME_TO_HEX_MAP['red']).toBeUndefined();
+      expect(CSS_NAME_TO_HEX_MAP['green']).toBeUndefined();
+      expect(CSS_NAME_TO_HEX_MAP['blue']).toBeUndefined();
     });
   });
 

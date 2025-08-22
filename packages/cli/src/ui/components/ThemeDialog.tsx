@@ -6,6 +6,7 @@
 
 import React, { useCallback, useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
+
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { type CombinedThemes, loadFileBasedThemes } from '../themes/theme-loader.js';
@@ -17,6 +18,7 @@ import {
   getScopeItems,
   getScopeMessageForSetting,
 } from '../../utils/dialogScopeUtils.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
@@ -192,6 +194,7 @@ export function ThemeDialog({
       onSelect(undefined, selectedScope);
     }
   });
+
 
   // Generate scope message for theme setting
   const otherScopeModifiedMessage = getScopeMessageForSetting(
