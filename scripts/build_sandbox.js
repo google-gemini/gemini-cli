@@ -18,7 +18,13 @@
 // limitations under the License.
 
 import { execSync } from 'node:child_process';
-import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import os from 'node:os';
 import yargs from 'yargs';
