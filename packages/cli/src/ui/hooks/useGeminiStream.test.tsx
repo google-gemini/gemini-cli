@@ -1806,14 +1806,14 @@ describe('useGeminiStream', () => {
         mockConfig,
         mockOnDebugMessage,
         mockHandleSlashCommand,
-        false,
-        vi.fn(),
-        vi.fn(),
-        vi.fn(),
-        false,
-        vi.fn(),
-        vi.fn(),
-        vi.fn(),
+        false, // shellModeActive
+        vi.fn(), // getPreferredEditor
+        vi.fn(), // onAuthError
+        vi.fn(), // performMemoryRefresh
+        false, // modelSwitched
+        vi.fn(), // setModelSwitched
+        vi.fn(), // onEditorClose
+        vi.fn(), // onCancelSubmit
       ),
     );
 
