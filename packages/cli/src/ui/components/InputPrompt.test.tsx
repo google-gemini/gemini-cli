@@ -1470,8 +1470,10 @@ describe('InputPrompt', () => {
       props.buffer.text = 'line 1\nline 2\nline 3';
       props.buffer.cursor = [1, 2];
       props.buffer.lines = ['line 1', 'line 2', 'line 3'];
-      
-      const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
       await wait();
 
       stdin.write('\x05'); // Ctrl+E
@@ -1486,8 +1488,10 @@ describe('InputPrompt', () => {
       props.buffer.text = 'single line text';
       props.buffer.cursor = [0, 5];
       props.buffer.lines = ['single line text'];
-      
-      const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
       await wait();
 
       stdin.write('\x05'); // Ctrl+E
