@@ -1562,6 +1562,46 @@ describe('loadCliConfig chatCompression', () => {
   });
 });
 
+describe('loadCliConfig useRipgrep', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should be false by default when useRipgrep is not set in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getUseRipgrep()).toBe(false);
+  });
+
+  it('should be true when useRipgrep is set to true in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = { useRipgrep: true };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getUseRipgrep()).toBe(true);
+  });
+
+  it('should be false when useRipgrep is explicitly set to false in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments();
+    const settings: Settings = { useRipgrep: false };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getUseRipgrep()).toBe(false);
+  });
+});
+
 describe('loadCliConfig tool exclusions', () => {
   const originalArgv = process.argv;
   const originalIsTTY = process.stdin.isTTY;
