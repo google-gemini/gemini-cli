@@ -169,6 +169,15 @@ export class CBIIndexStorage {
     const totalFiles = fileIndices.length;
     const vectorDim = fileIndices[0]?.embeddings[0]?.length || 0;
 
+    // Validate vector dimension consistency across all files
+    for (const fileIndex of fileIndices) {
+      for (const embedding of fileIndex.embeddings) {
+        if (embedding.length !== vectorDim) {
+          throw new Error(`Vector dimension mismatch: Expected dimension ${vectorDim}, but found ${embedding.length} in file ${fileIndex.relpath}. All embeddings must have the same dimension.`);
+        }
+      }
+    }
+
     const stringHeap: string[] = [];
     const fileInfos: FileInfo[] = [];
     const blockMetadatas: BlockMetadata[] = [];
@@ -1086,8 +1095,13 @@ export class CBIIndexStorage {
         keptFileMapping.set(newFileInfos.length - 1, { fileInfo: newFileInfo, vectorIds });
       }
 
+      const newVectorDim = newFileIndices[0]?.embeddings[0]?.length;
+      if (newVectorDim && newVectorDim !== oldHeader.vector_dim) {
+        throw new Error(`Vector dimension mismatch: The existing index has vectors of dimension ${oldHeader.vector_dim}, but new files produced vectors of dimension ${newVectorDim}. A full re-index is required. Please run '/codebase index'.`);
+      }
+
       const totalFiles = newFileInfos.length;
-      const vectorDim = (newFileIndices[0]?.embeddings[0]?.length || oldHeader.vector_dim);
+      const vectorDim = newVectorDim || oldHeader.vector_dim;
 
       for (const fileIndex of newFileIndices) {
         const pathOffset = stringOffset;
