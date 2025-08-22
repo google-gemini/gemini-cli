@@ -140,7 +140,7 @@ export function getDiffCommand(
           'wincmd l | setlocal statusline=%#StatusBold#NEW\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ i/esc(toggle\\ edit\\ mode)',
           // Auto close all windows when one is closed
           '-c',
-          'autocmd WinClosed * wqa',
+          'autocmd BufWritePost * wqa',
           oldPath,
           newPath,
         ],
