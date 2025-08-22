@@ -256,8 +256,8 @@ export const requestPermissionResponseSchema = z.object({
 });
 
 export const fileSystemCapabilitySchema = z.object({
-  readTextFile: z.boolean(),
-  writeTextFile: z.boolean(),
+  readTextFile: z.boolean().optional().default(false),
+  writeTextFile: z.boolean().optional().default(false),
 });
 
 export const envVariableSchema = z.object({
@@ -378,7 +378,7 @@ export const toolCallSchema = z.object({
 });
 
 export const clientCapabilitiesSchema = z.object({
-  fs: fileSystemCapabilitySchema,
+  fs: fileSystemCapabilitySchema.optional(),
 });
 
 export const promptRequestSchema = z.object({
@@ -440,7 +440,7 @@ export const requestPermissionRequestSchema = z.object({
 });
 
 export const initializeRequestSchema = z.object({
-  clientCapabilities: clientCapabilitiesSchema,
+  clientCapabilities: clientCapabilitiesSchema.optional(),
   protocolVersion: z.number(),
 });
 

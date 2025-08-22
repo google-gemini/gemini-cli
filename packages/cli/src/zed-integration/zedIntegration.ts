@@ -284,6 +284,29 @@ class Session {
             functionCalls.push(...resp.functionCalls);
           }
         }
+
+        if (functionCalls.length > 0) {
+          const toolResponseParts: Part[] = [];
+
+          for (const fc of functionCalls) {
+            const response = await this.runTool(
+              pendingSend.signal,
+              promptId,
+              fc,
+            );
+            const parts = Array.isArray(response) ? response : [response];
+
+            for (const part of parts) {
+              if (typeof part === 'string') {
+                toolResponseParts.push({ text: part });
+              } else if (part) {
+                toolResponseParts.push(part);
+              }
+            }
+          }
+
+          nextMessage = { role: 'user', parts: toolResponseParts };
+        }
       } catch (error) {
         if (getErrorStatus(error) === 429) {
           throw new acp.RequestError(
@@ -292,27 +315,11 @@ class Session {
           );
         }
 
-        throw error;
-      }
-
-      if (functionCalls.length > 0) {
-        const toolResponseParts: Part[] = [];
-
-        for (const fc of functionCalls) {
-          const response = await this.runTool(pendingSend.signal, promptId, fc);
-
-          const parts = Array.isArray(response) ? response : [response];
-
-          for (const part of parts) {
-            if (typeof part === 'string') {
-              toolResponseParts.push({ text: part });
-            } else if (part) {
-              toolResponseParts.push(part);
-            }
-          }
+        if (pendingSend.signal.aborted) {
+          return { stopReason: 'cancelled' };
         }
 
-        nextMessage = { role: 'user', parts: toolResponseParts };
+        throw error;
       }
     }
 

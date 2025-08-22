@@ -38,7 +38,7 @@ export class AgentSideConnection implements Client {
         }
         case schema.AGENT_METHODS.session_load: {
           if (!agent.loadSession) {
-            throw RequestError.methodNotFound();
+            throw RequestError.methodNotFound(method);
           }
           const validatedParams = schema.loadSessionRequestSchema.parse(params);
           return agent.loadSession(validatedParams);
@@ -108,7 +108,7 @@ export class AgentSideConnection implements Client {
   }
 }
 
-type AnyMessage = AnyRequest | AnyResponse | AnyNotification;
+type AnyMessage = AnyRequest | AnyResponse | AnyNotification | AnyError;
 
 type AnyRequest = {
   jsonrpc: '2.0';
@@ -126,6 +126,11 @@ type AnyNotification = {
   jsonrpc: '2.0';
   method: string;
   params?: unknown;
+};
+
+type AnyError = {
+  jsonrpc: '2.0';
+  error: ErrorResponse;
 };
 
 type Result<T> =
@@ -180,8 +185,19 @@ class Connection {
         const trimmedLine = line.trim();
 
         if (trimmedLine) {
-          const message = JSON.parse(trimmedLine);
-          this.#processMessage(message);
+          try {
+            const message = JSON.parse(trimmedLine);
+            this.#processMessage(message);
+          } catch (err) {
+            if (err instanceof SyntaxError) {
+              this.#sendMessage({
+                jsonrpc: '2.0',
+                error: RequestError.parseError({ message: err.message }),
+              });
+            } else {
+              console.error('Unexpected error during message processing:', err);
+            }
+          }
         }
       }
     }
@@ -206,6 +222,11 @@ class Connection {
     } else if ('id' in message) {
       // It's a response
       this.#handleResponse(message as AnyResponse);
+    } else {
+      this.#sendMessage({
+        jsonrpc: '2.0',
+        error: RequestError.invalidRequest(),
+      });
     }
   }
 
@@ -222,9 +243,7 @@ class Connection {
       }
 
       if (error instanceof z.ZodError) {
-        return RequestError.invalidParams(
-          JSON.stringify(error.format(), undefined, 2),
-        ).toResult();
+        return RequestError.invalidParams(error.format()).toResult();
       }
 
       let details;
@@ -240,7 +259,13 @@ class Connection {
         details = error.message;
       }
 
-      return RequestError.internalError(details).toResult();
+      try {
+        return RequestError.internalError(
+          details ? JSON.parse(details) : {},
+        ).toResult();
+      } catch (_err) {
+        return RequestError.internalError({ details }).toResult();
+      }
     }
   }
 
@@ -289,42 +314,40 @@ class Connection {
 }
 
 export class RequestError extends Error {
-  data?: { details?: string };
+  data?: unknown;
 
   constructor(
     public code: number,
     message: string,
-    details?: string,
+    data?: unknown,
   ) {
     super(message);
     this.name = 'RequestError';
-    if (details) {
-      this.data = { details };
-    }
+    this.data = data;
   }
 
-  static parseError(details?: string): RequestError {
-    return new RequestError(-32700, 'Parse error', details);
+  static parseError(data?: object): RequestError {
+    return new RequestError(-32700, 'Parse error', data);
   }
 
-  static invalidRequest(details?: string): RequestError {
-    return new RequestError(-32600, 'Invalid request', details);
+  static invalidRequest(data?: object): RequestError {
+    return new RequestError(-32600, 'Invalid request', data);
   }
 
-  static methodNotFound(details?: string): RequestError {
-    return new RequestError(-32601, 'Method not found', details);
+  static methodNotFound(method: string): RequestError {
+    return new RequestError(-32601, 'Method not found', { method });
   }
 
-  static invalidParams(details?: string): RequestError {
-    return new RequestError(-32602, 'Invalid params', details);
+  static invalidParams(data?: object): RequestError {
+    return new RequestError(-32602, 'Invalid params', data);
   }
 
-  static internalError(details?: string): RequestError {
-    return new RequestError(-32603, 'Internal error', details);
+  static internalError(data?: object): RequestError {
+    return new RequestError(-32603, 'Internal error', data);
   }
 
-  static authRequired(details?: string): RequestError {
-    return new RequestError(-32000, 'Authentication required', details);
+  static authRequired(data?: object): RequestError {
+    return new RequestError(-32000, 'Authentication required', data);
   }
 
   toResult<T>(): Result<T> {
