@@ -447,7 +447,8 @@ export function makeResearchFeedbackEvent({
     survey_responses,
     user_id,
   };
-  
+}
+
 export class FileOperationEvent implements BaseTelemetryEvent {
   'event.name': 'file_operation';
   'event.timestamp': string;
@@ -478,7 +479,6 @@ export class FileOperationEvent implements BaseTelemetryEvent {
     this.diff_stat = diff_stat;
     this.programming_language = programming_language;
   }
-
 }
 
 export type TelemetryEvent =
@@ -497,5 +497,5 @@ export type TelemetryEvent =
   | IdeConnectionEvent
   | SlashCommandEvent
   | ResearchOptInEvent
-  | ResearchFeedbackEvent;
+  | ResearchFeedbackEvent
   | FileOperationEvent;
