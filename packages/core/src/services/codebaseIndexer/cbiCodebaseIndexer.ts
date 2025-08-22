@@ -53,6 +53,7 @@ export class CBICodebaseIndexer {
   ): Promise<IndexResult> {
     const startTime = Date.now();
     this.abortController = new AbortController();
+    const errors: string[] = [];
     
     try {
       if (await this.storage.indexExists()) {
@@ -166,7 +167,9 @@ export class CBICodebaseIndexer {
             totalVectors += units.length;
           }
         } catch (error) {
-          console.warn(`Error processing file ${relpath}: ${error}`);
+          const errorMessage = `Error processing file ${relpath}: ${error}`;
+          console.warn(errorMessage);
+          errors.push(errorMessage);
         }
       }
 
@@ -231,7 +234,9 @@ export class CBICodebaseIndexer {
           fileIndex.embeddings = embeddings;
           processedVectors += embeddings.length;
         } else {
-          console.warn(`Failed to generate embeddings for ${fileIndex.relpath}`);
+          const errorMessage = `Failed to generate embeddings for ${fileIndex.relpath}`;
+          console.warn(errorMessage);
+          errors.push(errorMessage);
         }
       }
 
@@ -285,7 +290,7 @@ export class CBICodebaseIndexer {
         totalVectors,
         indexSize,
         duration,
-        errors: []
+        errors
       };
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -305,6 +310,7 @@ export class CBICodebaseIndexer {
   ): Promise<IndexResult> {
     const startTime = Date.now();
     this.abortController = new AbortController();
+    const errors: string[] = [];
     
     try {
       if (!(await this.storage.indexExists())) {
@@ -444,7 +450,9 @@ export class CBICodebaseIndexer {
             unchangedFiles++;
           }
         } catch (error) {
-          console.warn(`Error processing file ${relpath}: ${error}`);
+          const errorMessage = `Error processing file ${relpath}: ${error}`;
+          console.warn(errorMessage);
+          errors.push(errorMessage);
         }
       }
 
@@ -466,7 +474,7 @@ export class CBICodebaseIndexer {
           totalVectors: 0,
           indexSize: await this.getIndexSize(),
           duration: Date.now() - startTime,
-          errors: []
+          errors
         };
       }
 
@@ -543,7 +551,9 @@ export class CBICodebaseIndexer {
             fileIndex.embeddings = embeddings;
             processedVectors += embeddings.length;
           } else {
-            console.warn(`Failed to generate embeddings for ${fileIndex.relpath}`);
+            const errorMessage = `Failed to generate embeddings for ${fileIndex.relpath}`;
+            console.warn(errorMessage);
+            errors.push(errorMessage);
           }
         }
       }
@@ -597,7 +607,7 @@ export class CBICodebaseIndexer {
         totalVectors: newFileIndices.reduce((sum, fi) => sum + fi.embeddings.length, 0),
         indexSize,
         duration,
-        errors: []
+        errors
       };
     } catch (error) {
       const duration = Date.now() - startTime;

@@ -657,10 +657,7 @@ export class CBIIndexStorage {
     return 1 - this.cosineSimilarity(a, b);
   }
 
-  private async generateSha(relpath: string): Promise<string> {
-    const crypto = await import('crypto');
-    return crypto.createHash('sha256').update(relpath).digest('hex').substring(0, 12);
-  }
+
 
   private async loadVector(vectorId: number, fileHandle: fs.FileHandle, header: IndexHeader): Promise<number[]> {
     const vectorBuffer = Buffer.alloc(header.vector_dim * 4);
@@ -886,7 +883,7 @@ export class CBIIndexStorage {
     await this.streamingUpdateIndex(newFileIndices, toRemove, onProgress);
   }
 
-  private async streamingUpdateIndex(
+    private async streamingUpdateIndex(
     newFileIndices: FileIndex[], 
     toRemove: Set<string>, 
     onProgress?: (current: number, total: number) => void
@@ -915,7 +912,7 @@ export class CBIIndexStorage {
       const newFileInfos: FileInfo[] = [];
       const newBlockMetadatas: BlockMetadata[] = [];
       const newStringHeap: string[] = [];
-      const keptFileIndices: FileIndex[] = [];
+      const keptFileMapping: Map<number, { fileInfo: FileInfo, vectorIds: number[] }> = new Map();
 
       let currentVectorId = 0;
       let stringOffset = 0;
@@ -936,20 +933,21 @@ export class CBIIndexStorage {
         const firstVectorId = currentVectorId;
         const numVectors = fileInfo.num_vectors;
 
-        newFileInfos.push({
+        const newFileInfo = {
           mtime: fileInfo.mtime,
           size: fileInfo.size,
           path_offset: pathOffset,
           first_vector_id: firstVectorId,
           num_vectors: numVectors
-        });
+        };
 
-        const units = [];
-        const embeddings = [];
+        newFileInfos.push(newFileInfo);
+
+        const vectorIds: number[] = [];
 
         for (let i = 0; i < fileInfo.num_vectors; i++) {
-          const vectorId = fileInfo.first_vector_id + i;
-          const block = oldBlockMetadatas[vectorId];
+          const oldVectorId = fileInfo.first_vector_id + i;
+          const block = oldBlockMetadatas[oldVectorId];
           
           const text = this.extractStringFromHeap(stringHeapBuffer, block.text_offset, block.text_len);
           const textOffset = stringOffset;
@@ -964,36 +962,16 @@ export class CBIIndexStorage {
             text_len: Buffer.byteLength(text, 'utf8')
           });
 
-          const vector = await this.loadVector(vectorId, sourceHandle, oldHeader);
-          embeddings.push(vector);
-
-          units.push({
-            id: `${relpath}:${block.lineno}:${block.start_char}`,
-            relpath,
-            text,
-            lineno: block.lineno,
-            start_char: block.start_char
-          });
-
+          vectorIds.push(oldVectorId);
           currentVectorId++;
           totalVectors++;
         }
 
-        const sha = await this.generateSha(relpath);
-        keptFileIndices.push({
-          sha,
-          relpath,
-          mtime: new Date(fileInfo.mtime * 1000),
-          size: fileInfo.size,
-          units,
-          embeddings
-        });
+        keptFileMapping.set(newFileInfos.length - 1, { fileInfo: newFileInfo, vectorIds });
       }
 
-      const totalFiles = keptFileIndices.length + newFileIndices.length;
-      const vectorDim = (keptFileIndices[0]?.embeddings[0]?.length || 
-                        newFileIndices[0]?.embeddings[0]?.length || 
-                        oldHeader.vector_dim);
+      const totalFiles = newFileInfos.length;
+      const vectorDim = (newFileIndices[0]?.embeddings[0]?.length || oldHeader.vector_dim);
 
       for (const fileIndex of newFileIndices) {
         const pathOffset = stringOffset;
@@ -1031,7 +1009,7 @@ export class CBIIndexStorage {
       }
 
       const newHeader = this.createHeader(vectorDim, totalVectors, totalFiles, newFileInfos, newBlockMetadatas, newStringHeap, [], { nodes: [], max_level: 0, entry_point: 0, m: 16, ef_construction: 200, ef_search: 50 });
-      
+
       const newHeaderBuffer = Buffer.alloc(newHeader.offset_ann);
       this.writeHeader(newHeaderBuffer, newHeader);
       this.writeFileInfos(newHeaderBuffer, newFileInfos, newHeader.offset_files);
@@ -1043,8 +1021,9 @@ export class CBIIndexStorage {
       let vectorOffset = newHeader.offset_vectors;
       let vectorCount = 0;
 
-      for (const fileIndex of keptFileIndices) {
-        for (const vector of fileIndex.embeddings) {
+      for (const [, { vectorIds }] of keptFileMapping) {
+        for (const oldVectorId of vectorIds) {
+          const vector = await this.loadVector(oldVectorId, sourceHandle, oldHeader);
           const float32Array = new Float32Array(vector);
           const vectorBuffer = Buffer.from(float32Array.buffer);
           await targetHandle.write(vectorBuffer, 0, vectorBuffer.length, vectorOffset);
@@ -1065,40 +1044,263 @@ export class CBIIndexStorage {
         }
       }
 
-      const allVectors = [...keptFileIndices.flatMap(fi => fi.embeddings), ...newFileIndices.flatMap(fi => fi.embeddings)];
-      const hnswGraph = this.buildHNSWIndex(allVectors, onProgress);
+      await this.buildHNSWIndexStreaming(targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle, onProgress);
       
-      const annBuffer = Buffer.alloc(hnswGraph.nodes.length * 8 + 24);
-      let annOffset = 0;
-      
-      annBuffer.writeUInt32LE(hnswGraph.max_level, annOffset);
-      annOffset += 4;
-      annBuffer.writeUInt32LE(hnswGraph.entry_point, annOffset);
-      annOffset += 4;
-      annBuffer.writeUInt32LE(hnswGraph.m, annOffset);
-      annOffset += 4;
-      annBuffer.writeUInt32LE(hnswGraph.ef_construction, annOffset);
-      annOffset += 4;
-      annBuffer.writeUInt32LE(hnswGraph.ef_search, annOffset);
-      annOffset += 4;
-      annBuffer.writeUInt32LE(hnswGraph.nodes.length, annOffset);
-      annOffset += 4;
-
-      for (const node of hnswGraph.nodes) {
-        annBuffer.writeUInt32LE(node.id, annOffset);
-        annOffset += 4;
-        annBuffer.writeUInt32LE(node.level, annOffset);
-        annOffset += 4;
-      }
-
-      await targetHandle.write(annBuffer, 0, annBuffer.length, newHeader.offset_ann);
       await targetHandle.sync();
-      
       await fs.rename(tempIndexPath, this.indexPath);
     } finally {
       await sourceHandle.close();
       await targetHandle.close();
     }
+  }
+
+  private async buildHNSWIndexStreaming(
+    targetHandle: fs.FileHandle,
+    newHeader: IndexHeader,
+    keptFileMapping: Map<number, { fileInfo: FileInfo, vectorIds: number[] }>,
+    newFileIndices: FileIndex[],
+    oldHeader: IndexHeader,
+    sourceHandle: fs.FileHandle,
+    onProgress?: (current: number, total: number) => void
+  ): Promise<void> {
+    const totalVectors = newHeader.total_vectors;
+    
+    if (totalVectors === 0) {
+      const emptyGraph = { nodes: [], max_level: 0, entry_point: 0, m: 16, ef_construction: 200, ef_search: 50 };
+      const annBuffer = Buffer.alloc(24);
+      let annOffset = 0;
+      
+      annBuffer.writeUInt32LE(emptyGraph.max_level, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(emptyGraph.entry_point, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(emptyGraph.m, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(emptyGraph.ef_construction, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(emptyGraph.ef_search, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(emptyGraph.nodes.length, annOffset);
+      
+      await targetHandle.write(annBuffer, 0, annBuffer.length, newHeader.offset_ann);
+      return;
+    }
+
+    if (totalVectors < 100) {
+      const simpleGraph = { nodes: [], max_level: 0, entry_point: 0, m: 16, ef_construction: 200, ef_search: 50 };
+      const annBuffer = Buffer.alloc(24);
+      let annOffset = 0;
+      
+      annBuffer.writeUInt32LE(simpleGraph.max_level, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(simpleGraph.entry_point, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(simpleGraph.m, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(simpleGraph.ef_construction, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(simpleGraph.ef_search, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(simpleGraph.nodes.length, annOffset);
+      
+      await targetHandle.write(annBuffer, 0, annBuffer.length, newHeader.offset_ann);
+      return;
+    }
+
+    const m = Math.min(16, Math.max(4, Math.floor(Math.log(totalVectors) / Math.log(4))));
+    const ef_construction = Math.min(200, Math.max(50, totalVectors / 10));
+    const ef_search = 50;
+    const max_level = Math.max(0, Math.floor(Math.log(totalVectors) / Math.log(m)));
+
+    const nodes: HNSWNode[] = [];
+    for (let i = 0; i < totalVectors; i++) {
+      const level = Math.floor(Math.random() * (max_level + 1));
+      nodes.push({
+        id: i,
+        level,
+        neighbors: Array(max_level + 1).fill(null).map(() => [])
+      });
+    }
+
+    const entry_point = 0;
+    const graph: HNSWGraph = {
+      nodes,
+      max_level,
+      entry_point,
+      m,
+      ef_construction,
+      ef_search
+    };
+
+    const batchSize = Math.max(1, Math.floor(totalVectors / 50));
+    for (let i = 1; i < totalVectors; i++) {
+      const vector = await this.loadVectorById(i, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+      await this.insertIntoHNSWStreaming(graph, vector, i, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+      
+      if (i % batchSize === 0) {
+        onProgress?.(i, totalVectors);
+      }
+    }
+
+    const annBuffer = Buffer.alloc(this.calculateHNSWSize(graph));
+    this.writeHNSWGraph(annBuffer, graph, 0);
+    await targetHandle.write(annBuffer, 0, annBuffer.length, newHeader.offset_ann);
+  }
+
+  private async loadVectorById(
+    vectorId: number,
+    targetHandle: fs.FileHandle,
+    newHeader: IndexHeader,
+    keptFileMapping: Map<number, { fileInfo: FileInfo, vectorIds: number[] }>,
+    newFileIndices: FileIndex[],
+    oldHeader: IndexHeader,
+    sourceHandle: fs.FileHandle
+  ): Promise<number[]> {
+    let currentVectorId = 0;
+    
+    for (const [, { vectorIds }] of keptFileMapping) {
+      for (const oldVectorId of vectorIds) {
+        if (currentVectorId === vectorId) {
+          return await this.loadVector(oldVectorId, sourceHandle, oldHeader);
+        }
+        currentVectorId++;
+      }
+    }
+
+    for (const fileIndex of newFileIndices) {
+      for (const vector of fileIndex.embeddings) {
+        if (currentVectorId === vectorId) {
+          return vector;
+        }
+        currentVectorId++;
+      }
+    }
+
+    throw new Error(`Vector ID ${vectorId} not found`);
+  }
+
+  private async insertIntoHNSWStreaming(
+    graph: HNSWGraph, 
+    queryVector: number[], 
+    vectorId: number,
+    targetHandle: fs.FileHandle,
+    newHeader: IndexHeader,
+    keptFileMapping: Map<number, { fileInfo: FileInfo, vectorIds: number[] }>,
+    newFileIndices: FileIndex[],
+    oldHeader: IndexHeader,
+    sourceHandle: fs.FileHandle
+  ): Promise<void> {
+    const node = graph.nodes[vectorId];
+    const currentLevel = node.level;
+
+    let currentEntryPoint = graph.entry_point;
+    let currentMaxLevel = graph.nodes[currentEntryPoint].level;
+
+    for (let level = currentMaxLevel; level > currentLevel; level--) {
+      const neighbors = await this.searchLayerStreaming(graph, queryVector, [currentEntryPoint], 1, level, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+      if (neighbors.length > 0) {
+        currentEntryPoint = neighbors[0];
+      }
+    }
+
+    for (let level = Math.min(currentLevel, currentMaxLevel); level >= 0; level--) {
+      const ef = Math.min(graph.ef_construction, Math.max(10, graph.nodes.length / 20));
+      const neighbors = await this.searchLayerStreaming(graph, queryVector, [currentEntryPoint], ef, level, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+      const selectedNeighbors = await this.selectNeighborsStreaming(graph, queryVector, neighbors, graph.m, level, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+      
+      for (const neighborId of selectedNeighbors) {
+        this.addBidirectionalConnection(graph, vectorId, neighborId, level);
+      }
+      
+      if (neighbors.length > 0) {
+        currentEntryPoint = neighbors[0];
+      }
+    }
+
+    if (currentLevel > currentMaxLevel) {
+      graph.entry_point = vectorId;
+    }
+  }
+
+  private async searchLayerStreaming(
+    graph: HNSWGraph, 
+    queryVector: number[], 
+    entryPoints: number[], 
+    ef: number, 
+    level: number,
+    targetHandle: fs.FileHandle,
+    newHeader: IndexHeader,
+    keptFileMapping: Map<number, { fileInfo: FileInfo, vectorIds: number[] }>,
+    newFileIndices: FileIndex[],
+    oldHeader: IndexHeader,
+    sourceHandle: fs.FileHandle
+  ): Promise<number[]> {
+    const visited = new Set<number>();
+    const candidates = new Set<number>();
+    const results: number[] = [];
+
+    for (const entryPoint of entryPoints) {
+      candidates.add(entryPoint);
+      visited.add(entryPoint);
+    }
+
+    while (candidates.size > 0) {
+      let bestCandidate = -1;
+      let bestDistance = Infinity;
+
+      for (const candidate of candidates) {
+        const vector = await this.loadVectorById(candidate, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+        const distance = this.cosineDistance(queryVector, vector);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestCandidate = candidate;
+        }
+      }
+
+      if (bestCandidate === -1) break;
+
+      candidates.delete(bestCandidate);
+      results.push(bestCandidate);
+
+      if (results.length >= ef) break;
+
+      const node = graph.nodes[bestCandidate];
+      if (node.level >= level) {
+        for (const neighborId of node.neighbors[level]) {
+          if (!visited.has(neighborId)) {
+            visited.add(neighborId);
+            candidates.add(neighborId);
+          }
+        }
+      }
+    }
+
+    return results;
+  }
+
+  private async selectNeighborsStreaming(
+    graph: HNSWGraph, 
+    queryVector: number[], 
+    candidates: number[], 
+    m: number, 
+    level: number,
+    targetHandle: fs.FileHandle,
+    newHeader: IndexHeader,
+    keptFileMapping: Map<number, { fileInfo: FileInfo, vectorIds: number[] }>,
+    newFileIndices: FileIndex[],
+    oldHeader: IndexHeader,
+    sourceHandle: fs.FileHandle
+  ): Promise<number[]> {
+    const distances = await Promise.all(candidates.map(async id => {
+      const vector = await this.loadVectorById(id, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+      return {
+        id,
+        distance: this.cosineDistance(queryVector, vector)
+      };
+    }));
+
+    distances.sort((a, b) => a.distance - b.distance);
+    return distances.slice(0, m).map(d => d.id);
   }
 
 
