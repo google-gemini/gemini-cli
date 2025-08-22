@@ -55,6 +55,7 @@ import {
 } from './useReactToolScheduler.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
+import { SHELL_COMMAND_NAME } from '../constants.js';
 
 enum StreamProcessingStatus {
   Completed,
@@ -83,6 +84,7 @@ export const useGeminiStream = (
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
   onEditorClose: () => void,
   onCancelSubmit: () => void,
+  setIsChildProcessRunning: (isChildProcessRunning: boolean) => void,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -115,6 +117,14 @@ export const useGeminiStream = (
             Date.now(),
           );
 
+          if (
+            completedToolCallsFromScheduler.some(
+              (tool) => tool.request.name === SHELL_COMMAND_NAME,
+            )
+          ) {
+            setIsChildProcessRunning(false);
+          }
+
           // Handle tool response submission immediately when tools complete
           await handleCompletedTools(
             completedToolCallsFromScheduler as TrackedToolCall[],
@@ -126,6 +136,16 @@ export const useGeminiStream = (
       getPreferredEditor,
       onEditorClose,
     );
+
+  const scheduleToolCallsWithState = useCallback(
+    (requests: ToolCallRequestInfo[], signal: AbortSignal) => {
+      if (requests.some((req) => req.name === SHELL_COMMAND_NAME)) {
+        setIsChildProcessRunning(true);
+      }
+      scheduleToolCalls(requests, signal);
+    },
+    [scheduleToolCalls, setIsChildProcessRunning],
+  );
 
   const pendingToolCallGroupDisplay = useMemo(
     () =>
@@ -258,7 +278,7 @@ export const useGeminiStream = (
                 isClientInitiated: true,
                 prompt_id,
               };
-              scheduleToolCalls([toolCallRequest], abortSignal);
+              scheduleToolCallsWithState([toolCallRequest], abortSignal);
               return { queryToSend: null, shouldProceed: false };
             }
             case 'submit_prompt': {
@@ -335,7 +355,7 @@ export const useGeminiStream = (
       handleSlashCommand,
       logger,
       shellModeActive,
-      scheduleToolCalls,
+      scheduleToolCallsWithState,
     ],
   );
 
@@ -596,7 +616,7 @@ export const useGeminiStream = (
         }
       }
       if (toolCallRequests.length > 0) {
-        scheduleToolCalls(toolCallRequests, signal);
+        scheduleToolCallsWithState(toolCallRequests, signal);
       }
       return StreamProcessingStatus.Completed;
     },
@@ -604,7 +624,7 @@ export const useGeminiStream = (
       handleContentEvent,
       handleUserCancelledEvent,
       handleErrorEvent,
-      scheduleToolCalls,
+      scheduleToolCallsWithState,
       handleChatCompressionEvent,
       handleFinishedEvent,
       handleMaxSessionTurnsEvent,

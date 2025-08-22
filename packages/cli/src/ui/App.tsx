@@ -209,6 +209,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isChildProcessRunning, setIsChildProcessRunning] =
+    useState<boolean>(false);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
@@ -572,6 +574,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setModelSwitchedFromQuotaError,
     refreshStatic,
     () => cancelHandlerRef.current(),
+    setIsChildProcessRunning,
   );
 
   // Message queue for handling input during streaming
@@ -583,6 +586,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   // Update the cancel handler with message queue support
   cancelHandlerRef.current = useCallback(() => {
+    if (isChildProcessRunning) {
+      buffer.setText(''); // Just clear the prompt
+      return;
+    }
+
     const lastUserMessage = userMessages.at(-1);
     let textToSet = lastUserMessage || '';
 
@@ -596,7 +604,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     if (textToSet) {
       buffer.setText(textToSet);
     }
-  }, [buffer, userMessages, getQueuedMessagesText, clearQueue]);
+  }, [
+    buffer,
+    userMessages,
+    getQueuedMessagesText,
+    clearQueue,
+    isChildProcessRunning,
+  ]);
 
   // Input handling - queue messages for processing
   const handleFinalSubmit = useCallback(
@@ -1217,6 +1231,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   focus={isFocused}
                   vimHandleInput={vimHandleInput}
                   placeholder={placeholder}
+                  isChildProcessRunning={isChildProcessRunning}
                 />
               )}
             </>

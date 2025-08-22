@@ -1504,4 +1504,46 @@ describe('App UI', () => {
       expect(output).toContain('esc to cancel');
     });
   });
+
+  describe('Ctrl+C behavior', () => {
+    it('should clear the prompt when Ctrl+C is pressed during a shell command', async () => {
+      const mockSubmitQuery = vi.fn();
+      const mockCancel = vi.fn();
+
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Responding,
+        submitQuery: mockSubmitQuery,
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: mockCancel,
+      });
+
+      const { stdin, lastFrame, unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Simulate user typing a command
+      stdin.write('/tools shell sleep 1');
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for UI to update
+
+      // Verify the command is in the prompt
+      expect(lastFrame()).toContain('/tools shell sleep 1');
+
+      // Simulate Ctrl+C
+      stdin.write('\x03');
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for UI to update
+
+      // Verify the cancellation was triggered
+      expect(mockCancel).toHaveBeenCalled();
+
+      // Verify the prompt is now empty
+      expect(lastFrame()).not.toContain('/tools shell sleep 1');
+    });
+  });
 });

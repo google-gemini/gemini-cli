@@ -44,6 +44,7 @@ export interface InputPromptProps {
   setShellModeActive: (value: boolean) => void;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
+  isChildProcessRunning?: boolean;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -62,6 +63,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
   onEscapePromptChange,
   vimHandleInput,
+  isChildProcessRunning,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [escPressCount, setEscPressCount] = useState(0);
@@ -486,6 +488,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       // Ctrl+C (Clear input)
       if (keyMatchers[Command.CLEAR_INPUT](key)) {
+        if (isChildProcessRunning) {
+          return; // Avoid it from interfering with the Ctrl+C detection logic in App.tsx
+        }
         if (buffer.text.length > 0) {
           buffer.setText('');
           resetCompletionState();
@@ -549,6 +554,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,
+      isChildProcessRunning,
     ],
   );
 
