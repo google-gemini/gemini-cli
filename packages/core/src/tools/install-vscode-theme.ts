@@ -16,7 +16,7 @@ import { getErrorMessage } from '../utils/errors.js';
 
 import type { InstallVSCodeThemeToolParams, VSCodeTheme } from './theme-types.js';
 import { convertVSCodeThemeToCustomTheme } from './theme-converter.js';
-import { createDefaultTheme } from './theme-generator.js';
+import { createDefaultTheme, generateThemeWithAI } from './theme-generator.js';
 import { extractExtensionId, downloadVsix, extractThemeFromVsix } from './theme-extractor.js';
 import { saveThemeToFile } from './theme-storage.js';
 import { createSimpleColorPreview } from './theme-display.js';
@@ -28,7 +28,7 @@ class InstallVSCodeThemeToolInvocation extends BaseToolInvocation<
   InstallVSCodeThemeToolParams,
   ToolResult
 > {
-  constructor(params: InstallVSCodeThemeToolParams) {
+  constructor(params: InstallVSCodeThemeToolParams, private readonly config: Config | undefined) {
     super(params);
   }
 
@@ -68,8 +68,8 @@ class InstallVSCodeThemeToolInvocation extends BaseToolInvocation<
       const vsixUrl = `https://marketplace.visualstudio.com/_apis/public/gallery/publishers/${extensionId.publisher}/vsextensions/${extensionId.name}/latest/vspackage`;
       const vsixBuffer = await downloadVsix(vsixUrl, signal);
 
-      let themeData: VSCodeTheme | null = null;
-      let extractionMethod = '';
+  let themeData: VSCodeTheme | null = null;
+  let extractionMethod = '';
 
       console.log(`Attempting to extract theme from VSIX for ${extensionId.name}...`);
       themeData = await extractThemeFromVsix(vsixBuffer, signal, extensionId.name);
@@ -77,10 +77,26 @@ class InstallVSCodeThemeToolInvocation extends BaseToolInvocation<
         extractionMethod = 'VSIX Extraction';
         console.log(`✅ Successfully extracted theme from VSIX: ${themeData.name}`);
       } else {
-        console.log(`⚠️ VSIX extraction failed, using default theme...`);
-        themeData = createDefaultTheme(extensionId.name);
-        extractionMethod = 'Default Theme';
-        console.log(`📦 Using default theme: ${themeData.name}`);
+        console.log(`⚠️ VSIX extraction failed. Attempting AI generation...`);
+        const defaultTemplate = createDefaultTheme(extensionId.name);
+        let aiTheme: VSCodeTheme | null = null;
+        try {
+          aiTheme = await generateThemeWithAI(extensionId.name, signal, this.config);
+        } catch (e) {
+          console.warn('⚠️ AI generation threw error, falling back to default theme.', e);
+        }
+        if (aiTheme) {
+          // Heuristic: if aiTheme matches default template exactly, we assume fallback not true AI.
+          const isDefault = JSON.stringify(aiTheme.colors) === JSON.stringify(defaultTemplate.colors) &&
+            JSON.stringify(aiTheme.tokenColors) === JSON.stringify(defaultTemplate.tokenColors);
+          themeData = aiTheme;
+          extractionMethod = isDefault ? 'Default Theme Fallback' : 'AI Generated';
+          console.log(`📦 Using ${extractionMethod}: ${themeData.name}`);
+        } else {
+          themeData = defaultTemplate;
+          extractionMethod = 'Default Theme Fallback (AI unavailable)';
+          console.log(`📦 Using default theme fallback: ${themeData.name}`);
+        }
       }
 
       if (!themeData) {
@@ -116,7 +132,7 @@ export class InstallVSCodeThemeTool extends BaseDeclarativeTool<
 > {
   static readonly Name: string = 'install_vscode_theme';
 
-  constructor(_config: Config) {
+  constructor(private readonly config: Config) {
     super(
       InstallVSCodeThemeTool.Name,
       'Install VS Code Theme',
@@ -146,7 +162,7 @@ export class InstallVSCodeThemeTool extends BaseDeclarativeTool<
   protected createInvocation(
     params: InstallVSCodeThemeToolParams,
   ): ToolInvocation<InstallVSCodeThemeToolParams, ToolResult> {
-  return new InstallVSCodeThemeToolInvocation(params);
+    return new InstallVSCodeThemeToolInvocation(params, this.config);
   }
 }
 

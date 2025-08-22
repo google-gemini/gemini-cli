@@ -207,41 +207,41 @@ export function createDefaultTheme(themeName: string): VSCodeTheme {
     name: themeName,
     type: 'dark',
     colors: {
-      'editor.background': '#1e1e1e',
-      'editor.foreground': '#d4d4d4',
-      'button.background': '#007acc',
-      'editor.findMatchBackground': '#264f78',
-      'editor.lineHighlightBackground': '#2d2d30',
-      'editor.wordHighlightBackground': '#2d2d30',
-      'editorGutter.addedBackground': '#6a9955',
-      'editorGutter.modifiedBackground': '#ce9178',
-      'editorGutter.deletedBackground': '#f44747',
-      'editorLineNumber.foreground': '#858585',
+      'editor.background': '#1f2335',
+      'editor.foreground': '#c0caf5',
+      'button.background': '#7aa2f7',
+      'editor.findMatchBackground': '#364a82',
+      'editor.lineHighlightBackground': '#aa304aff',
+      'editor.wordHighlightBackground': '#704083ff',
+      'editorGutter.addedBackground': '#9ece6a',
+      'editorGutter.modifiedBackground': '#e0af68',
+      'editorGutter.deletedBackground': '#f7768e',
+      'editorLineNumber.foreground': '#565f89'
     },
     tokenColors: [
       {
         scope: 'keyword',
-        settings: { foreground: '#569cd6' }
+        settings: { foreground: '#bb9af7' }
       },
       {
         scope: 'string',
-        settings: { foreground: '#ce9178' }
+        settings: { foreground: '#9ece6a' }
       },
       {
         scope: 'comment',
-        settings: { foreground: '#6a9955' }
+        settings: { foreground: '#565f89' }
       },
       {
         scope: 'constant.numeric',
-        settings: { foreground: '#b5cea8' }
+        settings: { foreground: '#ff9e64' }
       },
       {
         scope: 'entity.name.class',
-        settings: { foreground: '#4ec9b0' }
+        settings: { foreground: '#7dcfff' }
       },
       {
         scope: 'storage.type',
-        settings: { foreground: '#569cd6' }
+        settings: { foreground: '#2ac3de' }
       }
     ]
   };

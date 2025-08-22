@@ -269,17 +269,3 @@ function readFileData(buffer: Buffer, entry: ZipEntry): string | null {
   }
 }
 
-/**
- * TODO: Implement real ZIP extraction
- * 
- * This would involve:
- * 1. Parsing ZIP central directory
- * 2. Reading file entries
- * 3. Decompressing files as needed
- * 4. Handling different compression methods
- * 
- * For a production implementation, consider using:
- * - yauzl: Streaming ZIP parser
- * - node-stream-zip: Fast ZIP reading
- * - Built-in zlib for decompression
- */

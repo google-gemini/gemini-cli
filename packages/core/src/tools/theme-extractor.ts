@@ -4,8 +4,42 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { VSCodeTheme } from './theme-types.js';
+import type { VSCodeTheme, VSCodeTokenColor } from './theme-types.js';
 import { extractVsixContent } from './vsix-utils.js';
+
+/**
+ * Attempt to parse potentially non-strict VS Code theme JSON (comments, trailing commas).
+ */
+function parseLenientThemeJson(raw: string, context: { path: string; ext?: string }): unknown | null {
+  const stages: Array<{ label: string; transform: (s: string) => string }> = [
+    { label: 'raw', transform: (s) => s },
+    {
+      label: 'strip_comments',
+      transform: (s) =>
+        s
+          .replace(/\/\*[\s\S]*?\*\//g, '') // block comments
+          .replace(/(^|[^:\\])\/\/.*$/gm, '$1'), // line comments (naive)
+    },
+    {
+      label: 'strip_trailing_commas',
+      transform: (s) => s.replace(/,\s*(\]|\})/g, '$1'),
+    },
+  ];
+  const working = raw;
+  for (const stage of stages) {
+    try {
+      return JSON.parse(stage.transform(working));
+    } catch (e) {
+      console.warn(
+        `⚠️ theme-parse(${context.ext || 'ext'}:${context.path}) failed at stage '${stage.label}': ${(e as Error).message}`,
+      );
+    }
+  }
+  console.error(
+    `❌ theme-parse(${context.ext || 'ext'}:${context.path}) all strategies failed; giving up`,
+  );
+  return null;
+}
 
 /**
  * Extracts extension ID from marketplace URL
@@ -67,8 +101,11 @@ export async function extractThemeFromVsix(vsixBuffer: Buffer, _signal: AbortSig
     }
     
     console.log(`📄 Found package.json, parsing theme contributions...`);
-    const manifest = JSON.parse(packageJson);
-    const themeContributions = manifest.contributes?.themes;
+  const manifestRaw = parseLenientThemeJson(packageJson, { path: 'extension/package.json', ext: extensionName });
+  type ManifestThemeContribution = { id?: string; label?: string; uiTheme?: string; path?: string };
+  interface ManifestLike { contributes?: { themes?: ManifestThemeContribution[]; [k: string]: unknown }; [k: string]: unknown }
+  const manifest: ManifestLike = (manifestRaw && typeof manifestRaw === 'object' ? manifestRaw as ManifestLike : {});
+  const themeContributions = manifest.contributes?.themes;
     
     if (!themeContributions || !Array.isArray(themeContributions) || themeContributions.length === 0) {
       console.warn('❌ No theme contributions found in extension');
@@ -102,12 +139,21 @@ export async function extractThemeFromVsix(vsixBuffer: Buffer, _signal: AbortSig
       const altThemeContent = vsixContent.files.get(cleanThemePath);
       if (altThemeContent) {
         console.log(`✅ Found theme file at alternate path: ${themePath}`);
-        const themeData = JSON.parse(altThemeContent);
+        const themeDataRaw =
+          parseLenientThemeJson(altThemeContent, {
+            path: cleanThemePath,
+            ext: extensionName,
+          });
+        interface ThemeJsonLike { name?: string; type?: string; colors?: Record<string,string>; tokenColors?: unknown }
+        const themeData: ThemeJsonLike = (themeDataRaw && typeof themeDataRaw === 'object' ? themeDataRaw as ThemeJsonLike : {});
+        const tokenColorsArr: VSCodeTokenColor[] = Array.isArray(themeData.tokenColors)
+          ? (themeData.tokenColors as unknown[]).filter((t): t is VSCodeTokenColor => !!t && typeof t === 'object')
+          : [];
         const extractedTheme: VSCodeTheme = {
           name: firstTheme.label || themeData.name || extensionName || 'Extracted Theme',
           type: themeData.type === 'light' ? 'light' : 'dark',
           colors: themeData.colors || {},
-          tokenColors: themeData.tokenColors || []
+          tokenColors: tokenColorsArr
         };
         console.log(`🎨 Successfully extracted theme: ${extractedTheme.name} (${extractedTheme.type})`);
         console.log(`🎨 Theme has ${Object.keys(extractedTheme.colors).length} colors and ${extractedTheme.tokenColors.length} token colors`);
@@ -118,14 +164,23 @@ export async function extractThemeFromVsix(vsixBuffer: Buffer, _signal: AbortSig
     
     console.log(`📄 Parsing theme JSON...`);
     // Parse theme JSON
-    const themeData = JSON.parse(themeContent);
+    const themeDataRaw =
+      parseLenientThemeJson(themeContent, {
+        path: themeFilePath,
+        ext: extensionName,
+      });
+    interface ThemeJsonLike { name?: string; type?: string; colors?: Record<string,string>; tokenColors?: unknown }
+    const themeData: ThemeJsonLike = (themeDataRaw && typeof themeDataRaw === 'object' ? themeDataRaw as ThemeJsonLike : {});
     
     // Convert to our VSCodeTheme format
+    const tokenColorsArr: VSCodeTokenColor[] = Array.isArray(themeData.tokenColors)
+      ? (themeData.tokenColors as unknown[]).filter((t): t is VSCodeTokenColor => !!t && typeof t === 'object')
+      : [];
     const extractedTheme: VSCodeTheme = {
       name: firstTheme.label || themeData.name || extensionName || 'Extracted Theme',
       type: themeData.type === 'light' ? 'light' : 'dark',
       colors: themeData.colors || {},
-      tokenColors: themeData.tokenColors || []
+  tokenColors: tokenColorsArr
     };
     
     console.log(`🎨 Successfully extracted theme: ${extractedTheme.name} (${extractedTheme.type})`);
