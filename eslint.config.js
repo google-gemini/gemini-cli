@@ -33,6 +33,7 @@ export default tseslint.config(
       'packages/cli/dist/**',
       'packages/core/dist/**',
       'packages/server/dist/**',
+      'packages/test-utils/dist/**',
       'packages/vscode-ide-companion/dist/**',
       'bundle/**',
       'package/bundle/**',
@@ -118,7 +119,12 @@ export default tseslint.config(
       'import/no-internal-modules': [
         'error',
         {
-          allow: ['react-dom/test-utils', 'memfs/lib/volume.js', 'yargs/**'],
+          allow: [
+            'react-dom/test-utils',
+            'memfs/lib/volume.js',
+            'yargs/**',
+            'msw/node',
+          ],
         },
       ],
       'import/no-relative-packages': 'error',

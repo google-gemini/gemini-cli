@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { useKeypress, Key } from './useKeypress.js';
+import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
@@ -102,6 +104,9 @@ describe('useKeypress', () => {
   const onKeypress = vi.fn();
   let originalNodeVersion: string;
 
+  const wrapper = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(KeypressProvider, null, children);
+
   beforeEach(() => {
     vi.clearAllMocks();
     stdin = new MockStdin();
@@ -111,7 +116,7 @@ describe('useKeypress', () => {
     });
 
     originalNodeVersion = process.versions.node;
-    delete process.env['PASTE_WORKAROUND'];
+    vi.unstubAllEnvs();
   });
 
   afterEach(() => {
@@ -129,21 +134,29 @@ describe('useKeypress', () => {
   };
 
   it('should not listen if isActive is false', () => {
-    renderHook(() => useKeypress(onKeypress, { isActive: false }));
+    renderHook(() => useKeypress(onKeypress, { isActive: false }), {
+      wrapper,
+    });
     act(() => stdin.pressKey({ name: 'a' }));
     expect(onKeypress).not.toHaveBeenCalled();
   });
 
-  it('should listen for keypress when active', () => {
-    renderHook(() => useKeypress(onKeypress, { isActive: true }));
-    const key = { name: 'a', sequence: 'a' };
+  it.each([
+    { key: { name: 'a', sequence: 'a' } },
+    { key: { name: 'left', sequence: '\x1b[D' } },
+    { key: { name: 'right', sequence: '\x1b[C' } },
+    { key: { name: 'up', sequence: '\x1b[A' } },
+    { key: { name: 'down', sequence: '\x1b[B' } },
+  ])('should listen for keypress when active for key $key.name', ({ key }) => {
+    renderHook(() => useKeypress(onKeypress, { isActive: true }), { wrapper });
     act(() => stdin.pressKey(key));
     expect(onKeypress).toHaveBeenCalledWith(expect.objectContaining(key));
   });
 
   it('should set and release raw mode', () => {
-    const { unmount } = renderHook(() =>
-      useKeypress(onKeypress, { isActive: true }),
+    const { unmount } = renderHook(
+      () => useKeypress(onKeypress, { isActive: true }),
+      { wrapper },
     );
     expect(mockSetRawMode).toHaveBeenCalledWith(true);
     unmount();
@@ -151,8 +164,9 @@ describe('useKeypress', () => {
   });
 
   it('should stop listening after being unmounted', () => {
-    const { unmount } = renderHook(() =>
-      useKeypress(onKeypress, { isActive: true }),
+    const { unmount } = renderHook(
+      () => useKeypress(onKeypress, { isActive: true }),
+      { wrapper },
     );
     unmount();
     act(() => stdin.pressKey({ name: 'a' }));
@@ -160,7 +174,7 @@ describe('useKeypress', () => {
   });
 
   it('should correctly identify alt+enter (meta key)', () => {
-    renderHook(() => useKeypress(onKeypress, { isActive: true }));
+    renderHook(() => useKeypress(onKeypress, { isActive: true }), { wrapper });
     const key = { name: 'return', sequence: '\x1B\r' };
     act(() => stdin.pressKey(key));
     expect(onKeypress).toHaveBeenCalledWith(
@@ -183,18 +197,20 @@ describe('useKeypress', () => {
       description: 'Workaround Env Var',
       setup: () => {
         setNodeVersion('20.0.0');
-        process.env['PASTE_WORKAROUND'] = 'true';
+        vi.stubEnv('PASTE_WORKAROUND', 'true');
       },
       isLegacy: true,
     },
-  ])('Paste Handling in $description', ({ setup, isLegacy }) => {
+  ])('in $description', ({ setup, isLegacy }) => {
     beforeEach(() => {
       setup();
       stdin.setLegacy(isLegacy);
     });
 
     it('should process a paste as a single event', () => {
-      renderHook(() => useKeypress(onKeypress, { isActive: true }));
+      renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+        wrapper,
+      });
       const pasteText = 'hello world';
       act(() => stdin.paste(pasteText));
 
@@ -210,7 +226,9 @@ describe('useKeypress', () => {
     });
 
     it('should handle keypress interspersed with pastes', () => {
-      renderHook(() => useKeypress(onKeypress, { isActive: true }));
+      renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+        wrapper,
+      });
 
       const keyA = { name: 'a', sequence: 'a' };
       act(() => stdin.pressKey(keyA));
@@ -234,8 +252,9 @@ describe('useKeypress', () => {
     });
 
     it('should emit partial paste content if unmounted mid-paste', () => {
-      const { unmount } = renderHook(() =>
-        useKeypress(onKeypress, { isActive: true }),
+      const { unmount } = renderHook(
+        () => useKeypress(onKeypress, { isActive: true }),
+        { wrapper },
       );
       const pasteText = 'incomplete paste';
 

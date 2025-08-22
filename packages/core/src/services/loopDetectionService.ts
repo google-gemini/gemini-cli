@@ -9,7 +9,6 @@ import { GeminiEventType, ServerGeminiStreamEvent } from '../core/turn.js';
 import { logLoopDetected } from '../telemetry/loggers.js';
 import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
 import { Config, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
-import { SchemaUnion, Type } from '@google/genai';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -180,7 +179,7 @@ export class LoopDetectionService {
     const wasInCodeBlock = this.inCodeBlock;
     this.inCodeBlock =
       numFences % 2 === 0 ? this.inCodeBlock : !this.inCodeBlock;
-    if (wasInCodeBlock) {
+    if (wasInCodeBlock || this.inCodeBlock) {
       return false;
     }
 
@@ -341,16 +340,16 @@ Please analyze the conversation history to determine the possibility that the co
       ...recentHistory,
       { role: 'user', parts: [{ text: prompt }] },
     ];
-    const schema: SchemaUnion = {
-      type: Type.OBJECT,
+    const schema: Record<string, unknown> = {
+      type: 'object',
       properties: {
         reasoning: {
-          type: Type.STRING,
+          type: 'string',
           description:
             'Your reasoning on if the conversation is looping without forward progress.',
         },
         confidence: {
-          type: Type.NUMBER,
+          type: 'number',
           description:
             'A number between 0.0 and 1.0 representing your confidence that the conversation is in an unproductive state.',
         },
@@ -368,10 +367,10 @@ Please analyze the conversation history to determine the possibility that the co
       return false;
     }
 
-    if (typeof result.confidence === 'number') {
-      if (result.confidence > 0.9) {
-        if (typeof result.reasoning === 'string' && result.reasoning) {
-          console.warn(result.reasoning);
+    if (typeof result['confidence'] === 'number') {
+      if (result['confidence'] > 0.9) {
+        if (typeof result['reasoning'] === 'string' && result['reasoning']) {
+          console.warn(result['reasoning']);
         }
         logLoopDetected(
           this.config,
@@ -382,7 +381,7 @@ Please analyze the conversation history to determine the possibility that the co
         this.llmCheckInterval = Math.round(
           MIN_LLM_CHECK_INTERVAL +
             (MAX_LLM_CHECK_INTERVAL - MIN_LLM_CHECK_INTERVAL) *
-              (1 - result.confidence),
+              (1 - result['confidence']),
         );
       }
     }
