@@ -102,14 +102,14 @@ In addition to a project settings file, a project's `.gemini` directory can cont
       - **Example:** `"autoIndexingInterval": 10000` (10 seconds)
   - **Example:**
     ```json
-    "codebaseIndexing": {
-      "embedEndpoint": "http://localhost:11434",
-      "apiKey": "$EMBED_API_KEY",
-      "batchSize": 64,
-      "maxTextChars": 4096,
-      "autoIndexingEnabled": true,
-      "autoIndexingInterval": 10000
-    }
+"codebaseIndexing": {
+  "embedEndpoint": "http://localhost:11434/v1/embeddings",
+  "apiKey": "$EMBED_API_KEY",
+  "batchSize": 64,
+  "maxTextChars": 4096,
+  "autoIndexingEnabled": true,
+  "autoIndexingInterval": 10000
+}
     ```
 ### Troubleshooting File Search Performance
 
