@@ -163,6 +163,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
         label: cmd.name,
         value: cmd.name,
         description: cmd.description,
+        commandKind: cmd.kind,
       }));
 
       setSuggestions(finalSuggestions);
