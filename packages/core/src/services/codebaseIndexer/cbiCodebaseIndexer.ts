@@ -290,7 +290,8 @@ export class CBICodebaseIndexer {
         totalVectors,
         indexSize,
         duration,
-        errors
+        errors,
+        isReindex: false
       };
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -474,7 +475,8 @@ export class CBICodebaseIndexer {
           totalVectors: 0,
           indexSize: await this.getIndexSize(),
           duration: Date.now() - startTime,
-          errors
+          errors,
+          isReindex: true
         };
       }
 
@@ -607,7 +609,8 @@ export class CBICodebaseIndexer {
         totalVectors: newFileIndices.reduce((sum, fi) => sum + fi.embeddings.length, 0),
         indexSize,
         duration,
-        errors
+        errors,
+        isReindex: true
       };
     } catch (error) {
       const duration = Date.now() - startTime;

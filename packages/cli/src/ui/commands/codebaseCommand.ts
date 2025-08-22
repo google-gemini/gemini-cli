@@ -79,15 +79,22 @@ async function handleIndexingOperation(
     context.ui.setPendingItem(null);
     
     if (result.success) {
-      const successMessage = formatSuccessMessage(result);
-      context.ui.addItem({
-        type: 'gemini',
-        text: successMessage
-      }, Date.now());
+      if (operation === 'reindex' && result.totalVectors === 0 && result.errors.length === 0) {
+        context.ui.addItem({
+          type: 'gemini',
+          text: '✅ No changes detected. Your index is up to date.'
+        }, Date.now());
+      } else {
+        const successMessage = formatSuccessMessage(result);
+        context.ui.addItem({
+          type: 'gemini',
+          text: successMessage
+        }, Date.now());
 
-      const geminiClient = config.getGeminiClient();
-      if (geminiClient) {
-        await geminiClient.refreshIndexContext();
+        const geminiClient = config.getGeminiClient();
+        if (geminiClient) {
+          await geminiClient.refreshIndexContext();
+        }
       }
     } else {
       const errorMessage = formatErrorMessage(result);
@@ -310,24 +317,21 @@ const autoCommand: SlashCommand = {
     const autoIndexService = AutoIndexService.fromConfig(
       projectRoot,
       config,
-      (progress) => {
-        const progressText = formatProgress(progress);
-        context.ui.addItem({
-          type: 'gemini',
-          text: `🔄 Auto-update: ${progressText}`
-        }, Date.now());
-      },
+      undefined, // onProgress callback removed to avoid noisy background updates.
       (result) => {
         if (result.success) {
-          const successMessage = formatSuccessMessage(result);
-          context.ui.addItem({
-            type: 'gemini',
-            text: `🔄 Auto-update: ${successMessage}`
-          }, Date.now());
+          // Only show a message if there were actual changes to the index.
+          if (result.totalVectors > 0 || (result.errors && result.errors.length > 0)) {
+            const successMessage = formatSuccessMessage(result);
+            context.ui.addItem({
+              type: 'gemini',
+              text: `🔄 Auto-update: ${successMessage}`
+            }, Date.now());
 
-          const geminiClient = config.getGeminiClient();
-          if (geminiClient) {
-            geminiClient.refreshIndexContext();
+            const geminiClient = config.getGeminiClient();
+            if (geminiClient) {
+              geminiClient.refreshIndexContext();
+            }
           }
         } else {
           const errorMessage = formatErrorMessage(result);
