@@ -8,6 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PartUnion } from '@google/genai';
 import mime from 'mime-types';
+import { FileSystemService } from '../services/fileSystemService.js';
+import { ToolErrorType } from '../tools/tool-error.js';
 
 // Constants for text file processing
 const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
@@ -122,9 +124,10 @@ export async function detectFileType(
 ): Promise<'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg'> {
   const ext = path.extname(filePath).toLowerCase();
 
-  // The mimetype for "ts" is MPEG transport stream (a video format) but we want
-  // to assume these are typescript files instead.
-  if (ext === '.ts') {
+  // The mimetype for various TypeScript extensions (ts, mts, cts, tsx) can be
+  // MPEG transport stream (a video format), but we want to assume these are
+  // TypeScript files instead.
+  if (['.ts', '.mts', '.cts'].includes(ext)) {
     return 'text';
   }
 
@@ -198,6 +201,7 @@ export interface ProcessedFileReadResult {
   llmContent: PartUnion; // string for text, Part for image/pdf/unreadable binary
   returnDisplay: string;
   error?: string; // Optional error message for the LLM if file processing failed
+  errorType?: ToolErrorType; // Structured error type
   isTruncated?: boolean; // For text files, indicates if content was truncated
   originalLineCount?: number; // For text files
   linesShown?: [number, number]; // For text files [startLine, endLine] (1-based for display)
@@ -214,6 +218,7 @@ export interface ProcessedFileReadResult {
 export async function processSingleFileContent(
   filePath: string,
   rootDirectory: string,
+  fileSystemService: FileSystemService,
   offset?: number,
   limit?: number,
 ): Promise<ProcessedFileReadResult> {
@@ -221,31 +226,32 @@ export async function processSingleFileContent(
     if (!fs.existsSync(filePath)) {
       // Sync check is acceptable before async read
       return {
-        llmContent: '',
+        llmContent:
+          'Could not read file because no file was found at the specified path.',
         returnDisplay: 'File not found.',
         error: `File not found: ${filePath}`,
+        errorType: ToolErrorType.FILE_NOT_FOUND,
       };
     }
     const stats = await fs.promises.stat(filePath);
     if (stats.isDirectory()) {
       return {
-        llmContent: '',
+        llmContent:
+          'Could not read file because the provided path is a directory, not a file.',
         returnDisplay: 'Path is a directory.',
         error: `Path is a directory, not a file: ${filePath}`,
+        errorType: ToolErrorType.TARGET_IS_DIRECTORY,
       };
     }
 
-    const fileSizeInBytes = stats.size;
-    // 20MB limit
-    const maxFileSize = 20 * 1024 * 1024;
-
-    if (fileSizeInBytes > maxFileSize) {
-      throw new Error(
-        `File size exceeds the 20MB limit: ${filePath} (${(
-          fileSizeInBytes /
-          (1024 * 1024)
-        ).toFixed(2)}MB)`,
-      );
+    const fileSizeInMB = stats.size / (1024 * 1024);
+    if (fileSizeInMB > 20) {
+      return {
+        llmContent: 'File size exceeds the 20MB limit.',
+        returnDisplay: 'File size exceeds the 20MB limit.',
+        error: `File size exceeds the 20MB limit: ${filePath} (${fileSizeInMB.toFixed(2)}MB)`,
+        errorType: ToolErrorType.FILE_TOO_LARGE,
+      };
     }
 
     const fileType = await detectFileType(filePath);
@@ -268,14 +274,14 @@ export async function processSingleFileContent(
             returnDisplay: `Skipped large SVG file (>1MB): ${relativePathForDisplay}`,
           };
         }
-        const content = await fs.promises.readFile(filePath, 'utf8');
+        const content = await fileSystemService.readTextFile(filePath);
         return {
           llmContent: content,
           returnDisplay: `Read SVG as text: ${relativePathForDisplay}`,
         };
       }
       case 'text': {
-        const content = await fs.promises.readFile(filePath, 'utf8');
+        const content = await fileSystemService.readTextFile(filePath);
         const lines = content.split('\n');
         const originalLineCount = lines.length;
 
@@ -299,20 +305,27 @@ export async function processSingleFileContent(
           return line;
         });
 
-        const contentRangeTruncated = endLine < originalLineCount;
+        const contentRangeTruncated =
+          startLine > 0 || endLine < originalLineCount;
         const isTruncated = contentRangeTruncated || linesWereTruncatedInLength;
+        const llmContent = formattedLines.join('\n');
 
-        let llmTextContent = '';
+        // By default, return nothing to streamline the common case of a successful read_file.
+        let returnDisplay = '';
         if (contentRangeTruncated) {
-          llmTextContent += `[File content truncated: showing lines ${actualStartLine + 1}-${endLine} of ${originalLineCount} total lines. Use offset/limit parameters to view more.]\n`;
+          returnDisplay = `Read lines ${
+            actualStartLine + 1
+          }-${endLine} of ${originalLineCount} from ${relativePathForDisplay}`;
+          if (linesWereTruncatedInLength) {
+            returnDisplay += ' (some lines were shortened)';
+          }
         } else if (linesWereTruncatedInLength) {
-          llmTextContent += `[File content partially truncated: some lines exceeded maximum length of ${MAX_LINE_LENGTH_TEXT_FILE} characters.]\n`;
+          returnDisplay = `Read all ${originalLineCount} lines from ${relativePathForDisplay} (some lines were shortened)`;
         }
-        llmTextContent += formattedLines.join('\n');
 
         return {
-          llmContent: llmTextContent,
-          returnDisplay: isTruncated ? '(truncated)' : '',
+          llmContent,
+          returnDisplay,
           isTruncated,
           originalLineCount,
           linesShown: [actualStartLine + 1, endLine],
@@ -353,6 +366,7 @@ export async function processSingleFileContent(
       llmContent: `Error reading file ${displayPath}: ${errorMessage}`,
       returnDisplay: `Error reading file ${displayPath}: ${errorMessage}`,
       error: `Error reading file ${filePath}: ${errorMessage}`,
+      errorType: ToolErrorType.READ_CONTENT_FAILURE,
     };
   }
 }

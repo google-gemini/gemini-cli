@@ -5,13 +5,18 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import {
+  getScopeItems,
+  getScopeMessageForSetting,
+} from '../../utils/dialogScopeUtils.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
@@ -76,11 +81,7 @@ export function ThemeDialog({
   // If not found, fall back to the first theme
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
 
-  const scopeItems = [
-    { label: 'User Settings', value: SettingScope.User },
-    { label: 'Workspace Settings', value: SettingScope.Workspace },
-    { label: 'System Settings', value: SettingScope.System },
-  ];
+  const scopeItems = getScopeItems();
 
   const handleThemeSelect = useCallback(
     (themeName: string) => {
@@ -111,31 +112,24 @@ export function ThemeDialog({
     'theme',
   );
 
-  useInput((input, key) => {
-    if (key.tab) {
-      setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
-    }
-    if (key.escape) {
-      onSelect(undefined, selectedScope);
-    }
-  });
-
-  const otherScopes = Object.values(SettingScope).filter(
-    (scope) => scope !== selectedScope,
+  useKeypress(
+    (key) => {
+      if (key.name === 'tab') {
+        setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
+      }
+      if (key.name === 'escape') {
+        onSelect(undefined, selectedScope);
+      }
+    },
+    { isActive: true },
   );
 
-  const modifiedInOtherScopes = otherScopes.filter(
-    (scope) => settings.forScope(scope).settings.theme !== undefined,
+  // Generate scope message for theme setting
+  const otherScopeModifiedMessage = getScopeMessageForSetting(
+    'theme',
+    selectedScope,
+    settings,
   );
-
-  let otherScopeModifiedMessage = '';
-  if (modifiedInOtherScopes.length > 0) {
-    const modifiedScopesStr = modifiedInOtherScopes.join(', ');
-    otherScopeModifiedMessage =
-      settings.forScope(selectedScope).settings.theme !== undefined
-        ? `(Also modified in ${modifiedScopesStr})`
-        : `(Modified in ${modifiedScopesStr})`;
-  }
 
   // Constants for calculating preview pane layout.
   // These values are based on the JSX structure below.
@@ -279,18 +273,23 @@ export function ThemeDialog({
               >
                 {colorizeCode(
                   `# function
--def fibonacci(n):
--    a, b = 0, 1
--    for _ in range(n):
--        a, b = b, a + b
--    return a`,
+def fibonacci(n):
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+    return a`,
                   'python',
                   codeBlockHeight,
                   colorizeCodeWidth,
                 )}
                 <Box marginTop={1} />
                 <DiffRenderer
-                  diffContent={`--- a/old_file.txt\n+++ b/new_file.txt\n@@ -1,6 +1,7 @@\n # function\n-def fibonacci(n):\n-    a, b = 0, 1\n-    for _ in range(n):\n-        a, b = b, a + b\n-    return a\n+def fibonacci(n):\n+    a, b = 0, 1\n+    for _ in range(n):\n+        a, b = b, a + b\n+    return a\n+\n+print(fibonacci(10))\n`}
+                  diffContent={`--- a/util.py
++++ b/util.py
+@@ -1,2 +1,2 @@
+- print("Hello, " + name)
++ print(f"Hello, {name}!")
+`}
                   availableTerminalHeight={diffHeight}
                   terminalWidth={colorizeCodeWidth}
                   theme={previewTheme}

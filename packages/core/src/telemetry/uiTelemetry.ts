@@ -11,12 +11,8 @@ import {
   EVENT_TOOL_CALL,
 } from './constants.js';
 
-import {
-  ApiErrorEvent,
-  ApiResponseEvent,
-  ToolCallEvent,
-  ToolCallDecision,
-} from './types.js';
+import { ToolCallDecision } from './tool-call-decision.js';
+import { ApiErrorEvent, ApiResponseEvent, ToolCallEvent } from './types.js';
 
 export type UiEvent =
   | (ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE })
@@ -32,6 +28,7 @@ export interface ToolCallStats {
     [ToolCallDecision.ACCEPT]: number;
     [ToolCallDecision.REJECT]: number;
     [ToolCallDecision.MODIFY]: number;
+    [ToolCallDecision.AUTO_ACCEPT]: number;
   };
 }
 
@@ -62,8 +59,13 @@ export interface SessionMetrics {
       [ToolCallDecision.ACCEPT]: number;
       [ToolCallDecision.REJECT]: number;
       [ToolCallDecision.MODIFY]: number;
+      [ToolCallDecision.AUTO_ACCEPT]: number;
     };
     byName: Record<string, ToolCallStats>;
+  };
+  files: {
+    totalLinesAdded: number;
+    totalLinesRemoved: number;
   };
 }
 
@@ -94,8 +96,13 @@ const createInitialMetrics = (): SessionMetrics => ({
       [ToolCallDecision.ACCEPT]: 0,
       [ToolCallDecision.REJECT]: 0,
       [ToolCallDecision.MODIFY]: 0,
+      [ToolCallDecision.AUTO_ACCEPT]: 0,
     },
     byName: {},
+  },
+  files: {
+    totalLinesAdded: 0,
+    totalLinesRemoved: 0,
   },
 });
 
@@ -172,7 +179,7 @@ export class UiTelemetryService extends EventEmitter {
   }
 
   private processToolCall(event: ToolCallEvent) {
-    const { tools } = this.#metrics;
+    const { tools, files } = this.#metrics;
     tools.totalCalls++;
     tools.totalDurationMs += event.duration_ms;
 
@@ -192,6 +199,7 @@ export class UiTelemetryService extends EventEmitter {
           [ToolCallDecision.ACCEPT]: 0,
           [ToolCallDecision.REJECT]: 0,
           [ToolCallDecision.MODIFY]: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
         },
       };
     }
@@ -208,6 +216,16 @@ export class UiTelemetryService extends EventEmitter {
     if (event.decision) {
       tools.totalDecisions[event.decision]++;
       toolStats.decisions[event.decision]++;
+    }
+
+    // Aggregate line count data from metadata
+    if (event.metadata) {
+      if (event.metadata['ai_added_lines'] !== undefined) {
+        files.totalLinesAdded += event.metadata['ai_added_lines'];
+      }
+      if (event.metadata['ai_removed_lines'] !== undefined) {
+        files.totalLinesRemoved += event.metadata['ai_removed_lines'];
+      }
     }
   }
 }

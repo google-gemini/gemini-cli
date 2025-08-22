@@ -5,6 +5,7 @@
  */
 
 import { lightTheme, Theme, type ColorsTheme } from './theme.js';
+import { lightSemanticColors } from './semantic-tokens.js';
 
 const googleCodeColors: ColorsTheme = {
   type: 'light',
@@ -17,6 +18,8 @@ const googleCodeColors: ColorsTheme = {
   AccentGreen: '#080',
   AccentYellow: '#660',
   AccentRed: '#800',
+  DiffAdded: '#C6EAD8',
+  DiffRemoved: '#FEDEDE',
   Comment: '#5f6368',
   Gray: lightTheme.Gray,
   GradientColors: ['#066', '#606'],
@@ -139,4 +142,5 @@ export const GoogleCode: Theme = new Theme(
     },
   },
   googleCodeColors,
+  lightSemanticColors,
 );

@@ -5,9 +5,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import { Colors } from '../colors.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface AuthInProgressProps {
   onTimeout: () => void;
@@ -18,11 +19,14 @@ export function AuthInProgress({
 }: AuthInProgressProps): React.JSX.Element {
   const [timedOut, setTimedOut] = useState(false);
 
-  useInput((_, key) => {
-    if (key.escape) {
-      onTimeout();
-    }
-  });
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+        onTimeout();
+      }
+    },
+    { isActive: true },
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -48,7 +52,8 @@ export function AuthInProgress({
       ) : (
         <Box>
           <Text>
-            <Spinner type="dots" /> Waiting for auth... (Press ESC to cancel)
+            <Spinner type="dots" /> Waiting for auth... (Press ESC or CTRL+C to
+            cancel)
           </Text>
         </Box>
       )}

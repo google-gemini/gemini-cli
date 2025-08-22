@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import stripAnsi from 'strip-ansi';
+import { stripVTControlCharacters } from 'node:util';
+
 /**
  * Calculates the maximum width of a multi-line ASCII art string.
  * @param asciiArt The ASCII art string.
@@ -16,35 +19,6 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
   const lines = asciiArt.split('\n');
   return Math.max(...lines.map((line) => line.length));
 };
-
-/**
- * Checks if a Buffer is likely binary by testing for the presence of a NULL byte.
- * The presence of a NULL byte is a strong indicator that the data is not plain text.
- * @param data The Buffer to check.
- * @param sampleSize The number of bytes from the start of the buffer to test.
- * @returns True if a NULL byte is found, false otherwise.
- */
-export function isBinary(
-  data: Buffer | null | undefined,
-  sampleSize = 512,
-): boolean {
-  if (!data) {
-    return false;
-  }
-
-  const sample = data.length > sampleSize ? data.subarray(0, sampleSize) : data;
-
-  for (const byte of sample) {
-    // The presence of a NULL byte (0x00) is one of the most reliable
-    // indicators of a binary file. Text files should not contain them.
-    if (byte === 0) {
-      return true;
-    }
-  }
-
-  // If no NULL bytes were found in the sample, we assume it's text.
-  return false;
-}
 
 /*
  * -------------------------------------------------------------------------
@@ -66,4 +40,49 @@ export function cpSlice(str: string, start: number, end?: number): string {
   // Slice by code‑point indices and re‑join.
   const arr = toCodePoints(str).slice(start, end);
   return arr.join('');
+}
+
+/**
+ * Strip characters that can break terminal rendering.
+ *
+ * Uses Node.js built-in stripVTControlCharacters to handle VT sequences,
+ * then filters remaining control characters that can disrupt display.
+ *
+ * Characters stripped:
+ * - ANSI escape sequences (via strip-ansi)
+ * - VT control sequences (via Node.js util.stripVTControlCharacters)
+ * - C0 control chars (0x00-0x1F) except CR/LF which are handled elsewhere
+ * - C1 control chars (0x80-0x9F) that can cause display issues
+ *
+ * Characters preserved:
+ * - All printable Unicode including emojis
+ * - DEL (0x7F) - handled functionally by applyOperations, not a display issue
+ * - CR/LF (0x0D/0x0A) - needed for line breaks
+ */
+export function stripUnsafeCharacters(str: string): string {
+  const strippedAnsi = stripAnsi(str);
+  const strippedVT = stripVTControlCharacters(strippedAnsi);
+
+  return toCodePoints(strippedVT)
+    .filter((char) => {
+      const code = char.codePointAt(0);
+      if (code === undefined) return false;
+
+      // Preserve CR/LF for line handling
+      if (code === 0x0a || code === 0x0d) return true;
+
+      // Remove C0 control chars (except CR/LF) that can break display
+      // Examples: BELL(0x07) makes noise, BS(0x08) moves cursor, VT(0x0B), FF(0x0C)
+      if (code >= 0x00 && code <= 0x1f) return false;
+
+      // Remove C1 control chars (0x80-0x9f) - legacy 8-bit control codes
+      if (code >= 0x80 && code <= 0x9f) return false;
+
+      // Preserve DEL (0x7f) - it's handled functionally by applyOperations as backspace
+      // and doesn't cause rendering issues when displayed
+
+      // Preserve all other characters including Unicode/emojis
+      return true;
+    })
+    .join('');
 }
