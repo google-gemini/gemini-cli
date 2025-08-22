@@ -60,11 +60,22 @@ export type ContentGeneratorConfig = {
 export function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
+<<<<<<< HEAD
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const googleApiKey = process.env.GOOGLE_API_KEY;
   const googleCloudProject = process.env.GOOGLE_CLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT_ID;
   const googleCloudLocation = process.env.GOOGLE_CLOUD_LOCATION;
+=======
+): ContentGeneratorConfig {
+  const geminiApiKey = process.env['GEMINI_API_KEY'] || undefined;
+  const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
+  const googleCloudProject =
+    process.env['GOOGLE_CLOUD_PROJECT'] ||
+    process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
+    undefined;
+  const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
+>>>>>>> 60e5d145 (fix(cli): resolve build failure in slashCommandProcessor)
 
   // Use runtime model from config if available; otherwise, fall back to parameter or default
   const effectiveModel = config.getModel() || DEFAULT_GEMINI_MODEL;
