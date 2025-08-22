@@ -22,7 +22,9 @@ export const Help: React.FC<Help> = ({ commands, language = 'en' }) => {
   // 同步语言设置
   useEffect(() => {
     if (language !== i18n.language) {
-      i18n.changeLanguage(language);
+      i18n.changeLanguage(language).catch((err) => {
+        console.error('Failed to change language in Help component:', err);
+      });
     }
   }, [language, i18n]);
 
