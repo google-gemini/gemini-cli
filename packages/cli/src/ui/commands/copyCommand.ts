@@ -53,7 +53,7 @@ export const copyCommand: SlashCommand = {
         return {
           type: 'message',
           messageType: 'error',
-          content: 'Failed to copy to the clipboard.',
+          content: `Failed to copy to the clipboard. ${message}`,
         };
       }
     } else {

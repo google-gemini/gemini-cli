@@ -40,6 +40,9 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **`/copy`**
   - **Description:** Copies the last output produced by Gemini CLI to your clipboard, for easy sharing or reuse.
+  - **Note:** This command requires platform-specific clipboard tools to be installed.
+    - On Linux, it requires `xclip` or `xsel`. You can typically install them using your system's package manager.
+    - On macOS, it requires `pbcopy`, and on Windows, it requires `clip`. These tools are typically pre-installed on their respective systems.
 
 - **`/directory`** (or **`/dir`**)
   - **Description:** Manage workspace directories for multi-directory support.

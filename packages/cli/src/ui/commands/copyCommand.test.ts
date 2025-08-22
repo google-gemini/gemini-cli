@@ -227,7 +227,7 @@ describe('copyCommand', () => {
     expect(result).toEqual({
       type: 'message',
       messageType: 'error',
-      content: 'Failed to copy to the clipboard.',
+      content: `Failed to copy to the clipboard. ${clipboardError.message}`,
     });
   });
 
@@ -242,14 +242,15 @@ describe('copyCommand', () => {
     ];
 
     mockGetHistory.mockReturnValue(historyWithAiMessage);
-    mockCopyToClipboard.mockRejectedValue('String error');
+    const rejectedValue = 'String error';
+    mockCopyToClipboard.mockRejectedValue(rejectedValue);
 
     const result = await copyCommand.action(mockContext, '');
 
     expect(result).toEqual({
       type: 'message',
       messageType: 'error',
-      content: 'Failed to copy to the clipboard.',
+      content: `Failed to copy to the clipboard. ${rejectedValue}`,
     });
   });
 
