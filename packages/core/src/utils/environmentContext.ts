@@ -7,7 +7,7 @@
 import { Part } from '@google/genai';
 import { Config } from '../config/config.js';
 import { getFolderStructure } from './getFolderStructure.js';
-import { CodebaseIndexer } from '../services/codebaseIndexer/codebaseIndexer.js';
+import { CBICodebaseIndexer } from '../services/codebaseIndexer/cbiCodebaseIndexer.js';
 
 /**
  * Generates a string describing the current workspace directories and their structures.
@@ -15,9 +15,9 @@ import { CodebaseIndexer } from '../services/codebaseIndexer/codebaseIndexer.js'
  * @returns {Promise<string>} A promise that resolves to the directory context string.
  */
 /**
- * Получает информацию о статусе индекса кодовой базы
- * @param {Config} config - Конфигурация среды выполнения
- * @returns {Promise<string>} Статус индекса в виде строки
+ * Gets information about the codebase index status
+ * @param {Config} config - Runtime configuration
+ * @returns {Promise<string>} Index status as a string
  */
 export async function getCodebaseIndexStatus(config: Config): Promise<string> {
   try {
@@ -28,9 +28,9 @@ export async function getCodebaseIndexStatus(config: Config): Promise<string> {
       return '';
     }
 
-    // Используем первую директорию рабочего пространства для проверки индекса
+    // Use the first workspace directory to check the index
     const projectRoot = workspaceDirectories[0];
-    const indexer = CodebaseIndexer.fromConfig(projectRoot, config);
+    const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
     const status = await indexer.getIndexStatus();
 
     if (!status.exists) {
@@ -44,7 +44,7 @@ export async function getCodebaseIndexStatus(config: Config): Promise<string> {
 
     return `\nCodebase Index: Available (${fileCount} files, ${vectorCount} vectors, ${sizeMB} MB, updated ${lastUpdated}). You can use semantic search to understand the codebase structure and relationships.`;
   } catch (error) {
-    // Не показываем ошибки пользователю, просто молча пропускаем
+    // Don't show errors to the user, just silently skip
     return '';
   }
 }

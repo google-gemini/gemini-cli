@@ -15,7 +15,7 @@ import {
 } from './tools.js';
 
 import { Config } from '../config/config.js';
-import { CodebaseIndexer } from '../services/codebaseIndexer/codebaseIndexer.js';
+import { CBICodebaseIndexer } from '../services/codebaseIndexer/cbiCodebaseIndexer.js';
 
 export interface SemanticSearchToolParams {
   query: string;
@@ -44,7 +44,7 @@ class SemanticSearchToolInvocation extends BaseToolInvocation<
 
   async execute(): Promise<ToolResult> {
     const targetDir = this.config.getTargetDir();
-    const indexer = CodebaseIndexer.fromConfig(targetDir, this.config);
+    const indexer = CBICodebaseIndexer.fromConfig(targetDir, this.config);
     
     const status = await indexer.getIndexStatus();
     if (!status.exists) {

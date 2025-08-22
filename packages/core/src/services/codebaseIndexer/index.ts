@@ -9,6 +9,5 @@ export * from './constants.js';
 export * from './fileDiscoveryService.js';
 export * from './textProcessor.js';
 export * from './embeddingService.js';
-export * from './indexStorage.js';
-export * from './codebaseIndexer.js';
+export * from './cbiCodebaseIndexer.js';
 export * from './autoIndexService.js';

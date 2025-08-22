@@ -10,7 +10,7 @@ import { getDirectoryContextString, getEnvironmentContext, getCodebaseIndexStatu
 import { getFolderStructure } from './getFolderStructure.js';
 
 vi.mock('./getFolderStructure.js');
-vi.mock('../services/codebaseIndexer/codebaseIndexer.js');
+vi.mock('../services/codebaseIndexer/cbiCodebaseIndexer.js');
 
 describe('getDirectoryContextString', () => {
   let mockConfig: Partial<Config>;
@@ -78,8 +78,8 @@ describe('getCodebaseIndexStatus', () => {
       getIndexStatus: vi.fn().mockResolvedValue({ exists: false }),
     };
 
-    const { CodebaseIndexer } = await import('../services/codebaseIndexer/codebaseIndexer.js');
-    vi.mocked(CodebaseIndexer.fromConfig).mockReturnValue(mockIndexer as any);
+    const { CBICodebaseIndexer } = await import('../services/codebaseIndexer/cbiCodebaseIndexer.js');
+    vi.mocked(CBICodebaseIndexer.fromConfig).mockReturnValue(mockIndexer as any);
 
     const result = await getCodebaseIndexStatus(mockConfig as Config);
     expect(result).toContain('Codebase Index: No semantic search index found');
@@ -97,8 +97,8 @@ describe('getCodebaseIndexStatus', () => {
       }),
     };
 
-    const { CodebaseIndexer } = await import('../services/codebaseIndexer/codebaseIndexer.js');
-    vi.mocked(CodebaseIndexer.fromConfig).mockReturnValue(mockIndexer as any);
+    const { CBICodebaseIndexer } = await import('../services/codebaseIndexer/cbiCodebaseIndexer.js');
+    vi.mocked(CBICodebaseIndexer.fromConfig).mockReturnValue(mockIndexer as any);
 
     const result = await getCodebaseIndexStatus(mockConfig as Config);
     expect(result).toContain('Codebase Index: Available');

@@ -64,13 +64,19 @@ export interface IndexConfig {
 }
 
 export interface IndexProgress {
-  phase: 'scanning' | 'processing' | 'embedding' | 'saving' | 'complete';
+  phase: 'scanning' | 'processing' | 'embedding' | 'building_index' | 'saving' | 'complete';
   currentFile?: string;
   processedFiles: number;
   totalFiles: number;
   currentBatch?: number;
   totalBatches?: number;
+  currentVector?: number;
+  totalVectors?: number;
+  currentEmbedding?: number;
+  totalEmbeddings?: number;
   stats: ScanStats;
+  message?: string;
+  detail?: string;
 }
 
 export interface IndexResult {

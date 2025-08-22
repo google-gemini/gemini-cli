@@ -224,14 +224,14 @@ export class GeminiClient {
   }
 
   /**
-   * Обновляет контекст чата с актуальной информацией о статусе индекса
+   * Refreshes the chat context with the latest index status information.
    */
   async refreshIndexContext(): Promise<void> {
     if (!this.chat) {
       return;
     }
 
-    // Используем getDirectoryContextString, который теперь включает статус индекса
+    // Using getDirectoryContextString which now includes index status
     this.getChat().addHistory({
       role: 'user',
       parts: [{ text: `Index status updated:\n${await getDirectoryContextString(this.config)}` }],

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CodebaseIndexer } from './codebaseIndexer.js';
+import { CBICodebaseIndexer } from './cbiCodebaseIndexer.js';
 import { IndexProgress } from './types.js';
 
 export interface AutoIndexConfig {
@@ -17,14 +17,14 @@ export interface AutoIndexConfig {
 
 export class AutoIndexService {
   private config: AutoIndexConfig;
-  private indexer: CodebaseIndexer;
+  private indexer: CBICodebaseIndexer;
   private intervalId: NodeJS.Timeout | null = null;
 
   private isRunning = false;
 
   constructor(config: AutoIndexConfig) {
     this.config = config;
-    this.indexer = new CodebaseIndexer(config.projectRoot);
+    this.indexer = new CBICodebaseIndexer(config.projectRoot);
   }
 
   static fromConfig(projectRoot: string, cliConfig: any, onProgress?: (progress: IndexProgress) => void, onUpdate?: (result: any) => void): AutoIndexService {
@@ -37,7 +37,7 @@ export class AutoIndexService {
     };
     
     const service = new AutoIndexService(config);
-    service.indexer = CodebaseIndexer.fromConfig(projectRoot, cliConfig);
+    service.indexer = CBICodebaseIndexer.fromConfig(projectRoot, cliConfig);
     return service;
   }
 

@@ -145,6 +145,10 @@ export class CodebaseFileDiscoveryService {
     try {
       const relPath = path.relative(baseDir, filePath).replace(/\\/g, '/');
       
+      if (relPath === 'index.cbi') {
+        return null;
+      }
+      
       if (this.ignoreParser.isIgnored(relPath)) {
         return null;
       }

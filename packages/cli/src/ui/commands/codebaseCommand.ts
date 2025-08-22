@@ -12,7 +12,7 @@ import {
   CommandKind,
   SlashCommandActionReturn,
 } from './types.js';
-import { CodebaseIndexer, IndexProgress, AutoIndexService } from '@google/gemini-cli-core';
+import { CBICodebaseIndexer, IndexProgress, AutoIndexService } from '@google/gemini-cli-core';
 import * as path from 'path';
 
 const indexCommand: SlashCommand = {
@@ -38,19 +38,24 @@ const indexCommand: SlashCommand = {
       };
     }
 
-    const indexer = CodebaseIndexer.fromConfig(projectRoot, config);
+    const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
     
-    context.ui.addItem({
+    context.ui.setPendingItem({
       type: 'gemini',
-      text: 'Starting codebase indexing...\n'
-    }, Date.now());
+      text: 'Starting codebase indexing...'
+    });
 
     try {
       const result = await indexer.indexCodebase((progress) => {
         const progressText = formatProgress(progress);
-        context.ui.setDebugMessage(progressText);
+        context.ui.setPendingItem({
+          type: 'gemini',
+          text: progressText
+        });
       });
 
+      context.ui.setPendingItem(null);
+      
       if (result.success) {
         const successMessage = formatSuccessMessage(result);
         context.ui.addItem({
@@ -70,6 +75,7 @@ const indexCommand: SlashCommand = {
         }, Date.now());
       }
     } catch (error) {
+      context.ui.setPendingItem(null);
       const errorMessage = `❌ Indexing failed: ${error instanceof Error ? error.message : String(error)}`;
       context.ui.addItem({
         type: 'gemini',
@@ -102,19 +108,24 @@ const reindexCommand: SlashCommand = {
       };
     }
 
-    const indexer = CodebaseIndexer.fromConfig(projectRoot, config);
+    const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
     
-    context.ui.addItem({
+    context.ui.setPendingItem({
       type: 'gemini',
-      text: 'Starting incremental codebase indexing...\n'
-    }, Date.now());
+      text: 'Starting incremental codebase indexing...'
+    });
 
     try {
       const result = await indexer.reindexCodebase((progress) => {
         const progressText = formatProgress(progress);
-        context.ui.setDebugMessage(progressText);
+        context.ui.setPendingItem({
+          type: 'gemini',
+          text: progressText
+        });
       });
 
+      context.ui.setPendingItem(null);
+      
       if (result.success) {
         const successMessage = formatSuccessMessage(result);
         context.ui.addItem({
@@ -134,6 +145,7 @@ const reindexCommand: SlashCommand = {
         }, Date.now());
       }
     } catch (error) {
+      context.ui.setPendingItem(null);
       const errorMessage = `❌ Re-indexing failed: ${error instanceof Error ? error.message : String(error)}`;
       context.ui.addItem({
         type: 'gemini',
@@ -145,7 +157,7 @@ const reindexCommand: SlashCommand = {
 
 const deleteCommand: SlashCommand = {
   name: 'delete',
-  description: 'Delete the index (.index folder)',
+  description: 'Delete the index (index.cbi file)',
   kind: CommandKind.BUILT_IN,
   action: async (context): Promise<SlashCommandActionReturn | void> => {
     const config = context.services.config;
@@ -166,7 +178,7 @@ const deleteCommand: SlashCommand = {
       };
     }
 
-    const indexer = CodebaseIndexer.fromConfig(projectRoot, config);
+    const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
     const status = await indexer.getIndexStatus();
 
     if (!status.exists) {
@@ -239,7 +251,7 @@ const statusCommand: SlashCommand = {
       };
     }
 
-    const indexer = CodebaseIndexer.fromConfig(projectRoot, config);
+    const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
     const status = await indexer.getIndexStatus();
 
     if (!status.exists) {
@@ -259,7 +271,7 @@ const statusCommand: SlashCommand = {
 • Index size: ${sizeMB} MB
 • Last updated: ${lastUpdated}
 
-Index location: ${path.join(projectRoot, '.index')}`;
+Index location: ${path.join(projectRoot, 'index.cbi')}`;
 
     return {
       type: 'message',
@@ -292,21 +304,26 @@ const autoCommand: SlashCommand = {
       };
     }
 
-    const indexer = CodebaseIndexer.fromConfig(projectRoot, config);
+    const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
     const status = await indexer.getIndexStatus();
 
     if (!status.exists) {
-      context.ui.addItem({
+      context.ui.setPendingItem({
         type: 'gemini',
-        text: 'No index found. Creating initial index...\n'
-      }, Date.now());
+        text: 'No index found. Creating initial index...'
+      });
 
       try {
         const result = await indexer.indexCodebase((progress) => {
           const progressText = formatProgress(progress);
-          context.ui.setDebugMessage(progressText);
+          context.ui.setPendingItem({
+            type: 'gemini',
+            text: progressText
+          });
         });
 
+        context.ui.setPendingItem(null);
+        
         if (result.success) {
           const successMessage = formatSuccessMessage(result);
           context.ui.addItem({
@@ -327,6 +344,7 @@ const autoCommand: SlashCommand = {
           return;
         }
       } catch (error) {
+        context.ui.setPendingItem(null);
         const errorMessage = `❌ Failed to create initial index: ${error instanceof Error ? error.message : String(error)}`;
         context.ui.addItem({
           type: 'gemini',
@@ -346,7 +364,10 @@ const autoCommand: SlashCommand = {
       config,
       (progress) => {
         const progressText = formatProgress(progress);
-        context.ui.setDebugMessage(progressText);
+        context.ui.addItem({
+          type: 'gemini',
+          text: `🔄 Auto-update: ${progressText}`
+        }, Date.now());
       },
       (result) => {
         if (result.success) {
@@ -394,19 +415,31 @@ function formatProgress(progress: IndexProgress): string {
   
   switch (phase) {
     case 'scanning':
-      return `📁 Scanning files... (${stats.totalFiles} found)`;
+      return `${progress.message || '🔍 Scanning files...'} ${progress.detail || `(${stats.totalFiles} found)`}`;
     case 'processing':
-      return `📄 Processing files... (${progress.processedFiles}/${progress.totalFiles})`;
+      return `${progress.message || '📝 Processing files...'} ${progress.detail || `(${progress.processedFiles}/${progress.totalFiles})`}`;
     case 'embedding':
-      return `🔗 Generating embeddings... (${progress.currentFile ? path.basename(progress.currentFile) : 'processing'})`;
+      if (progress.currentEmbedding && progress.totalEmbeddings) {
+        const percent = Math.round((progress.currentEmbedding / progress.totalEmbeddings) * 100);
+        return `${progress.message || '🧠 Generating embeddings...'} ${progress.detail || `(${progress.currentEmbedding}/${progress.totalEmbeddings}) ${percent}%`}`;
+      }
+      return `${progress.message || '🧠 Generating embeddings...'} ${progress.detail || ''}`;
+    case 'building_index':
+      if (progress.currentVector && progress.totalVectors) {
+        const percent = Math.round((progress.currentVector / progress.totalVectors) * 100);
+        return `${progress.message || '🔗 Building HNSW index...'} ${progress.detail || `(${progress.currentVector}/${progress.totalVectors}) ${percent}%`}`;
+      }
+      return `${progress.message || '🔗 Building HNSW index...'} ${progress.detail || ''}`;
     case 'saving':
-      return `💾 Saving index... (${progress.processedFiles}/${progress.totalFiles})`;
+      return `${progress.message || '💾 Saving index...'} ${progress.detail || ''}`;
     case 'complete':
-      return `✅ Indexing completed`;
+      return `${progress.message || '✅ Indexing completed'} ${progress.detail || ''}`;
     default:
       return 'Processing...';
   }
 }
+
+
 
 function formatSuccessMessage(result: any): string {
   const stats = result.stats;
@@ -425,7 +458,7 @@ function formatSuccessMessage(result: any): string {
 • Index size: ${sizeMB} MB
 • Time taken: ${duration}s
 
-Index updated in .index/`;
+Index updated in index.cbi`;
   } else {
     return `✅ Indexing completed successfully
 
@@ -438,7 +471,7 @@ Index updated in .index/`;
 • Index size: ${sizeMB} MB
 • Time taken: ${duration}s
 
-Index saved to .index/`;
+Index saved to index.cbi`;
   }
 }
 

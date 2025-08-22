@@ -20,7 +20,7 @@ export class EmbeddingService {
     };
   }
 
-  async generateEmbeddings(texts: string[]): Promise<number[][]> {
+  async generateEmbeddings(texts: string[], onProgress?: (current: number, total: number) => void): Promise<number[][]> {
     if (texts.length === 0) {
       return [];
     }
@@ -31,6 +31,8 @@ export class EmbeddingService {
       const batch = texts.slice(i, i + this.config.batchSize);
       const batchEmbeddings = await this.processBatch(batch);
       results.push(...batchEmbeddings);
+      
+      onProgress?.(results.length, texts.length);
     }
 
     return results;
@@ -139,7 +141,7 @@ export class EmbeddingService {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  async getEmbeddings(texts: string[]): Promise<number[][]> {
-    return this.generateEmbeddings(texts);
+  async getEmbeddings(texts: string[], onProgress?: (current: number, total: number) => void): Promise<number[][]> {
+    return this.generateEmbeddings(texts, onProgress);
   }
 }

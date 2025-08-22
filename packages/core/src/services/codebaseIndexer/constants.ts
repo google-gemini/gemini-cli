@@ -12,11 +12,8 @@ export const DEFAULT_BATCH_SIZE = 32;
 export const DEFAULT_MAX_TEXT_CHARS = 8192;
 export const DEFAULT_MERGE_THRESHOLD = 40;
 export const DEFAULT_SKIP_IF_LARGER_THAN = 50 * 1024 * 1024;
-export const INDEX_DIR = ".index";
-
 export const EXCLUDED_DIRS = new Set([
   '.git',
-  '.index',
   'node_modules',
   '.vscode',
   '.idea',
