@@ -119,9 +119,9 @@ describe('InputPrompt', () => {
       visualScrollRow: 0,
       handleInput: vi.fn(),
       move: vi.fn(),
-      moveToOffset: (offset: number) => {
+      moveToOffset: vi.fn((offset: number) => {
         mockBuffer.cursor = [0, offset];
-      },
+      }),
       killLineRight: vi.fn(),
       killLineLeft: vi.fn(),
       openInExternalEditor: vi.fn(),
@@ -1466,6 +1466,44 @@ describe('InputPrompt', () => {
       expect(props.buffer.text).toBe('initial text');
       expect(props.buffer.cursor).toEqual([0, 3]);
 
+      unmount();
+    });
+  });
+
+  describe('Ctrl+E keyboard shortcut', () => {
+    it('should move cursor to end of current line in multiline input', async () => {
+      props.buffer.text = 'line 1\nline 2\nline 3';
+      props.buffer.cursor = [1, 2];
+      props.buffer.lines = ['line 1', 'line 2', 'line 3'];
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\x05'); // Ctrl+E
+      await wait();
+
+      expect(props.buffer.move).toHaveBeenCalledWith('end');
+      expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should move cursor to end of current line for single line input', async () => {
+      props.buffer.text = 'single line text';
+      props.buffer.cursor = [0, 5];
+      props.buffer.lines = ['single line text'];
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\x05'); // Ctrl+E
+      await wait();
+
+      expect(props.buffer.move).toHaveBeenCalledWith('end');
+      expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
       unmount();
     });
   });
