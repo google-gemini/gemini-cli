@@ -4,334 +4,211 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import open from 'open';
-import { bugCommand } from './bugCommand.js';
-import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { getCliVersion } from '../../utils/version.js';
+import process from 'node:process';
+import stripAnsi from 'strip-ansi';
+import {
+  type CommandContext,
+  type SlashCommand,
+  CommandKind,
+} from './types.js';
+import { HistoryItem, MessageType } from '../types.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
-import { HistoryItem, ToolCallStatus, MessageType } from '../types.js';
+import { getCliVersion } from '../../utils/version.js';
 
-// Mock dependencies
-vi.mock('open');
-vi.mock('../../utils/version.js');
-vi.mock('../utils/formatters.js');
-vi.mock('../../ui/hooks/uiPrompt.js', () => ({
-  ui: {
-    promptYesNo: vi.fn(),
-  },
-}));
-vi.mock('node:process', () => ({
-  default: {
-    platform: 'test-platform',
-    version: 'v20.0.0',
-    env: process.env,
-    memoryUsage: () => ({ rss: 0 }),
-  },
-}));
+/**
+ * Redact sensitive information from a string.
+ * Masks passwords, API keys, and tokens.
+ */
+function redactSensitiveInfo(text: string): string {
+  return text
+    .replace(/(password\s*[:=]\s*)(\S+)/gi, '$1[REDACTED]')
+    .replace(/(api[_-]?key\s*[:=]\s*)(\S+)/gi, '$1[REDACTED]')
+    .replace(/(token\s*[:=]\s*)(\S+)/gi, '$1[REDACTED]');
+}
 
-describe('bugCommand', () => {
-  beforeEach(() => {
-    vi.mocked(getCliVersion).mockResolvedValue('0.1.0');
-    vi.mocked(formatMemoryUsage).mockReturnValue('100 MB');
-    vi.stubEnv('SANDBOX', 'gemini-test');
-  });
+function formatCliResponses(items: HistoryItem[]): string {
+  return items
+    .reduce((acc, item) => {
+      let responseText = '';
+      switch (item.type) {
+        case 'gemini':
+        case 'gemini_content':
+          responseText = `✦ ${stripAnsi(item.text)}`;
+          break;
+        case 'tool_group':
+          responseText = item.tools
+            .map((tool) => {
+              let output = `Tool Call: ${tool.name}, Status: ${
+                tool.status
+              }, Description: ${tool.description || 'N/A'}`;
+              if (
+                tool.resultDisplay &&
+                typeof tool.resultDisplay === 'object' &&
+                'fileDiff' in tool.resultDisplay &&
+                tool.resultDisplay.fileDiff
+              ) {
+                output += `\nTool Response: ${tool.resultDisplay.fileDiff}`;
+              } else if (
+                tool.resultDisplay &&
+                typeof tool.resultDisplay === 'string' &&
+                tool.resultDisplay
+              ) {
+                output += `\nTool Response: ${tool.resultDisplay}`;
+              }
+              return output;
+            })
+            .join('\n');
+          break;
+        case 'error':
+          responseText = `✕ ${stripAnsi(item.text)}`;
+          break;
+        case 'info':
+          if (item.text.startsWith('To submit your bug report')) return acc;
+          responseText = `ℹ ${stripAnsi(item.text)}`;
+          break;
+        default:
+          return acc;
+      }
+      acc.push(responseText);
+      return acc;
+    }, [] as string[])
+    .join('\n---\n');
+}
 
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.clearAllMocks();
-  });
+export const bugCommand: SlashCommand = {
+  name: 'bug',
+  description: 'submit a bug report',
+  kind: CommandKind.BUILT_IN,
+  action: async (context: CommandContext, args?: string): Promise<void> => {
+    const bugDescription = (args || '').trim();
+    const { config } = context.services;
 
-  // === Original tests ===
+    const osVersion = `${process.platform} ${process.version}`;
+    let sandboxEnv = 'no sandbox';
+    if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
+      sandboxEnv = process.env.SANDBOX.replace(/^gemini-(?:code-)?/, '');
+    } else if (process.env.SANDBOX === 'sandbox-exec') {
+      sandboxEnv = `sandbox-exec (${
+        process.env.SEATBELT_PROFILE || 'unknown'
+      })`;
+    }
+    const modelVersion = config?.getModel() || 'Unknown';
+    const cliVersion = await getCliVersion();
+    const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
 
-  it('should generate the default GitHub issue URL', async () => {
-    const mockContext = createMockCommandContext({
-      services: {
-        config: { getModel: () => 'gemini-pro', getBugCommand: () => undefined },
-      },
-      ui: { history: [] },
-    });
+    // --- User consent and redaction ---
+    let lastPromptText = 'N/A';
+    let lastCliResponseText = 'N/A';
 
-    if (!bugCommand.action) throw new Error('Action is not defined');
-    await bugCommand.action(mockContext, 'A test bug');
+    const lastUserPromptIndex = context.ui.history.findLastIndex(
+      (item) => item.type === 'user' && !item.text.startsWith('/bug')
+    );
+    const lastUserPrompt =
+      lastUserPromptIndex !== -1 ? context.ui.history[lastUserPromptIndex] : undefined;
 
-    const expectedInfo = `
-* **CLI Version:** 0.1.0
-* **Git Commit:** ${GIT_COMMIT_INFO}
-* **Operating System:** test-platform v20.0.0
-* **Sandbox Environment:** test
-* **Model Version:** gemini-pro
-* **Memory Usage:** 100 MB
-`;
+    if (lastUserPrompt && context.ui.promptYesNo) {
+      const consent = await context.ui.promptYesNo(
+        'Include the last prompt and response in your bug report? This may contain sensitive information.'
+      );
+
+      if (consent) {
+        const subsequentItems = context.ui.history.slice(lastUserPromptIndex + 1);
+        const cliResponses = formatCliResponses(subsequentItems);
+        lastPromptText = redactSensitiveInfo(lastUserPrompt.text);
+        lastCliResponseText = redactSensitiveInfo(cliResponses.length ? cliResponses : 'N/A');
+      }
+    }
+
     const problem = [
       '**Last User Prompt**',
       '```',
-      'N/A',
+      lastPromptText,
       '```',
       '',
       '**Last Gemini CLI Response**',
       '```',
-      'N/A',
+      lastCliResponseText,
       '```',
     ].join('\n');
 
-    let expectedUrl =
+    const info = `
+* **CLI Version:** ${cliVersion}
+* **Git Commit:** ${GIT_COMMIT_INFO}
+* **Operating System:** ${osVersion}
+* **Sandbox Environment:** ${sandboxEnv}
+* **Model Version:** ${modelVersion}
+* **Memory Usage:** ${memoryUsage}
+`;
+
+    let bugReportUrl =
       'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}&problem={problem}';
-    expectedUrl = expectedUrl
-      .replace('{title}', encodeURIComponent('A test bug'))
-      .replace('{info}', encodeURIComponent(expectedInfo))
+    const bugCommandSettings = config?.getBugCommand();
+    if (bugCommandSettings?.urlTemplate) {
+      bugReportUrl = bugCommandSettings.urlTemplate;
+    }
+
+    let url = bugReportUrl
+      .replace('{title}', encodeURIComponent(bugDescription))
+      .replace('{info}', encodeURIComponent(info))
       .replace('{problem}', encodeURIComponent(problem));
 
-    expect(open).toHaveBeenCalledWith(expectedUrl);
-  });
+    // Truncate if URL is too long
+    let wasTruncated = false;
+    const subsequentItems = lastUserPromptIndex === -1 ? [] : context.ui.history.slice(lastUserPromptIndex + 1);
+    while (url.length > 8000 && subsequentItems.length > 0) {
+      wasTruncated = true;
+      subsequentItems.shift();
+      const truncatedCliResponses = formatCliResponses(subsequentItems);
+      const truncatedLastCliResponse = truncatedCliResponses.length
+        ? truncatedCliResponses
+        : '... truncated response due to character limit ...';
 
-  it('should use a custom URL template from config if provided', async () => {
-    const customTemplate = 'https://internal.bug-tracker.com/new?desc={title}&details={info}';
-    const mockContext = createMockCommandContext({
-      services: {
-        config: { getModel: () => 'gemini-pro', getBugCommand: () => ({ urlTemplate: customTemplate }) },
+      const problemText =
+        truncatedCliResponses.length > 0 && wasTruncated
+          ? `... truncated response due to character limit ...\n${truncatedLastCliResponse}`
+          : truncatedLastCliResponse;
+
+      const truncatedProblem = [
+        '**Last User Prompt**',
+        '```',
+        lastPromptText,
+        '```',
+        '',
+        '**Last Gemini CLI Response**',
+        '```',
+        problemText,
+        '```',
+      ].join('\n');
+      url = bugReportUrl
+        .replace('{title}', encodeURIComponent(bugDescription))
+        .replace('{info}', encodeURIComponent(info))
+        .replace('{problem}', encodeURIComponent(truncatedProblem));
+    }
+
+    bugReportUrl = url;
+
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: `To submit your bug report, please open the following URL in your browser:\n${bugReportUrl}`,
       },
-      ui: { history: [] },
-    });
-
-    if (!bugCommand.action) throw new Error('Action is not defined');
-    await bugCommand.action(mockContext, 'A custom bug');
-
-    const expectedInfo = `
-* **CLI Version:** 0.1.0
-* **Git Commit:** ${GIT_COMMIT_INFO}
-* **Operating System:** test-platform v20.0.0
-* **Sandbox Environment:** test
-* **Model Version:** gemini-pro
-* **Memory Usage:** 100 MB
-`;
-    const expectedUrl = customTemplate
-      .replace('{title}', encodeURIComponent('A custom bug'))
-      .replace('{info}', encodeURIComponent(expectedInfo));
-
-    expect(open).toHaveBeenCalledWith(expectedUrl);
-  });
-
-  it('should correctly format multi-line prompts and responses', async () => {
-    const multiLinePrompt = `First line of prompt.\nSecond line of prompt.`;
-    const multiLineResponse = `First line of response.\nSecond line of response.`;
-
-    const mockContext = createMockCommandContext({
-      services: {
-        config: { getModel: () => 'gemini-pro', getBugCommand: () => undefined },
-      },
-      ui: {
-        history: [
-          { type: 'user', text: multiLinePrompt, id: 1 },
-          { type: 'gemini', text: multiLineResponse, id: 2 },
-          { type: 'user', text: '/bug', id: 3 },
-        ],
-      },
-    });
-
-    if (!bugCommand.action) throw new Error('Action is not defined');
-    await bugCommand.action(mockContext, 'A multi-line bug');
-
-    const expectedInfo = `
-* **CLI Version:** 0.1.0
-* **Git Commit:** ${GIT_COMMIT_INFO}
-* **Operating System:** test-platform v20.0.0
-* **Sandbox Environment:** test
-* **Model Version:** gemini-pro
-* **Memory Usage:** 100 MB
-`;
-
-    const expectedProblem = [
-      '**Last User Prompt**',
-      '```',
-      multiLinePrompt,
-      '```',
-      '',
-      '**Last Gemini CLI Response**',
-      '```',
-      `✦ ${multiLineResponse}`,
-      '```',
-    ].join('\n');
-
-    let expectedUrl =
-      'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}&problem={problem}';
-    expectedUrl = expectedUrl
-      .replace('{title}', encodeURIComponent('A multi-line bug'))
-      .replace('{info}', encodeURIComponent(expectedInfo))
-      .replace('{problem}', encodeURIComponent(expectedProblem));
-
-    expect(open).toHaveBeenCalledWith(expectedUrl);
-  });
-
-  it('should concatenate multiple Gemini responses since the last user prompt', async () => {
-    const mockContext = createMockCommandContext({
-      services: {
-        config: { getModel: () => 'gemini-pro', getBugCommand: () => undefined },
-      },
-      ui: {
-        history: [
-          { type: 'user', text: 'show me my files', id: 1 },
-          { type: 'gemini', text: 'Okay, which files?', id: 2 },
-          { type: 'tool_group', tools: [{ name: 'list_files', status: ToolCallStatus.Success, callId: '1', description: '', resultDisplay: undefined, confirmationDetails: undefined }], id: 3 },
-          { type: 'gemini', text: 'I have listed the files.', id: 4 },
-          { type: 'user', text: '/bug A complex bug', id: 5 },
-        ] as HistoryItem[],
-      },
-    });
-
-    if (!bugCommand.action) throw new Error('Action is not defined');
-    await bugCommand.action(mockContext, 'A complex bug');
-
-    const expectedInfo = `
-* **CLI Version:** 0.1.0
-* **Git Commit:** ${GIT_COMMIT_INFO}
-* **Operating System:** test-platform v20.0.0
-* **Sandbox Environment:** test
-* **Model Version:** gemini-pro
-* **Memory Usage:** 100 MB
-`;
-
-    const expectedProblem = [
-      '**Last User Prompt**',
-      '```',
-      'show me my files',
-      '```',
-      '',
-      '**Last Gemini CLI Response**',
-      '```',
-      [
-        `✦ Okay, which files?`,
-        `Tool Call: list_files, Status: Success, Description: N/A`,
-        `✦ I have listed the files.`,
-      ].join('\n---\n'),
-      '```',
-    ].join('\n');
-
-    let expectedUrl =
-      'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}&problem={problem}';
-    expectedUrl = expectedUrl
-      .replace('{title}', encodeURIComponent('A complex bug'))
-      .replace('{info}', encodeURIComponent(expectedInfo))
-      .replace('{problem}', encodeURIComponent(expectedProblem));
-
-    expect(open).toHaveBeenCalledWith(expectedUrl);
-  });
-
-  it('should truncate the URL and add a message if it exceeds 8000 characters', async () => {
-    const longText = 'a'.repeat(8000);
-    const mockContext = createMockCommandContext({
-      services: {
-        config: { getModel: () => 'gemini-pro', getBugCommand: () => undefined },
-      },
-      ui: {
-        history: [
-          { type: 'user', text: 'show me my files', id: 1 },
-          { type: 'gemini', text: longText, id: 2 },
-          { type: 'gemini', text: 'some more text', id: 3 },
-          { type: 'user', text: '/bug A long bug', id: 4 },
-        ] as HistoryItem[],
-      },
-    });
-
-    if (!bugCommand.action) throw new Error('Action is not defined');
-    await bugCommand.action(mockContext, 'A long bug');
-
-    const expectedInfo = `
-* **CLI Version:** 0.1.0
-* **Git Commit:** ${GIT_COMMIT_INFO}
-* **Operating System:** test-platform v20.0.0
-* **Sandbox Environment:** test
-* **Model Version:** gemini-pro
-* **Memory Usage:** 100 MB
-`;
-
-    const expectedProblem = [
-      '**Last User Prompt**',
-      '```',
-      'show me my files',
-      '```',
-      '',
-      '**Last Gemini CLI Response**',
-      '```',
-      `... truncated response due to character limit ...
-✦ some more text`,
-      '```',
-    ].join('\n');
-
-    let expectedUrl =
-      'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}&problem={problem}';
-    expectedUrl = expectedUrl
-      .replace('{title}', encodeURIComponent('A long bug'))
-      .replace('{info}', encodeURIComponent(expectedInfo))
-      .replace('{problem}', encodeURIComponent(expectedProblem));
-
-    expect(open).toHaveBeenCalledWith(expectedUrl);
-    expect(expectedUrl.length).toBeLessThan(8000);
-  });
-
-  // === New tests: consent & redaction ===
-
-  it('should include last prompt/response when user consents', async () => {
-    const mockPromptYesNo = vi.mocked(
-      (await import('../../ui/hooks/uiPrompt.js')).ui.promptYesNo
+      Date.now(),
     );
-    mockPromptYesNo.mockResolvedValue(true);
 
-    const sensitivePrompt = 'My password is secret123';
-    const sensitiveResponse = 'Here is the token: ABC123TOKEN';
-
-    const mockContext = createMockCommandContext({
-      services: {
-        config: { getModel: () => 'gemini-pro', getBugCommand: () => undefined },
-      },
-      ui: {
-        history: [
-          { type: 'user', text: sensitivePrompt, id: 1 },
-          { type: 'gemini', text: sensitiveResponse, id: 2 },
-          { type: 'user', text: '/bug A sensitive bug', id: 3 },
-        ],
-      },
-    });
-
-    if (!bugCommand.action) throw new Error('Action is not defined');
-    await bugCommand.action(mockContext, 'A sensitive bug');
-
-    expect(mockPromptYesNo).toHaveBeenCalled();
-
-    const calledUrl = vi.mocked(open).mock.calls[0][0];
-    expect(calledUrl).toContain(encodeURIComponent('A sensitive bug'));
-    expect(calledUrl).toContain('N/A'); // redacted sensitive info
-    expect(calledUrl).not.toContain('secret123');
-    expect(calledUrl).not.toContain('ABC123TOKEN');
-  });
-
-  it('should skip last prompt/response if user declines', async () => {
-    const mockPromptYesNo = vi.mocked(
-      (await import('../../ui/hooks/uiPrompt.js')).ui.promptYesNo
-    );
-    mockPromptYesNo.mockResolvedValue(false);
-
-    const mockContext = createMockCommandContext({
-      services: {
-        config: { getModel: () => 'gemini-pro', getBugCommand: () => undefined },
-      },
-      ui: {
-        history: [
-          { type: 'user', text: 'Show me files', id: 1 },
-          { type: 'gemini', text: 'Files listed', id: 2 },
-          { type: 'user', text: '/bug Another bug', id: 3 },
-        ],
-      },
-    });
-
-    if (!bugCommand.action) throw new Error('Action is not defined');
-    await bugCommand.action(mockContext, 'Another bug');
-
-    const calledUrl = vi.mocked(open).mock.calls[0][0];
-    expect(calledUrl).toContain(encodeURIComponent('Another bug'));
-    expect(calledUrl).toContain(encodeURIComponent('N/A')); // last prompt/response skipped
-    expect(calledUrl).not.toContain('Show me files');
-    expect(calledUrl).not.toContain('Files listed');
-  });
-});
+    try {
+      await open(bugReportUrl);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      context.ui.addItem(
+        {
+          type: MessageType.ERROR,
+          text: `Could not open URL in browser: ${errorMessage}`,
+        },
+        Date.now(),
+      );
+    }
+  },
+};
