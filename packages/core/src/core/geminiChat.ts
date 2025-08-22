@@ -25,6 +25,21 @@ import { hasCycleInSchema } from '../tools/tools.js';
 import { StructuredError } from './turn.js';
 
 /**
+ * Options for retrying due to invalid content from the model.
+ */
+interface ContentRetryOptions {
+  /** Total number of attempts to make (1 initial + N retries). */
+  maxAttempts: number;
+  /** The base delay in milliseconds for linear backoff. */
+  initialDelayMs: number;
+}
+
+const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
+  maxAttempts: 3, // 1 initial call + 2 retries
+  initialDelayMs: 500,
+};
+
+/**
  * Returns true if the response is valid, false otherwise.
  */
 function isValidResponse(response: GenerateContentResponse): boolean {
@@ -330,10 +345,13 @@ export class GeminiChat {
     const self = this;
     return (async function* () {
       try {
-        const MAX_RETRIES = 2;
         let lastError: unknown = new Error('Request failed after all retries.');
 
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        for (
+          let attempt = 0;
+          attempt <= INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
+          attempt++
+        ) {
           try {
             const stream = await self.makeApiCallAndProcessStream(
               requestContents,
@@ -353,9 +371,14 @@ export class GeminiChat {
             const isContentError = error instanceof EmptyStreamError;
 
             if (isContentError) {
-              if (attempt < MAX_RETRIES) {
+              // Check if we have more attempts left.
+              if (attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts - 1) {
                 await new Promise((res) =>
-                  setTimeout(res, 500 * (attempt + 1)),
+                  setTimeout(
+                    res,
+                    INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs *
+                      (attempt + 1),
+                  ),
                 );
                 continue;
               }
