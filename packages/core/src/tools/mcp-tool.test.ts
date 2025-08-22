@@ -14,6 +14,7 @@ import {
   afterEach,
   Mocked,
 } from 'vitest';
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
 import { ToolResult, ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
 import { CallableTool, Part } from '@google/genai';
@@ -200,6 +201,10 @@ describe('DiscoveredMCPTool', () => {
           inputSchema,
         );
         const params = { param: 'isErrorTrueCase' };
+        const functionCall = {
+          name: serverToolName,
+          args: params,
+        };
 
         const errorResponse = { isError: isErrorValue };
         const mockMcpToolResponseParts: Part[] = [
@@ -211,10 +216,11 @@ describe('DiscoveredMCPTool', () => {
           },
         ];
         mockCallTool.mockResolvedValue(mockMcpToolResponseParts);
-        const expectedErrorMessage = `MCP tool '${serverToolName}' reported tool error with response: ${JSON.stringify(
-          mockMcpToolResponseParts,
-        )}`;
-
+        const expectedErrorMessage = `MCP tool '${
+          serverToolName
+        }' reported tool error for function call: ${safeJsonStringify(
+          functionCall,
+        )} with response: ${safeJsonStringify(mockMcpToolResponseParts)}`;
         const invocation = tool.build(params);
         const result = await invocation.execute(new AbortController().signal);
 
