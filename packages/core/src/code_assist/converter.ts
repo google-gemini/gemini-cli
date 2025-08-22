@@ -218,32 +218,32 @@ function toPart(part: PartUnion): Part {
   if ('thought' in part && part.thought) {
     const thoughtText = `[Thought: ${part.thought}]`;
 
-    if ('text' in part && typeof part.text === 'string') {
-      const newPart = { ...part };
-      delete (newPart as Record<string, unknown>)['thought'];
-      newPart.text = (part.text || '') + `\n${thoughtText}`;
+    const newPart = { ...part };
+    delete (newPart as Record<string, unknown>)['thought'];
+
+    const hasApiContent =
+      'functionCall' in newPart ||
+      'functionResponse' in newPart ||
+      'inlineData' in newPart ||
+      'fileData' in newPart;
+
+    if (hasApiContent) {
+      // It's a functionCall or other non-text part. Just strip the thought.
       return newPart;
     }
 
-    const restOfPart = { ...part } as Part;
-    delete (restOfPart as Record<string, unknown>)['thought'];
-
-    const hasApiContent =
-      'functionCall' in restOfPart ||
-      'functionResponse' in restOfPart ||
-      'inlineData' in restOfPart ||
-      'fileData' in restOfPart;
-
-    if (hasApiContent) {
-      return restOfPart;
-    }
-
     // If no other valid API content, this must be a text part.
-    // Convert thought to text, preserving any existing text-like content.
-    if (restOfPart.text) {
-      return { text: `${String(restOfPart.text)}\n${thoughtText}` };
-    }
-    return { text: thoughtText };
+    // Combine existing text (if any) with the thought, preserving other properties.
+    const text = (newPart as { text?: unknown }).text;
+    const existingText = text ? String(text) : '';
+    const combinedText = existingText
+      ? `${existingText}\n${thoughtText}`
+      : thoughtText;
+
+    return {
+      ...newPart,
+      text: combinedText,
+    };
   }
 
   return part;
