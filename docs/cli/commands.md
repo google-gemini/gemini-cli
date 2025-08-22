@@ -299,6 +299,37 @@ Please generate a Conventional Commit message based on the following git diff:
 
 When you run `/git:commit`, the CLI first executes `git diff --staged`, then replaces `!{git diff --staged}` with the output of that command before sending the final, complete prompt to the model.
 
+##### 4. Injecting File Content with `@{...}`
+
+You can directly embed the content of a file or a directory listing into your prompt using the `@{...}` syntax. This is useful for creating commands that operate on specific files.
+
+**How It Works:**
+
+- **File Injection**: `@{path/to/file.txt}` is replaced by the content of `file.txt`.
+- **Directory Listing**: `@{path/to/dir}` is replaced by a formatted list of the directory's contents.
+- **Workspace-Aware**: The command searches for the path in the current directory and any other workspace directories. Absolute paths are allowed if they are within the workspace.
+- **Dynamic Paths**: This processing happens _after_ shell and argument injection, so you can dynamically construct the path.
+
+**Example (`review.toml`):**
+
+This command takes a filename as an argument and injects its content into the prompt.
+
+````toml
+# In: <project>/.gemini/commands/review.toml
+# Invoked via: /review src/index.ts
+
+description = "Reviews a specific file."
+prompt = """
+Please review the following code from the file `{{args}}`:
+
+```typescript
+@{ {{args}} }
+```
+"""
+````
+
+When you run `/review src/index.ts`, the `{{args}}` placeholder is first replaced, resulting in the `@{src/index.ts}` placeholder, which is then replaced by the content of that file.
+
 ---
 
 #### Example: A "Pure Function" Refactoring Command
