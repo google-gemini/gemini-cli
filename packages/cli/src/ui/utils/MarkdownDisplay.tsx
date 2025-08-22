@@ -6,10 +6,12 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
+import { EOL } from 'os';
 import { Colors } from '../colors.js';
 import { colorizeCode } from './CodeColorizer.js';
 import { TableRenderer } from './TableRenderer.js';
 import { RenderInline } from './InlineMarkdownRenderer.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 interface MarkdownDisplayProps {
   text: string;
@@ -33,7 +35,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
 }) => {
   if (!text) return <></>;
 
-  const lines = text.split('\n');
+  const lines = text.split(EOL);
   const headerRegex = /^ *(#{1,4}) +(.*)/;
   const codeFenceRegex = /^ *(`{3,}|~{3,}) *(\w*?) *$/;
   const ulItemRegex = /^([ \t]*)([-*+]) +(.*)/;
@@ -298,6 +300,7 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
   availableTerminalHeight,
   terminalWidth,
 }) => {
+  const settings = useSettings();
   const MIN_LINES_FOR_MESSAGE = 1; // Minimum lines to show before the "generating more" message
   const RESERVED_LINES = 2; // Lines reserved for the message itself and potential padding
 
@@ -322,6 +325,8 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
         lang,
         availableTerminalHeight,
         terminalWidth - CODE_BLOCK_PREFIX_PADDING,
+        undefined,
+        settings,
       );
       return (
         <Box paddingLeft={CODE_BLOCK_PREFIX_PADDING} flexDirection="column">
@@ -338,6 +343,8 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
     lang,
     availableTerminalHeight,
     terminalWidth - CODE_BLOCK_PREFIX_PADDING,
+    undefined,
+    settings,
   );
 
   return (

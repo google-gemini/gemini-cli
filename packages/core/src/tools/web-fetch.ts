@@ -4,17 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import {
-  BaseTool,
-  ToolResult,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
-  Icon,
+  ToolInvocation,
+  ToolResult,
 } from './tools.js';
-import { Type } from '@google/genai';
+import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { Config, ApprovalMode } from '../config/config.js';
+import { ApprovalMode, Config } from '../config/config.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { convert } from 'html-to-text';
@@ -60,47 +61,19 @@ export interface WebFetchToolParams {
   prompt: string;
 }
 
-/**
- * Implementation of the WebFetch tool logic
- */
-export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
-  static readonly Name: string = 'web_fetch';
-
-  constructor(private readonly config: Config) {
-    super(
-      WebFetchTool.Name,
-      'WebFetch',
-      "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
-      Icon.Globe,
-      {
-        properties: {
-          prompt: {
-            description:
-              'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). Must contain as least one URL starting with http:// or https://.',
-            type: Type.STRING,
-          },
-        },
-        required: ['prompt'],
-        type: Type.OBJECT,
-      },
-    );
-    const proxy = config.getProxy();
-    if (proxy) {
-      setGlobalDispatcher(new ProxyAgent(proxy as string));
-    }
+class WebFetchToolInvocation extends BaseToolInvocation<
+  WebFetchToolParams,
+  ToolResult
+> {
+  constructor(
+    private readonly config: Config,
+    params: WebFetchToolParams,
+  ) {
+    super(params);
   }
 
-  private async executeFallback(
-    params: WebFetchToolParams,
-    signal: AbortSignal,
-  ): Promise<ToolResult> {
-    const urls = extractUrls(params.prompt);
-    if (urls.length === 0) {
-      return {
-        llmContent: 'Error: No URL found in the prompt for fallback.',
-        returnDisplay: 'Error: No URL found in the prompt for fallback.',
-      };
-    }
+  private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
+    const urls = extractUrls(this.params.prompt);
     // For now, we only support one URL for fallback
     let url = urls[0];
 
@@ -128,13 +101,14 @@ export class WebFetchTool extends BaseTool<WebFetchToolParams, ToolResult> {
       }).substring(0, MAX_CONTENT_LENGTH);
 
       const geminiClient = this.config.getGeminiClient();
-      const fallbackPrompt = `The user requested the following: "${params.prompt}".
+      const fallbackPrompt = `The user requested the following: "${this.params.prompt}".
 
-I was unable to access the URL directly. Instead, I have fetched the raw content of the page. Please use the following content to answer the user's request. Do not attempt to access the URL again.
+I was unable to access the URL directly. Instead, I have fetched the raw content of the page. Please use the following content to answer the request. Do not attempt to access the URL again.
 
 ---
 ${textContent}
----`;
+---
+`;
       const result = await geminiClient.generateContent(
         [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
         {},
@@ -151,50 +125,32 @@ ${textContent}
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_FALLBACK_FAILED,
+        },
       };
     }
   }
 
-  validateParams(params: WebFetchToolParams): string | null {
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
-    if (errors) {
-      return errors;
-    }
-    if (!params.prompt || params.prompt.trim() === '') {
-      return "The 'prompt' parameter cannot be empty and must contain URL(s) and instructions.";
-    }
-    if (
-      !params.prompt.includes('http://') &&
-      !params.prompt.includes('https://')
-    ) {
-      return "The 'prompt' must contain at least one valid URL (starting with http:// or https://).";
-    }
-    return null;
-  }
-
-  getDescription(params: WebFetchToolParams): string {
+  getDescription(): string {
     const displayPrompt =
-      params.prompt.length > 100
-        ? params.prompt.substring(0, 97) + '...'
-        : params.prompt;
+      this.params.prompt.length > 100
+        ? this.params.prompt.substring(0, 97) + '...'
+        : this.params.prompt;
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
   }
 
-  async shouldConfirmExecute(
-    params: WebFetchToolParams,
-  ): Promise<ToolCallConfirmationDetails | false> {
+  override async shouldConfirmExecute(): Promise<
+    ToolCallConfirmationDetails | false
+  > {
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
-      return false;
-    }
-
-    const validationError = this.validateParams(params);
-    if (validationError) {
       return false;
     }
 
     // Perform GitHub URL conversion here to differentiate between user-provided
     // URL and the actual URL to be fetched.
-    const urls = extractUrls(params.prompt).map((url) => {
+    const urls = extractUrls(this.params.prompt).map((url) => {
       if (url.includes('github.com') && url.includes('/blob/')) {
         return url
           .replace('github.com', 'raw.githubusercontent.com')
@@ -206,7 +162,7 @@ ${textContent}
     const confirmationDetails: ToolCallConfirmationDetails = {
       type: 'info',
       title: `Confirm Web Fetch`,
-      prompt: params.prompt,
+      prompt: this.params.prompt,
       urls,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
@@ -217,25 +173,14 @@ ${textContent}
     return confirmationDetails;
   }
 
-  async execute(
-    params: WebFetchToolParams,
-    signal: AbortSignal,
-  ): Promise<ToolResult> {
-    const validationError = this.validateParams(params);
-    if (validationError) {
-      return {
-        llmContent: `Error: Invalid parameters provided. Reason: ${validationError}`,
-        returnDisplay: validationError,
-      };
-    }
-
-    const userPrompt = params.prompt;
+  async execute(signal: AbortSignal): Promise<ToolResult> {
+    const userPrompt = this.params.prompt;
     const urls = extractUrls(userPrompt);
     const url = urls[0];
     const isPrivate = isPrivateIp(url);
 
     if (isPrivate) {
-      return this.executeFallback(params, signal);
+      return this.executeFallback(signal);
     }
 
     const geminiClient = this.config.getGeminiClient();
@@ -293,7 +238,7 @@ ${textContent}
       }
 
       if (processingError) {
-        return this.executeFallback(params, signal);
+        return this.executeFallback(signal);
       }
 
       const sourceListFormatted: string[] = [];
@@ -354,7 +299,66 @@ ${sourceListFormatted.join('\n')}`;
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_PROCESSING_ERROR,
+        },
       };
     }
+  }
+}
+
+/**
+ * Implementation of the WebFetch tool logic
+ */
+export class WebFetchTool extends BaseDeclarativeTool<
+  WebFetchToolParams,
+  ToolResult
+> {
+  static readonly Name: string = 'web_fetch';
+
+  constructor(private readonly config: Config) {
+    super(
+      WebFetchTool.Name,
+      'WebFetch',
+      "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
+      Kind.Fetch,
+      {
+        properties: {
+          prompt: {
+            description:
+              'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). Must contain as least one URL starting with http:// or https://.',
+            type: 'string',
+          },
+        },
+        required: ['prompt'],
+        type: 'object',
+      },
+    );
+    const proxy = config.getProxy();
+    if (proxy) {
+      setGlobalDispatcher(new ProxyAgent(proxy as string));
+    }
+  }
+
+  protected override validateToolParamValues(
+    params: WebFetchToolParams,
+  ): string | null {
+    if (!params.prompt || params.prompt.trim() === '') {
+      return "The 'prompt' parameter cannot be empty and must contain URL(s) and instructions.";
+    }
+    if (
+      !params.prompt.includes('http://') &&
+      !params.prompt.includes('https://')
+    ) {
+      return "The 'prompt' must contain at least one valid URL (starting with http:// or https://).";
+    }
+    return null;
+  }
+
+  protected createInvocation(
+    params: WebFetchToolParams,
+  ): ToolInvocation<WebFetchToolParams, ToolResult> {
+    return new WebFetchToolInvocation(this.config, params);
   }
 }

@@ -16,17 +16,20 @@ vi.mock('fs');
 vi.mock('os');
 
 describe('ide-installer', () => {
+  beforeEach(() => {
+    vi.spyOn(os, 'homedir').mockReturnValue('/home/user');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('getIdeInstaller', () => {
     it('should return a VsCodeInstaller for "vscode"', () => {
       const installer = getIdeInstaller(DetectedIde.VSCode);
       expect(installer).not.toBeNull();
       // A more specific check might be needed if we export the class
       expect(installer).toBeInstanceOf(Object);
-    });
-
-    it('should return null for an unknown IDE', () => {
-      const installer = getIdeInstaller('unknown' as DetectedIde);
-      expect(installer).toBeNull();
     });
   });
 
@@ -38,37 +41,6 @@ describe('ide-installer', () => {
       installer = getIdeInstaller(DetectedIde.VSCode)!;
       vi.spyOn(child_process, 'execSync').mockImplementation(() => '');
       vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-      vi.spyOn(os, 'homedir').mockReturnValue('/home/user');
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    describe('isInstalled', () => {
-      it('should return true if command is in PATH', async () => {
-        expect(await installer.isInstalled()).toBe(true);
-      });
-
-      it('should return true if command is in a known location', async () => {
-        vi.spyOn(child_process, 'execSync').mockImplementation(() => {
-          throw new Error('Command not found');
-        });
-        vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-        // Re-create the installer so it re-runs findVsCodeCommand
-        installer = getIdeInstaller(DetectedIde.VSCode)!;
-        expect(await installer.isInstalled()).toBe(true);
-      });
-
-      it('should return false if command is not found', async () => {
-        vi.spyOn(child_process, 'execSync').mockImplementation(() => {
-          throw new Error('Command not found');
-        });
-        vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-        // Re-create the installer so it re-runs findVsCodeCommand
-        installer = getIdeInstaller(DetectedIde.VSCode)!;
-        expect(await installer.isInstalled()).toBe(false);
-      });
     });
 
     describe('install', () => {
@@ -81,9 +53,7 @@ describe('ide-installer', () => {
         installer = getIdeInstaller(DetectedIde.VSCode)!;
         const result = await installer.install();
         expect(result.success).toBe(false);
-        expect(result.message).toContain(
-          'not found in your PATH or common installation locations',
-        );
+        expect(result.message).toContain('VS Code CLI not found');
       });
     });
   });
