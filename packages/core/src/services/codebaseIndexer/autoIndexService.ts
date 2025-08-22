@@ -54,7 +54,7 @@ export class AutoIndexService {
       await this.indexer.indexCodebase(this.config.onProgress);
     }
 
-    this.intervalId = setInterval(async () => {
+    this.intervalId = setTimeout(async () => {
       await this.checkForChanges();
     }, this.config.checkInterval);
 
