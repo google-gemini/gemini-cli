@@ -45,14 +45,12 @@ export function getThemesDirectory(): string {
 /**
  * Load themes from file-based storage
  */
-export async function loadFileBasedThemes(): Promise<
-  Record<string, CustomTheme>
-> {
+export async function loadFileBasedThemes(): Promise<Record<string, CustomTheme>> {
   const themes: Record<string, CustomTheme> = {};
-
+  
   try {
     const themesDir = getThemesDirectory();
-
+    
     // Check if themes directory exists
     try {
       await fs.access(themesDir);
@@ -60,16 +58,16 @@ export async function loadFileBasedThemes(): Promise<
       // Directory doesn't exist, return empty themes
       return themes;
     }
-
+    
     const files = await fs.readdir(themesDir);
-    const themeFiles = files.filter((file) => file.endsWith('.json'));
-
+    const themeFiles = files.filter(file => file.endsWith('.json'));
+    
     for (const file of themeFiles) {
       try {
         const filePath = path.join(themesDir, file);
         const fileContent = await fs.readFile(filePath, 'utf8');
         const themeData: ThemeFileData | CustomTheme = JSON.parse(fileContent);
-
+        
         // Support both new format (with metadata) and legacy format
         let theme: CustomTheme;
         if ('theme' in themeData && themeData.theme) {
@@ -77,7 +75,7 @@ export async function loadFileBasedThemes(): Promise<
         } else {
           theme = themeData as CustomTheme;
         }
-
+        
         // Use theme name as key
         if (theme.name) {
           themes[theme.name] = theme;
@@ -89,38 +87,34 @@ export async function loadFileBasedThemes(): Promise<
   } catch (error) {
     console.warn('Failed to load file-based themes:', error);
   }
-
+  
   return themes;
 }
 
 /**
  * Load and combine themes from both settings and file-based storage
  */
-export async function loadCombinedThemes(
-  settingsThemes: Record<string, CustomTheme> = {},
-): Promise<CombinedThemes> {
+export async function loadCombinedThemes(settingsThemes: Record<string, CustomTheme> = {}): Promise<CombinedThemes> {
   const fileThemes = await loadFileBasedThemes();
-
+  
   // Combine themes, with file-based themes taking precedence over settings themes
   // if there are naming conflicts
   const allThemes = {
     ...settingsThemes,
-    ...fileThemes,
+    ...fileThemes
   };
-
+  
   return {
     settingsThemes,
     fileThemes,
-    allThemes,
+    allThemes
   };
 }
 
 /**
  * Get all available custom themes (convenience function)
  */
-export async function getAllCustomThemes(
-  settingsThemes: Record<string, CustomTheme> = {},
-): Promise<Record<string, CustomTheme>> {
+export async function getAllCustomThemes(settingsThemes: Record<string, CustomTheme> = {}): Promise<Record<string, CustomTheme>> {
   const combined = await loadCombinedThemes(settingsThemes);
   return combined.allThemes;
 }

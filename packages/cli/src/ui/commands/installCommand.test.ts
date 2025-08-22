@@ -18,18 +18,16 @@ describe('installCommand', () => {
 
   it('should return help message when no args provided', async () => {
     const result = await installCommand.action!(mockContext, '');
-
+    
     expect(result).toEqual({
       type: 'submit_prompt',
-      content: expect.stringContaining(
-        'I need help installing a VS Code theme',
-      ),
+      content: expect.stringContaining('I need help installing a VS Code theme'),
     });
   });
 
   it('should return error message when no valid URL found', async () => {
     const result = await installCommand.action!(mockContext, 'invalid input');
-
+    
     expect(result).toEqual({
       type: 'submit_prompt',
       content: expect.stringContaining("I couldn't find a valid URL"),
@@ -38,20 +36,18 @@ describe('installCommand', () => {
 
   it('should return success message when valid marketplace URL provided', async () => {
     const result = await installCommand.action!(
-      mockContext,
-      'https://marketplace.visualstudio.com/items?itemName=arcticicestudio.nord-visual-studio-code',
+      mockContext, 
+      'https://marketplace.visualstudio.com/items?itemName=arcticicestudio.nord-visual-studio-code'
     );
-
+    
     expect(result).toEqual({
       type: 'submit_prompt',
-      content: expect.stringContaining("I'll help you install a VS Code theme"),
+      content: expect.stringContaining('I\'ll help you install a VS Code theme'),
     });
   });
 
   it('should have the correct name and description', () => {
     expect(installCommand.name).toBe('install');
-    expect(installCommand.description).toBe(
-      'install VS Code themes from marketplace URLs',
-    );
+    expect(installCommand.description).toBe('install VS Code themes from marketplace URLs');
   });
-});
+}); 

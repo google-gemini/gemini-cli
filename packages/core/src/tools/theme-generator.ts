@@ -10,32 +10,22 @@ import type { VSCodeTheme, ColorPalette } from './theme-types.js';
 /**
  * Generates a theme using AI based on the theme name
  */
-export async function generateThemeWithAI(
-  themeName: string,
-  signal: AbortSignal,
-  config?: Config,
-): Promise<VSCodeTheme | null> {
+export async function generateThemeWithAI(themeName: string, signal: AbortSignal, config?: Config): Promise<VSCodeTheme | null> {
   try {
     console.log(`🤖 Attempting AI theme generation for "${themeName}"...`);
-
+    
     if (!config) {
-      console.warn(
-        '❌ No config provided for AI theme generation, falling back to default theme',
-      );
+      console.warn('❌ No config provided for AI theme generation, falling back to default theme');
       return createDefaultTheme(themeName);
     }
 
     const gemini = config.getGeminiClient();
     if (!gemini) {
-      console.warn(
-        '❌ No Gemini client available for AI theme generation, falling back to default theme',
-      );
+      console.warn('❌ No Gemini client available for AI theme generation, falling back to default theme');
       return createDefaultTheme(themeName);
     }
     // 1) Determine theme type using JSON mode
-    console.log(
-      `🤖 Determining theme type for "${themeName}" using JSON mode...`,
-    );
+    console.log(`🤖 Determining theme type for "${themeName}" using JSON mode...`);
     const THEME_TYPE_SCHEMA: Record<string, unknown> = {
       type: 'object',
       properties: {
@@ -62,18 +52,13 @@ Return a JSON object with { "themeType": "light" | "dark" }.`;
       )) as unknown as { themeType?: 'light' | 'dark' };
       themeType = themeTypeResult?.themeType === 'light' ? 'light' : 'dark';
     } catch (e) {
-      console.warn(
-        '⚠️ Failed to get theme type from LLM, defaulting to dark.',
-        e,
-      );
+      console.warn('⚠️ Failed to get theme type from LLM, defaulting to dark.', e);
       themeType = 'dark';
     }
     console.log(`🤖 Determined theme type: ${themeType}`);
 
     // 2) Generate palette using JSON mode
-    console.log(
-      `🤖 Generating color palette for ${themeType} theme "${themeName}" using JSON mode...`,
-    );
+    console.log(`🤖 Generating color palette for ${themeType} theme "${themeName}" using JSON mode...`);
 
     const HEX = '^#[0-9a-fA-F]{6}$';
     const PALETTE_SCHEMA: Record<string, unknown> = {
@@ -147,74 +132,66 @@ Return a JSON object matching the provided schema with exactly these keys.`;
       return createDefaultTheme(themeName);
     }
 
-    console.log(
-      `🎨 Received AI-generated palette with ${Object.keys(palette).length} colors`,
-    );
+    console.log(`🎨 Received AI-generated palette with ${Object.keys(palette).length} colors`);
 
-    // Validate all colors are hex format
-    const isValidHex = (color: string) => /^#[\da-f]{6}$/i.test(color);
-    for (const [key, value] of Object.entries(palette)) {
-      if (typeof value !== 'string' || !isValidHex(value)) {
-        console.warn(
-          `❌ Invalid color format for ${key}: ${value}, using default theme`,
-        );
-        return createDefaultTheme(themeName);
+      // Validate all colors are hex format
+      const isValidHex = (color: string) => /^#[\da-f]{6}$/i.test(color);
+      for (const [key, value] of Object.entries(palette)) {
+        if (typeof value !== 'string' || !isValidHex(value)) {
+          console.warn(`❌ Invalid color format for ${key}: ${value}, using default theme`);
+          return createDefaultTheme(themeName);
+        }
       }
-    }
+      
+      console.log(`✅ All colors validated successfully`);
 
-    console.log(`✅ All colors validated successfully`);
-
-    const aiTheme: VSCodeTheme = {
-      name: themeName,
-      type: themeType,
-      colors: {
-        'editor.background': palette.background,
-        'editor.foreground': palette.foreground,
-        'button.background': palette.accent,
-        'editor.findMatchBackground': palette.highlight,
-        'editor.lineHighlightBackground': palette.surface,
-        'editor.wordHighlightBackground': palette.surface,
-        'editorGutter.addedBackground': palette.success,
-        'editorGutter.modifiedBackground': palette.warning,
-        'editorGutter.deletedBackground': palette.error,
-        'editorLineNumber.foreground': palette.muted,
-      },
-      tokenColors: [
-        {
-          scope: 'keyword',
-          settings: { foreground: palette.keyword },
+      const aiTheme: VSCodeTheme = {
+        name: themeName,
+        type: themeType,
+        colors: {
+          'editor.background': palette.background,
+          'editor.foreground': palette.foreground,
+          'button.background': palette.accent,
+          'editor.findMatchBackground': palette.highlight,
+          'editor.lineHighlightBackground': palette.surface,
+          'editor.wordHighlightBackground': palette.surface,
+          'editorGutter.addedBackground': palette.success,
+          'editorGutter.modifiedBackground': palette.warning,
+          'editorGutter.deletedBackground': palette.error,
+          'editorLineNumber.foreground': palette.muted,
         },
-        {
-          scope: 'string',
-          settings: { foreground: palette.string },
-        },
-        {
-          scope: 'comment',
-          settings: { foreground: palette.comment },
-        },
-        {
-          scope: 'constant.numeric',
-          settings: { foreground: palette.number },
-        },
-        {
-          scope: 'entity.name.class',
-          settings: { foreground: palette.class },
-        },
-        {
-          scope: 'storage.type',
-          settings: { foreground: palette.type },
-        },
-      ],
-    };
-
-    console.log(
-      `✅ Successfully generated AI theme: ${aiTheme.name} (${aiTheme.type})`,
-    );
-    console.log(
-      `🎨 AI theme has ${Object.keys(aiTheme.colors).length} colors and ${aiTheme.tokenColors.length} token colors`,
-    );
-
-    return aiTheme;
+        tokenColors: [
+          {
+            scope: 'keyword',
+            settings: { foreground: palette.keyword }
+          },
+          {
+            scope: 'string',
+            settings: { foreground: palette.string }
+          },
+          {
+            scope: 'comment',
+            settings: { foreground: palette.comment }
+          },
+          {
+            scope: 'constant.numeric',
+            settings: { foreground: palette.number }
+          },
+          {
+            scope: 'entity.name.class',
+            settings: { foreground: palette.class }
+          },
+          {
+            scope: 'storage.type',
+            settings: { foreground: palette.type }
+          }
+        ]
+      };
+      
+      console.log(`✅ Successfully generated AI theme: ${aiTheme.name} (${aiTheme.type})`);
+      console.log(`🎨 AI theme has ${Object.keys(aiTheme.colors).length} colors and ${aiTheme.tokenColors.length} token colors`);
+      
+      return aiTheme;
   } catch (error) {
     console.error('Failed to generate theme with AI:', error);
     return createDefaultTheme(themeName);
@@ -244,30 +221,30 @@ export function createDefaultTheme(themeName: string): VSCodeTheme {
     tokenColors: [
       {
         scope: 'keyword',
-        settings: { foreground: '#569cd6' },
+        settings: { foreground: '#569cd6' }
       },
       {
         scope: 'string',
-        settings: { foreground: '#ce9178' },
+        settings: { foreground: '#ce9178' }
       },
       {
         scope: 'comment',
-        settings: { foreground: '#6a9955' },
+        settings: { foreground: '#6a9955' }
       },
       {
         scope: 'constant.numeric',
-        settings: { foreground: '#b5cea8' },
+        settings: { foreground: '#b5cea8' }
       },
       {
         scope: 'entity.name.class',
-        settings: { foreground: '#4ec9b0' },
+        settings: { foreground: '#4ec9b0' }
       },
       {
         scope: 'storage.type',
-        settings: { foreground: '#569cd6' },
-      },
-    ],
+        settings: { foreground: '#569cd6' }
+      }
+    ]
   };
-
+  
   return defaultTheme;
-}
+} 

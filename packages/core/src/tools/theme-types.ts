@@ -94,4 +94,4 @@ export interface ThemeDebugInfo {
   themeName: string;
   colorSources: Record<string, string>;
   colorValues: Record<string, string>;
-}
+} 

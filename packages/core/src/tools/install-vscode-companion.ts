@@ -4,16 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolResult,
-  ToolCallConfirmationDetails,
-  ToolLocation,
-  ToolInvocation,
-} from './tools.js';
-import { BaseDeclarativeTool, Kind } from './tools.js';
-
+import type { ToolResult, ToolCallConfirmationDetails, ToolLocation } from './tools.js';
+import { BaseTool, Icon } from './tools.js';
+import type { Config } from '../config/config.js';
 import { Type } from '@google/genai';
-import { detectIde, DetectedIde, getIdeInfo } from '../ide/detect-ide.js';
+import { detectIde, getIdeDisplayName, DetectedIde } from '../ide/detect-ide.js';
 import { getIdeInstaller } from '../ide/ide-installer.js';
 
 export type InstallVSCodeCompanionParams = Record<string, never>;
@@ -21,47 +16,35 @@ export type InstallVSCodeCompanionParams = Record<string, never>;
 /**
  * Tool for installing the Gemini CLI VS Code companion extension.
  */
-export class InstallVSCodeCompanionTool extends BaseDeclarativeTool<
+export class InstallVSCodeCompanionTool extends BaseTool<
   InstallVSCodeCompanionParams,
   ToolResult
 > {
   static readonly Name = 'install_vscode_companion';
 
-  constructor() {
+  constructor(private readonly config: Config) {
     super(
       InstallVSCodeCompanionTool.Name,
       'Install VS Code Companion',
-      'Installs or updates the Gemini CLI VS Code companion extension for tighter IDE integration.',
-      Kind.Other,
-      { type: Type.OBJECT, properties: {} },
+  'Installs or updates the Gemini CLI VS Code companion extension for tighter IDE integration.',
+  Icon.Hammer,
+  { type: Type.OBJECT, properties: {} },
     );
   }
 
-  protected override validateToolParamValues(
-    _params: InstallVSCodeCompanionParams,
-  ): string | null {
+  validateToolParams(_params: InstallVSCodeCompanionParams): string | null {
     return null;
   }
 
-  protected createInvocation(
-    params: InstallVSCodeCompanionParams,
-  ): ToolInvocation<InstallVSCodeCompanionParams, ToolResult> {
-    return new InstallVSCodeCompanionInvocation(params);
-  }
-}
-
-class InstallVSCodeCompanionInvocation
-  implements ToolInvocation<InstallVSCodeCompanionParams, ToolResult>
-{
-  constructor(readonly params: InstallVSCodeCompanionParams) {}
-
-  getDescription(): string {
+  getDescription(_params: InstallVSCodeCompanionParams): string {
     return `Install or update the Gemini CLI IDE companion extension`;
-  }
+    }
 
-  async shouldConfirmExecute(): Promise<ToolCallConfirmationDetails | false> {
+  async shouldConfirmExecute(
+    _params: InstallVSCodeCompanionParams,
+  ): Promise<ToolCallConfirmationDetails | false> {
     const ide = detectIde();
-    const ideName = ide ? getIdeInfo(ide).displayName : 'VS Code family';
+    const ideName = ide ? getIdeDisplayName(ide) : 'VS Code family';
     return {
       type: 'info',
       title: 'Install IDE Companion',
@@ -70,13 +53,15 @@ class InstallVSCodeCompanionInvocation
     };
   }
 
-  toolLocations(): ToolLocation[] {
+  toolLocations(_params: InstallVSCodeCompanionParams): ToolLocation[] {
     return [];
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    _params: InstallVSCodeCompanionParams,
+  ): Promise<ToolResult> {
     const ide = detectIde();
-    const target = ide ?? DetectedIde.VSCode;
+  const target = ide ?? DetectedIde.VSCode;
     const installer = getIdeInstaller(target);
     if (!installer) {
       return {

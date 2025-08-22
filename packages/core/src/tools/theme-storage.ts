@@ -44,16 +44,16 @@ async function ensureThemesDirectory(): Promise<string> {
 export async function saveThemeToFile(theme: CustomTheme): Promise<string> {
   try {
     const themesDir = await ensureThemesDirectory();
-
+    
     // Create a safe filename from the theme name
     const safeFileName = theme.name
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
-
+    
     const themeFilePath = path.join(themesDir, `${safeFileName}.json`);
-
+    
     // Create the theme file with metadata
     const themeFileContent = {
       metadata: {
@@ -61,17 +61,17 @@ export async function saveThemeToFile(theme: CustomTheme): Promise<string> {
         version: '1.0.0',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        source: 'vscode-theme-installer',
+        source: 'vscode-theme-installer'
       },
-      theme,
+      theme
     };
-
+    
     await fsPromises.writeFile(
-      themeFilePath,
-      JSON.stringify(themeFileContent, null, 2),
-      'utf8',
+      themeFilePath, 
+      JSON.stringify(themeFileContent, null, 2), 
+      'utf8'
     );
-
+    
     console.log(`✅ Theme "${theme.name}" saved to: ${themeFilePath}`);
     return themeFilePath;
   } catch (error) {
@@ -82,13 +82,11 @@ export async function saveThemeToFile(theme: CustomTheme): Promise<string> {
 /**
  * Load a theme from a theme file
  */
-export async function loadThemeFromFile(
-  themeFilePath: string,
-): Promise<CustomTheme | null> {
+export async function loadThemeFromFile(themeFilePath: string): Promise<CustomTheme | null> {
   try {
     const fileContent = await fsPromises.readFile(themeFilePath, 'utf8');
     const themeFileData = JSON.parse(fileContent);
-
+    
     // Support both new format (with metadata) and legacy format
     if (themeFileData.theme) {
       return themeFileData.theme as CustomTheme;
@@ -105,12 +103,10 @@ export async function loadThemeFromFile(
 /**
  * List all available theme files
  */
-export async function listThemeFiles(): Promise<
-  Array<{ name: string; path: string }>
-> {
+export async function listThemeFiles(): Promise<Array<{ name: string; path: string }>> {
   try {
     const themesDir = getThemesDirectory();
-
+    
     // Check if themes directory exists
     try {
       await fsPromises.access(themesDir);
@@ -118,15 +114,15 @@ export async function listThemeFiles(): Promise<
       // Directory doesn't exist, return empty list
       return [];
     }
-
+    
     const files = await fsPromises.readdir(themesDir);
     const themeFiles = files
-      .filter((file) => file.endsWith('.json'))
-      .map((file) => ({
+      .filter(file => file.endsWith('.json'))
+      .map(file => ({
         name: path.basename(file, '.json'),
-        path: path.join(themesDir, file),
+        path: path.join(themesDir, file)
       }));
-
+    
     return themeFiles;
   } catch (error) {
     console.warn('Failed to list theme files:', error);
@@ -138,18 +134,13 @@ export async function listThemeFiles(): Promise<
  * Legacy function: Save theme to settings.json (deprecated)
  * Maintained for backward compatibility
  */
-export async function saveThemeToSettings(
-  theme: CustomTheme,
-  settingsPath: string,
-): Promise<void> {
-  console.warn(
-    'saveThemeToSettings is deprecated. Use saveThemeToFile instead.',
-  );
-
+export async function saveThemeToSettings(theme: CustomTheme, settingsPath: string): Promise<void> {
+  console.warn('saveThemeToSettings is deprecated. Use saveThemeToFile instead.');
+  
   try {
     // Check if settings file exists
     let settings: SettingsWithThemes = {};
-
+    
     try {
       const settingsContent = await fsPromises.readFile(settingsPath, 'utf8');
       settings = JSON.parse(settingsContent);
@@ -167,13 +158,9 @@ export async function saveThemeToSettings(
     settings.customThemes[theme.name] = theme;
 
     // Write back to file
-    await fsPromises.writeFile(
-      settingsPath,
-      JSON.stringify(settings, null, 2),
-      'utf8',
-    );
+    await fsPromises.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
     console.log(`✅ Theme "${theme.name}" saved to settings`);
   } catch (_error) {
     throw new Error(`Failed to save theme to settings: ${_error}`);
   }
-}
+} 

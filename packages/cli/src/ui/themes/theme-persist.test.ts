@@ -11,8 +11,7 @@ import { themeManager } from './theme-manager.js';
 import type { CustomTheme } from './theme.js';
 
 vi.mock('fs/promises', async () => {
-  const actual =
-    await vi.importActual<typeof import('fs/promises')>('fs/promises');
+  const actual = await vi.importActual<typeof import('fs/promises')>('fs/promises');
   return {
     ...actual,
     writeFile: vi.fn().mockResolvedValue(undefined),
@@ -22,9 +21,7 @@ vi.mock('fs/promises', async () => {
 
 describe('theme-persist', () => {
   beforeEach(() => {
-    vi.spyOn(themeManager, 'loadCustomThemes').mockResolvedValue(
-      undefined as unknown as void,
-    );
+    vi.spyOn(themeManager, 'loadCustomThemes').mockResolvedValue(undefined as unknown as void);
   });
 
   it('should persist a theme and trigger reload', async () => {

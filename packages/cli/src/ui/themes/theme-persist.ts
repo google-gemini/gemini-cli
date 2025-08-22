@@ -27,10 +27,7 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^a-z0-9-_.]/gi, '_');
 }
 
-export async function persistTheme(
-  theme: CustomTheme,
-  metadata: PersistedThemeMetadata,
-): Promise<string> {
+export async function persistTheme(theme: CustomTheme, metadata: PersistedThemeMetadata): Promise<string> {
   const dir = getThemesDirectory();
   await fs.mkdir(dir, { recursive: true });
 
@@ -58,11 +55,7 @@ export async function persistTheme(
   return filePath;
 }
 
-export async function persistThemeAndReload(
-  theme: CustomTheme,
-  metadata: PersistedThemeMetadata,
-  mergedSettingsThemes: Record<string, CustomTheme> = {},
-): Promise<string> {
+export async function persistThemeAndReload(theme: CustomTheme, metadata: PersistedThemeMetadata, mergedSettingsThemes: Record<string, CustomTheme> = {}): Promise<string> {
   const filePath = await persistTheme(theme, metadata);
   // Ensure the runtime picks up the new file-based theme
   await themeManager.loadCustomThemes(mergedSettingsThemes);

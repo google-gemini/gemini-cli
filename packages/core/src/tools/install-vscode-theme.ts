@@ -4,50 +4,38 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolResult,
-  ToolCallConfirmationDetails,
-  ToolLocation,
-  ToolInvocation,
-} from './tools.js';
-import { BaseDeclarativeTool, Kind } from './tools.js';
+import type { Config } from '../config/config.js';
+import type { ToolResult, ToolCallConfirmationDetails, ToolLocation } from './tools.js';
+import { BaseTool, Icon } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { Type } from '@google/genai';
+import {  Type } from '@google/genai';
 
-import type {
-  InstallVSCodeThemeToolParams,
-  VSCodeTheme,
-} from './theme-types.js';
+import type { InstallVSCodeThemeToolParams, VSCodeTheme } from './theme-types.js';
 import { convertVSCodeThemeToCustomTheme } from './theme-converter.js';
 import { createDefaultTheme } from './theme-generator.js';
-import {
-  extractExtensionId,
-  downloadVsix,
-  extractThemeFromVsix,
-} from './theme-extractor.js';
+import { extractExtensionId, downloadVsix, extractThemeFromVsix } from './theme-extractor.js';
 import { saveThemeToFile } from './theme-storage.js';
 import { createSimpleColorPreview } from './theme-display.js';
 
 /**
  * Tool for installing VS Code themes from marketplace URLs
  */
-export class InstallVSCodeThemeTool extends BaseDeclarativeTool<
+export class InstallVSCodeThemeTool extends BaseTool<
   InstallVSCodeThemeToolParams,
   ToolResult
 > {
   static readonly Name: string = 'install_vscode_theme';
 
-  constructor() {
+  constructor(private readonly config: Config) {
     super(
       InstallVSCodeThemeTool.Name,
       'Install VS Code Theme',
       'Downloads and installs VS Code themes from marketplace URLs, extracting color schemes and creating custom Gemini CLI themes.',
-      Kind.Fetch,
+      Icon.Globe,
       {
         properties: {
           marketplaceUrl: {
-            description:
-              'The VS Code marketplace URL to install the theme from (e.g., https://marketplace.visualstudio.com/items?itemName=arcticicestudio.nord-visual-studio-code)',
+            description: 'The VS Code marketplace URL to install the theme from (e.g., https://marketplace.visualstudio.com/items?itemName=arcticicestudio.nord-visual-studio-code)',
             type: Type.STRING,
           },
         },
@@ -57,9 +45,7 @@ export class InstallVSCodeThemeTool extends BaseDeclarativeTool<
     );
   }
 
-  protected override validateToolParamValues(
-    params: InstallVSCodeThemeToolParams,
-  ): string | null {
+  validateToolParams(params: InstallVSCodeThemeToolParams): string | null {
     if (!params.marketplaceUrl) {
       return 'Marketplace URL is required';
     }
@@ -71,27 +57,17 @@ export class InstallVSCodeThemeTool extends BaseDeclarativeTool<
     return null;
   }
 
-  protected createInvocation(
+  getDescription(params: InstallVSCodeThemeToolParams): string {
+    return `Install VS Code theme from marketplace URL: ${params.marketplaceUrl}`;
+  }
+
+  async shouldConfirmExecute(
     params: InstallVSCodeThemeToolParams,
-  ): ToolInvocation<InstallVSCodeThemeToolParams, ToolResult> {
-    return new InstallVSCodeThemeInvocation(params);
-  }
-}
-
-class InstallVSCodeThemeInvocation
-  implements ToolInvocation<InstallVSCodeThemeToolParams, ToolResult>
-{
-  constructor(readonly params: InstallVSCodeThemeToolParams) {}
-
-  getDescription(): string {
-    return `Install VS Code theme from marketplace URL: ${this.params.marketplaceUrl}`;
-  }
-
-  async shouldConfirmExecute(): Promise<ToolCallConfirmationDetails | false> {
+  ): Promise<ToolCallConfirmationDetails | false> {
     return {
       type: 'info',
       title: 'Install VS Code Theme',
-      prompt: `This will install a VS Code theme from the marketplace URL: ${this.params.marketplaceUrl}
+      prompt: `This will install a VS Code theme from the marketplace URL: ${params.marketplaceUrl}
 
 The theme will be downloaded, converted to Gemini CLI format, and added to your custom themes.
 
@@ -102,20 +78,23 @@ Do you want to proceed?`,
     };
   }
 
-  toolLocations(): ToolLocation[] {
-    return [{ path: '~/.gemini/themes' }];
+  toolLocations(params: InstallVSCodeThemeToolParams): ToolLocation[] {
+    return [
+      { path: '~/.gemini/themes' }
+    ];
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    params: InstallVSCodeThemeToolParams,
+    signal: AbortSignal,
+  ): Promise<ToolResult> {
     try {
       // Step 1: Extract extension ID from marketplace URL
-      const extensionId = extractExtensionId(this.params.marketplaceUrl);
+      const extensionId = extractExtensionId(params.marketplaceUrl);
       if (!extensionId) {
         return {
-          llmContent:
-            'Error: Could not extract extension ID from marketplace URL',
-          returnDisplay:
-            '❌ **Error**: Could not extract extension ID from the marketplace URL. Please ensure the URL is valid.',
+          llmContent: 'Error: Could not extract extension ID from marketplace URL',
+          returnDisplay: '❌ **Error**: Could not extract extension ID from the marketplace URL. Please ensure the URL is valid.',
         };
       }
 
@@ -126,21 +105,13 @@ Do you want to proceed?`,
       // Step 3: Try to extract theme JSON from .vsix (Fallback Hierarchy)
       let themeData: VSCodeTheme | null = null;
       let extractionMethod = '';
-
+      
       // Try 1: Extract from VSIX file
-      console.log(
-        `Attempting to extract theme from VSIX for ${extensionId.name}...`,
-      );
-      themeData = await extractThemeFromVsix(
-        vsixBuffer,
-        signal,
-        extensionId.name,
-      );
+      console.log(`Attempting to extract theme from VSIX for ${extensionId.name}...`);
+      themeData = await extractThemeFromVsix(vsixBuffer, signal, extensionId.name);
       if (themeData) {
         extractionMethod = 'VSIX Extraction';
-        console.log(
-          `✅ Successfully extracted theme from VSIX: ${themeData.name}`,
-        );
+        console.log(`✅ Successfully extracted theme from VSIX: ${themeData.name}`);
       } else {
         console.log(`⚠️ VSIX extraction failed, using default theme...`);
         // Try 2: Use default theme (no AI generation)
@@ -153,25 +124,24 @@ Do you want to proceed?`,
       if (!themeData) {
         return {
           llmContent: 'Error: Could not extract theme data',
-          returnDisplay:
-            '❌ **Error**: Could not extract theme data. VSIX extraction failed and no fallback theme could be created.',
+          returnDisplay: '❌ **Error**: Could not extract theme data. VSIX extraction failed and no fallback theme could be created.',
         };
       }
-
+      
       const customTheme = convertVSCodeThemeToCustomTheme(themeData);
 
       // Step 5: Save theme to dedicated theme file
-      await saveThemeToFile(customTheme);
-
+      const _themeFilePath = await saveThemeToFile(customTheme);
+      
       // Create simplified color palette preview
       const colorPalettePreview = createSimpleColorPreview(customTheme);
 
       return {
-        llmContent: `Successfully installed VS Code theme "${customTheme.name}" from ${this.params.marketplaceUrl}`,
+        llmContent: `Successfully installed VS Code theme "${customTheme.name}" from ${params.marketplaceUrl}`,
         returnDisplay: `✅ Theme Installed Successfully!
 
 🎨 Theme Name: ${customTheme.name}
-📦 Source: ${this.params.marketplaceUrl}
+📦 Source: ${params.marketplaceUrl}
 🔧 Method: ${extractionMethod}
 
 ${colorPalettePreview}
@@ -200,4 +170,4 @@ Please check that:
       };
     }
   }
-}
+} 
