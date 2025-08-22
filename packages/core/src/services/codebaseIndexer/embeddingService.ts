@@ -103,7 +103,7 @@ export class EmbeddingService {
         const singleResult = await this.callEmbeddingsAPI([text]);
         results.push(singleResult[0]);
       } catch (error) {
-        results.push(new Array(this.embeddingDimension).fill(0));
+        console.warn(`Failed to generate embedding for a text unit after multiple retries. Skipping. Error: ${error}`);
       }
     }
 

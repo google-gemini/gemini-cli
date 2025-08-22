@@ -883,10 +883,165 @@ export class CBIIndexStorage {
       return;
     }
 
-    const allFileIndices = await this.loadAllFileIndicesExcept(toRemove);
-    allFileIndices.push(...newFileIndices);
+    await this.streamingUpdateIndex(newFileIndices, toRemove, onProgress);
+  }
+
+  private async streamingUpdateIndex(
+    newFileIndices: FileIndex[], 
+    toRemove: Set<string>, 
+    onProgress?: (current: number, total: number) => void
+  ): Promise<void> {
+    const tempIndexPath = this.indexPath + '.tmp';
+    const sourceHandle = await fs.open(this.indexPath, 'r');
+    const targetHandle = await fs.open(tempIndexPath, 'w');
     
-    await this.saveIndex(allFileIndices, onProgress);
+    try {
+      const headerBuffer = Buffer.alloc(HEADER_SIZE);
+      await sourceHandle.read(headerBuffer, 0, HEADER_SIZE, 0);
+      const oldHeader = this.parseHeader(headerBuffer);
+
+      const fileInfosBuffer = Buffer.alloc(oldHeader.total_files * 32);
+      await sourceHandle.read(fileInfosBuffer, 0, fileInfosBuffer.length, oldHeader.offset_files);
+      const oldFileInfos = this.parseFileInfos(fileInfosBuffer, oldHeader.total_files);
+
+      const blocksBuffer = Buffer.alloc(oldHeader.total_vectors * 24);
+      await sourceHandle.read(blocksBuffer, 0, blocksBuffer.length, oldHeader.offset_blocks);
+      const oldBlockMetadatas = this.parseBlockMetadatas(blocksBuffer, oldHeader.total_vectors);
+
+      const stringHeapSize = oldHeader.offset_vectors - oldHeader.offset_strings;
+      const stringHeapBuffer = Buffer.alloc(stringHeapSize);
+      await sourceHandle.read(stringHeapBuffer, 0, stringHeapSize, oldHeader.offset_strings);
+
+      const newFileInfos: FileInfo[] = [];
+      const newBlockMetadatas: BlockMetadata[] = [];
+      const newStringHeap: string[] = [];
+      const newVectors: number[][] = [];
+      const keptFileIndices: FileIndex[] = [];
+
+      let currentVectorId = 0;
+      let stringOffset = 0;
+
+      for (let fileId = 0; fileId < oldFileInfos.length; fileId++) {
+        const fileInfo = oldFileInfos[fileId];
+        const relpath = this.extractStringFromHeap(stringHeapBuffer, fileInfo.path_offset);
+        
+        if (toRemove.has(relpath)) {
+          continue;
+        }
+
+        const pathOffset = stringOffset;
+        newStringHeap.push(relpath);
+        stringOffset += Buffer.byteLength(relpath, 'utf8');
+
+        const firstVectorId = currentVectorId;
+        const numVectors = fileInfo.num_vectors;
+
+        newFileInfos.push({
+          mtime: fileInfo.mtime,
+          size: fileInfo.size,
+          path_offset: pathOffset,
+          first_vector_id: firstVectorId,
+          num_vectors: numVectors
+        });
+
+        const units = [];
+        const embeddings = [];
+
+        for (let i = 0; i < fileInfo.num_vectors; i++) {
+          const vectorId = fileInfo.first_vector_id + i;
+          const block = oldBlockMetadatas[vectorId];
+          
+          const text = this.extractStringFromHeap(stringHeapBuffer, block.text_offset, block.text_len);
+          const textOffset = stringOffset;
+          newStringHeap.push(text);
+          stringOffset += Buffer.byteLength(text, 'utf8');
+
+          newBlockMetadatas.push({
+            file_id: newFileInfos.length - 1,
+            lineno: block.lineno,
+            start_char: block.start_char,
+            text_offset: textOffset,
+            text_len: Buffer.byteLength(text, 'utf8')
+          });
+
+          const vector = await this.loadVector(vectorId, sourceHandle, oldHeader);
+          newVectors.push(vector);
+          embeddings.push(vector);
+
+          units.push({
+            id: `${relpath}:${block.lineno}:${block.start_char}`,
+            relpath,
+            text,
+            lineno: block.lineno,
+            start_char: block.start_char
+          });
+
+          currentVectorId++;
+        }
+
+        const sha = await this.generateSha(relpath);
+        keptFileIndices.push({
+          sha,
+          relpath,
+          mtime: new Date(fileInfo.mtime * 1000),
+          size: fileInfo.size,
+          units,
+          embeddings
+        });
+      }
+
+      const allFileIndices = [...keptFileIndices, ...newFileIndices];
+      const totalVectors = allFileIndices.reduce((sum, fi) => sum + fi.embeddings.length, 0);
+      const totalFiles = allFileIndices.length;
+      const vectorDim = allFileIndices[0]?.embeddings[0]?.length || oldHeader.vector_dim;
+
+      for (const fileIndex of newFileIndices) {
+        const pathOffset = stringOffset;
+        newStringHeap.push(fileIndex.relpath);
+        stringOffset += Buffer.byteLength(fileIndex.relpath, 'utf8');
+
+        const firstVectorId = currentVectorId;
+        const numVectors = fileIndex.embeddings.length;
+
+        newFileInfos.push({
+          mtime: Math.floor(fileIndex.mtime.getTime() / 1000),
+          size: fileIndex.size,
+          path_offset: pathOffset,
+          first_vector_id: firstVectorId,
+          num_vectors: numVectors
+        });
+
+        for (let i = 0; i < fileIndex.units.length; i++) {
+          const unit = fileIndex.units[i];
+          const textOffset = stringOffset;
+          newStringHeap.push(unit.text);
+          stringOffset += Buffer.byteLength(unit.text, 'utf8');
+
+          newBlockMetadatas.push({
+            file_id: newFileInfos.length - 1,
+            lineno: unit.lineno,
+            start_char: unit.start_char,
+            text_offset: textOffset,
+            text_len: Buffer.byteLength(unit.text, 'utf8')
+          });
+
+          newVectors.push(fileIndex.embeddings[i]);
+          currentVectorId++;
+        }
+      }
+
+      const hnswGraph = this.buildHNSWIndex(newVectors, onProgress);
+      const newHeader = this.createHeader(vectorDim, totalVectors, totalFiles, newFileInfos, newBlockMetadatas, newStringHeap, newVectors, hnswGraph);
+      const indexBuffer = this.serializeIndex(newHeader, newFileInfos, newBlockMetadatas, newStringHeap, newVectors, hnswGraph);
+
+      await targetHandle.write(indexBuffer);
+      await targetHandle.sync();
+      
+      await fs.rename(tempIndexPath, this.indexPath);
+    } finally {
+      await sourceHandle.close();
+      await targetHandle.close();
+    }
   }
 
   private async loadAllFileIndicesExcept(excludePaths: Set<string>): Promise<FileIndex[]> {
