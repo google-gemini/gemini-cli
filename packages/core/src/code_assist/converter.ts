@@ -22,7 +22,6 @@ import {
   Part,
   SafetySetting,
   PartUnion,
-  SchemaUnion,
   SpeechConfigUnion,
   ThinkingConfig,
   ToolListUnion,
@@ -61,7 +60,8 @@ interface VertexGenerationConfig {
   frequencyPenalty?: number;
   seed?: number;
   responseMimeType?: string;
-  responseSchema?: SchemaUnion;
+  responseJsonSchema?: unknown;
+  responseSchema?: unknown;
   routingConfig?: GenerationConfigRoutingConfig;
   modelSelectionConfig?: ModelSelectionConfig;
   responseModalities?: string[];
@@ -157,7 +157,7 @@ function toVertexGenerateContentRequest(
   };
 }
 
-function toContents(contents: ContentListUnion): Content[] {
+export function toContents(contents: ContentListUnion): Content[] {
   if (Array.isArray(contents)) {
     // it's a Content[] or a PartsUnion[]
     return contents.map(toContent);
@@ -231,6 +231,7 @@ function toVertexGenerationConfig(
     seed: config.seed,
     responseMimeType: config.responseMimeType,
     responseSchema: config.responseSchema,
+    responseJsonSchema: config.responseJsonSchema,
     routingConfig: config.routingConfig,
     modelSelectionConfig: config.modelSelectionConfig,
     responseModalities: config.responseModalities,

@@ -16,6 +16,7 @@ import { HistoryItem, MessageType } from '../types.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
+import { sessionId } from '@google/gemini-cli-core';
 
 function formatCliResponses(items: HistoryItem[]): string {
   return items
@@ -78,55 +79,69 @@ export const bugCommand: SlashCommand = {
 
     const osVersion = `${process.platform} ${process.version}`;
     let sandboxEnv = 'no sandbox';
-    if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-      sandboxEnv = process.env.SANDBOX.replace(/^gemini-(?:code-)?/, '');
-    } else if (process.env.SANDBOX === 'sandbox-exec') {
+    if (process.env['SANDBOX'] && process.env['SANDBOX'] !== 'sandbox-exec') {
+      sandboxEnv = process.env['SANDBOX'].replace(/^gemini-(?:code-)?/, '');
+    } else if (process.env['SANDBOX'] === 'sandbox-exec') {
       sandboxEnv = `sandbox-exec (${
-        process.env.SEATBELT_PROFILE || 'unknown'
+        process.env['SEATBELT_PROFILE'] || 'unknown'
       })`;
     }
     const modelVersion = config?.getModel() || 'Unknown';
     const cliVersion = await getCliVersion();
     const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
+    const ideClient =
+      (context.services.config?.getIdeMode() &&
+        context.services.config?.getIdeClient()?.getDetectedIdeDisplayName()) ||
+      '';
 
-    const lastUserPromptIndex = context.ui.history.findLastIndex(
-      (item) => item.type === 'user' && !item.text.startsWith('/bug'),
-    );
+// --- User consent and redaction ---
+let lastPromptText = 'N/A';
+let lastCliResponseText = 'N/A';
 
-    const lastUserPrompt =
-      lastUserPromptIndex === -1
-        ? undefined
-        : context.ui.history[lastUserPromptIndex];
+const lastUserPromptIndex = context.ui.history.findLastIndex(
+  (item) => item.type === 'user' && !item.text.startsWith('/bug')
+);
+const lastUserPrompt =
+  lastUserPromptIndex !== -1 ? context.ui.history[lastUserPromptIndex] : undefined;
 
-    const subsequentItems =
-      lastUserPromptIndex === -1
-        ? context.ui.history
-        : context.ui.history.slice(lastUserPromptIndex + 1);
+if (lastUserPrompt && context.ui.promptYesNo) {
+  const consent = await context.ui.promptYesNo(
+    'Include the last prompt and response in your bug report? This may contain sensitive information.'
+  );
 
+  if (consent) {
+    const subsequentItems = context.ui.history.slice(lastUserPromptIndex + 1);
     const cliResponses = formatCliResponses(subsequentItems);
 
-    const lastCliResponse = cliResponses.length ? cliResponses : 'N/A';
+    // Redact sensitive info
+    lastPromptText = redactSensitiveInfo(lastUserPrompt.text);
+    lastCliResponseText = redactSensitiveInfo(cliResponses.length ? cliResponses : 'N/A');
+  }
+}
 
-    const problem = [
-      '**Last User Prompt**',
-      '```',
-      lastUserPrompt?.text || 'N/A',
-      '```',
-      '',
-      '**Last Gemini CLI Response**',
-      '```',
-      lastCliResponse || 'N/A',
-      '```',
-    ].join('\n');
+const problem = [
+  '**Last User Prompt**',
+  '```',
+  lastPromptText,
+  '```',
+  '',
+  '**Last Gemini CLI Response**',
+  '```',
+  lastCliResponseText,
+  '```',
+].join('\n');
 
-    const info = `
 * **CLI Version:** ${cliVersion}
 * **Git Commit:** ${GIT_COMMIT_INFO}
+* **Session ID:** ${sessionId}
 * **Operating System:** ${osVersion}
 * **Sandbox Environment:** ${sandboxEnv}
 * **Model Version:** ${modelVersion}
 * **Memory Usage:** ${memoryUsage}
 `;
+    if (ideClient) {
+      info += `* **IDE Client:** ${ideClient}\n`;
+    }
 
     let bugReportUrl =
       'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}&problem={problem}';

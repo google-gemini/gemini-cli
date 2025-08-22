@@ -11,6 +11,7 @@ import { LoadingIndicator } from './LoadingIndicator.js';
 import { StreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
 import { vi } from 'vitest';
+import * as useTerminalSize from '../hooks/useTerminalSize.js';
 
 // Mock GeminiRespondingSpinner
 vi.mock('./GeminiRespondingSpinner.js', () => ({
@@ -29,10 +30,18 @@ vi.mock('./GeminiRespondingSpinner.js', () => ({
   },
 }));
 
+vi.mock('../hooks/useTerminalSize.js', () => ({
+  useTerminalSize: vi.fn(),
+}));
+
+const useTerminalSizeMock = vi.mocked(useTerminalSize.useTerminalSize);
+
 const renderWithContext = (
   ui: React.ReactElement,
   streamingStateValue: StreamingState,
+  width = 120,
 ) => {
+  useTerminalSizeMock.mockReturnValue({ columns: width, rows: 24 });
   const contextValue: StreamingState = streamingStateValue;
   return render(
     <StreamingContext.Provider value={contextValue}>
@@ -222,5 +231,66 @@ describe('<LoadingIndicator />', () => {
     const output = lastFrame();
     expect(output).toContain('This should be displayed');
     expect(output).not.toContain('This should not be displayed');
+  });
+
+  describe('responsive layout', () => {
+    it('should render on a single line on a wide terminal', () => {
+      const { lastFrame } = renderWithContext(
+        <LoadingIndicator
+          {...defaultProps}
+          rightContent={<Text>Right</Text>}
+        />,
+        StreamingState.Responding,
+        120,
+      );
+      const output = lastFrame();
+      // Check for single line output
+      expect(output?.includes('\n')).toBe(false);
+      expect(output).toContain('Loading...');
+      expect(output).toContain('(esc to cancel, 5s)');
+      expect(output).toContain('Right');
+    });
+
+    it('should render on multiple lines on a narrow terminal', () => {
+      const { lastFrame } = renderWithContext(
+        <LoadingIndicator
+          {...defaultProps}
+          rightContent={<Text>Right</Text>}
+        />,
+        StreamingState.Responding,
+        79,
+      );
+      const output = lastFrame();
+      const lines = output?.split('\n');
+      // Expecting 3 lines:
+      // 1. Spinner + Primary Text
+      // 2. Cancel + Timer
+      // 3. Right Content
+      expect(lines).toHaveLength(3);
+      if (lines) {
+        expect(lines[0]).toContain('Loading...');
+        expect(lines[0]).not.toContain('(esc to cancel, 5s)');
+        expect(lines[1]).toContain('(esc to cancel, 5s)');
+        expect(lines[2]).toContain('Right');
+      }
+    });
+
+    it('should use wide layout at 80 columns', () => {
+      const { lastFrame } = renderWithContext(
+        <LoadingIndicator {...defaultProps} />,
+        StreamingState.Responding,
+        80,
+      );
+      expect(lastFrame()?.includes('\n')).toBe(false);
+    });
+
+    it('should use narrow layout at 79 columns', () => {
+      const { lastFrame } = renderWithContext(
+        <LoadingIndicator {...defaultProps} />,
+        StreamingState.Responding,
+        79,
+      );
+      expect(lastFrame()?.includes('\n')).toBe(true);
+    });
   });
 });
