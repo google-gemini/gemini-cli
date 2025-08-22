@@ -34,7 +34,6 @@ import { settingsCommand } from '../ui/commands/settingsCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
 import { installCommand } from '../ui/commands/installCommand.js';
 import { setupGithubCommand } from '../ui/commands/setupGithubCommand.js';
-import { isGitHubRepository } from '../utils/gitUtils.js';
 import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
 
 /**
