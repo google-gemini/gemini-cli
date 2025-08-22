@@ -919,9 +919,16 @@ export const useGeminiStream = (
               continue;
             }
 
-            let commitHash = await gitService.createFileSnapshot(
-              `Snapshot for ${toolCall.request.name}`,
-            );
+            let commitHash: string | undefined;
+            try {
+              commitHash = await gitService.createFileSnapshot(
+                `Snapshot for ${toolCall.request.name}`,
+              );
+            } catch (error) {
+              onDebugMessage(
+                `Failed to create new snapshot: ${getErrorMessage(error)}. Attempting to use current commit.`,
+              );
+            }
 
             if (!commitHash) {
               commitHash = await gitService.getCurrentCommitHash();
