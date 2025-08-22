@@ -655,6 +655,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
