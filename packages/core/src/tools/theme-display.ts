@@ -43,13 +43,13 @@ export function createColorPalettePreview(debugInfo: ThemeDebugInfo): string {
   
   return `
 🎨 Color Palette Preview:
-${renderColorValue(colors.Background, 'Background')}  ${renderColorValue(colors.Foreground, 'Foreground')}
-${renderColorValue(colors.LightBlue, 'LightBlue')}  ${renderColorValue(colors.AccentBlue, 'AccentBlue')}
-${renderColorValue(colors.AccentPurple, 'AccentPurple')}  ${renderColorValue(colors.AccentCyan, 'AccentCyan')}
-${renderColorValue(colors.AccentGreen, 'AccentGreen')}  ${renderColorValue(colors.AccentYellow, 'AccentYellow')}
-${renderColorValue(colors.AccentRed, 'AccentRed')}  ${renderColorValue(colors.Comment, 'Comment')}
-${renderColorValue(colors.DiffAdded, 'DiffAdded')}  ${renderColorValue(colors.DiffRemoved, 'DiffRemoved')}
-${renderColorValue(colors.Gray, 'Gray')}`;
+${renderColorValue(colors['Background'], 'Background')}  ${renderColorValue(colors['Foreground'], 'Foreground')}
+${renderColorValue(colors['LightBlue'], 'LightBlue')}  ${renderColorValue(colors['AccentBlue'], 'AccentBlue')}
+${renderColorValue(colors['AccentPurple'], 'AccentPurple')}  ${renderColorValue(colors['AccentCyan'], 'AccentCyan')}
+${renderColorValue(colors['AccentGreen'], 'AccentGreen')}  ${renderColorValue(colors['AccentYellow'], 'AccentYellow')}
+${renderColorValue(colors['AccentRed'], 'AccentRed')}  ${renderColorValue(colors['Comment'], 'Comment')}
+${renderColorValue(colors['DiffAdded'], 'DiffAdded')}  ${renderColorValue(colors['DiffRemoved'], 'DiffRemoved')}
+${renderColorValue(colors['Gray'], 'Gray')}`;
 }
 
 /**

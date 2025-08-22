@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { CommandContext, SlashCommandActionReturn } from '../types.js';
+import type { CommandContext, SlashCommandActionReturn } from './types.js';
 
 export interface Installer {
   /** Identifier for the installer (e.g., 'theme'). */

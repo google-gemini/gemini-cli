@@ -18,7 +18,7 @@ import {
   getScopeItems,
   getScopeMessageForSetting,
 } from '../../utils/dialogScopeUtils.js';
-import { useKeypress } from '../hooks/useKeypress.js';
+// Removed unused useKeypress import
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */

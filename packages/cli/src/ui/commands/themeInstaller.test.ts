@@ -6,8 +6,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { themeInstaller } from './themeInstaller.js';
-import { type CommandContext } from '../types.js';
-import { createMockCommandContext } from '../../../test-utils/mockCommandContext.js';
+import { type CommandContext } from './types.js';
+import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 
 describe('themeInstaller', () => {
   let mockContext: CommandContext;
