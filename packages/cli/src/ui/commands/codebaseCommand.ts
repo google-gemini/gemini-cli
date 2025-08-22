@@ -300,6 +300,12 @@ const autoCommand: SlashCommand = {
           if (geminiClient) {
             geminiClient.refreshIndexContext();
           }
+        } else {
+          const errorMessage = formatErrorMessage(result);
+          context.ui.addItem({
+            type: 'gemini',
+            text: `🔄 Auto-update failed: ${errorMessage}`
+          }, Date.now());
         }
       }
     );

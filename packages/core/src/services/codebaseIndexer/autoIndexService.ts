@@ -76,11 +76,14 @@ export class AutoIndexService {
     try {
       const result = await this.indexer.reindexCodebase(this.config.onProgress);
 
-      if (result.success) {
-        this.config.onUpdate?.(result);
-      }
+      this.config.onUpdate?.(result);
     } catch (error) {
       console.warn('Auto-index check failed:', error);
+      const errorResult = {
+        success: false,
+        errors: [error instanceof Error ? error.message : String(error)]
+      };
+      this.config.onUpdate?.(errorResult);
     }
   }
 

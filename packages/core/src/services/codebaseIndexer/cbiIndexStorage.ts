@@ -915,11 +915,11 @@ export class CBIIndexStorage {
       const newFileInfos: FileInfo[] = [];
       const newBlockMetadatas: BlockMetadata[] = [];
       const newStringHeap: string[] = [];
-      const newVectors: number[][] = [];
       const keptFileIndices: FileIndex[] = [];
 
       let currentVectorId = 0;
       let stringOffset = 0;
+      let totalVectors = 0;
 
       for (let fileId = 0; fileId < oldFileInfos.length; fileId++) {
         const fileInfo = oldFileInfos[fileId];
@@ -965,7 +965,6 @@ export class CBIIndexStorage {
           });
 
           const vector = await this.loadVector(vectorId, sourceHandle, oldHeader);
-          newVectors.push(vector);
           embeddings.push(vector);
 
           units.push({
@@ -977,6 +976,7 @@ export class CBIIndexStorage {
           });
 
           currentVectorId++;
+          totalVectors++;
         }
 
         const sha = await this.generateSha(relpath);
@@ -990,10 +990,10 @@ export class CBIIndexStorage {
         });
       }
 
-      const allFileIndices = [...keptFileIndices, ...newFileIndices];
-      const totalVectors = allFileIndices.reduce((sum, fi) => sum + fi.embeddings.length, 0);
-      const totalFiles = allFileIndices.length;
-      const vectorDim = allFileIndices[0]?.embeddings[0]?.length || oldHeader.vector_dim;
+      const totalFiles = keptFileIndices.length + newFileIndices.length;
+      const vectorDim = (keptFileIndices[0]?.embeddings[0]?.length || 
+                        newFileIndices[0]?.embeddings[0]?.length || 
+                        oldHeader.vector_dim);
 
       for (const fileIndex of newFileIndices) {
         const pathOffset = stringOffset;
@@ -1025,16 +1025,73 @@ export class CBIIndexStorage {
             text_len: Buffer.byteLength(unit.text, 'utf8')
           });
 
-          newVectors.push(fileIndex.embeddings[i]);
           currentVectorId++;
+          totalVectors++;
         }
       }
 
-      const hnswGraph = this.buildHNSWIndex(newVectors, onProgress);
-      const newHeader = this.createHeader(vectorDim, totalVectors, totalFiles, newFileInfos, newBlockMetadatas, newStringHeap, newVectors, hnswGraph);
-      const indexBuffer = this.serializeIndex(newHeader, newFileInfos, newBlockMetadatas, newStringHeap, newVectors, hnswGraph);
+      const newHeader = this.createHeader(vectorDim, totalVectors, totalFiles, newFileInfos, newBlockMetadatas, newStringHeap, [], { nodes: [], max_level: 0, entry_point: 0, m: 16, ef_construction: 200, ef_search: 50 });
+      
+      const newHeaderBuffer = Buffer.alloc(newHeader.offset_ann);
+      this.writeHeader(newHeaderBuffer, newHeader);
+      this.writeFileInfos(newHeaderBuffer, newFileInfos, newHeader.offset_files);
+      this.writeBlockMetadatas(newHeaderBuffer, newBlockMetadatas, newHeader.offset_blocks);
+      this.writeStringHeap(newHeaderBuffer, newStringHeap, newHeader.offset_strings);
 
-      await targetHandle.write(indexBuffer);
+      await targetHandle.write(newHeaderBuffer);
+
+      let vectorOffset = newHeader.offset_vectors;
+      let vectorCount = 0;
+
+      for (const fileIndex of keptFileIndices) {
+        for (const vector of fileIndex.embeddings) {
+          const float32Array = new Float32Array(vector);
+          const vectorBuffer = Buffer.from(float32Array.buffer);
+          await targetHandle.write(vectorBuffer, 0, vectorBuffer.length, vectorOffset);
+          vectorOffset += vectorBuffer.length;
+          vectorCount++;
+          onProgress?.(vectorCount, totalVectors);
+        }
+      }
+
+      for (const fileIndex of newFileIndices) {
+        for (const vector of fileIndex.embeddings) {
+          const float32Array = new Float32Array(vector);
+          const vectorBuffer = Buffer.from(float32Array.buffer);
+          await targetHandle.write(vectorBuffer, 0, vectorBuffer.length, vectorOffset);
+          vectorOffset += vectorBuffer.length;
+          vectorCount++;
+          onProgress?.(vectorCount, totalVectors);
+        }
+      }
+
+      const allVectors = [...keptFileIndices.flatMap(fi => fi.embeddings), ...newFileIndices.flatMap(fi => fi.embeddings)];
+      const hnswGraph = this.buildHNSWIndex(allVectors, onProgress);
+      
+      const annBuffer = Buffer.alloc(hnswGraph.nodes.length * 8 + 24);
+      let annOffset = 0;
+      
+      annBuffer.writeUInt32LE(hnswGraph.max_level, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(hnswGraph.entry_point, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(hnswGraph.m, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(hnswGraph.ef_construction, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(hnswGraph.ef_search, annOffset);
+      annOffset += 4;
+      annBuffer.writeUInt32LE(hnswGraph.nodes.length, annOffset);
+      annOffset += 4;
+
+      for (const node of hnswGraph.nodes) {
+        annBuffer.writeUInt32LE(node.id, annOffset);
+        annOffset += 4;
+        annBuffer.writeUInt32LE(node.level, annOffset);
+        annOffset += 4;
+      }
+
+      await targetHandle.write(annBuffer, 0, annBuffer.length, newHeader.offset_ann);
       await targetHandle.sync();
       
       await fs.rename(tempIndexPath, this.indexPath);
