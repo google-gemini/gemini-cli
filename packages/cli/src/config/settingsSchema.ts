@@ -468,7 +468,8 @@ export const SETTINGS_SCHEMA = {
     category: 'General',
     requiresRestart: false,
     default: [] as string[],
-    description: 'Additional directories to include in the workspace context.',
+    description:
+      'Additional directories to include in the workspace context. Missing directories will be skipped with a warning.',
     showInDialog: false,
   },
   loadMemoryFromIncludeDirectories: {
