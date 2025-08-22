@@ -185,8 +185,13 @@ jobs:
             core.info(`Raw duplicates JSON: ${rawJson}`);
             let parsedJson;
             try {
-              const trimmedJson = rawJson.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '').trim();
-              parsedJson = JSON.parse(trimmedJson);
+              const jsonStringMatch = rawJson.match(/{[\s\S]*}/);
+              if (!jsonStringMatch) {
+                core.setFailed(`Could not find JSON object in the output.\nRaw output: ${rawJson}`);
+                return;
+              }
+              const jsonString = jsonStringMatch[0];
+              parsedJson = JSON.parse(jsonString);
               core.info(`Parsed duplicates JSON: ${JSON.stringify(parsedJson)}`);
             } catch (err) {
               core.setFailed(`Failed to parse duplicates JSON from Gemini output: ${err.message}\nRaw output: ${rawJson}`);
