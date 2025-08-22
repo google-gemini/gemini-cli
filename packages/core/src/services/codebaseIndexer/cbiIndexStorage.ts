@@ -6,6 +6,49 @@ const MAGIC_NUMBER = 0xC0DEB1D0;
 const VERSION = 1;
 const HEADER_SIZE = 84;
 
+// Binary format constants for FileInfo struct (32 bytes total)
+const FILE_INFO_SIZE = 32;
+const FILE_INFO_MTIME_OFFSET = 0;
+const FILE_INFO_SIZE_OFFSET = 8;
+const FILE_INFO_PATH_OFFSET_OFFSET = 16;
+const FILE_INFO_FIRST_VECTOR_ID_OFFSET = 24;
+const FILE_INFO_NUM_VECTORS_OFFSET = 28;
+
+// Binary format constants for BlockMetadata struct (24 bytes total)
+const BLOCK_METADATA_SIZE = 24;
+const BLOCK_METADATA_FILE_ID_OFFSET = 0;
+const BLOCK_METADATA_LINENO_OFFSET = 4;
+const BLOCK_METADATA_START_CHAR_OFFSET = 8;
+const BLOCK_METADATA_TEXT_OFFSET_OFFSET = 12;
+const BLOCK_METADATA_TEXT_LEN_OFFSET = 20;
+
+// Binary format constants for Header struct
+const HEADER_MAGIC_NUMBER_OFFSET = 0;
+const HEADER_VERSION_OFFSET = 4;
+const HEADER_VECTOR_DIM_OFFSET = 8;
+const HEADER_TOTAL_VECTORS_OFFSET = 12;
+const HEADER_TOTAL_FILES_OFFSET = 20;
+const HEADER_OFFSET_FILES_OFFSET = 28;
+const HEADER_OFFSET_BLOCKS_OFFSET = 36;
+const HEADER_OFFSET_STRINGS_OFFSET = 44;
+const HEADER_OFFSET_VECTORS_OFFSET = 52;
+const HEADER_OFFSET_ANN_OFFSET = 60;
+const HEADER_ANN_SIZE_OFFSET = 68;
+const HEADER_EF_SEARCH_OFFSET = 76;
+
+// HNSW graph constants
+const HNSW_HEADER_SIZE = 24; // max_level, entry_point, m, ef_construction, ef_search, node_count
+const HNSW_NODE_SIZE = 8; // id, level
+const HNSW_DEFAULT_M = 16;
+const HNSW_DEFAULT_EF_CONSTRUCTION = 200;
+const HNSW_DEFAULT_EF_SEARCH = 50;
+const HNSW_MIN_M = 4;
+const HNSW_MIN_EF_CONSTRUCTION = 50;
+const HNSW_SIMPLE_GRAPH_THRESHOLD = 100;
+
+// Vector dimension constants
+const VECTOR_FLOAT_SIZE = 4;
+
 interface IndexHeader {
   magic_number: number;
   version: number;
@@ -192,8 +235,8 @@ export class CBIIndexStorage {
         const batchEnd = Math.min(batchStart + batchSize, header.total_vectors);
         const batchVectorCount = batchEnd - batchStart;
         
-        const vectorsBuffer = Buffer.alloc(batchVectorCount * header.vector_dim * 4);
-        const vectorsOffset = header.offset_vectors + (batchStart * header.vector_dim * 4);
+        const vectorsBuffer = Buffer.alloc(batchVectorCount * header.vector_dim * VECTOR_FLOAT_SIZE);
+        const vectorsOffset = header.offset_vectors + (batchStart * header.vector_dim * VECTOR_FLOAT_SIZE);
         await fileHandle.read(vectorsBuffer, 0, vectorsBuffer.length, vectorsOffset);
         
         const batchVectors = this.parseVectors(vectorsBuffer, batchVectorCount, header.vector_dim);
@@ -208,11 +251,11 @@ export class CBIIndexStorage {
       results.sort((a, b) => b.score - a.score);
       const topResults = results.slice(0, topK);
       
-      const fileInfosBuffer = Buffer.alloc(header.total_files * 32);
+      const fileInfosBuffer = Buffer.alloc(header.total_files * FILE_INFO_SIZE);
       await fileHandle.read(fileInfosBuffer, 0, fileInfosBuffer.length, header.offset_files);
       const fileInfos = this.parseFileInfos(fileInfosBuffer, header.total_files);
 
-      const blocksBuffer = Buffer.alloc(header.total_vectors * 24);
+      const blocksBuffer = Buffer.alloc(header.total_vectors * BLOCK_METADATA_SIZE);
       await fileHandle.read(blocksBuffer, 0, blocksBuffer.length, header.offset_blocks);
       const blockMetadatas = this.parseBlockMetadatas(blocksBuffer, header.total_vectors);
 
@@ -320,10 +363,10 @@ export class CBIIndexStorage {
 
   private createHeader(vectorDim: number, totalVectors: number, totalFiles: number, fileInfos: FileInfo[], blockMetadatas: BlockMetadata[], stringHeap: string[], allVectors: number[][], hnswGraph: HNSWGraph): IndexHeader {
     const offsetFiles = HEADER_SIZE;
-    const offsetBlocks = offsetFiles + totalFiles * 32;
-    const offsetStrings = offsetBlocks + totalVectors * 24;
+    const offsetBlocks = offsetFiles + totalFiles * FILE_INFO_SIZE;
+    const offsetStrings = offsetBlocks + totalVectors * BLOCK_METADATA_SIZE;
     const offsetVectors = offsetStrings + this.calculateStringHeapSize(stringHeap);
-    const offsetAnn = offsetVectors + totalVectors * vectorDim * 4;
+    const offsetAnn = offsetVectors + totalVectors * vectorDim * VECTOR_FLOAT_SIZE;
     
     const annSize = this.calculateHNSWSize(hnswGraph);
 
@@ -359,41 +402,41 @@ export class CBIIndexStorage {
   }
 
   private writeHeader(buffer: Buffer, header: IndexHeader): void {
-    buffer.writeUInt32LE(header.magic_number, 0);
-    buffer.writeUInt32LE(header.version, 4);
-    buffer.writeUInt32LE(header.vector_dim, 8);
-    buffer.writeBigUInt64LE(BigInt(header.total_vectors), 12);
-    buffer.writeBigUInt64LE(BigInt(header.total_files), 20);
-    buffer.writeBigUInt64LE(BigInt(header.offset_files), 28);
-    buffer.writeBigUInt64LE(BigInt(header.offset_blocks), 36);
-    buffer.writeBigUInt64LE(BigInt(header.offset_strings), 44);
-    buffer.writeBigUInt64LE(BigInt(header.offset_vectors), 52);
-    buffer.writeBigUInt64LE(BigInt(header.offset_ann), 60);
-    buffer.writeBigUInt64LE(BigInt(header.ann_size), 68); // Write ann_size
-    buffer.writeBigUInt64LE(BigInt(header.ef_search), 76); // Write ef_search
+    buffer.writeUInt32LE(header.magic_number, HEADER_MAGIC_NUMBER_OFFSET);
+    buffer.writeUInt32LE(header.version, HEADER_VERSION_OFFSET);
+    buffer.writeUInt32LE(header.vector_dim, HEADER_VECTOR_DIM_OFFSET);
+    buffer.writeBigUInt64LE(BigInt(header.total_vectors), HEADER_TOTAL_VECTORS_OFFSET);
+    buffer.writeBigUInt64LE(BigInt(header.total_files), HEADER_TOTAL_FILES_OFFSET);
+    buffer.writeBigUInt64LE(BigInt(header.offset_files), HEADER_OFFSET_FILES_OFFSET);
+    buffer.writeBigUInt64LE(BigInt(header.offset_blocks), HEADER_OFFSET_BLOCKS_OFFSET);
+    buffer.writeBigUInt64LE(BigInt(header.offset_strings), HEADER_OFFSET_STRINGS_OFFSET);
+    buffer.writeBigUInt64LE(BigInt(header.offset_vectors), HEADER_OFFSET_VECTORS_OFFSET);
+    buffer.writeBigUInt64LE(BigInt(header.offset_ann), HEADER_OFFSET_ANN_OFFSET);
+    buffer.writeBigUInt64LE(BigInt(header.ann_size), HEADER_ANN_SIZE_OFFSET);
+    buffer.writeBigUInt64LE(BigInt(header.ef_search), HEADER_EF_SEARCH_OFFSET);
   }
 
   private writeFileInfos(buffer: Buffer, fileInfos: FileInfo[], offset: number): void {
     for (let i = 0; i < fileInfos.length; i++) {
       const fileInfo = fileInfos[i];
-      const pos = offset + i * 32;
-      buffer.writeBigUInt64LE(BigInt(fileInfo.mtime), pos);
-      buffer.writeBigUInt64LE(BigInt(fileInfo.size), pos + 8);
-      buffer.writeBigUInt64LE(BigInt(fileInfo.path_offset), pos + 16);
-      buffer.writeUInt32LE(fileInfo.first_vector_id, pos + 24);
-      buffer.writeUInt32LE(fileInfo.num_vectors, pos + 28);
+      const pos = offset + i * FILE_INFO_SIZE;
+      buffer.writeBigUInt64LE(BigInt(fileInfo.mtime), pos + FILE_INFO_MTIME_OFFSET);
+      buffer.writeBigUInt64LE(BigInt(fileInfo.size), pos + FILE_INFO_SIZE_OFFSET);
+      buffer.writeBigUInt64LE(BigInt(fileInfo.path_offset), pos + FILE_INFO_PATH_OFFSET_OFFSET);
+      buffer.writeUInt32LE(fileInfo.first_vector_id, pos + FILE_INFO_FIRST_VECTOR_ID_OFFSET);
+      buffer.writeUInt32LE(fileInfo.num_vectors, pos + FILE_INFO_NUM_VECTORS_OFFSET);
     }
   }
 
   private writeBlockMetadatas(buffer: Buffer, blockMetadatas: BlockMetadata[], offset: number): void {
     for (let i = 0; i < blockMetadatas.length; i++) {
       const block = blockMetadatas[i];
-      const pos = offset + i * 24;
-      buffer.writeUInt32LE(block.file_id, pos);
-      buffer.writeUInt32LE(block.lineno, pos + 4);
-      buffer.writeUInt32LE(block.start_char, pos + 8);
-      buffer.writeBigUInt64LE(BigInt(block.text_offset), pos + 12);
-      buffer.writeUInt32LE(block.text_len, pos + 20);
+      const pos = offset + i * BLOCK_METADATA_SIZE;
+      buffer.writeUInt32LE(block.file_id, pos + BLOCK_METADATA_FILE_ID_OFFSET);
+      buffer.writeUInt32LE(block.lineno, pos + BLOCK_METADATA_LINENO_OFFSET);
+      buffer.writeUInt32LE(block.start_char, pos + BLOCK_METADATA_START_CHAR_OFFSET);
+      buffer.writeBigUInt64LE(BigInt(block.text_offset), pos + BLOCK_METADATA_TEXT_OFFSET_OFFSET);
+      buffer.writeUInt32LE(block.text_len, pos + BLOCK_METADATA_TEXT_LEN_OFFSET);
     }
   }
 
@@ -418,31 +461,31 @@ export class CBIIndexStorage {
 
   private parseHeader(buffer: Buffer): IndexHeader {
     return {
-      magic_number: buffer.readUInt32LE(0),
-      version: buffer.readUInt32LE(4),
-      vector_dim: buffer.readUInt32LE(8),
-      total_vectors: Number(buffer.readBigUInt64LE(12)),
-      total_files: Number(buffer.readBigUInt64LE(20)),
-      offset_files: Number(buffer.readBigUInt64LE(28)),
-      offset_blocks: Number(buffer.readBigUInt64LE(36)),
-      offset_strings: Number(buffer.readBigUInt64LE(44)),
-      offset_vectors: Number(buffer.readBigUInt64LE(52)),
-      offset_ann: Number(buffer.readBigUInt64LE(60)),
-      ann_size: Number(buffer.readBigUInt64LE(68)), // Read ann_size
-      ef_search: Number(buffer.readBigUInt64LE(76)) // Read ef_search
+      magic_number: buffer.readUInt32LE(HEADER_MAGIC_NUMBER_OFFSET),
+      version: buffer.readUInt32LE(HEADER_VERSION_OFFSET),
+      vector_dim: buffer.readUInt32LE(HEADER_VECTOR_DIM_OFFSET),
+      total_vectors: Number(buffer.readBigUInt64LE(HEADER_TOTAL_VECTORS_OFFSET)),
+      total_files: Number(buffer.readBigUInt64LE(HEADER_TOTAL_FILES_OFFSET)),
+      offset_files: Number(buffer.readBigUInt64LE(HEADER_OFFSET_FILES_OFFSET)),
+      offset_blocks: Number(buffer.readBigUInt64LE(HEADER_OFFSET_BLOCKS_OFFSET)),
+      offset_strings: Number(buffer.readBigUInt64LE(HEADER_OFFSET_STRINGS_OFFSET)),
+      offset_vectors: Number(buffer.readBigUInt64LE(HEADER_OFFSET_VECTORS_OFFSET)),
+      offset_ann: Number(buffer.readBigUInt64LE(HEADER_OFFSET_ANN_OFFSET)),
+      ann_size: Number(buffer.readBigUInt64LE(HEADER_ANN_SIZE_OFFSET)),
+      ef_search: Number(buffer.readBigUInt64LE(HEADER_EF_SEARCH_OFFSET))
     };
   }
 
   private parseFileInfos(buffer: Buffer, totalFiles: number): FileInfo[] {
     const fileInfos: FileInfo[] = [];
     for (let i = 0; i < totalFiles; i++) {
-      const pos = i * 32;
+      const pos = i * FILE_INFO_SIZE;
       fileInfos.push({
-        mtime: Number(buffer.readBigUInt64LE(pos)),
-        size: Number(buffer.readBigUInt64LE(pos + 8)),
-        path_offset: Number(buffer.readBigUInt64LE(pos + 16)),
-        first_vector_id: buffer.readUInt32LE(pos + 24),
-        num_vectors: buffer.readUInt32LE(pos + 28)
+        mtime: Number(buffer.readBigUInt64LE(pos + FILE_INFO_MTIME_OFFSET)),
+        size: Number(buffer.readBigUInt64LE(pos + FILE_INFO_SIZE_OFFSET)),
+        path_offset: Number(buffer.readBigUInt64LE(pos + FILE_INFO_PATH_OFFSET_OFFSET)),
+        first_vector_id: buffer.readUInt32LE(pos + FILE_INFO_FIRST_VECTOR_ID_OFFSET),
+        num_vectors: buffer.readUInt32LE(pos + FILE_INFO_NUM_VECTORS_OFFSET)
       });
     }
     return fileInfos;
@@ -451,13 +494,13 @@ export class CBIIndexStorage {
   private parseBlockMetadatas(buffer: Buffer, totalVectors: number): BlockMetadata[] {
     const blockMetadatas: BlockMetadata[] = [];
     for (let i = 0; i < totalVectors; i++) {
-      const pos = i * 24;
+      const pos = i * BLOCK_METADATA_SIZE;
       blockMetadatas.push({
-        file_id: buffer.readUInt32LE(pos),
-        lineno: buffer.readUInt32LE(pos + 4),
-        start_char: buffer.readUInt32LE(pos + 8),
-        text_offset: Number(buffer.readBigUInt64LE(pos + 12)),
-        text_len: buffer.readUInt32LE(pos + 20)
+        file_id: buffer.readUInt32LE(pos + BLOCK_METADATA_FILE_ID_OFFSET),
+        lineno: buffer.readUInt32LE(pos + BLOCK_METADATA_LINENO_OFFSET),
+        start_char: buffer.readUInt32LE(pos + BLOCK_METADATA_START_CHAR_OFFSET),
+        text_offset: Number(buffer.readBigUInt64LE(pos + BLOCK_METADATA_TEXT_OFFSET_OFFSET)),
+        text_len: buffer.readUInt32LE(pos + BLOCK_METADATA_TEXT_LEN_OFFSET)
       });
     }
     return blockMetadatas;
@@ -466,8 +509,8 @@ export class CBIIndexStorage {
   private parseVectors(buffer: Buffer, totalVectors: number, vectorDim: number): number[][] {
     const vectors: number[][] = [];
     for (let i = 0; i < totalVectors; i++) {
-      const pos = i * vectorDim * 4;
-      const vectorBuffer = buffer.slice(pos, pos + vectorDim * 4);
+      const pos = i * vectorDim * VECTOR_FLOAT_SIZE;
+      const vectorBuffer = buffer.slice(pos, pos + vectorDim * VECTOR_FLOAT_SIZE);
       const float32Array = new Float32Array(vectorBuffer.buffer, vectorBuffer.byteOffset, vectorDim);
       vectors.push(Array.from(float32Array));
     }
@@ -479,8 +522,8 @@ export class CBIIndexStorage {
   }
 
   private calculateHNSWSize(graph: HNSWGraph): number {
-    let size = 24; // Header: max_level, entry_point, m, ef_construction, ef_search, node_count
-    size += graph.nodes.length * 8; // Each node: id, level
+    let size = HNSW_HEADER_SIZE; // Header: max_level, entry_point, m, ef_construction, ef_search, node_count
+    size += graph.nodes.length * HNSW_NODE_SIZE; // Each node: id, level
     
     for (const node of graph.nodes) {
       for (let level = 0; level <= graph.max_level; level++) {
@@ -499,26 +542,26 @@ export class CBIIndexStorage {
         nodes: [],
         max_level: 0,
         entry_point: 0,
-        m: 16,
-        ef_construction: 200,
-        ef_search: 50
+        m: HNSW_DEFAULT_M,
+        ef_construction: HNSW_DEFAULT_EF_CONSTRUCTION,
+        ef_search: HNSW_DEFAULT_EF_SEARCH
       };
     }
 
-    if (vectors.length < 100) {
+    if (vectors.length < HNSW_SIMPLE_GRAPH_THRESHOLD) {
       return {
         nodes: [],
         max_level: 0,
         entry_point: 0,
-        m: 16,
-        ef_construction: 200,
-        ef_search: 50
+        m: HNSW_DEFAULT_M,
+        ef_construction: HNSW_DEFAULT_EF_CONSTRUCTION,
+        ef_search: HNSW_DEFAULT_EF_SEARCH
       };
     }
 
-    const m = Math.min(16, Math.max(4, Math.floor(Math.log(vectors.length) / Math.log(4))));
-    const ef_construction = Math.min(200, Math.max(50, vectors.length / 10));
-    const ef_search = 50;
+    const m = Math.min(HNSW_DEFAULT_M, Math.max(HNSW_MIN_M, Math.floor(Math.log(vectors.length) / Math.log(4))));
+    const ef_construction = Math.min(HNSW_DEFAULT_EF_CONSTRUCTION, Math.max(HNSW_MIN_EF_CONSTRUCTION, vectors.length / 10));
+    const ef_search = HNSW_DEFAULT_EF_SEARCH;
     const max_level = Math.max(0, Math.floor(Math.log(vectors.length) / Math.log(m)));
 
     const nodes: HNSWNode[] = [];
@@ -660,8 +703,8 @@ export class CBIIndexStorage {
 
 
   private async loadVector(vectorId: number, fileHandle: fs.FileHandle, header: IndexHeader): Promise<number[]> {
-    const vectorBuffer = Buffer.alloc(header.vector_dim * 4);
-    const vectorOffset = header.offset_vectors + (vectorId * header.vector_dim * 4);
+    const vectorBuffer = Buffer.alloc(header.vector_dim * VECTOR_FLOAT_SIZE);
+    const vectorOffset = header.offset_vectors + (vectorId * header.vector_dim * VECTOR_FLOAT_SIZE);
     await fileHandle.read(vectorBuffer, 0, vectorBuffer.length, vectorOffset);
     return Array.from(new Float32Array(vectorBuffer.buffer, vectorBuffer.byteOffset, header.vector_dim));
   }
@@ -831,7 +874,7 @@ export class CBIIndexStorage {
       await fileHandle.read(headerBuffer, 0, HEADER_SIZE, 0);
       const header = this.parseHeader(headerBuffer);
 
-      const fileInfosBuffer = Buffer.alloc(header.total_files * 32);
+      const fileInfosBuffer = Buffer.alloc(header.total_files * FILE_INFO_SIZE);
       await fileHandle.read(fileInfosBuffer, 0, fileInfosBuffer.length, header.offset_files);
       const fileInfos = this.parseFileInfos(fileInfosBuffer, header.total_files);
 
@@ -883,7 +926,7 @@ export class CBIIndexStorage {
     await this.streamingUpdateIndex(newFileIndices, toRemove, onProgress);
   }
 
-    private async streamingUpdateIndex(
+  private async streamingUpdateIndex(
     newFileIndices: FileIndex[], 
     toRemove: Set<string>, 
     onProgress?: (current: number, total: number) => void
@@ -897,11 +940,11 @@ export class CBIIndexStorage {
       await sourceHandle.read(headerBuffer, 0, HEADER_SIZE, 0);
       const oldHeader = this.parseHeader(headerBuffer);
 
-      const fileInfosBuffer = Buffer.alloc(oldHeader.total_files * 32);
+      const fileInfosBuffer = Buffer.alloc(oldHeader.total_files * FILE_INFO_SIZE);
       await sourceHandle.read(fileInfosBuffer, 0, fileInfosBuffer.length, oldHeader.offset_files);
       const oldFileInfos = this.parseFileInfos(fileInfosBuffer, oldHeader.total_files);
 
-      const blocksBuffer = Buffer.alloc(oldHeader.total_vectors * 24);
+      const blocksBuffer = Buffer.alloc(oldHeader.total_vectors * BLOCK_METADATA_SIZE);
       await sourceHandle.read(blocksBuffer, 0, blocksBuffer.length, oldHeader.offset_blocks);
       const oldBlockMetadatas = this.parseBlockMetadatas(blocksBuffer, oldHeader.total_vectors);
 
@@ -1009,7 +1052,7 @@ export class CBIIndexStorage {
       }
 
       const newHeader = this.createHeader(vectorDim, totalVectors, totalFiles, newFileInfos, newBlockMetadatas, newStringHeap, [], { nodes: [], max_level: 0, entry_point: 0, m: 16, ef_construction: 200, ef_search: 50 });
-
+      
       const newHeaderBuffer = Buffer.alloc(newHeader.offset_ann);
       this.writeHeader(newHeaderBuffer, newHeader);
       this.writeFileInfos(newHeaderBuffer, newFileInfos, newHeader.offset_files);
@@ -1066,8 +1109,8 @@ export class CBIIndexStorage {
     const totalVectors = newHeader.total_vectors;
     
     if (totalVectors === 0) {
-      const emptyGraph = { nodes: [], max_level: 0, entry_point: 0, m: 16, ef_construction: 200, ef_search: 50 };
-      const annBuffer = Buffer.alloc(24);
+      const emptyGraph = { nodes: [], max_level: 0, entry_point: 0, m: HNSW_DEFAULT_M, ef_construction: HNSW_DEFAULT_EF_CONSTRUCTION, ef_search: HNSW_DEFAULT_EF_SEARCH };
+      const annBuffer = Buffer.alloc(HNSW_HEADER_SIZE);
       let annOffset = 0;
       
       annBuffer.writeUInt32LE(emptyGraph.max_level, annOffset);
@@ -1086,15 +1129,15 @@ export class CBIIndexStorage {
       return;
     }
 
-    if (totalVectors < 100) {
-      const simpleGraph = { nodes: [], max_level: 0, entry_point: 0, m: 16, ef_construction: 200, ef_search: 50 };
-      const annBuffer = Buffer.alloc(24);
+    if (totalVectors < HNSW_SIMPLE_GRAPH_THRESHOLD) {
+      const simpleGraph = { nodes: [], max_level: 0, entry_point: 0, m: HNSW_DEFAULT_M, ef_construction: HNSW_DEFAULT_EF_CONSTRUCTION, ef_search: HNSW_DEFAULT_EF_SEARCH };
+      const annBuffer = Buffer.alloc(HNSW_HEADER_SIZE);
       let annOffset = 0;
       
       annBuffer.writeUInt32LE(simpleGraph.max_level, annOffset);
-      annOffset += 4;
+        annOffset += 4;
       annBuffer.writeUInt32LE(simpleGraph.entry_point, annOffset);
-      annOffset += 4;
+        annOffset += 4;
       annBuffer.writeUInt32LE(simpleGraph.m, annOffset);
       annOffset += 4;
       annBuffer.writeUInt32LE(simpleGraph.ef_construction, annOffset);
@@ -1107,7 +1150,7 @@ export class CBIIndexStorage {
       return;
     }
 
-    const m = Math.min(16, Math.max(4, Math.floor(Math.log(totalVectors) / Math.log(4))));
+    const m = Math.min(HNSW_DEFAULT_M, Math.max(HNSW_MIN_M, Math.floor(Math.log(totalVectors) / Math.log(4))));
     const ef_construction = Math.min(200, Math.max(50, totalVectors / 10));
     const ef_search = 50;
     const max_level = Math.max(0, Math.floor(Math.log(totalVectors) / Math.log(m)));
@@ -1144,7 +1187,7 @@ export class CBIIndexStorage {
 
     const annBuffer = Buffer.alloc(this.calculateHNSWSize(graph));
     this.writeHNSWGraph(annBuffer, graph, 0);
-    await targetHandle.write(annBuffer, 0, annBuffer.length, newHeader.offset_ann);
+      await targetHandle.write(annBuffer, 0, annBuffer.length, newHeader.offset_ann);
   }
 
   private async loadVectorById(
@@ -1327,11 +1370,11 @@ export class CBIIndexStorage {
       const candidates = await this.searchLayerWithFileAccess(graph, queryVector, [graph.entry_point], header.ef_search || 50, 0, fileHandle, header);
       const topCandidates = await this.selectNeighborsWithFileAccess(queryVector, candidates, topK, fileHandle, header);
 
-      const fileInfosBuffer = Buffer.alloc(header.total_files * 32);
+      const fileInfosBuffer = Buffer.alloc(header.total_files * FILE_INFO_SIZE);
       await fileHandle.read(fileInfosBuffer, 0, fileInfosBuffer.length, header.offset_files);
       const fileInfos = this.parseFileInfos(fileInfosBuffer, header.total_files);
 
-      const blocksBuffer = Buffer.alloc(header.total_vectors * 24);
+      const blocksBuffer = Buffer.alloc(header.total_vectors * BLOCK_METADATA_SIZE);
       await fileHandle.read(blocksBuffer, 0, blocksBuffer.length, header.offset_blocks);
       const blockMetadatas = this.parseBlockMetadatas(blocksBuffer, header.total_vectors);
 
