@@ -56,9 +56,9 @@ describe('langCommand', () => {
 
   describe('Language Switching Functionality', () => {
     it('should switch to English successfully', async () => {
-      mockI18n.changeLanguage.mockResolvedValue(undefined);
+      mockI18n.changeLanguage.mockResolvedValue({} as any);
       
-      await langCommand.action!(mockContext, ['en']);
+      await langCommand.action!(mockContext, 'en');
       
       expect(mockI18n.changeLanguage).toHaveBeenCalledWith('en');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -71,9 +71,9 @@ describe('langCommand', () => {
     });
 
     it('should switch to Chinese successfully', async () => {
-      mockI18n.changeLanguage.mockResolvedValue(undefined);
+      mockI18n.changeLanguage.mockResolvedValue({} as any);
       
-      await langCommand.action!(mockContext, ['zh']);
+      await langCommand.action!(mockContext, 'zh');
       
       expect(mockI18n.changeLanguage).toHaveBeenCalledWith('zh');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -86,9 +86,9 @@ describe('langCommand', () => {
     });
 
     it('should switch to French successfully', async () => {
-      mockI18n.changeLanguage.mockResolvedValue(undefined);
+      mockI18n.changeLanguage.mockResolvedValue({} as any);
       
-      await langCommand.action!(mockContext, ['fr']);
+      await langCommand.action!(mockContext, 'fr');
       
       expect(mockI18n.changeLanguage).toHaveBeenCalledWith('fr');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -101,9 +101,9 @@ describe('langCommand', () => {
     });
 
     it('should switch to Spanish successfully', async () => {
-      mockI18n.changeLanguage.mockResolvedValue(undefined);
+      mockI18n.changeLanguage.mockResolvedValue({} as any);
       
-      await langCommand.action!(mockContext, ['es']);
+      await langCommand.action!(mockContext, 'es');
       
       expect(mockI18n.changeLanguage).toHaveBeenCalledWith('es');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -120,7 +120,7 @@ describe('langCommand', () => {
     it('should handle language switching errors gracefully', async () => {
       mockI18n.changeLanguage.mockRejectedValue(new Error('Switch failed'));
       
-      await langCommand.action!(mockContext, ['zh']);
+      await langCommand.action!(mockContext, 'zh');
       
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -132,7 +132,7 @@ describe('langCommand', () => {
     });
 
     it('should show error for invalid language', async () => {
-      await langCommand.action!(mockContext, ['invalid']);
+      await langCommand.action!(mockContext, 'invalid');
       
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -148,7 +148,7 @@ describe('langCommand', () => {
     it('should show current language when language is English', async () => {
       mockI18n.language = 'en';
       
-      await langCommand.action!(mockContext, ['current']);
+      await langCommand.action!(mockContext, 'current');
       
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -162,7 +162,7 @@ describe('langCommand', () => {
     it('should show current language when language is Chinese', async () => {
       mockI18n.language = 'zh';
       
-      await langCommand.action!(mockContext, ['current']);
+      await langCommand.action!(mockContext, 'current');
       
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -176,7 +176,7 @@ describe('langCommand', () => {
     it('should show current language when language is French', async () => {
       mockI18n.language = 'fr';
       
-      await langCommand.action!(mockContext, ['current']);
+      await langCommand.action!(mockContext, 'current');
       
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -190,7 +190,7 @@ describe('langCommand', () => {
     it('should show current language when language is Spanish', async () => {
       mockI18n.language = 'es';
       
-      await langCommand.action!(mockContext, ['current']);
+      await langCommand.action!(mockContext, 'current');
       
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -204,7 +204,7 @@ describe('langCommand', () => {
 
   describe('Usage Information', () => {
     it('should show usage when no arguments provided', async () => {
-      await langCommand.action!(mockContext, []);
+      await langCommand.action!(mockContext, '');
       
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -216,7 +216,7 @@ describe('langCommand', () => {
     });
 
     it('should show usage when undefined arguments provided', async () => {
-      await langCommand.action!(mockContext, undefined);
+      await langCommand.action!(mockContext, undefined as any);
       
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -233,9 +233,9 @@ describe('langCommand', () => {
       const enSubCommand = langCommand.subCommands?.find(cmd => cmd.name === 'en');
       expect(enSubCommand).toBeDefined();
       
-      mockI18n.changeLanguage.mockResolvedValue(undefined);
+      mockI18n.changeLanguage.mockResolvedValue({} as any);
       
-      await enSubCommand!.action!(mockContext, []);
+      await enSubCommand!.action!(mockContext, '');
       
       expect(mockI18n.changeLanguage).toHaveBeenCalledWith('en');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -251,9 +251,9 @@ describe('langCommand', () => {
       const zhSubCommand = langCommand.subCommands?.find(cmd => cmd.name === 'zh');
       expect(zhSubCommand).toBeDefined();
       
-      mockI18n.changeLanguage.mockResolvedValue(undefined);
+      mockI18n.changeLanguage.mockResolvedValue({} as any);
       
-      await zhSubCommand!.action!(mockContext, []);
+      await zhSubCommand!.action!(mockContext, '');
       
       expect(mockI18n.changeLanguage).toHaveBeenCalledWith('zh');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -271,7 +271,7 @@ describe('langCommand', () => {
       
       mockI18n.changeLanguage.mockRejectedValue(new Error('Failed'));
       
-      await zhSubCommand!.action!(mockContext, []);
+      await zhSubCommand!.action!(mockContext, '');
       
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -286,9 +286,9 @@ describe('langCommand', () => {
   describe('Translation System Integration', () => {
     it('should use translation system when available', async () => {
       mockI18n.t.mockReturnValue('Translated success message');
-      mockI18n.changeLanguage.mockResolvedValue(undefined);
+      mockI18n.changeLanguage.mockResolvedValue({} as any);
       
-      await langCommand.action!(mockContext, ['en']);
+      await langCommand.action!(mockContext, 'en');
       
       expect(mockI18n.t).toHaveBeenCalledWith(
         'commands:lang.languageChanged',
@@ -300,9 +300,9 @@ describe('langCommand', () => {
       mockI18n.t.mockImplementation(() => {
         throw new Error('Translation failed');
       });
-      mockI18n.changeLanguage.mockResolvedValue(undefined);
+      mockI18n.changeLanguage.mockResolvedValue({} as any);
       
-      await langCommand.action!(mockContext, ['zh']);
+      await langCommand.action!(mockContext, 'zh');
       
       // Should still show message even when translation fails
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -317,10 +317,10 @@ describe('langCommand', () => {
 
   describe('Multi-language Workflow Test', () => {
     it('should handle complete language switching workflow', async () => {
-      mockI18n.changeLanguage.mockResolvedValue(undefined);
+      mockI18n.changeLanguage.mockResolvedValue({} as any);
       
       // Step 1: Check current language (English)
-      await langCommand.action!(mockContext, ['current']);
+      await langCommand.action!(mockContext, 'current');
       expect(mockContext.ui.addItem).toHaveBeenLastCalledWith(
         expect.objectContaining({
           text: expect.stringContaining('English'),
@@ -330,11 +330,11 @@ describe('langCommand', () => {
       
       // Step 2: Switch to Chinese
       mockI18n.language = 'zh';
-      await langCommand.action!(mockContext, ['zh']);
+      await langCommand.action!(mockContext, 'zh');
       expect(mockI18n.changeLanguage).toHaveBeenCalledWith('zh');
       
       // Step 3: Check current language (Chinese)
-      await langCommand.action!(mockContext, ['current']);
+      await langCommand.action!(mockContext, 'current');
       expect(mockContext.ui.addItem).toHaveBeenLastCalledWith(
         expect.objectContaining({
           text: expect.stringContaining('中文'),
@@ -344,11 +344,11 @@ describe('langCommand', () => {
       
       // Step 4: Switch to French
       mockI18n.language = 'fr';
-      await langCommand.action!(mockContext, ['fr']);
+      await langCommand.action!(mockContext, 'fr');
       expect(mockI18n.changeLanguage).toHaveBeenCalledWith('fr');
       
       // Step 5: Check current language (French)
-      await langCommand.action!(mockContext, ['current']);
+      await langCommand.action!(mockContext, 'current');
       expect(mockContext.ui.addItem).toHaveBeenLastCalledWith(
         expect.objectContaining({
           text: expect.stringContaining('Français'),

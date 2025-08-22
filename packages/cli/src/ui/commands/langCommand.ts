@@ -114,7 +114,7 @@ export const langCommand: SlashCommand = {
     },
   ],
   action: async (context, args) => {
-    const subCommand = args?.[0] as 'en' | 'zh' | 'fr' | 'es' | 'current' | undefined;
+    const subCommand = (args?.trim() || '') as 'en' | 'zh' | 'fr' | 'es' | 'current' | '';
 
     if (!subCommand) {
       // Show usage with fallback

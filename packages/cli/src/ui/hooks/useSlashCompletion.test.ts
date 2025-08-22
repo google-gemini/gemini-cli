@@ -59,8 +59,8 @@ describe('useSlashCompletion', () => {
         { name: 'clear', description: 'Clear the screen' },
         {
           name: 'memory',
-          description: 'Manage memory',
-          subCommands: [{ name: 'show', description: 'Show memory' }],
+          description: 'Manage conversation memory',
+          subCommands: [{ name: 'show', description: 'Show the current memory contents' }],
         },
         { name: 'chat', description: 'Manage chat history' },
       ] as unknown as SlashCommand[];
@@ -93,7 +93,7 @@ describe('useSlashCompletion', () => {
       );
 
       expect(result.current.suggestions).toEqual([
-        { label: 'memory', value: 'memory', description: 'Manage memory' },
+        { label: 'memory', value: 'memory', description: 'Manage conversation memory' },
       ]);
     });
 
@@ -118,7 +118,7 @@ describe('useSlashCompletion', () => {
         {
           label: 'stats',
           value: 'stats',
-          description: 'check session stats. Usage: /stats [model|tools]',
+          description: 'Show session statistics',
         },
       ]);
     });
@@ -208,10 +208,10 @@ describe('useSlashCompletion', () => {
       const slashCommands = [
         {
           name: 'memory',
-          description: 'Manage memory',
+          description: 'Manage conversation memory',
           subCommands: [
-            { name: 'show', description: 'Show memory' },
-            { name: 'add', description: 'Add to memory' },
+            { name: 'show', description: 'Show the current memory contents' },
+            { name: 'add', description: 'Add content to the memory' },
           ],
         },
       ] as unknown as SlashCommand[];
@@ -228,8 +228,8 @@ describe('useSlashCompletion', () => {
       expect(result.current.suggestions).toHaveLength(2);
       expect(result.current.suggestions).toEqual(
         expect.arrayContaining([
-          { label: 'show', value: 'show', description: 'Show memory' },
-          { label: 'add', value: 'add', description: 'Add to memory' },
+          { label: 'show', value: 'show', description: 'Show the current memory contents' },
+          { label: 'add', value: 'add', description: 'Add content to the memory' },
         ]),
       );
     });
@@ -238,10 +238,10 @@ describe('useSlashCompletion', () => {
       const slashCommands = [
         {
           name: 'memory',
-          description: 'Manage memory',
+          description: 'Manage conversation memory',
           subCommands: [
-            { name: 'show', description: 'Show memory' },
-            { name: 'add', description: 'Add to memory' },
+            { name: 'show', description: 'Show the current memory contents' },
+            { name: 'add', description: 'Add content to the memory' },
           ],
         },
       ] as unknown as SlashCommand[];
@@ -257,8 +257,8 @@ describe('useSlashCompletion', () => {
       expect(result.current.suggestions).toHaveLength(2);
       expect(result.current.suggestions).toEqual(
         expect.arrayContaining([
-          { label: 'show', value: 'show', description: 'Show memory' },
-          { label: 'add', value: 'add', description: 'Add to memory' },
+          { label: 'show', value: 'show', description: 'Show the current memory contents' },
+          { label: 'add', value: 'add', description: 'Add content to the memory' },
         ]),
       );
     });
@@ -267,10 +267,10 @@ describe('useSlashCompletion', () => {
       const slashCommands = [
         {
           name: 'memory',
-          description: 'Manage memory',
+          description: 'Manage conversation memory',
           subCommands: [
-            { name: 'show', description: 'Show memory' },
-            { name: 'add', description: 'Add to memory' },
+            { name: 'show', description: 'Show the current memory contents' },
+            { name: 'add', description: 'Add content to the memory' },
           ],
         },
       ] as unknown as SlashCommand[];
@@ -284,7 +284,7 @@ describe('useSlashCompletion', () => {
       );
 
       expect(result.current.suggestions).toEqual([
-        { label: 'add', value: 'add', description: 'Add to memory' },
+        { label: 'add', value: 'add', description: 'Add content to the memory' },
       ]);
     });
 
@@ -292,10 +292,10 @@ describe('useSlashCompletion', () => {
       const slashCommands = [
         {
           name: 'memory',
-          description: 'Manage memory',
+          description: 'Manage conversation memory',
           subCommands: [
-            { name: 'show', description: 'Show memory' },
-            { name: 'add', description: 'Add to memory' },
+            { name: 'show', description: 'Show the current memory contents' },
+            { name: 'add', description: 'Add content to the memory' },
           ],
         },
       ] as unknown as SlashCommand[];
