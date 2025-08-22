@@ -768,7 +768,6 @@ export class Config {
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
     registerCoreTool(TodoListTool, this);
-    registerCoreTool(TodoListTool, this);
 
     await registry.discoverAllTools();
     return registry;
