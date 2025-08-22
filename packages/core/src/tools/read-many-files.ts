@@ -22,7 +22,6 @@ import {
   getSpecificMimeType,
   ProcessedFileReadResult,
 } from '../utils/fileUtils.js';
-import { FileExclusions } from '../utils/ignorePatterns.js';
 import { PartListUnion } from '@google/genai';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
 import { FileOperation } from '../telemetry/metrics.js';
@@ -103,8 +102,7 @@ type FileProcessingResult =
  * TODO(adh): Consider making this configurable or extendable through a command line argument.
  */
 function getDefaultExcludes(config?: Config): string[] {
-  const excluder = new FileExclusions(config);
-  return excluder.getReadManyFilesExcludes();
+  return config?.getFileExclusions().getReadManyFilesExcludes() ?? [];
 }
 
 const DEFAULT_OUTPUT_SEPARATOR_FORMAT = '--- {filePath} ---';

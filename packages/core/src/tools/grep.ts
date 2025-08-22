@@ -66,7 +66,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     params: GrepToolParams,
   ) {
     super(params);
-    this.fileExclusions = new FileExclusions(config);
+    this.fileExclusions = config.getFileExclusions();
   }
 
   /**
