@@ -16,6 +16,7 @@ defaults:
 permissions:
   id-token: 'write'
   issues: 'write'
+  packages: 'read'
 
 jobs:
   triage-issues:
