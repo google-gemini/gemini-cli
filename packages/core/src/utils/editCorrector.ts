@@ -119,7 +119,7 @@ async function findLastEditTimestamp(
         const { response } = part.functionResponse;
         if (response && !('error' in response) && 'output' in response) {
           id = part.functionResponse.id;
-          content = response.output;
+          content = response['output'];
         }
       }
 
@@ -411,10 +411,10 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
 
     if (
       result &&
-      typeof result.corrected_target_snippet === 'string' &&
-      result.corrected_target_snippet.length > 0
+      typeof result['corrected_target_snippet'] === 'string' &&
+      result['corrected_target_snippet'].length > 0
     ) {
-      return result.corrected_target_snippet;
+      return result['corrected_target_snippet'];
     } else {
       return problematicSnippet;
     }
@@ -499,10 +499,10 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
 
     if (
       result &&
-      typeof result.corrected_new_string === 'string' &&
-      result.corrected_new_string.length > 0
+      typeof result['corrected_new_string'] === 'string' &&
+      result['corrected_new_string'].length > 0
     ) {
-      return result.corrected_new_string;
+      return result['corrected_new_string'];
     } else {
       return originalNewString;
     }
@@ -568,10 +568,10 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
 
     if (
       result &&
-      typeof result.corrected_new_string_escaping === 'string' &&
-      result.corrected_new_string_escaping.length > 0
+      typeof result['corrected_new_string_escaping'] === 'string' &&
+      result['corrected_new_string_escaping'].length > 0
     ) {
-      return result.corrected_new_string_escaping;
+      return result['corrected_new_string_escaping'];
     } else {
       return potentiallyProblematicNewString;
     }
@@ -634,10 +634,10 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
 
     if (
       result &&
-      typeof result.corrected_string_escaping === 'string' &&
-      result.corrected_string_escaping.length > 0
+      typeof result['corrected_string_escaping'] === 'string' &&
+      result['corrected_string_escaping'].length > 0
     ) {
-      return result.corrected_string_escaping;
+      return result['corrected_string_escaping'];
     } else {
       return potentiallyProblematicString;
     }

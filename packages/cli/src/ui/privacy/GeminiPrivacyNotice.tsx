@@ -4,19 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Newline, Text, useInput } from 'ink';
+import { Box, Newline, Text } from 'ink';
 import { Colors } from '../colors.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface GeminiPrivacyNoticeProps {
   onExit: () => void;
 }
 
 export const GeminiPrivacyNotice = ({ onExit }: GeminiPrivacyNoticeProps) => {
-  useInput((input, key) => {
-    if (key.escape) {
-      onExit();
-    }
-  });
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape') {
+        onExit();
+      }
+    },
+    { isActive: true },
+  );
 
   return (
     <Box flexDirection="column" marginBottom={1}>

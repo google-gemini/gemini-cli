@@ -24,6 +24,7 @@ function getContainerPath(hostPath: string): string {
   if (os.platform() !== 'win32') {
     return hostPath;
   }
+
   const withForwardSlashes = hostPath.replace(/\\/g, '/');
   const match = withForwardSlashes.match(/^([A-Z]):\/(.*)/i);
   if (match) {
@@ -63,7 +64,7 @@ const BUILTIN_SEATBELT_PROFILES = [
  * @returns {Promise<boolean>} A promise that resolves to true if the current user's UID/GID should be used, false otherwise.
  */
 async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
-  const envVar = process.env.SANDBOX_SET_UID_GID?.toLowerCase().trim();
+  const envVar = process.env['SANDBOX_SET_UID_GID']?.toLowerCase().trim();
 
   if (envVar === '1' || envVar === 'true') {
     return true;
@@ -108,21 +109,21 @@ function parseImageName(image: string): string {
 }
 
 function ports(): string[] {
-  return (process.env.SANDBOX_PORTS ?? '')
+  return (process.env['SANDBOX_PORTS'] ?? '')
     .split(',')
     .filter((p) => p.trim())
     .map((p) => p.trim());
 }
 
-function entrypoint(workdir: string): string[] {
+function entrypoint(workdir: string, cliArgs: string[]): string[] {
   const isWindows = os.platform() === 'win32';
   const containerWorkdir = getContainerPath(workdir);
   const shellCmds = [];
   const pathSeparator = isWindows ? ';' : ':';
 
   let pathSuffix = '';
-  if (process.env.PATH) {
-    const paths = process.env.PATH.split(pathSeparator);
+  if (process.env['PATH']) {
+    const paths = process.env['PATH'].split(pathSeparator);
     for (const p of paths) {
       const containerPath = getContainerPath(p);
       if (
@@ -137,8 +138,8 @@ function entrypoint(workdir: string): string[] {
   }
 
   let pythonPathSuffix = '';
-  if (process.env.PYTHONPATH) {
-    const paths = process.env.PYTHONPATH.split(pathSeparator);
+  if (process.env['PYTHONPATH']) {
+    const paths = process.env['PYTHONPATH'].split(pathSeparator);
     for (const p of paths) {
       const containerPath = getContainerPath(p);
       if (
@@ -166,18 +167,17 @@ function entrypoint(workdir: string): string[] {
     ),
   );
 
-  const cliArgs = process.argv.slice(2).map((arg) => quote([arg]));
+  const quotedCliArgs = cliArgs.slice(2).map((arg) => quote([arg]));
   const cliCmd =
-    process.env.NODE_ENV === 'development'
-      ? process.env.DEBUG
+    process.env['NODE_ENV'] === 'development'
+      ? process.env['DEBUG']
         ? 'npm run debug --'
         : 'npm rebuild && npm run start --'
-      : process.env.DEBUG
-        ? `node --inspect-brk=0.0.0.0:${process.env.DEBUG_PORT || '9229'} $(which gemini)`
+      : process.env['DEBUG']
+        ? `node --inspect-brk=0.0.0.0:${process.env['DEBUG_PORT'] || '9229'} $(which gemini)`
         : 'gemini';
 
-  const args = [...shellCmds, cliCmd, ...cliArgs];
-
+  const args = [...shellCmds, cliCmd, ...quotedCliArgs];
   return ['bash', '-c', args.join(' ')];
 }
 
@@ -185,9 +185,10 @@ export async function start_sandbox(
   config: SandboxConfig,
   nodeArgs: string[] = [],
   cliConfig?: Config,
+  cliArgs: string[] = [],
 ) {
   const patcher = new ConsolePatcher({
-    debugMode: cliConfig?.getDebugMode() || !!process.env.DEBUG,
+    debugMode: cliConfig?.getDebugMode() || !!process.env['DEBUG'],
     stderr: true,
   });
   patcher.patch();
@@ -195,11 +196,11 @@ export async function start_sandbox(
   try {
     if (config.command === 'sandbox-exec') {
       // disallow BUILD_SANDBOX
-      if (process.env.BUILD_SANDBOX) {
+      if (process.env['BUILD_SANDBOX']) {
         console.error('ERROR: cannot BUILD_SANDBOX when using macOS Seatbelt');
         process.exit(1);
       }
-      const profile = (process.env.SEATBELT_PROFILE ??= 'permissive-open');
+      const profile = (process.env['SEATBELT_PROFILE'] ??= 'permissive-open');
       let profileFile = new URL(`sandbox-macos-${profile}.sb`, import.meta.url)
         .pathname;
       // if profile name is not recognized, then look for file under project settings directory
@@ -219,7 +220,7 @@ export async function start_sandbox(
       console.error(`using macos seatbelt (profile: ${profile}) ...`);
       // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
       const nodeOptions = [
-        ...(process.env.DEBUG ? ['--inspect-brk'] : []),
+        ...(process.env['DEBUG'] ? ['--inspect-brk'] : []),
         ...nodeArgs,
       ].join(' ');
 
@@ -263,6 +264,8 @@ export async function start_sandbox(
         args.push('-D', `INCLUDE_DIR_${i}=${dirPath}`);
       }
 
+      const finalArgv = cliArgs;
+
       args.push(
         '-f',
         profileFile,
@@ -271,26 +274,26 @@ export async function start_sandbox(
         [
           `SANDBOX=sandbox-exec`,
           `NODE_OPTIONS="${nodeOptions}"`,
-          ...process.argv.map((arg) => quote([arg])),
+          ...finalArgv.map((arg) => quote([arg])),
         ].join(' '),
       );
       // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
-      const proxyCommand = process.env.GEMINI_SANDBOX_PROXY_COMMAND;
+      const proxyCommand = process.env['GEMINI_SANDBOX_PROXY_COMMAND'];
       let proxyProcess: ChildProcess | undefined = undefined;
       let sandboxProcess: ChildProcess | undefined = undefined;
       const sandboxEnv = { ...process.env };
       if (proxyCommand) {
         const proxy =
-          process.env.HTTPS_PROXY ||
-          process.env.https_proxy ||
-          process.env.HTTP_PROXY ||
-          process.env.http_proxy ||
+          process.env['HTTPS_PROXY'] ||
+          process.env['https_proxy'] ||
+          process.env['HTTP_PROXY'] ||
+          process.env['http_proxy'] ||
           'http://localhost:8877';
         sandboxEnv['HTTPS_PROXY'] = proxy;
         sandboxEnv['https_proxy'] = proxy; // lower-case can be required, e.g. for curl
         sandboxEnv['HTTP_PROXY'] = proxy;
         sandboxEnv['http_proxy'] = proxy;
-        const noProxy = process.env.NO_PROXY || process.env.no_proxy;
+        const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
         if (noProxy) {
           sandboxEnv['NO_PROXY'] = noProxy;
           sandboxEnv['no_proxy'] = noProxy;
@@ -358,7 +361,7 @@ export async function start_sandbox(
     // if BUILD_SANDBOX is set, then call scripts/build_sandbox.js under gemini-cli repo
     //
     // note this can only be done with binary linked from gemini-cli repo
-    if (process.env.BUILD_SANDBOX) {
+    if (process.env['BUILD_SANDBOX']) {
       if (!gcPath.includes('gemini-cli/packages/')) {
         console.error(
           'ERROR: cannot build sandbox using installed gemini binary; ' +
@@ -408,8 +411,8 @@ export async function start_sandbox(
     const args = ['run', '-i', '--rm', '--init', '--workdir', containerWorkdir];
 
     // add custom flags from SANDBOX_FLAGS
-    if (process.env.SANDBOX_FLAGS) {
-      const flags = parse(process.env.SANDBOX_FLAGS, process.env).filter(
+    if (process.env['SANDBOX_FLAGS']) {
+      const flags = parse(process.env['SANDBOX_FLAGS'], process.env).filter(
         (f): f is string => typeof f === 'string',
       );
       args.push(...flags);
@@ -456,8 +459,8 @@ export async function start_sandbox(
     }
 
     // mount ADC file if GOOGLE_APPLICATION_CREDENTIALS is set
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      const adcFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (process.env['GOOGLE_APPLICATION_CREDENTIALS']) {
+      const adcFile = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
       if (fs.existsSync(adcFile)) {
         args.push('--volume', `${adcFile}:${getContainerPath(adcFile)}:ro`);
         args.push(
@@ -468,8 +471,8 @@ export async function start_sandbox(
     }
 
     // mount paths listed in SANDBOX_MOUNTS
-    if (process.env.SANDBOX_MOUNTS) {
-      for (let mount of process.env.SANDBOX_MOUNTS.split(',')) {
+    if (process.env['SANDBOX_MOUNTS']) {
+      for (let mount of process.env['SANDBOX_MOUNTS'].split(',')) {
         if (mount.trim()) {
           // parse mount as from:to:opts
           let [from, to, opts] = mount.trim().split(':');
@@ -500,22 +503,22 @@ export async function start_sandbox(
     ports().forEach((p) => args.push('--publish', `${p}:${p}`));
 
     // if DEBUG is set, expose debugging port
-    if (process.env.DEBUG) {
-      const debugPort = process.env.DEBUG_PORT || '9229';
+    if (process.env['DEBUG']) {
+      const debugPort = process.env['DEBUG_PORT'] || '9229';
       args.push(`--publish`, `${debugPort}:${debugPort}`);
     }
 
     // copy proxy environment variables, replacing localhost with SANDBOX_PROXY_NAME
     // copy as both upper-case and lower-case as is required by some utilities
     // GEMINI_SANDBOX_PROXY_COMMAND implies HTTPS_PROXY unless HTTP_PROXY is set
-    const proxyCommand = process.env.GEMINI_SANDBOX_PROXY_COMMAND;
+    const proxyCommand = process.env['GEMINI_SANDBOX_PROXY_COMMAND'];
 
     if (proxyCommand) {
       let proxy =
-        process.env.HTTPS_PROXY ||
-        process.env.https_proxy ||
-        process.env.HTTP_PROXY ||
-        process.env.http_proxy ||
+        process.env['HTTPS_PROXY'] ||
+        process.env['https_proxy'] ||
+        process.env['HTTP_PROXY'] ||
+        process.env['http_proxy'] ||
         'http://localhost:8877';
       proxy = proxy.replace('localhost', SANDBOX_PROXY_NAME);
       if (proxy) {
@@ -524,7 +527,7 @@ export async function start_sandbox(
         args.push('--env', `HTTP_PROXY=${proxy}`);
         args.push('--env', `http_proxy=${proxy}`);
       }
-      const noProxy = process.env.NO_PROXY || process.env.no_proxy;
+      const noProxy = process.env['NO_PROXY'] || process.env['no_proxy'];
       if (noProxy) {
         args.push('--env', `NO_PROXY=${noProxy}`);
         args.push('--env', `no_proxy=${noProxy}`);
@@ -562,56 +565,56 @@ export async function start_sandbox(
     args.push('--name', containerName, '--hostname', containerName);
 
     // copy GEMINI_API_KEY(s)
-    if (process.env.GEMINI_API_KEY) {
-      args.push('--env', `GEMINI_API_KEY=${process.env.GEMINI_API_KEY}`);
+    if (process.env['GEMINI_API_KEY']) {
+      args.push('--env', `GEMINI_API_KEY=${process.env['GEMINI_API_KEY']}`);
     }
-    if (process.env.GOOGLE_API_KEY) {
-      args.push('--env', `GOOGLE_API_KEY=${process.env.GOOGLE_API_KEY}`);
+    if (process.env['GOOGLE_API_KEY']) {
+      args.push('--env', `GOOGLE_API_KEY=${process.env['GOOGLE_API_KEY']}`);
     }
 
     // copy GOOGLE_GENAI_USE_VERTEXAI
-    if (process.env.GOOGLE_GENAI_USE_VERTEXAI) {
+    if (process.env['GOOGLE_GENAI_USE_VERTEXAI']) {
       args.push(
         '--env',
-        `GOOGLE_GENAI_USE_VERTEXAI=${process.env.GOOGLE_GENAI_USE_VERTEXAI}`,
+        `GOOGLE_GENAI_USE_VERTEXAI=${process.env['GOOGLE_GENAI_USE_VERTEXAI']}`,
       );
     }
 
     // copy GOOGLE_GENAI_USE_GCA
-    if (process.env.GOOGLE_GENAI_USE_GCA) {
+    if (process.env['GOOGLE_GENAI_USE_GCA']) {
       args.push(
         '--env',
-        `GOOGLE_GENAI_USE_GCA=${process.env.GOOGLE_GENAI_USE_GCA}`,
+        `GOOGLE_GENAI_USE_GCA=${process.env['GOOGLE_GENAI_USE_GCA']}`,
       );
     }
 
     // copy GOOGLE_CLOUD_PROJECT
-    if (process.env.GOOGLE_CLOUD_PROJECT) {
+    if (process.env['GOOGLE_CLOUD_PROJECT']) {
       args.push(
         '--env',
-        `GOOGLE_CLOUD_PROJECT=${process.env.GOOGLE_CLOUD_PROJECT}`,
+        `GOOGLE_CLOUD_PROJECT=${process.env['GOOGLE_CLOUD_PROJECT']}`,
       );
     }
 
     // copy GOOGLE_CLOUD_LOCATION
-    if (process.env.GOOGLE_CLOUD_LOCATION) {
+    if (process.env['GOOGLE_CLOUD_LOCATION']) {
       args.push(
         '--env',
-        `GOOGLE_CLOUD_LOCATION=${process.env.GOOGLE_CLOUD_LOCATION}`,
+        `GOOGLE_CLOUD_LOCATION=${process.env['GOOGLE_CLOUD_LOCATION']}`,
       );
     }
 
     // copy GEMINI_MODEL
-    if (process.env.GEMINI_MODEL) {
-      args.push('--env', `GEMINI_MODEL=${process.env.GEMINI_MODEL}`);
+    if (process.env['GEMINI_MODEL']) {
+      args.push('--env', `GEMINI_MODEL=${process.env['GEMINI_MODEL']}`);
     }
 
     // copy TERM and COLORTERM to try to maintain terminal setup
-    if (process.env.TERM) {
-      args.push('--env', `TERM=${process.env.TERM}`);
+    if (process.env['TERM']) {
+      args.push('--env', `TERM=${process.env['TERM']}`);
     }
-    if (process.env.COLORTERM) {
-      args.push('--env', `COLORTERM=${process.env.COLORTERM}`);
+    if (process.env['COLORTERM']) {
+      args.push('--env', `COLORTERM=${process.env['COLORTERM']}`);
     }
 
     // Pass through IDE mode environment variables
@@ -630,7 +633,9 @@ export async function start_sandbox(
     // sandbox can then set up this new VIRTUAL_ENV directory using sandbox.bashrc (see below)
     // directory will be empty if not set up, which is still preferable to having host binaries
     if (
-      process.env.VIRTUAL_ENV?.toLowerCase().startsWith(workdir.toLowerCase())
+      process.env['VIRTUAL_ENV']
+        ?.toLowerCase()
+        .startsWith(workdir.toLowerCase())
     ) {
       const sandboxVenvPath = path.resolve(
         SETTINGS_DIRECTORY_NAME,
@@ -641,17 +646,17 @@ export async function start_sandbox(
       }
       args.push(
         '--volume',
-        `${sandboxVenvPath}:${getContainerPath(process.env.VIRTUAL_ENV)}`,
+        `${sandboxVenvPath}:${getContainerPath(process.env['VIRTUAL_ENV'])}`,
       );
       args.push(
         '--env',
-        `VIRTUAL_ENV=${getContainerPath(process.env.VIRTUAL_ENV)}`,
+        `VIRTUAL_ENV=${getContainerPath(process.env['VIRTUAL_ENV'])}`,
       );
     }
 
     // copy additional environment variables from SANDBOX_ENV
-    if (process.env.SANDBOX_ENV) {
-      for (let env of process.env.SANDBOX_ENV.split(',')) {
+    if (process.env['SANDBOX_ENV']) {
+      for (let env of process.env['SANDBOX_ENV'].split(',')) {
         if ((env = env.trim())) {
           if (env.includes('=')) {
             console.error(`SANDBOX_ENV: ${env}`);
@@ -667,7 +672,7 @@ export async function start_sandbox(
     }
 
     // copy NODE_OPTIONS
-    const existingNodeOptions = process.env.NODE_OPTIONS || '';
+    const existingNodeOptions = process.env['NODE_OPTIONS'] || '';
     const allNodeOptions = [
       ...(existingNodeOptions ? [existingNodeOptions] : []),
       ...nodeArgs,
@@ -690,9 +695,9 @@ export async function start_sandbox(
     // Determine if the current user's UID/GID should be passed to the sandbox.
     // See shouldUseCurrentUserInSandbox for more details.
     let userFlag = '';
-    const finalEntrypoint = entrypoint(workdir);
+    const finalEntrypoint = entrypoint(workdir, cliArgs);
 
-    if (process.env.GEMINI_CLI_INTEGRATION_TEST === 'true') {
+    if (process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true') {
       args.push('--user', 'root');
       userFlag = '--user root';
     } else if (await shouldUseCurrentUserInSandbox()) {

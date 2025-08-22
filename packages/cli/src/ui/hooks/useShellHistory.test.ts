@@ -11,9 +11,41 @@ import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 
-vi.mock('fs/promises');
+vi.mock('fs/promises', () => ({
+  readFile: vi.fn(),
+  writeFile: vi.fn(),
+  mkdir: vi.fn(),
+}));
 vi.mock('os');
 vi.mock('crypto');
+vi.mock('fs', async (importOriginal) => {
+  const actualFs = await importOriginal<typeof import('fs')>();
+  return {
+    ...actualFs,
+    mkdirSync: vi.fn(),
+  };
+});
+vi.mock('@google/gemini-cli-core', () => {
+  class Storage {
+    getProjectTempDir(): string {
+      return path.join('/test/home/', '.gemini', 'tmp', 'mocked_hash');
+    }
+    getHistoryFilePath(): string {
+      return path.join(
+        '/test/home/',
+        '.gemini',
+        'tmp',
+        'mocked_hash',
+        'shell_history',
+      );
+    }
+  }
+  return {
+    isNodeError: (err: unknown): err is NodeJS.ErrnoException =>
+      typeof err === 'object' && err !== null && 'code' in err,
+    Storage,
+  };
+});
 
 const MOCKED_PROJECT_ROOT = '/test/project';
 const MOCKED_HOME_DIR = '/test/home';

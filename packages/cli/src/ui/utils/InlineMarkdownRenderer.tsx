@@ -22,10 +22,15 @@ interface RenderInlineProps {
 }
 
 const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
+  // Early return for plain text without markdown or URLs
+  if (!/[*_~`<[https?:]/.test(text)) {
+    return <Text>{text}</Text>;
+  }
+
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
   const inlineRegex =
-    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>)/g;
+    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
   let match;
 
   while ((match = inlineRegex.exec(text)) !== null) {
@@ -124,6 +129,12 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
               UNDERLINE_TAG_START_LENGTH,
               -UNDERLINE_TAG_END_LENGTH,
             )}
+          </Text>
+        );
+      } else if (fullMatch.match(/^https?:\/\//)) {
+        renderedNode = (
+          <Text key={key} color={Colors.AccentBlue}>
+            {fullMatch}
           </Text>
         );
       }

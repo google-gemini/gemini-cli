@@ -6,22 +6,22 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as os from 'os';
 import { isNodeError } from '../utils/errors.js';
 import { exec } from 'node:child_process';
 import { simpleGit, SimpleGit, CheckRepoActions } from 'simple-git';
-import { getProjectHash, GEMINI_DIR } from '../utils/paths.js';
+import { Storage } from '../config/storage.js';
 
 export class GitService {
   private projectRoot: string;
+  private storage: Storage;
 
-  constructor(projectRoot: string) {
+  constructor(projectRoot: string, storage: Storage) {
     this.projectRoot = path.resolve(projectRoot);
+    this.storage = storage;
   }
 
   private getHistoryDir(): string {
-    const hash = getProjectHash(this.projectRoot);
-    return path.join(os.homedir(), GEMINI_DIR, 'history', hash);
+    return this.storage.getHistoryDir();
   }
 
   async initialize(): Promise<void> {
@@ -31,7 +31,13 @@ export class GitService {
         'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
       );
     }
-    this.setupShadowGitRepository();
+    try {
+      await this.setupShadowGitRepository();
+    } catch (error) {
+      throw new Error(
+        `Failed to initialize checkpointing: ${error instanceof Error ? error.message : 'Unknown error'}. Please check that Git is working properly or disable checkpointing.`,
+      );
+    }
   }
 
   verifyGitAvailability(): Promise<boolean> {
@@ -105,10 +111,16 @@ export class GitService {
   }
 
   async createFileSnapshot(message: string): Promise<string> {
-    const repo = this.shadowGitRepository;
-    await repo.add('.');
-    const commitResult = await repo.commit(message);
-    return commitResult.commit;
+    try {
+      const repo = this.shadowGitRepository;
+      await repo.add('.');
+      const commitResult = await repo.commit(message);
+      return commitResult.commit;
+    } catch (error) {
+      throw new Error(
+        `Failed to create checkpoint snapshot: ${error instanceof Error ? error.message : 'Unknown error'}. Checkpointing may not be working properly.`,
+      );
+    }
   }
 
   async restoreProjectFromSnapshot(commitHash: string): Promise<void> {

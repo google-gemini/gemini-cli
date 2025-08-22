@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import stripAnsi from 'strip-ansi';
 import { renderHook, act } from '@testing-library/react';
 import {
   useTextBuffer,
@@ -1277,6 +1278,45 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
         }),
       );
       expect(getBufferState(result).text).toBe('Pasted Text');
+    });
+
+    it('should not strip popular emojis', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const emojis = '🐍🐳🦀🦄';
+      act(() =>
+        result.current.handleInput({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: emojis,
+        }),
+      );
+      expect(getBufferState(result).text).toBe(emojis);
+    });
+  });
+
+  describe('stripAnsi', () => {
+    it('should correctly strip ANSI escape codes', () => {
+      const textWithAnsi = '\x1B[31mHello\x1B[0m World';
+      expect(stripAnsi(textWithAnsi)).toBe('Hello World');
+    });
+
+    it('should handle multiple ANSI codes', () => {
+      const textWithMultipleAnsi = '\x1B[1m\x1B[34mBold Blue\x1B[0m Text';
+      expect(stripAnsi(textWithMultipleAnsi)).toBe('Bold Blue Text');
+    });
+
+    it('should not modify text without ANSI codes', () => {
+      const plainText = 'Plain text';
+      expect(stripAnsi(plainText)).toBe('Plain text');
+    });
+
+    it('should handle empty string', () => {
+      expect(stripAnsi('')).toBe('');
     });
   });
 });

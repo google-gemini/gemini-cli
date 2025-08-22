@@ -24,7 +24,7 @@ export const toolsCommand: SlashCommand = {
       useShowDescriptions = true;
     }
 
-    const toolRegistry = await context.services.config?.getToolRegistry();
+    const toolRegistry = context.services.config?.getToolRegistry();
     if (!toolRegistry) {
       context.ui.addItem(
         {

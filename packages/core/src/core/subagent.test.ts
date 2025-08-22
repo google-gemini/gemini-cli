@@ -59,7 +59,7 @@ async function createMockConfig(
     ...toolRegistryMocks,
   } as unknown as ToolRegistry;
 
-  vi.spyOn(config, 'getToolRegistry').mockResolvedValue(mockToolRegistry);
+  vi.spyOn(config, 'getToolRegistry').mockReturnValue(mockToolRegistry);
   return { config, toolRegistry: mockToolRegistry };
 }
 
@@ -534,7 +534,7 @@ describe('subagent.ts', () => {
           parameters: { type: Type.OBJECT, properties: {} },
         };
 
-        const { config, toolRegistry } = await createMockConfig({
+        const { config } = await createMockConfig({
           getFunctionDeclarationsFiltered: vi
             .fn()
             .mockReturnValue([listFilesToolDef]),
@@ -580,7 +580,6 @@ describe('subagent.ts', () => {
         expect(executeToolCall).toHaveBeenCalledWith(
           config,
           expect.objectContaining({ name: 'list_files', args: { path: '.' } }),
-          toolRegistry,
           expect.any(AbortSignal),
         );
 

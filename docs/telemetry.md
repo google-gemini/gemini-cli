@@ -74,7 +74,11 @@ gemini --telemetry \
 ## Running an OTEL Collector
 
 An OTEL Collector is a service that receives, processes, and exports telemetry data.
-The CLI sends data using the OTLP/gRPC protocol.
+The CLI can send data using either the OTLP/gRPC or OTLP/HTTP protocol.
+You can specify which protocol to use via the `--telemetry-otlp-protocol` flag
+or the `telemetry.otlpProtocol` setting in your `settings.json` file. See the
+[configuration docs](./cli/configuration.md#--telemetry-otlp-protocol) for more
+details.
 
 Learn more about OTEL exporter standard configuration in [documentation][otel-config-docs].
 
@@ -236,6 +240,7 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `function_name`
     - `success` (boolean)
     - `decision` (string: "accept", "reject", or "modify", if applicable)
+    - `tool_type` (string: "mcp", or "native", if applicable)
 
 - `gemini_cli.tool.call.latency` (Histogram, ms): Measures tool call latency.
   - **Attributes**:
@@ -267,3 +272,9 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `ai_removed_lines` (Int, if applicable): Number of lines removed/changed by AI.
     - `user_added_lines` (Int, if applicable): Number of lines added/changed by user in AI proposed changes.
     - `user_removed_lines` (Int, if applicable): Number of lines removed/changed by user in AI proposed changes.
+    - `programming_language` (string, if applicable): The programming language of the file.
+
+- `gemini_cli.chat_compression` (Counter, Int): Counts chat compression operations
+  - **Attributes**:
+    - `tokens_before`: (Int): Number of tokens in context prior to compression
+    - `tokens_after`: (Int): Number of tokens in context after compression

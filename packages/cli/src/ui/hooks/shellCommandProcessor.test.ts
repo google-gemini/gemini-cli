@@ -17,15 +17,10 @@ import {
 
 const mockIsBinary = vi.hoisted(() => vi.fn());
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...original,
-    ShellExecutionService: { execute: mockShellExecutionService },
-    isBinary: mockIsBinary,
-  };
-});
+vi.mock('@google/gemini-cli-core', () => ({
+  ShellExecutionService: { execute: mockShellExecutionService },
+  isBinary: mockIsBinary,
+}));
 vi.mock('fs');
 vi.mock('os');
 vi.mock('crypto');
@@ -65,7 +60,10 @@ describe('useShellCommandProcessor', () => {
     setPendingHistoryItemMock = vi.fn();
     onExecMock = vi.fn();
     onDebugMessageMock = vi.fn();
-    mockConfig = { getTargetDir: () => '/test/dir' } as Config;
+    mockConfig = {
+      getTargetDir: () => '/test/dir',
+      getShouldUseNodePtyShell: () => false,
+    } as Config;
     mockGeminiClient = { addHistory: vi.fn() } as unknown as GeminiClient;
 
     vi.mocked(os.platform).mockReturnValue('linux');
@@ -104,13 +102,12 @@ describe('useShellCommandProcessor', () => {
   ): ShellExecutionResult => ({
     rawOutput: Buffer.from(overrides.output || ''),
     output: 'Success',
-    stdout: 'Success',
-    stderr: '',
     exitCode: 0,
     signal: null,
     error: null,
     aborted: false,
     pid: 12345,
+    executionMethod: 'child_process',
     ...overrides,
   });
 
@@ -141,6 +138,7 @@ describe('useShellCommandProcessor', () => {
       '/test/dir',
       expect.any(Function),
       expect.any(Object),
+      false,
     );
     expect(onExecMock).toHaveBeenCalledWith(expect.any(Promise));
   });
@@ -223,7 +221,6 @@ describe('useShellCommandProcessor', () => {
       act(() => {
         mockShellOutputCallback({
           type: 'data',
-          stream: 'stdout',
           chunk: 'hello',
         });
       });
@@ -238,7 +235,6 @@ describe('useShellCommandProcessor', () => {
       act(() => {
         mockShellOutputCallback({
           type: 'data',
-          stream: 'stdout',
           chunk: ' world',
         });
       });
@@ -319,6 +315,7 @@ describe('useShellCommandProcessor', () => {
       '/test/dir',
       expect.any(Function),
       expect.any(Object),
+      false,
     );
   });
 

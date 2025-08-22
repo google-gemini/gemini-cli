@@ -1,173 +1,231 @@
-name: Release
+name: 'Release'
 
 on:
   schedule:
     # Runs every day at midnight UTC for the nightly release.
     - cron: '0 0 * * *'
+    # Runs every Tuesday at 23:59 UTC for the preview release.
+    - cron: '59 23 * * 2'
   workflow_dispatch:
     inputs:
       version:
         description: 'The version to release (e.g., v0.1.11). Required for manual patch releases.'
         required: false # Not required for scheduled runs
-        type: string
+        type: 'string'
       ref:
         description: 'The branch or ref (full git sha) to release from.'
         required: true
-        type: string
+        type: 'string'
         default: 'main'
       dry_run:
         description: 'Run a dry-run of the release process; no branches, npm packages or GitHub releases will be created.'
         required: true
-        type: boolean
+        type: 'boolean'
         default: true
       create_nightly_release:
         description: 'Auto apply the nightly release tag, input version is ignored.'
         required: false
-        type: boolean
+        type: 'boolean'
+        default: false
+      create_preview_release:
+        description: 'Auto apply the preview release tag, input version is ignored.'
+        required: false
+        type: 'boolean'
         default: false
       force_skip_tests:
         description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
         required: false
-        type: boolean
+        type: 'boolean'
         default: false
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
     environment:
-      name: production-release
-      url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.version.outputs.RELEASE_TAG }}
-    if: github.repository == 'google-gemini/gemini-cli'
+      name: 'production-release'
+      url: '${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.version.outputs.RELEASE_TAG }}'
+    if: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' }}
     permissions:
-      contents: write
-      packages: write
-      id-token: write
-      issues: write # For creating issues on failure
+      contents: 'write'
+      packages: 'write'
+      id-token: 'write'
+      issues: 'write' # For creating issues on failure
     outputs:
-      RELEASE_TAG: ${{ steps.version.outputs.RELEASE_TAG }}
+      RELEASE_TAG: '${{ steps.version.outputs.RELEASE_TAG }}'
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
-          ref: ${{ github.sha }}
+          ref: '${{ github.sha }}'
           fetch-depth: 0
 
-      - name: Set booleans for simplified logic
-        id: vars
-        run: |
+      - name: 'Set booleans for simplified logic'
+        env:
+          CREATE_NIGHTLY_RELEASE: '${{ github.event.inputs.create_nightly_release }}'
+          CREATE_PREVIEW_RELEASE: '${{ github.event.inputs.create_preview_release }}'
+          EVENT_NAME: '${{ github.event_name }}'
+          CRON: '${{ github.event.schedule }}'
+          DRY_RUN_INPUT: '${{ github.event.inputs.dry_run }}'
+        id: 'vars'
+        run: |-
           is_nightly="false"
-          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event.inputs.create_nightly_release }}" == "true" ]]; then
+          if [[ "${CRON}" == "0 0 * * *" || "${CREATE_NIGHTLY_RELEASE}" == "true" ]]; then
             is_nightly="true"
           fi
-          echo "is_nightly=${is_nightly}" >> $GITHUB_OUTPUT
+          echo "is_nightly=${is_nightly}" >> "${GITHUB_OUTPUT}"
+
+          is_preview="false"
+          if [[ "${CRON}" == "59 23 * * 2" || "${CREATE_PREVIEW_RELEASE}" == "true" ]]; then
+            is_preview="true"
+          fi
+          echo "is_preview=${is_preview}" >> "${GITHUB_OUTPUT}"
 
           is_dry_run="false"
-          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+          if [[ "${DRY_RUN_INPUT}" == "true" ]]; then
             is_dry_run="true"
           fi
-          echo "is_dry_run=${is_dry_run}" >> $GITHUB_OUTPUT
+          echo "is_dry_run=${is_dry_run}" >> "${GITHUB_OUTPUT}"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm ci
+      - name: 'Install Dependencies'
+        run: |-
+          npm ci
 
-      - name: Get the version
-        id: version
-        run: |
-          VERSION_JSON=$(node scripts/get-release-version.js)
-          echo "RELEASE_TAG=$(echo $VERSION_JSON | jq -r .releaseTag)" >> $GITHUB_OUTPUT
-          echo "RELEASE_VERSION=$(echo $VERSION_JSON | jq -r .releaseVersion)" >> $GITHUB_OUTPUT
-          echo "NPM_TAG=$(echo $VERSION_JSON | jq -r .npmTag)" >> $GITHUB_OUTPUT
+      - name: 'Get the version'
+        id: 'version'
         env:
-          IS_NIGHTLY: ${{ steps.vars.outputs.is_nightly }}
-          MANUAL_VERSION: ${{ inputs.version }}
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          IS_NIGHTLY: '${{ steps.vars.outputs.is_nightly }}'
+          IS_PREVIEW: '${{ steps.vars.outputs.is_preview }}'
+          MANUAL_VERSION: '${{ inputs.version }}'
+        run: |-
+          VERSION_JSON="$(node scripts/get-release-version.js)"
+          echo "RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)" >> "${GITHUB_OUTPUT}"
+          echo "RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
+          echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
+          echo "PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
 
-      - name: Run Tests
-        if: github.event.inputs.force_skip_tests != 'true'
-        run: |
+      - name: 'Run Tests'
+        if: |-
+          ${{ github.event.inputs.force_skip_tests != 'true' }}
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+        run: |-
           npm run preflight
           npm run test:integration:sandbox:none
           npm run test:integration:sandbox:docker
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
-      - name: Configure Git User
-        run: |
+      - name: 'Configure Git User'
+        run: |-
           git config user.name "gemini-cli-robot"
           git config user.email "gemini-cli-robot@google.com"
 
-      - name: Create and switch to a release branch
-        id: release_branch
-        run: |
-          BRANCH_NAME="release/${{ steps.version.outputs.RELEASE_TAG }}"
-          git switch -c $BRANCH_NAME
-          echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+      - name: 'Create and switch to a release branch'
+        id: 'release_branch'
+        env:
+          RELEASE_TAG: '${{ steps.version.outputs.RELEASE_TAG }}'
+        run: |-
+          BRANCH_NAME="release/${RELEASE_TAG}"
+          git switch -c "${BRANCH_NAME}"
+          echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
 
-      - name: Update package versions
-        run: |
-          npm run release:version ${{ steps.version.outputs.RELEASE_VERSION }}
+      - name: 'Update package versions'
+        env:
+          RELEASE_VERSION: '${{ steps.version.outputs.RELEASE_VERSION }}'
+        run: |-
+          npm run release:version "${RELEASE_VERSION}"
 
-      - name: Commit and Conditionally Push package versions
-        run: |
+      - name: 'Commit and Conditionally Push package versions'
+        env:
+          BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+          IS_DRY_RUN: '${{ steps.vars.outputs.is_dry_run }}'
+          RELEASE_TAG: '${{ steps.version.outputs.RELEASE_TAG }}'
+        run: |-
           git add package.json package-lock.json packages/*/package.json
-          git commit -m "chore(release): ${{ steps.version.outputs.RELEASE_TAG }}"
-          if [[ "${{ steps.vars.outputs.is_dry_run }}" == "false" ]]; then
+          git commit -m "chore(release): ${RELEASE_TAG}"
+          if [[ "${IS_DRY_RUN}" == "false" ]]; then
             echo "Pushing release branch to remote..."
-            git push --set-upstream origin ${{ steps.release_branch.outputs.BRANCH_NAME }} --follow-tags
+            git push --set-upstream origin "${BRANCH_NAME}" --follow-tags
           else
             echo "Dry run enabled. Skipping push."
           fi
 
-      - name: Build and Prepare Packages
-        run: |
+      - name: 'Build and Prepare Packages'
+        run: |-
           npm run build:packages
           npm run prepare:package
 
-      - name: Configure npm for publishing
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - name: 'Configure npm for publishing'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
           registry-url: 'https://wombat-dressing-room.appspot.com'
           scope: '@google'
 
-      - name: Publish @google/gemini-cli-core
-        run: npm publish --workspace=@google/gemini-cli-core --tag=${{ steps.version.outputs.NPM_TAG }} ${{ steps.vars.outputs.is_dry_run == 'true' && '--dry-run' || '' }}
+      - name: 'Publish @google/gemini-cli-core'
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CORE }}
+          IS_DRY_RUN: '${{ steps.vars.outputs.is_dry_run }}'
+          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+          NPM_TAG: '${{ steps.version.outputs.NPM_TAG }}'
+        run: |-
+          npm publish \
+            --dry-run="${IS_DRY_RUN}" \
+            --workspace="@google/gemini-cli-core" \
+            --tag="${NPM_TAG}"
 
-      - name: Install latest core package
-        if: steps.vars.outputs.is_dry_run == 'false'
-        run: npm install @google/gemini-cli-core@${{ steps.version.outputs.RELEASE_VERSION }} --workspace=@google/gemini-cli --save-exact
-
-      - name: Publish @google/gemini-cli
-        run: npm publish --workspace=@google/gemini-cli --tag=${{ steps.version.outputs.NPM_TAG }} ${{ steps.vars.outputs.is_dry_run == 'true' && '--dry-run' || '' }}
+      - name: 'Install latest core package'
+        if: |-
+          ${{ steps.vars.outputs.is_dry_run == 'false' }}
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CLI }}
+          RELEASE_VERSION: '${{ steps.version.outputs.RELEASE_VERSION }}'
+        run: |-
+          npm install "@google/gemini-cli-core@${RELEASE_VERSION}" \
+          --workspace="@google/gemini-cli" \
+          --save-exact
 
-      - name: Create GitHub Release and Tag
-        if: ${{ steps.vars.outputs.is_dry_run == 'false' }}
+      - name: 'Publish @google/gemini-cli'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_BRANCH: ${{ steps.release_branch.outputs.BRANCH_NAME }}
-        run: |
-          gh release create ${{ steps.version.outputs.RELEASE_TAG }} \
+          IS_DRY_RUN: '${{ steps.vars.outputs.is_dry_run }}'
+          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          NPM_TAG: '${{ steps.version.outputs.NPM_TAG }}'
+        run: |-
+          npm publish \
+            --dry-run="${IS_DRY_RUN}" \
+            --workspace="@google/gemini-cli" \
+            --tag="${NPM_TAG}"
+
+      - name: 'Create GitHub Release and Tag'
+        if: |-
+          ${{ steps.vars.outputs.is_dry_run == 'false' }}
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_BRANCH: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+          RELEASE_TAG: '${{ steps.version.outputs.RELEASE_TAG }}'
+          PREVIOUS_TAG: '${{ steps.version.outputs.PREVIOUS_TAG }}'
+        run: |-
+          gh release create "${RELEASE_TAG}" \
             bundle/gemini.js \
             --target "$RELEASE_BRANCH" \
-            --title "Release ${{ steps.version.outputs.RELEASE_TAG }}" \
+            --title "Release ${RELEASE_TAG}" \
+            --notes-start-tag "$PREVIOUS_TAG" \
             --generate-notes
 
-      - name: Create Issue on Failure
-        if: failure()
-        run: |
-          gh issue create \
-            --title "Release Failed for ${{ steps.version.outputs.RELEASE_TAG || 'N/A' }} on $(date +'%Y-%m-%d')" \
-            --body "The release workflow failed. See the full run for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --label "kind/bug,release-failure"
+      - name: 'Create Issue on Failure'
+        if: |-
+          ${{ failure() }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_TAG: '${{ steps.version.outputs.RELEASE_TAG }} || "N/A"'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |-
+          gh issue create \
+            --title "Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')" \
+            --body "The release workflow failed. See the full run for details: ${DETAILS_URL}" \
+            --label "kind/bug,release-failure"

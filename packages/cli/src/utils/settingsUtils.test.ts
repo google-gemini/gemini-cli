@@ -239,7 +239,7 @@ describe('SettingsUtils', () => {
         expect(shouldShowInDialog('showMemoryUsage')).toBe(true);
         expect(shouldShowInDialog('vimMode')).toBe(true);
         expect(shouldShowInDialog('hideWindowTitle')).toBe(true);
-        expect(shouldShowInDialog('usageStatisticsEnabled')).toBe(true);
+        expect(shouldShowInDialog('usageStatisticsEnabled')).toBe(false);
       });
 
       it('should return false for settings marked to hide from dialog', () => {
@@ -286,7 +286,7 @@ describe('SettingsUtils', () => {
         expect(allKeys).toContain('ideMode');
         expect(allKeys).toContain('disableAutoUpdate');
         expect(allKeys).toContain('showMemoryUsage');
-        expect(allKeys).toContain('usageStatisticsEnabled');
+        expect(allKeys).not.toContain('usageStatisticsEnabled');
         expect(allKeys).not.toContain('selectedAuthType');
         expect(allKeys).not.toContain('coreTools');
         expect(allKeys).not.toContain('theme'); // Now hidden
@@ -302,7 +302,7 @@ describe('SettingsUtils', () => {
         expect(keys).toContain('showMemoryUsage');
         expect(keys).toContain('vimMode');
         expect(keys).toContain('hideWindowTitle');
-        expect(keys).toContain('usageStatisticsEnabled');
+        expect(keys).not.toContain('usageStatisticsEnabled');
         expect(keys).not.toContain('selectedAuthType'); // Advanced setting
         expect(keys).not.toContain('useExternalAuth'); // Advanced setting
       });
@@ -329,7 +329,7 @@ describe('SettingsUtils', () => {
         expect(dialogKeys).toContain('showMemoryUsage');
         expect(dialogKeys).toContain('vimMode');
         expect(dialogKeys).toContain('hideWindowTitle');
-        expect(dialogKeys).toContain('usageStatisticsEnabled');
+        expect(dialogKeys).not.toContain('usageStatisticsEnabled');
         expect(dialogKeys).toContain('ideMode');
         expect(dialogKeys).toContain('disableAutoUpdate');
 
@@ -392,7 +392,7 @@ describe('SettingsUtils', () => {
           new Set(),
           updatedPendingSettings,
         );
-        expect(displayValue).toBe('true*'); // Should show true with * indicating change
+        expect(displayValue).toBe('true'); // Should show true (no * since value matches default)
 
         // Test that modified settings also show the * indicator
         const modifiedSettings = new Set([key]);
@@ -602,7 +602,7 @@ describe('SettingsUtils', () => {
           mergedSettings,
           modifiedSettings,
         );
-        expect(result).toBe('false'); // matches default, no *
+        expect(result).toBe('false*');
       });
 
       it('should show default value when setting is not in scope', () => {

@@ -24,12 +24,12 @@ Our development is guided by the following principles:
 
 ## How the Roadmap Works
 
-Our roadmap is managed directly through Github Issues. See our entry point Roadmap Issue [here](https://github.com/google-gemini/gemini-cli/issues/4191). This approach allows for transparency and gives you a direct way to learn more or get involved with any specific initiative. All our roadmap items will be tagged as Type:`Feature` and Label:`maintainer` for features we are actively working on, or Type:`Task` and Label:`maintainer` for a more detailed list of tasks.
+Our roadmap is managed directly through GitHub Issues. See our entry point Roadmap Issue [here](https://github.com/google-gemini/gemini-cli/issues/4191). This approach allows for transparency and gives you a direct way to learn more or get involved with any specific initiative. All our roadmap items will be tagged as Type:`Feature` and Label:`maintainer` for features we are actively working on, or Type:`Task` and Label:`maintainer` for a more detailed list of tasks.
 
 Issues are organized to provide key information at a glance:
 
 - **Target Quarter:** `Milestone` denotes the anticipated delivery timeline.
-- **Feature Area:** Labels such as `area/model` or `area/tooling` categorizes the work.
+- **Feature Area:** Labels such as `area/model` or `area/tooling` categorize the work.
 - **Issue Type:** _Workstream_ => _Epics_ => _Features_ => _Tasks|Bugs_
 
 To see what we're working on, you can filter our issues by these dimensions. See all our items [here](https://github.com/orgs/google-gemini/projects/11/views/19)
@@ -39,7 +39,7 @@ To see what we're working on, you can filter our issues by these dimensions. See
 To better organize our efforts, we categorize our work into several key feature areas. These labels are used on our GitHub Issues to help you filter and
 find initiatives that interest you.
 
-- **Authentication:** Secure user access via API keys, Gemini Code Assist login etc.
+- **Authentication:** Secure user access via API keys, Gemini Code Assist login, etc.
 - **Model:** Support new Gemini models, multi-modality, local execution, and performance tuning.
 - **User Experience:** Improve the CLI's usability, performance, interactive features, and documentation.
 - **Tooling:** Built-in tools and the MCP ecosystem.

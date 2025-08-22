@@ -11,6 +11,7 @@ import {
   FileDiscoveryService,
   GlobTool,
   ReadManyFilesTool,
+  StandardFileSystemService,
   ToolRegistry,
 } from '@google/gemini-cli-core';
 import * as os from 'os';
@@ -56,11 +57,19 @@ describe('handleAtCommand', () => {
         respectGitIgnore: true,
         respectGeminiIgnore: true,
       }),
+      getFileSystemService: () => new StandardFileSystemService(),
       getEnableRecursiveFileSearch: vi.fn(() => true),
       getWorkspaceContext: () => ({
         isPathWithinWorkspace: () => true,
         getDirectories: () => [testRootDir],
       }),
+      getMcpServers: () => ({}),
+      getMcpServerCommand: () => undefined,
+      getPromptRegistry: () => ({
+        getPromptsByServer: () => [],
+      }),
+      getDebugMode: () => false,
+      getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig);
@@ -90,10 +99,6 @@ describe('handleAtCommand', () => {
       processedQuery: [{ text: query }],
       shouldProceed: true,
     });
-    expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: query },
-      123,
-    );
   });
 
   it('should pass through original query if only a lone @ symbol is present', async () => {
@@ -112,10 +117,6 @@ describe('handleAtCommand', () => {
       processedQuery: [{ text: queryWithSpaces }],
       shouldProceed: true,
     });
-    expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: queryWithSpaces },
-      124,
-    );
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       'Lone @ detected, will be treated as text in the modified query.',
     );
@@ -148,10 +149,6 @@ describe('handleAtCommand', () => {
       ],
       shouldProceed: true,
     });
-    expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: query },
-      125,
-    );
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
@@ -190,10 +187,6 @@ describe('handleAtCommand', () => {
       ],
       shouldProceed: true,
     });
-    expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: query },
-      126,
-    );
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Path ${dirPath} resolved to directory, using glob: ${resolvedGlob}`,
     );
@@ -228,10 +221,6 @@ describe('handleAtCommand', () => {
       ],
       shouldProceed: true,
     });
-    expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: query },
-      128,
-    );
   });
 
   it('should correctly unescape paths with escaped spaces', async () => {
@@ -262,10 +251,6 @@ describe('handleAtCommand', () => {
       ],
       shouldProceed: true,
     });
-    expect(mockAddItem).toHaveBeenCalledWith(
-      { type: 'user', text: query },
-      125,
-    );
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
@@ -1081,5 +1066,38 @@ describe('handleAtCommand', () => {
         shouldProceed: true,
       });
     });
+  });
+
+  it("should not add the user's turn to history, as that is the caller's responsibility", async () => {
+    // Arrange
+    const fileContent = 'This is the file content.';
+    const filePath = await createTestFile(
+      path.join(testRootDir, 'path', 'to', 'another-file.txt'),
+      fileContent,
+    );
+    const query = `A query with @${filePath}`;
+
+    // Act
+    await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 999,
+      signal: abortController.signal,
+    });
+
+    // Assert
+    // It SHOULD be called for the tool_group
+    expect(mockAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'tool_group' }),
+      999,
+    );
+
+    // It should NOT have been called for the user turn
+    const userTurnCalls = mockAddItem.mock.calls.filter(
+      (call) => call[0].type === 'user',
+    );
+    expect(userTurnCalls).toHaveLength(0);
   });
 });

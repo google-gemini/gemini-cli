@@ -129,20 +129,25 @@ export const defaultKeyBindings: KeyBindingConfig = {
 
   // Text input
   // Original: key.name === 'return' && !key.ctrl && !key.meta && !key.paste
+  // Must also exclude shift to allow shift+enter for newline
   [Command.SUBMIT]: [
     {
       key: 'return',
       ctrl: false,
       command: false,
       paste: false,
+      shift: false,
     },
   ],
   // Original: key.name === 'return' && (key.ctrl || key.meta || key.paste)
   // Split into multiple data-driven bindings
+  // Now also includes shift+enter for multi-line input
   [Command.NEWLINE]: [
     { key: 'return', ctrl: true },
     { key: 'return', command: true },
     { key: 'return', paste: true },
+    { key: 'return', shift: true },
+    { key: 'j', ctrl: true },
   ],
 
   // External tools
@@ -159,8 +164,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'o', ctrl: true }],
   // Original: key.ctrl && key.name === 't'
   [Command.TOGGLE_TOOL_DESCRIPTIONS]: [{ key: 't', ctrl: true }],
-  // Original: key.ctrl && key.name === 'e'
-  [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'e', ctrl: true }],
+  // Original: key.ctrl && key.name === 'g'
+  [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
   // Original: key.ctrl && (key.name === 'c' || key.name === 'C')
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   // Original: key.ctrl && (key.name === 'd' || key.name === 'D')

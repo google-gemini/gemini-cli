@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import React from 'react';
 import { Colors } from '../colors.js';
 import {
   RadioButtonSelect,
   RadioSelectItem,
 } from './shared/RadioButtonSelect.js';
+import { useKeypress } from '../hooks/useKeypress.js';
+import * as process from 'process';
 
 export enum FolderTrustChoice {
   TRUST_FOLDER = 'trust_folder',
@@ -20,16 +22,30 @@ export enum FolderTrustChoice {
 
 interface FolderTrustDialogProps {
   onSelect: (choice: FolderTrustChoice) => void;
+  isRestarting?: boolean;
 }
 
 export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   onSelect,
+  isRestarting,
 }) => {
-  useInput((_, key) => {
-    if (key.escape) {
-      onSelect(FolderTrustChoice.DO_NOT_TRUST);
-    }
-  });
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape') {
+        onSelect(FolderTrustChoice.DO_NOT_TRUST);
+      }
+    },
+    { isActive: !isRestarting },
+  );
+
+  useKeypress(
+    (key) => {
+      if (key.name === 'r') {
+        process.exit(0);
+      }
+    },
+    { isActive: !!isRestarting },
+  );
 
   const options: Array<RadioSelectItem<FolderTrustChoice>> = [
     {
@@ -47,24 +63,38 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   ];
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor={Colors.AccentYellow}
-      padding={1}
-      width="100%"
-      marginLeft={1}
-    >
-      <Box flexDirection="column" marginBottom={1}>
-        <Text bold>Do you trust this folder?</Text>
-        <Text>
-          Trusting a folder allows Gemini to execute commands it suggests. This
-          is a security feature to prevent accidental execution in untrusted
-          directories.
-        </Text>
-      </Box>
+    <Box flexDirection="column">
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={Colors.AccentYellow}
+        padding={1}
+        width="100%"
+        marginLeft={1}
+      >
+        <Box flexDirection="column" marginBottom={1}>
+          <Text bold>Do you trust this folder?</Text>
+          <Text>
+            Trusting a folder allows Gemini to execute commands it suggests.
+            This is a security feature to prevent accidental execution in
+            untrusted directories.
+          </Text>
+        </Box>
 
-      <RadioButtonSelect items={options} onSelect={onSelect} isFocused />
+        <RadioButtonSelect
+          items={options}
+          onSelect={onSelect}
+          isFocused={!isRestarting}
+        />
+      </Box>
+      {isRestarting && (
+        <Box marginLeft={1} marginTop={1}>
+          <Text color={Colors.AccentYellow}>
+            To see changes, Gemini CLI must be restarted. Press r to exit and
+            apply changes now.
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 };

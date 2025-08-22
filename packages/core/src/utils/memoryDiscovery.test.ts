@@ -48,8 +48,8 @@ describe('loadServerHierarchicalMemory', () => {
 
     vi.resetAllMocks();
     // Set environment variables to indicate test environment
-    process.env.NODE_ENV = 'test';
-    process.env.VITEST = 'true';
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('VITEST', 'true');
 
     projectRoot = await createEmptyDir(path.join(testRootDir, 'project'));
     cwd = await createEmptyDir(path.join(projectRoot, 'src'));
@@ -58,6 +58,7 @@ describe('loadServerHierarchicalMemory', () => {
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     // Some tests set this to a different value.
     setGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
     // Clean up the temporary directory to prevent resource leaks.
@@ -366,5 +367,76 @@ describe('loadServerHierarchicalMemory', () => {
       memoryContent: `--- Context from: ${path.relative(cwd, includedFile)} ---\nincluded directory memory\n--- End of Context from: ${path.relative(cwd, includedFile)} ---`,
       fileCount: 1,
     });
+  });
+
+  it('should handle multiple directories and files in parallel correctly', async () => {
+    // Create multiple test directories with GEMINI.md files
+    const numDirs = 5;
+    const createdFiles: string[] = [];
+
+    for (let i = 0; i < numDirs; i++) {
+      const dirPath = await createEmptyDir(
+        path.join(testRootDir, `project-${i}`),
+      );
+      const filePath = await createTestFile(
+        path.join(dirPath, DEFAULT_CONTEXT_FILENAME),
+        `Content from project ${i}`,
+      );
+      createdFiles.push(filePath);
+    }
+
+    // Load memory from all directories
+    const result = await loadServerHierarchicalMemory(
+      cwd,
+      createdFiles.map((f) => path.dirname(f)),
+      false,
+      new FileDiscoveryService(projectRoot),
+    );
+
+    // Should have loaded all files
+    expect(result.fileCount).toBe(numDirs);
+
+    // Content should include all project contents
+    for (let i = 0; i < numDirs; i++) {
+      expect(result.memoryContent).toContain(`Content from project ${i}`);
+    }
+  });
+
+  it('should preserve order and prevent duplicates when processing multiple directories', async () => {
+    // Create overlapping directory structure
+    const parentDir = await createEmptyDir(path.join(testRootDir, 'parent'));
+    const childDir = await createEmptyDir(path.join(parentDir, 'child'));
+
+    await createTestFile(
+      path.join(parentDir, DEFAULT_CONTEXT_FILENAME),
+      'Parent content',
+    );
+    await createTestFile(
+      path.join(childDir, DEFAULT_CONTEXT_FILENAME),
+      'Child content',
+    );
+
+    // Include both parent and child directories
+    const result = await loadServerHierarchicalMemory(
+      parentDir,
+      [childDir, parentDir], // Deliberately include duplicates
+      false,
+      new FileDiscoveryService(projectRoot),
+    );
+
+    // Should have both files without duplicates
+    expect(result.fileCount).toBe(2);
+    expect(result.memoryContent).toContain('Parent content');
+    expect(result.memoryContent).toContain('Child content');
+
+    // Check that files are not duplicated
+    const parentOccurrences = (
+      result.memoryContent.match(/Parent content/g) || []
+    ).length;
+    const childOccurrences = (
+      result.memoryContent.match(/Child content/g) || []
+    ).length;
+    expect(parentOccurrences).toBe(1);
+    expect(childOccurrences).toBe(1);
   });
 });

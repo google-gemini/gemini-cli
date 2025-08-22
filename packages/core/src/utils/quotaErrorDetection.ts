@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { StructuredError } from '../core/turn.js';
+
 export interface ApiError {
   error: {
     code: number;
@@ -11,11 +13,6 @@ export interface ApiError {
     status: string;
     details: unknown[];
   };
-}
-
-interface StructuredError {
-  message: string;
-  status?: number;
 }
 
 export function isApiError(error: unknown): error is ApiError {

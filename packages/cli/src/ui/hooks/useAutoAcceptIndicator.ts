@@ -5,8 +5,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useInput } from 'ink';
 import { ApprovalMode, type Config } from '@google/gemini-cli-core';
+import { useKeypress } from './useKeypress.js';
 
 export interface UseAutoAcceptIndicatorArgs {
   config: Config;
@@ -23,27 +23,30 @@ export function useAutoAcceptIndicator({
     setShowAutoAcceptIndicator(currentConfigValue);
   }, [currentConfigValue]);
 
-  useInput((input, key) => {
-    let nextApprovalMode: ApprovalMode | undefined;
+  useKeypress(
+    (key) => {
+      let nextApprovalMode: ApprovalMode | undefined;
 
-    if (key.ctrl && input === 'y') {
-      nextApprovalMode =
-        config.getApprovalMode() === ApprovalMode.YOLO
-          ? ApprovalMode.DEFAULT
-          : ApprovalMode.YOLO;
-    } else if (key.tab && key.shift) {
-      nextApprovalMode =
-        config.getApprovalMode() === ApprovalMode.AUTO_EDIT
-          ? ApprovalMode.DEFAULT
-          : ApprovalMode.AUTO_EDIT;
-    }
+      if (key.ctrl && key.name === 'y') {
+        nextApprovalMode =
+          config.getApprovalMode() === ApprovalMode.YOLO
+            ? ApprovalMode.DEFAULT
+            : ApprovalMode.YOLO;
+      } else if (key.shift && key.name === 'tab') {
+        nextApprovalMode =
+          config.getApprovalMode() === ApprovalMode.AUTO_EDIT
+            ? ApprovalMode.DEFAULT
+            : ApprovalMode.AUTO_EDIT;
+      }
 
-    if (nextApprovalMode) {
-      config.setApprovalMode(nextApprovalMode);
-      // Update local state immediately for responsiveness
-      setShowAutoAcceptIndicator(nextApprovalMode);
-    }
-  });
+      if (nextApprovalMode) {
+        config.setApprovalMode(nextApprovalMode);
+        // Update local state immediately for responsiveness
+        setShowAutoAcceptIndicator(nextApprovalMode);
+      }
+    },
+    { isActive: true },
+  );
 
   return showAutoAcceptIndicator;
 }

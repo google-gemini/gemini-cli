@@ -7,7 +7,7 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import { Content } from '@google/genai';
-import { getProjectTempDir } from '../utils/paths.js';
+import { Storage } from '../config/storage.js';
 
 const LOG_FILE_NAME = 'logs.json';
 
@@ -23,6 +23,42 @@ export interface LogEntry {
   message: string;
 }
 
+// This regex matches any character that is NOT a letter (a-z, A-Z),
+// a number (0-9), a hyphen (-), an underscore (_), or a dot (.).
+
+/**
+ * Encodes a string to be safe for use as a filename.
+ *
+ * It replaces any characters that are not alphanumeric or one of `_`, `-`, `.`
+ * with a URL-like percent-encoding (`%` followed by the 2-digit hex code).
+ *
+ * @param str The input string to encode.
+ * @returns The encoded, filename-safe string.
+ */
+export function encodeTagName(str: string): string {
+  return encodeURIComponent(str);
+}
+
+/**
+ * Decodes a string that was encoded with the `encode` function.
+ *
+ * It finds any percent-encoded characters and converts them back to their
+ * original representation.
+ *
+ * @param str The encoded string to decode.
+ * @returns The decoded, original string.
+ */
+export function decodeTagName(str: string): string {
+  try {
+    return decodeURIComponent(str);
+  } catch (_e) {
+    // Fallback for old, potentially malformed encoding
+    return str.replace(/%([0-9A-F]{2})/g, (_, hex) =>
+      String.fromCharCode(parseInt(hex, 16)),
+    );
+  }
+}
+
 export class Logger {
   private geminiDir: string | undefined;
   private logFilePath: string | undefined;
@@ -31,7 +67,10 @@ export class Logger {
   private initialized = false;
   private logs: LogEntry[] = []; // In-memory cache, ideally reflects the last known state of the file
 
-  constructor(sessionId: string) {
+  constructor(
+    sessionId: string,
+    private readonly storage: Storage,
+  ) {
     this.sessionId = sessionId;
   }
 
@@ -94,7 +133,7 @@ export class Logger {
       return;
     }
 
-    this.geminiDir = getProjectTempDir(process.cwd());
+    this.geminiDir = this.storage.getProjectTempDir();
     this.logFilePath = path.join(this.geminiDir, LOG_FILE_NAME);
 
     try {
@@ -231,19 +270,46 @@ export class Logger {
     }
   }
 
-  _checkpointPath(tag: string): string {
+  private _checkpointPath(tag: string): string {
     if (!tag.length) {
       throw new Error('No checkpoint tag specified.');
     }
     if (!this.geminiDir) {
       throw new Error('Checkpoint file path not set.');
     }
-    // Sanitize tag to prevent directory traversal attacks
-    let sanitizedTag = tag.replace(/[^a-zA-Z0-9-_]/g, '');
-    if (!sanitizedTag) {
-      sanitizedTag = 'default';
+    // Encode the tag to handle all special characters safely.
+    const encodedTag = encodeTagName(tag);
+    return path.join(this.geminiDir, `checkpoint-${encodedTag}.json`);
+  }
+
+  private async _getCheckpointPath(tag: string): Promise<string> {
+    // 1. Check for the new encoded path first.
+    const newPath = this._checkpointPath(tag);
+    try {
+      await fs.access(newPath);
+      return newPath; // Found it, use the new path.
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code !== 'ENOENT') {
+        throw error; // A real error occurred, rethrow it.
+      }
+      // It was not found, so we'll check the old path next.
     }
-    return path.join(this.geminiDir, `checkpoint-${sanitizedTag}.json`);
+
+    // 2. Fallback for backward compatibility: check for the old raw path.
+    const oldPath = path.join(this.geminiDir!, `checkpoint-${tag}.json`);
+    try {
+      await fs.access(oldPath);
+      return oldPath; // Found it, use the old path.
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code !== 'ENOENT') {
+        throw error; // A real error occurred, rethrow it.
+      }
+    }
+
+    // 3. If neither path exists, return the new encoded path as the canonical one.
+    return newPath;
   }
 
   async saveCheckpoint(conversation: Content[], tag: string): Promise<void> {
@@ -253,6 +319,7 @@ export class Logger {
       );
       return;
     }
+    // Always save with the new encoded path.
     const path = this._checkpointPath(tag);
     try {
       await fs.writeFile(path, JSON.stringify(conversation, null, 2), 'utf-8');
@@ -269,7 +336,7 @@ export class Logger {
       return [];
     }
 
-    const path = this._checkpointPath(tag);
+    const path = await this._getCheckpointPath(tag);
     try {
       const fileContent = await fs.readFile(path, 'utf-8');
       const parsedContent = JSON.parse(fileContent);
@@ -281,6 +348,11 @@ export class Logger {
       }
       return parsedContent as Content[];
     } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === 'ENOENT') {
+        // This is okay, it just means the checkpoint doesn't exist in either format.
+        return [];
+      }
       console.error(`Failed to read or parse checkpoint file ${path}:`, error);
       return [];
     }
@@ -294,20 +366,39 @@ export class Logger {
       return false;
     }
 
-    const path = this._checkpointPath(tag);
+    let deletedSomething = false;
 
+    // 1. Attempt to delete the new encoded path.
+    const newPath = this._checkpointPath(tag);
     try {
-      await fs.unlink(path);
-      return true;
+      await fs.unlink(newPath);
+      deletedSomething = true;
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException;
-      if (nodeError.code === 'ENOENT') {
-        // File doesn't exist, which is fine.
-        return false;
+      if (nodeError.code !== 'ENOENT') {
+        console.error(`Failed to delete checkpoint file ${newPath}:`, error);
+        throw error; // Rethrow unexpected errors
       }
-      console.error(`Failed to delete checkpoint file ${path}:`, error);
-      throw error;
+      // It's okay if it doesn't exist.
     }
+
+    // 2. Attempt to delete the old raw path for backward compatibility.
+    const oldPath = path.join(this.geminiDir!, `checkpoint-${tag}.json`);
+    if (newPath !== oldPath) {
+      try {
+        await fs.unlink(oldPath);
+        deletedSomething = true;
+      } catch (error) {
+        const nodeError = error as NodeJS.ErrnoException;
+        if (nodeError.code !== 'ENOENT') {
+          console.error(`Failed to delete checkpoint file ${oldPath}:`, error);
+          throw error; // Rethrow unexpected errors
+        }
+        // It's okay if it doesn't exist.
+      }
+    }
+
+    return deletedSomething;
   }
 
   async checkpointExists(tag: string): Promise<boolean> {
@@ -316,17 +407,23 @@ export class Logger {
         'Logger not initialized. Cannot check for checkpoint existence.',
       );
     }
-    const filePath = this._checkpointPath(tag);
+    let filePath: string | undefined;
     try {
+      filePath = await this._getCheckpointPath(tag);
+      // We need to check for existence again, because _getCheckpointPath
+      // returns a canonical path even if it doesn't exist yet.
       await fs.access(filePath);
       return true;
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code === 'ENOENT') {
-        return false;
+        return false; // It truly doesn't exist in either format.
       }
+      // A different error occurred.
       console.error(
-        `Failed to check checkpoint existence for ${filePath}:`,
+        `Failed to check checkpoint existence for ${
+          filePath ?? `path for tag "${tag}"`
+        }:`,
         error,
       );
       throw error;

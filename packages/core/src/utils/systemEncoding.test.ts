@@ -39,9 +39,9 @@ describe('Shell Command Processor - Encoding Functions', () => {
     resetEncodingCache();
 
     // Clear environment variables that might affect tests
-    delete process.env.LC_ALL;
-    delete process.env.LC_CTYPE;
-    delete process.env.LANG;
+    delete process.env['LC_ALL'];
+    delete process.env['LC_CTYPE'];
+    delete process.env['LANG'];
   });
 
   afterEach(() => {
@@ -218,21 +218,21 @@ describe('Shell Command Processor - Encoding Functions', () => {
     });
 
     it('should parse locale from LC_ALL environment variable', () => {
-      process.env.LC_ALL = 'en_US.UTF-8';
+      process.env['LC_ALL'] = 'en_US.UTF-8';
 
       const result = getSystemEncoding();
       expect(result).toBe('utf-8');
     });
 
     it('should parse locale from LC_CTYPE when LC_ALL is not set', () => {
-      process.env.LC_CTYPE = 'fr_FR.ISO-8859-1';
+      process.env['LC_CTYPE'] = 'fr_FR.ISO-8859-1';
 
       const result = getSystemEncoding();
       expect(result).toBe('iso-8859-1');
     });
 
     it('should parse locale from LANG when LC_ALL and LC_CTYPE are not set', () => {
-      process.env.LANG = 'de_DE.UTF-8';
+      process.env['LANG'] = 'de_DE.UTF-8';
 
       const result = getSystemEncoding();
       expect(result).toBe('utf-8');
@@ -268,16 +268,16 @@ describe('Shell Command Processor - Encoding Functions', () => {
     });
 
     it('should handle locale without encoding (no dot)', () => {
-      process.env.LANG = 'C';
+      process.env['LANG'] = 'C';
 
       const result = getSystemEncoding();
       expect(result).toBe('c');
     });
 
     it('should handle empty locale environment variables', () => {
-      process.env.LC_ALL = '';
-      process.env.LC_CTYPE = '';
-      process.env.LANG = '';
+      process.env['LC_ALL'] = '';
+      process.env['LC_CTYPE'] = '';
+      process.env['LANG'] = '';
       mockedExecSync.mockReturnValue('UTF-8');
 
       const result = getSystemEncoding();
@@ -285,24 +285,24 @@ describe('Shell Command Processor - Encoding Functions', () => {
     });
 
     it('should return locale as-is when locale format has no dot', () => {
-      process.env.LANG = 'invalid_format';
+      process.env['LANG'] = 'invalid_format';
 
       const result = getSystemEncoding();
       expect(result).toBe('invalid_format');
     });
 
     it('should prioritize LC_ALL over other environment variables', () => {
-      process.env.LC_ALL = 'en_US.UTF-8';
-      process.env.LC_CTYPE = 'fr_FR.ISO-8859-1';
-      process.env.LANG = 'de_DE.CP1252';
+      process.env['LC_ALL'] = 'en_US.UTF-8';
+      process.env['LC_CTYPE'] = 'fr_FR.ISO-8859-1';
+      process.env['LANG'] = 'de_DE.CP1252';
 
       const result = getSystemEncoding();
       expect(result).toBe('utf-8');
     });
 
     it('should prioritize LC_CTYPE over LANG', () => {
-      process.env.LC_CTYPE = 'fr_FR.ISO-8859-1';
-      process.env.LANG = 'de_DE.CP1252';
+      process.env['LC_CTYPE'] = 'fr_FR.ISO-8859-1';
+      process.env['LANG'] = 'de_DE.CP1252';
 
       const result = getSystemEncoding();
       expect(result).toBe('iso-8859-1');
@@ -315,7 +315,7 @@ describe('Shell Command Processor - Encoding Functions', () => {
     });
 
     it('should use cached system encoding on subsequent calls', () => {
-      process.env.LANG = 'en_US.UTF-8';
+      process.env['LANG'] = 'en_US.UTF-8';
       const buffer = Buffer.from('test');
 
       // First call
@@ -323,7 +323,7 @@ describe('Shell Command Processor - Encoding Functions', () => {
       expect(result1).toBe('utf-8');
 
       // Change environment (should not affect cached result)
-      process.env.LANG = 'fr_FR.ISO-8859-1';
+      process.env['LANG'] = 'fr_FR.ISO-8859-1';
 
       // Second call should use cached value
       const result2 = getCachedEncodingForBuffer(buffer);
@@ -435,7 +435,7 @@ describe('Shell Command Processor - Encoding Functions', () => {
   describe('Cross-platform behavior', () => {
     it('should work correctly on macOS', () => {
       mockedOsPlatform.mockReturnValue('darwin');
-      process.env.LANG = 'en_US.UTF-8';
+      process.env['LANG'] = 'en_US.UTF-8';
 
       const result = getSystemEncoding();
       expect(result).toBe('utf-8');
@@ -443,7 +443,7 @@ describe('Shell Command Processor - Encoding Functions', () => {
 
     it('should work correctly on other Unix-like systems', () => {
       mockedOsPlatform.mockReturnValue('freebsd');
-      process.env.LANG = 'en_US.UTF-8';
+      process.env['LANG'] = 'en_US.UTF-8';
 
       const result = getSystemEncoding();
       expect(result).toBe('utf-8');
@@ -451,7 +451,7 @@ describe('Shell Command Processor - Encoding Functions', () => {
 
     it('should handle unknown platforms as Unix-like', () => {
       mockedOsPlatform.mockReturnValue('unknown' as NodeJS.Platform);
-      process.env.LANG = 'en_US.UTF-8';
+      process.env['LANG'] = 'en_US.UTF-8';
 
       const result = getSystemEncoding();
       expect(result).toBe('utf-8');
@@ -461,7 +461,7 @@ describe('Shell Command Processor - Encoding Functions', () => {
   describe('Edge cases and error handling', () => {
     it('should handle empty buffer gracefully', () => {
       mockedOsPlatform.mockReturnValue('linux');
-      process.env.LANG = 'en_US.UTF-8';
+      process.env['LANG'] = 'en_US.UTF-8';
 
       const buffer = Buffer.alloc(0);
       const result = getCachedEncodingForBuffer(buffer);
@@ -470,7 +470,7 @@ describe('Shell Command Processor - Encoding Functions', () => {
 
     it('should handle very large buffers', () => {
       mockedOsPlatform.mockReturnValue('linux');
-      process.env.LANG = 'en_US.UTF-8';
+      process.env['LANG'] = 'en_US.UTF-8';
 
       const buffer = Buffer.alloc(1024 * 1024, 'a');
       const result = getCachedEncodingForBuffer(buffer);
