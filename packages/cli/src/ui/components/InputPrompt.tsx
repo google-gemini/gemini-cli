@@ -26,6 +26,7 @@ import {
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
 import * as path from 'path';
+import { SCREEN_READER_USER_PREFIX } from '../constants.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -481,7 +482,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       if (keyMatchers[Command.END](key)) {
         buffer.move('end');
-        buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
       // Ctrl+C (Clear input)
@@ -688,7 +688,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         >
           {shellModeActive ? (
             reverseSearchActive ? (
-              <Text color={theme.text.link}>(r:) </Text>
+              <Text
+                color={theme.text.link}
+                aria-label={SCREEN_READER_USER_PREFIX}
+              >
+                (r:){' '}
+              </Text>
             ) : (
               '! '
             )
