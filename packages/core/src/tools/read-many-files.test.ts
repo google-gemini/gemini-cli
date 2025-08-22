@@ -47,6 +47,10 @@ vi.mock('mime-types', () => {
   };
 });
 
+vi.mock('../telemetry/loggers.js', () => ({
+  logFileOperation: vi.fn(),
+}));
+
 describe('ReadManyFilesTool', () => {
   let tool: ReadManyFilesTool;
   let tempRootDir: string;
