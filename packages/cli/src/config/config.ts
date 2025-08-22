@@ -552,6 +552,7 @@ export async function loadCliConfig(
     folderTrust,
     interactive,
     trustedFolder,
+    thinkingConfig: settings.thinkingConfig,
     shouldUseNodePtyShell: settings.shouldUseNodePtyShell,
     skipNextSpeakerCheck: settings.skipNextSpeakerCheck,
     enablePromptCompletion: settings.enablePromptCompletion ?? false,

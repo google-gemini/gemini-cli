@@ -41,7 +41,7 @@ import {
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
-import type { Content } from '@google/genai';
+import type { Content, ThinkingConfig } from '@google/genai';
 import {
   FileSystemService,
   StandardFileSystemService,
@@ -199,6 +199,7 @@ export interface ConfigParameters {
   chatCompression?: ChatCompressionSettings;
   interactive?: boolean;
   trustedFolder?: boolean;
+  thinkingConfig?: ThinkingConfig;
   shouldUseNodePtyShell?: boolean;
   skipNextSpeakerCheck?: boolean;
   enablePromptCompletion?: boolean;
@@ -267,6 +268,7 @@ export class Config {
   private readonly chatCompression: ChatCompressionSettings | undefined;
   private readonly interactive: boolean;
   private readonly trustedFolder: boolean | undefined;
+  private readonly thinkingConfig: ThinkingConfig | undefined;
   private readonly shouldUseNodePtyShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private readonly enablePromptCompletion: boolean = false;
@@ -338,6 +340,7 @@ export class Config {
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
+    this.thinkingConfig = params.thinkingConfig;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
     this.storage = new Storage(this.targetDir);
@@ -725,6 +728,10 @@ export class Config {
 
   isInteractive(): boolean {
     return this.interactive;
+  }
+
+  getThinkingConfig(): ThinkingConfig | undefined {
+    return this.thinkingConfig;
   }
 
   getShouldUseNodePtyShell(): boolean {

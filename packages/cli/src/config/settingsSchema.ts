@@ -11,6 +11,7 @@ import {
   AuthType,
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
+import { ThinkingConfig } from '@google/genai';
 import { CustomTheme } from '../ui/themes/theme.js';
 
 export interface SettingDefinition {
@@ -524,6 +525,15 @@ export const SETTINGS_SCHEMA = {
     default: false,
     description: 'Show line numbers in the chat.',
     showInDialog: true,
+  },
+  thinkingConfig: {
+    type: 'object',
+    label: 'Thinking Config',
+    category: 'General',
+    requiresRestart: true,
+    default: undefined as ThinkingConfig | undefined,
+    description: 'Configuration for model thinking behavior.',
+    showInDialog: false,
   },
   skipNextSpeakerCheck: {
     type: 'boolean',

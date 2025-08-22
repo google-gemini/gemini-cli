@@ -247,7 +247,7 @@ export class GeminiClient {
       )
         ? {
             ...this.generateContentConfig,
-            thinkingConfig: {
+            thinkingConfig: this.config.getThinkingConfig() || {
               includeThoughts: true,
             },
           }
