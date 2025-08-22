@@ -27,4 +27,4 @@ export const METRIC_FILE_OPERATION_COUNT = 'gemini_cli.file.operation.count';
 export const METRIC_INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
 export const METRIC_CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
 export const METRIC_CONTENT_RETRY_FAILURE_COUNT =
-  'gemini_cli.chat.retry_failure.count';
+  'gemini_cli.chat.content_retry_failure.count';
