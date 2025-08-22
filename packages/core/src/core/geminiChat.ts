@@ -613,7 +613,7 @@ export class GeminiChat {
       for (const content of outputContents) {
         const lastContent =
           consolidatedOutputContents[consolidatedOutputContents.length - 1];
-        if (this.isTextContent(lastContent) && this.isTextContent(content)) {
+        if (this.hasTextContent(lastContent) && this.hasTextContent(content)) {
           lastContent.parts[0].text += content.parts[0].text || '';
           if (content.parts.length > 1) {
             lastContent.parts.push(...content.parts.slice(1));
@@ -628,7 +628,7 @@ export class GeminiChat {
     this.history.push(...newHistoryEntries, ...consolidatedOutputContents);
   }
 
-  private isTextContent(
+  private hasTextContent(
     content: Content | undefined,
   ): content is Content & { parts: [{ text: string }, ...Part[]] } {
     return !!(
