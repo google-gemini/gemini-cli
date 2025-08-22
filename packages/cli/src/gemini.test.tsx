@@ -18,6 +18,7 @@ import {
   loadSettings,
 } from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { Config } from '@google/gemini-cli-core';
 
 // Custom error to identify mock process.exit calls
 class MockProcessExitError extends Error {
@@ -255,8 +256,10 @@ describe('validateDnsResolutionOrder', () => {
 
 describe('startInteractiveUI', () => {
   // Mock dependencies
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mockConfig = { getProjectRoot: () => '/root' } as any;
+  const mockConfig = {
+    getProjectRoot: () => '/root',
+    getScreenReader: () => false,
+  } as Config;
   const mockSettings = {
     merged: {
       hideWindowTitle: false,
@@ -306,7 +309,10 @@ describe('startInteractiveUI', () => {
     const [reactElement, options] = renderSpy.mock.calls[0];
 
     // Verify render options
-    expect(options).toEqual({ exitOnCtrlC: false });
+    expect(options).toEqual({
+      exitOnCtrlC: false,
+      isScreenReaderEnabled: false,
+    });
 
     // Verify React element structure is valid (but don't deep dive into JSX internals)
     expect(reactElement).toBeDefined();
