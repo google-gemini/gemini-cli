@@ -16,42 +16,28 @@ describe('installCommand', () => {
     mockContext = createMockCommandContext();
   });
 
-  it('should return help message when no args provided', async () => {
+  it('should show deprecation message when invoked with no args', async () => {
     const result = await installCommand.action!(mockContext, '');
-
     expect(result).toEqual({
-      type: 'submit_prompt',
-      content: expect.stringContaining(
-        'I need help installing a VS Code theme',
-      ),
+      type: 'message',
+      messageType: 'info',
+      content: expect.stringContaining('/theme install'),
     });
   });
 
-  it('should return error message when no valid URL found', async () => {
-    const result = await installCommand.action!(mockContext, 'invalid input');
-
+  it('should show same deprecation message for any args (legacy paths)', async () => {
+    const result = await installCommand.action!(mockContext, 'anything here');
     expect(result).toEqual({
-      type: 'submit_prompt',
-      content: expect.stringContaining("I couldn't find a valid URL"),
+      type: 'message',
+      messageType: 'info',
+      content: expect.stringContaining('/theme install'),
     });
   });
 
-  it('should return success message when valid marketplace URL provided', async () => {
-    const result = await installCommand.action!(
-      mockContext,
-      'https://marketplace.visualstudio.com/items?itemName=arcticicestudio.nord-visual-studio-code',
-    );
-
-    expect(result).toEqual({
-      type: 'submit_prompt',
-      content: expect.stringContaining("I'll help you install a VS Code theme"),
-    });
-  });
-
-  it('should have the correct name and description', () => {
+  it('should have deprecated description', () => {
     expect(installCommand.name).toBe('install');
     expect(installCommand.description).toBe(
-      'install VS Code themes from marketplace URLs',
+      'deprecated: use /theme install instead',
     );
   });
 });

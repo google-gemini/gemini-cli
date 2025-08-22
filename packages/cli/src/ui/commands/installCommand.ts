@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandKind, SlashCommand, SlashCommandActionReturn } from './types.js';
+import {
+  CommandKind,
+  SlashCommand,
+  SlashCommandActionReturn,
+} from './types.js';
 
 export const installCommand: SlashCommand = {
   name: 'install',
@@ -13,6 +17,7 @@ export const installCommand: SlashCommand = {
   action: async (): Promise<SlashCommandActionReturn> => ({
     type: 'message',
     messageType: 'info',
-    content: 'The /install command is deprecated. Use /theme install <marketplace-url> to install themes.',
+    content:
+      'The /install command is deprecated. Use /theme install <marketplace-url> to install themes.',
   }),
 };

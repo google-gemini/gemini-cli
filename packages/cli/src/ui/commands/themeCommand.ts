@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandKind, OpenDialogActionReturn, SlashCommand, SlashCommandActionReturn, CommandContext } from './types.js';
+import {
+  CommandKind,
+  OpenDialogActionReturn,
+  SlashCommand,
+  SlashCommandActionReturn,
+  CommandContext,
+} from './types.js';
 import { listThemeFiles } from '@google/gemini-cli-core';
 import { themeInstaller } from './installers/themeInstaller.js';
 
@@ -21,12 +27,11 @@ const listSubCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: 'No custom theme files found. Use /theme install <marketplace-url> to add one.',
+        content:
+          'No custom theme files found. Use /theme install <marketplace-url> to add one.',
       } as const;
     }
-    const lines = files
-      .map((f: { name: string }) => `• ${f.name}`)
-      .join('\n');
+    const lines = files.map((f: { name: string }) => `• ${f.name}`).join('\n');
     return {
       type: 'message',
       messageType: 'info',
@@ -39,7 +44,10 @@ const installSubCommand: SlashCommand = {
   name: 'install',
   description: 'install a VS Code theme from marketplace URL',
   kind: CommandKind.BUILT_IN,
-  action: async (context: CommandContext, args: string): Promise<SlashCommandActionReturn> => {
+  action: async (
+    context: CommandContext,
+    args: string,
+  ): Promise<SlashCommandActionReturn> => {
     if (!args.trim()) {
       return {
         type: 'submit_prompt',
