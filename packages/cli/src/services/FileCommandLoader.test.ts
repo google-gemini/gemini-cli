@@ -21,8 +21,15 @@ import {
 } from './prompt-processors/shellProcessor.js';
 import { DefaultArgumentProcessor } from './prompt-processors/argumentProcessor.js';
 import type { CommandContext } from '../ui/commands/types.js';
+import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 
 const mockShellProcess = vi.hoisted(() => vi.fn());
+const mockAtFileProcess = vi.hoisted(() => vi.fn());
+vi.mock('./prompt-processors/atFileProcessor.js', () => ({
+  AtFileProcessor: vi.fn().mockImplementation(() => ({
+    process: mockAtFileProcess,
+  })),
+}));
 vi.mock('./prompt-processors/shellProcessor.js', () => ({
   ShellProcessor: vi.fn().mockImplementation(() => ({
     process: mockShellProcess,
@@ -77,6 +84,7 @@ describe('FileCommandLoader', () => {
         return Promise.resolve(processedPrompt);
       },
     );
+    mockAtFileProcess.mockImplementation(async (prompt: string) => prompt);
   });
 
   afterEach(() => {
@@ -203,7 +211,7 @@ describe('FileCommandLoader', () => {
     const mockConfig = {
       getProjectRoot: vi.fn(() => '/path/to/project'),
       getExtensions: vi.fn(() => []),
-    } as Config;
+    } as unknown as Config;
     const loader = new FileCommandLoader(mockConfig);
     const commands = await loader.loadCommands(signal);
     expect(commands).toHaveLength(1);
@@ -246,7 +254,7 @@ describe('FileCommandLoader', () => {
     const mockConfig = {
       getProjectRoot: vi.fn(() => process.cwd()),
       getExtensions: vi.fn(() => []),
-    } as Config;
+    } as unknown as Config;
     const loader = new FileCommandLoader(mockConfig);
     const commands = await loader.loadCommands(signal);
 
@@ -446,6 +454,54 @@ describe('FileCommandLoader', () => {
       expect(ShellProcessor).toHaveBeenCalledTimes(1);
       expect(DefaultArgumentProcessor).not.toHaveBeenCalled();
     });
+
+    it('instantiates AtFileProcessor and DefaultArgumentProcessor if @{} is present', async () => {
+      const userCommandsDir = Storage.getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'at-file.toml': `prompt = "Context: @{./my-file.txt}"`,
+        },
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      await loader.loadCommands(signal);
+
+      expect(AtFileProcessor).toHaveBeenCalledTimes(1);
+      expect(ShellProcessor).not.toHaveBeenCalled();
+      expect(DefaultArgumentProcessor).toHaveBeenCalledTimes(1);
+    });
+
+    it('instantiates ShellProcessor and AtFileProcessor if !{} and @{} are present', async () => {
+      const userCommandsDir = Storage.getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'shell-and-at.toml': `prompt = "Run !{cmd} with @{file.txt}"`,
+        },
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      await loader.loadCommands(signal);
+
+      expect(ShellProcessor).toHaveBeenCalledTimes(1);
+      expect(AtFileProcessor).toHaveBeenCalledTimes(1);
+      expect(DefaultArgumentProcessor).toHaveBeenCalledTimes(1); // because no {{args}}
+    });
+
+    it('instantiates only ShellProcessor and AtFileProcessor if {{args}} and @{} are present', async () => {
+      const userCommandsDir = Storage.getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'args-and-at.toml': `prompt = "Run {{args}} with @{file.txt}"`,
+        },
+      });
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      await loader.loadCommands(signal);
+
+      expect(ShellProcessor).toHaveBeenCalledTimes(1);
+      expect(AtFileProcessor).toHaveBeenCalledTimes(1);
+      expect(DefaultArgumentProcessor).not.toHaveBeenCalled();
+    });
   });
 
   describe('Extension Command Loading', () => {
@@ -487,7 +543,7 @@ describe('FileCommandLoader', () => {
             path: extensionDir,
           },
         ]),
-      } as Config;
+      } as unknown as Config;
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
 
@@ -538,7 +594,7 @@ describe('FileCommandLoader', () => {
             path: extensionDir,
           },
         ]),
-      } as Config;
+      } as unknown as Config;
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
 
@@ -645,7 +701,7 @@ describe('FileCommandLoader', () => {
             path: extensionDir2,
           },
         ]),
-      } as Config;
+      } as unknown as Config;
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
 
@@ -681,7 +737,7 @@ describe('FileCommandLoader', () => {
             path: extensionDir,
           },
         ]),
-      } as Config;
+      } as unknown as Config;
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
       expect(commands).toHaveLength(0);
@@ -713,7 +769,7 @@ describe('FileCommandLoader', () => {
         getExtensions: vi.fn(() => [
           { name: 'a', version: '1.0.0', isActive: true, path: extensionDir },
         ]),
-      } as Config;
+      } as unknown as Config;
       const loader = new FileCommandLoader(mockConfig);
       const commands = await loader.loadCommands(signal);
 
@@ -938,15 +994,16 @@ describe('FileCommandLoader', () => {
         ),
       ).rejects.toThrow('Something else went wrong');
     });
-    it('assembles the processor pipeline in the correct order (Shell -> Default)', async () => {
+    it('assembles the processor pipeline in the correct order (Shell -> AtFile -> Default)', async () => {
       const userCommandsDir = Storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
-          // This prompt uses !{} but NOT {{args}}, so both processors should be active.
+          // This prompt uses !{}, @{}, but NOT {{args}}, so all processors should be active.
           'pipeline.toml': `
-              prompt = "Shell says: ${SHELL_INJECTION_TRIGGER}echo foo}."
+              prompt = "Shell says: !{echo foo}. File says: @{./bar.txt}"
             `,
         },
+        './bar.txt': 'bar content',
       });
 
       const defaultProcessMock = vi
@@ -955,6 +1012,10 @@ describe('FileCommandLoader', () => {
 
       mockShellProcess.mockImplementation((p) =>
         Promise.resolve(`${p}-shell-processed`),
+      );
+
+      mockAtFileProcess.mockImplementation((p) =>
+        Promise.resolve(`${p}-at-file-processed`),
       );
 
       vi.mocked(DefaultArgumentProcessor).mockImplementation(
@@ -972,34 +1033,93 @@ describe('FileCommandLoader', () => {
       const result = await command!.action!(
         createMockCommandContext({
           invocation: {
-            raw: '/pipeline bar',
+            raw: '/pipeline baz',
             name: 'pipeline',
-            args: 'bar',
+            args: 'baz',
           },
         }),
-        'bar',
+        'baz',
       );
 
       expect(mockShellProcess.mock.invocationCallOrder[0]).toBeLessThan(
+        mockAtFileProcess.mock.invocationCallOrder[0],
+      );
+      expect(mockAtFileProcess.mock.invocationCallOrder[0]).toBeLessThan(
         defaultProcessMock.mock.invocationCallOrder[0],
       );
 
       // Verify the flow of the prompt through the processors
       // 1. Shell processor runs first
       expect(mockShellProcess).toHaveBeenCalledWith(
-        expect.stringContaining(SHELL_INJECTION_TRIGGER),
+        expect.stringContaining('!{echo foo}'),
         expect.any(Object),
       );
-      // 2. Default processor runs second
-      expect(defaultProcessMock).toHaveBeenCalledWith(
+      // 2. AtFile processor runs second
+      expect(mockAtFileProcess).toHaveBeenCalledWith(
         expect.stringContaining('-shell-processed'),
+        expect.any(Object),
+      );
+      // 3. Default processor runs third
+      expect(defaultProcessMock).toHaveBeenCalledWith(
+        expect.stringContaining('-at-file-processed'),
         expect.any(Object),
       );
 
       if (result?.type === 'submit_prompt') {
-        expect(result.content).toContain('-shell-processed-default-processed');
+        expect(result.content).toContain(
+          '-shell-processed-at-file-processed-default-processed',
+        );
       } else {
         assert.fail('Incorrect action type');
+      }
+    });
+  });
+
+  describe('@-file Processor Integration', () => {
+    it('correctly processes a command with @{file}', async () => {
+      const userCommandsDir = Storage.getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'at-file.toml':
+            'prompt = "Context from file: @{./test.txt}"\ndescription = "@-file test"',
+        },
+        './test.txt': 'file content',
+      });
+
+      mockAtFileProcess.mockImplementation(async (prompt: string) => {
+        // A simplified mock of AtFileProcessor's behavior
+        if (prompt.includes('@{./test.txt}')) {
+          return prompt.replace('@{./test.txt}', 'file content');
+        }
+        return prompt;
+      });
+
+      // Prevent default processor from interfering
+      vi.mocked(DefaultArgumentProcessor).mockImplementation(
+        () =>
+          ({
+            process: (p: string) => Promise.resolve(p),
+          }) as unknown as DefaultArgumentProcessor,
+      );
+
+      const loader = new FileCommandLoader(null as unknown as Config);
+      const commands = await loader.loadCommands(signal);
+      const command = commands.find((c) => c.name === 'at-file');
+      expect(command).toBeDefined();
+
+      const result = await command!.action?.(
+        createMockCommandContext({
+          invocation: {
+            raw: '/at-file',
+            name: 'at-file',
+            args: '',
+          },
+        }),
+        '',
+      );
+      expect(result?.type).toBe('submit_prompt');
+      if (result?.type === 'submit_prompt') {
+        expect(result.content).toBe('Context from file: file content');
       }
     });
   });
