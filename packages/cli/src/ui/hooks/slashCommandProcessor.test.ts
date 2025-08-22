@@ -134,6 +134,7 @@ describe('useSlashCommandProcessor', () => {
       useSlashCommandProcessor(
         mockConfig,
         mockSettings,
+        [], // history
         mockAddItem,
         mockClearItems,
         mockLoadHistory,
@@ -899,7 +900,11 @@ describe('useSlashCommandProcessor', () => {
 
           vi.fn(), // openSettingsDialog
           vi.fn(), // toggleVimEnabled
-          vi.fn().mockResolvedValue(false), // toggleVimEnabled
+toggleVimEnabled: vi.fn().mockResolvedValue(false),
+history: [...], // keep your history mock for bugCommand
+setGeminiMdFileCount: vi.fn(),
+reloadCommands: vi.fn(),
+
           vi.fn(), // setIsProcessing
         ),
       );

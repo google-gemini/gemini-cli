@@ -60,8 +60,10 @@ export interface CommandContext {
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
     toggleVimEnabled: () => Promise<boolean>;
-    setGeminiMdFileCount: (count: number) => void;
-    reloadCommands: () => void;
+const lastUserPromptIndex = context.ui.history.findLastIndex(
+  (item) => item.type === 'user' && !item.text.startsWith('/bug')
+);
+
   };
   // Session-specific data
   session: {

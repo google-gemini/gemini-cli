@@ -520,6 +520,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   } = useSlashCommandProcessor(
     config,
     settings,
+    history,
     addItem,
     clearItems,
     loadHistory,

@@ -40,6 +40,7 @@ import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 export const useSlashCommandProcessor = (
   config: Config | null,
   settings: LoadedSettings,
+  history: UseHistoryManagerReturn['history'],
   addItem: UseHistoryManagerReturn['addItem'],
   clearItems: UseHistoryManagerReturn['clearItems'],
   loadHistory: UseHistoryManagerReturn['loadHistory'],
@@ -181,8 +182,10 @@ export const useSlashCommandProcessor = (
         setPendingItem: setPendingCompressionItem,
         toggleCorgiMode,
         toggleVimEnabled,
-        setGeminiMdFileCount,
-        reloadCommands,
+history,
+setGeminiMdFileCount: vi.fn(),
+reloadCommands: vi.fn(),
+
       },
       session: {
         stats: session.stats,
@@ -205,8 +208,10 @@ export const useSlashCommandProcessor = (
       toggleCorgiMode,
       toggleVimEnabled,
       sessionShellAllowlist,
-      setGeminiMdFileCount,
-      reloadCommands,
+history,
+setGeminiMdFileCount: vi.fn(),
+reloadCommands: vi.fn(),
+
     ],
   );
 
