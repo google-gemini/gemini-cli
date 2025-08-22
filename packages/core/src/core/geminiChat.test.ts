@@ -29,13 +29,11 @@ const {
   mockRecordInvalidChunk,
   mockRecordContentRetry,
   mockRecordContentRetryFailure,
-} = vi.hoisted(() => {
-  return {
-    mockRecordInvalidChunk: vi.fn(),
-    mockRecordContentRetry: vi.fn(),
-    mockRecordContentRetryFailure: vi.fn(),
-  };
-});
+} = vi.hoisted(() => ({
+  mockRecordInvalidChunk: vi.fn(),
+  mockRecordContentRetry: vi.fn(),
+  mockRecordContentRetryFailure: vi.fn(),
+}));
 
 vi.mock('../telemetry/metrics.js', () => ({
   recordInvalidChunk: mockRecordInvalidChunk,
