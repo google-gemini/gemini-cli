@@ -494,6 +494,8 @@ export class CBIIndexStorage {
       const bytes = Buffer.from(str, 'utf8');
       bytes.copy(buffer, currentOffset);
       currentOffset += bytes.length;
+      buffer.writeUInt8(0, currentOffset); // Add null terminator
+      currentOffset += 1;
     }
   }
 
@@ -566,7 +568,7 @@ export class CBIIndexStorage {
   }
 
   private calculateStringHeapSize(stringHeap: string[]): number {
-    return stringHeap.reduce((size, str) => size + Buffer.byteLength(str, 'utf8'), 0);
+    return stringHeap.reduce((size, str) => size + Buffer.byteLength(str, 'utf8') + 1, 0);
   }
 
   private calculateHNSWSize(graph: HNSWGraph): number {
