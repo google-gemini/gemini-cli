@@ -281,7 +281,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     ```
 
 - **`includeDirectories`** (array of strings):
-  - **Description:** Specifies an array of additional absolute or relative paths to include in the workspace context. This allows you to work with files across multiple directories as if they were one. Paths can use `~` to refer to the user's home directory. This setting can be combined with the `--include-directories` command-line flag.
+  - **Description:** Specifies an array of additional absolute or relative paths to include in the workspace context. Missing directories will be skipped with a warning by default. Paths can use `~` to refer to the user's home directory. This setting can be combined with the `--include-directories` command-line flag.
   - **Default:** `[]`
   - **Example:**
     ```json
