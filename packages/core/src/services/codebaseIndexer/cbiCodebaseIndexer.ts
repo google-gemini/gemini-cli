@@ -13,6 +13,7 @@ import {
   ScanStats 
 } from './types.js';
 import { DEFAULT_CONFIG } from './constants.js';
+import { Config } from '../../config/config.js';
 
 export class CBICodebaseIndexer {
   private readonly config: IndexConfig;
@@ -34,7 +35,7 @@ export class CBICodebaseIndexer {
     this.storage = new CBIIndexStorage(baseDir);
   }
 
-  static fromConfig(baseDir: string, cliConfig: any): CBICodebaseIndexer {
+  static fromConfig(baseDir: string, cliConfig: Config): CBICodebaseIndexer {
     const config: Partial<IndexConfig> = {
       embedEndpoint: cliConfig.getCodebaseIndexingEmbedEndpoint(),
       apiKey: cliConfig.getCodebaseIndexingApiKey(),

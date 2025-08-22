@@ -5,14 +5,15 @@
  */
 
 import { CBICodebaseIndexer } from './cbiCodebaseIndexer.js';
-import { IndexProgress } from './types.js';
+import { IndexProgress, IndexResult } from './types.js';
+import { Config } from '../../config/config.js';
 
 export interface AutoIndexConfig {
   checkInterval: number;
   enabled: boolean;
   projectRoot: string;
   onProgress?: (progress: IndexProgress) => void;
-  onUpdate?: (result: any) => void;
+  onUpdate?: (result: IndexResult) => void;
 }
 
 export class AutoIndexService {
@@ -27,7 +28,7 @@ export class AutoIndexService {
     this.indexer = new CBICodebaseIndexer(config.projectRoot);
   }
 
-  static fromConfig(projectRoot: string, cliConfig: any, onProgress?: (progress: IndexProgress) => void, onUpdate?: (result: any) => void): AutoIndexService {
+  static fromConfig(projectRoot: string, cliConfig: Config, onProgress?: (progress: IndexProgress) => void, onUpdate?: (result: IndexResult) => void): AutoIndexService {
     const config: AutoIndexConfig = {
       checkInterval: cliConfig.getCodebaseIndexingAutoIndexingInterval(),
       enabled: cliConfig.getCodebaseIndexingAutoIndexingEnabled(),
@@ -79,8 +80,12 @@ export class AutoIndexService {
       this.config.onUpdate?.(result);
     } catch (error) {
       console.warn('Auto-index check failed:', error);
-      const errorResult = {
+      const errorResult: IndexResult = {
         success: false,
+        stats: { totalFiles: 0, textFiles: 0, binaryFiles: 0, largeFiles: 0, excludedFiles: 0 },
+        totalVectors: 0,
+        indexSize: 0,
+        duration: 0,
         errors: [error instanceof Error ? error.message : String(error)]
       };
       this.config.onUpdate?.(errorResult);

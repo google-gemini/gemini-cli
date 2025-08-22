@@ -11,17 +11,18 @@ import {
   SlashCommand,
   CommandKind,
   SlashCommandActionReturn,
+  CommandContext,
 } from './types.js';
-import { CBICodebaseIndexer, IndexProgress, AutoIndexService } from '@google/gemini-cli-core';
+import { CBICodebaseIndexer, IndexProgress, AutoIndexService, Config, IndexResult } from '@google/gemini-cli-core';
 import * as path from 'path';
 
 interface IndexingContext {
-  config: any;
-  context: any;
+  config: Config;
+  context: CommandContext;
   projectRoot: string;
 }
 
-function validateConfigAndProjectRoot(context: any): { config: any; projectRoot: string } | SlashCommandActionReturn {
+function validateConfigAndProjectRoot(context: CommandContext): { config: Config; projectRoot: string } | SlashCommandActionReturn {
   const config = context.services.config;
   if (!config) {
     return {
@@ -366,7 +367,7 @@ function formatProgress(progress: IndexProgress): string {
 
 
 
-function formatSuccessMessage(result: any): string {
+function formatSuccessMessage(result: IndexResult): string {
   const stats = result.stats;
   const duration = Math.round(result.duration / 1000);
   const sizeMB = (result.indexSize / (1024 * 1024)).toFixed(1);
@@ -400,7 +401,7 @@ Index saved to index.cbi`;
   }
 }
 
-function formatErrorMessage(result: any): string {
+function formatErrorMessage(result: IndexResult): string {
   return `❌ Indexing failed
 
 Errors:
