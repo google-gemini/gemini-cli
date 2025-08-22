@@ -7,7 +7,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'os';
 import * as path from 'path';
-import { ShellTool, EditTool, WriteFileTool } from '@google/gemini-cli-core';
+import {
+  ShellTool,
+  EditTool,
+  WriteFileTool,
+  TodoListTool,
+} from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments } from './config.js';
 import { Settings } from './settings.js';
 import { Extension } from './extension.js';
@@ -737,7 +742,12 @@ describe('mergeMcpServers', () => {
 });
 
 describe('mergeExcludeTools', () => {
-  const defaultExcludes = [ShellTool.Name, EditTool.Name, WriteFileTool.Name];
+  const defaultExcludes = [
+    ShellTool.Name,
+    EditTool.Name,
+    WriteFileTool.Name,
+    TodoListTool.Name,
+  ];
   const originalIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {

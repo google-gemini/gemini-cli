@@ -26,6 +26,7 @@ import {
   ShellTool,
   EditTool,
   WriteFileTool,
+  TodoListTool,
   MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { Settings } from './settings.js';
@@ -420,7 +421,12 @@ export async function loadCliConfig(
     switch (approvalMode) {
       case ApprovalMode.DEFAULT:
         // In default non-interactive mode, all tools that require approval are excluded.
-        extraExcludes.push(ShellTool.Name, EditTool.Name, WriteFileTool.Name);
+        extraExcludes.push(
+          ShellTool.Name,
+          EditTool.Name,
+          WriteFileTool.Name,
+          TodoListTool.Name,
+        );
         break;
       case ApprovalMode.AUTO_EDIT:
         // In auto-edit non-interactive mode, only tools that still require a prompt are excluded.
