@@ -5,12 +5,17 @@
  */
 
 import * as fsPromises from 'fs/promises';
+import React from 'react';
+import { Text } from 'ink';
+import { Colors } from '../colors.js';
 import {
   CommandContext,
   SlashCommand,
   MessageActionReturn,
   CommandKind,
+  SlashCommandActionReturn,
 } from './types.js';
+import { decodeTagName } from '@google/gemini-cli-core';
 import path from 'path';
 import { HistoryItemWithoutId, MessageType } from '../types.js';
 
@@ -23,7 +28,8 @@ const getSavedChatTags = async (
   context: CommandContext,
   mtSortDesc: boolean,
 ): Promise<ChatDetail[]> => {
-  const geminiDir = context.services.config?.getProjectTempDir();
+  const cfg = context.services.config;
+  const geminiDir = cfg?.storage?.getProjectTempDir();
   if (!geminiDir) {
     return [];
   }
@@ -37,8 +43,9 @@ const getSavedChatTags = async (
       if (file.startsWith(file_head) && file.endsWith(file_tail)) {
         const filePath = path.join(geminiDir, file);
         const stats = await fsPromises.stat(filePath);
+        const tagName = file.slice(file_head.length, -file_tail.length);
         chatDetails.push({
-          name: file.slice(file_head.length, -file_tail.length),
+          name: decodeTagName(tagName),
           mtime: stats.mtime,
         });
       }
@@ -96,7 +103,7 @@ const saveCommand: SlashCommand = {
   description:
     'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
   kind: CommandKind.BUILT_IN,
-  action: async (context, args): Promise<MessageActionReturn> => {
+  action: async (context, args): Promise<SlashCommandActionReturn | void> => {
     const tag = args.trim();
     if (!tag) {
       return {
@@ -108,6 +115,26 @@ const saveCommand: SlashCommand = {
 
     const { logger, config } = context.services;
     await logger.initialize();
+
+    if (!context.overwriteConfirmed) {
+      const exists = await logger.checkpointExists(tag);
+      if (exists) {
+        return {
+          type: 'confirm_action',
+          prompt: React.createElement(
+            Text,
+            null,
+            'A checkpoint with the tag ',
+            React.createElement(Text, { color: Colors.AccentPurple }, tag),
+            ' already exists. Do you want to overwrite it?',
+          ),
+          originalInvocation: {
+            raw: context.invocation?.raw || `/chat save ${tag}`,
+          },
+        };
+      }
+    }
+
     const chat = await config?.getGeminiClient()?.getChat();
     if (!chat) {
       return {
@@ -118,12 +145,12 @@ const saveCommand: SlashCommand = {
     }
 
     const history = chat.getHistory();
-    if (history.length > 0) {
+    if (history.length > 2) {
       await logger.saveCheckpoint(history, tag);
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint saved with tag: ${tag}.`,
+        content: `Conversation checkpoint saved with tag: ${decodeTagName(tag)}.`,
       };
     } else {
       return {
@@ -159,7 +186,7 @@ const resumeCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `No saved checkpoint found with tag: ${tag}.`,
+        content: `No saved checkpoint found with tag: ${decodeTagName(tag)}.`,
       };
     }
 
@@ -228,13 +255,13 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint '${tag}' has been deleted.`,
+        content: `Conversation checkpoint '${decodeTagName(tag)}' has been deleted.`,
       };
     } else {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Error: No checkpoint found with tag '${tag}'.`,
+        content: `Error: No checkpoint found with tag '${decodeTagName(tag)}'.`,
       };
     }
   },
