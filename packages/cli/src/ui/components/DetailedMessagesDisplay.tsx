@@ -56,7 +56,7 @@ export const DetailedMessagesDisplay: React.FC<
               break;
             case 'debug':
               textColor = Colors.Gray; // Or Colors.Gray
-              icon = '\u1F50D'; // Left-pointing magnifying glass (????)
+              icon = '\u{1F50D}'; // Left-pointing magnifying glass (🔍)
               break;
             case 'log':
             default:
