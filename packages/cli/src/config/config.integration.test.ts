@@ -53,19 +53,17 @@ vi.mock('@google/gemini-cli-core', async () => {
 
 describe('Configuration Integration Tests', () => {
   let tempDir: string;
-  let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
     server.resetHandlers(http.post(CLEARCUT_URL, () => HttpResponse.text()));
 
     tempDir = fs.mkdtempSync(path.join(tmpdir(), 'gemini-cli-test-'));
-    originalEnv = { ...process.env };
-    process.env.GEMINI_API_KEY = 'test-api-key';
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    vi.unstubAllEnvs();
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true });
     }
@@ -259,6 +257,151 @@ describe('Configuration Integration Tests', () => {
       };
       const config = new Config(configParams);
       expect(config.getExtensionContextFilePaths()).toEqual(contextFiles);
+    });
+  });
+
+  describe('Approval Mode Integration Tests', () => {
+    let parseArguments: typeof import('./config').parseArguments;
+
+    beforeEach(async () => {
+      // Import the argument parsing function for integration testing
+      const { parseArguments: parseArgs } = await import('./config');
+      parseArguments = parseArgs;
+    });
+
+    it('should parse --approval-mode=auto_edit correctly through the full argument parsing flow', async () => {
+      const originalArgv = process.argv;
+
+      try {
+        process.argv = [
+          'node',
+          'script.js',
+          '--approval-mode',
+          'auto_edit',
+          '-p',
+          'test',
+        ];
+
+        const argv = await parseArguments();
+
+        // Verify that the argument was parsed correctly
+        expect(argv.approvalMode).toBe('auto_edit');
+        expect(argv.prompt).toBe('test');
+        expect(argv.yolo).toBe(false);
+      } finally {
+        process.argv = originalArgv;
+      }
+    });
+
+    it('should parse --approval-mode=yolo correctly through the full argument parsing flow', async () => {
+      const originalArgv = process.argv;
+
+      try {
+        process.argv = [
+          'node',
+          'script.js',
+          '--approval-mode',
+          'yolo',
+          '-p',
+          'test',
+        ];
+
+        const argv = await parseArguments();
+
+        expect(argv.approvalMode).toBe('yolo');
+        expect(argv.prompt).toBe('test');
+        expect(argv.yolo).toBe(false); // Should NOT be set when using --approval-mode
+      } finally {
+        process.argv = originalArgv;
+      }
+    });
+
+    it('should parse --approval-mode=default correctly through the full argument parsing flow', async () => {
+      const originalArgv = process.argv;
+
+      try {
+        process.argv = [
+          'node',
+          'script.js',
+          '--approval-mode',
+          'default',
+          '-p',
+          'test',
+        ];
+
+        const argv = await parseArguments();
+
+        expect(argv.approvalMode).toBe('default');
+        expect(argv.prompt).toBe('test');
+        expect(argv.yolo).toBe(false);
+      } finally {
+        process.argv = originalArgv;
+      }
+    });
+
+    it('should parse legacy --yolo flag correctly', async () => {
+      const originalArgv = process.argv;
+
+      try {
+        process.argv = ['node', 'script.js', '--yolo', '-p', 'test'];
+
+        const argv = await parseArguments();
+
+        expect(argv.yolo).toBe(true);
+        expect(argv.approvalMode).toBeUndefined(); // Should NOT be set when using --yolo
+        expect(argv.prompt).toBe('test');
+      } finally {
+        process.argv = originalArgv;
+      }
+    });
+
+    it('should reject invalid approval mode values during argument parsing', async () => {
+      const originalArgv = process.argv;
+
+      try {
+        process.argv = ['node', 'script.js', '--approval-mode', 'invalid_mode'];
+
+        // Should throw during argument parsing due to yargs validation
+        await expect(parseArguments()).rejects.toThrow();
+      } finally {
+        process.argv = originalArgv;
+      }
+    });
+
+    it('should reject conflicting --yolo and --approval-mode flags', async () => {
+      const originalArgv = process.argv;
+
+      try {
+        process.argv = [
+          'node',
+          'script.js',
+          '--yolo',
+          '--approval-mode',
+          'default',
+        ];
+
+        // Should throw during argument parsing due to conflict validation
+        await expect(parseArguments()).rejects.toThrow();
+      } finally {
+        process.argv = originalArgv;
+      }
+    });
+
+    it('should handle backward compatibility with mixed scenarios', async () => {
+      const originalArgv = process.argv;
+
+      try {
+        // Test that no approval mode arguments defaults to no flags set
+        process.argv = ['node', 'script.js', '-p', 'test'];
+
+        const argv = await parseArguments();
+
+        expect(argv.approvalMode).toBeUndefined();
+        expect(argv.yolo).toBe(false);
+        expect(argv.prompt).toBe('test');
+      } finally {
+        process.argv = originalArgv;
+      }
     });
   });
 });

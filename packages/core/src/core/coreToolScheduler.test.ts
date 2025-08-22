@@ -4,70 +4,97 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi } from 'vitest';
 import {
   CoreToolScheduler,
   ToolCall,
-  ValidatingToolCall,
+  WaitingToolCall,
   convertToFunctionResponse,
 } from './coreToolScheduler.js';
 import {
-  BaseTool,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
   ToolCallConfirmationDetails,
   ToolConfirmationOutcome,
   ToolConfirmationPayload,
+  ToolInvocation,
   ToolResult,
   Config,
-  Icon,
+  Kind,
   ApprovalMode,
+  ToolRegistry,
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
+import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
 
-import {
-  ModifiableDeclarativeTool,
-  ModifyContext,
-} from '../tools/modifiable-tool.js';
-import { MockTool } from '../test-utils/tools.js';
+class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
+  static readonly Name = 'testApprovalTool';
 
-class MockModifiableTool
-  extends MockTool
-  implements ModifiableDeclarativeTool<Record<string, unknown>>
-{
-  constructor(name = 'mockModifiableTool') {
-    super(name);
-    this.shouldConfirm = true;
+  constructor(private config: Config) {
+    super(
+      TestApprovalTool.Name,
+      'TestApprovalTool',
+      'A tool for testing approval logic',
+      Kind.Edit,
+      {
+        properties: { id: { type: 'string' } },
+        required: ['id'],
+        type: 'object',
+      },
+    );
   }
 
-  getModifyContext(
-    _abortSignal: AbortSignal,
-  ): ModifyContext<Record<string, unknown>> {
+  protected createInvocation(params: {
+    id: string;
+  }): ToolInvocation<{ id: string }, ToolResult> {
+    return new TestApprovalInvocation(this.config, params);
+  }
+}
+
+class TestApprovalInvocation extends BaseToolInvocation<
+  { id: string },
+  ToolResult
+> {
+  constructor(
+    private config: Config,
+    params: { id: string },
+  ) {
+    super(params);
+  }
+
+  getDescription(): string {
+    return `Test tool ${this.params.id}`;
+  }
+
+  override async shouldConfirmExecute(): Promise<
+    ToolCallConfirmationDetails | false
+  > {
+    // Need confirmation unless approval mode is AUTO_EDIT
+    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
+      return false;
+    }
+
     return {
-      getFilePath: () => 'test.txt',
-      getCurrentContent: async () => 'old content',
-      getProposedContent: async () => 'new content',
-      createUpdatedParams: (
-        _oldContent: string,
-        modifiedProposedContent: string,
-        _originalParams: Record<string, unknown>,
-      ) => ({ newContent: modifiedProposedContent }),
+      type: 'edit',
+      title: `Confirm Test Tool ${this.params.id}`,
+      fileName: `test-${this.params.id}.txt`,
+      filePath: `/test-${this.params.id}.txt`,
+      fileDiff: 'Test diff content',
+      originalContent: '',
+      newContent: 'Test content',
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+        }
+      },
     };
   }
 
-  async shouldConfirmExecute(): Promise<ToolCallConfirmationDetails | false> {
-    if (this.shouldConfirm) {
-      return {
-        type: 'edit',
-        title: 'Confirm Mock Tool',
-        fileName: 'test.txt',
-        filePath: 'test.txt',
-        fileDiff: 'diff',
-        originalContent: 'originalContent',
-        newContent: 'newContent',
-        onConfirm: async () => {},
-      };
-    }
-    return false;
+  async execute(): Promise<ToolResult> {
+    return {
+      llmContent: `Executed test tool ${this.params.id}`,
+      returnDisplay: `Executed test tool ${this.params.id}`,
+    };
   }
 }
 
@@ -76,11 +103,11 @@ describe('CoreToolScheduler', () => {
     const mockTool = new MockTool();
     mockTool.shouldConfirm = true;
     const declarativeTool = mockTool;
-    const toolRegistry = {
+    const mockToolRegistry = {
       getTool: () => declarativeTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
-      discovery: {} as any,
+      discovery: {},
       registerTool: () => {},
       getToolByName: () => declarativeTool,
       getToolByDisplayName: () => declarativeTool,
@@ -88,7 +115,7 @@ describe('CoreToolScheduler', () => {
       discoverTools: async () => {},
       getAllTools: () => [],
       getToolsByServer: () => [],
-    };
+    } as unknown as ToolRegistry;
 
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
@@ -98,11 +125,15 @@ describe('CoreToolScheduler', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getToolRegistry: () => mockToolRegistry,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as any),
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -121,21 +152,6 @@ describe('CoreToolScheduler', () => {
     abortController.abort();
     await scheduler.schedule([request], abortController.signal);
 
-    const _waitingCall = onToolCallsUpdate.mock
-      .calls[1][0][0] as ValidatingToolCall;
-    const confirmationDetails = await mockTool.shouldConfirmExecute(
-      {},
-      abortController.signal,
-    );
-    if (confirmationDetails) {
-      await scheduler.handleConfirmationResponse(
-        '1',
-        confirmationDetails.onConfirm,
-        ToolConfirmationOutcome.ProceedOnce,
-        abortController.signal,
-      );
-    }
-
     expect(onAllToolCallsComplete).toHaveBeenCalled();
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
@@ -147,11 +163,11 @@ describe('CoreToolScheduler with payload', () => {
   it('should update args and diff and execute tool when payload is provided', async () => {
     const mockTool = new MockModifiableTool();
     const declarativeTool = mockTool;
-    const toolRegistry = {
+    const mockToolRegistry = {
       getTool: () => declarativeTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
-      discovery: {} as any,
+      discovery: {},
       registerTool: () => {},
       getToolByName: () => declarativeTool,
       getToolByDisplayName: () => declarativeTool,
@@ -159,7 +175,7 @@ describe('CoreToolScheduler with payload', () => {
       discoverTools: async () => {},
       getAllTools: () => [],
       getToolsByServer: () => [],
-    };
+    } as unknown as ToolRegistry;
 
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
@@ -169,11 +185,15 @@ describe('CoreToolScheduler with payload', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getToolRegistry: () => mockToolRegistry,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as any),
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -191,15 +211,22 @@ describe('CoreToolScheduler with payload', () => {
 
     await scheduler.schedule([request], abortController.signal);
 
-    const confirmationDetails = await mockTool.shouldConfirmExecute();
+    await vi.waitFor(() => {
+      const awaitingCall = onToolCallsUpdate.mock.calls.find(
+        (call) => call[0][0].status === 'awaiting_approval',
+      )?.[0][0];
+      expect(awaitingCall).toBeDefined();
+    });
+
+    const awaitingCall = onToolCallsUpdate.mock.calls.find(
+      (call) => call[0][0].status === 'awaiting_approval',
+    )?.[0][0];
+    const confirmationDetails = awaitingCall.confirmationDetails;
 
     if (confirmationDetails) {
       const payload: ToolConfirmationPayload = { newContent: 'final version' };
-      await scheduler.handleConfirmationResponse(
-        '1',
-        confirmationDetails.onConfirm,
+      await confirmationDetails.onConfirm(
         ToolConfirmationOutcome.ProceedOnce,
-        abortController.signal,
         payload,
       );
     }
@@ -381,62 +408,73 @@ describe('convertToFunctionResponse', () => {
   });
 });
 
+class MockEditToolInvocation extends BaseToolInvocation<
+  Record<string, unknown>,
+  ToolResult
+> {
+  constructor(params: Record<string, unknown>) {
+    super(params);
+  }
+
+  getDescription(): string {
+    return 'A mock edit tool invocation';
+  }
+
+  override async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    return {
+      type: 'edit',
+      title: 'Confirm Edit',
+      fileName: 'test.txt',
+      filePath: 'test.txt',
+      fileDiff:
+        '--- test.txt\n+++ test.txt\n@@ -1,1 +1,1 @@\n-old content\n+new content',
+      originalContent: 'old content',
+      newContent: 'new content',
+      onConfirm: async () => {},
+    };
+  }
+
+  async execute(_abortSignal: AbortSignal): Promise<ToolResult> {
+    return {
+      llmContent: 'Edited successfully',
+      returnDisplay: 'Edited successfully',
+    };
+  }
+}
+
+class MockEditTool extends BaseDeclarativeTool<
+  Record<string, unknown>,
+  ToolResult
+> {
+  constructor() {
+    super('mockEditTool', 'mockEditTool', 'A mock edit tool', Kind.Edit, {});
+  }
+
+  protected createInvocation(
+    params: Record<string, unknown>,
+  ): ToolInvocation<Record<string, unknown>, ToolResult> {
+    return new MockEditToolInvocation(params);
+  }
+}
+
 describe('CoreToolScheduler edit cancellation', () => {
   it('should preserve diff when an edit is cancelled', async () => {
-    class MockEditTool extends BaseTool<Record<string, unknown>, ToolResult> {
-      constructor() {
-        super(
-          'mockEditTool',
-          'mockEditTool',
-          'A mock edit tool',
-          Icon.Pencil,
-          {},
-        );
-      }
-
-      async shouldConfirmExecute(
-        _params: Record<string, unknown>,
-        _abortSignal: AbortSignal,
-      ): Promise<ToolCallConfirmationDetails | false> {
-        return {
-          type: 'edit',
-          title: 'Confirm Edit',
-          fileName: 'test.txt',
-          filePath: 'test.txt',
-          fileDiff:
-            '--- test.txt\n+++ test.txt\n@@ -1,1 +1,1 @@\n-old content\n+new content',
-          originalContent: 'old content',
-          newContent: 'new content',
-          onConfirm: async () => {},
-        };
-      }
-
-      async execute(
-        _params: Record<string, unknown>,
-        _abortSignal: AbortSignal,
-      ): Promise<ToolResult> {
-        return {
-          llmContent: 'Edited successfully',
-          returnDisplay: 'Edited successfully',
-        };
-      }
-    }
-
     const mockEditTool = new MockEditTool();
-    const declarativeTool = mockEditTool;
-    const toolRegistry = {
-      getTool: () => declarativeTool,
+    const mockToolRegistry = {
+      getTool: () => mockEditTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
-      discovery: {} as any,
+      discovery: {},
       registerTool: () => {},
-      getToolByName: () => declarativeTool,
-      getToolByDisplayName: () => declarativeTool,
+      getToolByName: () => mockEditTool,
+      getToolByDisplayName: () => mockEditTool,
       getTools: () => [],
       discoverTools: async () => {},
       getAllTools: () => [],
       getToolsByServer: () => [],
-    };
+    } as unknown as ToolRegistry;
 
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
@@ -446,11 +484,15 @@ describe('CoreToolScheduler edit cancellation', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getToolRegistry: () => mockToolRegistry,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as any),
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -476,17 +518,9 @@ describe('CoreToolScheduler edit cancellation', () => {
     expect(awaitingCall).toBeDefined();
 
     // Cancel the edit
-    const confirmationDetails = await mockEditTool.shouldConfirmExecute(
-      {},
-      abortController.signal,
-    );
+    const confirmationDetails = awaitingCall.confirmationDetails;
     if (confirmationDetails) {
-      await scheduler.handleConfirmationResponse(
-        '1',
-        confirmationDetails.onConfirm,
-        ToolConfirmationOutcome.Cancel,
-        abortController.signal,
-      );
+      await confirmationDetails.onConfirm(ToolConfirmationOutcome.Cancel);
     }
 
     expect(onAllToolCallsComplete).toHaveBeenCalled();
@@ -496,6 +530,7 @@ describe('CoreToolScheduler edit cancellation', () => {
     expect(completedCalls[0].status).toBe('cancelled');
 
     // Check that the diff is preserved
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cancelledCall = completedCalls[0] as any;
     expect(cancelledCall.response.resultDisplay).toBeDefined();
     expect(cancelledCall.response.resultDisplay.fileDiff).toBe(
@@ -517,20 +552,20 @@ describe('CoreToolScheduler YOLO mode', () => {
     mockTool.shouldConfirm = true;
     const declarativeTool = mockTool;
 
-    const toolRegistry = {
+    const mockToolRegistry = {
       getTool: () => declarativeTool,
       getToolByName: () => declarativeTool,
       // Other properties are not needed for this test but are included for type consistency.
       getFunctionDeclarations: () => [],
       tools: new Map(),
-      discovery: {} as any,
+      discovery: {},
       registerTool: () => {},
       getToolByDisplayName: () => declarativeTool,
       getTools: () => [],
       discoverTools: async () => {},
       getAllTools: () => [],
       getToolsByServer: () => [],
-    };
+    } as unknown as ToolRegistry;
 
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
@@ -541,11 +576,15 @@ describe('CoreToolScheduler YOLO mode', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.YOLO,
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getToolRegistry: () => mockToolRegistry,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as any),
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -604,19 +643,19 @@ describe('CoreToolScheduler request queueing', () => {
     mockTool.executeFn.mockImplementation(() => firstCallPromise);
     const declarativeTool = mockTool;
 
-    const toolRegistry = {
+    const mockToolRegistry = {
       getTool: () => declarativeTool,
       getToolByName: () => declarativeTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
-      discovery: {} as any,
+      discovery: {},
       registerTool: () => {},
       getToolByDisplayName: () => declarativeTool,
       getTools: () => [],
       discoverTools: async () => {},
       getAllTools: () => [],
       getToolsByServer: () => [],
-    };
+    } as unknown as ToolRegistry;
 
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
@@ -626,11 +665,15 @@ describe('CoreToolScheduler request queueing', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getToolRegistry: () => mockToolRegistry,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as any),
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -713,19 +756,19 @@ describe('CoreToolScheduler request queueing', () => {
   it('should handle two synchronous calls to schedule', async () => {
     const mockTool = new MockTool();
     const declarativeTool = mockTool;
-    const toolRegistry = {
+    const mockToolRegistry = {
       getTool: () => declarativeTool,
       getToolByName: () => declarativeTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
-      discovery: {} as any,
+      discovery: {},
       registerTool: () => {},
       getToolByDisplayName: () => declarativeTool,
       getTools: () => [],
       discoverTools: async () => {},
       getAllTools: () => [],
       getToolsByServer: () => [],
-    };
+    } as unknown as ToolRegistry;
 
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
@@ -735,11 +778,15 @@ describe('CoreToolScheduler request queueing', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.YOLO,
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getToolRegistry: () => mockToolRegistry,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: Promise.resolve(toolRegistry as any),
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -782,5 +829,133 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Ensure completion callbacks were called twice.
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(2);
+  });
+
+  it('should auto-approve remaining tool calls when first tool call is approved with ProceedAlways', async () => {
+    let approvalMode = ApprovalMode.DEFAULT;
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => approvalMode,
+      setApprovalMode: (mode: ApprovalMode) => {
+        approvalMode = mode;
+      },
+    } as unknown as Config;
+
+    const testTool = new TestApprovalTool(mockConfig);
+    const toolRegistry = {
+      getTool: () => testTool,
+      getFunctionDeclarations: () => [],
+      getFunctionDeclarationsFiltered: () => [],
+      registerTool: () => {},
+      discoverAllTools: async () => {},
+      discoverMcpTools: async () => {},
+      discoverToolsForServer: async () => {},
+      removeMcpToolsByServer: () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+      tools: new Map(),
+      config: mockConfig,
+      mcpClientManager: undefined,
+      getToolByName: () => testTool,
+      getToolByDisplayName: () => testTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      discovery: {},
+    } as unknown as ToolRegistry;
+
+    mockConfig.getToolRegistry = () => toolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+    const pendingConfirmations: Array<
+      (outcome: ToolConfirmationOutcome) => void
+    > = [];
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate: (toolCalls) => {
+        onToolCallsUpdate(toolCalls);
+        // Capture confirmation handlers for awaiting_approval tools
+        toolCalls.forEach((call) => {
+          if (call.status === 'awaiting_approval') {
+            const waitingCall = call as WaitingToolCall;
+            if (waitingCall.confirmationDetails?.onConfirm) {
+              const originalHandler = pendingConfirmations.find(
+                (h) => h === waitingCall.confirmationDetails.onConfirm,
+              );
+              if (!originalHandler) {
+                pendingConfirmations.push(
+                  waitingCall.confirmationDetails.onConfirm,
+                );
+              }
+            }
+          }
+        });
+      },
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const abortController = new AbortController();
+
+    // Schedule multiple tools that need confirmation
+    const requests = [
+      {
+        callId: '1',
+        name: 'testApprovalTool',
+        args: { id: 'first' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+      {
+        callId: '2',
+        name: 'testApprovalTool',
+        args: { id: 'second' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-2',
+      },
+      {
+        callId: '3',
+        name: 'testApprovalTool',
+        args: { id: 'third' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-3',
+      },
+    ];
+
+    await scheduler.schedule(requests, abortController.signal);
+
+    // Wait for all tools to be awaiting approval
+    await vi.waitFor(() => {
+      const calls = onToolCallsUpdate.mock.calls.at(-1)?.[0] as ToolCall[];
+      expect(calls?.length).toBe(3);
+      expect(calls?.every((call) => call.status === 'awaiting_approval')).toBe(
+        true,
+      );
+    });
+
+    expect(pendingConfirmations.length).toBe(3);
+
+    // Approve the first tool with ProceedAlways
+    const firstConfirmation = pendingConfirmations[0];
+    firstConfirmation(ToolConfirmationOutcome.ProceedAlways);
+
+    // Wait for all tools to be completed
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+      const completedCalls = onAllToolCallsComplete.mock.calls.at(
+        -1,
+      )?.[0] as ToolCall[];
+      expect(completedCalls?.length).toBe(3);
+      expect(completedCalls?.every((call) => call.status === 'success')).toBe(
+        true,
+      );
+    });
+
+    // Verify approval mode was changed
+    expect(approvalMode).toBe(ApprovalMode.AUTO_EDIT);
   });
 });

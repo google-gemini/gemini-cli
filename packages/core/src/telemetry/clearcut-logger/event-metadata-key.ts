@@ -157,6 +157,12 @@ export enum EventMetadataKey {
   // Logs the session id
   GEMINI_CLI_SESSION_ID = 40,
 
+  // Logs the Gemini CLI version
+  GEMINI_CLI_VERSION = 54,
+
+  // Logs the Gemini CLI Git commit hash
+  GEMINI_CLI_GIT_COMMIT_HASH = 55,
+
   // ==========================================================================
   // Loop Detected Event Keys
   // ===========================================================================
@@ -173,6 +179,9 @@ export enum EventMetadataKey {
 
   // Logs the subcommand of the slash command.
   GEMINI_CLI_SLASH_COMMAND_SUBCOMMAND = 42,
+
+  // Logs the status of the slash command (e.g. 'success', 'error')
+  GEMINI_CLI_SLASH_COMMAND_STATUS = 51,
 
   // ==========================================================================
   // Next Speaker Check Event Keys
@@ -209,17 +218,51 @@ export enum EventMetadataKey {
 
   // Logs user removed lines in edit/write tool response.
   GEMINI_CLI_USER_REMOVED_LINES = 50,
-}
 
-export function getEventMetadataKey(
-  keyName: string,
-): EventMetadataKey | undefined {
-  // Access the enum member by its string name
-  const key = EventMetadataKey[keyName as keyof typeof EventMetadataKey];
+  // Logs the programming language of the project.
+  GEMINI_CLI_PROGRAMMING_LANGUAGE = 56,
 
-  // Check if the result is a valid enum member (not undefined and is a number)
-  if (typeof key === 'number') {
-    return key;
-  }
-  return undefined;
+  // ==========================================================================
+  // Kitty Sequence Overflow Event Keys
+  // ===========================================================================
+
+  // Logs the truncated kitty sequence.
+  GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
+
+  // Logs the length of the kitty sequence that overflowed.
+  GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,
+
+  // Logs the number of tokens before context window compression.
+  GEMINI_CLI_COMPRESSION_TOKENS_BEFORE = 60,
+
+  // Logs the number of tokens after context window compression.
+  GEMINI_CLI_COMPRESSION_TOKENS_AFTER = 61,
+
+  // Logs tool type whether it is mcp or native.
+  GEMINI_CLI_TOOL_TYPE = 62,
+
+  // Logs count of MCP servers in Start Session Event
+  GEMINI_CLI_START_SESSION_MCP_SERVERS_COUNT = 63,
+
+  // Logs count of MCP tools in Start Session Event
+  GEMINI_CLI_START_SESSION_MCP_TOOLS_COUNT = 64,
+
+  // Logs name of MCP tools as comma seperated string
+  GEMINI_CLI_START_SESSION_MCP_TOOLS = 65,
+
+  // ==========================================================================
+  // File Operation Event Keys
+  // ===========================================================================
+
+  // Logs the operation type of the file operation.
+  GEMINI_CLI_FILE_OPERATION_TYPE = 66,
+
+  // Logs the number of lines in the file operation.
+  GEMINI_CLI_FILE_OPERATION_LINES = 67,
+
+  // Logs the mimetype of the file in the file operation.
+  GEMINI_CLI_FILE_OPERATION_MIMETYPE = 68,
+
+  // Logs the extension of the file in the file operation.
+  GEMINI_CLI_FILE_OPERATION_EXTENSION = 69,
 }
