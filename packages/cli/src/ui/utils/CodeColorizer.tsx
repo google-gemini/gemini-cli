@@ -20,6 +20,7 @@ import {
   MaxSizedBox,
   MINIMUM_MAX_HEIGHT,
 } from '../components/shared/MaxSizedBox.js';
+import { LoadedSettings } from '../../config/settings.js';
 
 // Configure theming and parsing utilities.
 const lowlight = createLowlight(common);
@@ -37,7 +38,7 @@ function renderHastNode(
   // Handle Element Nodes: Determine color and pass it down, don't wrap
   if (node.type === 'element') {
     const nodeClasses: string[] =
-      (node.properties?.className as string[]) || [];
+      (node.properties?.['className'] as string[]) || [];
     let elementColor: string | undefined = undefined;
 
     // Find color defined specifically for this element's class
@@ -88,6 +89,34 @@ function renderHastNode(
   return null;
 }
 
+function highlightAndRenderLine(
+  line: string,
+  language: string | null,
+  theme: Theme,
+): React.ReactNode {
+  try {
+    const getHighlightedLine = () =>
+      !language || !lowlight.registered(language)
+        ? lowlight.highlightAuto(line)
+        : lowlight.highlight(language, line);
+
+    const renderedNode = renderHastNode(getHighlightedLine(), theme, undefined);
+
+    return renderedNode !== null ? renderedNode : line;
+  } catch (_error) {
+    return line;
+  }
+}
+
+export function colorizeLine(
+  line: string,
+  language: string | null,
+  theme?: Theme,
+): React.ReactNode {
+  const activeTheme = theme || themeManager.getActiveTheme();
+  return highlightAndRenderLine(line, language, activeTheme);
+}
+
 /**
  * Renders syntax-highlighted code for Ink applications using a selected theme.
  *
@@ -101,9 +130,11 @@ export function colorizeCode(
   availableHeight?: number,
   maxWidth?: number,
   theme?: Theme,
+  settings?: LoadedSettings,
 ): React.ReactNode {
   const codeToHighlight = code.replace(/\n$/, '');
   const activeTheme = theme || themeManager.getActiveTheme();
+  const showLineNumbers = settings?.merged.showLineNumbers ?? true;
 
   try {
     // Render the HAST tree using the adapted theme
@@ -123,11 +154,6 @@ export function colorizeCode(
       }
     }
 
-    const getHighlightedLines = (line: string) =>
-      !language || !lowlight.registered(language)
-        ? lowlight.highlightAuto(line)
-        : lowlight.highlight(language, line);
-
     return (
       <MaxSizedBox
         maxHeight={availableHeight}
@@ -136,18 +162,22 @@ export function colorizeCode(
         overflowDirection="top"
       >
         {lines.map((line, index) => {
-          const renderedNode = renderHastNode(
-            getHighlightedLines(line),
+          const contentToRender = highlightAndRenderLine(
+            line,
+            language,
             activeTheme,
-            undefined,
           );
 
-          const contentToRender = renderedNode !== null ? renderedNode : line;
           return (
             <Box key={index}>
-              <Text color={activeTheme.colors.Gray}>
-                {`${String(index + 1 + hiddenLinesCount).padStart(padWidth, ' ')} `}
-              </Text>
+              {showLineNumbers && (
+                <Text color={activeTheme.colors.Gray}>
+                  {`${String(index + 1 + hiddenLinesCount).padStart(
+                    padWidth,
+                    ' ',
+                  )} `}
+                </Text>
+              )}
               <Text color={activeTheme.defaultColor} wrap="wrap">
                 {contentToRender}
               </Text>
@@ -173,9 +203,11 @@ export function colorizeCode(
       >
         {lines.map((line, index) => (
           <Box key={index}>
-            <Text color={activeTheme.defaultColor}>
-              {`${String(index + 1).padStart(padWidth, ' ')} `}
-            </Text>
+            {showLineNumbers && (
+              <Text color={activeTheme.defaultColor}>
+                {`${String(index + 1).padStart(padWidth, ' ')} `}
+              </Text>
+            )}
             <Text color={activeTheme.colors.Gray}>{line}</Text>
           </Box>
         ))}

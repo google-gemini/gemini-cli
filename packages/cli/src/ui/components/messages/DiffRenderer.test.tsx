@@ -9,6 +9,7 @@ import { render } from 'ink-testing-library';
 import { DiffRenderer } from './DiffRenderer.js';
 import * as CodeColorizer from '../../utils/CodeColorizer.js';
 import { vi } from 'vitest';
+import { EOL } from 'os';
 
 describe('<OverflowProvider><DiffRenderer /></OverflowProvider>', () => {
   const mockColorizeCode = vi.spyOn(CodeColorizer, 'colorizeCode');
@@ -29,7 +30,7 @@ index 0000000..e69de29
 +++ b/test.py
 @@ -0,0 +1 @@
 +print("hello world")
-`;
+`.replace(/\n/g, EOL);
     render(
       <OverflowProvider>
         <DiffRenderer
@@ -57,7 +58,7 @@ index 0000000..e69de29
 +++ b/test.unknown
 @@ -0,0 +1 @@
 +some content
-`;
+`.replace(/\n/g, EOL);
     render(
       <OverflowProvider>
         <DiffRenderer
@@ -85,7 +86,7 @@ index 0000000..e69de29
 +++ b/test.txt
 @@ -0,0 +1 @@
 +some text content
-`;
+`.replace(/\n/g, EOL);
     render(
       <OverflowProvider>
         <DiffRenderer diffContent={newFileDiffContent} terminalWidth={80} />
@@ -109,7 +110,7 @@ index 0000001..0000002 100644
 @@ -1 +1 @@
 -old line
 +new line
-`;
+`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <OverflowProvider>
         <DiffRenderer
@@ -130,8 +131,8 @@ index 0000001..0000002 100644
     );
     const output = lastFrame();
     const lines = output!.split('\n');
-    expect(lines[0]).toBe('1    - old line');
-    expect(lines[1]).toBe('1    + new line');
+    expect(lines[0]).toBe('1 - old line');
+    expect(lines[1]).toBe('1 + new line');
   });
 
   it('should handle diff with only header and no changes', () => {
@@ -139,7 +140,7 @@ index 0000001..0000002 100644
 index 1234567..1234567 100644
 --- a/file.txt
 +++ b/file.txt
-`;
+`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <OverflowProvider>
         <DiffRenderer
@@ -176,7 +177,7 @@ index 123..456 100644
 @@ -10,2 +10,2 @@
  context line 10
  context line 11
-`;
+`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <OverflowProvider>
         <DiffRenderer
@@ -213,7 +214,7 @@ index abc..def 100644
  context line 13
  context line 14
  context line 15
-`;
+`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <OverflowProvider>
         <DiffRenderer
@@ -247,41 +248,41 @@ index 123..789 100644
 -const anotherOld = 'test';
 +const anotherNew = 'test';
  console.log('end of second hunk');
-`;
+`.replace(/\n/g, EOL);
 
     it.each([
       {
         terminalWidth: 80,
         height: undefined,
-        expected: `1      console.log('first hunk');
-2    - const oldVar = 1;
-2    + const newVar = 1;
-3      console.log('end of first hunk');
+        expected: ` 1   console.log('first hunk');
+ 2 - const oldVar = 1;
+ 2 + const newVar = 1;
+ 3   console.log('end of first hunk');
 ════════════════════════════════════════════════════════════════════════════════
-20     console.log('second hunk');
-21   - const anotherOld = 'test';
-21   + const anotherNew = 'test';
-22     console.log('end of second hunk');`,
+20   console.log('second hunk');
+21 - const anotherOld = 'test';
+21 + const anotherNew = 'test';
+22   console.log('end of second hunk');`,
       },
       {
         terminalWidth: 80,
         height: 6,
         expected: `... first 4 lines hidden ...
 ════════════════════════════════════════════════════════════════════════════════
-20     console.log('second hunk');
-21   - const anotherOld = 'test';
-21   + const anotherNew = 'test';
-22     console.log('end of second hunk');`,
+20   console.log('second hunk');
+21 - const anotherOld = 'test';
+21 + const anotherNew = 'test';
+22   console.log('end of second hunk');`,
       },
       {
         terminalWidth: 30,
         height: 6,
         expected: `... first 10 lines hidden ...
-       'test';
-21   + const anotherNew =
-       'test';
-22     console.log('end of
-       second hunk');`,
+   ;
+21 + const anotherNew = 'test'
+   ;
+22   console.log('end of
+     second hunk');`,
       },
     ])(
       'with terminalWidth $terminalWidth and height $height',
@@ -317,7 +318,7 @@ fileDiff Index: file.txt
 -const anotherOld = 'test';
 +const anotherNew = 'test';
 \\ No newline at end of file  
-`;
+`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <OverflowProvider>
         <DiffRenderer
@@ -329,11 +330,11 @@ fileDiff Index: file.txt
     );
     const output = lastFrame();
 
-    expect(output).toEqual(`1    - const oldVar = 1;
-1    + const newVar = 1;
+    expect(output).toEqual(` 1 - const oldVar = 1;
+ 1 + const newVar = 1;
 ════════════════════════════════════════════════════════════════════════════════
-20   - const anotherOld = 'test';
-20   + const anotherNew = 'test';`);
+20 - const anotherOld = 'test';
+20 + const anotherNew = 'test';`);
   });
 
   it('should correctly render a new file with no file extension correctly', () => {
@@ -347,7 +348,7 @@ fileDiff Index: Dockerfile
 +RUN npm install
 +RUN npm run build
 \\ No newline at end of file  
-`;
+`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <OverflowProvider>
         <DiffRenderer

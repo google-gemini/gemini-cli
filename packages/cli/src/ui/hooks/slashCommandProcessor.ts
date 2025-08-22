@@ -8,9 +8,18 @@ import { useCallback, useMemo, useEffect, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { useStateAndRef } from './useStateAndRef.js';
-import { Config, GitService, Logger } from '@google/gemini-cli-core';
+import {
+  Config,
+  GitService,
+  Logger,
+  logSlashCommand,
+  makeSlashCommandEvent,
+  SlashCommandStatus,
+  ToolConfirmationOutcome,
+  Storage,
+} from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
+import { runExitCleanup } from '../../utils/cleanup.js';
 import {
   Message,
   MessageType,
@@ -23,6 +32,7 @@ import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
+import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 
 /**
  * Hook to define and process slash commands (e.g., /help, /clear).
@@ -34,7 +44,6 @@ export const useSlashCommandProcessor = (
   clearItems: UseHistoryManagerReturn['clearItems'],
   loadHistory: UseHistoryManagerReturn['loadHistory'],
   refreshStatic: () => void,
-  setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
   onDebugMessage: (message: string) => void,
   openThemeDialog: () => void,
   openAuthDialog: () => void,
@@ -42,33 +51,61 @@ export const useSlashCommandProcessor = (
   toggleCorgiMode: () => void,
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
+  openSettingsDialog: () => void,
+  toggleVimEnabled: () => Promise<boolean>,
+  setIsProcessing: (isProcessing: boolean) => void,
+  setGeminiMdFileCount: (count: number) => void,
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<readonly SlashCommand[]>([]);
+  const [reloadTrigger, setReloadTrigger] = useState(0);
+
+  const reloadCommands = useCallback(() => {
+    setReloadTrigger((v) => v + 1);
+  }, []);
+  const [shellConfirmationRequest, setShellConfirmationRequest] =
+    useState<null | {
+      commands: string[];
+      onConfirm: (
+        outcome: ToolConfirmationOutcome,
+        approvedCommands?: string[],
+      ) => void;
+    }>(null);
+  const [confirmationRequest, setConfirmationRequest] = useState<null | {
+    prompt: React.ReactNode;
+    onConfirm: (confirmed: boolean) => void;
+  }>(null);
+
+  const [sessionShellAllowlist, setSessionShellAllowlist] = useState(
+    new Set<string>(),
+  );
   const gitService = useMemo(() => {
     if (!config?.getProjectRoot()) {
       return;
     }
-    return new GitService(config.getProjectRoot());
+    return new GitService(config.getProjectRoot(), config.storage);
   }, [config]);
 
   const logger = useMemo(() => {
-    const l = new Logger(config?.getSessionId() || '');
+    const l = new Logger(
+      config?.getSessionId() || '',
+      config?.storage ?? new Storage(process.cwd()),
+    );
     // The logger's initialize is async, but we can create the instance
     // synchronously. Commands that use it will await its initialization.
     return l;
   }, [config]);
 
-  const [pendingCompressionItemRef, setPendingCompressionItem] =
-    useStateAndRef<HistoryItemWithoutId | null>(null);
+  const [pendingCompressionItem, setPendingCompressionItem] =
+    useState<HistoryItemWithoutId | null>(null);
 
   const pendingHistoryItems = useMemo(() => {
     const items: HistoryItemWithoutId[] = [];
-    if (pendingCompressionItemRef.current != null) {
-      items.push(pendingCompressionItemRef.current);
+    if (pendingCompressionItem != null) {
+      items.push(pendingCompressionItem);
     }
     return items;
-  }, [pendingCompressionItemRef]);
+  }, [pendingCompressionItem]);
 
   const addMessage = useCallback(
     (message: Message) => {
@@ -83,6 +120,12 @@ export const useSlashCommandProcessor = (
           modelVersion: message.modelVersion,
           selectedAuthType: message.selectedAuthType,
           gcpProject: message.gcpProject,
+          ideClient: message.ideClient,
+        };
+      } else if (message.type === MessageType.HELP) {
+        historyItemContent = {
+          type: 'help',
+          timestamp: message.timestamp,
         };
       } else if (message.type === MessageType.STATS) {
         historyItemContent = {
@@ -117,7 +160,6 @@ export const useSlashCommandProcessor = (
     },
     [addItem],
   );
-
   const commandContext = useMemo(
     (): CommandContext => ({
       services: {
@@ -135,12 +177,16 @@ export const useSlashCommandProcessor = (
         },
         loadHistory,
         setDebugMessage: onDebugMessage,
-        pendingItem: pendingCompressionItemRef.current,
+        pendingItem: pendingCompressionItem,
         setPendingItem: setPendingCompressionItem,
         toggleCorgiMode,
+        toggleVimEnabled,
+        setGeminiMdFileCount,
+        reloadCommands,
       },
       session: {
         stats: session.stats,
+        sessionShellAllowlist,
       },
     }),
     [
@@ -154,16 +200,38 @@ export const useSlashCommandProcessor = (
       refreshStatic,
       session.stats,
       onDebugMessage,
-      pendingCompressionItemRef,
+      pendingCompressionItem,
       setPendingCompressionItem,
       toggleCorgiMode,
+      toggleVimEnabled,
+      sessionShellAllowlist,
+      setGeminiMdFileCount,
+      reloadCommands,
     ],
   );
+
+  useEffect(() => {
+    if (!config) {
+      return;
+    }
+
+    const ideClient = config.getIdeClient();
+    const listener = () => {
+      reloadCommands();
+    };
+
+    ideClient.addStatusChangeListener(listener);
+
+    return () => {
+      ideClient.removeStatusChangeListener(listener);
+    };
+  }, [config, reloadCommands]);
 
   useEffect(() => {
     const controller = new AbortController();
     const load = async () => {
       const loaders = [
+        new McpPromptLoader(config),
         new BuiltinCommandLoader(config),
         new FileCommandLoader(config),
       ];
@@ -179,11 +247,13 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config]);
+  }, [config, reloadTrigger]);
 
   const handleSlashCommand = useCallback(
     async (
       rawQuery: PartListUnion,
+      oneTimeShellAllowlist?: Set<string>,
+      overwriteConfirmed?: boolean,
     ): Promise<SlashCommandProcessorResult | false> => {
       if (typeof rawQuery !== 'string') {
         return false;
@@ -194,6 +264,8 @@ export const useSlashCommandProcessor = (
         return false;
       }
 
+      setIsProcessing(true);
+
       const userMessageTimestamp = Date.now();
       addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
 
@@ -203,6 +275,8 @@ export const useSlashCommandProcessor = (
       let currentCommands = commands;
       let commandToExecute: SlashCommand | undefined;
       let pathIndex = 0;
+      let hasError = false;
+      const canonicalPath: string[] = [];
 
       for (const part of commandPath) {
         // TODO: For better performance and architectural clarity, this two-pass
@@ -223,6 +297,7 @@ export const useSlashCommandProcessor = (
 
         if (foundCommand) {
           commandToExecute = foundCommand;
+          canonicalPath.push(foundCommand.name);
           pathIndex++;
           if (foundCommand.subCommands) {
             currentCommands = foundCommand.subCommands;
@@ -234,110 +309,245 @@ export const useSlashCommandProcessor = (
         }
       }
 
-      if (commandToExecute) {
-        const args = parts.slice(pathIndex).join(' ');
+      const resolvedCommandPath = canonicalPath;
+      const subcommand =
+        resolvedCommandPath.length > 1
+          ? resolvedCommandPath.slice(1).join(' ')
+          : undefined;
 
-        if (commandToExecute.action) {
-          const result = await commandToExecute.action(commandContext, args);
+      try {
+        if (commandToExecute) {
+          const args = parts.slice(pathIndex).join(' ');
 
-          if (result) {
-            switch (result.type) {
-              case 'tool':
-                return {
-                  type: 'schedule_tool',
-                  toolName: result.toolName,
-                  toolArgs: result.toolArgs,
-                };
-              case 'message':
-                addItem(
-                  {
-                    type:
-                      result.messageType === 'error'
-                        ? MessageType.ERROR
-                        : MessageType.INFO,
-                    text: result.content,
-                  },
-                  Date.now(),
-                );
-                return { type: 'handled' };
-              case 'dialog':
-                switch (result.dialog) {
-                  case 'help':
-                    setShowHelp(true);
+          if (commandToExecute.action) {
+            const fullCommandContext: CommandContext = {
+              ...commandContext,
+              invocation: {
+                raw: trimmed,
+                name: commandToExecute.name,
+                args,
+              },
+              overwriteConfirmed,
+            };
+
+            // If a one-time list is provided for a "Proceed" action, temporarily
+            // augment the session allowlist for this single execution.
+            if (oneTimeShellAllowlist && oneTimeShellAllowlist.size > 0) {
+              fullCommandContext.session = {
+                ...fullCommandContext.session,
+                sessionShellAllowlist: new Set([
+                  ...fullCommandContext.session.sessionShellAllowlist,
+                  ...oneTimeShellAllowlist,
+                ]),
+              };
+            }
+            const result = await commandToExecute.action(
+              fullCommandContext,
+              args,
+            );
+
+            if (result) {
+              switch (result.type) {
+                case 'tool':
+                  return {
+                    type: 'schedule_tool',
+                    toolName: result.toolName,
+                    toolArgs: result.toolArgs,
+                  };
+                case 'message':
+                  addItem(
+                    {
+                      type:
+                        result.messageType === 'error'
+                          ? MessageType.ERROR
+                          : MessageType.INFO,
+                      text: result.content,
+                    },
+                    Date.now(),
+                  );
+                  return { type: 'handled' };
+                case 'dialog':
+                  switch (result.dialog) {
+                    case 'auth':
+                      openAuthDialog();
+                      return { type: 'handled' };
+                    case 'theme':
+                      openThemeDialog();
+                      return { type: 'handled' };
+                    case 'editor':
+                      openEditorDialog();
+                      return { type: 'handled' };
+                    case 'privacy':
+                      openPrivacyNotice();
+                      return { type: 'handled' };
+                    case 'settings':
+                      openSettingsDialog();
+                      return { type: 'handled' };
+                    case 'help':
+                      return { type: 'handled' };
+                    default: {
+                      const unhandled: never = result.dialog;
+                      throw new Error(
+                        `Unhandled slash command result: ${unhandled}`,
+                      );
+                    }
+                  }
+                case 'load_history': {
+                  await config
+                    ?.getGeminiClient()
+                    ?.setHistory(result.clientHistory);
+                  fullCommandContext.ui.clear();
+                  result.history.forEach((item, index) => {
+                    fullCommandContext.ui.addItem(item, index);
+                  });
+                  return { type: 'handled' };
+                }
+                case 'quit':
+                  setQuittingMessages(result.messages);
+                  setTimeout(async () => {
+                    await runExitCleanup();
+                    process.exit(0);
+                  }, 100);
+                  return { type: 'handled' };
+
+                case 'submit_prompt':
+                  return {
+                    type: 'submit_prompt',
+                    content: result.content,
+                  };
+                case 'confirm_shell_commands': {
+                  const { outcome, approvedCommands } = await new Promise<{
+                    outcome: ToolConfirmationOutcome;
+                    approvedCommands?: string[];
+                  }>((resolve) => {
+                    setShellConfirmationRequest({
+                      commands: result.commandsToConfirm,
+                      onConfirm: (
+                        resolvedOutcome,
+                        resolvedApprovedCommands,
+                      ) => {
+                        setShellConfirmationRequest(null); // Close the dialog
+                        resolve({
+                          outcome: resolvedOutcome,
+                          approvedCommands: resolvedApprovedCommands,
+                        });
+                      },
+                    });
+                  });
+
+                  if (
+                    outcome === ToolConfirmationOutcome.Cancel ||
+                    !approvedCommands ||
+                    approvedCommands.length === 0
+                  ) {
                     return { type: 'handled' };
-                  case 'auth':
-                    openAuthDialog();
-                    return { type: 'handled' };
-                  case 'theme':
-                    openThemeDialog();
-                    return { type: 'handled' };
-                  case 'editor':
-                    openEditorDialog();
-                    return { type: 'handled' };
-                  case 'privacy':
-                    openPrivacyNotice();
-                    return { type: 'handled' };
-                  default: {
-                    const unhandled: never = result.dialog;
-                    throw new Error(
-                      `Unhandled slash command result: ${unhandled}`,
+                  }
+
+                  if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+                    setSessionShellAllowlist(
+                      (prev) => new Set([...prev, ...approvedCommands]),
                     );
                   }
-                }
-              case 'load_history': {
-                await config
-                  ?.getGeminiClient()
-                  ?.setHistory(result.clientHistory);
-                commandContext.ui.clear();
-                result.history.forEach((item, index) => {
-                  commandContext.ui.addItem(item, index);
-                });
-                return { type: 'handled' };
-              }
-              case 'quit':
-                setQuittingMessages(result.messages);
-                setTimeout(() => {
-                  process.exit(0);
-                }, 100);
-                return { type: 'handled' };
 
-              case 'submit_prompt':
-                return {
-                  type: 'submit_prompt',
-                  content: result.content,
-                };
-              default: {
-                const unhandled: never = result;
-                throw new Error(`Unhandled slash command result: ${unhandled}`);
+                  return await handleSlashCommand(
+                    result.originalInvocation.raw,
+                    // Pass the approved commands as a one-time grant for this execution.
+                    new Set(approvedCommands),
+                  );
+                }
+                case 'confirm_action': {
+                  const { confirmed } = await new Promise<{
+                    confirmed: boolean;
+                  }>((resolve) => {
+                    setConfirmationRequest({
+                      prompt: result.prompt,
+                      onConfirm: (resolvedConfirmed) => {
+                        setConfirmationRequest(null);
+                        resolve({ confirmed: resolvedConfirmed });
+                      },
+                    });
+                  });
+
+                  if (!confirmed) {
+                    addItem(
+                      {
+                        type: MessageType.INFO,
+                        text: 'Operation cancelled.',
+                      },
+                      Date.now(),
+                    );
+                    return { type: 'handled' };
+                  }
+
+                  return await handleSlashCommand(
+                    result.originalInvocation.raw,
+                    undefined,
+                    true,
+                  );
+                }
+                default: {
+                  const unhandled: never = result;
+                  throw new Error(
+                    `Unhandled slash command result: ${unhandled}`,
+                  );
+                }
               }
             }
+
+            return { type: 'handled' };
+          } else if (commandToExecute.subCommands) {
+            const helpText = `Command '/${commandToExecute.name}' requires a subcommand. Available:\n${commandToExecute.subCommands
+              .map((sc) => `  - ${sc.name}: ${sc.description || ''}`)
+              .join('\n')}`;
+            addMessage({
+              type: MessageType.INFO,
+              content: helpText,
+              timestamp: new Date(),
+            });
+            return { type: 'handled' };
           }
-
-          return { type: 'handled' };
-        } else if (commandToExecute.subCommands) {
-          const helpText = `Command '/${commandToExecute.name}' requires a subcommand. Available:\n${commandToExecute.subCommands
-            .map((sc) => `  - ${sc.name}: ${sc.description || ''}`)
-            .join('\n')}`;
-          addMessage({
-            type: MessageType.INFO,
-            content: helpText,
-            timestamp: new Date(),
-          });
-          return { type: 'handled' };
         }
-      }
 
-      addMessage({
-        type: MessageType.ERROR,
-        content: `Unknown command: ${trimmed}`,
-        timestamp: new Date(),
-      });
-      return { type: 'handled' };
+        addMessage({
+          type: MessageType.ERROR,
+          content: `Unknown command: ${trimmed}`,
+          timestamp: new Date(),
+        });
+
+        return { type: 'handled' };
+      } catch (e: unknown) {
+        hasError = true;
+        if (config) {
+          const event = makeSlashCommandEvent({
+            command: resolvedCommandPath[0],
+            subcommand,
+            status: SlashCommandStatus.ERROR,
+          });
+          logSlashCommand(config, event);
+        }
+        addItem(
+          {
+            type: MessageType.ERROR,
+            text: e instanceof Error ? e.message : String(e),
+          },
+          Date.now(),
+        );
+        return { type: 'handled' };
+      } finally {
+        if (config && resolvedCommandPath[0] && !hasError) {
+          const event = makeSlashCommandEvent({
+            command: resolvedCommandPath[0],
+            subcommand,
+            status: SlashCommandStatus.SUCCESS,
+          });
+          logSlashCommand(config, event);
+        }
+        setIsProcessing(false);
+      }
     },
     [
       config,
       addItem,
-      setShowHelp,
       openAuthDialog,
       commands,
       commandContext,
@@ -346,6 +556,11 @@ export const useSlashCommandProcessor = (
       openPrivacyNotice,
       openEditorDialog,
       setQuittingMessages,
+      openSettingsDialog,
+      setShellConfirmationRequest,
+      setSessionShellAllowlist,
+      setIsProcessing,
+      setConfirmationRequest,
     ],
   );
 
@@ -354,5 +569,7 @@ export const useSlashCommandProcessor = (
     slashCommands: commands,
     pendingHistoryItems,
     commandContext,
+    shellConfirmationRequest,
+    confirmationRequest,
   };
 };

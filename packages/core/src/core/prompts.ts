@@ -24,7 +24,7 @@ export function getCoreSystemPrompt(userMemory?: string): string {
   // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD
   let systemMdEnabled = false;
   let systemMdPath = path.resolve(path.join(GEMINI_CONFIG_DIR, 'system.md'));
-  const systemMdVar = process.env.GEMINI_SYSTEM_MD;
+  const systemMdVar = process.env['GEMINI_SYSTEM_MD'];
   if (systemMdVar) {
     const systemMdVarLower = systemMdVar.toLowerCase();
     if (!['0', 'false'].includes(systemMdVarLower)) {
@@ -112,7 +112,7 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 - **Command Execution:** Use the '${ShellTool.Name}' tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`. If unsure, ask the user.
 - **Interactive Commands:** Try to avoid shell commands that are likely to require user interaction (e.g. \`git rebase -i\`). Use non-interactive versions of commands (e.g. \`npm init -y\` instead of \`npm init\`) when available, and otherwise remind the user that interactive shell commands are not supported and may cause hangs until canceled by the user.
-- **Remembering Facts:** Use the '${MemoryTool.Name}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information that belongs in project-specific \`GEMINI.md\` files. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
+- **Remembering Facts:** Use the '${MemoryTool.Name}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
 - **Respect User Confirmations:** Most tool calls (also denoted as 'function calls') will first require confirmation from the user, where they will either approve or cancel the function call. If a user cancels a function call, respect their choice and do _not_ try to make the function call again. It is okay to request the tool call again _only_ if the user requests that same tool call on a subsequent prompt. When a user cancels a function call, assume best intentions from the user and consider inquiring if they prefer any alternative paths forward.
 
 ## Interaction Details
@@ -121,8 +121,8 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 
 ${(function () {
   // Determine sandbox status based on environment variables
-  const isSandboxExec = process.env.SANDBOX === 'sandbox-exec';
-  const isGenericSandbox = !!process.env.SANDBOX; // Check if SANDBOX is set to any non-empty value
+  const isSandboxExec = process.env['SANDBOX'] === 'sandbox-exec';
+  const isGenericSandbox = !!process.env['SANDBOX']; // Check if SANDBOX is set to any non-empty value
 
   if (isSandboxExec) {
     return `
@@ -266,7 +266,7 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
 `.trim();
 
   // if GEMINI_WRITE_SYSTEM_MD is set (and not 0|false), write base system prompt to file
-  const writeSystemMdVar = process.env.GEMINI_WRITE_SYSTEM_MD;
+  const writeSystemMdVar = process.env['GEMINI_WRITE_SYSTEM_MD'];
   if (writeSystemMdVar) {
     const writeSystemMdVarLower = writeSystemMdVar.toLowerCase();
     if (!['0', 'false'].includes(writeSystemMdVarLower)) {

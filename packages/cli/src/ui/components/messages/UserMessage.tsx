@@ -7,6 +7,7 @@
 import React from 'react';
 import { Text, Box } from 'ink';
 import { Colors } from '../../colors.js';
+import { SCREEN_READER_USER_PREFIX } from '../../constants.js';
 
 interface UserMessageProps {
   text: string;
@@ -15,11 +16,15 @@ interface UserMessageProps {
 export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
+  const isSlashCommand = text.startsWith('/');
+
+  const textColor = isSlashCommand ? Colors.AccentPurple : Colors.Gray;
+  const borderColor = isSlashCommand ? Colors.AccentPurple : Colors.Gray;
 
   return (
     <Box
       borderStyle="round"
-      borderColor={Colors.Gray}
+      borderColor={borderColor}
       flexDirection="row"
       paddingX={2}
       paddingY={0}
@@ -27,10 +32,12 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
       alignSelf="flex-start"
     >
       <Box width={prefixWidth}>
-        <Text color={Colors.Gray}>{prefix}</Text>
+        <Text color={textColor} aria-label={SCREEN_READER_USER_PREFIX}>
+          {prefix}
+        </Text>
       </Box>
       <Box flexGrow={1}>
-        <Text wrap="wrap" color={Colors.Gray}>
+        <Text wrap="wrap" color={textColor}>
           {text}
         </Text>
       </Box>

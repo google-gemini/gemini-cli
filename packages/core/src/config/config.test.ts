@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Mock } from 'vitest';
 import { Config, ConfigParameters, SandboxConfig } from './config.js';
 import * as path from 'path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
@@ -14,17 +15,30 @@ import {
 } from '../telemetry/index.js';
 import {
   AuthType,
+  ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
-import { loadServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
+import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn().mockReturnValue(true),
+    statSync: vi.fn().mockReturnValue({
+      isDirectory: vi.fn().mockReturnValue(true),
+    }),
+    realpathSync: vi.fn((path) => path),
+  };
+});
 
 // Mock dependencies that might be called during Config construction or createServerConfig
 vi.mock('../tools/tool-registry', () => {
   const ToolRegistryMock = vi.fn();
   ToolRegistryMock.prototype.registerTool = vi.fn();
-  ToolRegistryMock.prototype.discoverTools = vi.fn();
+  ToolRegistryMock.prototype.discoverAllTools = vi.fn();
   ToolRegistryMock.prototype.getAllTools = vi.fn(() => []); // Mock methods if needed
   ToolRegistryMock.prototype.getTool = vi.fn();
   ToolRegistryMock.prototype.getFunctionDeclarations = vi.fn(() => []);
@@ -108,11 +122,16 @@ describe('Server Config (config.ts)', () => {
     telemetry: TELEMETRY_SETTINGS,
     sessionId: SESSION_ID,
     model: MODEL,
+    usageStatisticsEnabled: false,
   };
 
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
+    vi.spyOn(
+      ClearcutLogger.prototype,
+      'logStartSessionEvent',
+    ).mockImplementation(() => undefined);
   });
 
   describe('initialize', () => {
@@ -139,6 +158,18 @@ describe('Server Config (config.ts)', () => {
 
       await expect(config.initialize()).resolves.toBeUndefined();
     });
+
+    it('should throw an error if initialized more than once', async () => {
+      const config = new Config({
+        ...baseParams,
+        checkpointing: false,
+      });
+
+      await expect(config.initialize()).resolves.toBeUndefined();
+      await expect(config.initialize()).rejects.toThrow(
+        'Config was already initialized',
+      );
+    });
   });
 
   describe('refreshAuth', () => {
@@ -153,6 +184,10 @@ describe('Server Config (config.ts)', () => {
 
       (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
 
+      // Set fallback mode to true to ensure it gets reset
+      config.setFallbackMode(true);
+      expect(config.isInFallbackMode()).toBe(true);
+
       await config.refreshAuth(authType);
 
       expect(createContentGeneratorConfig).toHaveBeenCalledWith(
@@ -164,6 +199,176 @@ describe('Server Config (config.ts)', () => {
       expect(config.getContentGeneratorConfig().model).toBe(newModel);
       expect(config.getModel()).toBe(newModel); // getModel() should return the updated model
       expect(GeminiClient).toHaveBeenCalledWith(config);
+      // Verify that fallback mode is reset
+      expect(config.isInFallbackMode()).toBe(false);
+    });
+
+    it('should preserve conversation history when refreshing auth', async () => {
+      const config = new Config(baseParams);
+      const authType = AuthType.USE_GEMINI;
+      const mockContentConfig = {
+        model: 'gemini-pro',
+        apiKey: 'test-key',
+      };
+
+      (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
+
+      // Mock the existing client with some history
+      const mockExistingHistory = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there!' }] },
+        { role: 'user', parts: [{ text: 'How are you?' }] },
+      ];
+
+      const mockExistingClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue(mockExistingHistory),
+      };
+
+      const mockNewClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        initialize: vi.fn().mockResolvedValue(undefined),
+      };
+
+      // Set the existing client
+      (
+        config as unknown as { geminiClient: typeof mockExistingClient }
+      ).geminiClient = mockExistingClient;
+      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
+
+      await config.refreshAuth(authType);
+
+      // Verify that existing history was retrieved
+      expect(mockExistingClient.getHistory).toHaveBeenCalled();
+
+      // Verify that new client was created and initialized
+      expect(GeminiClient).toHaveBeenCalledWith(config);
+      expect(mockNewClient.initialize).toHaveBeenCalledWith(mockContentConfig);
+
+      // Verify that history was restored to the new client
+      expect(mockNewClient.setHistory).toHaveBeenCalledWith(
+        mockExistingHistory,
+        { stripThoughts: false },
+      );
+    });
+
+    it('should handle case when no existing client is initialized', async () => {
+      const config = new Config(baseParams);
+      const authType = AuthType.USE_GEMINI;
+      const mockContentConfig = {
+        model: 'gemini-pro',
+        apiKey: 'test-key',
+      };
+
+      (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
+
+      const mockNewClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        initialize: vi.fn().mockResolvedValue(undefined),
+      };
+
+      // No existing client
+      (config as unknown as { geminiClient: null }).geminiClient = null;
+      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
+
+      await config.refreshAuth(authType);
+
+      // Verify that new client was created and initialized
+      expect(GeminiClient).toHaveBeenCalledWith(config);
+      expect(mockNewClient.initialize).toHaveBeenCalledWith(mockContentConfig);
+
+      // Verify that setHistory was not called since there was no existing history
+      expect(mockNewClient.setHistory).not.toHaveBeenCalled();
+    });
+
+    it('should strip thoughts when switching from GenAI to Vertex', async () => {
+      const config = new Config(baseParams);
+      const mockContentConfig = {
+        model: 'gemini-pro',
+        apiKey: 'test-key',
+        authType: AuthType.USE_GEMINI,
+      };
+      (
+        config as unknown as { contentGeneratorConfig: ContentGeneratorConfig }
+      ).contentGeneratorConfig = mockContentConfig;
+
+      (createContentGeneratorConfig as Mock).mockReturnValue({
+        ...mockContentConfig,
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      });
+
+      const mockExistingHistory = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ];
+      const mockExistingClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue(mockExistingHistory),
+      };
+      const mockNewClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        initialize: vi.fn().mockResolvedValue(undefined),
+      };
+
+      (
+        config as unknown as { geminiClient: typeof mockExistingClient }
+      ).geminiClient = mockExistingClient;
+      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
+
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(mockNewClient.setHistory).toHaveBeenCalledWith(
+        mockExistingHistory,
+        { stripThoughts: true },
+      );
+    });
+
+    it('should not strip thoughts when switching from Vertex to GenAI', async () => {
+      const config = new Config(baseParams);
+      const mockContentConfig = {
+        model: 'gemini-pro',
+        apiKey: 'test-key',
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      };
+      (
+        config as unknown as { contentGeneratorConfig: ContentGeneratorConfig }
+      ).contentGeneratorConfig = mockContentConfig;
+
+      (createContentGeneratorConfig as Mock).mockReturnValue({
+        ...mockContentConfig,
+        authType: AuthType.USE_GEMINI,
+      });
+
+      const mockExistingHistory = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ];
+      const mockExistingClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue(mockExistingHistory),
+      };
+      const mockNewClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        initialize: vi.fn().mockResolvedValue(undefined),
+      };
+
+      (
+        config as unknown as { geminiClient: typeof mockExistingClient }
+      ).geminiClient = mockExistingClient;
+      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(mockNewClient.setHistory).toHaveBeenCalledWith(
+        mockExistingHistory,
+        { stripThoughts: false },
+      );
     });
   });
 
@@ -214,6 +419,23 @@ describe('Server Config (config.ts)', () => {
     expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
   });
 
+  it('should initialize WorkspaceContext with includeDirectories', () => {
+    const includeDirectories = ['/path/to/dir1', '/path/to/dir2'];
+    const paramsWithIncludeDirs: ConfigParameters = {
+      ...baseParams,
+      includeDirectories,
+    };
+    const config = new Config(paramsWithIncludeDirs);
+    const workspaceContext = config.getWorkspaceContext();
+    const directories = workspaceContext.getDirectories();
+
+    // Should include the target directory plus the included directories
+    expect(directories).toHaveLength(3);
+    expect(directories).toContain(path.resolve(baseParams.targetDir));
+    expect(directories).toContain('/path/to/dir1');
+    expect(directories).toContain('/path/to/dir2');
+  });
+
   it('Config constructor should set telemetry to true when provided as true', () => {
     const paramsWithTelemetry: ConfigParameters = {
       ...baseParams,
@@ -243,6 +465,40 @@ describe('Server Config (config.ts)', () => {
     const config = new Config(baseParams);
     const fileService = config.getFileService();
     expect(fileService).toBeDefined();
+  });
+
+  describe('Usage Statistics', () => {
+    it('defaults usage statistics to enabled if not specified', () => {
+      const config = new Config({
+        ...baseParams,
+        usageStatisticsEnabled: undefined,
+      });
+
+      expect(config.getUsageStatisticsEnabled()).toBe(true);
+    });
+
+    it.each([{ enabled: true }, { enabled: false }])(
+      'sets usage statistics based on the provided value (enabled: $enabled)',
+      ({ enabled }) => {
+        const config = new Config({
+          ...baseParams,
+          usageStatisticsEnabled: enabled,
+        });
+        expect(config.getUsageStatisticsEnabled()).toBe(enabled);
+      },
+    );
+
+    it('logs the session start event', async () => {
+      const config = new Config({
+        ...baseParams,
+        usageStatisticsEnabled: true,
+      });
+      await config.initialize();
+
+      expect(
+        ClearcutLogger.prototype.logStartSessionEvent,
+      ).toHaveBeenCalledOnce();
+    });
   });
 
   describe('Telemetry Settings', () => {
@@ -312,40 +568,64 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(paramsWithoutTelemetry);
       expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
     });
-  });
 
-  describe('refreshMemory', () => {
-    it('should update memory and file count on successful refresh', async () => {
-      const config = new Config(baseParams);
-      const mockMemoryData = {
-        memoryContent: 'new memory content',
-        fileCount: 5,
+    it('should return provided OTLP protocol', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true, otlpProtocol: 'http' },
       };
-
-      (loadServerHierarchicalMemory as Mock).mockResolvedValue(mockMemoryData);
-
-      const result = await config.refreshMemory();
-
-      expect(loadServerHierarchicalMemory).toHaveBeenCalledWith(
-        config.getWorkingDir(),
-        config.getDebugMode(),
-        config.getFileService(),
-        config.getExtensionContextFilePaths(),
-        config.getFileFilteringOptions(),
-      );
-
-      expect(config.getUserMemory()).toBe(mockMemoryData.memoryContent);
-      expect(config.getGeminiMdFileCount()).toBe(mockMemoryData.fileCount);
-      expect(result).toEqual(mockMemoryData);
+      const config = new Config(params);
+      expect(config.getTelemetryOtlpProtocol()).toBe('http');
     });
 
-    it('should propagate errors from loadServerHierarchicalMemory', async () => {
+    it('should return default OTLP protocol if not provided', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
+    });
+
+    it('should return default OTLP protocol if telemetry object is not provided', () => {
+      const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
+      delete paramsWithoutTelemetry.telemetry;
+      const config = new Config(paramsWithoutTelemetry);
+      expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
+    });
+  });
+
+  describe('UseRipgrep Configuration', () => {
+    it('should default useRipgrep to false when not provided', () => {
       const config = new Config(baseParams);
-      const testError = new Error('Failed to load memory');
+      expect(config.getUseRipgrep()).toBe(false);
+    });
 
-      (loadServerHierarchicalMemory as Mock).mockRejectedValue(testError);
+    it('should set useRipgrep to true when provided as true', () => {
+      const paramsWithRipgrep: ConfigParameters = {
+        ...baseParams,
+        useRipgrep: true,
+      };
+      const config = new Config(paramsWithRipgrep);
+      expect(config.getUseRipgrep()).toBe(true);
+    });
 
-      await expect(config.refreshMemory()).rejects.toThrow(testError);
+    it('should set useRipgrep to false when explicitly provided as false', () => {
+      const paramsWithRipgrep: ConfigParameters = {
+        ...baseParams,
+        useRipgrep: false,
+      };
+      const config = new Config(paramsWithRipgrep);
+      expect(config.getUseRipgrep()).toBe(false);
+    });
+
+    it('should default useRipgrep to false when undefined', () => {
+      const paramsWithUndefinedRipgrep: ConfigParameters = {
+        ...baseParams,
+        useRipgrep: undefined,
+      };
+      const config = new Config(paramsWithUndefinedRipgrep);
+      expect(config.getUseRipgrep()).toBe(false);
     });
   });
 });
