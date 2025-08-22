@@ -1,0 +1,109 @@
+{
+  "lang": {
+    "description": "Changer la langue de l'interface",
+    "usage": "Usage: /lang [en|zh|fr|current]",
+    "currentLanguage": "Langue actuelle: {{language}}",
+    "languageChanged": "Langue changée en {{language}}",
+    "invalidLanguage": "Langue invalide: {{language}}. Disponibles: en, zh, fr",
+    "availableLanguages": "Langues disponibles: {{languages}}"
+  },
+  "auth": {
+    "description": "Configurer la méthode d'authentification",
+    "openingDialog": "Ouverture du dialogue d'authentification..."
+  },
+  "settings": {
+    "description": "Ouvrir la configuration des paramètres",
+    "openingDialog": "Ouverture du dialogue des paramètres..."
+  },
+  "help": {
+    "description": "Afficher les informations d'aide",
+    "showingHelp": "Affichage de l'aide en {{language}}"
+  },
+  "chat": {
+    "list": "Lister les points de contrôle de conversation sauvegardés",
+    "save": "Sauvegarder la conversation actuelle. Usage: /chat save <tag>",
+    "resume": "Reprendre une conversation depuis un point de contrôle. Usage: /chat resume <tag>",
+    "delete": "Supprimer un point de contrôle de conversation. Usage: /chat delete <tag>"
+  },
+  "ide": {
+    "description": "gérer l'intégration IDE",
+    "status": "vérifier le statut de l'intégration IDE",
+    "install": "installer le compagnon IDE requis",
+    "enable": "activer l'intégration IDE", 
+    "disable": "désactiver l'intégration IDE"
+  },
+  "directory": {
+    "description": "gérer les répertoires de l'espace de travail",
+    "add": "Ajouter des répertoires à l'espace de travail. Utilisez une virgule pour séparer les chemins",
+    "show": "Afficher tous les répertoires dans l'espace de travail"
+  },
+  "mcp": {
+    "description": "gérer les serveurs MCP",
+    "list": "Lister les serveurs MCP configurés et les outils",
+    "auth": "S'authentifier avec un serveur MCP compatible OAuth",
+    "refresh": "Actualiser la liste des serveurs MCP et outils"
+  },
+  "memory": {
+    "description": "gérer la mémoire de conversation",
+    "show": "Afficher le contenu actuel de la mémoire",
+    "add": "Ajouter du contenu à la mémoire",
+    "refresh": "Actualiser la mémoire depuis la source"
+  },
+  "stats": {
+    "description": "afficher les statistiques de session",
+    "model": "Afficher les statistiques d'utilisation spécifiques au modèle",
+    "tools": "Afficher les statistiques d'utilisation spécifiques aux outils"
+  },
+  "descriptions": {
+    "about": "afficher les informations de version",
+    "auth": "changer la méthode d'authentification",
+    "help": "Afficher les informations d'aide",
+    "settings": "Configurer les paramètres de l'application",
+    "bug": "soumettre un rapport de bogue",
+    "chat": "Gérer l'historique des conversations.",
+    "clear": "effacer l'écran et l'historique des conversations",
+    "compress": "Compresse le contexte en le remplaçant par un résumé.",
+    "copy": "Copier le dernier résultat ou extrait de code dans le presse-papiers",
+    "corgi": "Active/désactive le mode corgi.",
+    "docs": "Ouvrir la documentation dans votre navigateur",
+    "directory": "Changer le répertoire de travail", 
+    "editor": "Configurer les paramètres d'éditeur externe",
+    "extensions": "Gérer les extensions",
+    "help": "Afficher les informations d'aide",
+    "ide": "Configurer l'intégration IDE",
+    "init": "Initialiser un nouveau projet",
+    "lang": "Changer la langue de l'interface / Switch interface language",
+    "mcp": "Gérer les serveurs MCP",
+    "memory": "Gérer la mémoire de conversation",
+    "privacy": "Afficher les informations de confidentialité",
+    "quit": "Quitter l'application",
+    "restore": "Restaurer depuis la sauvegarde",
+    "settings": "Configurer les paramètres de l'application",
+    "stats": "Afficher les statistiques de session", 
+    "theme": "Changer le thème de couleur",
+    "tools": "Afficher les outils disponibles",
+    "vim": "Activer/désactiver le mode Vim",
+    "setup-github": "Configurer GitHub Actions",
+    "terminal-setup": "Configurer les raccourcis clavier du terminal pour l'entrée multiligne (VS Code, Cursor, Windsurf)"
+  },
+  "tools": {
+    "title": "Outils Gemini CLI disponibles:",
+    "noTools": "Aucun outil disponible",
+    "registryError": "Impossible de récupérer le registre des outils."
+  },
+  "extensions": {
+    "title": "Extensions actives:",
+    "noExtensions": "Aucune extension active."
+  },
+  "copy": {
+    "failed": "Échec de la copie dans le presse-papiers."
+  },
+  "compress": {
+    "failed": "Échec de la compression de l'historique de conversation.",
+    "failedWithError": "Échec de la compression de l'historique de conversation: {{error}}",
+    "alreadyInProgress": "Compression déjà en cours, attendez que la requête précédente se termine"
+  },
+  "mcp": {
+    "authFailed": "Échec de l'authentification avec le serveur MCP '{{serverName}}': {{error}}"
+  }
+}

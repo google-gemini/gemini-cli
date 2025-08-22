@@ -1,0 +1,39 @@
+{
+  "required": {
+    "pathToAdd": "Please provide at least one path to add.",
+    "tagForSave": "Missing tag. Usage: /chat save <tag>",
+    "tagForResume": "Missing tag. Usage: /chat resume <tag>",
+    "tagForDelete": "Missing tag. Usage: /chat delete <tag>",
+    "memoryUsage": "Usage: /memory add <text to remember>"
+  },
+  "notFound": {
+    "checkpoints": "No saved conversation checkpoints found.",
+    "checkpoint": "No saved checkpoint found with tag: {{tag}}.",
+    "conversation": "No conversation found to save.",
+    "toolRegistry": "Could not retrieve tool registry.",
+    "readManyFilesTool": "Error: read_many_files tool not found.",
+    "restorableToolCalls": "No restorable tool calls found.",
+    "fileNotFound": "File not found: {{filename}}"
+  },
+  "browser": {
+    "openDocs": "Please open the following URL in your browser to view the documentation:\n{{url}}",
+    "openingDocs": "Opening documentation in your browser: {{url}}",
+    "openBugReport": "To submit your bug report, please open the following URL in your browser:\n{{url}}",
+    "openFailed": "Could not open URL in browser: {{error}}"
+  },
+  "commands": {
+    "invalidAtCommand": "Error: Invalid @ command '{{command}}'. No path specified.",
+    "unknownCommand": "Unknown command: {{command}}",
+    "geminiDirectoryPath": "Could not determine the .gemini directory path."
+  },
+  "theme": {
+    "noColorEnv": "Theme configuration unavailable due to NO_COLOR env variable."
+  },
+  "ide": {
+    "noInstaller": "No installer is available for {{ide}}. Please install the '{{extensionName}}' extension manually from the marketplace."
+  },
+  "system": {
+    "unexpectedError": "An unexpected error occurred: {{error}}",
+    "installationFailed": "Installation failed."
+  }
+}

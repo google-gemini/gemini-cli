@@ -1,0 +1,37 @@
+{
+  "memory": {
+    "refreshing": "Actualisation de la mémoire hiérarchique (GEMINI.md ou autres fichiers de contexte)...",
+    "refreshedSuccess": "Mémoire actualisée avec succès. {{characters}} caractères chargés depuis {{fileCount}} fichier(s).",
+    "refreshedEmpty": "Mémoire actualisée avec succès. Aucun contenu de mémoire trouvé.",
+    "refreshError": "Erreur lors de l'actualisation de la mémoire : {{error}}",
+    "empty": "La mémoire est actuellement vide.",
+    "saveAttempt": "Tentative de sauvegarde en mémoire : \"{{content}}\"",
+    "refreshingFromFiles": "Actualisation de la mémoire depuis les fichiers sources..."
+  },
+  "configuration": {
+    "notAvailable": "La configuration n'est pas disponible.",
+    "noClient": "Aucun client de chat disponible pour sauvegarder la conversation."
+  },
+  "initialization": {
+    "geminiCreated": "GEMINI.md vide créé. Analyse du projet en cours pour le remplir."
+  },
+  "operation": {
+    "cancelled": "Opération annulée.",
+    "restored": "Projet restauré à l'état précédent l'appel d'outil."
+  },
+  "restore": {
+    "noDirectoryPath": "Impossible de déterminer le chemin du répertoire .gemini.",
+    "noRestorableToolCalls": "Aucun appel d'outil restaurable trouvé.",
+    "availableToolCalls": "Appels d'outils disponibles à restaurer:\n\n{{fileList}}",
+    "fileNotFound": "Fichier non trouvé: {{filename}}",
+    "loadHistoryNotAvailable": "La fonction loadHistory n'est pas disponible.",
+    "readError": "Impossible de lire les appels d'outils restaurables. Voici l'erreur: {{error}}"
+  },
+  "github": {
+    "setupSuccess": "{{count}} flux de travail téléchargés avec succès et .gitignore mis à jour. Suivez les étapes dans {{readmeUrl}} (en ignorant l'étape /setup-github) pour terminer la configuration.",
+    "setupDescription": "Configuration de GitHub Actions pour trier les problèmes et réviser les PRs avec Gemini."
+  },
+  "session": {
+    "startTimeUnavailable": "L'heure de début de session n'est pas disponible, impossible de calculer les statistiques."
+  }
+}

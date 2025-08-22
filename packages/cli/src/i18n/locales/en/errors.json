@@ -1,0 +1,19 @@
+{
+  "api": {
+    "prefix": "[API Error: {{message}}]",
+    "prefixWithStatus": "[API Error: {{message}} (Status: {{status}})]",
+    "unknownError": "An unknown error occurred.",
+    "requestCancelled": "Request cancelled."
+  },
+  "quota": {
+    "rateLimitDetected": "Possible quota limitations in place or slow response times detected. Switching to the {{fallbackModel}} model for the rest of this session.",
+    "rateLimitDetectedPaid": "Possible quota limitations in place or slow response times detected. Switching to the {{fallbackModel}} model for the rest of this session. We appreciate you for choosing Gemini Code Assist and the Gemini CLI.",
+    "dailyQuotaReached": "You have reached your daily quota limit. To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist, or use /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey",
+    "dailyQuotaReachedPaid": "You have reached your daily quota limit. We appreciate you for choosing Gemini Code Assist and the Gemini CLI. To continue accessing the {{currentModel}} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey",
+    "modelQuotaReached": "You have reached your daily {{currentModel}} quota limit. You will be switched to the {{fallbackModel}} model for the rest of this session. To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist, or use /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey",
+    "modelQuotaReachedPaid": "You have reached your daily {{currentModel}} quota limit. You will be switched to the {{fallbackModel}} model for the rest of this session. We appreciate you for choosing Gemini Code Assist and the Gemini CLI. To continue accessing the {{currentModel}} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey",
+    "waitAndRetryGemini": "Please wait and try again later. To increase your limits, request a quota increase through AI Studio, or switch to another /auth method",
+    "waitAndRetryVertex": "Please wait and try again later. To increase your limits, request a quota increase through Vertex, or switch to another /auth method",
+    "rateLimitDefault": "Possible quota limitations in place or slow response times detected. Switching to the {{fallbackModel}} model for the rest of this session."
+  }
+}

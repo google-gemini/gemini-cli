@@ -1,0 +1,73 @@
+{
+  "auth": {
+    "title": "Commencer",
+    "subtitle": "Authentifiez-vous pour utiliser Gemini CLI",
+    "description": "Choisissez votre méthode d'authentification préférée :",
+    "methods": {
+      "adc": "Identifiants par défaut de l'application (ADC)",
+      "serviceAccount": "Clé de compte de service",
+      "oauth": "Flux OAuth",
+      "apiKey": "Clé API"
+    },
+    "buttons": {
+      "selectMethod": "Sélectionner cette méthode",
+      "cancel": "Annuler",
+      "close": "Fermer"
+    },
+    "status": {
+      "authenticated": "Authentifié",
+      "notAuthenticated": "Non authentifié"
+    }
+  },
+  "settings": {
+    "title": "Paramètres",
+    "subtitle": "Configurez vos préférences Gemini CLI",
+    "sections": {
+      "general": "Général",
+      "appearance": "Apparence",
+      "behavior": "Comportement"
+    },
+    "options": {
+      "theme": "Thème",
+      "language": "Langue",
+      "editor": "Éditeur",
+      "autoSave": "Sauvegarde automatique"
+    },
+    "buttons": {
+      "save": "Sauvegarder",
+      "cancel": "Annuler",
+      "reset": "Réinitialiser"
+    }
+  },
+  "theme": {
+    "title": "Sélectionner un thème",
+    "preview": "Aperçu",
+    "applyTo": "Appliquer au thème",
+    "instructions": "Naviguez avec {{tabInstruction}} et Entrée pour sélectionner",
+    "tabInstruction": "Tab/Shift+Tab"
+  },
+  "editor": {
+    "title": "Sélectionner un éditeur",
+    "preference": "Préférence d'éditeur",
+    "description": "Choisissez votre éditeur préféré pour modifier les fichiers",
+    "currentPreference": "Préférence actuelle: {{editor}}"
+  },
+  "folderTrust": {
+    "title": "Dossier non fiable",
+    "message": "Ce dossier n'est pas dans votre liste de dossiers fiables.",
+    "question": "Voulez-vous faire confiance à ce dossier ?",
+    "buttons": {
+      "trust": "Faire confiance",
+      "dontTrust": "Ne pas faire confiance"
+    }
+  },
+  "shellConfirmation": {
+    "title": "Confirmation d'exécution de commande",
+    "message": "Voulez-vous exécuter cette commande ?",
+    "command": "Commande:",
+    "buttons": {
+      "execute": "Exécuter",
+      "cancel": "Annuler"
+    }
+  }
+}

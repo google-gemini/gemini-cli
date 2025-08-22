@@ -1,0 +1,38 @@
+{
+  "memory": {
+    "refreshing": "正在刷新分层内存 (GEMINI.md 或其他上下文文件)...",
+    "refreshedSuccess": "内存刷新成功。已从 {{fileCount}} 个文件加载 {{characters}} 个字符。",
+    "refreshedEmpty": "内存刷新成功。未找到内存内容。",
+    "refreshError": "刷新内存时出错：{{error}}",
+    "empty": "内存当前为空。",
+    "saveAttempt": "尝试保存到内存：\"{{content}}\"",
+    "refreshingFromFiles": "正在从源文件刷新内存...",
+    "currentContent": "来自 {{fileCount}} 个文件的当前内存内容:\n\n---\n{{content}}\n---"
+  },
+  "configuration": {
+    "notAvailable": "配置不可用。",
+    "noClient": "没有可用的聊天客户端来保存对话。"
+  },
+  "initialization": {
+    "geminiCreated": "已创建空的 GEMINI.md。现在分析项目以填充内容。"
+  },
+  "operation": {
+    "cancelled": "操作已取消。",
+    "restored": "项目已恢复到工具调用之前的状态。"
+  },
+  "restore": {
+    "noDirectoryPath": "无法确定 .gemini 目录路径。",
+    "noRestorableToolCalls": "未找到可恢复的工具调用。",
+    "availableToolCalls": "可恢复的工具调用:\n\n{{fileList}}",
+    "fileNotFound": "文件未找到: {{filename}}",
+    "loadHistoryNotAvailable": "loadHistory 函数不可用。",
+    "readError": "无法读取可恢复的工具调用。错误信息: {{error}}"
+  },
+  "github": {
+    "setupSuccess": "成功下载了 {{count}} 个工作流程并更新了 .gitignore。请按照 {{readmeUrl}} 中的步骤（跳过 /setup-github 步骤）完成设置。",
+    "setupDescription": "设置 GitHub Actions 以使用 Gemini 分类问题和审查 PR。"
+  },
+  "session": {
+    "startTimeUnavailable": "会话开始时间不可用，无法计算统计信息。"
+  }
+}

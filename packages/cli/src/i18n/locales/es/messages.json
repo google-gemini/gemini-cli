@@ -1,0 +1,37 @@
+{
+  "memory": {
+    "refreshing": "Actualizando memoria jerárquica (GEMINI.md u otros archivos de contexto)...",
+    "refreshedSuccess": "Memoria actualizada exitosamente. {{characters}} caracteres cargados desde {{fileCount}} archivo(s).",
+    "refreshedEmpty": "Memoria actualizada exitosamente. No se encontró contenido de memoria.",
+    "refreshError": "Error al actualizar la memoria: {{error}}",
+    "empty": "La memoria está actualmente vacía.",
+    "saveAttempt": "Intentando guardar en memoria: \"{{content}}\"",
+    "refreshingFromFiles": "Actualizando memoria desde archivos fuente..."
+  },
+  "configuration": {
+    "notAvailable": "La configuración no está disponible.",
+    "noClient": "No hay cliente de chat disponible para guardar la conversación."
+  },
+  "initialization": {
+    "geminiCreated": "GEMINI.md vacío creado. Ahora analizando el proyecto para completarlo."
+  },
+  "operation": {
+    "cancelled": "Operación cancelada.",
+    "restored": "Proyecto restaurado al estado anterior a la llamada de herramienta."
+  },
+  "restore": {
+    "noDirectoryPath": "No se pudo determinar la ruta del directorio .gemini.",
+    "noRestorableToolCalls": "No se encontraron llamadas de herramientas restaurables.",
+    "availableToolCalls": "Llamadas de herramientas disponibles para restaurar:\\n\\n{{fileList}}",
+    "fileNotFound": "Archivo no encontrado: {{filename}}",
+    "loadHistoryNotAvailable": "La función loadHistory no está disponible.",
+    "readError": "No se pudieron leer las llamadas de herramientas restaurables. Este es el error: {{error}}"
+  },
+  "github": {
+    "setupSuccess": "Se descargaron exitosamente {{count}} flujos de trabajo y se actualizó .gitignore. Siga los pasos en {{readmeUrl}} (omitiendo el paso /setup-github) para completar la configuración.",
+    "setupDescription": "Configurando GitHub Actions para clasificar problemas y revisar PRs con Gemini."
+  },
+  "session": {
+    "startTimeUnavailable": "La hora de inicio de sesión no está disponible, no se pueden calcular estadísticas."
+  }
+}
