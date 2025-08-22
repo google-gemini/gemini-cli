@@ -73,6 +73,7 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
+  screenReader: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -228,6 +229,11 @@ export async function parseArguments(): Promise<CliArgs> {
           coerce: (dirs: string[]) =>
             // Handle comma-separated values
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
+        })
+        .option('screen-reader', {
+          type: 'boolean',
+          description: 'Enable screen reader mode for accessibility.',
+          default: false,
         })
 
         .check((argv) => {
@@ -465,6 +471,9 @@ export async function loadCliConfig(
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
 
+  // The screen reader argument takes precedence over the accessibility setting.
+  const screenReader =
+    argv.screenReader ?? settings.accessibility?.screenReader ?? false;
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -490,7 +499,10 @@ export async function loadCliConfig(
       argv.show_memory_usage ||
       settings.showMemoryUsage ||
       false,
-    accessibility: settings.accessibility,
+    accessibility: {
+      ...settings.accessibility,
+      screenReader,
+    },
     telemetry: {
       enabled: argv.telemetry ?? settings.telemetry?.enabled,
       target: (argv.telemetryTarget ??
@@ -540,8 +552,10 @@ export async function loadCliConfig(
     folderTrust,
     interactive,
     trustedFolder,
+    useRipgrep: settings.useRipgrep,
     shouldUseNodePtyShell: settings.shouldUseNodePtyShell,
     skipNextSpeakerCheck: settings.skipNextSpeakerCheck,
+    enablePromptCompletion: settings.enablePromptCompletion ?? false,
   });
 }
 

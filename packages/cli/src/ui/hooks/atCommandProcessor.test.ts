@@ -69,6 +69,7 @@ describe('handleAtCommand', () => {
         getPromptsByServer: () => [],
       }),
       getDebugMode: () => false,
+      getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig);
