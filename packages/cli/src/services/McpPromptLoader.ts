@@ -169,7 +169,16 @@ export class McpPromptLoader implements ICommandLoader {
     return Promise.resolve(promptCommands);
   }
 
-  private parseArgs(
+  /**
+   * Parses the `userArgs` string representing the prompt arguments (all the text
+   * after the command) into a record matching the shape of the `promptArgs`.
+   *
+   * @param userArgs
+   * @param promptArgs
+   * @returns A record of the parsed arguments
+   * @visibleForTesting
+   */
+  parseArgs(
     userArgs: string,
     promptArgs: PromptArgument[] | undefined,
   ): Record<string, unknown> | Error {
@@ -177,28 +186,36 @@ export class McpPromptLoader implements ICommandLoader {
     const promptInputs: Record<string, unknown> = {};
 
     // arg parsing: --key="value" or --key=value
-    const namedArgRegex = /--([^=]+)=(?:"((?:\\.|[^"\\])*)"|([^ ]*))/g;
+    const namedArgRegex = /--([^=]+)=(?:"((?:\\.|[^"\\])*)"|([^ ]+))/g;
     let match;
-    const remainingArgs: string[] = [];
     let lastIndex = 0;
+    const positionalParts: string[] = [];
 
     while ((match = namedArgRegex.exec(userArgs)) !== null) {
       const key = match[1];
-      const value = match[2] ?? match[3]; // Quoted or unquoted value
+      // Extract the quoted or unquoted argument and remove escape chars.
+      const value = (match[2] ?? match[3]).replace(/\\(.)/g, '$1');
       argValues[key] = value;
       // Capture text between matches as potential positional args
       if (match.index > lastIndex) {
-        remainingArgs.push(userArgs.substring(lastIndex, match.index).trim());
+        positionalParts.push(userArgs.substring(lastIndex, match.index));
       }
       lastIndex = namedArgRegex.lastIndex;
     }
 
     // Capture any remaining text after the last named arg
     if (lastIndex < userArgs.length) {
-      remainingArgs.push(userArgs.substring(lastIndex).trim());
+      positionalParts.push(userArgs.substring(lastIndex));
     }
 
-    const positionalArgs = remainingArgs.join(' ').split(/ +/);
+    const positionalArgsString = positionalParts.join('').trim();
+    // extracts either quoted strings or non-quoted sequences of non-space characters.
+    const positionalArgRegex = /(?:"((?:\\.|[^"\\])*)"|([^ ]+))/g;
+    const positionalArgs: string[] = [];
+    while ((match = positionalArgRegex.exec(positionalArgsString)) !== null) {
+      // Extract the quoted or unquoted argument and remove escape chars.
+      positionalArgs.push((match[1] ?? match[2]).replace(/\\(.)/g, '$1'));
+    }
 
     if (!promptArgs) {
       return promptInputs;
@@ -213,19 +230,27 @@ export class McpPromptLoader implements ICommandLoader {
       (arg) => arg.required && !promptInputs[arg.name],
     );
 
-    const missingArgs: string[] = [];
-    for (let i = 0; i < unfilledArgs.length; i++) {
-      if (positionalArgs.length > i && positionalArgs[i]) {
-        promptInputs[unfilledArgs[i].name] = positionalArgs[i];
-      } else {
-        missingArgs.push(unfilledArgs[i].name);
+    if (unfilledArgs.length === 1) {
+      // If we have only one unfilled arg, we don't require quotes we just
+      // join all the given arguments together as if they were quoted.
+      promptInputs[unfilledArgs[0].name] = positionalArgs.join(' ');
+    } else {
+      const missingArgs: string[] = [];
+      for (let i = 0; i < unfilledArgs.length; i++) {
+        if (positionalArgs.length > i) {
+          promptInputs[unfilledArgs[i].name] = positionalArgs[i];
+        } else {
+          missingArgs.push(unfilledArgs[i].name);
+        }
+      }
+      if (missingArgs.length > 0) {
+        const missingArgNames = missingArgs
+          .map((name) => `--${name}`)
+          .join(', ');
+        return new Error(`Missing required argument(s): ${missingArgNames}`);
       }
     }
 
-    if (missingArgs.length > 0) {
-      const missingArgNames = missingArgs.map((name) => `--${name}`).join(', ');
-      return new Error(`Missing required argument(s): ${missingArgNames}`);
-    }
     return promptInputs;
   }
 }
