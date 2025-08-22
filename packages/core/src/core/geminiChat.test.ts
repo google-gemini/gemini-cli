@@ -787,4 +787,76 @@ describe('GeminiChat', () => {
     }
     expect(turn2.parts[0].text).toBe('Successful response after empty');
   });
+  it('should queue a subsequent sendMessageStream call until the first stream is fully consumed', async () => {
+    // 1. Create a promise to manually control the first stream's lifecycle
+    let continueFirstStream: () => void;
+    const firstStreamContinuePromise = new Promise<void>((resolve) => {
+      continueFirstStream = resolve;
+    });
+
+    // 2. Mock the API to return controllable async generators
+    const firstStreamGenerator = (async function* () {
+      yield {
+        candidates: [
+          { content: { parts: [{ text: 'first response part 1' }] } },
+        ],
+      } as unknown as GenerateContentResponse;
+      await firstStreamContinuePromise; // Pause the stream mid-flow
+      yield {
+        candidates: [{ content: { parts: [{ text: ' part 2' }] } }],
+      } as unknown as GenerateContentResponse;
+    })();
+
+    const secondStreamGenerator = (async function* () {
+      yield {
+        candidates: [{ content: { parts: [{ text: 'second response' }] } }],
+      } as unknown as GenerateContentResponse;
+    })();
+
+    vi.mocked(mockModelsModule.generateContentStream)
+      .mockResolvedValueOnce(firstStreamGenerator)
+      .mockResolvedValueOnce(secondStreamGenerator);
+
+    // 3. Start the first stream and consume only the first chunk to pause it
+    const firstStream = await chat.sendMessageStream(
+      { message: 'first' },
+      'prompt-1',
+    );
+    const firstStreamIterator = firstStream[Symbol.asyncIterator]();
+    await firstStreamIterator.next();
+
+    // 4. While the first stream is paused, start the second call. It will block on sendPromise.
+    const secondStreamPromise = chat.sendMessageStream(
+      { message: 'second' },
+      'prompt-2',
+    );
+
+    // 5. Assert that only the first API call has been made.
+    expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(1);
+
+    // 6. Unblock and fully consume the first stream to completion.
+    continueFirstStream!();
+    await firstStreamIterator.next(); // Consume the rest of the stream
+    await firstStreamIterator.next(); // Finish the iterator
+
+    // 7. Now that the first stream is done, await the second promise to get its generator.
+    const secondStream = await secondStreamPromise;
+
+    // 8. CRITICAL STEP: Start consuming the second stream. This action will trigger its internal API call.
+    const secondStreamIterator = secondStream[Symbol.asyncIterator]();
+    await secondStreamIterator.next();
+
+    // 9. Final check on history to ensure it's not corrupted
+    const history = chat.getHistory();
+    expect(history.length).toBe(4);
+
+    // Explicitly verify the structure of the final turn to satisfy TypeScript
+    const turn4 = history[3];
+    if (!turn4?.parts?.[0] || !('text' in turn4.parts[0])) {
+      throw new Error(
+        'Test setup error: Fourth turn is not a valid text part.',
+      );
+    }
+    expect(turn4.parts[0].text).toBe('second response');
+  });
 });

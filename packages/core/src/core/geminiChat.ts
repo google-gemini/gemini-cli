@@ -313,6 +313,13 @@ export class GeminiChat {
     prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     await this.sendPromise;
+
+    let streamDoneResolver: () => void;
+    const streamDonePromise = new Promise<void>((resolve) => {
+      streamDoneResolver = resolve;
+    });
+    this.sendPromise = streamDonePromise;
+
     const userContent = createUserContent(params.message);
 
     // Add user content to history ONCE before any attempts.
@@ -322,46 +329,50 @@ export class GeminiChat {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
     return (async function* () {
-      const MAX_RETRIES = 2;
-      let lastError: unknown = new Error('Request failed after all retries.');
+      try {
+        const MAX_RETRIES = 2;
+        let lastError: unknown = new Error('Request failed after all retries.');
 
-      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        try {
-          const stream = await self.makeApiCallAndProcessStream(
-            requestContents,
-            params,
-            prompt_id,
-            userContent,
-          );
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            const stream = await self.makeApiCallAndProcessStream(
+              requestContents,
+              params,
+              prompt_id,
+              userContent,
+            );
 
-          for await (const chunk of stream) {
-            yield chunk;
-          }
-
-          lastError = null;
-          break;
-        } catch (error) {
-          lastError = error;
-          const isContentError = error instanceof EmptyStreamError;
-
-          if (isContentError) {
-            if (attempt < MAX_RETRIES) {
-              await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
-              continue;
+            for await (const chunk of stream) {
+              yield chunk;
             }
-          }
-          break;
-        }
-      }
 
-      if (lastError) {
-        // If the stream fails, remove the user message that was added.
-        // TODO: get rid of this.
-        if (self.history[self.history.length - 1] === userContent) {
-          self.history.pop();
+            lastError = null;
+            break;
+          } catch (error) {
+            lastError = error;
+            const isContentError = error instanceof EmptyStreamError;
+
+            if (isContentError) {
+              if (attempt < MAX_RETRIES) {
+                await new Promise((res) =>
+                  setTimeout(res, 500 * (attempt + 1)),
+                );
+                continue;
+              }
+            }
+            break;
+          }
         }
-        self.sendPromise = Promise.resolve();
-        throw lastError;
+
+        if (lastError) {
+          // If the stream fails, remove the user message that was added.
+          if (self.history[self.history.length - 1] === userContent) {
+            self.history.pop();
+          }
+          throw lastError;
+        }
+      } finally {
+        streamDoneResolver!();
       }
     })();
   }
