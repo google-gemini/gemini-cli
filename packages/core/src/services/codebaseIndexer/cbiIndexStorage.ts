@@ -236,26 +236,8 @@ export class CBIIndexStorage {
       // Build HNSW index using streaming approach
       const hnswGraph = await this.buildHNSWIndexStreaming(getVector, totalVectors, vectorDim, onProgress);
 
-      // For serialization, we need vectors but can process them in chunks to limit memory usage
-      const allVectors: number[][] = [];
-      const chunkSize = 1000; // Process vectors in chunks to limit memory usage
-      
-      for (let i = 0; i < totalVectors; i += chunkSize) {
-        const chunkEnd = Math.min(i + chunkSize, totalVectors);
-        const chunk: number[][] = [];
-        for (let j = i; j < chunkEnd; j++) {
-          chunk.push(await getVector(j));
-        }
-        allVectors.push(...chunk);
-        
-        // Allow garbage collection between chunks
-        // Note: Explicit GC calls are discouraged - let V8 manage memory automatically
-      }
-
-      const header = this.createHeader(vectorDim, totalVectors, totalFiles, fileInfos, blockMetadatas, stringHeap, allVectors, hnswGraph);
-      const indexBuffer = this.serializeIndex(header, fileInfos, blockMetadatas, stringHeap, allVectors, hnswGraph);
-
-      await fs.writeFile(this.indexPath, indexBuffer);
+      // Stream the entire index to disk to maintain memory efficiency
+      await this.streamIndexToFile(vectorFd, vectorDim, totalVectors, totalFiles, fileInfos, blockMetadatas, stringHeap, hnswGraph);
     } finally {
       await vectorFd.close();
       try {
@@ -432,20 +414,7 @@ export class CBIIndexStorage {
     };
   }
 
-  private serializeIndex(header: IndexHeader, fileInfos: FileInfo[], blockMetadatas: BlockMetadata[], stringHeap: string[], allVectors: number[][], hnswGraph: HNSWGraph): Buffer {
-    const totalSize = header.offset_ann + header.ann_size;
 
-    const buffer = Buffer.alloc(totalSize);
-
-    this.writeHeader(buffer, header);
-    this.writeFileInfos(buffer, fileInfos, header.offset_files);
-    this.writeBlockMetadatas(buffer, blockMetadatas, header.offset_blocks);
-    this.writeStringHeap(buffer, stringHeap, header.offset_strings);
-    this.writeVectors(buffer, allVectors, header.offset_vectors);
-    this.writeHNSWGraph(buffer, hnswGraph, header.offset_ann);
-
-    return buffer;
-  }
 
   private writeHeader(buffer: Buffer, header: IndexHeader): void {
     buffer.writeUInt32LE(header.magic_number, HEADER_MAGIC_NUMBER_OFFSET);
@@ -497,15 +466,7 @@ export class CBIIndexStorage {
     }
   }
 
-  private writeVectors(buffer: Buffer, vectors: number[][], offset: number): void {
-    let currentOffset = offset;
-    for (const vector of vectors) {
-      const float32Array = new Float32Array(vector);
-      const vectorBuffer = Buffer.from(float32Array.buffer);
-      vectorBuffer.copy(buffer, currentOffset);
-      currentOffset += vectorBuffer.length;
-    }
-  }
+
 
   private parseHeader(buffer: Buffer): IndexHeader {
     return {
@@ -1520,6 +1481,77 @@ export class CBIIndexStorage {
       return results.slice(0, topK);
     } finally {
       await fileHandle.close();
+    }
+  }
+
+  private async streamIndexToFile(
+    vectorFd: fs.FileHandle,
+    vectorDim: number,
+    totalVectors: number,
+    totalFiles: number,
+    fileInfos: FileInfo[],
+    blockMetadatas: BlockMetadata[],
+    stringHeap: string[],
+    hnswGraph: HNSWGraph
+  ): Promise<void> {
+    // Create a temporary index file
+    const tempIndexPath = this.indexPath + '.tmp';
+    const indexFd = await fs.open(tempIndexPath, 'w');
+    
+    try {
+      // Calculate header with placeholder vectors size (we'll update it later)
+      const header = this.createHeader(vectorDim, totalVectors, totalFiles, fileInfos, blockMetadatas, stringHeap, [], hnswGraph);
+      
+      // Write header
+      const headerBuffer = Buffer.alloc(HEADER_SIZE);
+      this.writeHeader(headerBuffer, header);
+      await indexFd.write(headerBuffer);
+      
+      // Write file infos
+      const fileInfosBuffer = Buffer.alloc(totalFiles * FILE_INFO_SIZE);
+      this.writeFileInfos(fileInfosBuffer, fileInfos, 0);
+      await indexFd.write(fileInfosBuffer);
+      
+      // Write block metadatas
+      const blockMetadatasBuffer = Buffer.alloc(totalVectors * BLOCK_METADATA_SIZE);
+      this.writeBlockMetadatas(blockMetadatasBuffer, blockMetadatas, 0);
+      await indexFd.write(blockMetadatasBuffer);
+      
+      // Write string heap
+      const stringHeapBuffer = Buffer.alloc(this.calculateStringHeapSize(stringHeap));
+      this.writeStringHeap(stringHeapBuffer, stringHeap, 0);
+      await indexFd.write(stringHeapBuffer);
+      
+      // Stream vectors from temporary file to index file
+      const vectorBuffer = Buffer.alloc(64 * 1024); // 64KB buffer for streaming
+      let bytesRead = 0;
+      let totalBytesRead = 0;
+      const totalVectorBytes = totalVectors * vectorDim * VECTOR_FLOAT_SIZE;
+      
+      // Stream vectors from temporary file to index file
+      while (totalBytesRead < totalVectorBytes) {
+        const bytesToRead = Math.min(vectorBuffer.length, totalVectorBytes - totalBytesRead);
+        const readResult = await vectorFd.read(vectorBuffer, 0, bytesToRead, totalBytesRead);
+        bytesRead = readResult.bytesRead;
+        
+        if (bytesRead === 0) break;
+        
+        await indexFd.write(vectorBuffer, 0, bytesRead);
+        totalBytesRead += bytesRead;
+      }
+      
+      // Write HNSW graph
+      const hnswBuffer = Buffer.alloc(this.calculateHNSWSize(hnswGraph));
+      this.writeHNSWGraph(hnswBuffer, hnswGraph, 0);
+      await indexFd.write(hnswBuffer);
+      
+      // Ensure all data is written
+      await indexFd.sync();
+      
+      // Rename temporary file to final index file
+      await fs.rename(tempIndexPath, this.indexPath);
+    } finally {
+      await indexFd.close();
     }
   }
 
