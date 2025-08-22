@@ -644,4 +644,86 @@ describe('GeminiChat', () => {
     }
     expect(turn4.parts[0].text).toBe('Second answer');
   });
+
+  describe('concurrency control', () => {
+    it('should queue a subsequent sendMessage call until the first one completes', async () => {
+      // 1. Create promises to manually control when the API calls resolve
+      let firstCallResolver: (value: GenerateContentResponse) => void;
+      const firstCallPromise = new Promise<GenerateContentResponse>(
+        (resolve) => {
+          firstCallResolver = resolve;
+        },
+      );
+
+      let secondCallResolver: (value: GenerateContentResponse) => void;
+      const secondCallPromise = new Promise<GenerateContentResponse>(
+        (resolve) => {
+          secondCallResolver = resolve;
+        },
+      );
+
+      // A standard response body for the mock
+      const mockResponse = {
+        candidates: [
+          {
+            content: { parts: [{ text: 'response' }], role: 'model' },
+          },
+        ],
+      } as unknown as GenerateContentResponse;
+
+      // 2. Mock the API to return our controllable promises in order
+      vi.mocked(mockModelsModule.generateContent)
+        .mockReturnValueOnce(firstCallPromise)
+        .mockReturnValueOnce(secondCallPromise);
+
+      // 3. Start the first message call. Do not await it yet.
+      const firstMessagePromise = chat.sendMessage(
+        { message: 'first' },
+        'prompt-1',
+      );
+
+      // Give the event loop a chance to run the async call up to the `await`
+      await new Promise(process.nextTick);
+
+      // 4. While the first call is "in-flight", start the second message call.
+      const secondMessagePromise = chat.sendMessage(
+        { message: 'second' },
+        'prompt-2',
+      );
+
+      // 5. CRUCIAL CHECK: At this point, only the first API call should have been made.
+      // The second call should be waiting on `sendPromise`.
+      expect(mockModelsModule.generateContent).toHaveBeenCalledTimes(1);
+      expect(mockModelsModule.generateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contents: expect.arrayContaining([
+            expect.objectContaining({ parts: [{ text: 'first' }] }),
+          ]),
+        }),
+        'prompt-1',
+      );
+
+      // 6. Unblock the first API call and wait for the first message to fully complete.
+      firstCallResolver!(mockResponse);
+      await firstMessagePromise;
+
+      // Give the event loop a chance to unblock and run the second call.
+      await new Promise(process.nextTick);
+
+      // 7. CRUCIAL CHECK: Now, the second API call should have been made.
+      expect(mockModelsModule.generateContent).toHaveBeenCalledTimes(2);
+      expect(mockModelsModule.generateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contents: expect.arrayContaining([
+            expect.objectContaining({ parts: [{ text: 'second' }] }),
+          ]),
+        }),
+        'prompt-2',
+      );
+
+      // 8. Clean up by resolving the second call.
+      secondCallResolver!(mockResponse);
+      await secondMessagePromise;
+    });
+  });
 });
