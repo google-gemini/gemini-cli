@@ -498,8 +498,10 @@ export class GeminiChat {
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
     let isStreamInvalid = false;
+    let hasReceivedAnyChunk = false;
 
     for await (const chunk of streamResponse) {
+      hasReceivedAnyChunk = true;
       if (isValidResponse(chunk)) {
         const content = chunk.candidates?.[0]?.content;
         if (content) {
@@ -515,7 +517,8 @@ export class GeminiChat {
     }
 
     // Now that the stream is finished, make a decision.
-    if (isStreamInvalid) {
+    // Throw an error if the stream was invalid OR if it was completely empty.
+    if (isStreamInvalid || !hasReceivedAnyChunk) {
       throw new EmptyStreamError(
         'Model stream was invalid or completed without valid content.',
       );
