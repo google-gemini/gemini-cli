@@ -65,15 +65,21 @@ class ThemeManager {
    * Loads custom themes from both settings and file-based storage.
    * @param customThemesSettings Custom themes from settings.
    */
-  async loadCustomThemes(customThemesSettings?: Record<string, CustomTheme>): Promise<void> {
+  async loadCustomThemes(
+    customThemesSettings?: Record<string, CustomTheme>,
+  ): Promise<void> {
     // Fast path: synchronously load themes from settings so immediate callers see results.
     this.loadCustomThemesSync(customThemesSettings);
 
     // Async augmentation: include file-based themes and rebuild.
     try {
-      const combinedThemes = await loadCombinedThemes(customThemesSettings || {});
+      const combinedThemes = await loadCombinedThemes(
+        customThemesSettings || {},
+      );
       this.customThemes.clear();
-      for (const [name, customThemeConfig] of Object.entries(combinedThemes.allThemes)) {
+      for (const [name, customThemeConfig] of Object.entries(
+        combinedThemes.allThemes,
+      )) {
         const validation = validateCustomTheme(customThemeConfig);
         if (validation.isValid) {
           if (validation.warning) {
@@ -91,7 +97,10 @@ class ThemeManager {
         }
       }
     } catch (error) {
-      console.warn('Failed to include file-based themes; using settings-only.', error);
+      console.warn(
+        'Failed to include file-based themes; using settings-only.',
+        error,
+      );
     }
   }
 
@@ -100,7 +109,9 @@ class ThemeManager {
    * @param customThemesSettings Custom themes from settings.
    * @deprecated Use loadCustomThemes instead for full file + settings support
    */
-  loadCustomThemesSync(customThemesSettings?: Record<string, CustomTheme>): void {
+  loadCustomThemesSync(
+    customThemesSettings?: Record<string, CustomTheme>,
+  ): void {
     this.customThemes.clear();
 
     if (!customThemesSettings) {
