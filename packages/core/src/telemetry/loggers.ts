@@ -25,6 +25,7 @@ import {
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
+  FileOperationEvent,
   IdeConnectionEvent,
   StartSessionEvent,
   ToolCallEvent,
@@ -42,6 +43,7 @@ import {
   recordApiResponseMetrics,
   recordToolCallMetrics,
   recordChatCompressionMetrics,
+  recordFileOperationMetric,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import { uiTelemetryService, UiEvent } from './uiTelemetry.js';
@@ -152,6 +154,24 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     event.success,
     event.decision,
     event.tool_type,
+  );
+}
+
+export function logFileOperation(
+  config: Config,
+  event: FileOperationEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logFileOperationEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  recordFileOperationMetric(
+    config,
+    event.operation,
+    event.lines,
+    event.mimetype,
+    event.extension,
+    event.diff_stat,
+    event.programming_language,
   );
 }
 

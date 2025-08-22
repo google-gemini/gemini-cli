@@ -19,6 +19,7 @@ import {
   IdeConnectionEvent,
   KittySequenceOverflowEvent,
   ChatCompressionEvent,
+  FileOperationEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { Config } from '../../config/config.js';
@@ -33,6 +34,7 @@ export enum EventNames {
   START_SESSION = 'start_session',
   NEW_PROMPT = 'new_prompt',
   TOOL_CALL = 'tool_call',
+  FILE_OPERATION = 'file_operation',
   API_REQUEST = 'api_request',
   API_RESPONSE = 'api_response',
   API_ERROR = 'api_error',
@@ -472,6 +474,64 @@ export class ClearcutLogger {
     }
 
     const logEvent = this.createLogEvent(EventNames.TOOL_CALL, data);
+    this.enqueueLogEvent(logEvent);
+    this.flushIfNeeded();
+  }
+
+  logFileOperationEvent(event: FileOperationEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
+        value: JSON.stringify(event.tool_name),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_TYPE,
+        value: JSON.stringify(event.operation),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_LINES,
+        value: JSON.stringify(event.lines),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_MIMETYPE,
+        value: JSON.stringify(event.mimetype),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_EXTENSION,
+        value: JSON.stringify(event.extension),
+      },
+    ];
+
+    if (event.programming_language) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROGRAMMING_LANGUAGE,
+        value: event.programming_language,
+      });
+    }
+
+    if (event.diff_stat) {
+      const metadataMapping: { [key: string]: EventMetadataKey } = {
+        ai_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
+        ai_removed_lines: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
+        user_added_lines: EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
+        user_removed_lines: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
+      };
+
+      for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {
+        if (
+          event.diff_stat[key as keyof typeof event.diff_stat] !== undefined
+        ) {
+          data.push({
+            gemini_cli_key,
+            value: JSON.stringify(
+              event.diff_stat[key as keyof typeof event.diff_stat],
+            ),
+          });
+        }
+      }
+    }
+
+    const logEvent = this.createLogEvent(EventNames.FILE_OPERATION, data);
     this.enqueueLogEvent(logEvent);
     this.flushIfNeeded();
   }

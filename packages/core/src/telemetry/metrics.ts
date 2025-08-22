@@ -210,6 +210,7 @@ export function recordFileOperationMetric(
   mimetype?: string,
   extension?: string,
   diffStat?: DiffStat,
+  programming_language?: string,
 ): void {
   if (!fileOperationCounter || !isMetricsInitialized) return;
   const attributes: Attributes = {
@@ -224,6 +225,9 @@ export function recordFileOperationMetric(
     attributes['ai_removed_lines'] = diffStat.ai_removed_lines;
     attributes['user_added_lines'] = diffStat.user_added_lines;
     attributes['user_removed_lines'] = diffStat.user_removed_lines;
+  }
+  if (programming_language !== undefined) {
+    attributes['programming_language'] = programming_language;
   }
   fileOperationCounter.add(1, attributes);
 }
