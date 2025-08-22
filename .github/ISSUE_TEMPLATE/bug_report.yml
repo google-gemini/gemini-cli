@@ -1,36 +1,38 @@
-name: Bug Report
-description: Report a bug to help us improve Gemini CLI
-labels: ['kind/bug', 'status/need-triage']
+name: 'Bug Report'
+description: 'Report a bug to help us improve Gemini CLI'
+labels:
+  - 'kind/bug'
+  - 'status/need-triage'
 body:
-  - type: markdown
+  - type: 'markdown'
     attributes:
-      value: |
-        > [!IMPORTANT]  
+      value: |-
+        > [!IMPORTANT]
         > Thanks for taking the time to fill out this bug report!
         >
         > Please search **[existing issues](https://github.com/google-gemini/gemini-cli/issues)** to see if an issue already exists for the bug you encountered.
 
-  - type: textarea
-    id: problem
+  - type: 'textarea'
+    id: 'problem'
     attributes:
-      label: What happened?
-      description: A clear and concise description of what the bug is.
+      label: 'What happened?'
+      description: 'A clear and concise description of what the bug is.'
     validations:
       required: true
 
-  - type: textarea
-    id: expected
+  - type: 'textarea'
+    id: 'expected'
     attributes:
-      label: What did you expect to happen?
+      label: 'What did you expect to happen?'
     validations:
       required: true
 
-  - type: textarea
-    id: info
+  - type: 'textarea'
+    id: 'info'
     attributes:
-      label: Client information
-      description: Please paste the full text from the `/about` command run from Gemini CLI. Also include which platform (macOS, Windows, Linux).
-      value: |
+      label: 'Client information'
+      description: 'Please paste the full text from the `/about` command run from Gemini CLI. Also include which platform (macOS, Windows, Linux).'
+      value: |-
         <details>
 
         ```console
@@ -42,14 +44,14 @@ body:
     validations:
       required: true
 
-  - type: textarea
-    id: login-info
+  - type: 'textarea'
+    id: 'login-info'
     attributes:
-      label: Login information
-      description: Describe how you are logging in (e.g., Google Account, API key).
+      label: 'Login information'
+      description: 'Describe how you are logging in (e.g., Google Account, API key).'
 
-  - type: textarea
-    id: additional-context
+  - type: 'textarea'
+    id: 'additional-context'
     attributes:
-      label: Anything else we need to know?
-      description: Add any other context about the problem here.
+      label: 'Anything else we need to know?'
+      description: 'Add any other context about the problem here.'
