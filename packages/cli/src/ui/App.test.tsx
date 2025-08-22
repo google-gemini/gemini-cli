@@ -1504,4 +1504,55 @@ describe('App UI', () => {
       expect(output).toContain('esc to cancel');
     });
   });
+
+  describe('debug keystroke logging', () => {
+    let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should pass debugKeystrokeLogging setting to KeypressProvider', () => {
+      const mockSettingsWithDebug = createMockSettings({
+        workspace: {
+          theme: 'Default',
+          debugKeystrokeLogging: true,
+        },
+      });
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettingsWithDebug}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      const output = lastFrame();
+
+      expect(output).toBeDefined();
+      expect(mockSettingsWithDebug.merged.debugKeystrokeLogging).toBe(true);
+    });
+
+    it('should use default false value when debugKeystrokeLogging is not set', () => {
+      const { lastFrame, unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      const output = lastFrame();
+
+      expect(output).toBeDefined();
+      expect(mockSettings.merged.debugKeystrokeLogging).toBeUndefined();
+    });
+  });
 });
