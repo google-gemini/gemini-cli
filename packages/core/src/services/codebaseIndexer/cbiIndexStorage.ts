@@ -1248,6 +1248,9 @@ export class CBIIndexStorage {
       ef_search
     };
 
+    // Pre-compute vector mapping for O(1) lookups
+    const vectorMapping = await this.buildVectorMapping(keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+    
     // Simple LRU cache to reduce disk I/O during HNSW construction
     const cacheSize = Math.min(1000, Math.floor(totalVectors * 0.1));
     const vectorCache = new Map<number, number[]>();
@@ -1264,7 +1267,7 @@ export class CBIIndexStorage {
         return vectorCache.get(vectorId)!;
       }
 
-      const vector = await this.loadVectorById(vectorId, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+      const vector = await this.loadVectorByIdOptimized(vectorId, vectorMapping, oldHeader, sourceHandle);
       
       // Add to cache
       vectorCache.set(vectorId, vector);
@@ -1294,37 +1297,7 @@ export class CBIIndexStorage {
       await targetHandle.write(annBuffer, 0, annBuffer.length, newHeader.offset_ann);
   }
 
-  private async loadVectorById(
-    vectorId: number,
-    targetHandle: fs.FileHandle,
-    newHeader: IndexHeader,
-    keptFileMapping: Map<number, { fileInfo: FileInfo, vectorIds: number[] }>,
-    newFileIndices: FileIndex[],
-    oldHeader: IndexHeader,
-    sourceHandle: fs.FileHandle
-  ): Promise<number[]> {
-    let currentVectorId = 0;
-    
-    for (const [, { vectorIds }] of keptFileMapping) {
-      for (const oldVectorId of vectorIds) {
-        if (currentVectorId === vectorId) {
-          return await this.loadVector(oldVectorId, sourceHandle, oldHeader);
-        }
-        currentVectorId++;
-      }
-    }
 
-    for (const fileIndex of newFileIndices) {
-      for (const vector of fileIndex.embeddings) {
-        if (currentVectorId === vectorId) {
-          return vector;
-        }
-        currentVectorId++;
-      }
-    }
-
-    throw new Error(`Vector ID ${vectorId} not found`);
-  }
 
 
 
@@ -1571,6 +1544,52 @@ export class CBIIndexStorage {
 
     distances.sort((a, b) => a.distance - b.distance);
     return distances.slice(0, m).map(d => d.id);
+  }
+
+  private async buildVectorMapping(
+    keptFileMapping: Map<number, { fileInfo: FileInfo, vectorIds: number[] }>,
+    newFileIndices: FileIndex[],
+    oldHeader: IndexHeader,
+    sourceHandle: fs.FileHandle
+  ): Promise<Map<number, { type: 'old'; oldVectorId: number } | { type: 'new'; vector: number[] }>> {
+    const vectorMapping = new Map<number, { type: 'old'; oldVectorId: number } | { type: 'new'; vector: number[] }>();
+    let currentVectorId = 0;
+
+    // Map kept vectors from old index
+    for (const [, { vectorIds }] of keptFileMapping) {
+      for (const oldVectorId of vectorIds) {
+        vectorMapping.set(currentVectorId, { type: 'old', oldVectorId });
+        currentVectorId++;
+      }
+    }
+
+    // Map new vectors from memory
+    for (const fileIndex of newFileIndices) {
+      for (const vector of fileIndex.embeddings) {
+        vectorMapping.set(currentVectorId, { type: 'new', vector });
+        currentVectorId++;
+      }
+    }
+
+    return vectorMapping;
+  }
+
+  private async loadVectorByIdOptimized(
+    vectorId: number,
+    vectorMapping: Map<number, { type: 'old'; oldVectorId: number } | { type: 'new'; vector: number[] }>,
+    oldHeader: IndexHeader,
+    sourceHandle: fs.FileHandle
+  ): Promise<number[]> {
+    const mapping = vectorMapping.get(vectorId);
+    if (!mapping) {
+      throw new Error(`Vector ID ${vectorId} not found in mapping`);
+    }
+
+    if (mapping.type === 'new') {
+      return mapping.vector;
+    } else {
+      return await this.loadVector(mapping.oldVectorId, sourceHandle, oldHeader);
+    }
   }
 
 }
