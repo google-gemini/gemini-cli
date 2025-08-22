@@ -27,7 +27,12 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   parseAndFormatApiError,
 } from '@google/gemini-cli-core';
-import { type Part, type PartListUnion, FinishReason } from '@google/genai';
+import {
+  type Part,
+  type PartListUnion,
+  FinishReason,
+  Content,
+} from '@google/genai';
 import {
   StreamingState,
   HistoryItem,
@@ -66,6 +71,21 @@ export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
     }
   }
   return resultParts;
+}
+// TODO: this is duplicated
+function isValidContent(content: Content): boolean {
+  if (content.parts === undefined || content.parts.length === 0) {
+    return false;
+  }
+  for (const part of content.parts) {
+    if (part === undefined || Object.keys(part).length === 0) {
+      return false;
+    }
+    if (!part.thought && part.text !== undefined && part.text === '') {
+      return false;
+    }
+  }
+  return true;
 }
 
 enum StreamProcessingStatus {
@@ -555,8 +575,14 @@ export const useGeminiStream = (
       stream: AsyncIterable<GeminiEvent>,
       userMessageTimestamp: number,
       signal: AbortSignal,
-    ): Promise<StreamProcessingStatus> => {
+    ): Promise<{
+      status: StreamProcessingStatus;
+      geminiMessageBuffer: string;
+      isResponseInvalid: boolean;
+    }> => {
+      // CHANGE 1: Updated return type
       let geminiMessageBuffer = '';
+      let isResponseInvalid = false;
       const toolCallRequests: ToolCallRequestInfo[] = [];
       for await (const event of stream) {
         switch (event.type) {
@@ -564,6 +590,12 @@ export const useGeminiStream = (
             setThought(event.value);
             break;
           case ServerGeminiEventType.Content:
+            if (
+              !isValidContent({ role: 'model', parts: [{ text: event.value }] })
+            ) {
+              isResponseInvalid = true;
+            }
+
             geminiMessageBuffer = handleContentEvent(
               event.value,
               geminiMessageBuffer,
@@ -575,10 +607,20 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.UserCancelled:
             handleUserCancelledEvent(userMessageTimestamp);
-            break;
+            // CHANGE 2: Return the status and an empty buffer
+            return {
+              status: StreamProcessingStatus.UserCancelled,
+              geminiMessageBuffer: '',
+              isResponseInvalid: false,
+            };
           case ServerGeminiEventType.Error:
             handleErrorEvent(event.value, userMessageTimestamp);
-            break;
+            // CHANGE 3: Return the status and an empty buffer
+            return {
+              status: StreamProcessingStatus.Error,
+              geminiMessageBuffer: '',
+              isResponseInvalid: false,
+            };
           case ServerGeminiEventType.ChatCompressed:
             handleChatCompressionEvent(event.value);
             break;
@@ -610,7 +652,12 @@ export const useGeminiStream = (
       if (toolCallRequests.length > 0) {
         scheduleToolCalls(toolCallRequests, signal);
       }
-      return StreamProcessingStatus.Completed;
+      // CHANGE 4: Return the status and the final assembled buffer
+      return {
+        status: StreamProcessingStatus.Completed,
+        geminiMessageBuffer,
+        isResponseInvalid: isResponseInvalid,
+      };
     },
     [
       handleContentEvent,
@@ -671,51 +718,84 @@ export const useGeminiStream = (
       setIsResponding(true);
       setInitError(null);
 
-      try {
-        const stream = geminiClient.sendMessageStream(
-          queryToSend,
-          abortSignal,
-          prompt_id!,
-        );
-        const processingStatus = await processGeminiStreamEvents(
-          stream,
-          userMessageTimestamp,
-          abortSignal,
-        );
+      const MAX_RETRIES = 2;
+      let lastError: unknown = null;
 
-        if (processingStatus === StreamProcessingStatus.UserCancelled) {
-          return;
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const stream = geminiClient.sendMessageStream(
+            queryToSend,
+            abortSignal,
+            prompt_id!,
+          );
+
+          const { geminiMessageBuffer, status } =
+            await processGeminiStreamEvents(
+              stream,
+              userMessageTimestamp,
+              abortSignal,
+            );
+
+          // If the stream was cancelled by the user, stop immediately.
+          if (status === StreamProcessingStatus.UserCancelled) {
+            return;
+          }
+
+          // Check if the final assembled response is valid.
+          if (geminiMessageBuffer.trim().length > 0) {
+            // SUCCESS: The response is valid. Add the final item to history.
+            if (pendingHistoryItemRef.current) {
+              addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+            }
+            lastError = null; // Clear any previous errors.
+            break; // Exit the retry loop.
+          } else {
+            // FAILURE (Invalid Response): The response was empty.
+            lastError = new Error('Model returned an empty response.');
+            if (attempt < MAX_RETRIES) {
+              // If we have retries left, wait and try again.
+              await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
+              continue; // Go to the next iteration of the loop.
+            }
+          }
+        } catch (error: unknown) {
+          lastError = error;
+          if (error instanceof UnauthorizedError) {
+            onAuthError();
+            return; // Don't retry on auth errors.
+          }
+          if (isNodeError(error) && error.name === 'AbortError') {
+            return; // Don't retry if the user cancelled.
+          }
+          if (attempt < MAX_RETRIES) {
+            await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
+            continue;
+          }
         }
+      }
+      // --- END: NEW RETRY LOGIC ---
 
+      // After the loop, if there's still an error, display it.
+      if (lastError) {
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
-          setPendingHistoryItem(null);
         }
-        if (loopDetectedRef.current) {
-          loopDetectedRef.current = false;
-          handleLoopDetectedEvent();
-        }
-      } catch (error: unknown) {
-        if (error instanceof UnauthorizedError) {
-          onAuthError();
-        } else if (!isNodeError(error) || error.name !== 'AbortError') {
-          addItem(
-            {
-              type: MessageType.ERROR,
-              text: parseAndFormatApiError(
-                getErrorMessage(error) || 'Unknown error',
-                config.getContentGeneratorConfig()?.authType,
-                undefined,
-                config.getModel(),
-                DEFAULT_GEMINI_FLASH_MODEL,
-              ),
-            },
-            userMessageTimestamp,
-          );
-        }
-      } finally {
-        setIsResponding(false);
+        addItem(
+          {
+            type: MessageType.ERROR,
+            text: `The model failed to respond after multiple attempts. Error: ${getErrorMessage(lastError)}`,
+          },
+          userMessageTimestamp,
+        );
       }
+
+      // Cleanup regardless of outcome
+      setPendingHistoryItem(null);
+      if (loopDetectedRef.current) {
+        loopDetectedRef.current = false;
+        handleLoopDetectedEvent();
+      }
+      setIsResponding(false);
     },
     [
       streamingState,
