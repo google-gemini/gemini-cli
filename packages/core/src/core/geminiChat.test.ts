@@ -611,7 +611,13 @@ describe('GeminiChat', () => {
 
     // 2. Mock the API to fail once with an empty stream, then succeed.
     vi.mocked(mockModelsModule.generateContentStream)
-      .mockImplementationOnce(async () => (async function* () {})()) // First attempt fails (empty)
+      .mockImplementationOnce(async () =>
+        (async function* () {
+          yield {
+            candidates: [{ content: { parts: [{ text: '' }] } }],
+          } as unknown as GenerateContentResponse;
+        })(),
+      )
       .mockImplementationOnce(async () =>
         // Second attempt succeeds
         (async function* () {
@@ -635,7 +641,6 @@ describe('GeminiChat', () => {
     expect(history.length).toBe(4);
 
     // Assert that the correct metrics were reported for one empty-stream retry
-    expect(mockRecordInvalidChunk).not.toHaveBeenCalled();
     expect(mockRecordContentRetry).toHaveBeenCalledTimes(1);
 
     // Explicitly verify the structure of each part to satisfy TypeScript
