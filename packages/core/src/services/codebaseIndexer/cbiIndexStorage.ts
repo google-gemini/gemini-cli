@@ -1248,10 +1248,41 @@ export class CBIIndexStorage {
       ef_search
     };
 
+    // Simple LRU cache to reduce disk I/O during HNSW construction
+    const cacheSize = Math.min(1000, Math.floor(totalVectors * 0.1));
+    const vectorCache = new Map<number, number[]>();
+    const cacheOrder: number[] = [];
+
+    const cachedLoadVectorById = async (vectorId: number): Promise<number[]> => {
+      if (vectorCache.has(vectorId)) {
+        // Move to end (most recently used)
+        const index = cacheOrder.indexOf(vectorId);
+        if (index > -1) {
+          cacheOrder.splice(index, 1);
+          cacheOrder.push(vectorId);
+        }
+        return vectorCache.get(vectorId)!;
+      }
+
+      const vector = await this.loadVectorById(vectorId, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+      
+      // Add to cache
+      vectorCache.set(vectorId, vector);
+      cacheOrder.push(vectorId);
+      
+      // Evict oldest if cache is full
+      if (vectorCache.size > cacheSize) {
+        const oldest = cacheOrder.shift()!;
+        vectorCache.delete(oldest);
+      }
+      
+      return vector;
+    };
+
     const batchSize = Math.max(1, Math.floor(totalVectors / 50));
     for (let i = 1; i < totalVectors; i++) {
-      const vector = await this.loadVectorById(i, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
-      await this.insertIntoHNSWForUpdate(graph, vector, i, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
+      const vector = await cachedLoadVectorById(i);
+      await this.insertIntoHNSWForUpdateWithCache(graph, vector, i, cachedLoadVectorById);
       
       if (i % batchSize === 0) {
         onProgress?.(i, totalVectors);
@@ -1295,129 +1326,7 @@ export class CBIIndexStorage {
     throw new Error(`Vector ID ${vectorId} not found`);
   }
 
-  private async insertIntoHNSWForUpdate(
-    graph: HNSWGraph, 
-    queryVector: number[], 
-    vectorId: number,
-    targetHandle: fs.FileHandle,
-    newHeader: IndexHeader,
-    keptFileMapping: Map<number, { fileInfo: FileInfo, vectorIds: number[] }>,
-    newFileIndices: FileIndex[],
-    oldHeader: IndexHeader,
-    sourceHandle: fs.FileHandle
-  ): Promise<void> {
-    const node = graph.nodes[vectorId];
-    const currentLevel = node.level;
 
-    let currentEntryPoint = graph.entry_point;
-    let currentMaxLevel = graph.nodes[currentEntryPoint].level;
-
-    for (let level = currentMaxLevel; level > currentLevel; level--) {
-      const neighbors = await this.searchLayerForUpdate(graph, queryVector, [currentEntryPoint], 1, level, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
-      if (neighbors.length > 0) {
-        currentEntryPoint = neighbors[0];
-      }
-    }
-
-    for (let level = Math.min(currentLevel, currentMaxLevel); level >= 0; level--) {
-      const ef = Math.min(graph.ef_construction, Math.max(10, graph.nodes.length / 20));
-      const neighbors = await this.searchLayerForUpdate(graph, queryVector, [currentEntryPoint], ef, level, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
-      const selectedNeighbors = await this.selectNeighborsForUpdate(graph, queryVector, neighbors, graph.m, level, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
-      
-      for (const neighborId of selectedNeighbors) {
-        this.addBidirectionalConnection(graph, vectorId, neighborId, level);
-      }
-      
-      if (neighbors.length > 0) {
-        currentEntryPoint = neighbors[0];
-      }
-    }
-
-    if (currentLevel > currentMaxLevel) {
-      graph.entry_point = vectorId;
-    }
-  }
-
-  private async searchLayerForUpdate(
-    graph: HNSWGraph, 
-    queryVector: number[], 
-    entryPoints: number[], 
-    ef: number, 
-    level: number,
-    targetHandle: fs.FileHandle,
-    newHeader: IndexHeader,
-    keptFileMapping: Map<number, { fileInfo: FileInfo, vectorIds: number[] }>,
-    newFileIndices: FileIndex[],
-    oldHeader: IndexHeader,
-    sourceHandle: fs.FileHandle
-  ): Promise<number[]> {
-    const visited = new Set<number>();
-    const candidates = new Set<number>();
-    const results: number[] = [];
-
-    for (const entryPoint of entryPoints) {
-      candidates.add(entryPoint);
-      visited.add(entryPoint);
-    }
-
-    while (candidates.size > 0) {
-      let bestCandidate = -1;
-      let bestDistance = Infinity;
-
-      for (const candidate of candidates) {
-        const vector = await this.loadVectorById(candidate, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
-        const distance = this.cosineDistance(queryVector, vector);
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          bestCandidate = candidate;
-        }
-      }
-
-      if (bestCandidate === -1) break;
-
-      candidates.delete(bestCandidate);
-      results.push(bestCandidate);
-
-      if (results.length >= ef) break;
-
-      const node = graph.nodes[bestCandidate];
-      if (node.level >= level) {
-        for (const neighborId of node.neighbors[level]) {
-          if (!visited.has(neighborId)) {
-            visited.add(neighborId);
-            candidates.add(neighborId);
-          }
-        }
-      }
-    }
-
-    return results;
-  }
-
-  private async selectNeighborsForUpdate(
-    graph: HNSWGraph, 
-    queryVector: number[], 
-    candidates: number[], 
-    m: number, 
-    level: number,
-    targetHandle: fs.FileHandle,
-    newHeader: IndexHeader,
-    keptFileMapping: Map<number, { fileInfo: FileInfo, vectorIds: number[] }>,
-    newFileIndices: FileIndex[],
-    oldHeader: IndexHeader,
-    sourceHandle: fs.FileHandle
-  ): Promise<number[]> {
-    const distances = await Promise.all(candidates.map(async id => {
-      const vector = await this.loadVectorById(id, targetHandle, newHeader, keptFileMapping, newFileIndices, oldHeader, sourceHandle);
-      return {
-        id,
-        distance: this.cosineDistance(queryVector, vector)
-      };
-    }));
-
-    distances.sort((a, b) => a.distance - b.distance);
-    return distances.slice(0, m).map(d => d.id);
-  }
 
 
 
@@ -1553,6 +1462,115 @@ export class CBIIndexStorage {
     } finally {
       await indexFd.close();
     }
+  }
+
+  private async insertIntoHNSWForUpdateWithCache(
+    graph: HNSWGraph, 
+    queryVector: number[], 
+    vectorId: number,
+    cachedLoadVectorById: (vectorId: number) => Promise<number[]>
+  ): Promise<void> {
+    const node = graph.nodes[vectorId];
+    const currentLevel = node.level;
+
+    let currentEntryPoint = graph.entry_point;
+    let currentMaxLevel = graph.nodes[currentEntryPoint].level;
+
+    for (let level = currentMaxLevel; level > currentLevel; level--) {
+      const neighbors = await this.searchLayerForUpdateWithCache(graph, queryVector, [currentEntryPoint], 1, level, cachedLoadVectorById);
+      if (neighbors.length > 0) {
+        currentEntryPoint = neighbors[0];
+      }
+    }
+
+    for (let level = Math.min(currentLevel, currentMaxLevel); level >= 0; level--) {
+      const ef = Math.min(graph.ef_construction, Math.max(10, graph.nodes.length / 20));
+      const neighbors = await this.searchLayerForUpdateWithCache(graph, queryVector, [currentEntryPoint], ef, level, cachedLoadVectorById);
+      const selectedNeighbors = await this.selectNeighborsForUpdateWithCache(graph, queryVector, neighbors, graph.m, level, cachedLoadVectorById);
+      
+      for (const neighborId of selectedNeighbors) {
+        this.addBidirectionalConnection(graph, vectorId, neighborId, level);
+      }
+      
+      if (neighbors.length > 0) {
+        currentEntryPoint = neighbors[0];
+      }
+    }
+
+    if (currentLevel > currentMaxLevel) {
+      graph.entry_point = vectorId;
+    }
+  }
+
+  private async searchLayerForUpdateWithCache(
+    graph: HNSWGraph, 
+    queryVector: number[], 
+    entryPoints: number[], 
+    ef: number, 
+    level: number,
+    cachedLoadVectorById: (vectorId: number) => Promise<number[]>
+  ): Promise<number[]> {
+    const visited = new Set<number>();
+    const candidates = new Set<number>();
+    const results: number[] = [];
+
+    for (const entryPoint of entryPoints) {
+      candidates.add(entryPoint);
+      visited.add(entryPoint);
+    }
+
+    while (candidates.size > 0) {
+      let bestCandidate = -1;
+      let bestDistance = Infinity;
+
+      for (const candidate of candidates) {
+        const vector = await cachedLoadVectorById(candidate);
+        const distance = this.cosineDistance(queryVector, vector);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestCandidate = candidate;
+        }
+      }
+
+      if (bestCandidate === -1) break;
+
+      candidates.delete(bestCandidate);
+      results.push(bestCandidate);
+
+      if (results.length >= ef) break;
+
+      const node = graph.nodes[bestCandidate];
+      if (node.level >= level) {
+        for (const neighborId of node.neighbors[level]) {
+          if (!visited.has(neighborId)) {
+            visited.add(neighborId);
+            candidates.add(neighborId);
+          }
+        }
+      }
+    }
+
+    return results;
+  }
+
+  private async selectNeighborsForUpdateWithCache(
+    graph: HNSWGraph, 
+    queryVector: number[], 
+    candidates: number[], 
+    m: number, 
+    level: number,
+    cachedLoadVectorById: (vectorId: number) => Promise<number[]>
+  ): Promise<number[]> {
+    const distances = await Promise.all(candidates.map(async id => {
+      const vector = await cachedLoadVectorById(id);
+      return {
+        id,
+        distance: this.cosineDistance(queryVector, vector)
+      };
+    }));
+
+    distances.sort((a, b) => a.distance - b.distance);
+    return distances.slice(0, m).map(d => d.id);
   }
 
 }
