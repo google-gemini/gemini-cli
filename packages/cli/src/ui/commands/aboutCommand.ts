@@ -27,11 +27,18 @@ export const aboutCommand: SlashCommand = {
     const cliVersion = await getCliVersion();
     const selectedAuthType =
       context.services.settings.merged.selectedAuthType || '';
-    const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';
+    // Only show GCP Project for auth types that actually use it
+    const gcpProject =
+      selectedAuthType === 'oauth-gca' ||
+      selectedAuthType === 'vertex-ai' ||
+      selectedAuthType === 'cloud-shell'
+        ? process.env['GOOGLE_CLOUD_PROJECT'] || ''
+        : '';
     const ideClient =
       (context.services.config?.getIdeMode() &&
         context.services.config?.getIdeClient()?.getDetectedIdeDisplayName()) ||
       '';
+    const userTier = context.services.config?.getGeminiClient()?.getUserTier();
 
     const aboutItem: Omit<HistoryItemAbout, 'id'> = {
       type: MessageType.ABOUT,
@@ -42,6 +49,7 @@ export const aboutCommand: SlashCommand = {
       selectedAuthType,
       gcpProject,
       ideClient,
+      userTier,
     };
 
     context.ui.addItem(aboutItem, Date.now());
