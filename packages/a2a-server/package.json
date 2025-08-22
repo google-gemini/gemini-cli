@@ -37,6 +37,8 @@
     "@types/fs-extra": "^11.0.4",
     "@types/supertest": "^6.0.3",
     "@types/tar": "^6.1.13",
+    "@types/uuid": "^10.0.0",
+    "@types/winston": "^2.4.4",
     "dotenv": "^16.4.5",
     "supertest": "^7.1.4",
     "typescript": "^5.3.3",

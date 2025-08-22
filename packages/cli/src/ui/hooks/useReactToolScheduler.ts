@@ -140,7 +140,7 @@ export function useReactToolScheduler(
         getPreferredEditor,
         config,
         onEditorClose,
-      }),
+      } as any),
     [
       config,
       outputUpdateHandler,

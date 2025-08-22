@@ -1,0 +1,173 @@
+AI Migration Algorithm: Refactor to AppContainer Architecture
+
+Objective: To provide a deterministic algorithm for migrating code from the legacy App.tsx structure to the new AppContainer architecture. This guide is for an automated agent resolving merge conflicts.
+
+---
+
+Overall Process Algorithm
+
+Execute the following steps in order:
+
+Git Workflow (Simplified)
+
+This workflow processes commits in batches to rebase the current branch onto main.
+
+NOTE: This script is designed to be run multiple times. It will process up to 10 commits from `main` in each run. You must re-run the script until it exits successfully (indicating no commits are left) to complete the entire rebase.
+
+Overall Process:
+
+1.  Identify Commit Batch for Rebase:
+    * Find the common ancestor: MERGE_BASE=$(git merge-base HEAD main)
+    * Get the next batch of up to 10 commits from `main`: COMMIT_LIST=$(git log --reverse --format="%H" $MERGE_BASE..main | head -n 10)
+    * If COMMIT_LIST is empty, the rebase is complete. Exit successfully.
+
+2.  Process Commits Sequentially:
+    * Let PREVIOUS_COMMIT be MERGE_BASE.
+    * For each TARGET_COMMIT in COMMIT_LIST:
+        a. Filter Problem Commits: If TARGET_COMMIT is one of d250293c, a84f7493, or 3c0af365, skip this commit and continue to the next iteration of the loop.
+        b. Rebase One Step: git rebase $TARGET_COMMIT
+        c. Resolve Conflicts: If conflicts occur, apply the Conflict Resolution rules. This process culminates in a User Smoke Test (Rule 7).
+        d. Await User Confirmation: After resolving conflicts and presenting the smoke test plan, WAIT for the user to confirm that all tests passed.
+        e. Finalize Step: Only after receiving user confirmation, finalize the step with git rebase --continue.
+        f. Update Base: Set PREVIOUS_COMMIT=$TARGET_COMMIT for the next loop.
+
+3.  Completion:
+    * After iterating through all commits in the batch, the script will exit. Re-run it to process the next batch.
+
+Conflict Resolution:
+
+1.  Analyze Conflict: Identify each block of conflicting code that originates from the pre-refactor architecture (primarily changes within App.tsx).
+2.  Apply Migration Rules: For each conflicting block, apply the relevant rule (Rules 1-6) to transform and relocate the code to its new, correct location.
+3.  Consolidate & Import: After all blocks are migrated, consolidate the changes and run the Import Path Update (Rule 6) on all affected files.
+4.  Execute Verification Protocol: Run the full Verification Protocol (Rule 7).
+5.  Handle Failure: If Verification fails, attempt to fix issues based on tool output (e.g., lint/type errors). If still failing, revert the changes for the failing block and apply the Fallback Protocol (Rule 8).
+
+---
+
+Rule 0: Guiding Principles & Priorities
+
+When making decisions, adhere to these principles, ordered by priority:
+
+1.  Preserve Functionality: Never delete or break existing logic. Migrate it.
+2.  Single Source of Truth: All UI state must originate from AppContainer and be distributed via context.
+3.  Separation of Concerns: AppContainer handles state/logic. Components handle presentation. initializer.ts handles pre-render tasks.
+4.  Composition over Configuration: UI should be built from small, focused components.
+5.  Context over Props: Eliminate prop drilling. Components should get data directly from the relevant context.
+
+---
+
+Rule 1: State and Logic Hooks
+
+Pattern: State (useState, useRef) and business logic hooks (e.g., useGeminiStream) are located in App.tsx.
+Action:
+    1.  MOVE the hook and its related logic to packages/cli/src/ui/AppContainer.tsx.
+    2.  INTEGRATE its state values into the UIState context object.
+    3.  INTEGRATE its action callbacks into the UIActions context object.
+    4.  UPDATE any useEffect dependencies to reference the new context values.
+
+---
+
+Rule 2: Component Decomposition and Location
+
+Pattern: UI elements are defined directly within App.tsx.
+Action: MOVE the UI logic to the correct presentational component by executing this function:
+
+    function getTargetComponent(uiElement):
+      if isDialog(uiElement) or isModal(uiElement):
+        return "packages/cli/src/ui/components/DialogManager.tsx"
+      else if involvesUserInput(uiElement) or isFooter(uiElement) or isContextSummary(uiElement):
+        return "packages/cli/src/ui/components/Composer.tsx"
+      else if isNotification(uiElement) or isStartupWarning(uiElement):
+        return "packages/cli/src/ui/components/Notifications.tsx"
+      else if isHeader(uiElement) or isBanner(uiElement) or isTip(uiElement):
+        return "packages/cli/src/ui/components/AppHeader.tsx"
+      else if displaysChatHistory(uiElement) or isPendingMessage(uiElement):
+        return "packages/cli/src/ui/components/MainContent.tsx"
+      else:
+        // Default fallback if location is ambiguous
+        return "packages/cli/src/ui/components/MainContent.tsx"
+
+---
+
+Rule 3: Data Flow (Props vs. Context)
+
+Pattern: Data is passed down from App.tsx via props.
+Action: REMOVE the prop being passed and REPLACE its usage in the child component with the appropriate context hook: useUIState(), useUIActions(), useConfig(), useSettings(), or useAppContext().
+
+---
+
+Rule 4: Initialization Logic
+
+Pattern: Logic runs in a useEffect hook at the top of App.tsx.
+Action:
+    * If the logic must run before any UI is rendered (auth, config validation), MOVE it to packages/cli/src/core/initializer.ts.
+    * If the logic is related to React's lifecycle (setting up event listeners, initializing hooks), ensure it is in AppContainer.tsx.
+
+---
+
+Rule 5: Provider Hierarchy
+
+Pattern: A new context provider is added.
+Action: Ensure the provider nesting order in packages/cli/src/gemini.tsx is correct. New providers must wrap the components that consume their context.
+
+---
+
+Rule 6: Import Path Updates
+
+Pattern: Imports point to old file locations.
+Action: Systematically update all import paths in the modified files to reflect the new locations of components, hooks, and core logic.
+
+---
+
+Rule 7: Verification Protocol
+
+During Merge Resolution (Compilation Only):
+1.  npm run typecheck - Must pass with zero errors
+2.  npm run build - Must complete successfully
+
+IMPORTANT: Do NOT run tests during merge resolution. Tests may fail due to incomplete refactor state - this is expected and will be addressed after the complete refactor is finished.
+
+User Smoke Test (Interactive CLI):
+After a successful npm run build, the AI agent will provide a set of commands based on the functionality modified in the last commit. The user should then perform the following steps:
+
+1.  Start the CLI: Run npm run start.
+2.  Execute Provided Commands: Run the commands provided by the AI agent within the interactive Gemini CLI.
+3.  Verify Behavior: Check if the application behaves as expected.
+4.  Provide Feedback: Inform the AI agent if the tests passed or failed.
+
+Example Test Scenarios (to be provided by AI):
+
+* Authentication Flow:
+    * Run /auth
+    * Expected: Auth dialog opens and works correctly.
+* Theme Switching:
+    * Run /theme
+    * Expected: Theme dialog opens and theme changes apply.
+* Core Chat Functionality:
+    * Enter "Hello, test message"
+    * Expected: Message sends and response streams correctly.
+
+Note: Focus testing on the specific features and components that were modified in the current commit. Skip tests for unchanged functionality to save time.
+
+Expected Behavior: All dialogs should open/close properly, state should persist between commands, and core chat functionality should work identically to pre-refactor behavior.
+
+Architectural Checklist (Secondary):
+-   App.tsx contains no state management logic.
+-   No props are passed more than one level deep from App.tsx or AppContainer.tsx.
+-   All dialog visibility is controlled by state in UIStateContext.
+-   All stateful logic resides in AppContainer.tsx.
+
+---
+
+Rule 8: Fallback Protocol
+
+If the Verification Protocol fails and the errors cannot be fixed automatically:
+
+1.  Revert the specific conflicting code block that caused the failure.
+2.  Place the original, unmodified code block inside AppContainer.tsx.
+3.  Wrap the block with a specific, searchable comment for manual human review.
+
+    // AI_MERGE_REVIEW_REQUIRED: Could not automatically migrate the following code block due to [brief, specific reason, e.g., 'Verification Protocol failure'].
+    // --- START LEGACY CODE ---
+    ... original conflicting code ...
+    // --- END LEGACY CODE ---

@@ -4,23 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import type { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { AuthType, type Config } from '@google/gemini-cli-core';
-import {
-  clearCachedCredentialFile,
-  getErrorMessage,
-} from '@google/gemini-cli-core';
+import { clearCachedCredentialFile } from '@google/gemini-cli-core';
 import { runExitCleanup } from '../../utils/cleanup.js';
 
 export const useAuthCommand = (
   settings: LoadedSettings,
   setAuthError: (error: string | null) => void,
   config: Config,
+  shouldOpenAuthDialog: boolean,
 ) => {
-  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(
-    settings.merged.security?.auth?.selectedType === undefined,
-  );
+  const [isAuthDialogOpen, setIsAuthDialogOpen] =
+    useState(shouldOpenAuthDialog);
 
   const openAuthDialog = useCallback(() => {
     setIsAuthDialogOpen(true);
@@ -28,34 +25,22 @@ export const useAuthCommand = (
 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  useEffect(() => {
-    const authFlow = async () => {
-      const authType = settings.merged.security?.auth?.selectedType;
-      if (isAuthDialogOpen || !authType) {
-        return;
-      }
-
-      try {
-        setIsAuthenticating(true);
-        await config.refreshAuth(authType);
-        console.log(`Authenticated via "${authType}".`);
-      } catch (e) {
-        setAuthError(`Failed to login. Message: ${getErrorMessage(e)}`);
-        openAuthDialog();
-      } finally {
-        setIsAuthenticating(false);
-      }
-    };
-
-    void authFlow();
-  }, [isAuthDialogOpen, settings, config, setAuthError, openAuthDialog]);
-
   const handleAuthSelect = useCallback(
     async (authType: AuthType | undefined, scope: SettingScope) => {
       if (authType) {
         await clearCachedCredentialFile();
 
         settings.setValue(scope, 'security.auth.selectedType', authType);
+
+        // Refresh auth with the new auth type
+        try {
+          await config.refreshAuth(authType);
+        } catch (e) {
+          setAuthError(
+            `Failed to authenticate: ${e instanceof Error ? e.message : String(e)}`,
+          );
+          return;
+        }
         if (
           authType === AuthType.LOGIN_WITH_GOOGLE &&
           config.isBrowserLaunchSuppressed()

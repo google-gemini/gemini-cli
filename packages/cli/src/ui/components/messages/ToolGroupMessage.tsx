@@ -11,16 +11,15 @@ import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
-import { Colors } from '../../colors.js';
-import type { Config } from '@google/gemini-cli-core';
+import { theme } from '../../semantic-colors.js';
 import { SHELL_COMMAND_NAME } from '../../constants.js';
+import { useConfig } from '../../contexts/ConfigContext.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
   toolCalls: IndividualToolCallDisplay[];
   availableTerminalHeight?: number;
   terminalWidth: number;
-  config: Config;
   isFocused?: boolean;
 }
 
@@ -29,15 +28,15 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   toolCalls,
   availableTerminalHeight,
   terminalWidth,
-  config,
   isFocused = true,
 }) => {
+  const config = useConfig();
   const hasPending = !toolCalls.every(
     (t) => t.status === ToolCallStatus.Success,
   );
   const isShellCommand = toolCalls.some((t) => t.name === SHELL_COMMAND_NAME);
   const borderColor =
-    hasPending || isShellCommand ? Colors.AccentYellow : Colors.Gray;
+    hasPending || isShellCommand ? theme.status.warning : theme.border.default;
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
   // This is a bit of a magic number, but it accounts for the border and

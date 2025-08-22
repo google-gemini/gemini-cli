@@ -196,7 +196,9 @@ describe('Server Config (config.ts)', () => {
         apiKey: 'test-key',
       };
 
-      (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
+      (createContentGeneratorConfig as Mock).mockResolvedValue(
+        mockContentConfig,
+      );
 
       // Set fallback mode to true to ensure it gets reset
       config.setFallbackMode(true);
@@ -225,7 +227,9 @@ describe('Server Config (config.ts)', () => {
         apiKey: 'test-key',
       };
 
-      (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
+      (createContentGeneratorConfig as Mock).mockResolvedValue(
+        mockContentConfig,
+      );
 
       // Mock the existing client with some history
       const mockExistingHistory = [
@@ -276,7 +280,9 @@ describe('Server Config (config.ts)', () => {
         apiKey: 'test-key',
       };
 
-      (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
+      (createContentGeneratorConfig as Mock).mockResolvedValue(
+        mockContentConfig,
+      );
 
       const mockNewClient = {
         isInitialized: vi.fn().mockReturnValue(true),
