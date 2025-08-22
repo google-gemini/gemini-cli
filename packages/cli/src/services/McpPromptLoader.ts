@@ -145,7 +145,7 @@ export class McpPromptLoader implements ICommandLoader {
             }
           },
           completion: async (_: CommandContext, partialArg: string) => {
-            if (!prompt || !prompt.arguments) {
+            if (!prompt || !prompt.arguments || !partialArg.startsWith('-')) {
               return [];
             }
 
@@ -156,7 +156,7 @@ export class McpPromptLoader implements ICommandLoader {
 
             for (const arg of prompt.arguments) {
               if (!usedArgNames.has(arg.name)) {
-                suggestions.push(`--${arg.name}="${partialArg}"`);
+                suggestions.push(`--${arg.name}=""`);
               }
             }
 
