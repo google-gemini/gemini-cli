@@ -20,6 +20,7 @@ export interface FileSearchOptions {
   cache: boolean;
   cacheTtl: number;
   enableRecursiveFileSearch: boolean;
+  disableFuzzySearch: boolean;
   maxDepth?: number;
 }
 
@@ -128,7 +129,7 @@ class RecursiveFileSearch implements FileSearch {
       filteredCandidates = candidates;
     } else {
       let shouldCache = true;
-      if (pattern.includes('*')) {
+      if (pattern.includes('*') || this.options.disableFuzzySearch) {
         filteredCandidates = await filter(candidates, pattern, options.signal);
       } else {
         filteredCandidates = await this.fzf

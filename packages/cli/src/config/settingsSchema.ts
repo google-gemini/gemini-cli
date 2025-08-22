@@ -274,6 +274,15 @@ export const SETTINGS_SCHEMA = {
         description: 'Enable recursive file search functionality',
         showInDialog: true,
       },
+      disableFuzzySearch: {
+        type: 'boolean',
+        label: 'Disable Fuzzy Search',
+        category: 'File Filtering',
+        requiresRestart: true,
+        default: false,
+        description: 'Disable fuzzy search when searching for files.',
+        showInDialog: true,
+      },
     },
   },
 
