@@ -25,10 +25,11 @@ import {
 } from '../utils/fileUtils.js';
 import { PartListUnion } from '@google/genai';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
-import {
-  recordFileOperationMetric,
-  FileOperation,
-} from '../telemetry/metrics.js';
+import { FileOperation } from '../telemetry/metrics.js';
+import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
+import { logFileOperation } from '../telemetry/loggers.js';
+import { FileOperationEvent } from '../telemetry/types.js';
+import { ToolErrorType } from './tool-error.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -232,13 +233,6 @@ ${finalExclusionPatternsForDescription
       : [...exclude];
 
     const searchPatterns = [...inputPatterns, ...include];
-    if (searchPatterns.length === 0) {
-      return {
-        llmContent: 'No search paths or include patterns provided.',
-        returnDisplay: `## Information\n\nNo search paths or include patterns were specified. Nothing to read or concatenate.`,
-      };
-    }
-
     try {
       const allEntries = new Set<string>();
       const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
@@ -352,9 +346,14 @@ ${finalExclusionPatternsForDescription
         });
       }
     } catch (error) {
+      const errorMessage = `Error during file search: ${getErrorMessage(error)}`;
       return {
-        llmContent: `Error during file search: ${getErrorMessage(error)}`,
+        llmContent: errorMessage,
         returnDisplay: `## File Search Error\n\nAn error occurred while searching for files:\n\`\`\`\n${getErrorMessage(error)}\n\`\`\``,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.READ_MANY_FILES_SEARCH_ERROR,
+        },
       };
     }
 
@@ -469,12 +468,20 @@ ${finalExclusionPatternsForDescription
               ? fileReadResult.llmContent.split('\n').length
               : undefined;
           const mimetype = getSpecificMimeType(filePath);
-          recordFileOperationMetric(
+          const programming_language = getProgrammingLanguage({
+            absolute_path: filePath,
+          });
+          logFileOperation(
             this.config,
-            FileOperation.READ,
-            lines,
-            mimetype,
-            path.extname(filePath),
+            new FileOperationEvent(
+              ReadManyFilesTool.Name,
+              FileOperation.READ,
+              lines,
+              mimetype,
+              path.extname(filePath),
+              undefined,
+              programming_language,
+            ),
           );
         }
       } else {
