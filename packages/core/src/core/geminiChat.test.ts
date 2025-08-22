@@ -25,6 +25,24 @@ const mockModelsModule = {
   batchEmbedContents: vi.fn(),
 } as unknown as Models;
 
+const {
+  mockRecordInvalidChunk,
+  mockRecordContentRetry,
+  mockRecordContentRetryFailure,
+} = vi.hoisted(() => {
+  return {
+    mockRecordInvalidChunk: vi.fn(),
+    mockRecordContentRetry: vi.fn(),
+    mockRecordContentRetryFailure: vi.fn(),
+  };
+});
+
+vi.mock('../telemetry/metrics.js', () => ({
+  recordInvalidChunk: mockRecordInvalidChunk,
+  recordContentRetry: mockRecordContentRetry,
+  recordContentRetryFailure: mockRecordContentRetryFailure,
+}));
+
 describe('GeminiChat', () => {
   let chat: GeminiChat;
   let mockConfig: Config;
@@ -483,7 +501,7 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessageStream with retries', () => {
-    it('should retry on invalid content and succeed on the second attempt', async () => {
+    it('should retry on invalid content, succeed, and report metrics', async () => {
       // Use mockImplementationOnce to provide a fresh, promise-wrapped generator for each attempt.
       vi.mocked(mockModelsModule.generateContentStream)
         .mockImplementationOnce(async () =>
@@ -515,6 +533,9 @@ describe('GeminiChat', () => {
       }
 
       // Assertions
+      expect(mockRecordInvalidChunk).toHaveBeenCalledTimes(1);
+      expect(mockRecordContentRetry).toHaveBeenCalledTimes(1);
+      expect(mockRecordContentRetryFailure).not.toHaveBeenCalled();
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(2);
       expect(
         chunks.some(
@@ -537,7 +558,7 @@ describe('GeminiChat', () => {
       });
     });
 
-    it('should fail after all retries on persistent invalid content', async () => {
+    it('should fail after all retries on persistent invalid content and report metrics', async () => {
       vi.mocked(mockModelsModule.generateContentStream).mockImplementation(
         async () =>
           (async function* () {
@@ -571,6 +592,9 @@ describe('GeminiChat', () => {
 
       // Should be called 3 times (initial + 2 retries)
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(3);
+      expect(mockRecordInvalidChunk).toHaveBeenCalledTimes(3);
+      expect(mockRecordContentRetry).toHaveBeenCalledTimes(2);
+      expect(mockRecordContentRetryFailure).toHaveBeenCalledTimes(1);
 
       // History should be clean, as if the failed turn never happened.
       const history = chat.getHistory();
@@ -587,6 +611,7 @@ describe('GeminiChat', () => {
 
     // 2. Mock the API
     vi.mocked(mockModelsModule.generateContentStream)
+      .mockImplementationOnce(async () => (async function* () {})())
       .mockImplementationOnce(async () =>
         (async function* () {
           yield {
@@ -643,6 +668,9 @@ describe('GeminiChat', () => {
       );
     }
     expect(turn4.parts[0].text).toBe('Second answer');
+
+    expect(mockRecordInvalidChunk).not.toHaveBeenCalled(); // No invalid chunks, just an empty stream
+    expect(mockRecordContentRetry).toHaveBeenCalledTimes(1);
   });
 
   describe('concurrency control', () => {
