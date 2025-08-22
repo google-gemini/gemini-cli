@@ -283,7 +283,6 @@ export class MemoryMonitor {
     return snapshot;
   }
 
-
   /**
    * Check if memory usage exceeds threshold
    */
