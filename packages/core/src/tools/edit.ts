@@ -27,6 +27,11 @@ import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
 import { IDEConnectionStatus } from '../ide/ide-client.js';
+import { FileOperation } from '../telemetry/metrics.js';
+import { logFileOperation } from '../telemetry/loggers.js';
+import { FileOperationEvent } from '../telemetry/types.js';
+import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
+import { getSpecificMimeType } from '../utils/fileUtils.js';
 
 export function applyReplacement(
   currentContent: string | null,
@@ -345,12 +350,21 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         .writeTextFile(this.params.file_path, editData.newContent);
 
       let displayResult: ToolResultDisplay;
+      const fileName = path.basename(this.params.file_path);
+      const originallyProposedContent =
+        this.params.ai_proposed_string || this.params.new_string;
+      const diffStat = getDiffStat(
+        fileName,
+        editData.currentContent ?? '',
+        originallyProposedContent,
+        this.params.new_string,
+      );
+
       if (editData.isNewFile) {
         displayResult = `Created ${shortenPath(makeRelative(this.params.file_path, this.config.getTargetDir()))}`;
       } else {
         // Generate diff for display, even though core logic doesn't technically need it
         // The CLI wrapper will use this part of the ToolResult
-        const fileName = path.basename(this.params.file_path);
         const fileDiff = Diff.createPatch(
           fileName,
           editData.currentContent ?? '', // Should not be null here if not isNewFile
@@ -358,14 +372,6 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           'Current',
           'Proposed',
           DEFAULT_DIFF_OPTIONS,
-        );
-        const originallyProposedContent =
-          this.params.ai_proposed_string || this.params.new_string;
-        const diffStat = getDiffStat(
-          fileName,
-          editData.currentContent ?? '',
-          originallyProposedContent,
-          this.params.new_string,
         );
         displayResult = {
           fileDiff,
@@ -386,6 +392,26 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           `User modified the \`new_string\` content to be: ${this.params.new_string}.`,
         );
       }
+
+      const lines = editData.newContent.split('\n').length;
+      const mimetype = getSpecificMimeType(this.params.file_path);
+      const extension = path.extname(this.params.file_path);
+      const programming_language = getProgrammingLanguage({
+        file_path: this.params.file_path,
+      });
+
+      logFileOperation(
+        this.config,
+        new FileOperationEvent(
+          EditTool.Name,
+          editData.isNewFile ? FileOperation.CREATE : FileOperation.UPDATE,
+          lines,
+          mimetype,
+          extension,
+          diffStat,
+          programming_language,
+        ),
+      );
 
       return {
         llmContent: llmSuccessMessageParts.join(' '),

@@ -30,11 +30,11 @@ import {
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
-import {
-  recordFileOperationMetric,
-  FileOperation,
-} from '../telemetry/metrics.js';
+import { FileOperation } from '../telemetry/metrics.js';
 import { IDEConnectionStatus } from '../ide/ide-client.js';
+import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
+import { logFileOperation } from '../telemetry/loggers.js';
+import { FileOperationEvent } from '../telemetry/types.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -314,23 +314,32 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       const lines = fileContent.split('\n').length;
       const mimetype = getSpecificMimeType(file_path);
       const extension = path.extname(file_path); // Get extension
+      const programming_language = getProgrammingLanguage({ file_path });
       if (isNewFile) {
-        recordFileOperationMetric(
+        logFileOperation(
           this.config,
-          FileOperation.CREATE,
-          lines,
-          mimetype,
-          extension,
-          diffStat,
+          new FileOperationEvent(
+            WriteFileTool.Name,
+            FileOperation.CREATE,
+            lines,
+            mimetype,
+            extension,
+            diffStat,
+            programming_language,
+          ),
         );
       } else {
-        recordFileOperationMetric(
+        logFileOperation(
           this.config,
-          FileOperation.UPDATE,
-          lines,
-          mimetype,
-          extension,
-          diffStat,
+          new FileOperationEvent(
+            WriteFileTool.Name,
+            FileOperation.UPDATE,
+            lines,
+            mimetype,
+            extension,
+            diffStat,
+            programming_language,
+          ),
         );
       }
 

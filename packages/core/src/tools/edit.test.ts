@@ -26,6 +26,10 @@ vi.mock('../utils/editor.js', () => ({
   openDiff: mockOpenDiff,
 }));
 
+vi.mock('../telemetry/loggers.js', () => ({
+  logFileOperation: vi.fn(),
+}));
+
 import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 import { applyReplacement, EditTool, EditToolParams } from './edit.js';
 import { FileDiff, ToolConfirmationOutcome } from './tools.js';

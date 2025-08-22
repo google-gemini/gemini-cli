@@ -219,6 +219,9 @@ export enum EventMetadataKey {
   // Logs user removed lines in edit/write tool response.
   GEMINI_CLI_USER_REMOVED_LINES = 50,
 
+  // Logs the programming language of the project.
+  GEMINI_CLI_PROGRAMMING_LANGUAGE = 56,
+
   // ==========================================================================
   // Kitty Sequence Overflow Event Keys
   // ===========================================================================
@@ -246,4 +249,20 @@ export enum EventMetadataKey {
 
   // Logs name of MCP tools as comma seperated string
   GEMINI_CLI_START_SESSION_MCP_TOOLS = 65,
+
+  // ==========================================================================
+  // File Operation Event Keys
+  // ===========================================================================
+
+  // Logs the operation type of the file operation.
+  GEMINI_CLI_FILE_OPERATION_TYPE = 66,
+
+  // Logs the number of lines in the file operation.
+  GEMINI_CLI_FILE_OPERATION_LINES = 67,
+
+  // Logs the mimetype of the file in the file operation.
+  GEMINI_CLI_FILE_OPERATION_MIMETYPE = 68,
+
+  // Logs the extension of the file in the file operation.
+  GEMINI_CLI_FILE_OPERATION_EXTENSION = 69,
 }
