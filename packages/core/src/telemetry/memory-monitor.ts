@@ -283,33 +283,6 @@ export class MemoryMonitor {
     return snapshot;
   }
 
-  /**
-   * Force garbage collection and measure memory before/after
-   * Only works if --expose-gc flag is used
-   */
-  measureGarbageCollection(
-    config: Config,
-  ): { before: MemorySnapshot; after: MemorySnapshot } | null {
-    if (!global.gc) {
-      return null;
-    }
-
-    const before = this.getCurrentMemoryUsage();
-    global.gc();
-    const after = this.getCurrentMemoryUsage();
-
-    if (isPerformanceMonitoringActive()) {
-      const memoryFreed = before.heapUsed - after.heapUsed;
-      recordMemoryUsage(
-        config,
-        MemoryMetricType.HEAP_USED,
-        memoryFreed,
-        'gc_freed',
-      );
-    }
-
-    return { before, after };
-  }
 
   /**
    * Check if memory usage exceeds threshold
