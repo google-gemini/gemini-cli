@@ -121,6 +121,7 @@ export class DiffManager {
       diffTitle,
       {
         preview: false,
+        preserveFocus: true,
       },
     );
     await vscode.commands.executeCommand(
