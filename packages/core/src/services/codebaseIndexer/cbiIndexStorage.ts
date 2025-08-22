@@ -297,8 +297,8 @@ export class CBIIndexStorage {
       normA += a[i] * a[i];
       normB += b[i] * b[i];
     }
-    
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+    return denominator > 0 ? dotProduct / denominator : 0;
   }
 
   private extractStringFromHeap(heapBuffer: Buffer, offset: number, length?: number): string {
