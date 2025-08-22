@@ -560,8 +560,9 @@ export const SETTINGS_SCHEMA = {
     label: 'Research Contact Email',
     category: 'General',
     requiresRestart: false,
-    default: undefined as string | undefined,
+    default: '' as string,
     description: 'Email address for research study invitations (optional)',
+    showInDialog: true,
   },
   useRipgrep: {
     type: 'boolean',
