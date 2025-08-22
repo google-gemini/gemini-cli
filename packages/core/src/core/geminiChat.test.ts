@@ -788,7 +788,7 @@ describe('GeminiChat', () => {
     expect(turn2.parts[0].text).toBe('Successful response after empty');
   });
   it('should queue a subsequent sendMessageStream call until the first stream is fully consumed', async () => {
-    // 1. Create a promise to manually control the first stream's lifecycle
+    // 1. Create a promise to manually control the stream's lifecycle
     let continueFirstStream: () => void;
     const firstStreamContinuePromise = new Promise<void>((resolve) => {
       continueFirstStream = resolve;
@@ -801,7 +801,7 @@ describe('GeminiChat', () => {
           { content: { parts: [{ text: 'first response part 1' }] } },
         ],
       } as unknown as GenerateContentResponse;
-      await firstStreamContinuePromise; // Pause the stream mid-flow
+      await firstStreamContinuePromise; // Pause the stream
       yield {
         candidates: [{ content: { parts: [{ text: ' part 2' }] } }],
       } as unknown as GenerateContentResponse;
@@ -825,13 +825,13 @@ describe('GeminiChat', () => {
     const firstStreamIterator = firstStream[Symbol.asyncIterator]();
     await firstStreamIterator.next();
 
-    // 4. While the first stream is paused, start the second call. It will block on sendPromise.
+    // 4. While the first stream is paused, start the second call. It will block.
     const secondStreamPromise = chat.sendMessageStream(
       { message: 'second' },
       'prompt-2',
     );
 
-    // 5. Assert that only the first API call has been made.
+    // 5. Assert that only one API call has been made so far.
     expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(1);
 
     // 6. Unblock and fully consume the first stream to completion.
@@ -842,15 +842,20 @@ describe('GeminiChat', () => {
     // 7. Now that the first stream is done, await the second promise to get its generator.
     const secondStream = await secondStreamPromise;
 
-    // 8. CRITICAL STEP: Start consuming the second stream. This action will trigger its internal API call.
+    // 8. Start consuming the second stream, which triggers its internal API call.
     const secondStreamIterator = secondStream[Symbol.asyncIterator]();
     await secondStreamIterator.next();
 
-    // 9. Final check on history to ensure it's not corrupted
+    // 9. The second API call should now have been made.
+    expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(2);
+
+    // 10. FIX: Fully consume the second stream to ensure recordHistory is called.
+    await secondStreamIterator.next(); // This finishes the iterator.
+
+    // 11. Final check on history.
     const history = chat.getHistory();
     expect(history.length).toBe(4);
 
-    // Explicitly verify the structure of the final turn to satisfy TypeScript
     const turn4 = history[3];
     if (!turn4?.parts?.[0] || !('text' in turn4.parts[0])) {
       throw new Error(
