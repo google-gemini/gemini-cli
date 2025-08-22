@@ -68,7 +68,7 @@ describe('stdin context', () => {
     ).toBeTruthy();
   });
 
-  it.only('should exit quickly if stdin stream does not end', async () => {
+  it('should exit quickly if stdin stream does not end', async () => {
     /*
       This simulates scenario where gemini gets stuck waiting for stdin.
       This happens in situations where process.stdin.isTTY is false
