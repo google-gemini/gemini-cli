@@ -856,14 +856,27 @@ export async function connectToMcpServer(
     unlistenDirectories = undefined;
   };
 
-  // patch Client.callTool to use request timeout as genai McpCallTool.callTool does not do it
-  // TODO: remove this hack once GenAI SDK does callTool with request options
+  // patch Client methods to use request timeout as the MCP SDK does not respect custom timeouts
+  // TODO: remove this hack once MCP SDK properly respects timeout options
+  const configuredTimeout = mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC;
+  
   if ('callTool' in mcpClient) {
     const origCallTool = mcpClient.callTool.bind(mcpClient);
     mcpClient.callTool = function (params, resultSchema, options) {
       return origCallTool(params, resultSchema, {
         ...options,
-        timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+        timeout: configuredTimeout,
+      });
+    };
+  }
+
+  // Also patch the request method to use the configured timeout
+  if ('request' in mcpClient) {
+    const origRequest = mcpClient.request.bind(mcpClient);
+    mcpClient.request = function (schema, params, options) {
+      return origRequest(schema, params, {
+        ...options,
+        timeout: configuredTimeout,
       });
     };
   }
