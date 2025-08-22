@@ -22,6 +22,8 @@ import { PassThrough } from 'stream';
 import {
   BACKSLASH_ENTER_DETECTION_WINDOW_MS,
   KITTY_CTRL_C,
+  KITTY_KEYCODE_ENTER,
+  KITTY_KEYCODE_NUMPAD_ENTER,
   MAX_KITTY_SEQUENCE_LENGTH,
 } from '../utils/platformConstants.js';
 
@@ -132,7 +134,10 @@ export function KeypressProvider({
         };
       }
 
-      if (keyCode === 13) {
+      if (
+        keyCode === KITTY_KEYCODE_ENTER ||
+        keyCode === KITTY_KEYCODE_NUMPAD_ENTER
+      ) {
         return {
           name: 'return',
           ctrl,
@@ -167,6 +172,29 @@ export function KeypressProvider({
     };
 
     const handleKeypress = (_: unknown, key: Key) => {
+      if (key.name === 'paste-start') {
+        isPaste = true;
+        return;
+      }
+      if (key.name === 'paste-end') {
+        isPaste = false;
+        broadcast({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: true,
+          sequence: pasteBuffer.toString(),
+        });
+        pasteBuffer = Buffer.alloc(0);
+        return;
+      }
+
+      if (isPaste) {
+        pasteBuffer = Buffer.concat([pasteBuffer, Buffer.from(key.sequence)]);
+        return;
+      }
+
       if (key.name === 'return' && waitingForEnterAfterBackslash) {
         if (backslashTimeout) {
           clearTimeout(backslashTimeout);
@@ -273,29 +301,10 @@ export function KeypressProvider({
         }
       }
 
-      if (key.name === 'paste-start') {
-        isPaste = true;
-      } else if (key.name === 'paste-end') {
-        isPaste = false;
-        broadcast({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: true,
-          sequence: pasteBuffer.toString(),
-        });
-        pasteBuffer = Buffer.alloc(0);
-      } else {
-        if (isPaste) {
-          pasteBuffer = Buffer.concat([pasteBuffer, Buffer.from(key.sequence)]);
-        } else {
-          if (key.name === 'return' && key.sequence === `${ESC}\r`) {
-            key.meta = true;
-          }
-          broadcast({ ...key, paste: isPaste });
-        }
+      if (key.name === 'return' && key.sequence === `${ESC}\r`) {
+        key.meta = true;
       }
+      broadcast({ ...key, paste: isPaste });
     };
 
     const handleRawKeypress = (data: Buffer) => {

@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
-import { Ignore } from './ignore.js';
+import { describe, it, expect, afterEach } from 'vitest';
+import { Ignore, loadIgnoreRules } from './ignore.js';
+import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 
 describe('Ignore', () => {
   describe('getDirectoryFilter', () => {
@@ -61,5 +62,99 @@ describe('Ignore', () => {
     // Adding a new rule should change the fingerprint.
     ig2.add('baz');
     expect(ig1.getFingerprint()).not.toBe(ig2.getFingerprint());
+  });
+});
+
+describe('loadIgnoreRules', () => {
+  let tmpDir: string;
+
+  afterEach(async () => {
+    if (tmpDir) {
+      await cleanupTmpDir(tmpDir);
+    }
+  });
+
+  it('should load rules from .gitignore', async () => {
+    tmpDir = await createTmpDir({
+      '.gitignore': '*.log',
+    });
+    const ignore = loadIgnoreRules({
+      projectRoot: tmpDir,
+      useGitignore: true,
+      useGeminiignore: false,
+      ignoreDirs: [],
+    });
+    const fileFilter = ignore.getFileFilter();
+    expect(fileFilter('test.log')).toBe(true);
+    expect(fileFilter('test.txt')).toBe(false);
+  });
+
+  it('should load rules from .geminiignore', async () => {
+    tmpDir = await createTmpDir({
+      '.geminiignore': '*.log',
+    });
+    const ignore = loadIgnoreRules({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: true,
+      ignoreDirs: [],
+    });
+    const fileFilter = ignore.getFileFilter();
+    expect(fileFilter('test.log')).toBe(true);
+    expect(fileFilter('test.txt')).toBe(false);
+  });
+
+  it('should combine rules from .gitignore and .geminiignore', async () => {
+    tmpDir = await createTmpDir({
+      '.gitignore': '*.log',
+      '.geminiignore': '*.txt',
+    });
+    const ignore = loadIgnoreRules({
+      projectRoot: tmpDir,
+      useGitignore: true,
+      useGeminiignore: true,
+      ignoreDirs: [],
+    });
+    const fileFilter = ignore.getFileFilter();
+    expect(fileFilter('test.log')).toBe(true);
+    expect(fileFilter('test.txt')).toBe(true);
+    expect(fileFilter('test.md')).toBe(false);
+  });
+
+  it('should add ignoreDirs', async () => {
+    tmpDir = await createTmpDir({});
+    const ignore = loadIgnoreRules({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: false,
+      ignoreDirs: ['logs/'],
+    });
+    const dirFilter = ignore.getDirectoryFilter();
+    expect(dirFilter('logs/')).toBe(true);
+    expect(dirFilter('src/')).toBe(false);
+  });
+
+  it('should handle missing ignore files gracefully', async () => {
+    tmpDir = await createTmpDir({});
+    const ignore = loadIgnoreRules({
+      projectRoot: tmpDir,
+      useGitignore: true,
+      useGeminiignore: true,
+      ignoreDirs: [],
+    });
+    const fileFilter = ignore.getFileFilter();
+    expect(fileFilter('anyfile.txt')).toBe(false);
+  });
+
+  it('should always add .git to the ignore list', async () => {
+    tmpDir = await createTmpDir({});
+    const ignore = loadIgnoreRules({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: false,
+      ignoreDirs: [],
+    });
+    const dirFilter = ignore.getDirectoryFilter();
+    expect(dirFilter('.git/')).toBe(true);
   });
 });

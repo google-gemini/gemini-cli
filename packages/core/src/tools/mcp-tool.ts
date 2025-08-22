@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -15,6 +16,7 @@ import {
   ToolResult,
 } from './tools.js';
 import { CallableTool, FunctionCall, Part } from '@google/genai';
+import { ToolErrorType } from './tool-error.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -138,9 +140,19 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
 
     // Ensure the response is not an error
     if (this.isMCPToolError(rawResponseParts)) {
-      throw new Error(
-        `MCP tool '${this.serverToolName}' reported tool error with response: ${JSON.stringify(rawResponseParts)}`,
-      );
+      const errorMessage = `MCP tool '${
+        this.serverToolName
+      }' reported tool error for function call: ${safeJsonStringify(
+        functionCalls[0],
+      )} with response: ${safeJsonStringify(rawResponseParts)}`;
+      return {
+        llmContent: errorMessage,
+        returnDisplay: `Error: MCP tool '${this.serverToolName}' reported an error.`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.MCP_TOOL_ERROR,
+        },
+      };
     }
 
     const transformedParts = transformMcpContentToParts(rawResponseParts);
@@ -152,7 +164,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return this.displayName;
+    return safeJsonStringify(this.params);
   }
 }
 
@@ -271,7 +283,7 @@ function transformResourceLinkBlock(block: McpResourceLinkBlock): Part {
  */
 function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
   const funcResponse = sdkResponse?.[0]?.functionResponse;
-  const mcpContent = funcResponse?.response?.content as McpContentBlock[];
+  const mcpContent = funcResponse?.response?.['content'] as McpContentBlock[];
   const toolName = funcResponse?.name || 'unknown tool';
 
   if (!Array.isArray(mcpContent)) {
@@ -308,8 +320,9 @@ function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
  * @returns A formatted string representing the tool's output.
  */
 function getStringifiedResultForDisplay(rawResponse: Part[]): string {
-  const mcpContent = rawResponse?.[0]?.functionResponse?.response
-    ?.content as McpContentBlock[];
+  const mcpContent = rawResponse?.[0]?.functionResponse?.response?.[
+    'content'
+  ] as McpContentBlock[];
 
   if (!Array.isArray(mcpContent)) {
     return '```json\n' + JSON.stringify(rawResponse, null, 2) + '\n```';

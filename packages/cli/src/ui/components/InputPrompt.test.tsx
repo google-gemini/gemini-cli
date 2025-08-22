@@ -119,9 +119,9 @@ describe('InputPrompt', () => {
       visualScrollRow: 0,
       handleInput: vi.fn(),
       move: vi.fn(),
-      moveToOffset: (offset: number) => {
+      moveToOffset: vi.fn((offset: number) => {
         mockBuffer.cursor = [0, offset];
-      },
+      }),
       killLineRight: vi.fn(),
       killLineLeft: vi.fn(),
       openInExternalEditor: vi.fn(),
@@ -160,6 +160,11 @@ describe('InputPrompt', () => {
       setActiveSuggestionIndex: vi.fn(),
       setShowSuggestions: vi.fn(),
       handleAutocomplete: vi.fn(),
+      promptCompletion: {
+        text: '',
+        accept: vi.fn(),
+        clear: vi.fn(),
+      },
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
 
@@ -1211,6 +1216,43 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('multiline paste', () => {
+    it.each([
+      {
+        description: 'with \n newlines',
+        pastedText: 'This \n is \n a \n multiline \n paste.',
+      },
+      {
+        description: 'with extra slashes before \n newlines',
+        pastedText: 'This \\\n is \\\n a \\\n multiline \\\n paste.',
+      },
+      {
+        description: 'with \r\n newlines',
+        pastedText: 'This\r\nis\r\na\r\nmultiline\r\npaste.',
+      },
+    ])('should handle multiline paste $description', async ({ pastedText }) => {
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Simulate a bracketed paste event from the terminal
+      stdin.write(`\x1b[200~${pastedText}\x1b[201~`);
+      await wait();
+
+      // Verify that the buffer's handleInput was called once with the full text
+      expect(props.buffer.handleInput).toHaveBeenCalledTimes(1);
+      expect(props.buffer.handleInput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paste: true,
+          sequence: pastedText,
+        }),
+      );
+
+      unmount();
+    });
+  });
+
   describe('enhanced input UX - double ESC clear functionality', () => {
     it('should clear buffer on second ESC press', async () => {
       const onEscapePromptChange = vi.fn();
@@ -1424,6 +1466,44 @@ describe('InputPrompt', () => {
       expect(props.buffer.text).toBe('initial text');
       expect(props.buffer.cursor).toEqual([0, 3]);
 
+      unmount();
+    });
+  });
+
+  describe('Ctrl+E keyboard shortcut', () => {
+    it('should move cursor to end of current line in multiline input', async () => {
+      props.buffer.text = 'line 1\nline 2\nline 3';
+      props.buffer.cursor = [1, 2];
+      props.buffer.lines = ['line 1', 'line 2', 'line 3'];
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\x05'); // Ctrl+E
+      await wait();
+
+      expect(props.buffer.move).toHaveBeenCalledWith('end');
+      expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should move cursor to end of current line for single line input', async () => {
+      props.buffer.text = 'single line text';
+      props.buffer.cursor = [0, 5];
+      props.buffer.lines = ['single line text'];
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\x05'); // Ctrl+E
+      await wait();
+
+      expect(props.buffer.move).toHaveBeenCalledWith('end');
+      expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
       unmount();
     });
   });

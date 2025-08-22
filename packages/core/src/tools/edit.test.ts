@@ -26,6 +26,10 @@ vi.mock('../utils/editor.js', () => ({
   openDiff: mockOpenDiff,
 }));
 
+vi.mock('../telemetry/loggers.js', () => ({
+  logFileOperation: vi.fn(),
+}));
+
 import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
 import { applyReplacement, EditTool, EditToolParams } from './edit.js';
 import { FileDiff, ToolConfirmationOutcome } from './tools.js';
@@ -36,6 +40,7 @@ import os from 'os';
 import { ApprovalMode, Config } from '../config/config.js';
 import { Content, Part, SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
+import { StandardFileSystemService } from '../services/fileSystemService.js';
 
 describe('EditTool', () => {
   let tool: EditTool;
@@ -60,6 +65,7 @@ describe('EditTool', () => {
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
+      getFileSystemService: () => new StandardFileSystemService(),
       getIdeClient: () => undefined,
       getIdeMode: () => false,
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
@@ -393,13 +399,24 @@ describe('EditTool', () => {
       });
     });
 
-    it('should throw error if params are invalid', async () => {
+    it('should throw error if file path is not absolute', async () => {
       const params: EditToolParams = {
         file_path: 'relative.txt',
         old_string: 'old',
         new_string: 'new',
       };
       expect(() => tool.build(params)).toThrow(/File path must be absolute/);
+    });
+
+    it('should throw error if file path is empty', async () => {
+      const params: EditToolParams = {
+        file_path: '',
+        old_string: 'old',
+        new_string: 'new',
+      };
+      expect(() => tool.build(params)).toThrow(
+        /The 'file_path' parameter must be non-empty./,
+      );
     });
 
     it('should edit an existing file and return diff with fileName', async () => {
@@ -614,6 +631,33 @@ describe('EditTool', () => {
       const result = await invocation.execute(new AbortController().signal);
       expect(result.llmContent).toMatch(/No changes to apply/);
       expect(result.returnDisplay).toMatch(/No changes to apply/);
+    });
+
+    it('should return EDIT_NO_CHANGE error if replacement results in identical content', async () => {
+      // This can happen if ensureCorrectEdit finds a fuzzy match, but the literal
+      // string replacement with `replaceAll` results in no change.
+      const initialContent = 'line 1\nline  2\nline 3'; // Note the double space
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        // old_string has a single space, so it won't be found by replaceAll
+        old_string: 'line 1\nline 2\nline 3',
+        new_string: 'line 1\nnew line 2\nline 3',
+      };
+
+      // Mock ensureCorrectEdit to simulate it finding a match (e.g., via fuzzy matching)
+      // but it doesn't correct the old_string to the literal content.
+      mockEnsureCorrectEdit.mockResolvedValueOnce({ params, occurrences: 1 });
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_CHANGE);
+      expect(result.returnDisplay).toMatch(
+        /No changes to apply. The new content is identical to the current content./,
+      );
+      // Ensure the file was not actually changed
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent);
     });
   });
 

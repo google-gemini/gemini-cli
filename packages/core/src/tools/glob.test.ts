@@ -9,10 +9,14 @@ import { partListUnionToString } from '../core/geminiRequest.js';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
+import { ToolErrorType } from './tool-error.js';
+import * as glob from 'glob';
+
+vi.mock('glob', { spy: true });
 
 describe('GlobTool', () => {
   let tempRootDir: string; // This will be the rootDirectory for the GlobTool instance
@@ -150,6 +154,34 @@ describe('GlobTool', () => {
       expect(result.returnDisplay).toBe('No files found');
     });
 
+    it('should find files with special characters in the name', async () => {
+      await fs.writeFile(path.join(tempRootDir, 'file[1].txt'), 'content');
+      const params: GlobToolParams = { pattern: 'file[1].txt' };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain('Found 1 file(s)');
+      expect(result.llmContent).toContain(
+        path.join(tempRootDir, 'file[1].txt'),
+      );
+    });
+
+    it('should find files with special characters like [] and () in the path', async () => {
+      const filePath = path.join(
+        tempRootDir,
+        'src/app/[test]/(dashboard)/testing/components/code.tsx',
+      );
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
+      await fs.writeFile(filePath, 'content');
+
+      const params: GlobToolParams = {
+        pattern: 'src/app/[test]/(dashboard)/testing/components/code.tsx',
+      };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain('Found 1 file(s)');
+      expect(result.llmContent).toContain(filePath);
+    });
+
     it('should correctly sort files by modification time (newest first)', async () => {
       const params: GlobToolParams = { pattern: '*.sortme' };
       const invocation = globTool.build(params);
@@ -174,6 +206,29 @@ describe('GlobTool', () => {
       expect(path.resolve(filesListed[1])).toBe(
         path.resolve(tempRootDir, 'older.sortme'),
       );
+    });
+
+    it('should return a PATH_NOT_IN_WORKSPACE error if path is outside workspace', async () => {
+      // Bypassing validation to test execute method directly
+      vi.spyOn(globTool, 'validateToolParams').mockReturnValue(null);
+      const params: GlobToolParams = { pattern: '*.txt', path: '/etc' };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      expect(result.error?.type).toBe(ToolErrorType.PATH_NOT_IN_WORKSPACE);
+      expect(result.returnDisplay).toBe('Path is not within workspace');
+    });
+
+    it('should return a GLOB_EXECUTION_ERROR on glob failure', async () => {
+      vi.mocked(glob.glob).mockRejectedValue(new Error('Glob failed'));
+      const params: GlobToolParams = { pattern: '*.txt' };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      expect(result.error?.type).toBe(ToolErrorType.GLOB_EXECUTION_ERROR);
+      expect(result.llmContent).toContain(
+        'Error during glob search operation: Glob failed',
+      );
+      // Reset glob.
+      vi.mocked(glob.glob).mockReset();
     });
   });
 
