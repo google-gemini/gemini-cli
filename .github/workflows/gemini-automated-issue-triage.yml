@@ -274,3 +274,65 @@ jobs:
               issue_number: parseInt(process.env.ISSUE_NUMBER),
               body: 'There is a problem with the Gemini CLI issue triaging. Please check the [action logs](${process.env.RUN_URL}) for details.'
             })
+
+  self-assign-issue:
+    # Only run this job for comments that contain '/assign'
+    if: |-
+      github.repository == 'google-gemini/gemini-cli' &&
+      github.event_name == 'issue_comment' &&
+      contains(github.event.comment.body, '/assign')
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          # Add 'assignments' write permission
+          permission-issues: 'write'
+          permission-assignements: 'write'
+
+      - name: 'Assign issue to user'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |
+            const issueNumber = context.issue.number;
+            const commenter = context.actor;
+
+            // Check if the issue is already assigned
+            const issue = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+            });
+
+            if (issue.data.assignees.length > 0) {
+              console.log(`Issue #${issueNumber} is already assigned.`);
+              // Optionally, comment that it's already assigned
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: `@${commenter} Thanks for taking interest but this issue is already assigned. We'd still love to have you contribute. Check out our [Help Wanted](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22help%20wanted%22) list for issues where we need some extra attention.`
+              });
+              return;
+            }
+
+            // If not taken, assign the user who commented
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              assignees: [commenter]
+            });
+
+            // Post a comment to confirm assignment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `👋 @${commenter}, you've been assigned to this issue! Thank you for taking the time to contribute. Make sure to check out our [contributing guidelines](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md).`
+            });
+            
