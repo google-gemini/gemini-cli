@@ -5,7 +5,6 @@
  */
 
 import path from 'path';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import {
   BaseDeclarativeTool,
@@ -15,7 +14,7 @@ import {
   ToolLocation,
   ToolResult,
 } from './tools.js';
-import { ToolErrorType } from './tool-error.js';
+
 import { PartUnion } from '@google/genai';
 import {
   processSingleFileContent,
@@ -74,49 +73,18 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     const result = await processSingleFileContent(
       this.params.absolute_path,
       this.config.getTargetDir(),
+      this.config.getFileSystemService(),
       this.params.offset,
       this.params.limit,
     );
 
     if (result.error) {
-      // Map error messages to ToolErrorType
-      let errorType: ToolErrorType;
-      let llmContent: string;
-
-      // Check error message patterns to determine error type
-      if (
-        result.error.includes('File not found') ||
-        result.error.includes('does not exist') ||
-        result.error.includes('ENOENT')
-      ) {
-        errorType = ToolErrorType.FILE_NOT_FOUND;
-        llmContent =
-          'Could not read file because no file was found at the specified path.';
-      } else if (
-        result.error.includes('is a directory') ||
-        result.error.includes('EISDIR')
-      ) {
-        errorType = ToolErrorType.INVALID_TOOL_PARAMS;
-        llmContent =
-          'Could not read file because the provided path is a directory, not a file.';
-      } else if (
-        result.error.includes('too large') ||
-        result.error.includes('File size exceeds')
-      ) {
-        errorType = ToolErrorType.FILE_TOO_LARGE;
-        llmContent = `Could not read file. ${result.error}`;
-      } else {
-        // Other read errors map to READ_CONTENT_FAILURE
-        errorType = ToolErrorType.READ_CONTENT_FAILURE;
-        llmContent = `Could not read file. ${result.error}`;
-      }
-
       return {
-        llmContent,
+        llmContent: result.llmContent,
         returnDisplay: result.returnDisplay || 'Error reading file',
         error: {
           message: result.error,
-          type: errorType,
+          type: result.errorType,
         },
       };
     }
@@ -198,18 +166,14 @@ export class ReadFileTool extends BaseDeclarativeTool<
     );
   }
 
-  protected override validateToolParams(
+  protected override validateToolParamValues(
     params: ReadFileToolParams,
   ): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
+    const filePath = params.absolute_path;
+    if (params.absolute_path.trim() === '') {
+      return "The 'absolute_path' parameter must be non-empty.";
     }
 
-    const filePath = params.absolute_path;
     if (!path.isAbsolute(filePath)) {
       return `File path must be absolute, but was relative: ${filePath}. You must provide an absolute path.`;
     }

@@ -29,6 +29,8 @@ Gemini CLI uses `settings.json` files for persistent configuration. There are th
 
 **Note on environment variables in settings:** String values within your `settings.json` files can reference environment variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically resolved when the settings are loaded. For example, if you have an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`.
 
+> **Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI in a corporate environment, please see the [Enterprise Configuration](./enterprise.md) documentation.
+
 ### The `.gemini` directory in your project
 
 In addition to a project settings file, a project's `.gemini` directory can contain other project-specific files related to Gemini CLI's operation, such as:
@@ -60,13 +62,25 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Properties:**
     - **`respectGitIgnore`** (boolean): Whether to respect .gitignore patterns when discovering files. When set to `true`, git-ignored files (like `node_modules/`, `dist/`, `.env`) are automatically excluded from @ commands and file listing operations.
     - **`enableRecursiveFileSearch`** (boolean): Whether to enable searching recursively for filenames under the current tree when completing @ prefixes in the prompt.
+    - **`disableFuzzySearch`** (boolean): When `true`, disables the fuzzy search capabilities when searching for files, which can improve performance on projects with a large number of files.
   - **Example:**
     ```json
     "fileFiltering": {
       "respectGitIgnore": true,
-      "enableRecursiveFileSearch": false
+      "enableRecursiveFileSearch": false,
+      "disableFuzzySearch": true
     }
     ```
+
+### Troubleshooting File Search Performance
+
+If you are experiencing performance issues with file searching (e.g., with `@` completions), especially in projects with a very large number of files, here are a few things you can try in order of recommendation:
+
+1.  **Use `.geminiignore`:** Create a `.geminiignore` file in your project root to exclude directories that contain a large number of files that you don't need to reference (e.g., build artifacts, logs, `node_modules`). Reducing the total number of files crawled is the most effective way to improve performance.
+
+2.  **Disable Fuzzy Search:** If ignoring files is not enough, you can disable fuzzy search by setting `disableFuzzySearch` to `true` in your `settings.json` file. This will use a simpler, non-fuzzy matching algorithm, which can be faster.
+
+3.  **Disable Recursive File Search:** As a last resort, you can disable recursive file search entirely by setting `enableRecursiveFileSearch` to `false`. This will be the fastest option as it avoids a recursive crawl of your project. However, it means you will need to type the full path to files when using `@` completions.
 
 - **`coreTools`** (array of strings):
   - **Description:** Allows you to specify a list of core tool names that should be made available to the model. This can be used to restrict the set of built-in tools. See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools. You can also specify command-specific restrictions for tools that support it, like the `ShellTool`. For example, `"coreTools": ["ShellTool(ls -l)"]` will only allow the `ls -l` command to be executed.
@@ -127,16 +141,20 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Example:** `"toolCallCommand": "bin/call_tool"`
 
 - **`mcpServers`** (object):
-  - **Description:** Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools. Gemini CLI attempts to connect to each configured MCP server to discover available tools. If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts. Note that the system might strip certain schema properties from MCP tool definitions for compatibility.
+  - **Description:** Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools. Gemini CLI attempts to connect to each configured MCP server to discover available tools. If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts. Note that the system might strip certain schema properties from MCP tool definitions for compatibility. At least one of `command`, `url`, or `httpUrl` must be provided. If multiple are specified, the order of precedence is `httpUrl`, then `url`, then `command`.
   - **Default:** Empty
   - **Properties:**
     - **`<SERVER_NAME>`** (object): The server parameters for the named server.
-      - `command` (string, required): The command to execute to start the MCP server.
+      - `command` (string, optional): The command to execute to start the MCP server via standard I/O.
       - `args` (array of strings, optional): Arguments to pass to the command.
       - `env` (object, optional): Environment variables to set for the server process.
       - `cwd` (string, optional): The working directory in which to start the server.
+      - `url` (string, optional): The URL of an MCP server that uses Server-Sent Events (SSE) for communication.
+      - `httpUrl` (string, optional): The URL of an MCP server that uses streamable HTTP for communication.
+      - `headers` (object, optional): A map of HTTP headers to send with requests to `url` or `httpUrl`.
       - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
       - `trust` (boolean, optional): Trust this server and bypass all tool call confirmations.
+      - `description` (string, optional): A brief description of the server, which may be used for display purposes.
       - `includeTools` (array of strings, optional): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (whitelist behavior). If not specified, all tools from the server are enabled by default.
       - `excludeTools` (array of strings, optional): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
   - **Example:**
@@ -161,6 +179,20 @@ In addition to a project settings file, a project's `.gemini` directory can cont
         "env": {
           "API_KEY": "$MY_API_TOKEN"
         }
+      },
+      "mySseServer": {
+        "url": "http://localhost:8081/events",
+        "headers": {
+          "Authorization": "Bearer $MY_SSE_TOKEN"
+        },
+        "description": "An example SSE-based MCP server."
+      },
+      "myStreamableHttpServer": {
+        "httpUrl": "http://localhost:8082/stream",
+        "headers": {
+          "X-API-Key": "$MY_HTTP_API_KEY"
+        },
+        "description": "An example Streamable HTTP-based MCP server."
       }
     }
     ```
@@ -288,6 +320,20 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "showLineNumbers": false
     ```
 
+- **`accessibility`** (object):
+  - **Description:** Configures accessibility features for the CLI.
+  - **Properties:**
+    - **`screenReader`** (boolean): Enables screen reader mode, which adjusts the TUI for better compatibility with screen readers. This can also be enabled with the `--screen-reader` command-line flag, which will take precedence over the setting.
+    - **`disableLoadingPhrases`** (boolean): Disables the display of loading phrases during operations.
+  - **Default:** `{"screenReader": false, "disableLoadingPhrases": false}`
+  - **Example:**
+    ```json
+    "accessibility": {
+      "screenReader": true,
+      "disableLoadingPhrases": true
+    }
+    ```
+
 ### Example `settings.json`:
 
 ```json
@@ -336,7 +382,7 @@ The CLI keeps a history of shell commands you run. To avoid conflicts between di
 
 ## Environment Variables & `.env` Files
 
-Environment variables are a common way to configure applications, especially for sensitive information like API keys or for settings that might change between environments.
+Environment variables are a common way to configure applications, especially for sensitive information like API keys or for settings that might change between environments. For authentication setup, see the [Authentication documentation](./authentication.md) which covers all available authentication methods.
 
 The CLI automatically loads environment variables from an `.env` file. The loading order is:
 
@@ -346,9 +392,9 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 
 **Environment Variable Exclusion:** Some environment variables (like `DEBUG` and `DEBUG_MODE`) are automatically excluded from being loaded from project `.env` files to prevent interference with gemini-cli behavior. Variables from `.gemini/.env` files are never excluded. You can customize this behavior using the `excludedProjectEnvVars` setting in your `settings.json` file.
 
-- **`GEMINI_API_KEY`** (Required):
+- **`GEMINI_API_KEY`**:
   - Your API key for the Gemini API.
-  - **Crucial for operation.** The CLI will not function without it.
+  - One of several available [authentication methods](./authentication.md).
   - Set this in your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) or an `.env` file.
 - **`GEMINI_MODEL`**:
   - Specifies the default Gemini model to use.
@@ -455,6 +501,8 @@ Arguments passed directly when running the CLI can override other configurations
   - Can be specified multiple times or as comma-separated values.
   - 5 directories can be added at maximum.
   - Example: `--include-directories /path/to/project1,/path/to/project2` or `--include-directories /path/to/project1 --include-directories /path/to/project2`
+- **`--screen-reader`**:
+  - Enables screen reader mode for accessibility.
 - **`--version`**:
   - Displays the version of the CLI.
 

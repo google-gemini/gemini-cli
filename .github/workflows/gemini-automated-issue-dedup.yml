@@ -57,7 +57,7 @@ jobs:
           password: '${{ secrets.GITHUB_TOKEN }}'
 
       - name: 'Find Duplicate Issues'
-        uses: 'google-github-actions/run-gemini-cli@06123c6a203eb7a964ce3be7c48479cc66059f23' # ratchet:google-github-actions/run-gemini-cli@v0
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_issue_deduplication'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
@@ -172,6 +172,7 @@ jobs:
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
 
       - name: 'Comment and Label Duplicate Issue'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
@@ -184,8 +185,13 @@ jobs:
             core.info(`Raw duplicates JSON: ${rawJson}`);
             let parsedJson;
             try {
-              const trimmedJson = rawJson.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '').trim();
-              parsedJson = JSON.parse(trimmedJson);
+              const jsonStringMatch = rawJson.match(/{[\s\S]*}/);
+              if (!jsonStringMatch) {
+                core.setFailed(`Could not find JSON object in the output.\nRaw output: ${rawJson}`);
+                return;
+              }
+              const jsonString = jsonStringMatch[0];
+              parsedJson = JSON.parse(jsonString);
               core.info(`Parsed duplicates JSON: ${JSON.stringify(parsedJson)}`);
             } catch (err) {
               core.setFailed(`Failed to parse duplicates JSON from Gemini output: ${err.message}\nRaw output: ${rawJson}`);
