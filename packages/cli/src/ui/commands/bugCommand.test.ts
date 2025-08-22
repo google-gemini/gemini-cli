@@ -11,18 +11,21 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import { getCliVersion } from '../../utils/version.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
-import { HistoryItem, ToolCallStatus } from '../types.js';
+import { HistoryItem, ToolCallStatus, MessageType } from '../types.js';
 
 // Mock dependencies
 vi.mock('open');
 vi.mock('../../utils/version.js');
-
 vi.mock('../utils/formatters.js');
+vi.mock('../../ui/hooks/uiPrompt.js', () => ({
+  ui: {
+    promptYesNo: vi.fn(),
+  },
+}));
 vi.mock('node:process', () => ({
   default: {
     platform: 'test-platform',
     version: 'v20.0.0',
-    // Keep other necessary process properties if needed by other parts of the code
     env: process.env,
     memoryUsage: () => ({ rss: 0 }),
   },
@@ -40,17 +43,14 @@ describe('bugCommand', () => {
     vi.clearAllMocks();
   });
 
+  // === Original tests ===
+
   it('should generate the default GitHub issue URL', async () => {
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => undefined,
-        },
+        config: { getModel: () => 'gemini-pro', getBugCommand: () => undefined },
       },
-      ui: {
-        history: [],
-      },
+      ui: { history: [] },
     });
 
     if (!bugCommand.action) throw new Error('Action is not defined');
@@ -87,18 +87,12 @@ describe('bugCommand', () => {
   });
 
   it('should use a custom URL template from config if provided', async () => {
-    const customTemplate =
-      'https://internal.bug-tracker.com/new?desc={title}&details={info}';
+    const customTemplate = 'https://internal.bug-tracker.com/new?desc={title}&details={info}';
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => ({ urlTemplate: customTemplate }),
-        },
+        config: { getModel: () => 'gemini-pro', getBugCommand: () => ({ urlTemplate: customTemplate }) },
       },
-      ui: {
-        history: [],
-      },
+      ui: { history: [] },
     });
 
     if (!bugCommand.action) throw new Error('Action is not defined');
@@ -120,17 +114,12 @@ describe('bugCommand', () => {
   });
 
   it('should correctly format multi-line prompts and responses', async () => {
-    const multiLinePrompt = `First line of prompt.
-Second line of prompt.`;
-    const multiLineResponse = `First line of response.
-Second line of response.`;
+    const multiLinePrompt = `First line of prompt.\nSecond line of prompt.`;
+    const multiLineResponse = `First line of response.\nSecond line of response.`;
 
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => undefined,
-        },
+        config: { getModel: () => 'gemini-pro', getBugCommand: () => undefined },
       },
       ui: {
         history: [
@@ -178,29 +167,13 @@ Second line of response.`;
   it('should concatenate multiple Gemini responses since the last user prompt', async () => {
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => undefined,
-        },
+        config: { getModel: () => 'gemini-pro', getBugCommand: () => undefined },
       },
       ui: {
         history: [
           { type: 'user', text: 'show me my files', id: 1 },
           { type: 'gemini', text: 'Okay, which files?', id: 2 },
-          {
-            type: 'tool_group',
-            tools: [
-              {
-                name: 'list_files',
-                status: ToolCallStatus.Success,
-                callId: '1',
-                description: '',
-                resultDisplay: undefined,
-                confirmationDetails: undefined,
-              },
-            ],
-            id: 3,
-          },
+          { type: 'tool_group', tools: [{ name: 'list_files', status: ToolCallStatus.Success, callId: '1', description: '', resultDisplay: undefined, confirmationDetails: undefined }], id: 3 },
           { type: 'gemini', text: 'I have listed the files.', id: 4 },
           { type: 'user', text: '/bug A complex bug', id: 5 },
         ] as HistoryItem[],
@@ -249,10 +222,7 @@ Second line of response.`;
     const longText = 'a'.repeat(8000);
     const mockContext = createMockCommandContext({
       services: {
-        config: {
-          getModel: () => 'gemini-pro',
-          getBugCommand: () => undefined,
-        },
+        config: { getModel: () => 'gemini-pro', getBugCommand: () => undefined },
       },
       ui: {
         history: [
@@ -298,5 +268,70 @@ Second line of response.`;
 
     expect(open).toHaveBeenCalledWith(expectedUrl);
     expect(expectedUrl.length).toBeLessThan(8000);
+  });
+
+  // === New tests: consent & redaction ===
+
+  it('should include last prompt/response when user consents', async () => {
+    const mockPromptYesNo = vi.mocked(
+      (await import('../../ui/hooks/uiPrompt.js')).ui.promptYesNo
+    );
+    mockPromptYesNo.mockResolvedValue(true);
+
+    const sensitivePrompt = 'My password is secret123';
+    const sensitiveResponse = 'Here is the token: ABC123TOKEN';
+
+    const mockContext = createMockCommandContext({
+      services: {
+        config: { getModel: () => 'gemini-pro', getBugCommand: () => undefined },
+      },
+      ui: {
+        history: [
+          { type: 'user', text: sensitivePrompt, id: 1 },
+          { type: 'gemini', text: sensitiveResponse, id: 2 },
+          { type: 'user', text: '/bug A sensitive bug', id: 3 },
+        ],
+      },
+    });
+
+    if (!bugCommand.action) throw new Error('Action is not defined');
+    await bugCommand.action(mockContext, 'A sensitive bug');
+
+    expect(mockPromptYesNo).toHaveBeenCalled();
+
+    const calledUrl = vi.mocked(open).mock.calls[0][0];
+    expect(calledUrl).toContain(encodeURIComponent('A sensitive bug'));
+    expect(calledUrl).toContain('N/A'); // redacted sensitive info
+    expect(calledUrl).not.toContain('secret123');
+    expect(calledUrl).not.toContain('ABC123TOKEN');
+  });
+
+  it('should skip last prompt/response if user declines', async () => {
+    const mockPromptYesNo = vi.mocked(
+      (await import('../../ui/hooks/uiPrompt.js')).ui.promptYesNo
+    );
+    mockPromptYesNo.mockResolvedValue(false);
+
+    const mockContext = createMockCommandContext({
+      services: {
+        config: { getModel: () => 'gemini-pro', getBugCommand: () => undefined },
+      },
+      ui: {
+        history: [
+          { type: 'user', text: 'Show me files', id: 1 },
+          { type: 'gemini', text: 'Files listed', id: 2 },
+          { type: 'user', text: '/bug Another bug', id: 3 },
+        ],
+      },
+    });
+
+    if (!bugCommand.action) throw new Error('Action is not defined');
+    await bugCommand.action(mockContext, 'Another bug');
+
+    const calledUrl = vi.mocked(open).mock.calls[0][0];
+    expect(calledUrl).toContain(encodeURIComponent('Another bug'));
+    expect(calledUrl).toContain(encodeURIComponent('N/A')); // last prompt/response skipped
+    expect(calledUrl).not.toContain('Show me files');
+    expect(calledUrl).not.toContain('Files listed');
   });
 });
