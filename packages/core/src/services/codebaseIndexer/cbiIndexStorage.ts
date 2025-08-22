@@ -156,7 +156,7 @@ export class CBIIndexStorage {
         exists: true,
         fileCount: header.total_files,
         vectorCount: header.total_vectors,
-        lastUpdated: new Date(),
+        lastUpdated: stats.mtime,
         sizeBytes: stats.size
       };
     } catch {
@@ -1178,6 +1178,13 @@ export class CBIIndexStorage {
       
       await targetHandle.sync();
       await fs.rename(tempIndexPath, this.indexPath);
+    } catch (error) {
+      try {
+        await fs.unlink(tempIndexPath);
+      } catch (unlinkError) {
+        console.warn('Failed to clean up temporary index file:', unlinkError);
+      }
+      throw error;
     } finally {
       await sourceHandle.close();
       await targetHandle.close();

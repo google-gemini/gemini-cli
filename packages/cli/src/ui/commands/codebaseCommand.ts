@@ -204,16 +204,26 @@ const deleteCommand: SlashCommand = {
     try {
       await indexer.deleteIndex();
       
-      const geminiClient = config.getGeminiClient();
-      if (geminiClient) {
-        await geminiClient.refreshIndexContext();
-      }
-
-      return {
-        type: 'message',
-        messageType: 'info',
+      const result = {
+        type: 'message' as const,
+        messageType: 'info' as const,
         content: `✅ Index deleted successfully. Freed ${status.sizeBytes ? (status.sizeBytes / (1024 * 1024)).toFixed(1) : 'unknown'} MB of disk space.`,
       };
+
+      const geminiClient = config.getGeminiClient();
+      if (geminiClient) {
+        try {
+          await geminiClient.refreshIndexContext();
+        } catch (refreshError) {
+          return {
+            type: 'message',
+            messageType: 'info',
+            content: `${result.content}\n\n⚠️ Index was deleted successfully, but failed to refresh context: ${refreshError instanceof Error ? refreshError.message : String(refreshError)}`,
+          };
+        }
+      }
+
+      return result;
     } catch (error) {
       return {
         type: 'message',
