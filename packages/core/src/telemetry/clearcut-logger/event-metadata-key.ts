@@ -219,6 +219,9 @@ export enum EventMetadataKey {
   // Logs user removed lines in edit/write tool response.
   GEMINI_CLI_USER_REMOVED_LINES = 50,
 
+  // Logs the programming language of the project.
+  GEMINI_CLI_PROGRAMMING_LANGUAGE = 56,
+
   // ==========================================================================
   // Kitty Sequence Overflow Event Keys
   // ===========================================================================
@@ -248,24 +251,40 @@ export enum EventMetadataKey {
   GEMINI_CLI_START_SESSION_MCP_TOOLS = 65,
 
   // ==========================================================================
+
   // Research Event Keys
   // ===========================================================================
 
   // Logs the research opt-in status (true/false)
-  GEMINI_CLI_RESEARCH_OPT_IN_STATUS = 66,
+  GEMINI_CLI_RESEARCH_OPT_IN_STATUS = 70,
 
   // Logs the contact email for research participation
-  GEMINI_CLI_RESEARCH_CONTACT_EMAIL = 67,
+  GEMINI_CLI_RESEARCH_CONTACT_EMAIL = 71,
 
   // Logs the user ID for research events
-  GEMINI_CLI_RESEARCH_USER_ID = 68,
+  GEMINI_CLI_RESEARCH_USER_ID = 72,
 
   // Logs the type of research feedback
-  GEMINI_CLI_RESEARCH_FEEDBACK_TYPE = 69,
+  GEMINI_CLI_RESEARCH_FEEDBACK_TYPE = 73,
 
   // Logs the content of research feedback
-  GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT = 70,
+  GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT = 74,
 
   // Logs survey responses for research feedback (JSON stringified)
-  GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 71,
+  GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 75,
+
+  // File Operation Event Keys
+  // ===========================================================================
+
+  // Logs the operation type of the file operation.
+  GEMINI_CLI_FILE_OPERATION_TYPE = 66,
+
+  // Logs the number of lines in the file operation.
+  GEMINI_CLI_FILE_OPERATION_LINES = 67,
+
+  // Logs the mimetype of the file in the file operation.
+  GEMINI_CLI_FILE_OPERATION_MIMETYPE = 68,
+
+  // Logs the extension of the file in the file operation.
+  GEMINI_CLI_FILE_OPERATION_EXTENSION = 69,
 }

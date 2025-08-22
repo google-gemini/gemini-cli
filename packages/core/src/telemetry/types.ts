@@ -8,12 +8,14 @@ import { GenerateContentResponseUsageMetadata } from '@google/genai';
 import { Config } from '../config/config.js';
 import { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { FileDiff } from '../tools/tools.js';
+import { DiffStat, FileDiff } from '../tools/tools.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   getDecisionFromOutcome,
   ToolCallDecision,
 } from './tool-call-decision.js';
+import { FileOperation } from './metrics.js';
+export { ToolCallDecision };
 import { ToolRegistry } from '../tools/tool-registry.js';
 
 export interface BaseTelemetryEvent {
@@ -399,6 +401,7 @@ export class KittySequenceOverflowEvent {
   }
 }
 
+
 export interface ResearchOptInEvent extends BaseTelemetryEvent {
   'event.name': 'research_opt_in';
   'event.timestamp': string;
@@ -444,6 +447,38 @@ export function makeResearchFeedbackEvent({
     survey_responses,
     user_id,
   };
+  
+export class FileOperationEvent implements BaseTelemetryEvent {
+  'event.name': 'file_operation';
+  'event.timestamp': string;
+  tool_name: string;
+  operation: FileOperation;
+  lines?: number;
+  mimetype?: string;
+  extension?: string;
+  diff_stat?: DiffStat;
+  programming_language?: string;
+
+  constructor(
+    tool_name: string,
+    operation: FileOperation,
+    lines?: number,
+    mimetype?: string,
+    extension?: string,
+    diff_stat?: DiffStat,
+    programming_language?: string,
+  ) {
+    this['event.name'] = 'file_operation';
+    this['event.timestamp'] = new Date().toISOString();
+    this.tool_name = tool_name;
+    this.operation = operation;
+    this.lines = lines;
+    this.mimetype = mimetype;
+    this.extension = extension;
+    this.diff_stat = diff_stat;
+    this.programming_language = programming_language;
+  }
+
 }
 
 export type TelemetryEvent =
@@ -463,3 +498,4 @@ export type TelemetryEvent =
   | SlashCommandEvent
   | ResearchOptInEvent
   | ResearchFeedbackEvent;
+  | FileOperationEvent;

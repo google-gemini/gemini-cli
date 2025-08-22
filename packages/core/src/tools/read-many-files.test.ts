@@ -47,6 +47,10 @@ vi.mock('mime-types', () => {
   };
 });
 
+vi.mock('../telemetry/loggers.js', () => ({
+  logFileOperation: vi.fn(),
+}));
+
 describe('ReadManyFilesTool', () => {
   let tool: ReadManyFilesTool;
   let tempRootDir: string;
@@ -217,6 +221,7 @@ describe('ReadManyFilesTool', () => {
       const expectedPath = path.join(tempRootDir, 'file1.txt');
       expect(result.llmContent).toEqual([
         `--- ${expectedPath} ---\n\nContent of file1\n\n`,
+        `\n--- End of content ---`,
       ]);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
@@ -281,7 +286,10 @@ describe('ReadManyFilesTool', () => {
       const result = await invocation.execute(new AbortController().signal);
       const content = result.llmContent as string[];
       const expectedPath = path.join(tempRootDir, 'src/main.ts');
-      expect(content).toEqual([`--- ${expectedPath} ---\n\nMain content\n\n`]);
+      expect(content).toEqual([
+        `--- ${expectedPath} ---\n\nMain content\n\n`,
+        `\n--- End of content ---`,
+      ]);
       expect(
         content.find((c) => c.includes('src/main.test.ts')),
       ).toBeUndefined();
@@ -310,7 +318,10 @@ describe('ReadManyFilesTool', () => {
       const result = await invocation.execute(new AbortController().signal);
       const content = result.llmContent as string[];
       const expectedPath = path.join(tempRootDir, 'src/app.js');
-      expect(content).toEqual([`--- ${expectedPath} ---\n\napp code\n\n`]);
+      expect(content).toEqual([
+        `--- ${expectedPath} ---\n\napp code\n\n`,
+        `\n--- End of content ---`,
+      ]);
       expect(
         content.find((c) => c.includes('node_modules/some-lib/index.js')),
       ).toBeUndefined();
@@ -363,6 +374,7 @@ describe('ReadManyFilesTool', () => {
             mimeType: 'image/png',
           },
         },
+        '\n--- End of content ---',
       ]);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
@@ -386,6 +398,7 @@ describe('ReadManyFilesTool', () => {
             mimeType: 'image/png',
           },
         },
+        '\n--- End of content ---',
       ]);
     });
 
@@ -422,6 +435,7 @@ describe('ReadManyFilesTool', () => {
             mimeType: 'application/pdf',
           },
         },
+        '\n--- End of content ---',
       ]);
     });
 
@@ -437,6 +451,7 @@ describe('ReadManyFilesTool', () => {
             mimeType: 'application/pdf',
           },
         },
+        '\n--- End of content ---',
       ]);
     });
 
@@ -545,6 +560,7 @@ describe('ReadManyFilesTool', () => {
 Content of receive-detail
 
 `,
+        `\n--- End of content ---`,
       ]);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
@@ -563,6 +579,7 @@ Content of receive-detail
 Content of file[1]
 
 `,
+        `\n--- End of content ---`,
       ]);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
@@ -630,9 +647,10 @@ Content of file[1]
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
 
-      // Verify all files were processed
+      // Verify all files were processed. The content should have fileCount
+      // entries + 1 for the output terminator.
       const content = result.llmContent as string[];
-      expect(content).toHaveLength(fileCount);
+      expect(content).toHaveLength(fileCount + 1);
       for (let i = 0; i < fileCount; i++) {
         expect(content.join('')).toContain(`Batch test ${i}`);
       }
