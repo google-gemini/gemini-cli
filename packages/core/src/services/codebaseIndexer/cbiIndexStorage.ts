@@ -186,7 +186,7 @@ export class CBIIndexStorage {
         
         const pathOffset = stringOffset;
         stringHeap.push(fileIndex.relpath);
-        stringOffset += Buffer.byteLength(fileIndex.relpath, 'utf8');
+        stringOffset += Buffer.byteLength(fileIndex.relpath, 'utf8') + 1;
 
         const firstVectorId = currentVectorId;
         const numVectors = fileIndex.embeddings.length;
@@ -203,7 +203,7 @@ export class CBIIndexStorage {
           const unit = fileIndex.units[i];
           const textOffset = stringOffset;
           stringHeap.push(unit.text);
-          stringOffset += Buffer.byteLength(unit.text, 'utf8');
+          stringOffset += Buffer.byteLength(unit.text, 'utf8') + 1;
 
           blockMetadatas.push({
             file_id: fileId,
@@ -249,9 +249,7 @@ export class CBIIndexStorage {
         allVectors.push(...chunk);
         
         // Allow garbage collection between chunks
-        if (global.gc) {
-          global.gc();
-        }
+        // Note: Explicit GC calls are discouraged - let V8 manage memory automatically
       }
 
       const header = this.createHeader(vectorDim, totalVectors, totalFiles, fileInfos, blockMetadatas, stringHeap, allVectors, hnswGraph);
@@ -1085,7 +1083,7 @@ export class CBIIndexStorage {
 
         const pathOffset = stringOffset;
         newStringHeap.push(relpath);
-        stringOffset += Buffer.byteLength(relpath, 'utf8');
+        stringOffset += Buffer.byteLength(relpath, 'utf8') + 1;
 
         const firstVectorId = currentVectorId;
         const numVectors = fileInfo.num_vectors;
@@ -1109,7 +1107,7 @@ export class CBIIndexStorage {
           const text = this.extractStringFromHeap(stringHeapBuffer, block.text_offset, block.text_len);
           const textOffset = stringOffset;
           newStringHeap.push(text);
-          stringOffset += Buffer.byteLength(text, 'utf8');
+          stringOffset += Buffer.byteLength(text, 'utf8') + 1;
 
           newBlockMetadatas.push({
             file_id: newFileInfos.length - 1,
@@ -1133,7 +1131,7 @@ export class CBIIndexStorage {
       for (const fileIndex of newFileIndices) {
         const pathOffset = stringOffset;
         newStringHeap.push(fileIndex.relpath);
-        stringOffset += Buffer.byteLength(fileIndex.relpath, 'utf8');
+        stringOffset += Buffer.byteLength(fileIndex.relpath, 'utf8') + 1;
 
         const firstVectorId = currentVectorId;
         const numVectors = fileIndex.embeddings.length;
@@ -1150,7 +1148,7 @@ export class CBIIndexStorage {
           const unit = fileIndex.units[i];
           const textOffset = stringOffset;
           newStringHeap.push(unit.text);
-          stringOffset += Buffer.byteLength(unit.text, 'utf8');
+          stringOffset += Buffer.byteLength(unit.text, 'utf8') + 1;
 
           newBlockMetadatas.push({
             file_id: newFileInfos.length - 1,

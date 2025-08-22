@@ -54,6 +54,13 @@ export class CBICodebaseIndexer {
     const startTime = Date.now();
     this.abortController = new AbortController();
     const errors: string[] = [];
+    const stats: ScanStats = {
+      totalFiles: 0,
+      textFiles: 0,
+      binaryFiles: 0,
+      largeFiles: 0,
+      excludedFiles: 0
+    };
     
     try {
       if (await this.storage.indexExists()) {
@@ -65,19 +72,12 @@ export class CBICodebaseIndexer {
         phase: 'scanning',
         processedFiles: 0,
         totalFiles: 0,
-        stats: { totalFiles: 0, textFiles: 0, binaryFiles: 0, largeFiles: 0, excludedFiles: 0 },
+        stats,
         message: '🔍 Scanning files...',
         detail: '0 files found'
       });
 
       const files: string[] = [];
-      const stats: ScanStats = {
-        totalFiles: 0,
-        textFiles: 0,
-        binaryFiles: 0,
-        largeFiles: 0,
-        excludedFiles: 0
-      };
 
       for await (const fileInfo of this.fileDiscovery.scanDirectory(this.storage.getBaseDir())) {
         if (this.abortController.signal.aborted) {
@@ -296,7 +296,7 @@ export class CBICodebaseIndexer {
       const duration = Date.now() - startTime;
       return {
         success: false,
-        stats: { totalFiles: 0, textFiles: 0, binaryFiles: 0, largeFiles: 0, excludedFiles: 0 },
+        stats,
         totalVectors: 0,
         indexSize: 0,
         duration,
@@ -311,6 +311,13 @@ export class CBICodebaseIndexer {
     const startTime = Date.now();
     this.abortController = new AbortController();
     const errors: string[] = [];
+    const stats: ScanStats = {
+      totalFiles: 0,
+      textFiles: 0,
+      binaryFiles: 0,
+      largeFiles: 0,
+      excludedFiles: 0
+    };
     
     try {
       if (!(await this.storage.indexExists())) {
@@ -321,7 +328,7 @@ export class CBICodebaseIndexer {
         phase: 'scanning',
         processedFiles: 0,
         totalFiles: 0,
-        stats: { totalFiles: 0, textFiles: 0, binaryFiles: 0, largeFiles: 0, excludedFiles: 0 },
+        stats,
         message: '🔍 Scanning files for changes...',
         detail: 'Loading existing index metadata...'
       });
@@ -332,19 +339,12 @@ export class CBICodebaseIndexer {
         phase: 'scanning',
         processedFiles: 0,
         totalFiles: 0,
-        stats: { totalFiles: 0, textFiles: 0, binaryFiles: 0, largeFiles: 0, excludedFiles: 0 },
+        stats,
         message: '🔍 Scanning current files...',
         detail: `Found ${existingMetadata.size} files in existing index`
       });
 
       const currentFiles: string[] = [];
-      const stats: ScanStats = {
-        totalFiles: 0,
-        textFiles: 0,
-        binaryFiles: 0,
-        largeFiles: 0,
-        excludedFiles: 0
-      };
 
       for await (const fileInfo of this.fileDiscovery.scanDirectory(this.storage.getBaseDir())) {
         if (this.abortController.signal.aborted) {
@@ -613,7 +613,7 @@ export class CBICodebaseIndexer {
       const duration = Date.now() - startTime;
       return {
         success: false,
-        stats: { totalFiles: 0, textFiles: 0, binaryFiles: 0, largeFiles: 0, excludedFiles: 0 },
+        stats,
         totalVectors: 0,
         indexSize: 0,
         duration,
