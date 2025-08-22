@@ -62,6 +62,8 @@ describe('ShellExecutionService', () => {
     kill: Mock;
     onData: Mock;
     onExit: Mock;
+    write: Mock;
+    resize: Mock;
   };
   let onOutputEventMock: Mock<(event: ShellOutputEvent) => void>;
 
@@ -82,11 +84,15 @@ describe('ShellExecutionService', () => {
       kill: Mock;
       onData: Mock;
       onExit: Mock;
+      write: Mock;
+      resize: Mock;
     };
     mockPtyProcess.pid = 12345;
     mockPtyProcess.kill = vi.fn();
     mockPtyProcess.onData = vi.fn();
     mockPtyProcess.onExit = vi.fn();
+    mockPtyProcess.write = vi.fn();
+    mockPtyProcess.resize = vi.fn();
 
     mockPtySpawn.mockReturnValue(mockPtyProcess);
   });
@@ -106,6 +112,8 @@ describe('ShellExecutionService', () => {
       onOutputEventMock,
       abortController.signal,
       true,
+      80,
+      24,
     );
 
     await new Promise((resolve) => setImmediate(resolve));
@@ -170,6 +178,44 @@ describe('ShellExecutionService', () => {
       expect(result.output).toBe('');
       expect(onOutputEventMock).not.toHaveBeenCalled();
     });
+
+    it('should call onPid with the process id', async () => {
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'ls -l',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        80,
+        24,
+      );
+      mockPtyProcess.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      await handle.result;
+      expect(handle.pid).toBe(12345);
+    });
+  });
+
+  describe('pty interaction', () => {
+    it('should write to the pty', async () => {
+      await simulateExecution('ls -l', (pty) => {
+        pty.onData.mock.calls[0][0]('file1.txt\n');
+        ShellExecutionService.writeToPty(pty.pid!, 'hello');
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      expect(mockPtyProcess.write).toHaveBeenCalledWith('hello');
+    });
+
+    it('should resize the pty', async () => {
+      await simulateExecution('ls -l', (pty) => {
+        pty.onData.mock.calls[0][0]('file1.txt\n');
+        ShellExecutionService.resizePty(pty.pid, 30, 24);
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+      });
+
+      expect(mockPtyProcess.resize).toHaveBeenCalledWith(30, 24);
+    });
   });
 
   describe('Failed Execution', () => {
@@ -228,7 +274,7 @@ describe('ShellExecutionService', () => {
       );
 
       expect(result.aborted).toBe(true);
-      expect(mockPtyProcess.kill).toHaveBeenCalled();
+      expect(mockProcessKill).toHaveBeenCalled();
     });
   });
 
@@ -265,7 +311,6 @@ describe('ShellExecutionService', () => {
       mockIsBinary.mockImplementation((buffer) => buffer.includes(0x00));
 
       await simulateExecution('cat mixed_file', (pty) => {
-        pty.onData.mock.calls[0][0](Buffer.from('some text'));
         pty.onData.mock.calls[0][0](Buffer.from([0x00, 0x01, 0x02]));
         pty.onData.mock.calls[0][0](Buffer.from('more text'));
         pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
@@ -275,7 +320,6 @@ describe('ShellExecutionService', () => {
         (call: [ShellOutputEvent]) => call[0].type,
       );
       expect(eventTypes).toEqual([
-        'data',
         'binary_detected',
         'binary_progress',
         'binary_progress',
@@ -351,6 +395,8 @@ describe('ShellExecutionService child_process fallback', () => {
       onOutputEventMock,
       abortController.signal,
       true,
+      80,
+      24,
     );
 
     await new Promise((resolve) => setImmediate(resolve));
@@ -377,7 +423,7 @@ describe('ShellExecutionService child_process fallback', () => {
       expect(result.error).toBeNull();
       expect(result.aborted).toBe(false);
       expect(result.output).toBe('file1.txt\na warning');
-      expect(handle.pid).toBe(12345);
+      expect(handle.pid).toBe(undefined);
 
       expect(onOutputEventMock).toHaveBeenCalledWith({
         type: 'data',
@@ -649,6 +695,8 @@ describe('ShellExecutionService execution method selection', () => {
     kill: Mock;
     onData: Mock;
     onExit: Mock;
+    write: Mock;
+    resize: Mock;
   };
   let mockChildProcess: EventEmitter & Partial<ChildProcess>;
 
@@ -662,11 +710,16 @@ describe('ShellExecutionService execution method selection', () => {
       kill: Mock;
       onData: Mock;
       onExit: Mock;
+      write: Mock;
+      resize: Mock;
     };
     mockPtyProcess.pid = 12345;
     mockPtyProcess.kill = vi.fn();
     mockPtyProcess.onData = vi.fn();
     mockPtyProcess.onExit = vi.fn();
+    mockPtyProcess.write = vi.fn();
+    mockPtyProcess.resize = vi.fn();
+
     mockPtySpawn.mockReturnValue(mockPtyProcess);
     mockGetPty.mockResolvedValue({
       module: { spawn: mockPtySpawn },

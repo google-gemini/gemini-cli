@@ -14,7 +14,12 @@ import {
   useStdin,
   useStdout,
 } from 'ink';
-import { StreamingState, type HistoryItem, MessageType } from './types.js';
+import {
+  StreamingState,
+  type HistoryItem,
+  MessageType,
+  ToolCallStatus,
+} from './types.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
@@ -62,6 +67,9 @@ import {
   AuthType,
   type IdeContext,
   ideContext,
+  isProQuotaExceededError,
+  isGenericQuotaExceededError,
+  UserTierId,
 } from '@google/gemini-cli-core';
 import {
   IdeIntegrationNudge,
@@ -86,11 +94,6 @@ import { useKittyKeyboardProtocol } from './hooks/useKittyKeyboardProtocol.js';
 import { keyMatchers, Command } from './keyMatchers.js';
 import * as fs from 'fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
-import {
-  isProQuotaExceededError,
-  isGenericQuotaExceededError,
-  UserTierId,
-} from '@google/gemini-cli-core';
 import { UpdateObject } from './utils/updateCheck.js';
 import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
@@ -101,6 +104,7 @@ import { SettingsDialog } from './components/SettingsDialog.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
+import { SHELL_COMMAND_NAME } from './constants.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 // Maximum number of queued messages to display in UI to prevent performance issues
@@ -209,6 +213,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [shellInputFocused, setShellInputFocused] = useState(false);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
@@ -467,6 +472,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   // Terminal and UI setup
   const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
+
+  config.setTerminalHeight(terminalHeight);
+  config.setTerminalWidth(terminalWidth);
+
   const isNarrow = isNarrowWidth(terminalWidth);
   const { stdin, setRawMode } = useStdin();
   const isInitialMount = useRef(true);
@@ -572,6 +581,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setModelSwitchedFromQuotaError,
     refreshStatic,
     () => cancelHandlerRef.current(),
+    setShellInputFocused,
+    terminalWidth,
+    terminalHeight,
+    shellInputFocused,
   );
 
   // Message queue for handling input during streaming
@@ -632,8 +645,40 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   );
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
-  const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
-  pendingHistoryItems.push(...pendingGeminiHistoryItems);
+  const pendingHistoryItems = useMemo(
+    () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
+    [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
+  );
+
+  const [activeShellPtyId, setActiveShellPtyId] = useState<number | null>(null);
+
+  useEffect(() => {
+    let ptyId: number | null = null;
+    for (const item of pendingHistoryItems) {
+      if (item.type === 'tool_group') {
+        for (const tool of item.tools) {
+          if (
+            (tool.name === SHELL_COMMAND_NAME || tool.name === 'Shell') &&
+            tool.status === ToolCallStatus.Executing &&
+            tool.ptyId
+          ) {
+            ptyId = tool.ptyId;
+            break;
+          }
+        }
+      }
+      if (ptyId) {
+        break;
+      }
+    }
+    setActiveShellPtyId(ptyId);
+  }, [pendingHistoryItems]);
+
+  useEffect(() => {
+    if (activeShellPtyId === null) {
+      setShellInputFocused(false);
+    }
+  }, [activeShellPtyId]);
 
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
@@ -706,6 +751,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
+      } else if (keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS](key)) {
+        if (activeShellPtyId || shellInputFocused) {
+          setShellInputFocused((prev) => !prev);
+        }
       }
     },
     [
@@ -727,6 +776,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       handleSlashCommand,
       isAuthenticating,
       cancelOngoingRequest,
+      activeShellPtyId,
+      shellInputFocused,
     ],
   );
 
@@ -853,6 +904,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const geminiClient = config.getGeminiClient();
 
   useEffect(() => {
+    if (activeShellPtyId) {
+      geminiClient.resizeShell(
+        activeShellPtyId,
+        Math.floor(terminalWidth * 0.5),
+        Math.floor(terminalHeight * 0.5),
+      );
+    }
+  }, [terminalHeight, terminalWidth, activeShellPtyId, geminiClient]);
+
+  useEffect(() => {
     if (
       initialPrompt &&
       !initialPromptSubmitted.current &&
@@ -960,6 +1021,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 isPending={true}
                 config={config}
                 isFocused={!isEditorDialogOpen}
+                activeShellPtyId={activeShellPtyId}
+                shellInputFocused={shellInputFocused}
               />
             ))}
             <ShowMoreLines constrainHeight={constrainHeight} />
@@ -1092,23 +1155,24 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             />
           ) : (
             <>
-              <LoadingIndicator
-                thought={
-                  streamingState === StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.disableLoadingPhrases ||
-                  config.getScreenReader()
-                    ? undefined
-                    : thought
-                }
-                currentLoadingPhrase={
-                  config.getAccessibility()?.disableLoadingPhrases ||
-                  config.getScreenReader()
-                    ? undefined
-                    : currentLoadingPhrase
-                }
-                elapsedTime={elapsedTime}
-              />
-
+              {!shellInputFocused && (
+                <LoadingIndicator
+                  thought={
+                    streamingState === StreamingState.WaitingForConfirmation ||
+                    config.getAccessibility()?.disableLoadingPhrases ||
+                    config.getScreenReader()
+                      ? undefined
+                      : thought
+                  }
+                  currentLoadingPhrase={
+                    config.getAccessibility()?.disableLoadingPhrases ||
+                    config.getScreenReader()
+                      ? undefined
+                      : currentLoadingPhrase
+                  }
+                  elapsedTime={elapsedTime}
+                />
+              )}
               {/* Display queued messages below loading indicator */}
               {messageQueue.length > 0 && (
                 <Box flexDirection="column" marginTop={1}>
@@ -1217,6 +1281,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   focus={isFocused}
                   vimHandleInput={vimHandleInput}
                   placeholder={placeholder}
+                  isShellInputFocused={shellInputFocused}
                 />
               )}
             </>

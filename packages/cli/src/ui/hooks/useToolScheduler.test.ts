@@ -60,6 +60,8 @@ const mockConfig = {
     model: 'test-model',
     authType: 'oauth-personal',
   }),
+  getTerminalWidth: () => 80,
+  getTerminalHeight: () => 24,
 };
 
 class MockToolInvocation extends BaseToolInvocation<object, ToolResult> {
@@ -183,7 +185,6 @@ describe('useReactToolScheduler in YOLO Mode', () => {
         onComplete,
         mockConfig as unknown as Config,
         setPendingHistoryItem,
-        () => undefined,
         () => {},
       ),
     );
@@ -228,8 +229,8 @@ describe('useReactToolScheduler in YOLO Mode', () => {
       request.args,
       expect.any(AbortSignal),
       undefined,
-      undefined,
-      undefined,
+      80,
+      24,
     );
 
     // Check that onComplete was called with success
@@ -338,7 +339,6 @@ describe('useReactToolScheduler', () => {
         onComplete,
         mockConfig as unknown as Config,
         setPendingHistoryItem,
-        () => undefined,
         () => {},
       ),
     );
@@ -381,8 +381,8 @@ describe('useReactToolScheduler', () => {
       request.args,
       expect.any(AbortSignal),
       undefined,
-      undefined,
-      undefined,
+      80,
+      24,
     );
     expect(onComplete).toHaveBeenCalledWith([
       expect.objectContaining({

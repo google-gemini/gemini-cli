@@ -150,9 +150,7 @@ class ShellToolInvocation extends BaseToolInvocation<
               if (isBinaryStream) break;
               cumulativeOutput = event.chunk;
               currentDisplayOutput = cumulativeOutput;
-              if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                shouldUpdate = true;
-              }
+              shouldUpdate = true;
               break;
             case 'binary_detected':
               isBinaryStream = true;

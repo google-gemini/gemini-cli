@@ -5,6 +5,7 @@
  */
 
 import { getPty, PtyImplementation } from '../utils/getPty.js';
+import type { IPty } from '@lydell/node-pty';
 import { spawn as cpSpawn } from 'child_process';
 import { TextDecoder } from 'util';
 import os from 'os';
@@ -76,12 +77,18 @@ export type ShellOutputEvent =
       bytesReceived: number;
     };
 
+interface ActivePty {
+  ptyProcess: IPty;
+  headlessTerminal: pkg.Terminal;
+}
+
 /**
  * A centralized service for executing shell commands with robust process
  * management, cross-platform compatibility, and streaming output capabilities.
  *
  */
 export class ShellExecutionService {
+  private static activePtys = new Map<number, ActivePty>();
   /**
    * Executes a shell command using `node-pty`, capturing all output and lifecycle events.
    *
@@ -229,7 +236,7 @@ export class ShellExecutionService {
             signal: signal ? os.constants.signals[signal] : null,
             error,
             aborted: abortSignal.aborted,
-            pid: child.pid,
+            pid: undefined,
             executionMethod: 'child_process',
           });
         };
@@ -287,7 +294,7 @@ export class ShellExecutionService {
         }
       });
 
-      return { pid: child.pid, result };
+      return { pid: undefined, result };
     } catch (e) {
       const error = e as Error;
       return {
@@ -313,8 +320,12 @@ export class ShellExecutionService {
     abortSignal: AbortSignal,
     terminalColumns: number | undefined,
     terminalRows: number | undefined,
-    ptyInfo: PtyImplementation | undefined,
+    ptyInfo: PtyImplementation,
   ): ShellExecutionHandle {
+    if (!ptyInfo) {
+      // This should not happen, but as a safeguard...
+      throw new Error('PTY implementation not found');
+    }
     try {
       const cols = terminalColumns ?? 80;
       const rows = terminalRows ?? 30;
@@ -324,9 +335,9 @@ export class ShellExecutionService {
         ? ['/c', commandToExecute]
         : ['-c', commandToExecute];
 
-      const ptyProcess = ptyInfo?.module.spawn(shell, args, {
+      const ptyProcess = ptyInfo.module.spawn(shell, args, {
         cwd,
-        name: 'xterm-color',
+        name: 'xterm',
         cols,
         rows,
         env: {
@@ -343,7 +354,11 @@ export class ShellExecutionService {
           allowProposedApi: true,
           cols,
           rows,
+          cursorBlink: true,
         });
+
+        this.activePtys.set(ptyProcess.pid, { ptyProcess, headlessTerminal });
+
         let processingChain = Promise.resolve();
         let decoder: TextDecoder | null = null;
         let output = '';
@@ -354,6 +369,24 @@ export class ShellExecutionService {
         let isStreamingRawContent = true;
         const MAX_SNIFF_SIZE = 4096;
         let sniffedBytes = 0;
+
+        let renderTimeout: NodeJS.Timeout | null = null;
+        const RENDER_INTERVAL = 100;
+
+        const render = () => {
+          renderTimeout = null;
+          const newStrippedOutput = getFullText(headlessTerminal);
+          if (output !== newStrippedOutput) {
+            output = newStrippedOutput;
+            onOutputEvent({ type: 'data', chunk: newStrippedOutput });
+          }
+        };
+
+        const scheduleRender = () => {
+          if (!renderTimeout) {
+            renderTimeout = setTimeout(render, RENDER_INTERVAL);
+          }
+        };
 
         const handleOutput = (data: Buffer) => {
           processingChain = processingChain.then(
@@ -383,9 +416,7 @@ export class ShellExecutionService {
                 if (isStreamingRawContent) {
                   const decodedChunk = decoder.decode(data, { stream: true });
                   headlessTerminal.write(decodedChunk, () => {
-                    const newStrippedOutput = getFullText(headlessTerminal);
-                    output = newStrippedOutput;
-                    onOutputEvent({ type: 'data', chunk: newStrippedOutput });
+                    scheduleRender();
                     resolve();
                   });
                 } else {
@@ -412,8 +443,13 @@ export class ShellExecutionService {
           ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
             exited = true;
             abortSignal.removeEventListener('abort', abortHandler);
+            this.activePtys.delete(ptyProcess.pid);
 
             processingChain.then(() => {
+              if (renderTimeout) {
+                clearTimeout(renderTimeout);
+              }
+              render();
               const finalBuffer = Buffer.concat(outputChunks);
 
               resolve({
@@ -424,7 +460,9 @@ export class ShellExecutionService {
                 error,
                 aborted: abortSignal.aborted,
                 pid: ptyProcess.pid,
-                executionMethod: ptyInfo?.name ?? 'node-pty',
+                executionMethod:
+                  (ptyInfo?.name as 'node-pty' | 'lydell-node-pty') ??
+                  'node-pty',
               });
             });
           },
@@ -432,7 +470,17 @@ export class ShellExecutionService {
 
         const abortHandler = async () => {
           if (ptyProcess.pid && !exited) {
-            ptyProcess.kill('SIGHUP');
+            if (os.platform() === 'win32') {
+              ptyProcess.kill();
+            } else {
+              try {
+                // Kill the entire process group
+                process.kill(-ptyProcess.pid, 'SIGHUP');
+              } catch (_e) {
+                // Fallback to killing just the process if the group kill fails
+                ptyProcess.kill('SIGHUP');
+              }
+            }
           }
         };
 
@@ -455,6 +503,38 @@ export class ShellExecutionService {
           executionMethod: 'none',
         }),
       };
+    }
+  }
+
+  /**
+   * Writes a string to the pseudo-terminal (PTY) of a running process.
+   *
+   * @param pid The process ID of the target PTY.
+   * @param input The string to write to the terminal.
+   */
+  static writeToPty(pid: number, input: string): void {
+    const activePty = this.activePtys.get(pid);
+    if (activePty) {
+      activePty.ptyProcess.write(input);
+    }
+  }
+
+  /**
+   * Resizes the pseudo-terminal (PTY) of a running process.
+   *
+   * @param pid The process ID of the target PTY.
+   * @param cols The new number of columns.
+   * @param rows The new number of rows.
+   */
+  static resizePty(pid: number, cols: number, rows: number): void {
+    const activePty = this.activePtys.get(pid);
+    if (activePty) {
+      try {
+        activePty.ptyProcess.resize(cols, rows);
+        activePty.headlessTerminal.resize(cols, rows);
+      } catch (_e) {
+        // Ignore errors if the pty has already exited.
+      }
     }
   }
 }

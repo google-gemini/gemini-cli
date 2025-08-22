@@ -87,6 +87,10 @@ interface MockServerConfig {
   getGeminiClient: Mock<() => GeminiClient | undefined>;
   getUserTier: Mock<() => Promise<string | undefined>>;
   getIdeClient: Mock<() => { getCurrentIde: Mock<() => string | undefined> }>;
+  getTerminalWidth: Mock<() => number | undefined>;
+  getTerminalHeight: Mock<() => number | undefined>;
+  setTerminalWidth: Mock<(width: number) => void>;
+  setTerminalHeight: Mock<(height: number) => void>;
   getScreenReader: Mock<() => boolean>;
 }
 
@@ -169,6 +173,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
           getConnectionStatus: vi.fn(() => 'connected'),
         })),
         isTrustedFolder: vi.fn(() => true),
+        getTerminalWidth: vi.fn(() => 80),
+        getTerminalHeight: vi.fn(() => 24),
+        setTerminalWidth: vi.fn(),
+        setTerminalHeight: vi.fn(),
         getScreenReader: vi.fn(() => false),
       };
     });

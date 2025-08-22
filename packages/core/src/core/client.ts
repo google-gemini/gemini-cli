@@ -54,6 +54,7 @@ import {
 } from '../telemetry/types.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { IdeContext, File } from '../ide/ideContext.js';
+import { ShellExecutionService } from '../services/shellExecutionService.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -908,6 +909,14 @@ export class GeminiClient {
     }
 
     return null;
+  }
+
+  writeToShell(pid: number, input: string): void {
+    ShellExecutionService.writeToPty(pid, input);
+  }
+
+  resizeShell(pid: number, cols: number, rows: number): void {
+    ShellExecutionService.resizePty(pid, cols, rows);
   }
 }
 

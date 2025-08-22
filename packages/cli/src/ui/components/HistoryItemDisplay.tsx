@@ -32,6 +32,8 @@ interface HistoryItemDisplayProps {
   config?: Config;
   isFocused?: boolean;
   commands?: readonly SlashCommand[];
+  activeShellPtyId?: number | null;
+  shellInputFocused?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -42,6 +44,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   config,
   commands,
   isFocused = true,
+  activeShellPtyId,
+  shellInputFocused,
 }) => (
   <Box flexDirection="column" key={item.id}>
     {/* Render standard message types */}
@@ -90,6 +94,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         terminalWidth={terminalWidth}
         config={config}
         isFocused={isFocused}
+        activeShellPtyId={activeShellPtyId}
+        shellInputFocused={shellInputFocused}
       />
     )}
     {item.type === 'compression' && (

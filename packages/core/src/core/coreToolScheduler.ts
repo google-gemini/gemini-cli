@@ -239,6 +239,8 @@ const createErrorResponse = (
   errorType,
 });
 
+export type PidUpdateHandler = (toolCallId: string, pid: number) => void;
+
 interface CoreToolSchedulerOptions {
   config: Config;
   outputUpdateHandler?: OutputUpdateHandler;
@@ -847,7 +849,12 @@ export class CoreToolScheduler {
             : undefined;
 
         invocation
-          .execute(signal, liveOutputCallback)
+          .execute(
+            signal,
+            liveOutputCallback,
+            this.config.getTerminalWidth(),
+            this.config.getTerminalHeight(),
+          )
           .then(async (toolResult: ToolResult) => {
             if (signal.aborted) {
               this.setStatusInternal(

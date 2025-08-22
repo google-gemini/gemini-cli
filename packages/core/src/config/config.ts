@@ -204,6 +204,8 @@ export interface ConfigParameters {
   useRipgrep?: boolean;
   shouldUseNodePtyShell?: boolean;
   skipNextSpeakerCheck?: boolean;
+  terminalWidth?: number;
+  terminalHeight?: number;
   enablePromptCompletion?: boolean;
 }
 
@@ -274,6 +276,8 @@ export class Config {
   private readonly useRipgrep: boolean;
   private readonly shouldUseNodePtyShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
+  private terminalWidth: number;
+  private terminalHeight: number;
   private readonly enablePromptCompletion: boolean = false;
   private initialized: boolean = false;
   readonly storage: Storage;
@@ -347,6 +351,8 @@ export class Config {
     this.useRipgrep = params.useRipgrep ?? false;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
+    this.terminalWidth = params.terminalWidth ?? 80;
+    this.terminalHeight = params.terminalHeight ?? 24;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
 
@@ -750,6 +756,21 @@ export class Config {
     return this.skipNextSpeakerCheck;
   }
 
+  getTerminalWidth(): number {
+    return this.terminalWidth;
+  }
+
+  setTerminalWidth(width: number): void {
+    this.terminalWidth = width;
+  }
+
+  getTerminalHeight(): number {
+    return this.terminalHeight;
+  }
+
+  setTerminalHeight(height: number): void {
+    this.terminalHeight = height;
+  }
   getScreenReader(): boolean {
     return this.accessibility.screenReader ?? false;
   }

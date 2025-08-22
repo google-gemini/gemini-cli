@@ -26,7 +26,6 @@ import {
   HistoryItemToolGroup,
   IndividualToolCallDisplay,
   ToolCallStatus,
-  HistoryItemWithoutId,
 } from '../types.js';
 
 export type ScheduleFn = (
@@ -46,6 +45,7 @@ export type TrackedWaitingToolCall = WaitingToolCall & {
 };
 export type TrackedExecutingToolCall = ExecutingToolCall & {
   responseSubmittedToGemini?: boolean;
+  ptyId?: number;
 };
 export type TrackedCompletedToolCall = CompletedToolCall & {
   responseSubmittedToGemini?: boolean;
@@ -65,9 +65,6 @@ export type TrackedToolCall =
 export function useReactToolScheduler(
   onComplete: (tools: CompletedToolCall[]) => Promise<void>,
   config: Config,
-  setPendingHistoryItem: React.Dispatch<
-    React.SetStateAction<HistoryItemWithoutId | null>
-  >,
   getPreferredEditor: () => EditorType | undefined,
   onEditorClose: () => void,
 ): [TrackedToolCall[], ScheduleFn, MarkToolsAsSubmittedFn] {
@@ -77,21 +74,6 @@ export function useReactToolScheduler(
 
   const outputUpdateHandler: OutputUpdateHandler = useCallback(
     (toolCallId, outputChunk) => {
-      setPendingHistoryItem((prevItem) => {
-        if (prevItem?.type === 'tool_group') {
-          return {
-            ...prevItem,
-            tools: prevItem.tools.map((toolDisplay) =>
-              toolDisplay.callId === toolCallId &&
-              toolDisplay.status === ToolCallStatus.Executing
-                ? { ...toolDisplay, resultDisplay: outputChunk }
-                : toolDisplay,
-            ),
-          };
-        }
-        return prevItem;
-      });
-
       setToolCallsForDisplay((prevCalls) =>
         prevCalls.map((tc) => {
           if (tc.request.callId === toolCallId && tc.status === 'executing') {
@@ -102,7 +84,7 @@ export function useReactToolScheduler(
         }),
       );
     },
-    [setPendingHistoryItem],
+    [],
   );
 
   const allToolCallsCompleteHandler: AllToolCallsCompleteHandler = useCallback(
@@ -119,8 +101,13 @@ export function useReactToolScheduler(
           const existingTrackedCall = prevTrackedCalls.find(
             (ptc) => ptc.request.callId === coreTc.request.callId,
           );
+          // Start with the new core state, then layer on the existing UI state
+          // to ensure UI-only properties like ptyId are preserved.
           const newTrackedCall: TrackedToolCall = {
             ...coreTc,
+            liveOutput: (existingTrackedCall as TrackedExecutingToolCall)
+              ?.liveOutput,
+            ptyId: (existingTrackedCall as TrackedExecutingToolCall)?.ptyId,
             responseSubmittedToGemini:
               existingTrackedCall?.responseSubmittedToGemini ?? false,
           } as TrackedToolCall;
@@ -276,6 +263,7 @@ export function mapToDisplay(
             resultDisplay:
               (trackedCall as TrackedExecutingToolCall).liveOutput ?? undefined,
             confirmationDetails: undefined,
+            ptyId: (trackedCall as TrackedExecutingToolCall).ptyId,
           };
         case 'validating': // Fallthrough
         case 'scheduled':

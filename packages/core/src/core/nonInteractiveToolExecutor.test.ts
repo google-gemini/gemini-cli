@@ -40,6 +40,8 @@ describe('executeToolCall', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getTerminalWidth: () => 90,
+      getTerminalHeight: () => 30,
     } as unknown as Config;
 
     abortController = new AbortController();

@@ -139,6 +139,8 @@ describe('useShellCommandProcessor', () => {
       expect.any(Function),
       expect.any(Object),
       false,
+      undefined,
+      undefined,
     );
     expect(onExecMock).toHaveBeenCalledWith(expect.any(Promise));
   });
@@ -208,46 +210,6 @@ describe('useShellCommandProcessor', () => {
       vi.useRealTimers();
     });
 
-    it('should throttle pending UI updates for text streams', async () => {
-      const { result } = renderProcessorHook();
-      act(() => {
-        result.current.handleShellCommand(
-          'stream',
-          new AbortController().signal,
-        );
-      });
-
-      // Simulate rapid output
-      act(() => {
-        mockShellOutputCallback({
-          type: 'data',
-          chunk: 'hello',
-        });
-      });
-
-      // Should not have updated the UI yet
-      expect(setPendingHistoryItemMock).toHaveBeenCalledTimes(1); // Only the initial call
-
-      // Advance time and send another event to trigger the throttled update
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
-      });
-      act(() => {
-        mockShellOutputCallback({
-          type: 'data',
-          chunk: ' world',
-        });
-      });
-
-      // Should now have been called with the cumulative output
-      expect(setPendingHistoryItemMock).toHaveBeenCalledTimes(2);
-      expect(setPendingHistoryItemMock).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          tools: [expect.objectContaining({ resultDisplay: 'hello world' })],
-        }),
-      );
-    });
-
     it('should show binary progress messages correctly', async () => {
       const { result } = renderProcessorHook();
       act(() => {
@@ -269,14 +231,16 @@ describe('useShellCommandProcessor', () => {
         mockShellOutputCallback({ type: 'binary_progress', bytesReceived: 0 });
       });
 
-      expect(setPendingHistoryItemMock).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          tools: [
-            expect.objectContaining({
-              resultDisplay: '[Binary output detected. Halting stream...]',
-            }),
-          ],
-        }),
+      // The state update is functional, so we test it by executing it.
+      const updaterFn1 = setPendingHistoryItemMock.mock.lastCall?.[0];
+      if (!updaterFn1) {
+        throw new Error('setPendingHistoryItem was not called');
+      }
+      const initialState = setPendingHistoryItemMock.mock.calls[0][0];
+      const stateAfterBinaryDetected = updaterFn1(initialState);
+
+      expect(stateAfterBinaryDetected.tools[0].resultDisplay).toBe(
+        '[Binary output detected. Halting stream...]',
       );
 
       // Now test progress updates
@@ -290,14 +254,13 @@ describe('useShellCommandProcessor', () => {
         });
       });
 
-      expect(setPendingHistoryItemMock).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          tools: [
-            expect.objectContaining({
-              resultDisplay: '[Receiving binary output... 2.0 KB received]',
-            }),
-          ],
-        }),
+      const updaterFn2 = setPendingHistoryItemMock.mock.lastCall?.[0];
+      if (!updaterFn2) {
+        throw new Error('setPendingHistoryItem was not called');
+      }
+      const stateAfterProgress = updaterFn2(stateAfterBinaryDetected);
+      expect(stateAfterProgress.tools[0].resultDisplay).toBe(
+        '[Receiving binary output... 2.0 KB received]',
       );
     });
   });
@@ -316,6 +279,8 @@ describe('useShellCommandProcessor', () => {
       expect.any(Function),
       expect.any(Object),
       false,
+      undefined,
+      undefined,
     );
   });
 
