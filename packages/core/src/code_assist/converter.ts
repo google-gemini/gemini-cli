@@ -212,12 +212,27 @@ function toPart(part: PartUnion): Part {
     return { text: part };
   }
 
-  // Filter out thought parts for CountToken API compatibility
+  // Handle thought parts for CountToken API compatibility
   // The CountToken API expects parts to have certain required "oneof" fields initialized,
   // but thought parts don't conform to this schema and cause API failures
-  if ('thought' in part) {
-    // Convert thought to text part to preserve content while maintaining API compatibility
-    return { text: `[Thought: ${part.thought}]` };
+  if ('thought' in part && part.thought) {
+    const thoughtText = `[Thought: ${part.thought}]`;
+
+    if ('text' in part && typeof part.text === 'string') {
+      const newPart = { ...part };
+      delete (newPart as Record<string, unknown>)['thought'];
+      newPart.text = (part.text || '') + `\n${thoughtText}`;
+      return newPart;
+    }
+
+    const restOfPart = { ...part };
+    delete (restOfPart as Record<string, unknown>)['thought'];
+
+    if (Object.keys(restOfPart).length === 0) {
+      return { text: thoughtText };
+    }
+
+    return restOfPart;
   }
 
   return part;

@@ -373,5 +373,49 @@ describe('converter', () => {
         },
       ]);
     });
+
+    it('should combine text and thought for text parts with thoughts', () => {
+      const contentWithTextAndThought: ContentListUnion = {
+        role: 'model',
+        parts: [
+          {
+            text: 'Here is my response',
+            thought: 'I need to be careful here',
+          } as Part & { thought: string },
+        ],
+      };
+      expect(toContents(contentWithTextAndThought)).toEqual([
+        {
+          role: 'model',
+          parts: [
+            {
+              text: 'Here is my response\n[Thought: I need to be careful here]',
+            },
+          ],
+        },
+      ]);
+    });
+
+    it('should preserve non-thought properties while removing thought', () => {
+      const contentWithComplexPart: ContentListUnion = {
+        role: 'model',
+        parts: [
+          {
+            functionCall: { name: 'calculate', args: { x: 5, y: 10 } },
+            thought: 'Performing calculation',
+          } as Part & { thought: string },
+        ],
+      };
+      expect(toContents(contentWithComplexPart)).toEqual([
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: { name: 'calculate', args: { x: 5, y: 10 } },
+            },
+          ],
+        },
+      ]);
+    });
   });
 });
