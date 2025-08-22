@@ -206,6 +206,16 @@ export const SETTINGS_SCHEMA = {
         description: 'Disable loading phrases for accessibility',
         showInDialog: true,
       },
+      screenReader: {
+        type: 'boolean',
+        label: 'Screen Reader Mode',
+        category: 'Accessibility',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Render output in plain-text to be more screen reader accessible',
+        showInDialog: true,
+      },
     },
   },
   checkpointing: {

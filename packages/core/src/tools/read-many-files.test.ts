@@ -15,6 +15,10 @@ import os from 'os';
 import { Config } from '../config/config.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
+import { ToolErrorType } from './tool-error.js';
+import * as glob from 'glob';
+
+vi.mock('glob', { spy: true });
 
 vi.mock('mime-types', () => {
   const lookup = (filename: string) => {
@@ -563,6 +567,28 @@ Content of file[1]
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
+    });
+  });
+
+  describe('Error handling', () => {
+    it('should return an INVALID_TOOL_PARAMS error if no paths are provided', async () => {
+      const params = { paths: [], include: [] };
+      expect(() => {
+        tool.build(params);
+      }).toThrow('params/paths must NOT have fewer than 1 items');
+    });
+
+    it('should return a READ_MANY_FILES_SEARCH_ERROR on glob failure', async () => {
+      vi.mocked(glob.glob).mockRejectedValue(new Error('Glob failed'));
+      const params = { paths: ['*.txt'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe(
+        ToolErrorType.READ_MANY_FILES_SEARCH_ERROR,
+      );
+      expect(result.llmContent).toBe('Error during file search: Glob failed');
+      // Reset glob.
+      vi.mocked(glob.glob).mockReset();
     });
   });
 
