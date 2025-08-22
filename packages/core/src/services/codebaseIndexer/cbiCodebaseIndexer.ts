@@ -302,8 +302,313 @@ export class CBICodebaseIndexer {
   async reindexCodebase(
     onProgress?: (progress: IndexProgress) => void
   ): Promise<IndexResult> {
-    await this.storage.deleteIndex();
-    return this.indexCodebase(onProgress);
+    const startTime = Date.now();
+    this.abortController = new AbortController();
+    
+    try {
+      if (!(await this.storage.indexExists())) {
+        return this.indexCodebase(onProgress);
+      }
+
+      onProgress?.({
+        phase: 'scanning',
+        processedFiles: 0,
+        totalFiles: 0,
+        stats: { totalFiles: 0, textFiles: 0, binaryFiles: 0, largeFiles: 0, excludedFiles: 0 },
+        message: '🔍 Scanning files for changes...',
+        detail: 'Loading existing index metadata...'
+      });
+
+      const existingMetadata = await this.storage.loadFileMetadata();
+      
+      onProgress?.({
+        phase: 'scanning',
+        processedFiles: 0,
+        totalFiles: 0,
+        stats: { totalFiles: 0, textFiles: 0, binaryFiles: 0, largeFiles: 0, excludedFiles: 0 },
+        message: '🔍 Scanning current files...',
+        detail: `Found ${existingMetadata.size} files in existing index`
+      });
+
+      const currentFiles: string[] = [];
+      const stats: ScanStats = {
+        totalFiles: 0,
+        textFiles: 0,
+        binaryFiles: 0,
+        largeFiles: 0,
+        excludedFiles: 0
+      };
+
+      for await (const fileInfo of this.fileDiscovery.scanDirectory(this.storage.getBaseDir())) {
+        if (this.abortController.signal.aborted) {
+          throw new Error('Indexing cancelled');
+        }
+
+        stats.totalFiles++;
+        if (fileInfo.isText) {
+          stats.textFiles++;
+          currentFiles.push(fileInfo.path);
+        } else {
+          stats.binaryFiles++;
+        }
+
+        if (fileInfo.size > this.config.skipIfLargerThan) {
+          stats.largeFiles++;
+        }
+
+        if (stats.totalFiles % 10 === 0 || stats.totalFiles === 1) {
+          onProgress?.({
+            phase: 'scanning',
+            processedFiles: 0,
+            totalFiles: 0,
+            stats,
+            message: '🔍 Scanning current files...',
+            detail: `${stats.totalFiles} files found (${stats.textFiles} text, ${stats.binaryFiles} binary)`
+          });
+        }
+      }
+
+      onProgress?.({
+        phase: 'processing',
+        processedFiles: 0,
+        totalFiles: currentFiles.length,
+        stats,
+        message: '📝 Comparing files...',
+        detail: 'Detecting changes...'
+      });
+
+      const newFileIndices: FileIndex[] = [];
+      const removedFilePaths: string[] = [];
+      let addedFiles = 0;
+      let modifiedFiles = 0;
+      let unchangedFiles = 0;
+
+      const currentFilePaths = new Set(currentFiles.map(f => path.relative(this.storage.getBaseDir(), f)));
+      
+      for (const [existingPath] of existingMetadata) {
+        if (!currentFilePaths.has(existingPath)) {
+          removedFilePaths.push(existingPath);
+        }
+      }
+
+      for (let i = 0; i < currentFiles.length; i++) {
+        if (this.abortController.signal.aborted) {
+          throw new Error('Indexing cancelled');
+        }
+
+        const filePath = currentFiles[i];
+        const relpath = path.relative(this.storage.getBaseDir(), filePath);
+        
+        if (i % 5 === 0 || i === currentFiles.length - 1) {
+          onProgress?.({
+            phase: 'processing',
+            currentFile: relpath,
+            processedFiles: i,
+            totalFiles: currentFiles.length,
+            stats,
+            message: '📝 Comparing files...',
+            detail: `${i + 1}/${currentFiles.length} - ${addedFiles} new, ${modifiedFiles} modified, ${unchangedFiles} unchanged`
+          });
+        }
+
+        try {
+          const fileStats = await fs.stat(filePath);
+          const existingMeta = existingMetadata.get(relpath);
+          
+          const needsUpdate = !existingMeta || 
+            existingMeta.mtime !== Math.floor(fileStats.mtime.getTime() / 1000) ||
+            existingMeta.size !== fileStats.size;
+
+          if (needsUpdate) {
+            const units = await this.textProcessor.processFile(filePath, this.storage.getBaseDir());
+            
+            if (units.length > 0) {
+              const fileIndex: FileIndex = {
+                sha: await this.generateSha(relpath),
+                relpath,
+                units,
+                embeddings: [],
+                mtime: fileStats.mtime,
+                size: fileStats.size
+              };
+              
+              newFileIndices.push(fileIndex);
+              if (existingMeta) {
+                modifiedFiles++;
+              } else {
+                addedFiles++;
+              }
+            }
+          } else {
+            unchangedFiles++;
+          }
+        } catch (error) {
+          console.warn(`Error processing file ${relpath}: ${error}`);
+        }
+      }
+
+      const totalChanges = newFileIndices.length + removedFilePaths.length;
+      
+      if (totalChanges === 0) {
+        onProgress?.({
+          phase: 'complete',
+          processedFiles: currentFiles.length,
+          totalFiles: currentFiles.length,
+          stats,
+          message: '✅ No changes detected!',
+          detail: `All ${unchangedFiles} files are up to date`
+        });
+
+        return {
+          success: true,
+          stats,
+          totalVectors: 0,
+          indexSize: await this.getIndexSize(),
+          duration: Date.now() - startTime,
+          errors: []
+        };
+      }
+
+      onProgress?.({
+        phase: 'processing',
+        processedFiles: currentFiles.length,
+        totalFiles: currentFiles.length,
+        stats,
+        message: '📝 Analysis complete!',
+        detail: `Changes: ${addedFiles} new, ${modifiedFiles} modified, ${removedFilePaths.length} removed`
+      });
+
+      if (newFileIndices.length > 0) {
+        const totalVectors = newFileIndices.reduce((sum, fi) => sum + fi.units.length, 0);
+        
+        onProgress?.({
+          phase: 'embedding',
+          processedFiles: currentFiles.length,
+          totalFiles: currentFiles.length,
+          currentBatch: 0,
+          totalBatches: Math.ceil(totalVectors / this.config.batchSize),
+          totalVectors,
+          currentEmbedding: 0,
+          totalEmbeddings: totalVectors,
+          stats,
+          message: '🧠 Generating embeddings for changed files...',
+          detail: `0/${totalVectors} embeddings generated`
+        });
+
+        let processedVectors = 0;
+        let processedFiles = 0;
+        
+        for (const fileIndex of newFileIndices) {
+          if (this.abortController.signal.aborted) {
+            throw new Error('Indexing cancelled');
+          }
+
+          processedFiles++;
+          onProgress?.({
+            phase: 'embedding',
+            processedFiles: currentFiles.length,
+            totalFiles: currentFiles.length,
+            currentBatch: Math.floor(processedVectors / this.config.batchSize),
+            totalBatches: Math.ceil(totalVectors / this.config.batchSize),
+            currentVector: processedVectors,
+            totalVectors,
+            currentEmbedding: processedVectors,
+            totalEmbeddings: totalVectors,
+            stats,
+            message: '🧠 Generating embeddings for changed files...',
+            detail: `Processing file ${processedFiles}/${newFileIndices.length} - ${path.basename(fileIndex.relpath)}`
+          });
+
+          const texts = fileIndex.units.map(unit => unit.text);
+          const embeddings = await this.embeddingService.getEmbeddings(texts, (current, total) => {
+            const currentTotal = processedVectors + current;
+            onProgress?.({
+              phase: 'embedding',
+              processedFiles: currentFiles.length,
+              totalFiles: currentFiles.length,
+              currentBatch: Math.floor(currentTotal / this.config.batchSize),
+              totalBatches: Math.ceil(totalVectors / this.config.batchSize),
+              currentVector: currentTotal,
+              totalVectors,
+              currentEmbedding: currentTotal,
+              totalEmbeddings: totalVectors,
+              stats,
+              message: '🧠 Generating embeddings for changed files...',
+              detail: `${currentTotal}/${totalVectors} embeddings generated (${current}/${total} in current file)`
+            });
+          });
+          
+          if (embeddings && embeddings.length === texts.length) {
+            fileIndex.embeddings = embeddings;
+            processedVectors += embeddings.length;
+          } else {
+            console.warn(`Failed to generate embeddings for ${fileIndex.relpath}`);
+          }
+        }
+      }
+
+      onProgress?.({
+        phase: 'building_index',
+        processedFiles: currentFiles.length,
+        totalFiles: currentFiles.length,
+        stats,
+        message: '🔗 Updating index...',
+        detail: 'Merging changes with existing index...'
+      });
+
+      await this.storage.updateIndex(newFileIndices, removedFilePaths, (current, total) => {
+        onProgress?.({
+          phase: 'building_index',
+          processedFiles: currentFiles.length,
+          totalFiles: currentFiles.length,
+          currentVector: current,
+          totalVectors: total,
+          stats,
+          message: '🔗 Updating index...',
+          detail: `${current}/${total} vectors processed`
+        });
+      });
+
+      onProgress?.({
+        phase: 'saving',
+        processedFiles: currentFiles.length,
+        totalFiles: currentFiles.length,
+        stats,
+        message: '💾 Finalizing index...',
+        detail: 'Writing updated index to disk...'
+      });
+
+      const duration = Date.now() - startTime;
+      const indexSize = await this.getIndexSize();
+
+      onProgress?.({
+        phase: 'complete',
+        processedFiles: currentFiles.length,
+        totalFiles: currentFiles.length,
+        stats,
+        message: '✅ Incremental indexing complete!',
+        detail: `Updated ${addedFiles + modifiedFiles} files, removed ${removedFilePaths.length} files`
+      });
+
+      return {
+        success: true,
+        stats,
+        totalVectors: newFileIndices.reduce((sum, fi) => sum + fi.embeddings.length, 0),
+        indexSize,
+        duration,
+        errors: []
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      return {
+        success: false,
+        stats: { totalFiles: 0, textFiles: 0, binaryFiles: 0, largeFiles: 0, excludedFiles: 0 },
+        totalVectors: 0,
+        indexSize: 0,
+        duration,
+        errors: [error instanceof Error ? error.message : String(error)]
+      };
+    }
   }
 
   async deleteIndex(): Promise<void> {

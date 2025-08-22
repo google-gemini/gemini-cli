@@ -28,12 +28,17 @@ import {
   useInputHistory,
   UseInputHistoryReturn,
 } from '../hooks/useInputHistory.js';
+import {
+  useReverseSearchCompletion,
+  UseReverseSearchCompletionReturn,
+} from '../hooks/useReverseSearchCompletion.js';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
+vi.mock('../hooks/useReverseSearchCompletion.js');
 vi.mock('../utils/clipboardUtils.js');
 
 const mockSlashCommands: SlashCommand[] = [
@@ -89,12 +94,14 @@ describe('InputPrompt', () => {
   let mockShellHistory: UseShellHistoryReturn;
   let mockCommandCompletion: UseCommandCompletionReturn;
   let mockInputHistory: UseInputHistoryReturn;
+  let mockReverseSearchCompletion: UseReverseSearchCompletionReturn;
   let mockBuffer: TextBuffer;
   let mockCommandContext: CommandContext;
 
   const mockedUseShellHistory = vi.mocked(useShellHistory);
   const mockedUseCommandCompletion = vi.mocked(useCommandCompletion);
   const mockedUseInputHistory = vi.mocked(useInputHistory);
+  const mockedUseReverseSearchCompletion = vi.mocked(useReverseSearchCompletion);
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -174,6 +181,19 @@ describe('InputPrompt', () => {
       handleSubmit: vi.fn(),
     };
     mockedUseInputHistory.mockReturnValue(mockInputHistory);
+
+    mockReverseSearchCompletion = {
+      suggestions: [],
+      activeSuggestionIndex: -1,
+      isLoadingSuggestions: false,
+      showSuggestions: false,
+      visibleStartIndex: 0,
+      navigateUp: vi.fn(),
+      navigateDown: vi.fn(),
+      resetCompletionState: vi.fn(),
+      handleAutocomplete: vi.fn(),
+    };
+    mockedUseReverseSearchCompletion.mockReturnValue(mockReverseSearchCompletion);
 
     props = {
       buffer: mockBuffer,
@@ -1377,6 +1397,14 @@ describe('InputPrompt', () => {
         addCommandToHistory: vi.fn(),
         resetHistoryPosition: vi.fn(),
       });
+
+      mockReverseSearchCompletion.suggestions = [
+        { label: 'echo hello', value: 'echo hello', matchedIndex: 0 },
+        { label: 'echo world', value: 'echo world', matchedIndex: 0 },
+        { label: 'ls', value: 'ls', matchedIndex: 0 },
+      ];
+      mockReverseSearchCompletion.showSuggestions = true;
+      mockReverseSearchCompletion.activeSuggestionIndex = 0;
     });
 
     it('invokes reverse search on Ctrl+R', async () => {
@@ -1428,7 +1456,7 @@ describe('InputPrompt', () => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
       });
 
-      expect(props.buffer.setText).toHaveBeenCalledWith('echo hello');
+      expect(mockReverseSearchCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
       unmount();
     });
 

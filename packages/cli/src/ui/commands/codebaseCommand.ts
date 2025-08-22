@@ -15,73 +15,113 @@ import {
 import { CBICodebaseIndexer, IndexProgress, AutoIndexService } from '@google/gemini-cli-core';
 import * as path from 'path';
 
-const indexCommand: SlashCommand = {
-  name: 'index',
-  description: 'Index the entire codebase',
-  kind: CommandKind.BUILT_IN,
-  action: async (context): Promise<SlashCommandActionReturn | void> => {
-    const config = context.services.config;
-    if (!config) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'Configuration not available',
-      };
-    }
+interface IndexingContext {
+  config: any;
+  context: any;
+  projectRoot: string;
+}
 
-    const projectRoot = config.getProjectRoot();
-    if (!projectRoot) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'No project root found. Please run this command from a project directory.',
-      };
-    }
+function validateConfigAndProjectRoot(context: any): { config: any; projectRoot: string } | SlashCommandActionReturn {
+  const config = context.services.config;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Configuration not available',
+    };
+  }
 
-    const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
-    
-    context.ui.setPendingItem({
-      type: 'gemini',
-      text: 'Starting codebase indexing...'
-    });
+  const projectRoot = config.getProjectRoot();
+  if (!projectRoot) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'No project root found. Please run this command from a project directory.',
+    };
+  }
 
-    try {
-      const result = await indexer.indexCodebase((progress) => {
-        const progressText = formatProgress(progress);
-        context.ui.setPendingItem({
-          type: 'gemini',
-          text: progressText
+  return { config, projectRoot };
+}
+
+async function handleIndexingOperation(
+  indexingContext: IndexingContext,
+  operation: 'index' | 'reindex',
+  initialMessage: string,
+  errorPrefix: string
+): Promise<void> {
+  const { config, context, projectRoot } = indexingContext;
+  
+  const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
+  
+  context.ui.setPendingItem({
+    type: 'gemini',
+    text: initialMessage
+  });
+
+  try {
+    const result = operation === 'index' 
+      ? await indexer.indexCodebase((progress) => {
+          const progressText = formatProgress(progress);
+          context.ui.setPendingItem({
+            type: 'gemini',
+            text: progressText
+          });
+        })
+      : await indexer.reindexCodebase((progress) => {
+          const progressText = formatProgress(progress);
+          context.ui.setPendingItem({
+            type: 'gemini',
+            text: progressText
+          });
         });
-      });
 
-      context.ui.setPendingItem(null);
-      
-      if (result.success) {
-        const successMessage = formatSuccessMessage(result);
-        context.ui.addItem({
-          type: 'gemini',
-          text: successMessage
-        }, Date.now());
+    context.ui.setPendingItem(null);
+    
+    if (result.success) {
+      const successMessage = formatSuccessMessage(result);
+      context.ui.addItem({
+        type: 'gemini',
+        text: successMessage
+      }, Date.now());
 
-        const geminiClient = config.getGeminiClient();
-        if (geminiClient) {
-          await geminiClient.refreshIndexContext();
-        }
-      } else {
-        const errorMessage = formatErrorMessage(result);
-        context.ui.addItem({
-          type: 'gemini',
-          text: errorMessage
-        }, Date.now());
+      const geminiClient = config.getGeminiClient();
+      if (geminiClient) {
+        await geminiClient.refreshIndexContext();
       }
-    } catch (error) {
-      context.ui.setPendingItem(null);
-      const errorMessage = `❌ Indexing failed: ${error instanceof Error ? error.message : String(error)}`;
+    } else {
+      const errorMessage = formatErrorMessage(result);
       context.ui.addItem({
         type: 'gemini',
         text: errorMessage
       }, Date.now());
     }
+  } catch (error) {
+    context.ui.setPendingItem(null);
+    const errorMessage = `${errorPrefix}: ${error instanceof Error ? error.message : String(error)}`;
+    context.ui.addItem({
+      type: 'gemini',
+      text: errorMessage
+    }, Date.now());
+  }
+}
+
+const indexCommand: SlashCommand = {
+  name: 'index',
+  description: 'Index the entire codebase',
+  kind: CommandKind.BUILT_IN,
+  action: async (context): Promise<SlashCommandActionReturn | void> => {
+    const validation = validateConfigAndProjectRoot(context);
+    if ('type' in validation) {
+      return validation;
+    }
+
+    const { config, projectRoot } = validation;
+    await handleIndexingOperation(
+      { config, context, projectRoot },
+      'index',
+      'Starting codebase indexing...',
+      '❌ Indexing failed'
+    );
   },
 };
 
@@ -90,68 +130,18 @@ const reindexCommand: SlashCommand = {
   description: 'Index only new/modified files',
   kind: CommandKind.BUILT_IN,
   action: async (context): Promise<SlashCommandActionReturn | void> => {
-    const config = context.services.config;
-    if (!config) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'Configuration not available',
-      };
+    const validation = validateConfigAndProjectRoot(context);
+    if ('type' in validation) {
+      return validation;
     }
 
-    const projectRoot = config.getProjectRoot();
-    if (!projectRoot) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'No project root found. Please run this command from a project directory.',
-      };
-    }
-
-    const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
-    
-    context.ui.setPendingItem({
-      type: 'gemini',
-      text: 'Starting incremental codebase indexing...'
-    });
-
-    try {
-      const result = await indexer.reindexCodebase((progress) => {
-        const progressText = formatProgress(progress);
-        context.ui.setPendingItem({
-          type: 'gemini',
-          text: progressText
-        });
-      });
-
-      context.ui.setPendingItem(null);
-      
-      if (result.success) {
-        const successMessage = formatSuccessMessage(result);
-        context.ui.addItem({
-          type: 'gemini',
-          text: successMessage
-        }, Date.now());
-
-        const geminiClient = config.getGeminiClient();
-        if (geminiClient) {
-          await geminiClient.refreshIndexContext();
-        }
-      } else {
-        const errorMessage = formatErrorMessage(result);
-        context.ui.addItem({
-          type: 'gemini',
-          text: errorMessage
-        }, Date.now());
-      }
-    } catch (error) {
-      context.ui.setPendingItem(null);
-      const errorMessage = `❌ Re-indexing failed: ${error instanceof Error ? error.message : String(error)}`;
-      context.ui.addItem({
-        type: 'gemini',
-        text: errorMessage
-      }, Date.now());
-    }
+    const { config, projectRoot } = validation;
+    await handleIndexingOperation(
+      { config, context, projectRoot },
+      'reindex',
+      'Starting incremental codebase indexing...',
+      '❌ Re-indexing failed'
+    );
   },
 };
 
@@ -160,23 +150,12 @@ const deleteCommand: SlashCommand = {
   description: 'Delete the index (index.cbi file)',
   kind: CommandKind.BUILT_IN,
   action: async (context): Promise<SlashCommandActionReturn | void> => {
-    const config = context.services.config;
-    if (!config) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'Configuration not available',
-      };
+    const validation = validateConfigAndProjectRoot(context);
+    if ('type' in validation) {
+      return validation;
     }
 
-    const projectRoot = config.getProjectRoot();
-    if (!projectRoot) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'No project root found. Please run this command from a project directory.',
-      };
-    }
+    const { config, projectRoot } = validation;
 
     const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
     const status = await indexer.getIndexStatus();
@@ -233,23 +212,12 @@ const statusCommand: SlashCommand = {
   description: 'Show index status',
   kind: CommandKind.BUILT_IN,
   action: async (context): Promise<SlashCommandActionReturn | void> => {
-    const config = context.services.config;
-    if (!config) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'Configuration not available',
-      };
+    const validation = validateConfigAndProjectRoot(context);
+    if ('type' in validation) {
+      return validation;
     }
 
-    const projectRoot = config.getProjectRoot();
-    if (!projectRoot) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'No project root found. Please run this command from a project directory.',
-      };
-    }
+    const { config, projectRoot } = validation;
 
     const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
     const status = await indexer.getIndexStatus();
@@ -286,72 +254,23 @@ const autoCommand: SlashCommand = {
   description: 'Enable automatic index updates for this session',
   kind: CommandKind.BUILT_IN,
   action: async (context): Promise<SlashCommandActionReturn | void> => {
-    const config = context.services.config;
-    if (!config) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'Configuration not available',
-      };
+    const validation = validateConfigAndProjectRoot(context);
+    if ('type' in validation) {
+      return validation;
     }
 
-    const projectRoot = config.getProjectRoot();
-    if (!projectRoot) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'No project root found. Please run this command from a project directory.',
-      };
-    }
+    const { config, projectRoot } = validation;
 
     const indexer = CBICodebaseIndexer.fromConfig(projectRoot, config);
     const status = await indexer.getIndexStatus();
 
     if (!status.exists) {
-      context.ui.setPendingItem({
-        type: 'gemini',
-        text: 'No index found. Creating initial index...'
-      });
-
-      try {
-        const result = await indexer.indexCodebase((progress) => {
-          const progressText = formatProgress(progress);
-          context.ui.setPendingItem({
-            type: 'gemini',
-            text: progressText
-          });
-        });
-
-        context.ui.setPendingItem(null);
-        
-        if (result.success) {
-          const successMessage = formatSuccessMessage(result);
-          context.ui.addItem({
-            type: 'gemini',
-            text: successMessage
-          }, Date.now());
-
-          const geminiClient = config.getGeminiClient();
-          if (geminiClient) {
-            await geminiClient.refreshIndexContext();
-          }
-        } else {
-          const errorMessage = formatErrorMessage(result);
-          context.ui.addItem({
-            type: 'gemini',
-            text: errorMessage
-          }, Date.now());
-          return;
-        }
-      } catch (error) {
-        context.ui.setPendingItem(null);
-        const errorMessage = `❌ Failed to create initial index: ${error instanceof Error ? error.message : String(error)}`;
-        context.ui.addItem({
-          type: 'gemini',
-          text: errorMessage
-        }, Date.now());
-        return;
-      }
+      await handleIndexingOperation(
+        { config, context, projectRoot },
+        'index',
+        'No index found. Creating initial index...',
+        '❌ Failed to create initial index'
+      );
     }
 
     context.ui.addItem({

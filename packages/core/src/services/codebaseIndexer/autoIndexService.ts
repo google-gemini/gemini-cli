@@ -76,7 +76,7 @@ export class AutoIndexService {
     try {
       const result = await this.indexer.reindexCodebase(this.config.onProgress);
 
-      if (result.success && result.totalVectors > 0) {
+      if (result.success) {
         this.config.onUpdate?.(result);
       }
     } catch (error) {

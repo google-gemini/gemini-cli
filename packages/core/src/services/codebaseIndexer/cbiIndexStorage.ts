@@ -27,6 +27,7 @@ interface FileInfo {
   path_offset: number;
   first_vector_id: number;
   num_vectors: number;
+  sha_offset?: number;
 }
 
 interface BlockMetadata {
@@ -656,6 +657,11 @@ export class CBIIndexStorage {
     return 1 - this.cosineSimilarity(a, b);
   }
 
+  private async generateSha(relpath: string): Promise<string> {
+    const crypto = await import('crypto');
+    return crypto.createHash('sha256').update(relpath).digest('hex').substring(0, 12);
+  }
+
   private async loadVector(vectorId: number, fileHandle: fs.FileHandle, header: IndexHeader): Promise<number[]> {
     const vectorBuffer = Buffer.alloc(header.vector_dim * 4);
     const vectorOffset = header.offset_vectors + (vectorId * header.vector_dim * 4);
@@ -815,6 +821,139 @@ export class CBIIndexStorage {
       ef_construction,
       ef_search
     };
+  }
+
+  async loadFileMetadata(): Promise<Map<string, { mtime: number; size: number; vectorIds: number[] }>> {
+    if (!(await this.indexExists())) {
+      return new Map();
+    }
+
+    const fileHandle = await fs.open(this.indexPath, 'r');
+    try {
+      const headerBuffer = Buffer.alloc(HEADER_SIZE);
+      await fileHandle.read(headerBuffer, 0, HEADER_SIZE, 0);
+      const header = this.parseHeader(headerBuffer);
+
+      const fileInfosBuffer = Buffer.alloc(header.total_files * 32);
+      await fileHandle.read(fileInfosBuffer, 0, fileInfosBuffer.length, header.offset_files);
+      const fileInfos = this.parseFileInfos(fileInfosBuffer, header.total_files);
+
+      const stringHeapSize = header.offset_vectors - header.offset_strings;
+      const stringHeapBuffer = Buffer.alloc(stringHeapSize);
+      await fileHandle.read(stringHeapBuffer, 0, stringHeapSize, header.offset_strings);
+
+      const metadata = new Map<string, { mtime: number; size: number; vectorIds: number[] }>();
+      
+      for (const fileInfo of fileInfos) {
+        const relpath = this.extractStringFromHeap(stringHeapBuffer, fileInfo.path_offset);
+        const vectorIds: number[] = [];
+        for (let i = 0; i < fileInfo.num_vectors; i++) {
+          vectorIds.push(fileInfo.first_vector_id + i);
+        }
+        
+        metadata.set(relpath, {
+          mtime: fileInfo.mtime,
+          size: fileInfo.size,
+          vectorIds
+        });
+      }
+
+      return metadata;
+    } finally {
+      await fileHandle.close();
+    }
+  }
+
+  async updateIndex(
+    newFileIndices: FileIndex[], 
+    removedFilePaths: string[], 
+    onProgress?: (current: number, total: number) => void
+  ): Promise<void> {
+    if (!(await this.indexExists())) {
+      return this.saveIndex(newFileIndices, onProgress);
+    }
+
+    const toRemove = new Set(removedFilePaths);
+    
+    for (const fileIndex of newFileIndices) {
+      toRemove.add(fileIndex.relpath);
+    }
+
+    if (toRemove.size === 0 && newFileIndices.length === 0) {
+      return;
+    }
+
+    const allFileIndices = await this.loadAllFileIndicesExcept(toRemove);
+    allFileIndices.push(...newFileIndices);
+    
+    await this.saveIndex(allFileIndices, onProgress);
+  }
+
+  private async loadAllFileIndicesExcept(excludePaths: Set<string>): Promise<FileIndex[]> {
+    const fileHandle = await fs.open(this.indexPath, 'r');
+    try {
+      const headerBuffer = Buffer.alloc(HEADER_SIZE);
+      await fileHandle.read(headerBuffer, 0, HEADER_SIZE, 0);
+      const header = this.parseHeader(headerBuffer);
+
+      const fileInfosBuffer = Buffer.alloc(header.total_files * 32);
+      await fileHandle.read(fileInfosBuffer, 0, fileInfosBuffer.length, header.offset_files);
+      const fileInfos = this.parseFileInfos(fileInfosBuffer, header.total_files);
+
+      const blocksBuffer = Buffer.alloc(header.total_vectors * 24);
+      await fileHandle.read(blocksBuffer, 0, blocksBuffer.length, header.offset_blocks);
+      const blockMetadatas = this.parseBlockMetadatas(blocksBuffer, header.total_vectors);
+
+      const stringHeapSize = header.offset_vectors - header.offset_strings;
+      const stringHeapBuffer = Buffer.alloc(stringHeapSize);
+      await fileHandle.read(stringHeapBuffer, 0, stringHeapSize, header.offset_strings);
+
+      const fileIndices: FileIndex[] = [];
+      
+      for (let fileId = 0; fileId < fileInfos.length; fileId++) {
+        const fileInfo = fileInfos[fileId];
+        const relpath = this.extractStringFromHeap(stringHeapBuffer, fileInfo.path_offset);
+        
+        if (excludePaths.has(relpath)) {
+          continue;
+        }
+
+        const units = [];
+        const embeddings = [];
+        
+        for (let i = 0; i < fileInfo.num_vectors; i++) {
+          const vectorId = fileInfo.first_vector_id + i;
+          const block = blockMetadatas[vectorId];
+          
+          const text = this.extractStringFromHeap(stringHeapBuffer, block.text_offset, block.text_len);
+          units.push({
+            id: `${relpath}:${block.lineno}:${block.start_char}`,
+            relpath,
+            text,
+            lineno: block.lineno,
+            start_char: block.start_char
+          });
+
+          const vector = await this.loadVector(vectorId, fileHandle, header);
+          embeddings.push(vector);
+        }
+
+        const sha = await this.generateSha(relpath);
+          
+        fileIndices.push({
+          sha,
+          relpath,
+          mtime: new Date(fileInfo.mtime * 1000),
+          size: fileInfo.size,
+          units,
+          embeddings
+        });
+      }
+
+      return fileIndices;
+    } finally {
+      await fileHandle.close();
+    }
   }
 
   async searchWithHNSW(queryVector: number[], topK: number = 8): Promise<Array<{ score: number; vectorId: number; metadata: any }>> {
