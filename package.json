@@ -91,6 +91,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "@lvce-editor/ripgrep": "^2.1.0",
     "node-fetch": "^3.3.2",
     "strip-ansi": "^7.1.0"
   },

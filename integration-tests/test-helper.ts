@@ -249,7 +249,7 @@ export class TestRig {
           if (env.GEMINI_SANDBOX === 'podman') {
             // Remove telemetry JSON objects from output
             // They are multi-line JSON objects that start with { and contain telemetry fields
-            const lines = result.split('\n');
+            const lines = result.split(EOL);
             const filteredLines = [];
             let inTelemetryObject = false;
             let braceDepth = 0;
@@ -510,7 +510,7 @@ export class TestRig {
     // If no matches found with the simple pattern, try the JSON parsing approach
     // in case the format changes
     if (logs.length === 0) {
-      const lines = stdout.split('\n');
+      const lines = stdout.split(EOL);
       let currentObject = '';
       let inObject = false;
       let braceDepth = 0;
