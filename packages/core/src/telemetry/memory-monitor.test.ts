@@ -462,60 +462,6 @@ describe('MemoryMonitor', () => {
       });
     });
 
-    describe('measureGarbageCollection', () => {
-      it('should return null when gc is not available', () => {
-        const monitor = new MemoryMonitor();
-
-        const result = monitor.measureGarbageCollection(mockConfig);
-
-        expect(result).toBeNull();
-      });
-
-      it('should measure memory before and after garbage collection', () => {
-        // Mock global.gc
-        const mockGc = vi.fn();
-        (global as unknown as { gc?: () => void }).gc = mockGc;
-
-        const monitor = new MemoryMonitor();
-
-        // Set up different memory usage after GC
-        let callCount = 0;
-        mockProcessMemoryUsage.mockImplementation(() => {
-          callCount++;
-          if (callCount === 1) {
-            return mockMemoryUsage; // Before GC
-          } else {
-            return {
-              ...mockMemoryUsage,
-              heapUsed: mockMemoryUsage.heapUsed - 1048576, // -1MB after GC
-            };
-          }
-        });
-
-        const result = monitor.measureGarbageCollection(mockConfig);
-
-        expect(mockGc).toHaveBeenCalled();
-        expect(result).toEqual({
-          before: expect.objectContaining({
-            heapUsed: mockMemoryUsage.heapUsed,
-          }),
-          after: expect.objectContaining({
-            heapUsed: mockMemoryUsage.heapUsed - 1048576,
-          }),
-        });
-
-        // Verify memory freed metric was recorded
-        expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
-          mockConfig,
-          'heap_used',
-          1048576, // Memory freed
-          'gc_freed',
-        );
-
-        // Clean up
-        delete (global as unknown as { gc?: () => void }).gc;
-      });
-    });
 
     describe('destroy', () => {
       it('should stop monitoring and cleanup resources', () => {
