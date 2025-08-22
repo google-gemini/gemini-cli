@@ -77,21 +77,20 @@ class SemanticSearchToolInvocation extends BaseToolInvocation<
         const relativePath = makeRelative(result.file, targetDir);
         llmContent += `${relativePath} (${result.score.toFixed(3)})\n`;
         
-        try {
-          const fs = await import('fs/promises');
-          const fileContent = await fs.readFile(result.file, 'utf-8');
-          const lines = fileContent.split('\n');
-          const lineNumber = result.start_line;
-          const start = Math.max(0, lineNumber - 1);
-          const end = Math.min(lines.length, lineNumber + 2);
-          
-          for (let i = start; i < end; i++) {
-            const lineNum = i + 1;
-            const line = lines[i] || '';
-            llmContent += `${lineNum.toString().padStart(4)}    ${line}\n`;
-          }
-        } catch (error) {
-          llmContent += `${result.start_line.toString().padStart(4)}    ${result.text}\n`;
+        const contextLinesArr = result.context.split('\n');
+        const contextLinesParam = this.params.context_lines ?? 2;
+        
+        // This is an approximation of the start line. For a more robust solution,
+        // consider having the indexer return the context's start line.
+        const matchLineInContext = contextLinesArr.findIndex(line => result.text.includes(line.trim()));
+        const startLineNum = matchLineInContext !== -1 
+          ? result.start_line - matchLineInContext
+          : Math.max(1, result.start_line - contextLinesParam);
+
+        for (let i = 0; i < contextLinesArr.length; i++) {
+          const lineNum = startLineNum + i;
+          const line = contextLinesArr[i];
+          llmContent += `${lineNum.toString().padStart(4)}    ${line}\n`;
         }
         llmContent += '\n';
       }
