@@ -17,6 +17,7 @@ import {
   GenerateContentResponse,
   FinishReason,
   BlockedReason,
+  Part,
 } from '@google/genai';
 
 describe('converter', () => {
@@ -347,6 +348,29 @@ describe('converter', () => {
       expect(toContents(strings)).toEqual([
         { role: 'user', parts: [{ text: 'string 1' }] },
         { role: 'user', parts: [{ text: 'string 2' }] },
+      ]);
+    });
+
+    it('should convert thought parts to text parts for API compatibility', () => {
+      const contentWithThought: ContentListUnion = {
+        role: 'model',
+        parts: [
+          { text: 'regular text' },
+          { thought: 'thinking about the problem' } as Part & {
+            thought: string;
+          },
+          { text: 'more text' },
+        ],
+      };
+      expect(toContents(contentWithThought)).toEqual([
+        {
+          role: 'model',
+          parts: [
+            { text: 'regular text' },
+            { text: '[Thought: thinking about the problem]' },
+            { text: 'more text' },
+          ],
+        },
       ]);
     });
   });

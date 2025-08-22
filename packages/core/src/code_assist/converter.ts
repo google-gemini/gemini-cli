@@ -189,13 +189,16 @@ function toContent(content: ContentUnion): Content {
     };
   }
   if ('parts' in content) {
-    // it's a Content
-    return content;
+    // it's a Content - process parts to handle thought filtering
+    return {
+      ...content,
+      parts: content.parts ? toParts(content.parts) : [],
+    };
   }
   // it's a Part
   return {
     role: 'user',
-    parts: [content as Part],
+    parts: [toPart(content as Part)],
   };
 }
 
@@ -208,6 +211,15 @@ function toPart(part: PartUnion): Part {
     // it's a string
     return { text: part };
   }
+
+  // Filter out thought parts for CountToken API compatibility
+  // The CountToken API expects parts to have certain required "oneof" fields initialized,
+  // but thought parts don't conform to this schema and cause API failures
+  if ('thought' in part) {
+    // Convert thought to text part to preserve content while maintaining API compatibility
+    return { text: `[Thought: ${part.thought}]` };
+  }
+
   return part;
 }
 
