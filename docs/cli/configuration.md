@@ -440,6 +440,77 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Specifies the endpoint for the code assist server.
   - This is useful for development and testing.
 
+## Safe Sandbox Environment Variable Formats
+
+The Gemini CLI supports sandboxed execution environments. Certain environment variables control sandbox behavior, particularly for proxy configuration. Because these variables can influence process spawning and shell execution, they must be provided using **safe formats only**.
+
+> **SECURITY WARNING:** Do NOT provide arbitrary shell fragments in these environment variables. Instead, use the safe forms documented below. The CLI now includes security hardening to prevent command injection attacks via environment variables.
+
+### GEMINI_SANDBOX_PROXY_COMMAND (recommended format)
+
+This configures a *proxy* process that the CLI may start during sandbox setup.
+
+**Safe forms:**
+
+1. **JSON array** (recommended)
+```
+
+export GEMINI_SANDBOX_PROXY_COMMAND='["/usr/bin/socat","TCP-LISTEN:9999,bind=127.0.0.1,reuseaddr,fork","-"]'
+
+```
+This form is parsed as a JSON array of strings and passed to `spawn(cmd, args, { shell: false })`,
+which prevents shell interpretation of metacharacters.
+
+2. **Quoted token string** (less preferred)
+```
+
+export GEMINI_SANDBOX_PROXY_COMMAND='/usr/bin/socat "TCP-LISTEN:9999,bind=127.0.0.1,reuseaddr" -'
+
+```
+This will be tokenized conservatively (respecting single/double quotes) and spawned without a shell.
+Avoid embedding shell operators such as `;`, `|`, `&`, backticks, or `$()`.
+
+**Notes**
+- The command is executed **without a shell**, so environment variables and arguments are passed directly to the binary.
+- Always prefer JSON-array form to express arguments containing spaces.
+
+### SANDBOX_ENV
+
+Used to set additional environment variables for the sandboxed child process.
+
+**Format**: comma-separated `KEY=VALUE` pairs, e.g.
+
+```
+
+export SANDBOX_ENV='SOME_FLAG=1,API_HOST=api.internal.example.com,MODE=readonly'
+
+```
+
+**Validation rules**
+- `KEY` must match: `^[A-Za-z_][A-Za-z0-9_]*$`.
+- `VALUE` must not contain control characters nor shell metacharacters: `;|&$<>` or backticks.
+- Empty values are ignored.
+
+**Examples**
+- Valid:
+```
+
+SANDBOX_ENV='FOO=bar,MAX_RETRIES=3'
+
+```
+- Invalid (will be rejected):
+```
+
+SANDBOX_ENV='BAD=1;rm -rf /,EVIL=`echo 1`'
+
+```
+
+### Security notes
+
+- The CLI will **not** forward potentially dangerous environment variables to spawned processes (e.g. `LD_PRELOAD`, `BASH_ENV`, `IFS`, `NODE_OPTIONS`, `PYTHONPATH`).
+- If you need a proxy with complex behavior, prefer a wrapper script checked into your project and referenced by absolute path rather than passing shell-structured strings via environment variables.
+- When in doubt, use the JSON-array form for `GEMINI_SANDBOX_PROXY_COMMAND`.
+
 ## Command-Line Arguments
 
 Arguments passed directly when running the CLI can override other configurations for that specific session.
