@@ -22,6 +22,9 @@ import {
   METRIC_SESSION_COUNT,
   METRIC_FILE_OPERATION_COUNT,
   EVENT_CHAT_COMPRESSION,
+  METRIC_INVALID_CHUNK_COUNT,
+  METRIC_CONTENT_RETRY_COUNT,
+  METRIC_CONTENT_RETRY_FAILURE_COUNT,
 } from './constants.js';
 import { Config } from '../config/config.js';
 import { DiffStat } from '../tools/tools.js';
@@ -40,6 +43,9 @@ let apiRequestLatencyHistogram: Histogram | undefined;
 let tokenUsageCounter: Counter | undefined;
 let fileOperationCounter: Counter | undefined;
 let chatCompressionCounter: Counter | undefined;
+let invalidChunkCounter: Counter | undefined;
+let contentRetryCounter: Counter | undefined;
+let contentRetryFailureCounter: Counter | undefined;
 let isMetricsInitialized = false;
 
 function getCommonAttributes(config: Config): Attributes {
@@ -94,6 +100,24 @@ export function initializeMetrics(config: Config): void {
     description: 'Counts chat compression events.',
     valueType: ValueType.INT,
   });
+
+  // New counters for content errors
+  invalidChunkCounter = meter.createCounter(METRIC_INVALID_CHUNK_COUNT, {
+    description: 'Counts invalid chunks received from a stream.',
+    valueType: ValueType.INT,
+  });
+  contentRetryCounter = meter.createCounter(METRIC_CONTENT_RETRY_COUNT, {
+    description: 'Counts retries due to content errors (e.g., empty stream).',
+    valueType: ValueType.INT,
+  });
+  contentRetryFailureCounter = meter.createCounter(
+    METRIC_CONTENT_RETRY_FAILURE_COUNT,
+    {
+      description: 'Counts occurrences of all content retries failing.',
+      valueType: ValueType.INT,
+    },
+  );
+
   const sessionCounter = meter.createCounter(METRIC_SESSION_COUNT, {
     description: 'Count of CLI sessions started.',
     valueType: ValueType.INT,
@@ -226,4 +250,30 @@ export function recordFileOperationMetric(
     attributes['user_removed_lines'] = diffStat.user_removed_lines;
   }
   fileOperationCounter.add(1, attributes);
+}
+
+// --- New Metric Recording Functions ---
+
+/**
+ * Records a metric for when an invalid chunk is received from a stream.
+ */
+export function recordInvalidChunk(config: Config): void {
+  if (!invalidChunkCounter || !isMetricsInitialized) return;
+  invalidChunkCounter.add(1, getCommonAttributes(config));
+}
+
+/**
+ * Records a metric for when a retry is triggered due to a content error.
+ */
+export function recordContentRetry(config: Config): void {
+  if (!contentRetryCounter || !isMetricsInitialized) return;
+  contentRetryCounter.add(1, getCommonAttributes(config));
+}
+
+/**
+ * Records a metric for when all content error retries have failed for a request.
+ */
+export function recordContentRetryFailure(config: Config): void {
+  if (!contentRetryFailureCounter || !isMetricsInitialized) return;
+  contentRetryFailureCounter.add(1, getCommonAttributes(config));
 }
