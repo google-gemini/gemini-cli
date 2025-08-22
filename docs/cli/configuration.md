@@ -111,7 +111,6 @@ In addition to a project settings file, a project's `.gemini` directory can cont
       "autoIndexingInterval": 10000
     }
     ```
-=======
 ### Troubleshooting File Search Performance
 
 If you are experiencing performance issues with file searching (e.g., with `@` completions), especially in projects with a very large number of files, here are a few things you can try in order of recommendation:

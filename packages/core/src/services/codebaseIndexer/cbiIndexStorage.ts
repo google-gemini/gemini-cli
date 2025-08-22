@@ -4,7 +4,7 @@ import { FileIndex, IndexStatus } from './types.js';
 
 const MAGIC_NUMBER = 0xC0DEB1D0;
 const VERSION = 1;
-const HEADER_SIZE = 136;
+const HEADER_SIZE = 84;
 
 interface IndexHeader {
   magic_number: number;
@@ -1101,72 +1101,7 @@ export class CBIIndexStorage {
     }
   }
 
-  private async loadAllFileIndicesExcept(excludePaths: Set<string>): Promise<FileIndex[]> {
-    const fileHandle = await fs.open(this.indexPath, 'r');
-    try {
-      const headerBuffer = Buffer.alloc(HEADER_SIZE);
-      await fileHandle.read(headerBuffer, 0, HEADER_SIZE, 0);
-      const header = this.parseHeader(headerBuffer);
 
-      const fileInfosBuffer = Buffer.alloc(header.total_files * 32);
-      await fileHandle.read(fileInfosBuffer, 0, fileInfosBuffer.length, header.offset_files);
-      const fileInfos = this.parseFileInfos(fileInfosBuffer, header.total_files);
-
-      const blocksBuffer = Buffer.alloc(header.total_vectors * 24);
-      await fileHandle.read(blocksBuffer, 0, blocksBuffer.length, header.offset_blocks);
-      const blockMetadatas = this.parseBlockMetadatas(blocksBuffer, header.total_vectors);
-
-      const stringHeapSize = header.offset_vectors - header.offset_strings;
-      const stringHeapBuffer = Buffer.alloc(stringHeapSize);
-      await fileHandle.read(stringHeapBuffer, 0, stringHeapSize, header.offset_strings);
-
-      const fileIndices: FileIndex[] = [];
-      
-      for (let fileId = 0; fileId < fileInfos.length; fileId++) {
-        const fileInfo = fileInfos[fileId];
-        const relpath = this.extractStringFromHeap(stringHeapBuffer, fileInfo.path_offset);
-        
-        if (excludePaths.has(relpath)) {
-          continue;
-        }
-
-        const units = [];
-        const embeddings = [];
-        
-        for (let i = 0; i < fileInfo.num_vectors; i++) {
-          const vectorId = fileInfo.first_vector_id + i;
-          const block = blockMetadatas[vectorId];
-          
-          const text = this.extractStringFromHeap(stringHeapBuffer, block.text_offset, block.text_len);
-          units.push({
-            id: `${relpath}:${block.lineno}:${block.start_char}`,
-            relpath,
-            text,
-            lineno: block.lineno,
-            start_char: block.start_char
-          });
-
-          const vector = await this.loadVector(vectorId, fileHandle, header);
-          embeddings.push(vector);
-        }
-
-        const sha = await this.generateSha(relpath);
-          
-        fileIndices.push({
-          sha,
-          relpath,
-          mtime: new Date(fileInfo.mtime * 1000),
-          size: fileInfo.size,
-          units,
-          embeddings
-        });
-      }
-
-      return fileIndices;
-    } finally {
-      await fileHandle.close();
-    }
-  }
 
   async searchWithHNSW(queryVector: number[], topK: number = 8): Promise<Array<{ score: number; vectorId: number; metadata: any }>> {
     const fileHandle = await fs.open(this.indexPath, 'r');

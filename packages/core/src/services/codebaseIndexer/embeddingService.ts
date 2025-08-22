@@ -9,7 +9,6 @@ import { DEFAULT_MODEL } from './constants.js';
 
 export class EmbeddingService {
   private readonly config: EmbeddingConfig;
-  private embeddingDimension: number = 768;
 
   constructor(config: Partial<EmbeddingConfig> = {}) {
     this.config = {
@@ -130,9 +129,7 @@ export class EmbeddingService {
       throw new Error(`Unknown embeddings response format: ${JSON.stringify(data).substring(0, 300)}`);
     }
     
-    if (embeddings.length > 0 && embeddings[0].length > 0) {
-      this.embeddingDimension = embeddings[0].length;
-    }
+
     
     return embeddings;
   }
