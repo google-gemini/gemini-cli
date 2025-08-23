@@ -36,8 +36,8 @@ export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
 export const MAC_DRAG_MODE_PREFIX = `${ESC}[I`;
 export const MAC_FOCUS_EVENT_OUT_OF_EDITOR = "'"; // When editor does NOT have focus (macOS Finder.app)
 
-const DRAG_START_TIMEOUT_MS = 200;
-const DRAG_COMPLETION_TIMEOUT_MS = 500;
+export const DRAG_START_TIMEOUT_MS = 200;
+export const DRAG_COMPLETION_TIMEOUT_MS = 500;
 
 export interface Key {
   name: string;
@@ -222,13 +222,6 @@ export function KeypressProvider({
       const isDragFocusEvent = (sequence: string) =>
         sequence === MAC_DRAG_MODE_PREFIX ||
         sequence === MAC_FOCUS_EVENT_OUT_OF_EDITOR;
-
-      // Handle normal paste operations first
-      if (key.paste) {
-        if (isDragCollectingRef.current) {
-          resetDragState();
-        }
-      }
 
       if (isDragFocusEvent(key.sequence) && !key.paste) {
         isDragCollectingRef.current = true;
