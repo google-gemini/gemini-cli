@@ -159,6 +159,28 @@ export async function main() {
     argv,
   );
 
+  // Validate project access to prevent authentication bypass
+  // This checks if the user has access to the specified GOOGLE_CLOUD_PROJECT
+  if (process.env['GOOGLE_CLOUD_PROJECT']) {
+    try {
+      const { validateCurrentProjectAccess } = await import('./utils/projectAccessValidator.js');
+      const hasAccess = await validateCurrentProjectAccess(
+        config.getAuthMethod(),
+        config
+      );
+
+      if (!hasAccess) {
+        console.error('❌ Access denied: You do not have access to the specified Google Cloud project.');
+        console.error('Please check your GOOGLE_CLOUD_PROJECT environment variable or re-authenticate.');
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error('❌ Error validating project access:', error);
+      console.error('Please check your authentication and project settings.');
+      process.exit(1);
+    }
+  }
+
   const consolePatcher = new ConsolePatcher({
     stderr: true,
     debugMode: config.getDebugMode(),
