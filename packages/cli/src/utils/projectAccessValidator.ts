@@ -5,7 +5,7 @@
  */
 
 import { OAuth2Client } from 'google-auth-library';
-import { getOauthClient } from '../../core/src/code_assist/oauth2.js';
+import { getOauthClient } from '../../../core/src/code_assist/oauth2.js';
 import { AuthType } from '../../../core/src/core/contentGenerator.js';
 import { Config } from '../../../core/src/config/config.js';
 
