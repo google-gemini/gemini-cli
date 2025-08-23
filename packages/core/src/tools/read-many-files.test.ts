@@ -16,6 +16,10 @@ import { Config } from '../config/config.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from './tool-error.js';
+import {
+  COMMON_IGNORE_PATTERNS,
+  DEFAULT_FILE_EXCLUDES,
+} from '../utils/ignorePatterns.js';
 import * as glob from 'glob';
 
 vi.mock('glob', { spy: true });
@@ -77,6 +81,13 @@ describe('ReadManyFilesTool', () => {
       getTargetDir: () => tempRootDir,
       getWorkspaceDirs: () => [tempRootDir],
       getWorkspaceContext: () => new WorkspaceContext(tempRootDir),
+      getFileExclusions: () => ({
+        getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
+        getDefaultExcludePatterns: () => DEFAULT_FILE_EXCLUDES,
+        getGlobExcludes: () => COMMON_IGNORE_PATTERNS,
+        buildExcludePatterns: () => DEFAULT_FILE_EXCLUDES,
+        getReadManyFilesExcludes: () => DEFAULT_FILE_EXCLUDES,
+      }),
     } as Partial<Config> as Config;
     tool = new ReadManyFilesTool(mockConfig);
 
@@ -221,6 +232,7 @@ describe('ReadManyFilesTool', () => {
       const expectedPath = path.join(tempRootDir, 'file1.txt');
       expect(result.llmContent).toEqual([
         `--- ${expectedPath} ---\n\nContent of file1\n\n`,
+        `\n--- End of content ---`,
       ]);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
@@ -285,7 +297,10 @@ describe('ReadManyFilesTool', () => {
       const result = await invocation.execute(new AbortController().signal);
       const content = result.llmContent as string[];
       const expectedPath = path.join(tempRootDir, 'src/main.ts');
-      expect(content).toEqual([`--- ${expectedPath} ---\n\nMain content\n\n`]);
+      expect(content).toEqual([
+        `--- ${expectedPath} ---\n\nMain content\n\n`,
+        `\n--- End of content ---`,
+      ]);
       expect(
         content.find((c) => c.includes('src/main.test.ts')),
       ).toBeUndefined();
@@ -314,7 +329,10 @@ describe('ReadManyFilesTool', () => {
       const result = await invocation.execute(new AbortController().signal);
       const content = result.llmContent as string[];
       const expectedPath = path.join(tempRootDir, 'src/app.js');
-      expect(content).toEqual([`--- ${expectedPath} ---\n\napp code\n\n`]);
+      expect(content).toEqual([
+        `--- ${expectedPath} ---\n\napp code\n\n`,
+        `\n--- End of content ---`,
+      ]);
       expect(
         content.find((c) => c.includes('node_modules/some-lib/index.js')),
       ).toBeUndefined();
@@ -367,6 +385,7 @@ describe('ReadManyFilesTool', () => {
             mimeType: 'image/png',
           },
         },
+        '\n--- End of content ---',
       ]);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
@@ -390,6 +409,7 @@ describe('ReadManyFilesTool', () => {
             mimeType: 'image/png',
           },
         },
+        '\n--- End of content ---',
       ]);
     });
 
@@ -426,6 +446,7 @@ describe('ReadManyFilesTool', () => {
             mimeType: 'application/pdf',
           },
         },
+        '\n--- End of content ---',
       ]);
     });
 
@@ -441,6 +462,7 @@ describe('ReadManyFilesTool', () => {
             mimeType: 'application/pdf',
           },
         },
+        '\n--- End of content ---',
       ]);
     });
 
@@ -473,6 +495,13 @@ describe('ReadManyFilesTool', () => {
         }),
         getWorkspaceContext: () => new WorkspaceContext(tempDir1, [tempDir2]),
         getTargetDir: () => tempDir1,
+        getFileExclusions: () => ({
+          getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
+          getDefaultExcludePatterns: () => [],
+          getGlobExcludes: () => COMMON_IGNORE_PATTERNS,
+          buildExcludePatterns: () => [],
+          getReadManyFilesExcludes: () => [],
+        }),
       } as Partial<Config> as Config;
       tool = new ReadManyFilesTool(mockConfig);
 
@@ -549,6 +578,7 @@ describe('ReadManyFilesTool', () => {
 Content of receive-detail
 
 `,
+        `\n--- End of content ---`,
       ]);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
@@ -567,6 +597,7 @@ Content of receive-detail
 Content of file[1]
 
 `,
+        `\n--- End of content ---`,
       ]);
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
@@ -634,9 +665,10 @@ Content of file[1]
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
 
-      // Verify all files were processed
+      // Verify all files were processed. The content should have fileCount
+      // entries + 1 for the output terminator.
       const content = result.llmContent as string[];
-      expect(content).toHaveLength(fileCount);
+      expect(content).toHaveLength(fileCount + 1);
       for (let i = 0; i < fileCount; i++) {
         expect(content.join('')).toContain(`Batch test ${i}`);
       }

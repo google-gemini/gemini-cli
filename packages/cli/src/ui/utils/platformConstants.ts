@@ -48,3 +48,11 @@ export const BACKSLASH_ENTER_DETECTION_WINDOW_MS = 5;
  * We use 12 to provide a small buffer.
  */
 export const MAX_KITTY_SEQUENCE_LENGTH = 12;
+
+/**
+ * Character codes for common escape sequences
+ */
+export const CHAR_CODE_ESC = 27;
+export const CHAR_CODE_LEFT_BRACKET = 91;
+export const CHAR_CODE_1 = 49;
+export const CHAR_CODE_2 = 50;
