@@ -121,6 +121,7 @@ export class DiffManager {
       diffTitle,
       {
         preview: false,
+        preserveFocus: true,
       },
     );
     await vscode.commands.executeCommand(
@@ -214,10 +215,18 @@ export class DiffManager {
   }
 
   private async onActiveEditorChange(editor: vscode.TextEditor | undefined) {
-    const isVisible =
-      !!editor &&
-      editor.document.uri.scheme === DIFF_SCHEME &&
-      this.diffDocuments.has(editor.document.uri.toString());
+    let isVisible = false;
+    if (editor) {
+      isVisible = this.diffDocuments.has(editor.document.uri.toString());
+      if (!isVisible) {
+        for (const document of this.diffDocuments.values()) {
+          if (document.originalFilePath === editor.document.uri.fsPath) {
+            isVisible = true;
+            break;
+          }
+        }
+      }
+    }
     await vscode.commands.executeCommand(
       'setContext',
       'gemini.diff.isVisible',

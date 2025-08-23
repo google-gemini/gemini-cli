@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Mock } from 'vitest';
 import { Config, ConfigParameters, SandboxConfig } from './config.js';
 import * as path from 'path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
@@ -14,10 +15,12 @@ import {
 } from '../telemetry/index.js';
 import {
   AuthType,
+  ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
+import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -119,11 +122,16 @@ describe('Server Config (config.ts)', () => {
     telemetry: TELEMETRY_SETTINGS,
     sessionId: SESSION_ID,
     model: MODEL,
+    usageStatisticsEnabled: false,
   };
 
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
+    vi.spyOn(
+      ClearcutLogger.prototype,
+      'logStartSessionEvent',
+    ).mockImplementation(() => undefined);
   });
 
   describe('initialize', () => {
@@ -242,6 +250,7 @@ describe('Server Config (config.ts)', () => {
       // Verify that history was restored to the new client
       expect(mockNewClient.setHistory).toHaveBeenCalledWith(
         mockExistingHistory,
+        { stripThoughts: false },
       );
     });
 
@@ -274,6 +283,92 @@ describe('Server Config (config.ts)', () => {
 
       // Verify that setHistory was not called since there was no existing history
       expect(mockNewClient.setHistory).not.toHaveBeenCalled();
+    });
+
+    it('should strip thoughts when switching from GenAI to Vertex', async () => {
+      const config = new Config(baseParams);
+      const mockContentConfig = {
+        model: 'gemini-pro',
+        apiKey: 'test-key',
+        authType: AuthType.USE_GEMINI,
+      };
+      (
+        config as unknown as { contentGeneratorConfig: ContentGeneratorConfig }
+      ).contentGeneratorConfig = mockContentConfig;
+
+      (createContentGeneratorConfig as Mock).mockReturnValue({
+        ...mockContentConfig,
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      });
+
+      const mockExistingHistory = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ];
+      const mockExistingClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue(mockExistingHistory),
+      };
+      const mockNewClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        initialize: vi.fn().mockResolvedValue(undefined),
+      };
+
+      (
+        config as unknown as { geminiClient: typeof mockExistingClient }
+      ).geminiClient = mockExistingClient;
+      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
+
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(mockNewClient.setHistory).toHaveBeenCalledWith(
+        mockExistingHistory,
+        { stripThoughts: true },
+      );
+    });
+
+    it('should not strip thoughts when switching from Vertex to GenAI', async () => {
+      const config = new Config(baseParams);
+      const mockContentConfig = {
+        model: 'gemini-pro',
+        apiKey: 'test-key',
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      };
+      (
+        config as unknown as { contentGeneratorConfig: ContentGeneratorConfig }
+      ).contentGeneratorConfig = mockContentConfig;
+
+      (createContentGeneratorConfig as Mock).mockReturnValue({
+        ...mockContentConfig,
+        authType: AuthType.USE_GEMINI,
+      });
+
+      const mockExistingHistory = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ];
+      const mockExistingClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue(mockExistingHistory),
+      };
+      const mockNewClient = {
+        isInitialized: vi.fn().mockReturnValue(true),
+        getHistory: vi.fn().mockReturnValue([]),
+        setHistory: vi.fn(),
+        initialize: vi.fn().mockResolvedValue(undefined),
+      };
+
+      (
+        config as unknown as { geminiClient: typeof mockExistingClient }
+      ).geminiClient = mockExistingClient;
+      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(mockNewClient.setHistory).toHaveBeenCalledWith(
+        mockExistingHistory,
+        { stripThoughts: false },
+      );
     });
   });
 
@@ -372,6 +467,40 @@ describe('Server Config (config.ts)', () => {
     expect(fileService).toBeDefined();
   });
 
+  describe('Usage Statistics', () => {
+    it('defaults usage statistics to enabled if not specified', () => {
+      const config = new Config({
+        ...baseParams,
+        usageStatisticsEnabled: undefined,
+      });
+
+      expect(config.getUsageStatisticsEnabled()).toBe(true);
+    });
+
+    it.each([{ enabled: true }, { enabled: false }])(
+      'sets usage statistics based on the provided value (enabled: $enabled)',
+      ({ enabled }) => {
+        const config = new Config({
+          ...baseParams,
+          usageStatisticsEnabled: enabled,
+        });
+        expect(config.getUsageStatisticsEnabled()).toBe(enabled);
+      },
+    );
+
+    it('logs the session start event', async () => {
+      const config = new Config({
+        ...baseParams,
+        usageStatisticsEnabled: true,
+      });
+      await config.initialize();
+
+      expect(
+        ClearcutLogger.prototype.logStartSessionEvent,
+      ).toHaveBeenCalledOnce();
+    });
+  });
+
   describe('Telemetry Settings', () => {
     it('should return default telemetry target if not provided', () => {
       const params: ConfigParameters = {
@@ -438,6 +567,65 @@ describe('Server Config (config.ts)', () => {
       delete paramsWithoutTelemetry.telemetry;
       const config = new Config(paramsWithoutTelemetry);
       expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
+    });
+
+    it('should return provided OTLP protocol', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true, otlpProtocol: 'http' },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryOtlpProtocol()).toBe('http');
+    });
+
+    it('should return default OTLP protocol if not provided', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
+    });
+
+    it('should return default OTLP protocol if telemetry object is not provided', () => {
+      const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
+      delete paramsWithoutTelemetry.telemetry;
+      const config = new Config(paramsWithoutTelemetry);
+      expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
+    });
+  });
+
+  describe('UseRipgrep Configuration', () => {
+    it('should default useRipgrep to false when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getUseRipgrep()).toBe(false);
+    });
+
+    it('should set useRipgrep to true when provided as true', () => {
+      const paramsWithRipgrep: ConfigParameters = {
+        ...baseParams,
+        useRipgrep: true,
+      };
+      const config = new Config(paramsWithRipgrep);
+      expect(config.getUseRipgrep()).toBe(true);
+    });
+
+    it('should set useRipgrep to false when explicitly provided as false', () => {
+      const paramsWithRipgrep: ConfigParameters = {
+        ...baseParams,
+        useRipgrep: false,
+      };
+      const config = new Config(paramsWithRipgrep);
+      expect(config.getUseRipgrep()).toBe(false);
+    });
+
+    it('should default useRipgrep to false when undefined', () => {
+      const paramsWithUndefinedRipgrep: ConfigParameters = {
+        ...baseParams,
+        useRipgrep: undefined,
+      };
+      const config = new Config(paramsWithUndefinedRipgrep);
+      expect(config.getUseRipgrep()).toBe(false);
     });
   });
 });

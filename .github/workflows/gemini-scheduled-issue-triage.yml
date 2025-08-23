@@ -14,34 +14,32 @@ defaults:
     shell: 'bash'
 
 permissions:
-  contents: 'read'
   id-token: 'write'
   issues: 'write'
-  statuses: 'write'
 
 jobs:
   triage-issues:
     timeout-minutes: 10
-    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
+    if: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' }}
     runs-on: 'ubuntu-latest'
-
     steps:
-      - name: 'Checkout repository'
-        uses: 'actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683' # ratchet:actions/checkout@v4
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
 
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
-        uses: 'actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e' # ratchet:actions/create-github-app-token@v2
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
 
       - name: 'Find untriaged issues'
         id: 'find_issues'
         env:
           GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
           GITHUB_REPOSITORY: '${{ github.repository }}'
-          GITHUB_OUTPUT: '${{ github.output }}'
         run: |-
           set -euo pipefail
 
@@ -62,15 +60,31 @@ jobs:
           ISSUE_COUNT="$(echo "${ISSUES}" | jq 'length')"
           echo "✅ Found ${ISSUE_COUNT} issues to triage! 🎯"
 
-      - name: 'Run Gemini Issue Triage'
+      - name: 'Get Repository Labels'
+        id: 'get_labels'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          script: |-
+            const { data: labels } = await github.rest.issues.listLabelsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const labelNames = labels.map(label => label.name);
+            core.setOutput('available_labels', labelNames.join(','));
+            core.info(`Found ${labelNames.length} labels: ${labelNames.join(', ')}`);
+            return labelNames;
+
+      - name: 'Run Gemini Issue Analysis'
         if: |-
           ${{ steps.find_issues.outputs.issues_to_triage != '[]' }}
-        uses: 'google-github-actions/run-gemini-cli@20351b5ea2b4179431f1ae8918a246a0808f8747'
-        id: 'gemini_issue_triage'
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        id: 'gemini_issue_analysis'
         env:
-          GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
           ISSUES_TO_TRIAGE: '${{ steps.find_issues.outputs.issues_to_triage }}'
           REPOSITORY: '${{ github.repository }}'
+          AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         with:
           gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
@@ -83,11 +97,7 @@ jobs:
             {
               "maxSessionTurns": 25,
               "coreTools": [
-                "run_shell_command(echo)",
-                "run_shell_command(gh label list)",
-                "run_shell_command(gh issue edit)",
-                "run_shell_command(gh issue view)",
-                "run_shell_command(gh issue list)"
+                "run_shell_command(echo)"
               ],
               "telemetry": {
                 "enabled": true,
@@ -97,60 +107,69 @@ jobs:
           prompt: |-
             ## Role
 
-            You are an issue triage assistant. Analyze issues and apply
+            You are an issue triage assistant. Analyze issues and identify
             appropriate labels. Use the available tools to gather information;
             do not ask for information to be provided.
 
             ## Steps
 
-            1. Run: `gh label list --repo ${{ github.repository }} --limit 100` to get all available labels.
+            1. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
             2. Check environment variable for issues to triage: $ISSUES_TO_TRIAGE (JSON array of issues)
             3. Review the issue title, body and any comments provided in the environment variables.
             4. Ignore any existing priorities or tags on the issue.
-            5. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. 
-            6. Get the list of labels already on the issue using `gh issue view ISSUE_NUMBER --repo ${{ github.repository }} --json labels -t '{{range .labels}}{{.name}}{{"\n"}}{{end}}'
-            7. For area/* and kind/* limit yourself to only the single most applicable label in each case. 
-            8. Give me a single short paragraph about why you are selecting each label in the process. use the format Issue ID: , Title, Label applied:, Label removed, ovearll explanation
-            9. Parse the JSON array from step 2 and for EACH INDIVIDUAL issue, apply appropriate labels using separate commands:
-              - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --add-label "label1"`
-              - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --add-label "label2"`
-              - Continue for each label separately
-              - IMPORTANT: Label each issue individually, one command per issue, one label at a time if needed.
-              - Make sure after you apply labels there is only one area/* and one kind/* label per issue.  
-              - To do this look for labels found in step 6 that no longer apply remove them one at a time using 
-              - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "label-name1"`
-              - `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "label-name2"`
-              - IMPORTANT: Remove each label one at a time, one command per issue if needed.
-            10. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5 
+            5. Identify the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*.
+            6. Identify other applicable labels based on the issue content, such as status/*, help wanted, good first issue, etc.
+            7. For area/* and kind/* limit yourself to only the single most applicable label in each case.
+            8. Give me a single short explanation about why you are selecting each label in the process.
+            9. Output a JSON array of objects, each containing the issue number
+               and the labels to add and remove, along with an explanation. For example:
+               ```
+               [
+                 {
+                   "issue_number": 123,
+                   "labels_to_add": ["kind/bug", "priority/p2"],
+                   "labels_to_remove": ["status/needs-triage"],
+                   "explanation": "This issue is a bug that needs to be addressed with medium priority."
+                 },
+                 {
+                   "issue_number": 456,
+                   "labels_to_add": ["kind/enhancement"],
+                   "labels_to_remove": [],
+                   "explanation": "This issue is an enhancement request that could improve the user experience."
+                 }
+               ]
+               ```
+              If an issue cannot be classified, do not include it in the output array.
+            10. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5
               - Anything more than 6 versions older than the most recent should add the status/need-retesting label
-            11. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label
-              - After applying appropriate labels to an issue, remove the "status/need-triage" label if present: `gh issue edit ISSUE_NUMBER --repo ${{ github.repository }} --remove-label "status/need-triage"`
-              - Execute one `gh issue edit` command per issue, wait for success before proceeding to the next
-            Process each issue sequentially and confirm each labeling operation before moving to the next issue.
+            11. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label
+              - After identifying appropriate labels to an issue, add "status/need-triage" label to labels_to_remove in the output.
 
             ## Guidelines
 
+            - Output only valid JSON format
+            - Do not include any explanation or additional text, just the JSON
             - Only use labels that already exist in the repository.
               - Do not add comments or modify the issue content.
               - Do not remove labels titled help wanted or good first issue.
               - Triage only the current issue.
-              - Apply only one area/ label
-              - Apply only one kind/ label (Do not apply kind/duplicate or kind/parent-issue) 
-              - Apply all applicable sub-area/* and priority/* labels based on the issue content. It's ok to have multiple of these.
+              - Identify only one area/ label
+              - Identify only one kind/ label (Do not apply kind/duplicate or kind/parent-issue)
+              - Identify all applicable sub-area/* and priority/* labels based on the issue content. It's ok to have multiple of these.
               - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
-            Categorization Guidelines: 
+            Categorization Guidelines:
             P0: Critical / Blocker
               - A P0 bug is a catastrophic failure that demands immediate attention. It represents a complete showstopper for a significant portion of users or for the development process itself.
               Impact:
               - Blocks development or testing for the entire team.
               - Major security vulnerability that could compromise user data or system integrity.
               - Causes data loss or corruption with no workaround.
-              - Crashes the application or makes a core feature completely unusable for all or most users in a production environment. Will it cause severe quality degration? 
+              - Crashes the application or makes a core feature completely unusable for all or most users in a production environment. Will it cause severe quality degration?
               - Is it preventing contributors from contributing to the repository or is it a release blocker?
               Qualifier: Is the main function of the software broken?
               Example: The gemini auth login command fails with an unrecoverable error, preventing any user from authenticating and using the rest of the CLI.
             P1: High
-              - A P1 bug is a serious issue that significantly degrades the user experience or impacts a core feature. While not a complete blocker, it's a major problem that needs a fast resolution. 
+              - A P1 bug is a serious issue that significantly degrades the user experience or impacts a core feature. While not a complete blocker, it's a major problem that needs a fast resolution.
               - Feature requests are almost never P1.
               Impact:
               - A core feature is broken or behaving incorrectly for a large number of users or large number of use cases.
@@ -174,21 +193,21 @@ jobs:
               - An edge-case bug that is very difficult to reproduce and affects a tiny fraction of users.
               Qualifier: Is it a "nice-to-fix" issue?
               Example: Spelling mistakes etc.
-            Additional Context: 
+            Additional Context:
               - If users are talking about issues where the model gets downgraded from pro to flash then i want you to categorize that as a performance issue
-              - This product is designed to use different models eg.. using pro, downgrading to flash etc. 
+              - This product is designed to use different models eg.. using pro, downgrading to flash etc.
               - When users report that they dont expect the model to change those would be categorized as feature requests.
             Definition of Areas
-            area/ux: 
+            area/ux:
               - Issues concerning user-facing elements like command usability, interactive features, help docs, and perceived performance.
-              - I am seeing my screen flicker when using Gemini CLI 
-              - I am seeing the output malformed 
-              - Theme changes aren't taking effect 
+              - I am seeing my screen flicker when using Gemini CLI
+              - I am seeing the output malformed
+              - Theme changes aren't taking effect
               - My keyboard inputs arent' being recognzied
-            area/platform: 
+            area/platform:
               - Issues related to installation, packaging, OS compatibility (Windows, macOS, Linux), and the underlying CLI framework.
             area/background: Issues related to long-running background tasks, daemons, and autonomous or proactive agent features.
-            area/models: 
+            area/models:
               - i am not getting a response that is reasonable or expected. this can include things like
               - I am calling a tool and the tool is not performing as expected.
               - i am expecting a tool to be called and it is not getting called ,
@@ -202,24 +221,71 @@ jobs:
               - Memory compression
               - unexpected responses,
               - poor quality of generated code
-            area/tools: 
-              - These are primarily issues related to Model Context Protocol 
-              - These are issues that mention MCP support 
-              - feature requests asking for support for new tools. 
-            area/core: 
+            area/tools:
+              - These are primarily issues related to Model Context Protocol
+              - These are issues that mention MCP support
+              - feature requests asking for support for new tools.
+            area/core:
               - Issues with fundamental components like command parsing, configuration management, session state, and the main API client logic. Introducing multi-modality
-            area/contribution: 
+            area/contribution:
               - Issues related to improving the developer contribution experience, such as CI/CD pipelines, build scripts, and test automation infrastructure.
-            area/authentication: 
+            area/authentication:
               -  Issues related to user identity, login flows, API key handling, credential storage, and access token management, unable to sign in selecting wrong authentication path etc..
-            area/security-privacy: 
+            area/security-privacy:
               - Issues concerning vulnerability patching, dependency security, data sanitization, privacy controls, and preventing unauthorized data access.
-            area/extensibility: 
+            area/extensibility:
               - Issues related to the plugin system, extension APIs, or making the CLI's functionality available in other applications, github actions, ide support etc..
-            area/performance: 
+            area/performance:
               - Issues focused on model performance
               - Issues with running out of capacity,
               - 429 errors etc..
               - could also pertain to latency,
               - other general software performance like, memory usage, CPU consumption, and algorithmic efficiency.
               - Switching models from one to the other unexpectedly.
+
+      - name: 'Apply Labels to Issues'
+        if: |-
+          ${{ steps.gemini_issue_analysis.outcome == 'success' &&
+              steps.gemini_issue_analysis.outputs.summary != '[]' }}
+        env:
+          REPOSITORY: '${{ github.repository }}'
+          LABELS_OUTPUT: '${{ steps.gemini_issue_analysis.outputs.summary }}'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          script: |-
+            // Strip code block markers if present
+            const rawLabels = process.env.LABELS_OUTPUT;
+            core.info(`Raw labels JSON: ${rawLabels}`);
+            let parsedLabels;
+            try {
+              const trimmedLabels = rawLabels.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '').trim();
+              parsedLabels = JSON.parse(trimmedLabels);
+              core.info(`Parsed labels JSON: ${JSON.stringify(parsedLabels)}`);
+            } catch (err) {
+              core.setFailed(`Failed to parse labels JSON from Gemini output: ${err.message}\nRaw output: ${rawLabels}`);
+              return;
+            }
+
+            for (const entry of parsedLabels) {
+              const issueNumber = entry.issue_number;
+              if (!issueNumber) {
+                core.info(`Skipping entry with no issue number: ${JSON.stringify(entry)}`);
+                continue;
+              }
+
+              // Set labels based on triage result
+              if (entry.labels_to_set && entry.labels_to_set.length > 0) {
+                await github.rest.issues.setLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  labels: entry.labels_to_set
+                });
+                const explanation = entry.explanation ? ` - ${entry.explanation}` : '';
+                core.info(`Successfully set labels for #${issueNumber}: ${entry.labels_to_set.join(', ')}${explanation}`);
+              } else {
+                // If no labels to set, leave the issue as is
+                core.info(`No labels to set for #${issueNumber}, leaving as is`);
+              }
+            }

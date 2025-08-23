@@ -5,7 +5,6 @@
  */
 
 import { reportError } from '../utils/errorReporting.js';
-import { ToolRegistry } from '../tools/tool-registry.js';
 import { Config } from '../config/config.js';
 import { ToolCallRequestInfo } from './turn.js';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
@@ -284,7 +283,7 @@ export class SubAgentScope {
     outputConfig?: OutputConfig,
   ): Promise<SubAgentScope> {
     if (toolConfig) {
-      const toolRegistry: ToolRegistry = await runtimeContext.getToolRegistry();
+      const toolRegistry = runtimeContext.getToolRegistry();
       const toolsToLoad: string[] = [];
       for (const tool of toolConfig.tools) {
         if (typeof tool === 'string') {
@@ -349,8 +348,7 @@ export class SubAgentScope {
     }
 
     const abortController = new AbortController();
-    const toolRegistry: ToolRegistry =
-      await this.runtimeContext.getToolRegistry();
+    const toolRegistry = this.runtimeContext.getToolRegistry();
 
     // Prepare the list of tools available to the subagent.
     const toolsList: FunctionDeclaration[] = [];
@@ -423,7 +421,6 @@ export class SubAgentScope {
         if (functionCalls.length > 0) {
           currentMessages = await this.processFunctionCalls(
             functionCalls,
-            toolRegistry,
             abortController,
             promptId,
           );
@@ -480,7 +477,6 @@ export class SubAgentScope {
    */
   private async processFunctionCalls(
     functionCalls: FunctionCall[],
-    toolRegistry: ToolRegistry,
     abortController: AbortController,
     promptId: string,
   ): Promise<Content[]> {
@@ -506,7 +502,7 @@ export class SubAgentScope {
 
         toolResponse = {
           callId,
-          responseParts: `Emitted variable ${valName} successfully`,
+          responseParts: [{ text: `Emitted variable ${valName} successfully` }],
           resultDisplay: `Emitted variable ${valName} successfully`,
           error: undefined,
         };
@@ -514,7 +510,6 @@ export class SubAgentScope {
         toolResponse = await executeToolCall(
           this.runtimeContext,
           requestInfo,
-          toolRegistry,
           abortController.signal,
         );
       }
@@ -526,16 +521,7 @@ export class SubAgentScope {
       }
 
       if (toolResponse.responseParts) {
-        const parts = Array.isArray(toolResponse.responseParts)
-          ? toolResponse.responseParts
-          : [toolResponse.responseParts];
-        for (const part of parts) {
-          if (typeof part === 'string') {
-            toolResponseParts.push({ text: part });
-          } else if (part) {
-            toolResponseParts.push(part);
-          }
-        }
+        toolResponseParts.push(...toolResponse.responseParts);
       }
     }
     // If all tool calls failed, inform the model so it can re-evaluate.

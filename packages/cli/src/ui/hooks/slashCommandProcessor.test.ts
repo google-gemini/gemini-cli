@@ -4,18 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-const { logSlashCommand, SlashCommandEvent } = vi.hoisted(() => ({
+const { logSlashCommand } = vi.hoisted(() => ({
   logSlashCommand: vi.fn(),
-  SlashCommandEvent: vi.fn((command, subCommand) => ({ command, subCommand })),
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
+
   return {
     ...original,
     logSlashCommand,
-    SlashCommandEvent,
     getIdeInstaller: vi.fn().mockReturnValue(null),
   };
 });
@@ -25,10 +24,11 @@ const { mockProcessExit } = vi.hoisted(() => ({
 }));
 
 vi.mock('node:process', () => {
-  const mockProcess = {
+  const mockProcess: Partial<NodeJS.Process> = {
     exit: mockProcessExit,
-    platform: 'test-platform',
-  };
+    platform: 'sunos',
+    cwd: () => '/fake/dir',
+  } as unknown as NodeJS.Process;
   return {
     ...mockProcess,
     default: mockProcess,
@@ -77,22 +77,28 @@ import {
   ConfirmShellCommandsActionReturn,
   SlashCommand,
 } from '../commands/types.js';
-import { Config, ToolConfirmationOutcome } from '@google/gemini-cli-core';
+import { ToolConfirmationOutcome } from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
+import {
+  SlashCommandStatus,
+  makeFakeConfig,
+} from '@google/gemini-cli-core/index.js';
 
-const createTestCommand = (
+function createTestCommand(
   overrides: Partial<SlashCommand>,
   kind: CommandKind = CommandKind.BUILT_IN,
-): SlashCommand => ({
-  name: 'test',
-  description: 'a test command',
-  kind,
-  ...overrides,
-});
+): SlashCommand {
+  return {
+    name: 'test',
+    description: 'a test command',
+    kind,
+    ...overrides,
+  };
+}
 
 describe('useSlashCommandProcessor', () => {
   const mockAddItem = vi.fn();
@@ -102,15 +108,7 @@ describe('useSlashCommandProcessor', () => {
   const mockOpenAuthDialog = vi.fn();
   const mockSetQuittingMessages = vi.fn();
 
-  const mockConfig = {
-    getProjectRoot: vi.fn(() => '/mock/cwd'),
-    getSessionId: vi.fn(() => 'test-session'),
-    getGeminiClient: vi.fn(() => ({
-      setHistory: vi.fn().mockResolvedValue(undefined),
-    })),
-    getExtensions: vi.fn(() => []),
-    getIdeMode: vi.fn(() => false),
-  } as unknown as Config;
+  const mockConfig = makeFakeConfig({});
 
   const mockSettings = {} as LoadedSettings;
 
@@ -147,6 +145,7 @@ describe('useSlashCommandProcessor', () => {
         vi.fn(), // toggleCorgiMode
         mockSetQuittingMessages,
         vi.fn(), // openPrivacyNotice
+        vi.fn(), // openSettingsDialog
         vi.fn(), // toggleVimEnabled
         setIsProcessing,
       ),
@@ -313,6 +312,39 @@ describe('useSlashCommandProcessor', () => {
       );
     });
 
+    it('sets isProcessing to false if the the input is not a command', async () => {
+      const setMockIsProcessing = vi.fn();
+      const result = setupProcessorHook([], [], [], setMockIsProcessing);
+
+      await act(async () => {
+        await result.current.handleSlashCommand('imnotacommand');
+      });
+
+      expect(setMockIsProcessing).not.toHaveBeenCalled();
+    });
+
+    it('sets isProcessing to false if the command has an error', async () => {
+      const setMockIsProcessing = vi.fn();
+      const failCommand = createTestCommand({
+        name: 'fail',
+        action: vi.fn().mockRejectedValue(new Error('oh no!')),
+      });
+
+      const result = setupProcessorHook(
+        [failCommand],
+        [],
+        [],
+        setMockIsProcessing,
+      );
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/fail');
+      });
+
+      expect(setMockIsProcessing).toHaveBeenNthCalledWith(1, true);
+      expect(setMockIsProcessing).toHaveBeenNthCalledWith(2, false);
+    });
+
     it('should set isProcessing to true during execution and false afterwards', async () => {
       const mockSetIsProcessing = vi.fn();
       const command = createTestCommand({
@@ -328,14 +360,14 @@ describe('useSlashCommandProcessor', () => {
       });
 
       // It should be true immediately after starting
-      expect(mockSetIsProcessing).toHaveBeenCalledWith(true);
+      expect(mockSetIsProcessing).toHaveBeenNthCalledWith(1, true);
       // It should not have been called with false yet
       expect(mockSetIsProcessing).not.toHaveBeenCalledWith(false);
 
       await executionPromise;
 
       // After the promise resolves, it should be called with false
-      expect(mockSetIsProcessing).toHaveBeenCalledWith(false);
+      expect(mockSetIsProcessing).toHaveBeenNthCalledWith(2, false);
       expect(mockSetIsProcessing).toHaveBeenCalledTimes(2);
     });
   });
@@ -864,6 +896,9 @@ describe('useSlashCommandProcessor', () => {
           vi.fn(), // toggleCorgiMode
           mockSetQuittingMessages,
           vi.fn(), // openPrivacyNotice
+
+          vi.fn(), // openSettingsDialog
+          vi.fn(), // toggleVimEnabled
           vi.fn().mockResolvedValue(false), // toggleVimEnabled
           vi.fn(), // setIsProcessing
         ),
@@ -880,7 +915,9 @@ describe('useSlashCommandProcessor', () => {
     const loggingTestCommands: SlashCommand[] = [
       createTestCommand({
         name: 'logtest',
-        action: mockCommandAction,
+        action: vi
+          .fn()
+          .mockResolvedValue({ type: 'message', content: 'hello world' }),
       }),
       createTestCommand({
         name: 'logwithsub',
@@ -892,6 +929,10 @@ describe('useSlashCommandProcessor', () => {
         ],
       }),
       createTestCommand({
+        name: 'fail',
+        action: vi.fn().mockRejectedValue(new Error('oh no!')),
+      }),
+      createTestCommand({
         name: 'logalias',
         altNames: ['la'],
         action: mockCommandAction,
@@ -901,7 +942,6 @@ describe('useSlashCommandProcessor', () => {
     beforeEach(() => {
       mockCommandAction.mockClear();
       vi.mocked(logSlashCommand).mockClear();
-      vi.mocked(SlashCommandEvent).mockClear();
     });
 
     it('should log a simple slash command', async () => {
@@ -913,8 +953,45 @@ describe('useSlashCommandProcessor', () => {
         await result.current.handleSlashCommand('/logtest');
       });
 
-      expect(logSlashCommand).toHaveBeenCalledTimes(1);
-      expect(SlashCommandEvent).toHaveBeenCalledWith('logtest', undefined);
+      expect(logSlashCommand).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          command: 'logtest',
+          subcommand: undefined,
+          status: SlashCommandStatus.SUCCESS,
+        }),
+      );
+    });
+
+    it('logs nothing for a bogus command', async () => {
+      const result = setupProcessorHook(loggingTestCommands);
+      await waitFor(() =>
+        expect(result.current.slashCommands.length).toBeGreaterThan(0),
+      );
+      await act(async () => {
+        await result.current.handleSlashCommand('/bogusbogusbogus');
+      });
+
+      expect(logSlashCommand).not.toHaveBeenCalled();
+    });
+
+    it('logs a failure event for a failed command', async () => {
+      const result = setupProcessorHook(loggingTestCommands);
+      await waitFor(() =>
+        expect(result.current.slashCommands.length).toBeGreaterThan(0),
+      );
+      await act(async () => {
+        await result.current.handleSlashCommand('/fail');
+      });
+
+      expect(logSlashCommand).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          command: 'fail',
+          status: 'error',
+          subcommand: undefined,
+        }),
+      );
     });
 
     it('should log a slash command with a subcommand', async () => {
@@ -926,8 +1003,13 @@ describe('useSlashCommandProcessor', () => {
         await result.current.handleSlashCommand('/logwithsub sub');
       });
 
-      expect(logSlashCommand).toHaveBeenCalledTimes(1);
-      expect(SlashCommandEvent).toHaveBeenCalledWith('logwithsub', 'sub');
+      expect(logSlashCommand).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          command: 'logwithsub',
+          subcommand: 'sub',
+        }),
+      );
     });
 
     it('should log the command path when an alias is used', async () => {
@@ -938,8 +1020,12 @@ describe('useSlashCommandProcessor', () => {
       await act(async () => {
         await result.current.handleSlashCommand('/la');
       });
-      expect(logSlashCommand).toHaveBeenCalledTimes(1);
-      expect(SlashCommandEvent).toHaveBeenCalledWith('logalias', undefined);
+      expect(logSlashCommand).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          command: 'logalias',
+        }),
+      );
     });
 
     it('should not log for unknown commands', async () => {

@@ -1,153 +1,369 @@
-# .github/workflows/ci.yml
-
-name: Gemini CLI CI
+name: 'Gemini CLI CI'
 
 on:
   push:
-    branches: [main, release]
+    branches:
+      - 'main'
+      - 'release'
   pull_request:
-    branches: [main, release]
+    branches:
+      - 'main'
+      - 'release'
   merge_group:
 
-jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read # For checkout
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  cancel-in-progress: |-
+    ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+permissions:
+  checks: 'write'
+  contents: 'read'
+  statuses: 'write'
+
+defaults:
+  run:
+    shell: 'bash'
+
+env:
+  ACTIONLINT_VERSION: '1.7.7'
+  SHELLCHECK_VERSION: '0.11.0'
+  YAMLLINT_VERSION: '1.35.1'
+
+jobs:
+  #
+  # Lint: GitHub Actions
+  #
+  lint_github_actions:
+    name: 'Lint (GitHub Actions)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: 'Install shellcheck' # Actionlint uses shellcheck
+        run: |-
+          mkdir -p "${RUNNER_TEMP}/shellcheck"
+          curl -sSLo "${RUNNER_TEMP}/.shellcheck.txz" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          tar -xf "${RUNNER_TEMP}/.shellcheck.txz" -C "${RUNNER_TEMP}/shellcheck" --strip-components=1
+          echo "${RUNNER_TEMP}/shellcheck" >> "${GITHUB_PATH}"
+
+      - name: 'Install actionlint'
+        run: |-
+          mkdir -p "${RUNNER_TEMP}/actionlint"
+          curl -sSLo "${RUNNER_TEMP}/.actionlint.tgz" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          tar -xzf "${RUNNER_TEMP}/.actionlint.tgz" -C "${RUNNER_TEMP}/actionlint"
+          echo "${RUNNER_TEMP}/actionlint" >> "${GITHUB_PATH}"
+
+      # For actionlint, we specifically ignore shellcheck rules that are
+      # annoying or unhelpful. See the shellcheck action for a description.
+      - name: 'Run actionlint'
+        run: |-
+          actionlint \
+            -color \
+            -format '{{range $err := .}}::error file={{$err.Filepath}},line={{$err.Line}},col={{$err.Column}}::{{$err.Filepath}}@{{$err.Line}} {{$err.Message}}%0A```%0A{{replace $err.Snippet "\\n" "%0A"}}%0A```\n{{end}}' \
+            -ignore 'SC2002:' \
+            -ignore 'SC2016:' \
+            -ignore 'SC2129:' \
+            -ignore 'label ".+" is unknown'
+
+      - name: 'Run ratchet'
+        uses: 'sethvargo/ratchet@8b4ca256dbed184350608a3023620f267f0a5253' # ratchet:sethvargo/ratchet@v0.11.4
+        with:
+          files: |-
+            .github/workflows/*.yml
+            .github/actions/**/*.yml
+
+  #
+  # Lint: Javascript
+  #
+  lint_javascript:
+    name: 'Lint (Javascript)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: 'Install dependencies'
+        run: |-
+          npm ci
 
-      - name: Run formatter check
-        run: |
+      - name: 'Run formatter check'
+        run: |-
           npm run format
           git diff --exit-code
 
-      - name: Run linter
-        run: npm run lint:ci
+      - name: 'Run linter'
+        run: |-
+          npm run lint:ci
 
-      - name: Build project
-        run: npm run build
+      - name: 'Run linter on integration tests'
+        run: |-
+          npx eslint integration-tests --max-warnings 0
 
-      - name: Run type check
-        run: npm run typecheck
+      - name: 'Run formatter on integration tests'
+        run: |-
+          npx prettier --check integration-tests
+          git diff --exit-code
 
-  test:
-    name: Test
-    runs-on: ${{ matrix.os }}
-    needs: lint
-    permissions:
-      contents: read
-      checks: write
-      pull-requests: write
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [20.x, 22.x, 24.x]
+      - name: 'Build project'
+        run: |-
+          npm run build
+
+      - name: 'Run type check'
+        run: |-
+          npm run typecheck
+
+  #
+  # Lint: Shell
+  #
+  lint_shell:
+    name: 'Lint (Shell)'
+    runs-on: 'ubuntu-latest'
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
-          node-version: ${{ matrix.node-version }}
+          fetch-depth: 1
+
+      - name: 'Install shellcheck'
+        run: |-
+          mkdir -p "${RUNNER_TEMP}/shellcheck"
+          curl -sSLo "${RUNNER_TEMP}/.shellcheck.txz" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          tar -xf "${RUNNER_TEMP}/.shellcheck.txz" -C "${RUNNER_TEMP}/shellcheck" --strip-components=1
+          echo "${RUNNER_TEMP}/shellcheck" >> "${GITHUB_PATH}"
+
+      - name: 'Install shellcheck problem matcher'
+        run: |-
+          cat > "${RUNNER_TEMP}/shellcheck/problem-matcher-lint-shell.json" <<"EOF"
+          {
+            "problemMatcher": [
+              {
+                "owner": "lint_shell",
+                "pattern": [
+                  {
+                    "regexp": "^(.*):(\\\\d+):(\\\\d+):\\\\s+(?:fatal\\\\s+)?(warning|error):\\\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+          echo "::add-matcher::${RUNNER_TEMP}/shellcheck/problem-matcher-lint-shell.json"
+
+      # Note that only warning and error severity show up in the github files
+      # page. So we replace 'style' and 'note' with 'warning' to make it show
+      # up.
+      #
+      # We also try and find all bash scripts even if they don't have an
+      # explicit extension.
+      #
+      # We explicitly ignore the following rules:
+      #
+      # - SC2002: This rule suggests using "cmd < file" instead of "cat | cmd".
+      #   While < is more efficient, pipes are much more readable and expected.
+      #
+      # - SC2129: This rule suggests grouping multiple writes to a file in
+      #   braces like "{ cmd1; cmd2; } >> file". This is unexpected and less
+      #   readable.
+      #
+      # - SC2310: This is an optional warning that only appears with "set -e"
+      #   and when a command is used as a conditional.
+      - name: 'Run shellcheck'
+        run: |-
+          git ls-files | grep -E '^([^.]+|.*\.(sh|zsh|bash))$' | xargs file --mime-type \
+            | grep "text/x-shellscript" | awk '{ print substr($1, 1, length($1)-1) }' \
+            | xargs shellcheck \
+              --check-sourced \
+              --enable=all \
+              --exclude=SC2002,SC2129,SC2310 \
+              --severity=style \
+              --format=gcc \
+              --color=never | sed -e 's/note:/warning:/g' -e 's/style:/warning:/g'
+
+  #
+  # Lint: YAML
+  #
+  lint_yaml:
+    name: 'Lint (YAML)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: 'Setup Python'
+        uses: 'actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065' # ratchet:actions/setup-python@v5
+        with:
+          python-version: '3'
+
+      - name: 'Install yamllint'
+        run: |-
+          pip install --user "yamllint==${YAMLLINT_VERSION}"
+
+      - name: 'Run yamllint'
+        run: |-
+          git ls-files | grep -E '\.(yaml|yml)' | xargs yamllint --format github
+
+  #
+  # Lint: All
+  #
+  # This is a virtual job that other jobs depend on to wait for all linters to
+  # finish. It's also used to ensure linting happens on CI via required
+  # workflows.
+  lint:
+    name: 'Lint'
+    needs:
+      - 'lint_github_actions'
+      - 'lint_javascript'
+      - 'lint_shell'
+      - 'lint_yaml'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - run: |-
+          echo 'All linters finished!'
+
+  #
+  # Test: Node
+  #
+  test:
+    name: 'Test'
+    runs-on: '${{ matrix.os }}'
+    needs:
+      - 'lint'
+    permissions:
+      contents: 'read'
+      checks: 'write'
+      pull-requests: 'write'
+    strategy:
+      fail-fast: false # So we can see all test failures
+      matrix:
+        os:
+          - 'macos-latest'
+          - 'ubuntu-latest'
+          - 'windows-latest'
+        node-version:
+          - '20.x'
+          - '22.x'
+          - '24.x'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Set up Node.js ${{ matrix.node-version }}'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version: '${{ matrix.node-version }}'
           cache: 'npm'
 
-      - name: Build project
-        run: npm run build
+      - name: 'Build project'
+        run: |-
+          npm run build
 
-      - name: Install dependencies for testing
-        run: npm ci # Install fresh dependencies using the downloaded package-lock.json
+      - name: 'Install dependencies for testing'
+        run: |-
+          npm ci
 
-      - name: Run tests and generate reports
-        run: npm run test:ci
+      - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
+        run: 'npm run test:ci'
 
-      - name: Publish Test Report (for non-forks)
-        if: always() && (github.event.pull_request.head.repo.full_name == github.repository)
-        uses: dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3 # v2
+      - name: 'Publish Test Report (for non-forks)'
+        if: |-
+          ${{ always() && (github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: 'dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3' # ratchet:dorny/test-reporter@v2
         with:
-          name: Test Results (Node ${{ matrix.node-version }})
-          path: packages/*/junit.xml
-          reporter: java-junit
+          name: 'Test Results (Node ${{ matrix.node-version }})'
+          path: 'packages/*/junit.xml'
+          reporter: 'java-junit'
           fail-on-error: 'false'
 
-      - name: Upload Test Results Artifact (for forks)
-        if: always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: 'Upload Test Results Artifact (for forks)'
+        if: |-
+          ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          name: test-results-fork-${{ matrix.node-version }}-${{ matrix.os }}
-          path: packages/*/junit.xml
+          name: 'test-results-fork-${{ matrix.node-version }}-${{ matrix.os }}'
+          path: 'packages/*/junit.xml'
 
-      - name: Upload coverage reports
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: always()
+      - name: 'Upload coverage reports'
+        if: |-
+          ${{ always() }}
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          name: coverage-reports-${{ matrix.node-version }}-${{ matrix.os }}
-          path: packages/*/coverage
+          name: 'coverage-reports-${{ matrix.node-version }}-${{ matrix.os }}'
+          path: 'packages/*/coverage'
 
   post_coverage_comment:
-    name: Post Coverage Comment
-    runs-on: ubuntu-latest
-    needs: test
-    if: always() && github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name == github.repository)
+    name: 'Post Coverage Comment'
+    runs-on: 'ubuntu-latest'
+    needs: 'test'
+    if: |-
+      ${{ always() && github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name == github.repository) }}
     continue-on-error: true
     permissions:
-      contents: read # For checkout
-      pull-requests: write # For commenting
+      contents: 'read' # For checkout
+      pull-requests: 'write' # For commenting
     strategy:
       matrix:
         # Reduce noise by only posting the comment once
-        os: [ubuntu-latest]
-        node-version: [22.x]
+        os:
+          - 'ubuntu-latest'
+        node-version:
+          - '22.x'
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
 
-      - name: Download coverage reports artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - name: 'Download coverage reports artifact'
+        uses: 'actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0' # ratchet:actions/download-artifact@v5
         with:
-          name: coverage-reports-${{ matrix.node-version }}-${{ matrix.os }}
-          path: coverage_artifact # Download to a specific directory
+          name: 'coverage-reports-${{ matrix.node-version }}-${{ matrix.os }}'
+          path: 'coverage_artifact' # Download to a specific directory
 
-      - name: Post Coverage Comment using Composite Action
-        uses: ./.github/actions/post-coverage-comment # Path to the composite action directory
+      - name: 'Post Coverage Comment using Composite Action'
+        uses: './.github/actions/post-coverage-comment' # Path to the composite action directory
         with:
-          cli_json_file: coverage_artifact/cli/coverage/coverage-summary.json
-          core_json_file: coverage_artifact/core/coverage/coverage-summary.json
-          cli_full_text_summary_file: coverage_artifact/cli/coverage/full-text-summary.txt
-          core_full_text_summary_file: coverage_artifact/core/coverage/full-text-summary.txt
-          node_version: ${{ matrix.node-version }}
-          os: ${{ matrix.os }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          cli_json_file: 'coverage_artifact/cli/coverage/coverage-summary.json'
+          core_json_file: 'coverage_artifact/core/coverage/coverage-summary.json'
+          cli_full_text_summary_file: 'coverage_artifact/cli/coverage/full-text-summary.txt'
+          core_full_text_summary_file: 'coverage_artifact/core/coverage/full-text-summary.txt'
+          node_version: '${{ matrix.node-version }}'
+          os: '${{ matrix.os }}'
+          github_token: '${{ secrets.GITHUB_TOKEN }}'
 
   codeql:
-    name: CodeQL
-    runs-on: ubuntu-latest
+    name: 'CodeQL'
+    runs-on: 'ubuntu-latest'
     permissions:
-      actions: read
-      contents: read
-      security-events: write
+      actions: 'read'
+      contents: 'read'
+      security-events: 'write'
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@181d5eefc20863364f96762470ba6f862bdef56b # v3
+      - name: 'Initialize CodeQL'
+        uses: 'github/codeql-action/init@df559355d593797519d70b90fc8edd5db049e7a2' # ratchet:github/codeql-action/init@v3
         with:
-          languages: javascript
+          languages: 'javascript'
 
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@181d5eefc20863364f96762470ba6f862bdef56b # v3
+      - name: 'Perform CodeQL Analysis'
+        uses: 'github/codeql-action/analyze@df559355d593797519d70b90fc8edd5db049e7a2' # ratchet:github/codeql-action/analyze@v3
