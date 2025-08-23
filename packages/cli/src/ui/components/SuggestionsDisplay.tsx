@@ -7,7 +7,7 @@
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { PrepareLabel } from './PrepareLabel.js';
-import { isSlashCommand } from '../utils/commandUtils.js';
+import { CompletionMode } from '../hooks/useCommandCompletion.js';
 export interface Suggestion {
   label: string;
   value: string;
@@ -21,6 +21,7 @@ interface SuggestionsDisplayProps {
   width: number;
   scrollOffset: number;
   userInput: string;
+  completionMode: CompletionMode;
 }
 
 export const MAX_SUGGESTIONS_TO_SHOW = 8;
@@ -32,6 +33,7 @@ export function SuggestionsDisplay({
   width,
   scrollOffset,
   userInput,
+  completionMode,
 }: SuggestionsDisplayProps) {
   if (isLoading) {
     return (
@@ -53,7 +55,7 @@ export function SuggestionsDisplay({
   );
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
-  const isSlashCommandMode = isSlashCommand(userInput);
+  const isSlashCommandMode = completionMode === CompletionMode.SLASH;
   let commandNameWidth = 0;
 
   if (isSlashCommandMode) {
