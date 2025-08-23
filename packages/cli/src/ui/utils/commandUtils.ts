@@ -5,7 +5,6 @@
  */
 
 import { spawn, SpawnOptions } from 'child_process';
-import iconv from 'iconv-lite';
 /**
  * Checks if a query string potentially represents an '@' command.
  * It triggers if the query starts with '@' or contains '@' preceded by whitespace
@@ -29,7 +28,7 @@ export const isSlashCommand = (query: string): boolean => query.startsWith('/');
 
 // Copies a string snippet to the clipboard for different platforms
 export const copyToClipboard = async (text: string): Promise<void> => {
-  const run = (cmd: string, args: string[], options?: SpawnOptions, input?: string | Buffer) =>
+  const run = (cmd: string, args: string[], options?: SpawnOptions) =>
     new Promise<void>((resolve, reject) => {
       const child = options ? spawn(cmd, args, options) : spawn(cmd, args);
       let stderr = '';
@@ -48,11 +47,7 @@ export const copyToClipboard = async (text: string): Promise<void> => {
       });
       if (child.stdin) {
         child.stdin.on('error', reject);
-        if (input !== undefined) {
-          child.stdin.write(input);
-        } else {
-          child.stdin.write(text);
-        }
+        child.stdin.write(text, 'utf-8');
         child.stdin.end();
       } else {
         reject(new Error('Child process has no stdin stream to write to.'));
@@ -67,8 +62,13 @@ export const copyToClipboard = async (text: string): Promise<void> => {
 
   switch (process.platform) {
     case 'win32': {
-      const buf = iconv.encode(text, 'cp932');
-      return run('clip', [], undefined, buf);
+      return run('powershell', [
+        '-sta',
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        '$input|Set-Clipboard',
+      ]);
     }
     case 'darwin':
       return run('pbcopy', []);

@@ -6,7 +6,6 @@
 
 import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
 import { spawn, SpawnOptions } from 'child_process';
-import iconv from 'iconv-lite';
 import { EventEmitter } from 'events';
 import {
   isAtCommand,
@@ -121,7 +120,7 @@ describe('commandUtils', () => {
         await copyToClipboard(testText);
 
         expect(mockSpawn).toHaveBeenCalledWith('pbcopy', []);
-        expect(mockChild.stdin.write).toHaveBeenCalledWith(testText);
+        expect(mockChild.stdin.write).toHaveBeenCalledWith(testText, 'utf-8');
         expect(mockChild.stdin.end).toHaveBeenCalled();
       });
 
@@ -167,7 +166,6 @@ describe('commandUtils', () => {
 
       it('should successfully copy text to clipboard using clip', async () => {
         const testText = 'Hello, world!';
-        const expectedResult = iconv.encode(testText, 'cp932');
 
         setTimeout(() => {
           mockChild.emit('close', 0);
@@ -175,14 +173,19 @@ describe('commandUtils', () => {
 
         await copyToClipboard(testText);
 
-        expect(mockSpawn).toHaveBeenCalledWith('clip', []);
-        expect(mockChild.stdin.write).toHaveBeenCalledWith(expectedResult);
+        expect(mockSpawn).toHaveBeenCalledWith('powershell', [
+          '-sta',
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          '$input|Set-Clipboard',
+        ]);
+        expect(mockChild.stdin.write).toHaveBeenCalledWith(testText, 'utf-8');
         expect(mockChild.stdin.end).toHaveBeenCalled();
       });
 
       it('should successfully copy Japanese text to clipboard using clip', async () => {
         const testText = 'こんにちは、世界！';
-        const expectedResult = iconv.encode(testText, 'cp932');
 
         setTimeout(() => {
           mockChild.emit('close', 0);
@@ -190,8 +193,14 @@ describe('commandUtils', () => {
 
         await copyToClipboard(testText);
 
-        expect(mockSpawn).toHaveBeenCalledWith('clip', []);
-        expect(mockChild.stdin.write).toHaveBeenCalledWith(expectedResult);
+        expect(mockSpawn).toHaveBeenCalledWith('powershell', [
+          '-sta',
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          '$input|Set-Clipboard',
+        ]);
+        expect(mockChild.stdin.write).toHaveBeenCalledWith(testText, 'utf-8');
         expect(mockChild.stdin.end).toHaveBeenCalled();
       });
     });
@@ -218,7 +227,7 @@ describe('commandUtils', () => {
           ['-selection', 'clipboard'],
           linuxOptions,
         );
-        expect(mockChild.stdin.write).toHaveBeenCalledWith(testText);
+        expect(mockChild.stdin.write).toHaveBeenCalledWith(testText, 'utf-8');
         expect(mockChild.stdin.end).toHaveBeenCalled();
       });
 
@@ -418,7 +427,7 @@ describe('commandUtils', () => {
 
         await copyToClipboard('');
 
-        expect(mockChild.stdin.write).toHaveBeenCalledWith('');
+        expect(mockChild.stdin.write).toHaveBeenCalledWith('', 'utf-8');
       });
 
       it('should handle multiline text', async () => {
@@ -430,7 +439,7 @@ describe('commandUtils', () => {
 
         await copyToClipboard(multilineText);
 
-        expect(mockChild.stdin.write).toHaveBeenCalledWith(multilineText);
+        expect(mockChild.stdin.write).toHaveBeenCalledWith(multilineText, 'utf-8');
       });
 
       it('should handle special characters', async () => {
@@ -442,7 +451,7 @@ describe('commandUtils', () => {
 
         await copyToClipboard(specialText);
 
-        expect(mockChild.stdin.write).toHaveBeenCalledWith(specialText);
+        expect(mockChild.stdin.write).toHaveBeenCalledWith(specialText, 'utf-8');
       });
     });
   });
