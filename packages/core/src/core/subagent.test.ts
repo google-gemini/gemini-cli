@@ -59,7 +59,7 @@ async function createMockConfig(
     ...toolRegistryMocks,
   } as unknown as ToolRegistry;
 
-  vi.spyOn(config, 'getToolRegistry').mockResolvedValue(mockToolRegistry);
+  vi.spyOn(config, 'getToolRegistry').mockReturnValue(mockToolRegistry);
   return { config, toolRegistry: mockToolRegistry };
 }
 
@@ -534,7 +534,7 @@ describe('subagent.ts', () => {
           parameters: { type: Type.OBJECT, properties: {} },
         };
 
-        const { config, toolRegistry } = await createMockConfig({
+        const { config } = await createMockConfig({
           getFunctionDeclarationsFiltered: vi
             .fn()
             .mockReturnValue([listFilesToolDef]),
@@ -559,7 +559,7 @@ describe('subagent.ts', () => {
         // Mock the tool execution result
         vi.mocked(executeToolCall).mockResolvedValue({
           callId: 'call_1',
-          responseParts: 'file1.txt\nfile2.ts',
+          responseParts: [{ text: 'file1.txt\nfile2.ts' }],
           resultDisplay: 'Listed 2 files',
           error: undefined,
           errorType: undefined, // Or ToolErrorType.NONE if available and appropriate
@@ -580,7 +580,6 @@ describe('subagent.ts', () => {
         expect(executeToolCall).toHaveBeenCalledWith(
           config,
           expect.objectContaining({ name: 'list_files', args: { path: '.' } }),
-          toolRegistry,
           expect.any(AbortSignal),
         );
 
@@ -615,7 +614,7 @@ describe('subagent.ts', () => {
         // Mock the tool execution failure.
         vi.mocked(executeToolCall).mockResolvedValue({
           callId: 'call_fail',
-          responseParts: 'ERROR: Tool failed catastrophically', // This should be sent to the model
+          responseParts: [{ text: 'ERROR: Tool failed catastrophically' }], // This should be sent to the model
           resultDisplay: 'Tool failed catastrophically',
           error: new Error('Failure'),
           errorType: ToolErrorType.INVALID_TOOL_PARAMS,

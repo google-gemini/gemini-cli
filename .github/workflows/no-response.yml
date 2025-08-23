@@ -1,32 +1,33 @@
-name: No Response
+name: 'No Response'
 
 # Run as a daily cron at 1:45 AM
 on:
   schedule:
     - cron: '45 1 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 jobs:
   no-response:
-    runs-on: ubuntu-latest
-    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
+    runs-on: 'ubuntu-latest'
+    if: |-
+      ${{ github.repository == 'google-gemini/gemini-cli' }}
     permissions:
-      issues: write
-      pull-requests: write
+      issues: 'write'
+      pull-requests: 'write'
     concurrency:
-      group: ${{ github.workflow }}-no-response
+      group: '${{ github.workflow }}-no-response'
       cancel-in-progress: true
     steps:
-      - uses: actions/stale@5bef64f19d7facfb25b37b414482c7164d639639
+      - uses: 'actions/stale@5bef64f19d7facfb25b37b414482c7164d639639' # ratchet:actions/stale@v9
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token: '${{ secrets.GITHUB_TOKEN }}'
           days-before-stale: -1
           days-before-close: 14
           stale-issue-label: 'status/need-information'
-          close-issue-message: >
+          close-issue-message: >-
             This issue was marked as needing more information and has not received a response in 14 days.
             Closing it for now. If you still face this problem, feel free to reopen with more details. Thank you!
           stale-pr-label: 'status/need-information'
-          close-pr-message: >
+          close-pr-message: >-
             This pull request was marked as needing more information and has had no updates in 14 days.
             Closing it for now. You are welcome to reopen with the required info. Thanks for contributing!

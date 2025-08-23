@@ -5,23 +5,24 @@
  */
 
 import path from 'node:path';
-import fs from 'node:fs';
-import { fdir } from 'fdir';
 import picomatch from 'picomatch';
-import { Ignore } from './ignore.js';
+import { Ignore, loadIgnoreRules } from './ignore.js';
 import { ResultCache } from './result-cache.js';
-import * as cache from './crawlCache.js';
+import { crawl } from './crawler.js';
 import { AsyncFzf, FzfResultItem } from 'fzf';
+import { unescapePath } from '../paths.js';
 
-export type FileSearchOptions = {
+export interface FileSearchOptions {
   projectRoot: string;
   ignoreDirs: string[];
   useGitignore: boolean;
   useGeminiignore: boolean;
   cache: boolean;
   cacheTtl: number;
+  enableRecursiveFileSearch: boolean;
+  disableFuzzySearch: boolean;
   maxDepth?: number;
-};
+}
 
 export class AbortError extends Error {
   constructor(message = 'Search aborted') {
@@ -78,58 +79,46 @@ export async function filter(
   return results;
 }
 
-export type SearchOptions = {
+export interface SearchOptions {
   signal?: AbortSignal;
   maxResults?: number;
-};
+}
 
-/**
- * Provides a fast and efficient way to search for files within a project,
- * respecting .gitignore and .geminiignore rules, and utilizing caching
- * for improved performance.
- */
-export class FileSearch {
-  private readonly absoluteDir: string;
-  private readonly ignore: Ignore = new Ignore();
+export interface FileSearch {
+  initialize(): Promise<void>;
+  search(pattern: string, options?: SearchOptions): Promise<string[]>;
+}
+
+class RecursiveFileSearch implements FileSearch {
+  private ignore: Ignore | undefined;
   private resultCache: ResultCache | undefined;
   private allFiles: string[] = [];
   private fzf: AsyncFzf<string[]> | undefined;
 
-  /**
-   * Constructs a new `FileSearch` instance.
-   * @param options Configuration options for the file search.
-   */
-  constructor(private readonly options: FileSearchOptions) {
-    this.absoluteDir = path.resolve(options.projectRoot);
-  }
+  constructor(private readonly options: FileSearchOptions) {}
 
-  /**
-   * Initializes the file search engine by loading ignore rules, crawling the
-   * file system, and building the in-memory cache. This method must be called
-   * before performing any searches.
-   */
   async initialize(): Promise<void> {
-    this.loadIgnoreRules();
-    await this.crawlFiles();
+    this.ignore = loadIgnoreRules(this.options);
+    this.allFiles = await crawl({
+      crawlDirectory: this.options.projectRoot,
+      cwd: this.options.projectRoot,
+      ignore: this.ignore,
+      cache: this.options.cache,
+      cacheTtl: this.options.cacheTtl,
+      maxDepth: this.options.maxDepth,
+    });
     this.buildResultCache();
   }
 
-  /**
-   * Searches for files matching a given pattern.
-   * @param pattern The picomatch pattern to search for (e.g., '*.js', 'src/**').
-   * @param options Search options, including an AbortSignal and maxResults.
-   * @returns A promise that resolves to a list of matching file paths, relative
-   *          to the project root.
-   */
   async search(
     pattern: string,
     options: SearchOptions = {},
   ): Promise<string[]> {
-    if (!this.resultCache || !this.fzf) {
+    if (!this.resultCache || !this.fzf || !this.ignore) {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
 
-    pattern = pattern || '*';
+    pattern = unescapePath(pattern) || '*';
 
     let filteredCandidates;
     const { files: candidates, isExactMatch } =
@@ -140,7 +129,7 @@ export class FileSearch {
       filteredCandidates = candidates;
     } else {
       let shouldCache = true;
-      if (pattern.includes('*')) {
+      if (pattern.includes('*') || this.options.disableFuzzySearch) {
         filteredCandidates = await filter(candidates, pattern, options.signal);
       } else {
         filteredCandidates = await this.fzf
@@ -159,21 +148,9 @@ export class FileSearch {
       }
     }
 
-    // Trade-off: We apply a two-stage filtering process.
-    // 1. During the file system crawl (`performCrawl`), we only apply directory-level
-    //    ignore rules (e.g., `node_modules/`, `dist/`). This is because applying
-    //    a full ignore filter (which includes file-specific patterns like `*.log`)
-    //    during the crawl can significantly slow down `fdir`.
-    // 2. Here, in the `search` method, we apply the full ignore filter
-    //    (including file patterns) to the `filteredCandidates` (which have already
-    //    been filtered by the user's search pattern and sorted). For autocomplete,
-    //    the number of displayed results is small (MAX_SUGGESTIONS_TO_SHOW),
-    //    so applying the full filter to this truncated list is much more efficient
-    //    than applying it to every file during the initial crawl.
     const fileFilter = this.ignore.getFileFilter();
     const results: string[] = [];
     for (const [i, candidate] of filteredCandidates.entries()) {
-      // Yield to the event loop to avoid blocking on large result sets.
       if (i % 1000 === 0) {
         await new Promise((resolve) => setImmediate(resolve));
         if (options.signal?.aborted) {
@@ -184,7 +161,6 @@ export class FileSearch {
       if (results.length >= (options.maxResults ?? Infinity)) {
         break;
       }
-      // The `ignore` library throws an error if the path is '.', so we skip it.
       if (candidate === '.') {
         continue;
       }
@@ -195,106 +171,69 @@ export class FileSearch {
     return results;
   }
 
-  /**
-   * Loads ignore rules from .gitignore and .geminiignore files, and applies
-   * any additional ignore directories specified in the options.
-   */
-  private loadIgnoreRules(): void {
-    if (this.options.useGitignore) {
-      const gitignorePath = path.join(this.absoluteDir, '.gitignore');
-      if (fs.existsSync(gitignorePath)) {
-        this.ignore.add(fs.readFileSync(gitignorePath, 'utf8'));
-      }
-    }
-
-    if (this.options.useGeminiignore) {
-      const geminiignorePath = path.join(this.absoluteDir, '.geminiignore');
-      if (fs.existsSync(geminiignorePath)) {
-        this.ignore.add(fs.readFileSync(geminiignorePath, 'utf8'));
-      }
-    }
-
-    const ignoreDirs = ['.git', ...this.options.ignoreDirs];
-    this.ignore.add(
-      ignoreDirs.map((dir) => {
-        if (dir.endsWith('/')) {
-          return dir;
-        }
-        return `${dir}/`;
-      }),
-    );
-  }
-
-  /**
-   * Crawls the file system to get a list of all files and directories,
-   * optionally using a cache for faster initialization.
-   */
-  private async crawlFiles(): Promise<void> {
-    if (this.options.cache) {
-      const cacheKey = cache.getCacheKey(
-        this.absoluteDir,
-        this.ignore.getFingerprint(),
-        this.options.maxDepth,
-      );
-      const cachedResults = cache.read(cacheKey);
-
-      if (cachedResults) {
-        this.allFiles = cachedResults;
-        return;
-      }
-    }
-
-    this.allFiles = await this.performCrawl();
-
-    if (this.options.cache) {
-      const cacheKey = cache.getCacheKey(
-        this.absoluteDir,
-        this.ignore.getFingerprint(),
-        this.options.maxDepth,
-      );
-      cache.write(cacheKey, this.allFiles, this.options.cacheTtl * 1000);
-    }
-  }
-
-  /**
-   * Performs the actual file system crawl using `fdir`, applying directory
-   * ignore rules.
-   * @returns A promise that resolves to a list of all files and directories.
-   */
-  private async performCrawl(): Promise<string[]> {
-    const dirFilter = this.ignore.getDirectoryFilter();
-
-    // We use `fdir` for fast file system traversal. A key performance
-    // optimization for large workspaces is to exclude entire directories
-    // early in the traversal process. This is why we apply directory-specific
-    // ignore rules (e.g., `node_modules/`, `dist/`) directly to `fdir`'s
-    // exclude filter.
-    const api = new fdir()
-      .withRelativePaths()
-      .withDirs()
-      .withPathSeparator('/') // Always use unix style paths
-      .exclude((_, dirPath) => {
-        const relativePath = path.relative(this.absoluteDir, dirPath);
-        return dirFilter(`${relativePath}/`);
-      });
-
-    if (this.options.maxDepth !== undefined) {
-      api.withMaxDepth(this.options.maxDepth);
-    }
-
-    return api.crawl(this.absoluteDir).withPromise();
-  }
-
-  /**
-   * Builds the in-memory cache for fast pattern matching.
-   */
   private buildResultCache(): void {
-    this.resultCache = new ResultCache(this.allFiles, this.absoluteDir);
+    this.resultCache = new ResultCache(this.allFiles);
     // The v1 algorithm is much faster since it only looks at the first
     // occurence of the pattern. We use it for search spaces that have >20k
     // files, because the v2 algorithm is just too slow in those cases.
     this.fzf = new AsyncFzf(this.allFiles, {
       fuzzy: this.allFiles.length > 20000 ? 'v1' : 'v2',
     });
+  }
+}
+
+class DirectoryFileSearch implements FileSearch {
+  private ignore: Ignore | undefined;
+
+  constructor(private readonly options: FileSearchOptions) {}
+
+  async initialize(): Promise<void> {
+    this.ignore = loadIgnoreRules(this.options);
+  }
+
+  async search(
+    pattern: string,
+    options: SearchOptions = {},
+  ): Promise<string[]> {
+    if (!this.ignore) {
+      throw new Error('Engine not initialized. Call initialize() first.');
+    }
+    pattern = pattern || '*';
+
+    const dir = pattern.endsWith('/') ? pattern : path.dirname(pattern);
+    const results = await crawl({
+      crawlDirectory: path.join(this.options.projectRoot, dir),
+      cwd: this.options.projectRoot,
+      maxDepth: 0,
+      ignore: this.ignore,
+      cache: this.options.cache,
+      cacheTtl: this.options.cacheTtl,
+    });
+
+    const filteredResults = await filter(results, pattern, options.signal);
+
+    const fileFilter = this.ignore.getFileFilter();
+    const finalResults: string[] = [];
+    for (const candidate of filteredResults) {
+      if (finalResults.length >= (options.maxResults ?? Infinity)) {
+        break;
+      }
+      if (candidate === '.') {
+        continue;
+      }
+      if (!fileFilter(candidate)) {
+        finalResults.push(candidate);
+      }
+    }
+    return finalResults;
+  }
+}
+
+export class FileSearchFactory {
+  static create(options: FileSearchOptions): FileSearch {
+    if (options.enableRecursiveFileSearch) {
+      return new RecursiveFileSearch(options);
+    }
+    return new DirectoryFileSearch(options);
   }
 }

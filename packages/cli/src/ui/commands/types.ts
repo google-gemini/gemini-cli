@@ -61,6 +61,7 @@ export interface CommandContext {
     toggleCorgiMode: () => void;
     toggleVimEnabled: () => Promise<boolean>;
     setGeminiMdFileCount: (count: number) => void;
+    reloadCommands: () => void;
   };
   // Session-specific data
   session: {
@@ -102,7 +103,8 @@ export interface MessageActionReturn {
  */
 export interface OpenDialogActionReturn {
   type: 'dialog';
-  dialog: 'auth' | 'theme' | 'editor' | 'privacy';
+
+  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy' | 'settings';
 }
 
 /**

@@ -67,13 +67,9 @@ The integration test runner provides several options for diagnostics to help tra
 
 You can preserve the temporary files created during a test run for inspection. This is useful for debugging issues with file system operations.
 
-To keep the test output, you can either use the `--keep-output` flag or set the `KEEP_OUTPUT` environment variable to `true`.
+To keep the test output set the `KEEP_OUTPUT` environment variable to `true`.
 
 ```bash
-# Using the flag
-npm run test:integration:sandbox:none -- --keep-output
-
-# Using the environment variable
 KEEP_OUTPUT=true npm run test:integration:sandbox:none
 ```
 
@@ -81,20 +77,20 @@ When output is kept, the test runner will print the path to the unique directory
 
 ### Verbose output
 
-For more detailed debugging, the `--verbose` flag streams the real-time output from the `gemini` command to the console.
+For more detailed debugging, set the `VERBOSE` environment variable to `true`.
 
 ```bash
-npm run test:integration:sandbox:none -- --verbose
+VERBOSE=true npm run test:integration:sandbox:none
 ```
 
-When using `--verbose` and `--keep-output` in the same command, the output is streamed to the console and also saved to a log file within the test's temporary directory.
+When using `VERBOSE=true` and `KEEP_OUTPUT=true` in the same command, the output is streamed to the console and also saved to a log file within the test's temporary directory.
 
 The verbose output is formatted to clearly identify the source of the logs:
 
 ```
---- TEST: <file-name-without-js>:<test-name> ---
+--- TEST: <log dir>:<test-name> ---
 ... output from the gemini command ...
---- END TEST: <file-name-without-js>:<test-name> ---
+--- END TEST: <log dir>:<test-name> ---
 ```
 
 ## Linting and formatting

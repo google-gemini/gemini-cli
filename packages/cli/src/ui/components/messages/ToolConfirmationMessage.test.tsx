@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { ToolCallConfirmationDetails } from '@google/gemini-cli-core';
+import { renderWithProviders } from '../../../test-utils/render.js';
 
 describe('ToolConfirmationMessage', () => {
   it('should not display urls if prompt and url are the same', () => {
@@ -19,7 +19,7 @@ describe('ToolConfirmationMessage', () => {
       onConfirm: vi.fn(),
     };
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <ToolConfirmationMessage
         confirmationDetails={confirmationDetails}
         availableTerminalHeight={30}
@@ -42,7 +42,7 @@ describe('ToolConfirmationMessage', () => {
       onConfirm: vi.fn(),
     };
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <ToolConfirmationMessage
         confirmationDetails={confirmationDetails}
         availableTerminalHeight={30}
