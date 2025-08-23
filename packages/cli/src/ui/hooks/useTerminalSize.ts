@@ -13,30 +13,31 @@ const IME_SIZE_CHANGE_THRESHOLD = 5; // Minimum column change to consider signif
 const IME_STABILIZATION_DELAY = 150; // Delay in ms before applying size changes
 const VSCode_TERM_PROGRAM = 'vscode';
 
+// Helper function to centralize terminal size calculation
+const getTerminalSize = () => ({
+  columns: (process.stdout.columns || 60) - TERMINAL_PADDING_X,
+  rows: process.stdout.rows || 20,
+});
+
+// Check if we're running in VSCode or VSCode-based terminal where IME issues occur
+const isVSCodeFamily = process.env['TERM_PROGRAM'] === VSCode_TERM_PROGRAM ||
+                       process.env['VSCODE_GIT_IPC_HANDLE'] !== undefined ||
+                       process.env['CURSOR_TRACE_ID'] !== undefined ||
+                       process.env['VSCODE_GIT_ASKPASS_MAIN']?.toLowerCase().includes('cursor') ||
+                       process.env['VSCODE_GIT_ASKPASS_MAIN']?.toLowerCase().includes('windsurf');
+
 export function useTerminalSize(): { columns: number; rows: number } {
-  const [size, setSize] = useState({
-    columns: (process.stdout.columns || 60) - TERMINAL_PADDING_X,
-    rows: process.stdout.rows || 20,
-  });
+  const [size, setSize] = useState(getTerminalSize());
 
   const lastStableSize = useRef(size);
   const pendingUpdate = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     function updateSize() {
-      const newColumns = (process.stdout.columns || 60) - TERMINAL_PADDING_X;
-      const newRows = process.stdout.rows || 20;
-      const newSize = { columns: newColumns, rows: newRows };
-
-      // Check if we're running in VSCode or VSCode-based terminal where IME issues occur
-      const isVSCodeFamily = process.env['TERM_PROGRAM'] === VSCode_TERM_PROGRAM ||
-                             process.env['VSCODE_GIT_IPC_HANDLE'] !== undefined ||
-                             process.env['CURSOR_TRACE_ID'] !== undefined ||
-                             process.env['VSCODE_GIT_ASKPASS_MAIN']?.toLowerCase().includes('cursor') ||
-                             process.env['VSCODE_GIT_ASKPASS_MAIN']?.toLowerCase().includes('windsurf');
+      const newSize = getTerminalSize();
 
       if (isVSCodeFamily) {
-        const columnsDiff = Math.abs(newColumns - lastStableSize.current.columns);
+        const columnsDiff = Math.abs(newSize.columns - lastStableSize.current.columns);
         
         // If the column change is small (likely IME candidate window), debounce the update
         if (columnsDiff > 0 && columnsDiff <= IME_SIZE_CHANGE_THRESHOLD) {
@@ -48,12 +49,11 @@ export function useTerminalSize(): { columns: number; rows: number } {
           // Schedule a delayed update to allow IME operations to complete
           pendingUpdate.current = setTimeout(() => {
             // Only update if the size is still the same after the delay
-            const currentColumns = (process.stdout.columns || 60) - TERMINAL_PADDING_X;
-            const currentRows = process.stdout.rows || 20;
+            const currentSize = getTerminalSize();
             
-            if (currentColumns === newColumns && currentRows === newRows) {
-              lastStableSize.current = { columns: currentColumns, rows: currentRows };
-              setSize({ columns: currentColumns, rows: currentRows });
+            if (currentSize.columns === newSize.columns && currentSize.rows === newSize.rows) {
+              lastStableSize.current = currentSize;
+              setSize(currentSize);
             }
             pendingUpdate.current = null;
           }, IME_STABILIZATION_DELAY);
