@@ -44,6 +44,7 @@ export interface UseCommandCompletionReturn {
   navigateDown: () => void;
   handleAutocomplete: (indexToUse: number) => void;
   promptCompletion: PromptCompletion;
+  completionMode: CompletionMode;
 }
 
 export function useCommandCompletion(
@@ -299,5 +300,6 @@ export function useCommandCompletion(
     navigateDown,
     handleAutocomplete,
     promptCompletion,
+    completionMode,
   };
 }
