@@ -45,6 +45,7 @@ export * from './utils/generateContentResponseUtilities.js';
 export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
 export * from './utils/installationManager.js';
+export * from './utils/ignorePatterns.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

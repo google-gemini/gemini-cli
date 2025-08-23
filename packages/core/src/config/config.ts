@@ -54,6 +54,7 @@ import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 export type { MCPOAuthConfig };
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
+import { FileExclusions } from '../utils/ignorePatterns.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -277,6 +278,7 @@ export class Config {
   private readonly enablePromptCompletion: boolean = false;
   private initialized: boolean = false;
   readonly storage: Storage;
+  private readonly fileExclusions: FileExclusions;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -349,6 +351,7 @@ export class Config {
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
+    this.fileExclusions = new FileExclusions(this);
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -621,6 +624,21 @@ export class Config {
     };
   }
 
+  /**
+   * Gets custom file exclusion patterns from configuration.
+   * TODO: This is a placeholder implementation. In the future, this could
+   * read from settings files, CLI arguments, or environment variables.
+   */
+  getCustomExcludes(): string[] {
+    // Placeholder implementation - returns empty array for now
+    // Future implementation could read from:
+    // - User settings file
+    // - Project-specific configuration
+    // - Environment variables
+    // - CLI arguments
+    return [];
+  }
+
   getCheckpointingEnabled(): boolean {
     return this.checkpointing;
   }
@@ -764,6 +782,10 @@ export class Config {
       await this.gitService.initialize();
     }
     return this.gitService;
+  }
+
+  getFileExclusions(): FileExclusions {
+    return this.fileExclusions;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
