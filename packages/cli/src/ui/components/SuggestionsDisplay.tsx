@@ -79,6 +79,7 @@ export function SuggestionsDisplay({
         const isActive = originalIndex === activeIndex;
         const isExpanded = originalIndex === expandedIndex;
         const textColor = isActive ? Colors.AccentPurple : Colors.Gray;
+        const isLong = suggestion.value.length >= MAX_SUGGESTION_WIDTH;
         const labelElement = (
           <PrepareLabel
             label={suggestion.value}
@@ -120,6 +121,11 @@ export function SuggestionsDisplay({
                     </Box>
                   ) : null}
                 </>
+              )}
+              {isActive && isLong && (
+                <Box marginLeft={1}>
+                  <Text color={Colors.Gray}>{isExpanded ? ' ← ' : ' → '}</Text>
+                </Box>
               )}
             </Box>
           </Box>
