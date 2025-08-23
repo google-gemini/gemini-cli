@@ -328,71 +328,98 @@ describe('loadCliConfig', () => {
     expect(config.getShowMemoryUsage()).toBe(true);
   });
 
-  it(`should leave proxy to empty by default`, async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments();
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getProxy()).toBeFalsy();
-  });
+  describe('Proxy configuration', () => {
+    const originalProxyEnv: { [key: string]: string | undefined } = {};
+    const proxyEnvVars = [
+      'HTTP_PROXY',
+      'HTTPS_PROXY',
+      'http_proxy',
+      'https_proxy',
+    ];
 
-  const proxy_url = 'http://localhost:7890';
-  const testCases = [
-    {
-      input: {
-        env_name: 'https_proxy',
-        proxy_url,
-      },
-      expected: proxy_url,
-    },
-    {
-      input: {
-        env_name: 'http_proxy',
-        proxy_url,
-      },
-      expected: proxy_url,
-    },
-    {
-      input: {
-        env_name: 'HTTPS_PROXY',
-        proxy_url,
-      },
-      expected: proxy_url,
-    },
-    {
-      input: {
-        env_name: 'HTTP_PROXY',
-        proxy_url,
-      },
-      expected: proxy_url,
-    },
-  ];
-  testCases.forEach(({ input, expected }) => {
-    it(`should set proxy to ${expected} according to environment variable [${input.env_name}]`, async () => {
-      vi.stubEnv(input.env_name, input.proxy_url);
+    beforeEach(() => {
+      for (const key of proxyEnvVars) {
+        originalProxyEnv[key] = process.env[key];
+        delete process.env[key];
+      }
+    });
+
+    afterEach(() => {
+      for (const key of proxyEnvVars) {
+        if (originalProxyEnv[key]) {
+          process.env[key] = originalProxyEnv[key];
+        } else {
+          delete process.env[key];
+        }
+      }
+    });
+
+    it(`should leave proxy to empty by default`, async () => {
       process.argv = ['node', 'script.js'];
       const argv = await parseArguments();
       const settings: Settings = {};
       const config = await loadCliConfig(settings, [], 'test-session', argv);
-      expect(config.getProxy()).toBe(expected);
+      expect(config.getProxy()).toBeFalsy();
     });
-  });
 
-  it('should set proxy when --proxy flag is present', async () => {
-    process.argv = ['node', 'script.js', '--proxy', 'http://localhost:7890'];
-    const argv = await parseArguments();
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getProxy()).toBe('http://localhost:7890');
-  });
+    const proxy_url = 'http://localhost:7890';
+    const testCases = [
+      {
+        input: {
+          env_name: 'https_proxy',
+          proxy_url,
+        },
+        expected: proxy_url,
+      },
+      {
+        input: {
+          env_name: 'http_proxy',
+          proxy_url,
+        },
+        expected: proxy_url,
+      },
+      {
+        input: {
+          env_name: 'HTTPS_PROXY',
+          proxy_url,
+        },
+        expected: proxy_url,
+      },
+      {
+        input: {
+          env_name: 'HTTP_PROXY',
+          proxy_url,
+        },
+        expected: proxy_url,
+      },
+    ];
+    testCases.forEach(({ input, expected }) => {
+      it(`should set proxy to ${expected} according to environment variable [${input.env_name}]`, async () => {
+        vi.stubEnv(input.env_name, input.proxy_url);
+        process.argv = ['node', 'script.js'];
+        const argv = await parseArguments();
+        const settings: Settings = {};
+        const config = await loadCliConfig(settings, [], 'test-session', argv);
+        expect(config.getProxy()).toBe(expected);
+      });
+    });
 
-  it('should prioritize CLI flag over environment variable for proxy (CLI http://localhost:7890, environment variable http://localhost:7891)', async () => {
-    vi.stubEnv('http_proxy', 'http://localhost:7891');
-    process.argv = ['node', 'script.js', '--proxy', 'http://localhost:7890'];
-    const argv = await parseArguments();
-    const settings: Settings = {};
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getProxy()).toBe('http://localhost:7890');
+    it('should set proxy when --proxy flag is present', async () => {
+      process.argv = ['node', 'script.js', '--proxy', 'http://localhost:7890'];
+      const argv = await parseArguments();
+      const settings: Settings = {};
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(config.getProxy()).toBe('http://localhost:7890');
+    });
+
+    it('should prioritize CLI flag over environment variable for proxy (CLI http://localhost:7890, environment variable http://localhost:7891)', async () => {
+      vi.stubEnv('http_proxy', 'http://localhost:7891');
+      process.argv = ['node', 'script.js', '--proxy', 'http://localhost:7890'];
+      const argv = await parseArguments();
+      const settings: Settings = {};
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(config.getProxy()).toBe('http://localhost:7890');
+    });
   });
 });
 
