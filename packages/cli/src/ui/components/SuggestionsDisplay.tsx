@@ -52,6 +52,21 @@ export function SuggestionsDisplay({
   );
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
+  const isSlashCommandMode = userInput.startsWith('/');
+  let commandNameWidth = 0;
+
+  if (isSlashCommandMode) {
+    const maxLabelLength = visibleSuggestions.length
+      ? Math.max(...visibleSuggestions.map((s) => s.label.length))
+      : 0;
+
+    const maxAllowedWidth = Math.floor(width * 0.35);
+    commandNameWidth = Math.max(
+      15,
+      Math.min(maxLabelLength + 2, maxAllowedWidth),
+    );
+  }
+
   return (
     <Box flexDirection="column" paddingX={1} width={width}>
       {scrollOffset > 0 && <Text color={Colors.Foreground}>▲</Text>}
@@ -72,21 +87,31 @@ export function SuggestionsDisplay({
         return (
           <Box key={`${suggestion.value}-${originalIndex}`} width={width}>
             <Box flexDirection="row">
-              {userInput.startsWith('/') ? (
-                // only use box model for (/) command mode
-                <Box width={20} flexShrink={0}>
-                  {labelElement}
-                </Box>
+              {isSlashCommandMode ? (
+                <>
+                  <Box width={commandNameWidth} flexShrink={0}>
+                    {labelElement}
+                  </Box>
+                  {suggestion.description ? (
+                    <Box flexGrow={1} marginLeft={1}>
+                      <Text color={textColor} wrap="wrap">
+                        {suggestion.description}
+                      </Text>
+                    </Box>
+                  ) : null}
+                </>
               ) : (
-                labelElement
+                <>
+                  {labelElement}
+                  {suggestion.description ? (
+                    <Box flexGrow={1} marginLeft={1}>
+                      <Text color={textColor} wrap="wrap">
+                        {suggestion.description}
+                      </Text>
+                    </Box>
+                  ) : null}
+                </>
               )}
-              {suggestion.description ? (
-                <Box flexGrow={1}>
-                  <Text color={textColor} wrap="truncate">
-                    {suggestion.description}
-                  </Text>
-                </Box>
-              ) : null}
             </Box>
           </Box>
         );
