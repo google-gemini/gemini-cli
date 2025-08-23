@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import stripAnsi from 'strip-ansi';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
@@ -12,7 +11,12 @@ import pathMod from 'path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
 import stringWidth from 'string-width';
 import { unescapePath } from '@google/gemini-cli-core';
-import { toCodePoints, cpLen, cpSlice } from '../../utils/textUtils.js';
+import {
+  toCodePoints,
+  cpLen,
+  cpSlice,
+  stripUnsafeCharacters,
+} from '../../utils/textUtils.js';
 import { handleVimAction, VimAction } from './vim-buffer-actions.js';
 
 export type Direction =
@@ -492,28 +496,6 @@ export const replaceRangeInternal = (
     preferredCol: null,
   };
 };
-
-/**
- * Strip characters that can break terminal rendering.
- *
- * Strip ANSI escape codes and control characters except for line breaks.
- * Control characters such as delete break terminal UI rendering.
- */
-function stripUnsafeCharacters(str: string): string {
-  const stripped = stripAnsi(str);
-  return toCodePoints(stripped)
-    .filter((char) => {
-      if (char.length > 1) return false;
-      const code = char.codePointAt(0);
-      if (code === undefined) {
-        return false;
-      }
-      const isUnsafe =
-        code === 127 || (code <= 31 && code !== 13 && code !== 10);
-      return !isUnsafe;
-    })
-    .join('');
-}
 
 export interface Viewport {
   height: number;
@@ -1808,6 +1790,13 @@ export function useTextBuffer({
       sequence: string;
     }): void => {
       const { sequence: input } = key;
+
+      if (key.paste) {
+        // Do not do any other processing on pastes so ensure we handle them
+        // before all other cases.
+        insert(input, { paste: key.paste });
+        return;
+      }
 
       if (
         key.name === 'return' ||

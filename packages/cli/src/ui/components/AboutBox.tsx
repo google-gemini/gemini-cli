@@ -8,6 +8,8 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
+import { UserTierId } from '@google/gemini-cli-core';
+import { getLicenseDisplay } from '../../utils/license.js';
 
 interface AboutBoxProps {
   cliVersion: string;
@@ -16,6 +18,8 @@ interface AboutBoxProps {
   modelVersion: string;
   selectedAuthType: string;
   gcpProject: string;
+  ideClient: string;
+  userTier?: UserTierId;
 }
 
 export const AboutBox: React.FC<AboutBoxProps> = ({
@@ -25,6 +29,8 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
   modelVersion,
   selectedAuthType,
   gcpProject,
+  ideClient,
+  userTier,
 }) => (
   <Box
     borderStyle="round"
@@ -103,6 +109,16 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
         </Text>
       </Box>
     </Box>
+    <Box flexDirection="row">
+      <Box width="35%">
+        <Text bold color={Colors.LightBlue}>
+          License
+        </Text>
+      </Box>
+      <Box>
+        <Text>{getLicenseDisplay(selectedAuthType, userTier)}</Text>
+      </Box>
+    </Box>
     {gcpProject && (
       <Box flexDirection="row">
         <Box width="35%">
@@ -112,6 +128,18 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
         </Box>
         <Box>
           <Text>{gcpProject}</Text>
+        </Box>
+      </Box>
+    )}
+    {ideClient && (
+      <Box flexDirection="row">
+        <Box width="35%">
+          <Text bold color={Colors.LightBlue}>
+            IDE Client
+          </Text>
+        </Box>
+        <Box>
+          <Text>{ideClient}</Text>
         </Box>
       </Box>
     )}

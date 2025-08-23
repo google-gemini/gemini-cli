@@ -169,8 +169,16 @@ export class LoopDetectionService {
       /(^|\n)\s*[*-+]\s/.test(content) || /(^|\n)\s*\d+\.\s/.test(content);
     const hasHeading = /(^|\n)#+\s/.test(content);
     const hasBlockquote = /(^|\n)>\s/.test(content);
+    const isDivider = /^[+-_=*\u2500-\u257F]+$/.test(content);
 
-    if (numFences || hasTable || hasListItem || hasHeading || hasBlockquote) {
+    if (
+      numFences ||
+      hasTable ||
+      hasListItem ||
+      hasHeading ||
+      hasBlockquote ||
+      isDivider
+    ) {
       // Reset tracking when different content elements are detected to avoid analyzing content
       // that spans across different element boundaries.
       this.resetContentTracking();
@@ -179,7 +187,7 @@ export class LoopDetectionService {
     const wasInCodeBlock = this.inCodeBlock;
     this.inCodeBlock =
       numFences % 2 === 0 ? this.inCodeBlock : !this.inCodeBlock;
-    if (wasInCodeBlock || this.inCodeBlock) {
+    if (wasInCodeBlock || this.inCodeBlock || isDivider) {
       return false;
     }
 
@@ -367,10 +375,10 @@ Please analyze the conversation history to determine the possibility that the co
       return false;
     }
 
-    if (typeof result.confidence === 'number') {
-      if (result.confidence > 0.9) {
-        if (typeof result.reasoning === 'string' && result.reasoning) {
-          console.warn(result.reasoning);
+    if (typeof result['confidence'] === 'number') {
+      if (result['confidence'] > 0.9) {
+        if (typeof result['reasoning'] === 'string' && result['reasoning']) {
+          console.warn(result['reasoning']);
         }
         logLoopDetected(
           this.config,
@@ -381,7 +389,7 @@ Please analyze the conversation history to determine the possibility that the co
         this.llmCheckInterval = Math.round(
           MIN_LLM_CHECK_INTERVAL +
             (MAX_LLM_CHECK_INTERVAL - MIN_LLM_CHECK_INTERVAL) *
-              (1 - result.confidence),
+              (1 - result['confidence']),
         );
       }
     }
