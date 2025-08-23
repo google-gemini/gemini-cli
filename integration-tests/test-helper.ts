@@ -177,7 +177,9 @@ export class TestRig {
   }
 
   run(
-    promptOrOptions: string | { prompt?: string; stdin?: string },
+    promptOrOptions:
+      | string
+      | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
     ...args: string[]
   ): Promise<string> {
     let command = `node ${this.bundlePath} --yolo`;
@@ -221,7 +223,13 @@ export class TestRig {
     if (execOptions.input) {
       child.stdin!.write(execOptions.input);
     }
-    child.stdin!.end();
+
+    if (
+      typeof promptOrOptions === 'object' &&
+      !promptOrOptions.stdinDoesNotEnd
+    ) {
+      child.stdin!.end();
+    }
 
     child.stdout!.on('data', (data: Buffer) => {
       stdout += data;
