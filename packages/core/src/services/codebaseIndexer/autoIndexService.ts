@@ -22,6 +22,7 @@ export class AutoIndexService {
   private intervalId: NodeJS.Timeout | null = null;
 
   private isRunning = false;
+  private isChecking = false;
 
   constructor(config: AutoIndexConfig) {
     this.config = config;
@@ -70,10 +71,11 @@ export class AutoIndexService {
   }
 
   private async checkForChanges(): Promise<void> {
-    if (!this.isRunning) {
+    if (!this.isRunning || this.isChecking) {
       return;
     }
 
+    this.isChecking = true;
     try {
       const result = await this.indexer.reindexCodebase(this.config.onProgress);
 
@@ -89,6 +91,8 @@ export class AutoIndexService {
         errors: [error instanceof Error ? error.message : String(error)]
       };
       this.config.onUpdate?.(errorResult);
+    } finally {
+      this.isChecking = false;
     }
   }
 
