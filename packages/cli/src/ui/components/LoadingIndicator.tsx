@@ -43,6 +43,9 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       ? `(esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)})`
       : null;
 
+  const isloadingPhrase =
+    !thought && streamingState !== StreamingState.WaitingForConfirmation;
+
   return (
     <Box paddingLeft={0} flexDirection="column">
       {/* Main loading line */}
@@ -62,7 +65,12 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             />
           </Box>
           {primaryText && (
-            <Text color={Colors.AccentPurple}>{primaryText}</Text>
+            <Text
+              color={isloadingPhrase ? Colors.Gray : Colors.AccentPurple}
+              italic={isloadingPhrase}
+            >
+              {primaryText}
+            </Text>
           )}
           {!isNarrow && cancelAndTimerContent && (
             <Text color={Colors.Gray}> {cancelAndTimerContent}</Text>
