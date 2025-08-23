@@ -61,7 +61,7 @@ export function isSafeEnvValue(val: string): boolean {
   if (typeof val !== 'string') return false;
   if (/[\r\n]/.test(val)) return false;
   // disallow `;|&$<>` and backticks and newlines
-  if (/[;&|`$<>]/.test(val)) return false;
+  if (/[;&|`$<>()]/.test(val)) return false;
   return true;
 }
 
