@@ -28,6 +28,12 @@ interface SuggestionsDisplayProps {
 
 export const MAX_SUGGESTIONS_TO_SHOW = 8;
 
+// Utility to truncate long text with ellipsis for better UI polish
+function truncateWithEllipsis(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength - 3) + '...';
+}
+
 export function SuggestionsDisplay({
   suggestions,
   activeIndex,
@@ -78,10 +84,15 @@ const isSlashCommandMode = completionMode === CompletionMode.SLASH;
       {visibleSuggestions.map((suggestion, index) => {
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
-        const textColor = isActive ? theme.text.accent : theme.text.secondary;
+            const textColor = isActive ? theme.text.accent : theme.text.secondary;
+        
+        // For file path completions, truncate very long paths to prevent overflow
+        const displayLabel = completionMode === CompletionMode.AT 
+          ? truncateWithEllipsis(suggestion.label, Math.floor(width * 0.8))
+          : suggestion.label;
         const labelElement = (
           <PrepareLabel
-            label={suggestion.label}
+            label={displayLabel}
             matchedIndex={suggestion.matchedIndex}
             userInput={userInput}
             textColor={textColor}
