@@ -22,8 +22,8 @@ export interface UseInputHistoryStoreReturn {
  */
 export function useInputHistoryStore(): UseInputHistoryStoreReturn {
   const [inputHistory, setInputHistory] = useState<string[]>([]);
-  const [pastSessionMessages, setPastSessionMessages] = useState<string[]>([]);
-  const [currentSessionMessages, setCurrentSessionMessages] = useState<
+  const [_pastSessionMessages, setPastSessionMessages] = useState<string[]>([]);
+  const [_currentSessionMessages, setCurrentSessionMessages] = useState<
     string[]
   >([]);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -87,17 +87,21 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
       const trimmedInput = input.trim();
       if (!trimmedInput) return; // Filter empty/whitespace-only inputs
 
-      // Add to current session messages
-      const newCurrentSession = [...currentSessionMessages, trimmedInput];
-      setCurrentSessionMessages(newCurrentSession);
+      setCurrentSessionMessages((prevCurrent) => {
+        const newCurrentSession = [...prevCurrent, trimmedInput];
 
-      // Recalculate entire history (same as previous implementation)
-      recalculateHistory(
-        newCurrentSession.slice().reverse(), // Convert to newest first
-        pastSessionMessages,
-      );
+        setPastSessionMessages((prevPast) => {
+          recalculateHistory(
+            newCurrentSession.slice().reverse(), // Convert to newest first
+            prevPast,
+          );
+          return prevPast; // No change to past messages
+        });
+
+        return newCurrentSession;
+      });
     },
-    [currentSessionMessages, pastSessionMessages, recalculateHistory],
+    [recalculateHistory],
   );
 
   return {
