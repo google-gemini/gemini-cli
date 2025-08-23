@@ -16,6 +16,10 @@ import { Config } from '../config/config.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from './tool-error.js';
+import {
+  COMMON_IGNORE_PATTERNS,
+  DEFAULT_FILE_EXCLUDES,
+} from '../utils/ignorePatterns.js';
 import * as glob from 'glob';
 
 vi.mock('glob', { spy: true });
@@ -77,6 +81,13 @@ describe('ReadManyFilesTool', () => {
       getTargetDir: () => tempRootDir,
       getWorkspaceDirs: () => [tempRootDir],
       getWorkspaceContext: () => new WorkspaceContext(tempRootDir),
+      getFileExclusions: () => ({
+        getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
+        getDefaultExcludePatterns: () => DEFAULT_FILE_EXCLUDES,
+        getGlobExcludes: () => COMMON_IGNORE_PATTERNS,
+        buildExcludePatterns: () => DEFAULT_FILE_EXCLUDES,
+        getReadManyFilesExcludes: () => DEFAULT_FILE_EXCLUDES,
+      }),
     } as Partial<Config> as Config;
     tool = new ReadManyFilesTool(mockConfig);
 
@@ -484,6 +495,13 @@ describe('ReadManyFilesTool', () => {
         }),
         getWorkspaceContext: () => new WorkspaceContext(tempDir1, [tempDir2]),
         getTargetDir: () => tempDir1,
+        getFileExclusions: () => ({
+          getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
+          getDefaultExcludePatterns: () => [],
+          getGlobExcludes: () => COMMON_IGNORE_PATTERNS,
+          buildExcludePatterns: () => [],
+          getReadManyFilesExcludes: () => [],
+        }),
       } as Partial<Config> as Config;
       tool = new ReadManyFilesTool(mockConfig);
 
