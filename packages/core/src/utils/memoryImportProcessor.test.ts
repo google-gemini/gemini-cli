@@ -262,7 +262,7 @@ describe('memoryImportProcessor', () => {
       expect(result.content).toContain(innerContent);
     });
 
-    it('should handle absolute paths in imports', async () => {
+    it('should reject absolute paths outside the base path to prevent path traversal', async () => {
       const content = 'Content @/absolute/path/file.md more content';
       const basePath = testPath('test', 'path');
       const importedContent = 'Absolute path content';
@@ -274,6 +274,32 @@ describe('memoryImportProcessor', () => {
 
       expect(result.content).toContain(
         '<!-- Import failed: /absolute/path/file.md - Path traversal attempt -->',
+      );
+      expect(mockedFs.readFile).not.toHaveBeenCalled();
+    });
+
+    it('should allow absolute paths that resolve within the base path', async () => {
+      const importPath = '/test/path/absolute/path/file.md';
+      const content = `Content @${importPath} more content`;
+      const basePath = '/test/path';
+      const importedContent = 'Absolute path content';
+
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockResolvedValue(importedContent);
+
+      // This test works because the resolved absolute path of the import
+      // starts with the basePath, which is the default and only allowed
+      // directory for imports in the current implementation.
+      const result = await processImports(content, basePath, true);
+
+      expect(result.content).toContain(`<!-- Imported from: ${importPath} -->`);
+      expect(result.content).toContain(importedContent);
+      expect(result.content).toContain(
+        `<!-- End of import from: ${importPath} -->`,
+      );
+      expect(mockedFs.readFile).toHaveBeenCalledWith(
+        path.resolve(basePath, importPath),
+        'utf-8',
       );
     });
 
@@ -608,178 +634,6 @@ describe('memoryImportProcessor', () => {
       const basePath = testPath(projectRoot, 'src');
       const dupContent = 'Duplicated content';
 
-      // Reset mocks
-      mockedFs.access.mockReset();
-      mockedFs.readFile.mockReset();
-
-      // Set up mocks
-      mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile.mockResolvedValue(dupContent);
-
-      const result = await processImports(
-        content,
-        basePath,
-        true, // followImports
-        undefined, // allowedPaths
-        projectRoot,
-        'flat', // outputFormat
-      );
-
-      // Verify readFile was called only once for dup.md
-      expect(mockedFs.readFile).toHaveBeenCalledTimes(1);
-
-      // Check that the content contains the file content only once
-      const contentStr = result.content;
-      const firstIndex = contentStr.indexOf('Duplicated content');
-      const lastIndex = contentStr.lastIndexOf('Duplicated content');
-      expect(firstIndex).toBeGreaterThan(-1); // Content should exist
-      expect(firstIndex).toBe(lastIndex); // Should only appear once
-    });
-
-    it('should handle nested imports in flat output', async () => {
-      const content = 'Root @./a.md';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
-      const aContent = 'A @./b.md';
-      const bContent = 'B content';
-
-      mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile
-        .mockResolvedValueOnce(aContent)
-        .mockResolvedValueOnce(bContent);
-
-      const result = await processImports(
-        content,
-        basePath,
-        true,
-        undefined,
-        projectRoot,
-        'flat',
-      );
-
-      // Verify all files are present by checking for their basenames
-      expect(result.content).toContain('a.md');
-      expect(result.content).toContain('b.md');
-
-      // Verify content is in the correct order
-      const contentStr = result.content;
-      const aIndex = contentStr.indexOf('a.md');
-      const bIndex = contentStr.indexOf('b.md');
-      const rootIndex = contentStr.indexOf('Root @./a.md');
-
-      expect(rootIndex).toBeLessThan(aIndex);
-      expect(aIndex).toBeLessThan(bIndex);
-
-      // Verify content is present
-      expect(result.content).toContain('Root @./a.md');
-      expect(result.content).toContain('A @./b.md');
-      expect(result.content).toContain('B content');
-    });
-
-    it('should build import tree structure', async () => {
-      const content = 'Main content @./nested.md @./simple.md';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
-      const nestedContent = 'Nested @./inner.md content';
-      const simpleContent = 'Simple content';
-      const innerContent = 'Inner content';
-
-      mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile
-        .mockResolvedValueOnce(nestedContent)
-        .mockResolvedValueOnce(simpleContent)
-        .mockResolvedValueOnce(innerContent);
-
-      const result = await processImports(content, basePath, true);
-
-      // Use marked to find and validate import comments
-      const comments = findMarkdownComments(result.content);
-      const importComments = comments.filter((c) =>
-        c.includes('Imported from:'),
-      );
-
-      expect(importComments.some((c) => c.includes('./nested.md'))).toBe(true);
-      expect(importComments.some((c) => c.includes('./simple.md'))).toBe(true);
-      expect(importComments.some((c) => c.includes('./inner.md'))).toBe(true);
-
-      // Use marked to validate the markdown structure is well-formed
-      const tokens = parseMarkdown(result.content);
-      expect(tokens).toBeDefined();
-      expect(tokens.length).toBeGreaterThan(0);
-
-      // Verify the content contains expected text using marked parsing
-      const textContent = tokens
-        .filter((token) => token.type === 'paragraph')
-        .map((token) => token.raw)
-        .join(' ');
-
-      expect(textContent).toContain('Main content');
-      expect(textContent).toContain('Nested');
-      expect(textContent).toContain('Simple content');
-      expect(textContent).toContain('Inner content');
-
-      // Verify import tree structure
-      expect(result.importTree.path).toBe('unknown'); // No currentFile set in test
-      expect(result.importTree.imports).toHaveLength(2);
-
-      // First import: nested.md
-      const expectedNestedPath = testPath(projectRoot, 'src', 'nested.md');
-      const expectedInnerPath = testPath(projectRoot, 'src', 'inner.md');
-      const expectedSimplePath = testPath(projectRoot, 'src', 'simple.md');
-
-      // Check that the paths match using includes to handle potential absolute/relative differences
-      expect(result.importTree.imports![0].path).toContain(expectedNestedPath);
-      expect(result.importTree.imports![0].imports).toHaveLength(1);
-      expect(result.importTree.imports![0].imports![0].path).toContain(
-        expectedInnerPath,
-      );
-      expect(result.importTree.imports![0].imports![0].imports).toBeUndefined();
-
-      // Second import: simple.md
-      expect(result.importTree.imports![1].path).toContain(expectedSimplePath);
-      expect(result.importTree.imports![1].imports).toBeUndefined();
-    });
-
-    it('should produce flat output in Claude-style with unique files in order', async () => {
-      const content = 'Main @./nested.md content @./simple.md';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
-      const nestedContent = 'Nested @./inner.md content';
-      const simpleContent = 'Simple content';
-      const innerContent = 'Inner content';
-
-      mockedFs.access.mockResolvedValue(undefined);
-      mockedFs.readFile
-        .mockResolvedValueOnce(nestedContent)
-        .mockResolvedValueOnce(simpleContent)
-        .mockResolvedValueOnce(innerContent);
-
-      const result = await processImports(
-        content,
-        basePath,
-        true,
-        undefined,
-        projectRoot,
-        'flat',
-      );
-
-      // Verify all expected files are present by checking for their basenames
-      expect(result.content).toContain('nested.md');
-      expect(result.content).toContain('simple.md');
-      expect(result.content).toContain('inner.md');
-
-      // Verify content is present
-      expect(result.content).toContain('Nested @./inner.md content');
-      expect(result.content).toContain('Simple content');
-      expect(result.content).toContain('Inner content');
-    });
-
-    it('should not duplicate files in flat output if imported multiple times', async () => {
-      const content = 'Main @./dup.md again @./dup.md';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
-      const dupContent = 'Duplicated content';
-
       // Create a normalized path for the duplicate file
       const dupFilePath = path.normalize(path.join(basePath, 'dup.md'));
 
@@ -807,7 +661,7 @@ describe('memoryImportProcessor', () => {
         true, // debugMode
         undefined, // importState
         projectRoot,
-        'flat',
+        'flat', // outputFormat
       );
 
       // In flat mode, the output should only contain the main file content with import markers
