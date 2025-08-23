@@ -599,7 +599,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     if (textToSet) {
       buffer.setText(textToSet);
     }
-  }, [buffer, inputHistoryStore.inputHistory, getQueuedMessagesText, clearQueue]);
+  }, [
+    buffer,
+    inputHistoryStore.inputHistory,
+    getQueuedMessagesText,
+    clearQueue,
+  ]);
 
   // Input handling - queue messages for processing
   const handleFinalSubmit = useCallback(
