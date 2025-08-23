@@ -166,6 +166,27 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   getDescription(): string {
     return safeJsonStringify(this.params);
   }
+
+  /**
+   * Gets all MCP permissions in the allowlist for permission management
+   */
+  static getAllowedMcpPermissions(): string[] {
+    return Array.from(DiscoveredMCPToolInvocation.allowlist);
+  }
+
+  /**
+   * Removes a specific MCP permission from the allowlist
+   */
+  static revokeMcpPermission(permission: string): void {
+    DiscoveredMCPToolInvocation.allowlist.delete(permission);
+  }
+
+  /**
+   * Clears all MCP permissions
+   */
+  static clearAllMcpPermissions(): void {
+    DiscoveredMCPToolInvocation.allowlist.clear();
+  }
 }
 
 export class DiscoveredMCPTool extends BaseDeclarativeTool<

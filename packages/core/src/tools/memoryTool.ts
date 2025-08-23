@@ -281,6 +281,27 @@ class MemoryToolInvocation extends BaseToolInvocation<
       };
     }
   }
+
+  /**
+   * Gets all memory permissions in the allowlist for permission management
+   */
+  static getAllowedMemoryPermissions(): string[] {
+    return Array.from(MemoryToolInvocation.allowlist);
+  }
+
+  /**
+   * Removes a specific memory permission from the allowlist
+   */
+  static revokeMemoryPermission(permission: string): void {
+    MemoryToolInvocation.allowlist.delete(permission);
+  }
+
+  /**
+   * Clears all memory permissions
+   */
+  static clearAllMemoryPermissions(): void {
+    MemoryToolInvocation.allowlist.clear();
+  }
 }
 
 export class MemoryTool

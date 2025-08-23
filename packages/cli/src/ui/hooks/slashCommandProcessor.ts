@@ -52,6 +52,7 @@ export const useSlashCommandProcessor = (
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
   openSettingsDialog: () => void,
+  openPermissionsDialog: () => void,
   toggleVimEnabled: () => Promise<boolean>,
   setIsProcessing: (isProcessing: boolean) => void,
   setGeminiMdFileCount: (count: number) => void,
@@ -382,6 +383,9 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'settings':
                       openSettingsDialog();
+                      return { type: 'handled' };
+                    case 'permissions':
+                      openPermissionsDialog();
                       return { type: 'handled' };
                     case 'help':
                       return { type: 'handled' };
