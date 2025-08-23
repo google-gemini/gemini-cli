@@ -297,7 +297,10 @@ describe('memoryImportProcessor', () => {
       expect(result.content).toContain(
         `<!-- End of import from: ${importPath} -->`,
       );
-      expect(mockedFs.readFile).toHaveBeenCalledWith(importPath, 'utf-8');
+      expect(mockedFs.readFile).toHaveBeenCalledWith(
+        path.resolve(basePath, importPath),
+        'utf-8',
+      );
     });
 
     it('should handle multiple imports in same content', async () => {
