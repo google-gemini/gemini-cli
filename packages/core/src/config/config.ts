@@ -205,6 +205,7 @@ export interface ConfigParameters {
   shouldUseNodePtyShell?: boolean;
   skipNextSpeakerCheck?: boolean;
   enablePromptCompletion?: boolean;
+  propagateEnvironmentVars?: boolean;
 }
 
 export class Config {
@@ -275,6 +276,7 @@ export class Config {
   private readonly shouldUseNodePtyShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private readonly enablePromptCompletion: boolean = false;
+  private readonly propagateEnvironmentVars: boolean = true;
   private initialized: boolean = false;
   readonly storage: Storage;
 
@@ -349,6 +351,7 @@ export class Config {
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
+    this.propagateEnvironmentVars = params.propagateEnvironmentVars ?? true;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -756,6 +759,10 @@ export class Config {
 
   getEnablePromptCompletion(): boolean {
     return this.enablePromptCompletion;
+  }
+
+  getPropagateEnvironmentVars(): boolean {
+    return this.propagateEnvironmentVars;
   }
 
   async getGitService(): Promise<GitService> {
