@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { quote, parse } from 'shell-quote';
 import {
   USER_SETTINGS_DIR,
@@ -200,9 +201,11 @@ export async function start_sandbox(
         console.error('ERROR: cannot BUILD_SANDBOX when using macOS Seatbelt');
         process.exit(1);
       }
+
       const profile = (process.env['SEATBELT_PROFILE'] ??= 'permissive-open');
-      let profileFile = new URL(`sandbox-macos-${profile}.sb`, import.meta.url)
-        .pathname;
+      let profileFile = fileURLToPath(
+        new URL(`sandbox-macos-${profile}.sb`, import.meta.url),
+      );
       // if profile name is not recognized, then look for file under project settings directory
       if (!BUILTIN_SEATBELT_PROFILES.includes(profile)) {
         profileFile = path.join(

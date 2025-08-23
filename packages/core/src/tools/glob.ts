@@ -155,7 +155,7 @@ class GlobToolInvocation extends BaseToolInvocation<
           stat: true,
           nocase: !this.params.case_sensitive,
           dot: true,
-          ignore: ['**/node_modules/**', '**/.git/**'],
+          ignore: this.config.getFileExclusions().getGlobExcludes(),
           follow: false,
           signal,
         })) as GlobPath[];
