@@ -13,6 +13,13 @@ import { getErrorMessage } from '../utils/errors.js';
 import { OAuthUtils } from './oauth-utils.js';
 
 /**
+ * Message handler for displaying user-facing messages during OAuth flow.
+ */
+export interface MCPOAuthMessageHandler {
+  onDisplayMessage: (message: string) => void;
+}
+
+/**
  * OAuth configuration for an MCP server.
  */
 export interface MCPOAuthConfig {
@@ -576,16 +583,27 @@ export class MCPOAuthProvider {
    * @param serverName The name of the MCP server
    * @param config OAuth configuration
    * @param mcpServerUrl Optional MCP server URL for OAuth discovery
+   * @param messageHandler Optional handler for displaying user-facing messages
    * @returns The obtained OAuth token
    */
   static async authenticate(
     serverName: string,
     config: MCPOAuthConfig,
     mcpServerUrl?: string,
+    messageHandler?: MCPOAuthMessageHandler,
   ): Promise<MCPOAuthToken> {
+    // Helper function to display messages through handler or fallback to console.log
+    const displayMessage = (message: string) => {
+      if (messageHandler) {
+        messageHandler.onDisplayMessage(message);
+      } else {
+        console.log(message);
+      }
+    };
+
     // If no authorization URL is provided, try to discover OAuth configuration
     if (!config.authorizationUrl && mcpServerUrl) {
-      console.log(
+      displayMessage(
         'No authorization URL provided, attempting OAuth discovery...',
       );
 
@@ -663,7 +681,7 @@ export class MCPOAuthProvider {
       const authUrl = new URL(config.authorizationUrl);
       const serverUrl = `${authUrl.protocol}//${authUrl.host}`;
 
-      console.log(
+      displayMessage(
         'No client ID provided, attempting dynamic client registration...',
       );
 
@@ -695,7 +713,7 @@ export class MCPOAuthProvider {
           config.clientSecret = clientRegistration.client_secret;
         }
 
-        console.log('Dynamic client registration successful');
+        displayMessage('Dynamic client registration successful');
       } else {
         throw new Error(
           'No client ID provided and dynamic registration not supported',
@@ -720,30 +738,30 @@ export class MCPOAuthProvider {
       mcpServerUrl,
     );
 
-    console.log('\nOpening browser for OAuth authentication...');
-    console.log('If the browser does not open, please visit:');
-    console.log('');
+    displayMessage('\nOpening browser for OAuth authentication...');
+    displayMessage('If the browser does not open, please visit:');
+    displayMessage('');
 
     // Get terminal width or default to 80
     const terminalWidth = process.stdout.columns || 80;
     const separatorLength = Math.min(terminalWidth - 2, 80);
     const separator = '━'.repeat(separatorLength);
 
-    console.log(separator);
-    console.log(
+    displayMessage(separator);
+    displayMessage(
       'COPY THE ENTIRE URL BELOW (select all text between the lines):',
     );
-    console.log(separator);
-    console.log(authUrl);
-    console.log(separator);
-    console.log('');
-    console.log(
+    displayMessage(separator);
+    displayMessage(authUrl);
+    displayMessage(separator);
+    displayMessage('');
+    displayMessage(
       '💡 TIP: Triple-click to select the entire URL, then copy and paste it into your browser.',
     );
-    console.log(
+    displayMessage(
       '⚠️  Make sure to copy the COMPLETE URL - it may wrap across multiple lines.',
     );
-    console.log('');
+    displayMessage('');
 
     // Start callback server
     const callbackPromise = this.startCallbackServer(pkceParams.state);
@@ -761,7 +779,7 @@ export class MCPOAuthProvider {
     // Wait for callback
     const { code } = await callbackPromise;
 
-    console.log('\nAuthorization code received, exchanging for tokens...');
+    displayMessage('\nAuthorization code received, exchanging for tokens...');
 
     // Exchange code for tokens
     const tokenResponse = await this.exchangeCodeForToken(
@@ -796,7 +814,7 @@ export class MCPOAuthProvider {
         config.tokenUrl,
         mcpServerUrl,
       );
-      console.log('Authentication successful! Token saved.');
+      displayMessage('Authentication successful! Token saved.');
 
       // Verify token was saved
       const savedToken = await MCPOAuthTokenStorage.getToken(serverName);
@@ -805,7 +823,7 @@ export class MCPOAuthProvider {
           savedToken.token.accessToken.length > 20
             ? `${savedToken.token.accessToken.substring(0, 20)}...`
             : '[token]';
-        console.log(`Token verification successful: ${tokenPreview}`);
+        displayMessage(`Token verification successful: ${tokenPreview}`);
       } else {
         console.error(
           'Token verification failed: token not found or invalid after save',
