@@ -51,6 +51,44 @@ import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { loadThemesFromExtensions } from './services/ExtensionLoader.js';
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
 
+// --- THIS IS THE NEW EXPORTED FUNCTION THAT THE TEST FILE NEEDS ---
+export async function startInteractiveUI(
+  config: Config,
+  settings: LoadedSettings,
+  startupWarnings: string[],
+  workspaceRoot: string,
+) {
+  const version = await getCliVersion();
+  await detectAndEnableKittyProtocol();
+  setWindowTitle(basename(workspaceRoot), settings);
+  const instance = render(
+    <React.StrictMode>
+      <SettingsContext.Provider value={settings}>
+        <AppWrapper
+          config={config}
+          settings={settings}
+          startupWarnings={startupWarnings}
+          version={version}
+        />
+      </SettingsContext.Provider>
+    </React.StrictMode>,
+    { exitOnCtrlC: false },
+  );
+
+  checkForUpdates()
+    .then((info) => {
+      handleAutoUpdate(info, settings, config.getProjectRoot());
+    })
+    .catch((err) => {
+      if (config.getDebugMode()) {
+        console.error('Update check failed:', err);
+      }
+    });
+
+  registerCleanup(() => instance.unmount());
+}
+// ----------------------------------------------------------------
+
 export function validateDnsResolutionOrder(
   order: string | undefined,
 ): DnsResolutionOrder {
@@ -124,44 +162,6 @@ Reason: ${reason}${
   });
 }
 
-export async function startInteractiveUI(
-  config: Config,
-  settings: LoadedSettings,
-  startupWarnings: string[],
-  workspaceRoot: string,
-) {
-  const version = await getCliVersion();
-  // Detect and enable Kitty keyboard protocol once at startup
-  await detectAndEnableKittyProtocol();
-  setWindowTitle(basename(workspaceRoot), settings);
-  const instance = render(
-    <React.StrictMode>
-      <SettingsContext.Provider value={settings}>
-        <AppWrapper
-          config={config}
-          settings={settings}
-          startupWarnings={startupWarnings}
-          version={version}
-        />
-      </SettingsContext.Provider>
-    </React.StrictMode>,
-    { exitOnCtrlC: false, isScreenReaderEnabled: config.getScreenReader() },
-  );
-
-  checkForUpdates()
-    .then((info) => {
-      handleAutoUpdate(info, settings, config.getProjectRoot());
-    })
-    .catch((err) => {
-      // Silently ignore update check errors.
-      if (config.getDebugMode()) {
-        console.error('Update check failed:', err);
-      }
-    });
-
-  registerCleanup(() => instance.unmount());
-}
-
 export async function main() {
   setupUnhandledRejectionHandler();
   const workspaceRoot = process.cwd();
@@ -183,10 +183,8 @@ export async function main() {
   const argv = await parseArguments();
   const extensions = loadExtensions(workspaceRoot);
 
-  // --- YOUR CODE RUNS FIRST ---
-  // This calls `settings.setValue()` which correctly updates the state.
+  // Load themes contributed by extensions right after extensions are loaded.
   loadThemesFromExtensions(settings);
-  // -----------------------------
 
   const config = await loadCliConfig(
     settings.merged,
@@ -240,11 +238,7 @@ export async function main() {
     logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
   }
 
-  // --- THE ORIGINAL CODE IS RESTORED ---
-  // This line now runs AFTER you have updated the settings correctly.
-  // It will read the updated settings and load all themes.
   themeManager.loadCustomThemes(settings.merged.customThemes);
-  // ----------------------------------------
 
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
@@ -273,37 +267,7 @@ export async function main() {
           process.exit(1);
         }
       }
-      let stdinData = '';
-      if (!process.stdin.isTTY) {
-        stdinData = await readStdin();
-      }
-
-      // This function is a copy of the one from sandbox.ts
-      // It is moved here to decouple sandbox.ts from the CLI's argument structure.
-      const injectStdinIntoArgs = (
-        args: string[],
-        stdinData?: string,
-      ): string[] => {
-        const finalArgs = [...args];
-        if (stdinData) {
-          const promptIndex = finalArgs.findIndex(
-            (arg) => arg === '--prompt' || arg === '-p',
-          );
-          if (promptIndex > -1 && finalArgs.length > promptIndex + 1) {
-            // If there's a prompt argument, prepend stdin to it
-            finalArgs[promptIndex + 1] =
-              `${stdinData}\n\n${finalArgs[promptIndex + 1]}`;
-          } else {
-            // If there's no prompt argument, add stdin as the prompt
-            finalArgs.push('--prompt', stdinData);
-          }
-        }
-        return finalArgs;
-      };
-
-      const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
-
-      await start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs);
+      await start_sandbox(sandboxConfig, memoryArgs, config);
       process.exit(0);
     } else {
       if (memoryArgs.length > 0) {
@@ -331,7 +295,8 @@ export async function main() {
   ];
 
   if (config.isInteractive()) {
-
+    // The logic is now in the separate, exported function.
+    await startInteractiveUI(config, settings, startupWarnings, workspaceRoot);
     return;
   }
 
@@ -342,9 +307,7 @@ export async function main() {
     }
   }
   if (!input) {
-    console.error(
-      `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
-    );
+    console.error('No input provided via stdin.');
     process.exit(1);
   }
 
