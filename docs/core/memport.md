@@ -34,7 +34,7 @@ More content here.
 
 - `@/absolute/path/to/file.md` - Import using an absolute path.
 
-**Note on Security:** For security reasons, an absolute path is only allowed if it resolves to a file located *within the same directory as (or a subdirectory of) the file that contains the import statement*. This is a strict security measure to prevent a malicious markdown file from accessing arbitrary files on your system (e.g., `C:\Users\YourUser\secrets.txt` or `/etc/passwd`).
+**Note on Security:** For security reasons, an absolute path is only allowed if it resolves to a file located _within the same directory as (or a subdirectory of) the file that contains the import statement_. This is a strict security measure to prevent a malicious markdown file from accessing arbitrary files on your system (e.g., `C:\Users\YourUser\secrets.txt` or `/etc/passwd`).
 
 ## Examples
 
