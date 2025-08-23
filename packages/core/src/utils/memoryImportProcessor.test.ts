@@ -292,9 +292,11 @@ describe('memoryImportProcessor', () => {
       // directory for imports in the current implementation.
       const result = await processImports(content, basePath, true);
 
-      expect(result).toContain(`<!-- Imported from: ${importPath} -->`);
-      expect(result).toContain(importedContent);
-      expect(result).toContain(`<!-- End of import from: ${importPath} -->`);
+      expect(result.content).toContain(`<!-- Imported from: ${importPath} -->`);
+      expect(result.content).toContain(importedContent);
+      expect(result.content).toContain(
+        `<!-- End of import from: ${importPath} -->`,
+      );
       expect(mockedFs.readFile).toHaveBeenCalledWith(importPath, 'utf-8');
     });
 
