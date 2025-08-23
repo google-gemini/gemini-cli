@@ -35,7 +35,8 @@ export function PermissionsDialog({
     [],
   );
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [focusSection, setFocusSection] = useState<'groups' | 'actions'>(
+  const [selectedPermissionIndex, setSelectedPermissionIndex] = useState(0);
+  const [focusSection, setFocusSection] = useState<'groups' | 'permissions'>(
     'groups',
   );
   const [loading, setLoading] = useState(true);
@@ -87,35 +88,7 @@ export function PermissionsDialog({
   const handleResetAll = () => {
     try {
       permissionService.resetAllPermissions();
-      // Reload permissions
-      const allPermissions = permissionService.getAllPermissions();
-      setPermissions(allPermissions);
-
-      // Regroup permissions
-      const groups: PermissionGroup[] = [
-        {
-          type: 'shell',
-          name: 'Shell Commands',
-          permissions: allPermissions.filter((p) => p.type === 'shell'),
-        },
-        {
-          type: 'mcp',
-          name: 'MCP Tools',
-          permissions: allPermissions.filter((p) => p.type.startsWith('mcp_')),
-        },
-        {
-          type: 'memory',
-          name: 'Memory Operations',
-          permissions: allPermissions.filter((p) => p.type === 'memory'),
-        },
-        {
-          type: 'global',
-          name: 'Global Settings',
-          permissions: allPermissions.filter((p) => p.type === 'global'),
-        },
-      ];
-
-      setPermissionGroups(groups);
+      reloadPermissions();
     } catch (error) {
       console.error('Failed to reset permissions:', error);
     }
@@ -124,37 +97,60 @@ export function PermissionsDialog({
   const handleResetByType = (type: string) => {
     try {
       permissionService.resetPermissionsByType(type);
-      // Reload permissions
-      const allPermissions = permissionService.getAllPermissions();
-      setPermissions(allPermissions);
-
-      // Regroup permissions
-      const groups: PermissionGroup[] = [
-        {
-          type: 'shell',
-          name: 'Shell Commands',
-          permissions: allPermissions.filter((p) => p.type === 'shell'),
-        },
-        {
-          type: 'mcp',
-          name: 'MCP Tools',
-          permissions: allPermissions.filter((p) => p.type.startsWith('mcp_')),
-        },
-        {
-          type: 'memory',
-          name: 'Memory Operations',
-          permissions: allPermissions.filter((p) => p.type === 'memory'),
-        },
-        {
-          type: 'global',
-          name: 'Global Settings',
-          permissions: allPermissions.filter((p) => p.type === 'global'),
-        },
-      ];
-
-      setPermissionGroups(groups);
+      reloadPermissions();
     } catch (error) {
       console.error('Failed to reset permissions by type:', error);
+    }
+  };
+
+  const handleResetIndividualPermission = (permissionId: string) => {
+    try {
+      permissionService.resetPermission(permissionId);
+      reloadPermissions();
+    } catch (error) {
+      console.error('Failed to reset individual permission:', error);
+    }
+  };
+
+  const reloadPermissions = () => {
+    const allPermissions = permissionService.getAllPermissions();
+    setPermissions(allPermissions);
+
+    // Regroup permissions
+    const groups: PermissionGroup[] = [
+      {
+        type: 'shell',
+        name: 'Shell Commands',
+        permissions: allPermissions.filter((p) => p.type === 'shell'),
+      },
+      {
+        type: 'mcp',
+        name: 'MCP Tools',
+        permissions: allPermissions.filter((p) => p.type.startsWith('mcp_')),
+      },
+      {
+        type: 'memory',
+        name: 'Memory Operations',
+        permissions: allPermissions.filter((p) => p.type === 'memory'),
+      },
+      {
+        type: 'global',
+        name: 'Global Settings',
+        permissions: allPermissions.filter((p) => p.type === 'global'),
+      },
+    ];
+
+    setPermissionGroups(groups);
+
+    // Reset selection if current selection is out of bounds
+    const currentGroup = groups[selectedIndex];
+    if (
+      currentGroup &&
+      selectedPermissionIndex >= currentGroup.permissions.length
+    ) {
+      setSelectedPermissionIndex(
+        Math.max(0, currentGroup.permissions.length - 1),
+      );
     }
   };
 
@@ -165,14 +161,22 @@ export function PermissionsDialog({
       if (name === 'escape') {
         onClose();
       } else if (name === 'tab') {
-        setFocusSection((prev) => (prev === 'groups' ? 'actions' : 'groups'));
+        setFocusSection((prev) =>
+          prev === 'groups' ? 'permissions' : 'groups',
+        );
       } else if (focusSection === 'groups') {
         if (name === 'up' || name === 'k') {
-          setSelectedIndex((prev) => Math.max(0, prev - 1));
+          setSelectedIndex((prev) => {
+            const newIndex = Math.max(0, prev - 1);
+            setSelectedPermissionIndex(0);
+            return newIndex;
+          });
         } else if (name === 'down' || name === 'j') {
-          setSelectedIndex((prev) =>
-            Math.min(permissionGroups.length - 1, prev + 1),
-          );
+          setSelectedIndex((prev) => {
+            const newIndex = Math.min(permissionGroups.length - 1, prev + 1);
+            setSelectedPermissionIndex(0);
+            return newIndex;
+          });
         } else if (name === 'r') {
           const selectedGroup = permissionGroups[selectedIndex];
           if (selectedGroup && selectedGroup.permissions.length > 0) {
@@ -181,12 +185,28 @@ export function PermissionsDialog({
             );
           }
         }
-      } else if (focusSection === 'actions') {
-        if (name === 'return' || name === 'space') {
-          if (key.sequence === 'A') {
-            handleResetAll();
+      } else if (focusSection === 'permissions') {
+        const currentGroup = permissionGroups[selectedIndex];
+        if (currentGroup && currentGroup.permissions.length > 0) {
+          if (name === 'up' || name === 'k') {
+            setSelectedPermissionIndex((prev) => Math.max(0, prev - 1));
+          } else if (name === 'down' || name === 'j') {
+            setSelectedPermissionIndex((prev) =>
+              Math.min(currentGroup.permissions.length - 1, prev + 1),
+            );
+          } else if (name === 'r') {
+            const selectedPermission =
+              currentGroup.permissions[selectedPermissionIndex];
+            if (selectedPermission) {
+              handleResetIndividualPermission(selectedPermission.id);
+            }
           }
         }
+      }
+
+      // Global actions available from any section
+      if (key.sequence === 'A' || (key.shift && name === 'a')) {
+        handleResetAll();
       }
     },
     { isActive: true },
@@ -273,27 +293,58 @@ export function PermissionsDialog({
 
           <Box height={1} />
 
-          {/* Selected Group Details */}
+          {/* Individual Permissions */}
           {permissionGroups[selectedIndex] && (
             <Box flexDirection="column">
-              <Text bold color={Colors.AccentCyan}>
+              <Text
+                bold={focusSection === 'permissions'}
+                color={Colors.AccentCyan}
+              >
+                {focusSection === 'permissions' ? '> ' : '  '}
                 {permissionGroups[selectedIndex].name}:
               </Text>
               {permissionGroups[selectedIndex].permissions.length === 0 ? (
                 <Text color={Colors.Gray}>No permissions granted.</Text>
               ) : (
                 permissionGroups[selectedIndex].permissions.map(
-                  (permission) => (
+                  (permission, index) => (
                     <Box
                       key={permission.id}
-                      flexDirection="column"
+                      flexDirection="row"
                       marginLeft={2}
+                      alignItems="flex-start"
                     >
-                      <Text color={Colors.Foreground}>{permission.name}</Text>
-                      <Text color={Colors.Gray} wrap="wrap">
-                        {permission.description}
-                      </Text>
-                      <Box height={1} />
+                      <Box minWidth={2} flexShrink={0}>
+                        <Text
+                          color={
+                            focusSection === 'permissions' &&
+                            selectedPermissionIndex === index
+                              ? Colors.AccentCyan
+                              : Colors.Gray
+                          }
+                        >
+                          {focusSection === 'permissions' &&
+                          selectedPermissionIndex === index
+                            ? '●'
+                            : ''}
+                        </Text>
+                      </Box>
+                      <Box flexDirection="column" flexGrow={1}>
+                        <Text
+                          color={
+                            focusSection === 'permissions' &&
+                            selectedPermissionIndex === index
+                              ? Colors.AccentCyan
+                              : Colors.Foreground
+                          }
+                        >
+                          {permission.name}
+                        </Text>
+                        <Text color={Colors.Gray} wrap="wrap">
+                          {permission.description}
+                        </Text>
+                        <Box height={1} />
+                      </Box>
                     </Box>
                   ),
                 )
@@ -304,19 +355,16 @@ export function PermissionsDialog({
       )}
 
       <Box marginTop={1} flexDirection="column">
-        <Text bold={focusSection === 'actions'} color={Colors.AccentYellow}>
-          {focusSection === 'actions' ? '> ' : '  '}Actions:
-        </Text>
         <Text color={Colors.Gray}>
-          Press &apos;r&apos; to reset selected group permissions
+          Press &apos;r&apos; to reset selected group/permission
         </Text>
         <Text color={Colors.Gray}>
           Press &apos;A&apos; to reset ALL permissions
         </Text>
+        <Text color={Colors.Gray}>
+          (Tab to switch view, ↑↓ to navigate, Esc to close)
+        </Text>
       </Box>
-
-      <Box height={1} />
-      <Text color={Colors.Gray}>(Tab to change focus, Esc to close)</Text>
     </Box>
   );
 }
