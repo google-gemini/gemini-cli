@@ -194,7 +194,7 @@ describe('Project Access Validation', () => {
       try {
         await forceReauthentication();
       } catch (error) {
-        expect(error.message).toBe('Process exited');
+        expect((error as Error).message).toBe('Process exited');
       }
 
       expect(clearCachedCredentialFile).toHaveBeenCalled();
@@ -216,7 +216,7 @@ describe('Project Access Validation', () => {
       try {
         await forceReauthentication();
       } catch (error) {
-        expect(error.message).toBe('Process exited');
+        expect((error as Error).message).toBe('Process exited');
       }
 
       expect(exitSpy).toHaveBeenCalledWith(1);
