@@ -702,8 +702,8 @@ Expectation for required parameters:
           if (start_line) {
             const lines = currentContent.split('\n');
             const endLine = end_line ?? start_line;
-            const prefix = lines.slice(0, start_line - 1).join('\n');
-            const suffix = lines.slice(endLine).join('\n');
+            const prefix = lines.slice(0, start_line - 1);
+            const suffix = lines.slice(endLine);
             const contentSlice = lines
               .slice(start_line - 1, endLine)
               .join('\n');
