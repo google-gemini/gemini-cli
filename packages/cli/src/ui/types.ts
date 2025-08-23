@@ -7,6 +7,7 @@
 import {
   ToolCallConfirmationDetails,
   ToolResultDisplay,
+  UserTierId,
 } from '@google/gemini-cli-core';
 
 // Only defining the state enum needed by the UI
@@ -95,6 +96,8 @@ export type HistoryItemAbout = HistoryItemBase & {
   modelVersion: string;
   selectedAuthType: string;
   gcpProject: string;
+  ideClient: string;
+  userTier?: UserTierId;
 };
 
 export type HistoryItemHelp = HistoryItemBase & {
@@ -188,6 +191,7 @@ export type Message =
       modelVersion: string;
       selectedAuthType: string;
       gcpProject: string;
+      ideClient: string;
       content?: string; // Optional content, not really used for ABOUT
     }
   | {
@@ -224,7 +228,7 @@ export type Message =
     };
 
 export interface ConsoleMessageItem {
-  type: 'log' | 'warn' | 'error' | 'debug';
+  type: 'log' | 'warn' | 'error' | 'debug' | 'info';
   content: string;
   count: number;
 }
