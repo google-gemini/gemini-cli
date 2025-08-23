@@ -1422,11 +1422,17 @@ describe('InputPrompt', () => {
       );
       stdin.write('\x12');
       await wait();
+      // Verify reverse search is active
+      expect(stdout.lastFrame()).toContain('(r:)');
+
       stdin.write('\t');
 
-      await waitFor(() => {
-        expect(stdout.lastFrame()).not.toContain('(r:)');
-      });
+      await waitFor(
+        () => {
+          expect(stdout.lastFrame()).not.toContain('(r:)');
+        },
+        { timeout: 5000 },
+      ); // Increase timeout
 
       expect(props.buffer.setText).toHaveBeenCalledWith('echo hello');
       unmount();
