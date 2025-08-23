@@ -97,7 +97,7 @@ export function isSafeEnvValue(val: string): boolean {
   if (typeof val !== 'string') return false;
   if (/[\r\n]/.test(val)) return false;
   // disallow `;|&$<>` and backticks and newlines
-  if (/[;&|`$<>]/.test(val)) return false;
+  if (/[;&|`$<>()]/.test(val)) return false;
   return true;
 }
 
@@ -113,7 +113,7 @@ export function parseAndFilterSandboxEnv(raw?: string): Record<string, string> {
     if (eq === -1) continue;
     const key = part.slice(0, eq).trim();
     const value = part.slice(eq + 1).trim();
-    if (!isValidEnvKey(key)) continue;
+    if (!isValidEnvKey(key) || DANGEROUS_ENVS.has(key)) continue;
     if (!isSafeEnvValue(value)) continue;
     if (value.length === 0) continue; // skip empty values
 
