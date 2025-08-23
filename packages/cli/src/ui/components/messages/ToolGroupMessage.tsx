@@ -81,7 +81,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       borderDimColor={hasPending}
       borderColor={borderColor}
     >
-      {toolCalls.map((tool) => {
+      {toolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
         return (
           <Box key={tool.callId} flexDirection="column" minHeight={1}>
@@ -118,6 +118,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                   terminalWidth={innerWidth}
                 />
               )}
+            {index < toolCalls.length - 1 && <Box height={1} />}
           </Box>
         );
       })}
