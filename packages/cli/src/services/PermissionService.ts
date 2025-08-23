@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Config, ApprovalMode, ShellTool, MemoryToolInvocation, DiscoveredMCPToolInvocation } from '@google/gemini-cli-core';
+import {
+  Config,
+  ApprovalMode,
+  ShellTool,
+  MemoryToolInvocation,
+  DiscoveredMCPToolInvocation,
+} from '@google/gemini-cli-core';
 
 export interface ToolPermission {
   id: string;
@@ -88,6 +94,8 @@ export class PermissionService {
       case 'global':
         this.resetGlobalPermissions();
         break;
+      default:
+        throw new Error(`Unknown permission type: ${permission.type}`);
     }
   }
 
@@ -138,7 +146,8 @@ export class PermissionService {
     const permissions: ToolPermission[] = [];
 
     try {
-      const allowedPermissions = DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+      const allowedPermissions =
+        DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
 
       for (const allowlistKey of allowedPermissions) {
         if (allowlistKey.includes('.')) {
@@ -171,7 +180,8 @@ export class PermissionService {
     const permissions: ToolPermission[] = [];
 
     try {
-      const allowedPermissions = MemoryToolInvocation.getAllowedMemoryPermissions();
+      const allowedPermissions =
+        MemoryToolInvocation.getAllowedMemoryPermissions();
 
       for (const allowlistKey of allowedPermissions) {
         permissions.push({

@@ -229,7 +229,7 @@ export function PermissionsDialog({
 
       {totalPermissions === 0 ? (
         <Text color={Colors.Gray}>
-          No "Always Allow" permissions are currently granted.
+          No &quot;Always Allow&quot; permissions are currently granted.
         </Text>
       ) : (
         <>
@@ -308,9 +308,11 @@ export function PermissionsDialog({
           {focusSection === 'actions' ? '> ' : '  '}Actions:
         </Text>
         <Text color={Colors.Gray}>
-          Press 'r' to reset selected group permissions
+          Press &apos;r&apos; to reset selected group permissions
         </Text>
-        <Text color={Colors.Gray}>Press 'A' to reset ALL permissions</Text>
+        <Text color={Colors.Gray}>
+          Press &apos;A&apos; to reset ALL permissions
+        </Text>
       </Box>
 
       <Box height={1} />
