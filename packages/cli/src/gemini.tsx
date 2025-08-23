@@ -164,10 +164,10 @@ export async function main() {
   if (process.env['GOOGLE_CLOUD_PROJECT']) {
     try {
       const { validateCurrentProjectAccess } = await import('./utils/projectAccessValidator.js');
-      const hasAccess = await validateCurrentProjectAccess(
-        config.getAuthMethod(),
-        config
-      );
+              const hasAccess = await validateCurrentProjectAccess(
+          settings.merged.selectedAuthType,
+          config
+        );
 
       if (!hasAccess) {
         console.error('❌ Access denied: You do not have access to the specified Google Cloud project.');

@@ -5,9 +5,8 @@
  */
 
 import { OAuth2Client } from 'google-auth-library';
-import { getOauthClient } from '../../../core/src/code_assist/oauth2.js';
-import { AuthType } from '../../../core/src/core/contentGenerator.js';
-import { Config } from '../../../core/src/config/config.js';
+import { getOauthClient } from '@google/gemini-cli-core';
+import { AuthType, Config } from '@google/gemini-cli-core';
 
 /**
  * Validates if the current user has access to the specified Google Cloud project.

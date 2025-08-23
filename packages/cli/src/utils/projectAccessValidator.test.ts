@@ -11,7 +11,7 @@ import {
   validateCurrentProjectAccess,
   forceReauthentication,
 } from './projectAccessValidator.js';
-import { AuthType } from '../../../core/src/core/contentGenerator.js';
+import { AuthType } from '@google/gemini-cli-core';
 
 // Mock the OAuth2 client
 vi.mock('google-auth-library', () => ({
