@@ -623,7 +623,7 @@ export class MCPOAuthProvider {
     // Convert to our token format
     const token: MCPOAuthToken = {
       accessToken: bearerToken,
-      tokenType: tokenResponse.token_type,
+      tokenType: tokenResponse.token_type || 'Bearer',
       refreshToken: tokenResponse.refresh_token,
       scope: tokenResponse.scope,
     };
