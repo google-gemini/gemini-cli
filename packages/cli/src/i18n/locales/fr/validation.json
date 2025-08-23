@@ -1,0 +1,39 @@
+{
+  "required": {
+    "pathToAdd": "Veuillez fournir au moins un chemin à ajouter.",
+    "tagForSave": "Tag manquant. Usage : /chat save <tag>",
+    "tagForResume": "Tag manquant. Usage : /chat resume <tag>",
+    "tagForDelete": "Tag manquant. Usage : /chat delete <tag>",
+    "memoryUsage": "Usage : /memory add <texte à retenir>"
+  },
+  "notFound": {
+    "checkpoints": "Aucun point de contrôle de conversation sauvegardé trouvé.",
+    "checkpoint": "Aucun point de contrôle sauvegardé trouvé avec le tag : {{tag}}.",
+    "conversation": "Aucune conversation trouvée à sauvegarder.",
+    "toolRegistry": "Impossible de récupérer le registre des outils.",
+    "readManyFilesTool": "Erreur : outil read_many_files non trouvé.",
+    "restorableToolCalls": "Aucun appel d'outil restaurable trouvé.",
+    "fileNotFound": "Fichier non trouvé : {{filename}}"
+  },
+  "browser": {
+    "openDocs": "Veuillez ouvrir l'URL suivante dans votre navigateur pour voir la documentation :\n{{url}}",
+    "openingDocs": "Ouverture de la documentation dans votre navigateur : {{url}}",
+    "openBugReport": "Pour soumettre votre rapport de bug, veuillez ouvrir l'URL suivante dans votre navigateur :\n{{url}}",
+    "openFailed": "Impossible d'ouvrir l'URL dans le navigateur : {{error}}"
+  },
+  "commands": {
+    "invalidAtCommand": "Erreur : Commande @ invalide '{{command}}'. Aucun chemin spécifié.",
+    "unknownCommand": "Commande inconnue : {{command}}",
+    "geminiDirectoryPath": "Impossible de déterminer le chemin du répertoire .gemini."
+  },
+  "theme": {
+    "noColorEnv": "Configuration de thème indisponible à cause de la variable d'environnement NO_COLOR."
+  },
+  "ide": {
+    "noInstaller": "Aucun installateur n'est disponible pour {{ide}}. Veuillez installer l'extension '{{extensionName}}' manuellement depuis le marketplace."
+  },
+  "system": {
+    "unexpectedError": "Une erreur inattendue s'est produite : {{error}}",
+    "installationFailed": "L'installation a échoué."
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "success": {
+    "directoriesAdded": "Successfully added directories:\n- {{directories}}",
+    "geminiFilesAdded": "Successfully added GEMINI.md files from the following directories if there are:\n- {{directories}}",
+    "checkpointSaved": "Conversation checkpoint saved with tag: {{tag}}.",
+    "checkpointDeleted": "Conversation checkpoint '{{tag}}' has been deleted.",
+    "outputCopied": "Last output copied to the clipboard",
+    "projectRestored": "Restored project to the state before the tool call.",
+    "authenticated": "✅ Successfully authenticated with MCP server '{{serverName}}'!",
+    "installed": "Successfully installed."
+  },
+  "info": {
+    "connecting": "🟡 Connecting...",
+    "connected": "🟢 Connected to {{ide}}",
+    "installing": "Installing IDE companion...",
+    "discovering": "Re-discovering tools from '{{serverName}}'...",
+    "restarting": "Restarting MCP servers...",
+    "authStarting": "Starting OAuth authentication for MCP server '{{serverName}}'...",
+    "editorSet": "Editor preference set to \"{{editorType}}\" in {{scope}} settings.",
+    "editorCleared": "Editor preference cleared in {{scope}} settings."
+  },
+  "status": {
+    "workspaceDirectories": "Current workspace directories:\n{{directoryList}}",
+    "disconnected": "🔴 Disconnected",
+    "disconnectedWithDetails": "🔴 Disconnected: {{details}}",
+    "noOutput": "No output in history",
+    "noTextToCopy": "Last AI output contains no text to copy.",
+    "cancelled": "Operation cancelled.",
+    "userCancelled": "User cancelled the request."
+  },
+  "warning": {
+    "loopDetected": "A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.",
+    "messageWarning": "⚠️  {{message}}"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "api": {
+    "prefix": "[API 错误: {{message}}]",
+    "prefixWithStatus": "[API 错误: {{message}} (状态: {{status}})]",
+    "unknownError": "发生未知错误。",
+    "requestCancelled": "请求已取消。"
+  },
+  "quota": {
+    "rateLimitDetected": "检测到可能的配额限制或响应缓慢。将在本次会话的剩余时间内切换到 {{fallbackModel}} 模型。",
+    "rateLimitDetectedPaid": "检测到可能的配额限制或响应缓慢。将在本次会话的剩余时间内切换到 {{fallbackModel}} 模型。感谢您选择 Gemini Code Assist 和 Gemini CLI。",
+    "dailyQuotaReached": "您已达到每日配额限制。要提高限制，请升级到具有更高限制的 Gemini Code Assist Standard 或 Enterprise 计划：https://goo.gle/set-up-gemini-code-assist，或使用 /auth 切换到 AI Studio 的付费 API 密钥：https://aistudio.google.com/apikey",
+    "dailyQuotaReachedPaid": "您已达到每日配额限制。感谢您选择 Gemini Code Assist 和 Gemini CLI。要继续在今天访问 {{currentModel}} 模型，请考虑使用 /auth 切换到 AI Studio 的付费 API 密钥：https://aistudio.google.com/apikey",
+    "modelQuotaReached": "您已达到每日 {{currentModel}} 配额限制。将在本次会话的剩余时间内切换到 {{fallbackModel}} 模型。要提高限制，请升级到具有更高限制的 Gemini Code Assist Standard 或 Enterprise 计划：https://goo.gle/set-up-gemini-code-assist，或使用 /auth 切换到 AI Studio 的付费 API 密钥：https://aistudio.google.com/apikey",
+    "modelQuotaReachedPaid": "您已达到每日 {{currentModel}} 配额限制。将在本次会话的剩余时间内切换到 {{fallbackModel}} 模型。感谢您选择 Gemini Code Assist 和 Gemini CLI。要继续在今天访问 {{currentModel}} 模型，请考虑使用 /auth 切换到 AI Studio 的付费 API 密钥：https://aistudio.google.com/apikey",
+    "waitAndRetryGemini": "请稍候重试。要提高限制，请通过 AI Studio 请求配额增加，或切换到其他 /auth 方法",
+    "waitAndRetryVertex": "请稍候重试。要提高限制，请通过 Vertex 请求配额增加，或切换到其他 /auth 方法",
+    "rateLimitDefault": "检测到可能的配额限制或响应缓慢。将在本次会话的剩余时间内切换到 {{fallbackModel}} 模型。"
+  }
+}

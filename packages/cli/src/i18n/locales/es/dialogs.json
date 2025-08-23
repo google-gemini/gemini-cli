@@ -1,0 +1,71 @@
+{
+  "auth": {
+    "title": "Comenzar",
+    "description": "¿Cómo te gustaría autenticarte para este proyecto?",
+    "instructions": "(Usa Enter para seleccionar)",
+    "terms": "Términos de Servicio y Aviso de Privacidad para Gemini CLI",
+    "termsUrl": "https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md",
+    "options": {
+      "google": "Iniciar sesión con Google",
+      "cloudShell": "Usar credenciales de usuario de Cloud Shell",
+      "geminiKey": "Usar clave API de Gemini",
+      "vertexAI": "Vertex AI"
+    },
+    "errors": {
+      "invalidAuthType": "Valor inválido para GEMINI_DEFAULT_AUTH_TYPE: \"{{value}}\". Los valores válidos son: {{validValues}}.",
+      "existingApiKey": "Se detectó una clave API existente (GEMINI_API_KEY). Selecciona la opción \"Clave API de Gemini\" para usarla.",
+      "authRequired": "Debes seleccionar un método de autenticación para continuar. Presiona Ctrl+C dos veces para salir."
+    }
+  },
+  "settings": {
+    "title": "Configuración",
+    "subtitle": "Configura tus preferencias de Gemini CLI",
+    "sections": {
+      "general": "General",
+      "appearance": "Apariencia",
+      "behavior": "Comportamiento"
+    },
+    "options": {
+      "theme": "Tema",
+      "language": "Idioma",
+      "editor": "Editor",
+      "autoSave": "Guardado automático"
+    },
+    "buttons": {
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "reset": "Restablecer"
+    }
+  },
+  "theme": {
+    "title": "Seleccionar tema",
+    "preview": "Vista previa",
+    "applyTo": "Aplicar al tema",
+    "instructions": "Navega con {{tabInstruction}} y Enter para seleccionar",
+    "tabInstruction": "Tab/Shift+Tab"
+  },
+  "editor": {
+    "title": "Seleccionar editor",
+    "preference": "Preferencia de editor",
+    "description": "Elige tu editor preferido para editar archivos",
+    "currentPreference": "Preferencia actual: {{editor}}"
+  },
+  "folderTrust": {
+    "title": "Carpeta no confiable",
+    "message": "Esta carpeta no está en tu lista de carpetas confiables.",
+    "question": "¿Quieres confiar en esta carpeta?",
+    "buttons": {
+      "trust": "Confiar",
+      "dontTrust": "No confiar"
+    }
+  },
+  "shellConfirmation": {
+    "title": "Confirmación de ejecución de comando",
+    "message": "¿Quieres ejecutar este comando?",
+    "command": "Comando:",
+    "buttons": {
+      "execute": "Ejecutar",
+      "cancel": "Cancelar"
+    }
+  }
+}

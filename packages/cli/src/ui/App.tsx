@@ -4,7 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  useContext,
+} from 'react';
+import { useTranslation } from 'react-i18next';
+// Initialize i18n system 
+import '../i18n/index.js';
 import {
   Box,
   DOMElement,
@@ -41,7 +51,7 @@ import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js
 import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
 import { Colors } from './colors.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
-import { LoadedSettings, SettingScope } from '../config/settings.js';
+import { SettingScope } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup } from '../utils/cleanup.js';
@@ -100,6 +110,7 @@ import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { SettingsDialog } from './components/SettingsDialog.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
+import { SettingsContext } from './contexts/SettingsContext.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
@@ -108,13 +119,19 @@ const MAX_DISPLAYED_QUEUED_MESSAGES = 3;
 
 interface AppProps {
   config: Config;
-  settings: LoadedSettings;
   startupWarnings?: string[];
   version: string;
 }
 
 export const AppWrapper = (props: AppProps) => {
   const kittyProtocolStatus = useKittyKeyboardProtocol();
+  const settingsContext = useContext(SettingsContext);
+  if (!settingsContext) {
+    // This should not happen as AppWrapper is always rendered within the provider.
+    throw new Error('SettingsContext is not available');
+  }
+  const { settings } = settingsContext;
+
   return (
     <KeypressProvider
       kittyProtocolEnabled={kittyProtocolStatus.enabled}
@@ -122,7 +139,7 @@ export const AppWrapper = (props: AppProps) => {
       debugKeystrokeLogging={props.settings.merged.debugKeystrokeLogging}
     >
       <SessionStatsProvider>
-        <VimModeProvider settings={props.settings}>
+        <VimModeProvider settings={settings}>
           <App {...props} />
         </VimModeProvider>
       </SessionStatsProvider>
@@ -130,19 +147,27 @@ export const AppWrapper = (props: AppProps) => {
   );
 };
 
-const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
+const App = ({ config, startupWarnings = [], version }: AppProps) => {
+  const { t } = useTranslation(['ui', 'messages']);
   const isFocused = useFocus();
   useBracketedPaste();
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
   const { stdout } = useStdout();
   const nightly = version.includes('nightly');
   const { history, addItem, clearItems, loadHistory } = useHistory();
+  const settingsContext = useContext(SettingsContext);
+  if (!settingsContext) {
+    // This should not happen as App is always rendered within the provider.
+    throw new Error('SettingsContext is not available');
+  }
+  const { settings } = settingsContext;
 
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
   const currentIDE = config.getIdeClient().getCurrentIde();
   useEffect(() => {
     registerCleanup(() => config.getIdeClient().disconnect());
   }, [config]);
+  
   const shouldShowIdePrompt =
     currentIDE &&
     !config.getIdeMode() &&
@@ -263,13 +288,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     openThemeDialog,
     handleThemeSelect,
     handleThemeHighlight,
-  } = useThemeCommand(settings, setThemeError, addItem);
+  } = useThemeCommand(setThemeError, addItem);
 
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
 
-  const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
-    useFolderTrust(settings, setIsTrustedFolder);
+  const { isFolderTrustDialogOpen, handleFolderTrustSelect } = useFolderTrust(
+    settings,
+    setIsTrustedFolder,
+  );
 
   const {
     isAuthDialogOpen,
@@ -307,7 +334,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     openEditorDialog,
     handleEditorSelect,
     exitEditorDialog,
-  } = useEditorSettings(settings, setEditorError, addItem);
+  } = useEditorSettings(setEditorError, addItem);
 
   const toggleCorgiMode = useCallback(() => {
     setCorgiMode((prev) => !prev);
@@ -317,7 +344,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     addItem(
       {
         type: MessageType.INFO,
-        text: 'Refreshing hierarchical memory (GEMINI.md or other context files)...',
+        text: t('messages:memory.refreshing'),
       },
       Date.now(),
     );
@@ -342,7 +369,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       addItem(
         {
           type: MessageType.INFO,
-          text: `Memory refreshed successfully. ${memoryContent.length > 0 ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).` : 'No memory content found.'}`,
+          text: memoryContent.length > 0 
+            ? t('messages:memory.refreshedSuccess', { characters: memoryContent.length, fileCount })
+            : t('messages:memory.refreshedEmpty'),
         },
         Date.now(),
       );
@@ -356,13 +385,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       addItem(
         {
           type: MessageType.ERROR,
-          text: `Error refreshing memory: ${errorMessage}`,
+          text: t('messages:memory.refreshError', { error: errorMessage }),
         },
         Date.now(),
       );
       console.error('Error refreshing memory:', error);
     }
-  }, [config, addItem, settings.merged]);
+  }, [config, addItem, settings.merged, t]);
 
   // Watch for model changes (e.g., from Flash fallback)
   useEffect(() => {
@@ -909,8 +938,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   // enough but not too large to make the terminal hard to use.
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
   const placeholder = vimModeEnabled
-    ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
-    : '  Type your message or @path/to/file';
+    ? t('input.vimPlaceholder')
+    : t('input.defaultPlaceholder');
 
   return (
     <StreamingContext.Provider value={streamingState}>
@@ -930,12 +959,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           key={staticKey}
           items={[
             <Box flexDirection="column" key="header">
-              {!(settings.merged.hideBanner || config.getScreenReader()) && (
+              {!settings.merged.hideBanner && (
                 <Header version={version} nightly={nightly} />
               )}
-              {!(settings.merged.hideTips || config.getScreenReader()) && (
-                <Tips config={config} />
-              )}
+              {!settings.merged.hideTips && <Tips config={config} />}
             </Box>,
             ...history.map((h) => (
               <HistoryItemDisplay
@@ -998,10 +1025,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               onComplete={handleIdePromptComplete}
             />
           ) : isFolderTrustDialogOpen ? (
-            <FolderTrustDialog
-              onSelect={handleFolderTrustSelect}
-              isRestarting={isRestarting}
-            />
+            <FolderTrustDialog onSelect={handleFolderTrustSelect} />
           ) : shellConfirmationRequest ? (
             <ShellConfirmationDialog request={shellConfirmationRequest} />
           ) : confirmationRequest ? (
@@ -1011,8 +1035,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 <RadioButtonSelect
                   isFocused={!!confirmationRequest}
                   items={[
-                    { label: 'Yes', value: true },
-                    { label: 'No', value: false },
+                    { label: t('ui:buttons.yes'), value: true },
+                    { label: t('ui:buttons.no'), value: false },
                   ]}
                   onSelect={(value: boolean) => {
                     confirmationRequest.onConfirm(value);
@@ -1102,14 +1126,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               <LoadingIndicator
                 thought={
                   streamingState === StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.disableLoadingPhrases ||
-                  config.getScreenReader()
+                  config.getAccessibility()?.disableLoadingPhrases
                     ? undefined
                     : thought
                 }
                 currentLoadingPhrase={
-                  config.getAccessibility()?.disableLoadingPhrases ||
-                  config.getScreenReader()
+                  config.getAccessibility()?.disableLoadingPhrases
                     ? undefined
                     : currentLoadingPhrase
                 }
@@ -1162,14 +1184,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   )}
                   {ctrlCPressedOnce ? (
                     <Text color={Colors.AccentYellow}>
-                      Press Ctrl+C again to exit.
+                      {t('ui:prompts.pressCtrlCToExit')}
                     </Text>
                   ) : ctrlDPressedOnce ? (
                     <Text color={Colors.AccentYellow}>
-                      Press Ctrl+D again to exit.
+                      {t('ui:prompts.pressCtrlDToExit')}
                     </Text>
                   ) : showEscapePrompt ? (
-                    <Text color={Colors.Gray}>Press Esc again to clear.</Text>
+                    <Text color={Colors.Gray}>{t('ui:prompts.pressEscToClear')}</Text>
                   ) : (
                     <ContextSummaryDisplay
                       ideContext={ideContextState}

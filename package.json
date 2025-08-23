@@ -92,7 +92,9 @@
   },
   "dependencies": {
     "@lvce-editor/ripgrep": "^2.1.0",
+    "i18next": "^25.3.6",
     "node-fetch": "^3.3.2",
+    "react-i18next": "^15.6.1",
     "strip-ansi": "^7.1.0"
   },
   "optionalDependencies": {

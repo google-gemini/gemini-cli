@@ -1,0 +1,69 @@
+{
+  "auth": {
+    "title": "Get started",
+    "description": "How would you like to authenticate for this project?",
+    "instructions": "(Use Enter to select)",
+    "terms": "Terms of Services and Privacy Notice for Gemini CLI",
+    "termsUrl": "https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md",
+    "options": {
+      "google": "Login with Google",
+      "cloudShell": "Use Cloud Shell user credentials", 
+      "geminiKey": "Use Gemini API Key",
+      "vertexAI": "Vertex AI"
+    },
+    "errors": {
+      "invalidAuthType": "Invalid value for GEMINI_DEFAULT_AUTH_TYPE: \"{{value}}\". Valid values are: {{validValues}}.",
+      "existingApiKey": "Existing API key detected (GEMINI_API_KEY). Select \"Gemini API Key\" option to use it.",
+      "authRequired": "You must select an auth method to proceed. Press Ctrl+C twice to exit."
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "applyTo": "Apply To",
+    "instructions": "(Use Enter to select, Tab to change focus)",
+    "restartPrompt": "To see changes, Gemini CLI must be restarted. Press r to exit and apply changes now."
+  },
+  "folderTrust": {
+    "title": "Do you trust this folder?",
+    "description": "Trusting a folder allows Gemini to execute commands it suggests. This is a security feature to prevent accidental execution in untrusted directories.",
+    "options": {
+      "trustFolder": "Trust folder",
+      "trustParent": "Trust parent folder",
+      "dontTrust": "Don't trust (esc)"
+    }
+  },
+  "shellConfirm": {
+    "title": "Shell Command Execution",
+    "description": "A custom command wants to run the following shell commands:",
+    "question": "Do you want to proceed?",
+    "options": {
+      "allowOnce": "Yes, allow once",
+      "allowAlways": "Yes, allow always for this session",
+      "cancel": "No (esc)"
+    }
+  },
+  "theme": {
+    "title": "Select Theme",
+    "preview": "Preview",
+    "applyTo": "Apply To",
+    "instructions": "(Use Enter to select{{tabInstruction}})",
+    "tabInstruction": ", Tab to change focus"
+  },
+  "editor": {
+    "title": "Select Editor",
+    "applyTo": "Apply To",
+    "preference": "Editor Preference",
+    "instructions": "(Use Enter to select, Tab to change focus)",
+    "description": "These editors are currently supported. Please note that some editors cannot be used in sandbox mode.",
+    "currentPreference": "Your preferred editor is: {{editor}}.",
+    "scopeMessages": {
+      "alsoModified": "(Also modified in {{scope}})",
+      "modified": "(Modified in {{scope}})"
+    },
+    "scopes": {
+      "user": "User Settings",
+      "workspace": "Workspace Settings"
+    },
+    "none": "None"
+  }
+}

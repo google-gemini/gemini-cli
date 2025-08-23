@@ -1,0 +1,216 @@
+{
+  "footer": {
+    "noSandbox": "sin sandbox",
+    "seeDocsHint": "(ver /docs)",
+    "untrusted": "no confiable"
+  },
+  "input": {
+    "defaultPlaceholder": "  Escribe tu mensaje o @ruta/al/archivo",
+    "vimPlaceholder": "  Presiona 'i' para modo INSERTAR y 'Esc' para modo NORMAL."
+  },
+  "about": {
+    "title": "Acerca de Gemini CLI",
+    "cliVersion": "Versión CLI",
+    "gitCommit": "Commit Git",
+    "model": "Modelo",
+    "sandbox": "Sandbox",
+    "os": "SO",
+    "authMethod": "Método de autenticación",
+    "gcpProject": "Proyecto GCP",
+    "ideClient": "Cliente IDE"
+  },
+  "sessionSummary": {
+    "title": "Agente cerrándose. ¡Hasta la vista!",
+    "interactionSummary": "Resumen de interacciones",
+    "performance": "Rendimiento",
+    "sessionId": "ID de sesión:",
+    "toolCalls": "Llamadas a herramientas:",
+    "successRate": "Tasa de éxito:",
+    "wallTime": "Tiempo total:",
+    "agentActive": "Agente activo:",
+    "apiTime": "Tiempo API:",
+    "toolTime": "Tiempo herramientas:",
+    "modelUsage": "Uso del modelo",
+    "reqs": "Sol",
+    "inputTokens": "Tokens de entrada", 
+    "outputTokens": "Tokens de salida"
+  },
+  "errors": {
+    "unknownCommand": "Comando desconocido: {{command}}"
+  },
+  "loading": {
+    "waitingForConfirmation": "Esperando confirmación del usuario...",
+    "phrases": [
+      "Sintiéndome con suerte",
+      "Enviando excelencia...",
+      "Entregando serifas...", 
+      "Navegando el limo viscoso...",
+      "Consultando espíritus digitales...",
+      "Reticulando splines...",
+      "Calentando hámsters IA...",
+      "Consultando la concha mágica...",
+      "Generando réplica ingeniosa...",
+      "Puliendo algoritmos...",
+      "No apresures la perfección (ni mi código)...",
+      "Infundiendo bytes frescos...",
+      "Contando electrones...",
+      "Activando procesadores cognitivos...",
+      "Verificando errores de sintaxis en el universo...",
+      "Un momento, optimizando humor...",
+      "Mezclando punchlines...",
+      "Desenredando redes neuronales...",
+      "Compilando brillantez...",
+      "Cargando mente.exe...",
+      "Invocando la nube de sabiduría...",
+      "Preparando respuesta ingeniosa...",
+      "Solo un segundo, depurando la realidad..."
+    ]
+  },
+  "context": {
+    "using": "Usando:",
+    "file": "archivo",
+    "files": "archivos",
+    "openFile": "archivo abierto",
+    "openFiles": "archivos abiertos",
+    "viewHint": "(ctrl+g para ver)"
+  },
+  "tips": {
+    "title": "Consejos para empezar:",
+    "tip1": "Haz preguntas, edita archivos o ejecuta comandos.",
+    "tip2": "Sé específico para mejores resultados.",
+    "tip3Before": "Crea",
+    "tip3After": "archivos para personalizar tus interacciones con Gemini.",
+    "tip4": "para más información."
+  },
+  "auth": {
+    "timeout": "Tiempo de autenticación agotado. Por favor, inténtalo de nuevo.",
+    "waiting": "Esperando autenticación... (Presiona ESC o CTRL+C para cancelar)"
+  },
+  "contextUsage": {
+    "remaining": "{{percent}}% de contexto restante"
+  },
+  "modelStats": {
+    "title": "Estadísticas del modelo para nerds",
+    "noApiCalls": "No se realizaron llamadas a la API en esta sesión.",
+    "metric": "Métrica",
+    "sections": {
+      "api": "API",
+      "tokens": "Tokens"
+    },
+    "metrics": {
+      "requests": "Solicitudes",
+      "errors": "Errores",
+      "avgLatency": "Latencia prom.",
+      "total": "Total",
+      "prompt": "Prompt",
+      "cached": "En caché",
+      "thoughts": "Pensamientos",
+      "tool": "Herramienta",
+      "output": "Salida"
+    }
+  },
+  "prompts": {
+    "pressEscToClear": "Presiona Esc de nuevo para limpiar.",
+    "pressEscToExit": "Presiona Esc para salir.",
+    "pressEnterToChoose": "Presiona Enter para elegir una opción y salir.",
+    "pressCtrlCToExit": "Presiona Ctrl+C de nuevo para salir.",
+    "pressCtrlDToExit": "Presiona Ctrl+D de nuevo para salir.",
+    "ctrlOForDetails": "(ctrl+o para detalles)",
+    "escToDisable": " (esc para deshabilitar)"
+  },
+  "status": {
+    "loading": "Cargando...",
+    "codeBeingWritten": "... código siendo escrito ...",
+    "generatingMore": "... generando más ...",
+    "loadingSuggestions": "Cargando sugerencias...",
+    "noDiffContent": "Sin contenido de diferencias.",
+    "noChangesDetected": "No se detectaron cambios."
+  },
+  "stats": {
+    "noToolCalls": "No se realizaron llamadas a herramientas en esta sesión.",
+    "toolName": "Nombre de herramienta",
+    "calls": "Llamadas",
+    "successRate": "Tasa de éxito",
+    "avgDuration": "Duración prom.",
+    "userDecisionSummary": "Resumen de decisiones del usuario",
+    "totalReviewedSuggestions": "Total de sugerencias revisadas:",
+    "accepted": "» Aceptadas:",
+    "rejected": "» Rechazadas:",
+    "modified": "» Modificadas:",
+    "overallAgreementRate": "Tasa de acuerdo general:",
+    "savingsHighlight": "Aspectos destacados de ahorros:"
+  },
+  "tools": {
+    "modifyInProgress": "Modificación en progreso: ",
+    "urlsToFetch": "URLs a obtener:",
+    "mcpServer": "Servidor MCP: {{serverName}}",
+    "tool": "Herramienta: {{toolName}}"
+  },
+  "debug": {
+    "consoleTitle": "Consola de depuración",
+    "closeHint": "(ctrl+o para cerrar)",
+    "renders": "Renders: {{count}}"
+  },
+  "buttons": {
+    "yes": "Sí",
+    "no": "No",
+    "cancel": "Cancelar",
+    "allow": "Permitir",
+    "deny": "Denegar",
+    "continue": "Continuar",
+    "exit": "Salir"
+  },
+  "confirmations": {
+    "yesAllowOnce": "Sí, permitir una vez",
+    "yesAllowAlways": "Sí, permitir siempre",
+    "noEsc": "No (esc)",
+    "modifyWithExternalEditor": "Modificar con editor externo",
+    "noSuggestChanges": "No, sugerir cambios (esc)",
+    "yesAllowAlwaysEllipsis": "Sí, permitir siempre...",
+    "noDontAskAgain": "No, no preguntar de nuevo",
+    "yesAllowToolFromServer": "Sí, permitir siempre la herramienta \"{{toolName}}\" del servidor \"{{serverName}}\"",
+    "yesAllowAllToolsFromServer": "Sí, permitir siempre todas las herramientas del servidor \"{{serverName}}\""
+  },
+  "chat": {
+    "noCheckpoints": "No se encontraron puntos de control de conversación guardados.",
+    "missingTagSave": "Etiqueta faltante. Uso: /chat save <etiqueta>",
+    "missingTagResume": "Etiqueta faltante. Uso: /chat resume <etiqueta>",
+    "missingTagDelete": "Etiqueta faltante. Uso: /chat delete <etiqueta>",
+    "noClientAvailable": "No hay cliente de chat disponible para guardar la conversación.",
+    "checkpointSaved": "Punto de control de conversación guardado con etiqueta: {{tag}}.",
+    "noConversationFound": "No se encontró conversación para guardar.",
+    "noCheckpointFound": "No se encontró punto de control guardado con etiqueta: {{tag}}.",
+    "checkpointDeleted": "El punto de control de conversación '{{tag}}' ha sido eliminado.",
+    "deleteError": "Error: No se encontró punto de control con etiqueta '{{tag}}'."
+  },
+  "copy": {
+    "noHistory": "No hay salida en el historial",
+    "copySuccess": "Última salida copiada al portapapeles",
+    "copyError": "Error al copiar al portapapeles.",
+    "noTextToCopy": "La última salida de IA no contiene texto para copiar."
+  },
+  "ide": {
+    "connected": "🟢 Conectado a {{ideName}}",
+    "connecting": "🟡 Conectando...",
+    "disconnected": "🔴 Desconectado",
+    "disconnectedWithDetails": "🔴 Desconectado: {{details}}",
+    "noInstaller": "No hay instalador disponible para {{ideName}}. Por favor instale manualmente la extensión '{{extensionName}}' desde el marketplace.",
+    "installing": "Instalando compañero IDE...",
+    "installSuccess": "Instalación exitosa.",
+    "installFailed": "Error en la instalación."
+  },
+  "mcp": {
+    "configNotLoaded": "Configuración no cargada.",
+    "toolRegistryError": "No se pudo obtener el registro de herramientas.",
+    "noServersConfigured": "No hay servidores MCP configurados. Por favor vea la documentación MCP en su navegador: {{docsUrl}} o use el comando /docs",
+    "noOAuthServers": "No hay servidores MCP configurados con autenticación OAuth.",
+    "oauthServersList": "Servidores MCP con autenticación OAuth:\n{{serverList}}\n\nUse /mcp auth <nombre-servidor> para autenticar.",
+    "serverNotFound": "Servidor MCP '{{serverName}}' no encontrado.",
+    "startingAuth": "Iniciando autenticación OAuth para el servidor MCP '{{serverName}}'...",
+    "authSuccess": "✅ ¡Autenticación exitosa con el servidor MCP '{{serverName}}'!",
+    "rediscoveringTools": "Redescubriendo herramientas desde '{{serverName}}'...",
+    "authAndToolsSuccess": "Autenticación exitosa y herramientas actualizadas para '{{serverName}}'.",
+    "authError": "Error de autenticación para el servidor MCP '{{serverName}}'.",
+    "restartingServers": "Reiniciando servidores MCP..."
+  }
+}

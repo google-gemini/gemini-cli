@@ -1,0 +1,109 @@
+{
+  "lang": {
+    "description": "Cambiar el idioma de la interfaz",
+    "usage": "Uso: /lang [en|zh|fr|es|current]",
+    "currentLanguage": "Idioma actual: {{language}}",
+    "languageChanged": "Idioma cambiado a {{language}}",
+    "invalidLanguage": "Idioma inválido: {{language}}. Disponibles: en, zh, fr, es",
+    "availableLanguages": "Idiomas disponibles: {{languages}}"
+  },
+  "auth": {
+    "description": "Configurar el método de autenticación",
+    "openingDialog": "Abriendo diálogo de autenticación..."
+  },
+  "settings": {
+    "description": "Abrir la configuración de ajustes",
+    "openingDialog": "Abriendo diálogo de configuración..."
+  },
+  "help": {
+    "description": "Mostrar información de ayuda",
+    "showingHelp": "Mostrando ayuda en {{language}}"
+  },
+  "chat": {
+    "list": "Listar puntos de control de conversación guardados",
+    "save": "Guardar la conversación actual. Uso: /chat save <etiqueta>",
+    "resume": "Reanudar una conversación desde un punto de control. Uso: /chat resume <etiqueta>",
+    "delete": "Eliminar un punto de control de conversación. Uso: /chat delete <etiqueta>"
+  },
+  "ide": {
+    "description": "gestionar la integración del IDE",
+    "status": "verificar el estado de la integración del IDE",
+    "install": "instalar el compañero del IDE requerido",
+    "enable": "habilitar la integración del IDE", 
+    "disable": "deshabilitar la integración del IDE"
+  },
+  "directory": {
+    "description": "gestionar directorios del espacio de trabajo",
+    "add": "Agregar directorios al espacio de trabajo. Use comas para separar rutas",
+    "show": "Mostrar todos los directorios en el espacio de trabajo"
+  },
+  "mcp": {
+    "description": "gestionar servidores MCP",
+    "list": "Listar servidores MCP configurados y herramientas",
+    "auth": "Autenticarse con un servidor MCP habilitado para OAuth",
+    "refresh": "Actualizar la lista de servidores MCP y herramientas"
+  },
+  "memory": {
+    "description": "gestionar la memoria de conversación",
+    "show": "Mostrar el contenido actual de la memoria",
+    "add": "Agregar contenido a la memoria",
+    "refresh": "Actualizar la memoria desde la fuente"
+  },
+  "stats": {
+    "description": "mostrar estadísticas de la sesión",
+    "model": "Mostrar estadísticas de uso específicas del modelo",
+    "tools": "Mostrar estadísticas de uso específicas de herramientas"
+  },
+  "descriptions": {
+    "about": "mostrar información de la versión",
+    "auth": "cambiar el método de autenticación",
+    "help": "Mostrar información de ayuda",
+    "settings": "Configurar ajustes de la aplicación",
+    "bug": "enviar un informe de error",
+    "chat": "Gestionar historial de conversaciones.",
+    "clear": "limpiar la pantalla e historial de conversaciones",
+    "compress": "Comprime el contexto reemplazándolo con un resumen.",
+    "copy": "Copiar el último resultado o fragmento de código al portapapeles",
+    "corgi": "Activar/desactivar el modo corgi.",
+    "docs": "Abrir documentación en tu navegador",
+    "directory": "Cambiar el directorio de trabajo", 
+    "editor": "Configurar ajustes del editor externo",
+    "extensions": "Gestionar extensiones",
+    "help": "Mostrar información de ayuda",
+    "ide": "Configurar integración del IDE",
+    "init": "Inicializar un nuevo proyecto",
+    "lang": "Cambiar idioma de la interfaz / Switch interface language",
+    "mcp": "Gestionar servidores MCP",
+    "memory": "Gestionar memoria de conversación",
+    "privacy": "Mostrar información de privacidad",
+    "quit": "Salir de la aplicación",
+    "restore": "Restaurar desde respaldo",
+    "settings": "Configurar ajustes de la aplicación",
+    "stats": "Mostrar estadísticas de la sesión", 
+    "theme": "Cambiar tema de color",
+    "tools": "Mostrar herramientas disponibles",
+    "vim": "Activar/desactivar modo Vim",
+    "setup-github": "Configurar GitHub Actions",
+    "terminal-setup": "Configurar atajos de teclado del terminal para entrada multilínea (VS Code, Cursor, Windsurf)"
+  },
+  "tools": {
+    "title": "Herramientas Gemini CLI disponibles:",
+    "noTools": "No hay herramientas disponibles",
+    "registryError": "No se pudo recuperar el registro de herramientas."
+  },
+  "extensions": {
+    "title": "Extensiones activas:",
+    "noExtensions": "No hay extensiones activas."
+  },
+  "copy": {
+    "failed": "Error al copiar al portapapeles."
+  },
+  "compress": {
+    "failed": "Error al comprimir el historial de conversación.",
+    "failedWithError": "Error al comprimir el historial de conversación: {{error}}",
+    "alreadyInProgress": "Compresión ya en progreso, espere a que termine la solicitud anterior"
+  },
+  "mcp": {
+    "authFailed": "Error al autenticarse con el servidor MCP '{{serverName}}': {{error}}"
+  }
+}

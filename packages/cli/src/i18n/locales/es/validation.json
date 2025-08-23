@@ -1,0 +1,39 @@
+{
+  "required": {
+    "pathToAdd": "Por favor proporcione al menos una ruta para agregar.",
+    "tagForSave": "Falta etiqueta. Uso: /chat save <etiqueta>",
+    "tagForResume": "Falta etiqueta. Uso: /chat resume <etiqueta>",
+    "tagForDelete": "Falta etiqueta. Uso: /chat delete <etiqueta>",
+    "memoryUsage": "Uso: /memory add <texto para recordar>"
+  },
+  "notFound": {
+    "checkpoints": "No se encontraron puntos de control de conversación guardados.",
+    "checkpoint": "No se encontró punto de control guardado con etiqueta: {{tag}}.",
+    "conversation": "No se encontró conversación para guardar.",
+    "toolRegistry": "No se pudo obtener el registro de herramientas.",
+    "readManyFilesTool": "Error: herramienta read_many_files no encontrada.",
+    "restorableToolCalls": "No se encontraron llamadas de herramienta restaurables.",
+    "fileNotFound": "Archivo no encontrado: {{filename}}"
+  },
+  "browser": {
+    "openDocs": "Por favor abra la siguiente URL en su navegador para ver la documentación:\n{{url}}",
+    "openingDocs": "Abriendo documentación en su navegador: {{url}}",
+    "openBugReport": "Para enviar su reporte de error, por favor abra la siguiente URL en su navegador:\n{{url}}",
+    "openFailed": "No se pudo abrir URL en el navegador: {{error}}"
+  },
+  "commands": {
+    "invalidAtCommand": "Error: Comando @ inválido '{{command}}'. No se especificó ruta.",
+    "unknownCommand": "Comando desconocido: {{command}}",
+    "geminiDirectoryPath": "No se pudo determinar la ruta del directorio .gemini."
+  },
+  "theme": {
+    "noColorEnv": "Configuración de tema no disponible debido a la variable de entorno NO_COLOR."
+  },
+  "ide": {
+    "noInstaller": "No hay instalador disponible para {{ide}}. Por favor instale la extensión '{{extensionName}}' manualmente desde el marketplace."
+  },
+  "system": {
+    "unexpectedError": "Ocurrió un error inesperado: {{error}}",
+    "installationFailed": "La instalación falló."
+  }
+}
