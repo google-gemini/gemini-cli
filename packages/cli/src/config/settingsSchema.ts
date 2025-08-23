@@ -564,6 +564,15 @@ export const SETTINGS_SCHEMA = {
       'Enable AI-powered prompt completion suggestions while typing.',
     showInDialog: true,
   },
+  debugKeystrokeLogging: {
+    type: 'boolean',
+    label: 'Debug Keystroke Logging',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Enable debug logging of keystrokes to the console.',
+    showInDialog: true,
+  },
 } as const;
 
 type InferSettings<T extends SettingsSchema> = {
