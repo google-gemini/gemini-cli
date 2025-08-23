@@ -79,38 +79,46 @@ export function useCommandCompletion(
   const cursorRow = buffer.cursor[0];
   const cursorCol = buffer.cursor[1];
 
+  // Memoized map for O(1) command lookups
+  const slashCommandMap = useMemo(() => {
+    const map = new Map<string, SlashCommand>();
+    for (const cmd of slashCommands) {
+      map.set(cmd.name, cmd);
+      cmd.altNames?.forEach(alt => map.set(alt, cmd));
+    }
+    return map;
+  }, [slashCommands]);
+
   // Helper function to check if a command is a custom command (from .toml files)
   const isCustomCommand = useCallback((commandLine: string): boolean => {
     if (!isSlashCommand(commandLine)) return false;
     
-    // Extract command name from the line (remove leading '/' and any arguments)
-    const commandName = commandLine.trim().substring(1).split(' ')[0];
+    // Extract command name with robust regex parsing
+    const match = commandLine.trim().match(/^\/([^\s]+)/);
+    const commandName = match ? match[1] : '';
     if (!commandName) return false;
     
-    // Look up the command in slashCommands array
-    const command = slashCommands.find(cmd => 
-      cmd.name === commandName || cmd.altNames?.includes(commandName)
-    );
-    
+    // O(1) lookup in memoized map
+    const command = slashCommandMap.get(commandName);
     return command?.kind === CommandKind.FILE;
-  }, [slashCommands]);
+  }, [slashCommandMap]);
 
   const { completionMode, query, completionStart, completionEnd } =
     useMemo(() => {
       const currentLine = buffer.lines[cursorRow] || '';
       
-      if (cursorRow === 0 && isSlashCommand(currentLine.trim())) {
-        // For custom commands, allow fall-through to check for @ symbols
-        // For built-in commands, return SLASH mode immediately (preserve existing behavior)
-        if (!isCustomCommand(currentLine.trim())) {
-          return {
-            completionMode: CompletionMode.SLASH,
-            query: currentLine,
-            completionStart: 0,
-            completionEnd: currentLine.length,
-          };
-        }
-        // For custom commands, we'll still set SLASH mode but continue checking for @ symbols below
+      // Determine command type once at the beginning for efficiency
+      const isSlashCmd = cursorRow === 0 && isSlashCommand(currentLine.trim());
+      const isCustomCmd = isSlashCmd && isCustomCommand(currentLine.trim());
+      
+      if (isSlashCmd && !isCustomCmd) {
+        // Built-in commands: return SLASH mode immediately (preserve existing behavior)
+        return {
+          completionMode: CompletionMode.SLASH,
+          query: currentLine,
+          completionStart: 0,
+          completionEnd: currentLine.length,
+        };
       }
 
       const codePoints = toCodePoints(currentLine);
@@ -171,7 +179,7 @@ export function useCommandCompletion(
       }
 
       // Check if this is a custom command that didn't match @ completion
-      if (cursorRow === 0 && isCustomCommand(currentLine.trim())) {
+      if (isCustomCmd) {
         return {
           completionMode: CompletionMode.SLASH,
           query: currentLine,
