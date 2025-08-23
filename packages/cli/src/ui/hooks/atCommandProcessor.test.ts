@@ -13,6 +13,8 @@ import {
   ReadManyFilesTool,
   StandardFileSystemService,
   ToolRegistry,
+  COMMON_IGNORE_PATTERNS,
+  DEFAULT_FILE_EXCLUDES,
 } from '@google/gemini-cli-core';
 import * as os from 'os';
 import { ToolCallStatus } from '../types.js';
@@ -69,6 +71,13 @@ describe('handleAtCommand', () => {
         getPromptsByServer: () => [],
       }),
       getDebugMode: () => false,
+      getFileExclusions: () => ({
+        getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
+        getDefaultExcludePatterns: () => DEFAULT_FILE_EXCLUDES,
+        getGlobExcludes: () => COMMON_IGNORE_PATTERNS,
+        buildExcludePatterns: () => DEFAULT_FILE_EXCLUDES,
+        getReadManyFilesExcludes: () => DEFAULT_FILE_EXCLUDES,
+      }),
       getUsageStatisticsEnabled: () => false,
     } as unknown as Config;
 
