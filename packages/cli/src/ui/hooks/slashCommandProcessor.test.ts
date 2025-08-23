@@ -27,6 +27,7 @@ vi.mock('node:process', () => {
   const mockProcess: Partial<NodeJS.Process> = {
     exit: mockProcessExit,
     platform: 'sunos',
+    cwd: () => '/fake/dir',
   } as unknown as NodeJS.Process;
   return {
     ...mockProcess,
