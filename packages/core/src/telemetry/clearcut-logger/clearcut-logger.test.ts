@@ -542,7 +542,8 @@ describe('ClearcutLogger', () => {
       ) as { event_id: string };
       expect(firstRequeuedEvent.event_id).toBe('failed_5');
     });
-//asdf
+  });
+});
 
 function encodeVarint(value: number): Buffer {
   const bytes: number[] = [];
@@ -572,7 +573,7 @@ describe('decodeLogResponse', () => {
     expect(result).toEqual({ nextRequestWaitMs: 123 });
   });
 
-  it('thorws for empty buffer', () => {
+  it('throws for empty buffer', () => {
     expect(() => logger.decodeLogResponse(Buffer.alloc(0))).toThrow(
       ClearcutDecodeError,
     );
@@ -584,7 +585,7 @@ describe('decodeLogResponse', () => {
     );
   });
 
-  it('thorws for unterminated varint', () => {
+  it('throws for unterminated varint', () => {
     const buf = Buffer.from([8, 0x80]);
     expect(() => logger.decodeLogResponse(buf)).toThrow(ClearcutDecodeError);
   });
@@ -594,4 +595,3 @@ describe('decodeLogResponse', () => {
     expect(() => logger.decodeLogResponse(buf)).toThrow(ClearcutDecodeError);
   });
 });
-  

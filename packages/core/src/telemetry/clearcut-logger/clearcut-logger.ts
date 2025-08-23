@@ -322,19 +322,6 @@ export class ClearcutLogger {
       this.flushToClearcut().catch((error) => {
         if (this.config?.getDebugMode()) {
           console.debug('Error in pending flush to Clearcut:', error);
-        // Add the events back to the front of the queue to be retried.
-        this.events.unshift(...eventsToSend);
-        reject(e);
-      });
-      req.end(body);
-    })
-      .then((buf: Buffer) => {
-        try {
-          this.last_flush_time = Date.now();
-          return this.decodeLogResponse(buf);
-        } catch (error: unknown) {
-          console.error('Error flushing log events:', error);
-          return {};
         }
       });
     }
@@ -410,11 +397,6 @@ export class ClearcutLogger {
       },
       {
         gemini_cli_key:
-          EventMetadataKey.GEMINI_CLI_START_SESSION_VERTEX_API_ENABLED,
-        value: event.vertex_ai_enabled.toString(),
-      },
-      {
-        gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_DEBUG_MODE_ENABLED,
         value: event.debug_enabled.toString(),
       },
@@ -426,11 +408,6 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MCP_SERVERS,
         value: event.mcp_servers,
-      },
-      {
-        gemini_cli_key:
-          EventMetadataKey.GEMINI_CLI_START_SESSION_VERTEX_API_ENABLED,
-        value: event.vertex_ai_enabled.toString(),
       },
       {
         gemini_cli_key:
