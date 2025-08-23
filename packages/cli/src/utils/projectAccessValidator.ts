@@ -5,7 +5,7 @@
  */
 
 import { OAuth2Client } from 'google-auth-library';
-import { getOauthClient } from '@google/gemini-cli-core';
+import { getOauthClient, clearCachedCredentialFile, clearOauthClientCache } from '@google/gemini-cli-core';
 import { AuthType, Config } from '@google/gemini-cli-core';
 
 /**

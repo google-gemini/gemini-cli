@@ -1,4 +1,10 @@
 /**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
  * vitest unit tests for sandbox parsing and safe spawn helpers
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -13,13 +19,14 @@ import {
   validateSandboxMounts,
 } from './sandbox_helpers.js';
 
-vi.mock('node:child_process', () => {
-  return {
-    spawn: vi.fn(() => {
-      return { on: vi.fn(), stdout: { on: vi.fn() }, stderr: { on: vi.fn() }, pid: 12345 };
-    }),
-  };
-});
+vi.mock('node:child_process', () => ({
+  spawn: vi.fn(() => ({
+    on: vi.fn(),
+    stdout: { on: vi.fn() },
+    stderr: { on: vi.fn() },
+    pid: 12345,
+  })),
+}));
 
 describe('sandbox_helpers', () => {
   beforeEach(() => {
@@ -62,8 +69,8 @@ describe('sandbox_helpers', () => {
     expect(safe['PATH']).toBeDefined();
     expect(safe['LANG']).toBe('en_US.UTF-8');
     expect(safe['HOME']).toBe('/home/test');
-    expect((safe as any).LD_PRELOAD).toBeUndefined();
-    expect((safe as any).IFS).toBeUndefined();
+    expect(safe['LD_PRELOAD']).toBeUndefined();
+    expect(safe['IFS']).toBeUndefined();
     expect(safe['S1']).toBe('one');
     expect(safe['GOOD']).toBe('ok');
   });
@@ -72,8 +79,8 @@ describe('sandbox_helpers', () => {
     process.env['GEMINI_SANDBOX_PROXY_COMMAND'] = '/usr/bin/socat "ARG WITH SPACE" -';
     const cp = safeSpawnProxy();
     // spawn must have been called
-    expect((child as any).spawn).toHaveBeenCalled();
-    const call = (child as any).spawn.mock.calls[0];
+    expect(vi.mocked(child.spawn)).toHaveBeenCalled();
+    const call = vi.mocked(child.spawn).mock.calls[0];
     const [cmd, args, opts] = call;
     expect(cmd).toBe('/usr/bin/socat');
     expect(Array.isArray(args)).toBe(true);
@@ -86,8 +93,8 @@ describe('sandbox_helpers', () => {
   it('safeSpawnProxy accepts JSON array form', () => {
     process.env['GEMINI_SANDBOX_PROXY_COMMAND'] = '["/usr/bin/echo", "hello", "world"]';
     const cp = safeSpawnProxy();
-    expect((child as any).spawn).toHaveBeenCalled();
-    const [cmd, args, opts] = (child as any).spawn.mock.calls[0];
+    expect(vi.mocked(child.spawn)).toHaveBeenCalled();
+    const [cmd, args, opts] = vi.mocked(child.spawn).mock.calls[0];
     expect(cmd).toBe('/usr/bin/echo');
     expect(args).toEqual(['hello', 'world']);
     expect(opts.shell).toBe(false);
@@ -111,8 +118,8 @@ describe('Information Disclosure Prevention', () => {
     expect(parsed).toHaveProperty('ANOTHER_SAFE');
     expect(parsed).not.toHaveProperty('GEMINI_API_KEY');
     expect(parsed).not.toHaveProperty('GOOGLE_API_KEY');
-    expect(parsed.SAFE_VAR).toBe('hello');
-    expect(parsed.ANOTHER_SAFE).toBe('test');
+    expect(parsed['SAFE_VAR']).toBe('hello');
+    expect(parsed['ANOTHER_SAFE']).toBe('test');
   });
 
   it('filters sensitive environment variables with pattern matching', () => {
@@ -137,14 +144,14 @@ describe('Information Disclosure Prevention', () => {
     const safe = buildSafeEnv(parent);
 
     // Safe variables should be preserved
-    expect(safe.PATH).toBeDefined();
-    expect(safe.LANG).toBe('en_US.UTF-8');
+    expect(safe['PATH']).toBeDefined();
+    expect(safe['LANG']).toBe('en_US.UTF-8');
 
     // Sensitive variables should be filtered out
-    expect((safe as any).GEMINI_API_KEY).toBeUndefined();
-    expect((safe as any).GOOGLE_API_KEY).toBeUndefined();
-    expect((safe as any).AWS_ACCESS_KEY_ID).toBeUndefined();
-    expect((safe as any).GITHUB_TOKEN).toBeUndefined();
+    expect(safe['GEMINI_API_KEY']).toBeUndefined();
+    expect(safe['GOOGLE_API_KEY']).toBeUndefined();
+    expect(safe['AWS_ACCESS_KEY_ID']).toBeUndefined();
+    expect(safe['GITHUB_TOKEN']).toBeUndefined();
   });
 
   it('validateSandboxMounts allows only safe paths', () => {
@@ -193,15 +200,15 @@ describe('Information Disclosure Prevention', () => {
 
     const safe = buildSafeEnv(parent);
 
-    expect(safe.PATH).toBe('/usr/bin:/bin');
-    expect(safe.LANG).toBe('en_US.UTF-8');
-    expect(safe.HOME).toBe('/home/user');
-    expect(safe.TERM).toBe('xterm-256color');
-    expect(safe.SHELL).toBe('/bin/bash');
-    expect(safe.USER).toBe('testuser');
-    expect(safe.LOGNAME).toBe('testuser');
-    expect(safe.LC_ALL).toBe('en_US.UTF-8');
-    expect(safe.LC_CTYPE).toBe('UTF-8');
+    expect(safe['PATH']).toBe('/usr/bin:/bin');
+    expect(safe['LANG']).toBe('en_US.UTF-8');
+    expect(safe['HOME']).toBe('/home/user');
+    expect(safe['TERM']).toBe('xterm-256color');
+    expect(safe['SHELL']).toBe('/bin/bash');
+    expect(safe['USER']).toBe('testuser');
+    expect(safe['LOGNAME']).toBe('testuser');
+    expect(safe['LC_ALL']).toBe('en_US.UTF-8');
+    expect(safe['LC_CTYPE']).toBe('UTF-8');
   });
 
   it('buildSafeEnv filters out dangerous environment variables', () => {
@@ -216,11 +223,11 @@ describe('Information Disclosure Prevention', () => {
 
     const safe = buildSafeEnv(parent);
 
-    expect(safe.PATH).toBeDefined();
-    expect((safe as any).LD_PRELOAD).toBeUndefined();
-    expect((safe as any).BASH_ENV).toBeUndefined();
-    expect((safe as any).ENV).toBeUndefined();
-    expect((safe as any).IFS).toBeUndefined();
-    expect((safe as any).NODE_OPTIONS).toBeUndefined();
+    expect(safe['PATH']).toBeDefined();
+    expect(safe['LD_PRELOAD']).toBeUndefined();
+    expect(safe['BASH_ENV']).toBeUndefined();
+    expect(safe['ENV']).toBeUndefined();
+    expect(safe['IFS']).toBeUndefined();
+    expect(safe['NODE_OPTIONS']).toBeUndefined();
   });
 });

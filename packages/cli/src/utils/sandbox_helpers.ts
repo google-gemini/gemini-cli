@@ -1,4 +1,10 @@
 /**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
  * Helpers for secure sandbox handling: tokenization, env parsing, safe spawn.
  *
  * These helpers are deliberately conservative:
@@ -266,18 +272,11 @@ export function safeSpawnProxy(): ChildProcess | undefined {
   // Use 'pipe' stdio so tests/integration can observe output
   const cp = spawn(cmd, args, { stdio: 'pipe', shell: false, env: safeEnv });
   cp.on('error', (err) => {
-    // this module is a helper; avoid throwing synchronously
-    // consumer should handle errors/logging as appropriate
-    // eslint-disable-next-line no-console
-    console.error('safeSpawnProxy error:', err);
+          // this module is a helper; avoid throwing synchronously
+      // consumer should handle errors/logging as appropriate
+      console.error('safeSpawnProxy error:', err);
   });
   return cp;
 }
 
-export default {
-  parseCommandString,
-  parseAndFilterSandboxEnv,
-  buildSafeEnv,
-  safeSpawnProxy,
-  validateSandboxMounts,
-};
+// Named exports are preferred over default exports

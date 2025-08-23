@@ -11,7 +11,7 @@ import {
   validateCurrentProjectAccess,
   forceReauthentication,
 } from './projectAccessValidator.js';
-import { AuthType } from '@google/gemini-cli-core';
+import { AuthType, Config } from '@google/gemini-cli-core';
 
 // Mock the OAuth2 client
 vi.mock('google-auth-library', () => ({
@@ -20,10 +20,22 @@ vi.mock('google-auth-library', () => ({
   })),
 }));
 
-// Mock the oauth2 module
-vi.mock('../../core/src/code_assist/oauth2.js', () => ({
-  getOauthClient: vi.fn(),
-  clearCachedCredentialFile: vi.fn(),
+// Mock the core package functions
+const mockGetOauthClient = vi.fn();
+const mockClearCachedCredentialFile = vi.fn();
+const mockClearOauthClientCache = vi.fn();
+
+// Mock the core package
+vi.mock('@google/gemini-cli-core', () => ({
+  getOauthClient: mockGetOauthClient,
+  clearCachedCredentialFile: mockClearCachedCredentialFile,
+  clearOauthClientCache: mockClearOauthClientCache,
+  AuthType: {
+    LOGIN_WITH_GOOGLE: 'LOGIN_WITH_GOOGLE',
+    CLOUD_SHELL: 'CLOUD_SHELL',
+    USE_GEMINI: 'USE_GEMINI',
+  },
+  Config: vi.fn(),
 }));
 
 // Mock fetch for API calls
@@ -40,8 +52,7 @@ describe('Project Access Validation', () => {
     const mockClient = {
       getAccessToken: vi.fn().mockResolvedValue({ token: 'mock-token' }),
     };
-    const { getOauthClient } = require('../../core/src/code_assist/oauth2.js');
-    getOauthClient.mockResolvedValue(mockClient);
+    mockGetOauthClient.mockResolvedValue(mockClient);
   });
 
   afterEach(() => {
@@ -136,7 +147,7 @@ describe('Project Access Validation', () => {
     it('should return true when no project is specified', async () => {
       delete process.env['GOOGLE_CLOUD_PROJECT'];
 
-      const result = await validateCurrentProjectAccess(AuthType.LOGIN_WITH_GOOGLE, {} as any);
+      const result = await validateCurrentProjectAccess(AuthType.LOGIN_WITH_GOOGLE, {} as Config);
       expect(result).toBe(true);
     });
 
@@ -152,7 +163,7 @@ describe('Project Access Validation', () => {
         }),
       });
 
-      const result = await validateCurrentProjectAccess(AuthType.LOGIN_WITH_GOOGLE, {} as any);
+      const result = await validateCurrentProjectAccess(AuthType.LOGIN_WITH_GOOGLE, {} as Config);
       expect(result).toBe(true);
     });
 
@@ -165,25 +176,23 @@ describe('Project Access Validation', () => {
         status: 403,
       });
 
-      const result = await validateCurrentProjectAccess(AuthType.LOGIN_WITH_GOOGLE, {} as any);
+      const result = await validateCurrentProjectAccess(AuthType.LOGIN_WITH_GOOGLE, {} as Config);
       expect(result).toBe(false);
     });
 
     it('should handle authentication errors gracefully', async () => {
       process.env['GOOGLE_CLOUD_PROJECT'] = 'test-project';
 
-      const { getOauthClient } = require('../../core/src/code_assist/oauth2.js');
-      getOauthClient.mockRejectedValue(new Error('Auth failed'));
+      mockGetOauthClient.mockRejectedValue(new Error('Auth failed'));
 
-      const result = await validateCurrentProjectAccess(AuthType.LOGIN_WITH_GOOGLE, {} as any);
+      const result = await validateCurrentProjectAccess(AuthType.LOGIN_WITH_GOOGLE, {} as Config);
       expect(result).toBe(false);
     });
   });
 
   describe('forceReauthentication', () => {
     it('should clear cached credentials and exit with error', async () => {
-      const { clearCachedCredentialFile } = require('../../core/src/code_assist/oauth2.js');
-      clearCachedCredentialFile.mockResolvedValue();
+      mockClearCachedCredentialFile.mockResolvedValue();
 
       // Mock process.exit to avoid actually exiting
       const originalExit = process.exit;
@@ -197,7 +206,7 @@ describe('Project Access Validation', () => {
         expect((error as Error).message).toBe('Process exited');
       }
 
-      expect(clearCachedCredentialFile).toHaveBeenCalled();
+      expect(mockClearCachedCredentialFile).toHaveBeenCalled();
       expect(exitSpy).toHaveBeenCalledWith(1);
 
       // Restore original exit
@@ -205,8 +214,7 @@ describe('Project Access Validation', () => {
     });
 
     it('should handle errors during credential clearing', async () => {
-      const { clearCachedCredentialFile } = require('../../core/src/code_assist/oauth2.js');
-      clearCachedCredentialFile.mockRejectedValue(new Error('Clear failed'));
+      mockClearCachedCredentialFile.mockRejectedValue(new Error('Clear failed'));
 
       const originalExit = process.exit;
       const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {

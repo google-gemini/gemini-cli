@@ -1,4 +1,10 @@
 /**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
  * Integration test: starts a harmless Node process via GEMINI_SANDBOX_PROXY_COMMAND
  * to verify end-to-end proxy spawn works in real world (no mocking).
  *
@@ -7,9 +13,10 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { startSandboxProxyIfConfigured } from './sandbox.js';
+import { ChildProcess } from 'node:child_process';
 
 describe('sandbox integration', () => {
-  let prevEnv: Record<string, string | undefined> = {};
+  const prevEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
     // save relevant env
@@ -31,7 +38,7 @@ describe('sandbox integration', () => {
     expect(cp).toBeDefined();
 
     // collect stdout from child (stdio: pipe)
-    const child = cp as any;
+    const child = cp as ChildProcess;
     let stdout = '';
     if (child.stdout) {
       child.stdout.on('data', (b: Buffer) => {

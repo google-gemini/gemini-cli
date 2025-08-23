@@ -1,4 +1,10 @@
 /**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
  * Safer sandbox entrypoints — minimal wrapper that uses sandbox_helpers.
  *
  * This module intentionally keeps runtime logic small and delegates parsing
@@ -18,7 +24,6 @@ export function startSandboxProxyIfConfigured(): ChildProcess | undefined {
     const cp = helpers.safeSpawnProxy();
     return cp;
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error('Error starting sandbox proxy:', err);
     return undefined;
   }
@@ -28,10 +33,10 @@ export { parseAndFilterSandboxEnv, buildSafeEnv, parseCommandString, safeSpawnPr
 
 // Compatibility export for existing code - maintains the original signature
 export async function start_sandbox(
-  sandboxConfig: any,
-  memoryArgs: string[],
-  config: any,
-  sandboxArgs: string[]
+  _sandboxConfig: unknown,
+  _memoryArgs: string[],
+  _config: unknown,
+  _sandboxArgs: string[]
 ): Promise<void> {
   // For now, just handle the secure proxy functionality
   // This maintains compatibility with existing code while using our secure implementation
