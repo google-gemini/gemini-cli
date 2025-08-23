@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Config, ApprovalMode, ShellTool } from '@google/gemini-cli-core';
+import { Config, ApprovalMode, ShellTool, MemoryToolInvocation, DiscoveredMCPToolInvocation } from '@google/gemini-cli-core';
 
 export interface ToolPermission {
   id: string;
@@ -138,31 +138,26 @@ export class PermissionService {
     const permissions: ToolPermission[] = [];
 
     try {
-      // Access MCP permissions through require since imports don't work properly
-      const mcpModule = require('@google/gemini-cli-core');
-      if (mcpModule.DiscoveredMCPToolInvocation?.getAllowedMcpPermissions) {
-        const allowedPermissions =
-          mcpModule.DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+      const allowedPermissions = DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
 
-        for (const allowlistKey of allowedPermissions) {
-          if (allowlistKey.includes('.')) {
-            // Tool-specific permission
-            const [serverName, toolName] = allowlistKey.split('.');
-            permissions.push({
-              id: allowlistKey,
-              type: 'mcp_tool',
-              name: `${toolName} (${serverName})`,
-              description: `Always allow MCP tool "${toolName}" from server "${serverName}"`,
-            });
-          } else {
-            // Server-wide permission
-            permissions.push({
-              id: allowlistKey,
-              type: 'mcp_server',
-              name: allowlistKey,
-              description: `Always allow all tools from MCP server "${allowlistKey}"`,
-            });
-          }
+      for (const allowlistKey of allowedPermissions) {
+        if (allowlistKey.includes('.')) {
+          // Tool-specific permission
+          const [serverName, toolName] = allowlistKey.split('.');
+          permissions.push({
+            id: allowlistKey,
+            type: 'mcp_tool',
+            name: `${toolName} (${serverName})`,
+            description: `Always allow MCP tool "${toolName}" from server "${serverName}"`,
+          });
+        } else {
+          // Server-wide permission
+          permissions.push({
+            id: allowlistKey,
+            type: 'mcp_server',
+            name: allowlistKey,
+            description: `Always allow all tools from MCP server "${allowlistKey}"`,
+          });
         }
       }
     } catch (error) {
@@ -176,20 +171,15 @@ export class PermissionService {
     const permissions: ToolPermission[] = [];
 
     try {
-      // Access memory permissions through require since imports don't work properly
-      const memoryModule = require('@google/gemini-cli-core');
-      if (memoryModule.MemoryToolInvocation?.getAllowedMemoryPermissions) {
-        const allowedPermissions =
-          memoryModule.MemoryToolInvocation.getAllowedMemoryPermissions();
+      const allowedPermissions = MemoryToolInvocation.getAllowedMemoryPermissions();
 
-        for (const allowlistKey of allowedPermissions) {
-          permissions.push({
-            id: allowlistKey,
-            type: 'memory',
-            name: allowlistKey,
-            description: `Always allow memory operation: ${allowlistKey}`,
-          });
-        }
+      for (const allowlistKey of allowedPermissions) {
+        permissions.push({
+          id: allowlistKey,
+          type: 'memory',
+          name: allowlistKey,
+          description: `Always allow memory operation: ${allowlistKey}`,
+        });
       }
     } catch (error) {
       console.warn('Could not access memory permissions:', error);
@@ -243,10 +233,7 @@ export class PermissionService {
 
   private resetMcpPermissions(): void {
     try {
-      const mcpModule = require('@google/gemini-cli-core');
-      if (mcpModule.DiscoveredMCPToolInvocation?.clearAllMcpPermissions) {
-        mcpModule.DiscoveredMCPToolInvocation.clearAllMcpPermissions();
-      }
+      DiscoveredMCPToolInvocation.clearAllMcpPermissions();
     } catch (error) {
       console.warn('Could not reset MCP permissions:', error);
     }
@@ -254,10 +241,7 @@ export class PermissionService {
 
   private resetMcpPermission(permissionId: string): void {
     try {
-      const mcpModule = require('@google/gemini-cli-core');
-      if (mcpModule.DiscoveredMCPToolInvocation?.revokeMcpPermission) {
-        mcpModule.DiscoveredMCPToolInvocation.revokeMcpPermission(permissionId);
-      }
+      DiscoveredMCPToolInvocation.revokeMcpPermission(permissionId);
     } catch (error) {
       console.warn('Could not reset MCP permission:', error);
     }
@@ -265,10 +249,7 @@ export class PermissionService {
 
   private resetMemoryPermissions(): void {
     try {
-      const memoryModule = require('@google/gemini-cli-core');
-      if (memoryModule.MemoryToolInvocation?.clearAllMemoryPermissions) {
-        memoryModule.MemoryToolInvocation.clearAllMemoryPermissions();
-      }
+      MemoryToolInvocation.clearAllMemoryPermissions();
     } catch (error) {
       console.warn('Could not reset memory permissions:', error);
     }
@@ -276,10 +257,7 @@ export class PermissionService {
 
   private resetMemoryPermission(permissionId: string): void {
     try {
-      const memoryModule = require('@google/gemini-cli-core');
-      if (memoryModule.MemoryToolInvocation?.revokeMemoryPermission) {
-        memoryModule.MemoryToolInvocation.revokeMemoryPermission(permissionId);
-      }
+      MemoryToolInvocation.revokeMemoryPermission(permissionId);
     } catch (error) {
       console.warn('Could not reset memory permission:', error);
     }

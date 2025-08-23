@@ -169,7 +169,7 @@ function computeNewContent(currentContent: string, fact: string): string {
   }
 }
 
-class MemoryToolInvocation extends BaseToolInvocation<
+export class MemoryToolInvocation extends BaseToolInvocation<
   SaveMemoryParams,
   ToolResult
 > {

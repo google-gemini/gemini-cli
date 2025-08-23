@@ -54,7 +54,7 @@ type McpContentBlock =
   | McpResourceBlock
   | McpResourceLinkBlock;
 
-class DiscoveredMCPToolInvocation extends BaseToolInvocation<
+export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ToolParams,
   ToolResult
 > {
