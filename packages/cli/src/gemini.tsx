@@ -15,6 +15,7 @@ import os from 'node:os';
 import dns from 'node:dns';
 import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
+
 import {
   DnsResolutionOrder,
   LoadedSettings,
@@ -47,6 +48,8 @@ import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
+import { loadThemesFromExtensions } from './services/ExtensionLoader.js';
+import { runZedIntegration } from './zed-integration/zedIntegration.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -58,7 +61,6 @@ export function validateDnsResolutionOrder(
   if (order === 'ipv4first' || order === 'verbatim') {
     return order;
   }
-  // We don't want to throw here, just warn and use the default.
   console.warn(
     `Invalid value for dnsResolutionOrder in settings: "${order}". Using default "${defaultValue}".`,
   );
@@ -71,19 +73,15 @@ function getNodeMemoryArgs(config: Config): string[] {
   const currentMaxOldSpaceSizeMb = Math.floor(
     heapStats.heap_size_limit / 1024 / 1024,
   );
-
-  // Set target to 50% of total memory
   const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
   if (config.getDebugMode()) {
     console.debug(
       `Current heap size ${currentMaxOldSpaceSizeMb.toFixed(2)} MB`,
     );
   }
-
   if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
     return [];
   }
-
   if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
     if (config.getDebugMode()) {
       console.debug(
@@ -92,23 +90,19 @@ function getNodeMemoryArgs(config: Config): string[] {
     }
     return [`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`];
   }
-
   return [];
 }
 
 async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
   const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
-
   const child = spawn(process.execPath, nodeArgs, {
     stdio: 'inherit',
     env: newEnv,
   });
-
   await new Promise((resolve) => child.on('close', resolve));
   process.exit(0);
 }
-import { runZedIntegration } from './zed-integration/zedIntegration.js';
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
@@ -119,9 +113,7 @@ CRITICAL: Unhandled Promise Rejection!
 =========================================
 Reason: ${reason}${
       reason instanceof Error && reason.stack
-        ? `
-Stack trace:
-${reason.stack}`
+        ? `\nStack trace:\n${reason.stack}`
         : ''
     }`;
     appEvents.emit(AppEvent.LogError, errorMessage);
@@ -190,6 +182,12 @@ export async function main() {
 
   const argv = await parseArguments();
   const extensions = loadExtensions(workspaceRoot);
+
+  // --- YOUR CODE RUNS FIRST ---
+  // This calls `settings.setValue()` which correctly updates the state.
+  loadThemesFromExtensions(settings);
+  // -----------------------------
+
   const config = await loadCliConfig(
     settings.merged,
     extensions,
@@ -223,7 +221,6 @@ export async function main() {
     process.exit(0);
   }
 
-  // Set a default auth type if one isn't set.
   if (!settings.merged.selectedAuthType) {
     if (process.env['CLOUD_SHELL'] === 'true') {
       settings.setValue(
@@ -243,18 +240,18 @@ export async function main() {
     logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
   }
 
-  // Load custom themes from settings
+  // --- THE ORIGINAL CODE IS RESTORED ---
+  // This line now runs AFTER you have updated the settings correctly.
+  // It will read the updated settings and load all themes.
   themeManager.loadCustomThemes(settings.merged.customThemes);
+  // ----------------------------------------
 
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
-      // If the theme is not found during initial load, log a warning and continue.
-      // The useThemeCommand hook in App.tsx will handle opening the dialog.
       console.warn(`Warning: Theme "${settings.merged.theme}" not found.`);
     }
   }
 
-  // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
     const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
       ? getNodeMemoryArgs(config)
@@ -265,7 +262,6 @@ export async function main() {
         settings.merged.selectedAuthType &&
         !settings.merged.useExternalAuth
       ) {
-        // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
         try {
           const err = validateAuthMethod(settings.merged.selectedAuthType);
           if (err) {
@@ -310,8 +306,6 @@ export async function main() {
       await start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs);
       process.exit(0);
     } else {
-      // Not in a sandbox and not entering one, so relaunch with additional
-      // arguments to control memory usage if needed.
       if (memoryArgs.length > 0) {
         await relaunchWithAdditionalArgs(memoryArgs);
         process.exit(0);
@@ -323,7 +317,6 @@ export async function main() {
     settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
     config.isBrowserLaunchSuppressed()
   ) {
-    // Do oauth before app renders to make copying the link possible.
     await getOauthClient(settings.merged.selectedAuthType, config);
   }
 
@@ -337,13 +330,11 @@ export async function main() {
     ...(await getUserStartupWarnings(workspaceRoot)),
   ];
 
-  // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {
-    await startInteractiveUI(config, settings, startupWarnings, workspaceRoot);
+
     return;
   }
-  // If not a TTY, read from stdin
-  // This is for cases where the user pipes input directly into the command
+
   if (!process.stdin.isTTY) {
     const stdinData = await readStdin();
     if (stdinData) {
