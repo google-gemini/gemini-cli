@@ -55,6 +55,10 @@ export enum Command {
   REVERSE_SEARCH = 'reverseSearch',
   SUBMIT_REVERSE_SEARCH = 'submitReverseSearch',
   ACCEPT_SUGGESTION_REVERSE_SEARCH = 'acceptSuggestionReverseSearch',
+
+  // Suggestion expansion
+  EXPAND_SUGGESTION = 'expandSuggestion',
+  COLLAPSE_SUGGESTION = 'collapseSuggestion',
 }
 
 /**
@@ -181,4 +185,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   // Original: key.name === 'tab'
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
+
+  // Suggestion expansion
+  [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
+  [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
 };

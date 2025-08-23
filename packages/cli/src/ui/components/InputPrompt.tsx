@@ -299,7 +299,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             cursorPosition[1],
           );
           buffer.moveToOffset(offset);
-         setExpandedSuggestionIndex(-1);
+          setExpandedSuggestionIndex(-1);
         };
 
         if (reverseSearchActive) {
@@ -392,7 +392,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             navigateDown();
             return;
           }
-          if (keyMatchers[Command.EXPAND_SUGGESTION](key)) {
+          if (keyMatchers[Command.COLLAPSE_SUGGESTION](key)) {
             if (
               suggestions[activeSuggestionIndex].value.length >=
               MAX_SUGGESTION_WIDTH
@@ -401,7 +401,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               return;
             }
           }
-          if (keyMatchers[Command.COLLAPSE_SUGGESTION](key)) {
+          if (keyMatchers[Command.EXPAND_SUGGESTION](key)) {
             if (
               suggestions[activeSuggestionIndex].value.length >=
               MAX_SUGGESTION_WIDTH
