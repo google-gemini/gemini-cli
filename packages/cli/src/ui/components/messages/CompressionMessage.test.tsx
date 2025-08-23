@@ -49,6 +49,28 @@ describe('<CompressionMessage />', () => {
         'Chat history compressed from 100 to 50 tokens.',
       );
     });
+
+    it('renders success message for large successful compressions', () => {
+      const testCases = [
+        { original: 50000, new: 25000 }, // Large compression
+        { original: 700000, new: 350000 }, // Very large compression
+      ];
+
+      testCases.forEach(({ original, new: newTokens }) => {
+        const props = createCompressionProps({
+          isPending: false,
+          originalTokenCount: original,
+          newTokenCount: newTokens,
+        });
+        const { lastFrame } = render(<CompressionMessage {...props} />);
+        const output = lastFrame();
+
+        expect(output).toContain('✦');
+        expect(output).toContain(`compressed from ${original} to ${newTokens} tokens`);
+        expect(output).not.toContain('Skipping compression');
+        expect(output).not.toContain('did not reduce size');
+      });
+    });
   });
 
   describe('skipped compression (tokens increased or same)', () => {
@@ -63,7 +85,7 @@ describe('<CompressionMessage />', () => {
 
       expect(output).toContain('✦');
       expect(output).toContain(
-        'Skipping compression for small history as the process would have increased its size.',
+        'Compression was not beneficial for this history size.',
       );
     });
 
@@ -77,7 +99,7 @@ describe('<CompressionMessage />', () => {
       const output = lastFrame();
 
       expect(output).toContain(
-        'Skipping compression for small history as the process would have increased its size.',
+        'Compression was not beneficial for this history size.',
       );
     });
   });
@@ -115,10 +137,11 @@ describe('<CompressionMessage />', () => {
       });
     });
 
-    it('always shows skip message when new tokens >= original tokens', () => {
+    it('shows skip message for small histories when new tokens >= original tokens', () => {
       const testCases = [
         { original: 50, new: 60 }, // Increased
         { original: 100, new: 100 }, // Same
+        { original: 49999, new: 50000 }, // Just under 50k threshold
       ];
 
       testCases.forEach(({ original, new: newTokens }) => {
@@ -131,9 +154,33 @@ describe('<CompressionMessage />', () => {
         const output = lastFrame();
 
         expect(output).toContain(
-          'Skipping compression for small history as the process would have increased its size.',
+          'Compression was not beneficial for this history size.',
         );
         expect(output).not.toContain('compressed from');
+      });
+    });
+
+    it('shows compression failure message for large histories when new tokens >= original tokens', () => {
+      const testCases = [
+        { original: 50000, new: 50100 }, // At 50k threshold
+        { original: 700000, new: 710000 }, // Large history case
+        { original: 100000, new: 100000 }, // Large history, same count
+      ];
+
+      testCases.forEach(({ original, new: newTokens }) => {
+        const props = createCompressionProps({
+          isPending: false,
+          originalTokenCount: original,
+          newTokenCount: newTokens,
+        });
+        const { lastFrame } = render(<CompressionMessage {...props} />);
+        const output = lastFrame();
+
+        expect(output).toContain(
+          'compression did not reduce size',
+        );
+        expect(output).not.toContain('compressed from');
+        expect(output).not.toContain('Compression was not beneficial');
       });
     });
   });

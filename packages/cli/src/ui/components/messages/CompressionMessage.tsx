@@ -33,7 +33,13 @@ export const CompressionMessage: React.FC<CompressionDisplayProps> = ({
     }
 
     if (newTokens >= originalTokens) {
-      return 'Skipping compression for small history as the process would have increased its size.';
+      // For smaller histories (< 50k tokens), compression overhead likely exceeds benefits
+      if (originalTokens < 50000) {
+        return 'Compression was not beneficial for this history size.';
+      }
+      // For larger histories where compression should work but didn't,
+      // this suggests an issue with the compression process itself
+      return 'Chat history compression did not reduce size. This may indicate issues with the compression prompt.';
     }
 
     return `Chat history compressed from ${originalTokens} to ${newTokens} tokens.`;
