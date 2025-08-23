@@ -122,6 +122,7 @@ export class DiffManager {
       {
         preview: false,
         preserveFocus: true,
+        viewColumn: vscode.ViewColumn.Active,
       },
     );
     await vscode.commands.executeCommand(
