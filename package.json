@@ -92,6 +92,7 @@
   },
   "dependencies": {
     "@lvce-editor/ripgrep": "^2.1.0",
+    "iconv-lite": "^0.7.0",
     "node-fetch": "^3.3.2",
     "strip-ansi": "^7.1.0"
   },
