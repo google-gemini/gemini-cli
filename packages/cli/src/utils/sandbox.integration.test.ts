@@ -6,27 +6,26 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { startSandboxProxyIfConfigured } from './sandbox';
-import path from 'node:path';
+import { startSandboxProxyIfConfigured } from './sandbox.js';
 
 describe('sandbox integration', () => {
   let prevEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
     // save relevant env
-    prevEnv.GEMINI_SANDBOX_PROXY_COMMAND = process.env.GEMINI_SANDBOX_PROXY_COMMAND;
+    prevEnv['GEMINI_SANDBOX_PROXY_COMMAND'] = process.env['GEMINI_SANDBOX_PROXY_COMMAND'];
   });
 
   afterEach(() => {
     // restore
-    process.env.GEMINI_SANDBOX_PROXY_COMMAND = prevEnv.GEMINI_SANDBOX_PROXY_COMMAND;
+    process.env['GEMINI_SANDBOX_PROXY_COMMAND'] = prevEnv['GEMINI_SANDBOX_PROXY_COMMAND'];
   });
 
   it('spawns node -e "console.log(\'PROXY_OK\')"', async () => {
     // Use process.execPath to ensure we have an absolute node binary
     const nodePath = process.execPath;
     const cmdArray = JSON.stringify([nodePath, '-e', `console.log('PROXY_OK')`]);
-    process.env.GEMINI_SANDBOX_PROXY_COMMAND = cmdArray;
+    process.env['GEMINI_SANDBOX_PROXY_COMMAND'] = cmdArray;
 
     const cp = startSandboxProxyIfConfigured();
     expect(cp).toBeDefined();
