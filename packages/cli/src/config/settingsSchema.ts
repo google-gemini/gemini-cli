@@ -274,6 +274,15 @@ export const SETTINGS_SCHEMA = {
         description: 'Enable recursive file search functionality',
         showInDialog: true,
       },
+      disableFuzzySearch: {
+        type: 'boolean',
+        label: 'Disable Fuzzy Search',
+        category: 'File Filtering',
+        requiresRestart: true,
+        default: false,
+        description: 'Disable fuzzy search when searching for files.',
+        showInDialog: true,
+      },
     },
   },
 
@@ -459,7 +468,8 @@ export const SETTINGS_SCHEMA = {
     category: 'General',
     requiresRestart: false,
     default: [] as string[],
-    description: 'Additional directories to include in the workspace context.',
+    description:
+      'Additional directories to include in the workspace context. Missing directories will be skipped with a warning.',
     showInDialog: false,
   },
   loadMemoryFromIncludeDirectories: {
@@ -534,6 +544,16 @@ export const SETTINGS_SCHEMA = {
     description: 'Skip the next speaker check.',
     showInDialog: true,
   },
+  useRipgrep: {
+    type: 'boolean',
+    label: 'Use Ripgrep',
+    category: 'Tools',
+    requiresRestart: false,
+    default: false,
+    description:
+      'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
+    showInDialog: true,
+  },
   enablePromptCompletion: {
     type: 'boolean',
     label: 'Enable Prompt Completion',
@@ -542,6 +562,15 @@ export const SETTINGS_SCHEMA = {
     default: false,
     description:
       'Enable AI-powered prompt completion suggestions while typing.',
+    showInDialog: true,
+  },
+  debugKeystrokeLogging: {
+    type: 'boolean',
+    label: 'Debug Keystroke Logging',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Enable debug logging of keystrokes to the console.',
     showInDialog: true,
   },
 } as const;

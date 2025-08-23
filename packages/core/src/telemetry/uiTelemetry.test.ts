@@ -46,13 +46,15 @@ const createFakeCompletedToolCall = (
       invocation: tool.build({ param: 'test' }),
       response: {
         callId: request.callId,
-        responseParts: {
-          functionResponse: {
-            id: request.callId,
-            name,
-            response: { output: 'Success!' },
+        responseParts: [
+          {
+            functionResponse: {
+              id: request.callId,
+              name,
+              response: { output: 'Success!' },
+            },
           },
-        },
+        ],
         error: undefined,
         errorType: undefined,
         resultDisplay: 'Success!',
@@ -67,13 +69,15 @@ const createFakeCompletedToolCall = (
       tool,
       response: {
         callId: request.callId,
-        responseParts: {
-          functionResponse: {
-            id: request.callId,
-            name,
-            response: { error: 'Tool failed' },
+        responseParts: [
+          {
+            functionResponse: {
+              id: request.callId,
+              name,
+              response: { error: 'Tool failed' },
+            },
           },
-        },
+        ],
         error: error || new Error('Tool failed'),
         errorType: ToolErrorType.UNKNOWN,
         resultDisplay: 'Failure!',

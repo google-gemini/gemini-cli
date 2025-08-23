@@ -24,3 +24,7 @@ export const METRIC_API_REQUEST_LATENCY = 'gemini_cli.api.request.latency';
 export const METRIC_TOKEN_USAGE = 'gemini_cli.token.usage';
 export const METRIC_SESSION_COUNT = 'gemini_cli.session.count';
 export const METRIC_FILE_OPERATION_COUNT = 'gemini_cli.file.operation.count';
+export const METRIC_INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
+export const METRIC_CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
+export const METRIC_CONTENT_RETRY_FAILURE_COUNT =
+  'gemini_cli.chat.content_retry_failure.count';
