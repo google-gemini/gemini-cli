@@ -10,7 +10,7 @@
  * This module intentionally keeps runtime logic small and delegates parsing
  * and safety concerns to sandbox_helpers.ts so that behavior is testable.
  */
-import helpers from './sandbox_helpers.js';
+import * as helpers from './sandbox_helpers.js';
 import type { ChildProcess } from 'node:child_process';
 
 /** Public API used by the rest of the CLI for sandbox setup.
@@ -50,7 +50,7 @@ export async function start_sandbox(
       proxyProcess.on('close', (code) => {
         if (code === 0) {
           resolve();
-        } else {
+      } else {
           reject(new Error(`Proxy process exited with code ${code}`));
         }
       });
@@ -63,7 +63,4 @@ export async function start_sandbox(
   }
 }
 
-export default {
-  startSandboxProxyIfConfigured,
-  start_sandbox,
-};
+// All functions are exported as named exports above

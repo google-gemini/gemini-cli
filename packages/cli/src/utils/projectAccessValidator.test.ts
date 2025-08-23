@@ -192,7 +192,7 @@ describe('Project Access Validation', () => {
 
   describe('forceReauthentication', () => {
     it('should clear cached credentials and exit with error', async () => {
-      mockClearCachedCredentialFile.mockResolvedValue();
+      mockClearCachedCredentialFile.mockResolvedValue(undefined);
 
       // Mock process.exit to avoid actually exiting
       const originalExit = process.exit;

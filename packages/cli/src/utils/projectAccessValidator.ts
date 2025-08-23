@@ -5,8 +5,8 @@
  */
 
 import { OAuth2Client } from 'google-auth-library';
-import { getOauthClient, clearCachedCredentialFile, clearOauthClientCache } from '@google/gemini-cli-core';
-import { AuthType, Config } from '@google/gemini-cli-core';
+import { getOauthClient, clearCachedCredentialFile, clearOauthClientCache , AuthType, Config } from '@google/gemini-cli-core';
+
 
 /**
  * Validates if the current user has access to the specified Google Cloud project.
@@ -91,9 +91,8 @@ export async function validateCurrentProjectAccess(
  */
 export async function forceReauthentication(): Promise<void> {
   try {
-    // Import the clear function from oauth2
-    const { clearCachedCredentialFile } = await import('../../core/src/code_assist/oauth2.js');
     await clearCachedCredentialFile();
+    clearOauthClientCache();
 
     console.error('🔒 Authentication required due to project access validation failure.');
     console.error('Please re-authenticate to continue.');

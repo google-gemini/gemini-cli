@@ -12,10 +12,12 @@ import {
   CommandKind,
 } from './types.js';
 import { MessageType } from '../types.js';
-import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
 import { sessionId } from '@google/gemini-cli-core';
+
+// Fallback for git commit info if the generated file is not available
+const GIT_COMMIT_INFO = 'unknown';
 
 export const bugCommand: SlashCommand = {
   name: 'bug',

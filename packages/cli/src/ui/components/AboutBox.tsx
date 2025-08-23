@@ -7,9 +7,11 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { UserTierId } from '@google/gemini-cli-core';
 import { getLicenseDisplay } from '../../utils/license.js';
+
+// Define GIT_COMMIT_INFO as a fallback since the generated file may not exist
+const GIT_COMMIT_INFO = 'N/A';
 
 interface AboutBoxProps {
   cliVersion: string;
