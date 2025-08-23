@@ -38,6 +38,7 @@ export function applyReplacement(
   oldString: string,
   newString: string,
   isNewFile: boolean,
+  isRegex: boolean,
 ): string {
   if (isNewFile) {
     return newString;
@@ -49,6 +50,10 @@ export function applyReplacement(
   // If oldString is empty and it's not a new file, do not modify the content.
   if (oldString === '' && !isNewFile) {
     return currentContent;
+  }
+  if (isRegex) {
+    const regex = new RegExp(oldString, 'g');
+    return currentContent.replace(regex, newString);
   }
   return currentContent.replaceAll(oldString, newString);
 }
@@ -73,6 +78,11 @@ export interface EditToolParams {
   new_string: string;
 
   /**
+   * Whether to treat old_string as a regular expression.
+   */
+  is_regex?: boolean;
+
+  /**
    * Number of replacements expected. Defaults to 1 if not specified.
    * Use when you want to replace multiple occurrences.
    */
@@ -87,6 +97,21 @@ export interface EditToolParams {
    * Initially proposed string.
    */
   ai_proposed_string?: string;
+
+  /**
+   * The 1-based line number to start the edit from.
+   */
+  start_line?: number;
+
+  /**
+   * The 1-based line number to end the edit at.
+   */
+  end_line?: number;
+
+  /**
+   * If true, the tool will not write to the file system.
+   */
+  dry_run?: boolean;
 }
 
 interface CalculatedEdit {
@@ -118,6 +143,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     abortSignal: AbortSignal,
   ): Promise<CalculatedEdit> {
     const expectedReplacements = params.expected_replacements ?? 1;
+    const isRegex = params.is_regex ?? false;
     let currentContent: string | null = null;
     let fileExists = false;
     let isNewFile = false;
@@ -154,17 +180,108 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         type: ToolErrorType.FILE_NOT_FOUND,
       };
     } else if (currentContent !== null) {
+      if (params.start_line !== undefined) {
+        const {
+          old_string,
+          new_string,
+          start_line,
+          end_line,
+          is_regex,
+        } = params;
+        const lines = currentContent.split('\n');
+        const endLine = end_line ?? start_line!;
+        if (
+          start_line <= 0 ||
+          start_line > lines.length ||
+          endLine < start_line ||
+          endLine > lines.length
+        ) {
+          return {
+            currentContent,
+            newContent: currentContent,
+            occurrences: 0,
+            error: {
+              display: 'Invalid line range.',
+              raw: `Invalid line range: ${start_line}-${endLine}`,
+              type: ToolErrorType.INVALID_LINE_RANGE,
+            },
+            isNewFile: false,
+          };
+        }
+
+        const contentSlice = lines.slice(start_line - 1, endLine).join('\n');
+        const occurrences = is_regex
+          ? (contentSlice.match(new RegExp(old_string, 'g')) || []).length
+          : old_string === ''
+            ? 0
+            : contentSlice.split(old_string).length - 1;
+
+        if (occurrences === 0) {
+          return {
+            currentContent,
+            newContent: currentContent,
+            occurrences: 0,
+            error: {
+              display:
+                'Failed to edit, could not find the string to replace in the specified line range.',
+              raw: 'Failed to edit, 0 occurrences found for old_string in the specified line range.',
+              type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
+            },
+            isNewFile: false,
+          };
+        }
+
+        if (occurrences !== expectedReplacements) {
+          const occurrenceTerm =
+            expectedReplacements === 1 ? 'occurrence' : 'occurrences';
+          return {
+            currentContent,
+            newContent: currentContent,
+            occurrences,
+            error: {
+              display: `Failed to edit, expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences}.`,
+              raw: `Failed to edit, Expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
+              type: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+            },
+            isNewFile: false,
+          };
+        }
+
+        const newSlice = applyReplacement(
+          contentSlice,
+          old_string,
+          new_string,
+          false,
+          is_regex ?? false,
+        );
+
+        const prefix = lines.slice(0, start_line - 1);
+        const suffix = lines.slice(endLine);
+        const newContent = [...prefix, newSlice, ...suffix].join('\n');
+        return {
+          currentContent,
+          newContent,
+          occurrences,
+          isNewFile: false,
+        };
+      }
+
       // Editing an existing file
-      const correctedEdit = await ensureCorrectEdit(
-        params.file_path,
-        currentContent,
-        params,
-        this.config.getGeminiClient(),
-        abortSignal,
-      );
-      finalOldString = correctedEdit.params.old_string;
-      finalNewString = correctedEdit.params.new_string;
-      occurrences = correctedEdit.occurrences;
+      if (isRegex) {
+        const regex = new RegExp(params.old_string, 'g');
+        occurrences = (currentContent.match(regex) || []).length;
+      } else {
+        const correctedEdit = await ensureCorrectEdit(
+          params.file_path,
+          currentContent,
+          params,
+          this.config.getGeminiClient(),
+          abortSignal,
+        );
+        finalOldString = correctedEdit.params.old_string;
+        finalNewString = correctedEdit.params.new_string;
+        occurrences = correctedEdit.occurrences;
+      }
 
       if (params.old_string === '') {
         // Error: Trying to create a file that already exists
@@ -210,8 +327,9 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           finalOldString,
           finalNewString,
           isNewFile,
+          isRegex,
         )
-      : (currentContent ?? '');
+      : currentContent ?? '';
 
     if (!error && fileExists && currentContent === newContent) {
       error = {
@@ -354,6 +472,13 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       };
     }
 
+    if (this.params.dry_run) {
+      return {
+        llmContent: `Dry run: successfully calculated the changes for ${this.params.file_path}.`,
+        returnDisplay: editData.newContent,
+      };
+    }
+
     try {
       this.ensureParentDirectoriesExist(this.params.file_path);
       await this.config
@@ -493,6 +618,24 @@ Expectation for required parameters:
               'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
             type: 'string',
           },
+          is_regex: {
+            description:
+              'Whether to treat old_string as a regular expression.',
+            type: 'boolean',
+          },
+          start_line: {
+            description: 'The 1-based line number to start the edit from.',
+            type: 'number',
+          },
+          end_line: {
+            description: 'The 1-based line number to end the edit at.',
+            type: 'number',
+          },
+          dry_run: {
+            description:
+              'If true, the tool will not write to the file system.',
+            type: 'boolean',
+          },
           expected_replacements: {
             type: 'number',
             description:
@@ -555,11 +698,30 @@ Expectation for required parameters:
           const currentContent = await this.config
             .getFileSystemService()
             .readTextFile(params.file_path);
+          const { start_line, end_line } = params;
+          if (start_line) {
+            const lines = currentContent.split('\n');
+            const endLine = end_line ?? start_line;
+            const prefix = lines.slice(0, start_line - 1).join('\n');
+            const suffix = lines.slice(endLine).join('\n');
+            const contentSlice = lines
+              .slice(start_line - 1, endLine)
+              .join('\n');
+            const newSlice = applyReplacement(
+              contentSlice,
+              params.old_string,
+              params.new_string,
+              false,
+              params.is_regex ?? false,
+            );
+            return [...prefix, newSlice, ...suffix].join('\n');
+          }
           return applyReplacement(
             currentContent,
             params.old_string,
             params.new_string,
             params.old_string === '' && currentContent === '',
+            params.is_regex ?? false,
           );
         } catch (err) {
           if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
