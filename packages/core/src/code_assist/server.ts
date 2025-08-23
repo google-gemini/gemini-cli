@@ -141,13 +141,18 @@ export class CodeAssistServer implements ContentGenerator {
     req: object,
     signal?: AbortSignal,
   ): Promise<T> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...this.httpOptions.headers,
+    };
+    const quotaProject = process.env.CODE_ASSIST_QUOTA_PROJECT;
+    if (quotaProject) {
+      headers['x-goog-user-project'] = quotaProject;
+    }
     const res = await this.client.request({
       url: this.getMethodUrl(method),
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.httpOptions.headers,
-      },
+      headers,
       responseType: 'json',
       body: JSON.stringify(req),
       signal,
@@ -156,13 +161,18 @@ export class CodeAssistServer implements ContentGenerator {
   }
 
   async requestGet<T>(method: string, signal?: AbortSignal): Promise<T> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...this.httpOptions.headers,
+    };
+    const quotaProject = process.env.CODE_ASSIST_QUOTA_PROJECT;
+    if (quotaProject) {
+      headers['x-goog-user-project'] = quotaProject;
+    }
     const res = await this.client.request({
       url: this.getMethodUrl(method),
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.httpOptions.headers,
-      },
+      headers,
       responseType: 'json',
       signal,
     });
@@ -174,16 +184,21 @@ export class CodeAssistServer implements ContentGenerator {
     req: object,
     signal?: AbortSignal,
   ): Promise<AsyncGenerator<T>> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...this.httpOptions.headers,
+    };
+    const quotaProject = process.env.CODE_ASSIST_QUOTA_PROJECT;
+    if (quotaProject) {
+      headers['x-goog-user-project'] = quotaProject;
+    }
     const res = await this.client.request({
       url: this.getMethodUrl(method),
       method: 'POST',
       params: {
         alt: 'sse',
       },
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.httpOptions.headers,
-      },
+      headers,
       responseType: 'stream',
       body: JSON.stringify(req),
       signal,
