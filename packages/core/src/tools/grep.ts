@@ -10,6 +10,7 @@ import path from 'path';
 import { EOL } from 'os';
 import { spawn } from 'child_process';
 import { globStream } from 'glob';
+import safeRegex from 'safe-regex';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -625,6 +626,10 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
       new RegExp(params.pattern);
     } catch (error) {
       return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
+    }
+    // Prevent catastrophic (ReDoS-prone) regexes
+    if (!safeRegex(params.pattern)) {
+      return `The regular expression pattern provided is potentially unsafe or vulnerable to ReDoS (catastrophic backtracking): ${params.pattern}`;
     }
 
     // Only validate path if one is provided
