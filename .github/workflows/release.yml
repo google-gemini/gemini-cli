@@ -117,6 +117,7 @@ jobs:
           ${{ github.event.inputs.force_skip_tests != 'true' }}
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_API_BASE_URL: '${{ secrets.GEMINI_API_BASE_URL }}'
         run: |-
           npm run preflight
           npm run test:integration:sandbox:none
