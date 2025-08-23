@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-const esbuild = require('esbuild');
+import esbuild from 'esbuild';
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
@@ -40,13 +40,14 @@ async function main() {
     sourcemap: !production,
     sourcesContent: false,
     platform: 'node',
-    outfile: 'dist/extension.js',
+    outfile: 'dist/extension.cjs',
     external: ['vscode'],
     logLevel: 'silent',
     plugins: [
       /* add to the end of plugins array */
       esbuildProblemMatcherPlugin,
     ],
+    loader: { '.node': 'file' },
   });
   if (watch) {
     await ctx.watch();

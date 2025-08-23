@@ -244,7 +244,8 @@ describe('copyCommand', () => {
     ];
 
     mockGetHistory.mockReturnValue(historyWithAiMessage);
-    mockCopyToClipboard.mockRejectedValue('String error');
+    const rejectedValue = 'String error';
+    mockCopyToClipboard.mockRejectedValue(rejectedValue);
 
     const result = await copyCommand.action(mockContext, '');
 
