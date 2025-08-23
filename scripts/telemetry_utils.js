@@ -295,6 +295,7 @@ export function manageTelemetrySettings(
   oTelEndpoint = 'http://localhost:4317',
   target = 'local',
   originalSandboxSettingToRestore,
+  clearTelemetrySettings = false,
 ) {
   const workspaceSettings = readJsonFile(WORKSPACE_SETTINGS_FILE);
   const currentSandboxSetting = workspaceSettings.sandbox;
@@ -326,23 +327,25 @@ export function manageTelemetrySettings(
       console.log(`🎯 Set telemetry target to ${target}.`);
     }
   } else {
-    if (workspaceSettings.telemetry.enabled === true) {
-      delete workspaceSettings.telemetry.enabled;
-      settingsModified = true;
-      console.log('⚙️  Disabled telemetry in workspace settings.');
-    }
-    if (workspaceSettings.telemetry.otlpEndpoint) {
-      delete workspaceSettings.telemetry.otlpEndpoint;
-      settingsModified = true;
-      console.log('🔧 Cleared telemetry OTLP endpoint.');
-    }
-    if (workspaceSettings.telemetry.target) {
-      delete workspaceSettings.telemetry.target;
-      settingsModified = true;
-      console.log('🎯 Cleared telemetry target.');
-    }
-    if (Object.keys(workspaceSettings.telemetry).length === 0) {
-      delete workspaceSettings.telemetry;
+    if (clearTelemetrySettings) {
+      if (workspaceSettings.telemetry.enabled === true) {
+        delete workspaceSettings.telemetry.enabled;
+        settingsModified = true;
+        console.log('⚙️  Disabled telemetry in workspace settings.');
+      }
+      if (workspaceSettings.telemetry.otlpEndpoint) {
+        delete workspaceSettings.telemetry.otlpEndpoint;
+        settingsModified = true;
+        console.log('🔧 Cleared telemetry OTLP endpoint.');
+      }
+      if (workspaceSettings.telemetry.target) {
+        delete workspaceSettings.telemetry.target;
+        settingsModified = true;
+        console.log('🎯 Cleared telemetry target.');
+      }
+      if (Object.keys(workspaceSettings.telemetry).length === 0) {
+        delete workspaceSettings.telemetry;
+      }
     }
 
     if (
@@ -380,7 +383,7 @@ export function registerCleanup(
 
     console.log('\n👋 Shutting down...');
 
-    manageTelemetrySettings(false, null, originalSandboxSetting);
+    manageTelemetrySettings(false, null, null, originalSandboxSetting);
 
     const processes = getProcesses ? getProcesses() : [];
     processes.forEach((proc) => {

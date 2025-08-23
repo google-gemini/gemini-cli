@@ -100,7 +100,7 @@ Use the `npm run telemetry -- --target=local` command to automate the process of
     - Start a local Jaeger instance.
     - Start an OTEL collector configured to receive data from Gemini CLI.
     - Automatically enable telemetry in your workspace settings.
-    - On exit, disable telemetry.
+    - On exit (Ctrl+C), it will attempt to restore your original sandbox settings.
 
 1.  **View traces**:
     Open your web browser and navigate to **http://localhost:16686** to access the Jaeger UI. Here you can inspect detailed traces of Gemini CLI operations.
@@ -136,7 +136,7 @@ Use the `npm run telemetry -- --target=gcp` command to automate setting up a loc
     - Start an OTEL collector configured to receive data from Gemini CLI and export it to your specified Google Cloud project.
     - Automatically enable telemetry and disable sandbox mode in your workspace settings (`.gemini/settings.json`).
     - Provide direct links to view traces, metrics, and logs in your Google Cloud Console.
-    - On exit (Ctrl+C), it will attempt to restore your original telemetry and sandbox settings.
+    - On exit (Ctrl+C), it will attempt to restore your original sandbox settings.
 
 1.  **Run Gemini CLI:**
     In a separate terminal, run your Gemini CLI commands. This generates telemetry data that the collector captures.
