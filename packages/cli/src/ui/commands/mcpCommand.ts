@@ -384,6 +384,7 @@ const authCommand: SlashCommand = {
         oauthConfig = { enabled: false };
       }
 
+      // Pass the MCP server URL for OAuth discovery
       const messageHandler: MCPOAuthMessageHandler = {
         onDisplayMessage: (message: string) => {
           context.ui.addItem(

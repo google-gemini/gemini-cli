@@ -602,8 +602,8 @@ export class MCPOAuthProvider {
     };
 
     if (!config.authorizationUrl && mcpServerUrl) {
-      displayMessage(`Starting OAuth for MCP server "${serverName}"…\n`);
-      displayMessage('✓ No authorization URL; using OAuth discovery');
+      displayMessage(`Starting OAuth for MCP server "${serverName}"…
+✓ No authorization URL; using OAuth discovery`);
 
       // First check if the server requires authentication via WWW-Authenticate header
       try {
@@ -734,12 +734,13 @@ export class MCPOAuthProvider {
       mcpServerUrl,
     );
 
-    displayMessage('→ Opening your browser for OAuth sign-in...\n');
+    displayMessage(`→ Opening your browser for OAuth sign-in...
 
-    displayMessage('If the browser does not open, copy and paste this URL into your browser:');
-    displayMessage(authUrl);
-    displayMessage('');
-    displayMessage('Tip: Triple-click the line above to select the entire URL.');
+If the browser does not open, copy and paste this URL into your browser:
+${authUrl}
+
+💡 TIP: Triple-click to select the entire URL, then copy and paste it into your browser.
+⚠️  Make sure to copy the COMPLETE URL - it may wrap across multiple lines.`);
 
     // Start callback server
     const callbackPromise = this.startCallbackServer(pkceParams.state);
