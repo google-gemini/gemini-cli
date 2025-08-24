@@ -49,13 +49,14 @@ import { isTelemetrySdkInitialized } from './sdk.js';
 import { uiTelemetryService, UiEvent } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import { getCachedGoogleAccount } from '../utils/user_account.js';
+import { UserAccountManager } from '../utils/userAccountManager.js';
 
 const shouldLogUserPrompts = (config: Config): boolean =>
   config.getTelemetryLogPromptsEnabled();
 
 function getCommonAttributes(config: Config): LogAttributes {
-  const email = getCachedGoogleAccount();
+  const userAccountManager = new UserAccountManager();
+  const email = userAccountManager.getCachedGoogleAccount();
   return {
     'session.id': config.getSessionId(),
     ...(email && { 'user.email': email }),
