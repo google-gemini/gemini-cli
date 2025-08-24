@@ -222,6 +222,21 @@ export class GeminiClient {
     });
   }
 
+  /**
+   * Refreshes the chat context with the latest index status information.
+   */
+  async refreshIndexContext(): Promise<void> {
+    if (!this.chat) {
+      return;
+    }
+
+    // Using getDirectoryContextString which now includes index status
+    this.getChat().addHistory({
+      role: 'user',
+      parts: [{ text: `Index status updated:\n${await getDirectoryContextString(this.config)}` }],
+    });
+  }
+
   async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
     const envParts = await getEnvironmentContext(this.config);
@@ -501,6 +516,8 @@ export class GeminiClient {
       this.lastSentIdeContext = newIdeContext;
       this.forceFullIdeContext = false;
     }
+
+
 
     const turn = new Turn(this.getChat(), prompt_id);
 

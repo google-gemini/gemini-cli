@@ -28,6 +28,10 @@ let mockSendMessageStream: any;
 vi.mock('fs', () => ({
   statSync: vi.fn(),
   mkdirSync: vi.fn(),
+  stat: vi.fn(),
+  open: vi.fn(),
+  close: vi.fn(),
+  read: vi.fn(),
 }));
 
 vi.mock('../core/client.js', () => ({

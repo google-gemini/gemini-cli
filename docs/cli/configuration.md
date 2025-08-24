@@ -72,6 +72,45 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     }
     ```
 
+- **`codebaseIndexing`** (object):
+  - **Description:** Controls codebase indexing and semantic search functionality. These settings configure how the `/codebase` commands work for creating and maintaining semantic search indexes of your codebase.
+  - **Default:** See individual properties below
+  - **Properties:**
+    - **`embedEndpoint`** (string): The endpoint URL for the embedding service used to generate vector embeddings for code files.
+      - **Default:** `"http://localhost:11434/v1/embeddings"`
+      - **Example:** `"embedEndpoint": "https://api.openai.com/v1/embeddings"`
+    - **`apiKey`** (string, optional): API key for the embedding service. Can reference environment variables using `$VAR_NAME` syntax.
+      - **Default:** `undefined`
+      - **Example:** `"apiKey": "$OPENAI_API_KEY"`
+    - **`batchSize`** (number): Number of text units to process in a single batch when generating embeddings.
+      - **Default:** `32`
+      - **Example:** `"batchSize": 64`
+    - **`maxTextChars`** (number): Maximum number of characters per text unit before truncation.
+      - **Default:** `8192`
+      - **Example:** `"maxTextChars": 4096`
+    - **`mergeThreshold`** (number): Minimum number of characters for merging short lines into larger text units.
+      - **Default:** `40`
+      - **Example:** `"mergeThreshold": 50`
+    - **`skipIfLargerThan`** (number): Skip files larger than this size (in bytes) during indexing.
+      - **Default:** `52428800` (50MB)
+      - **Example:** `"skipIfLargerThan": 2097152` (2MB)
+    - **`autoIndexingEnabled`** (boolean): Whether to enable automatic index updates when files change during a session.
+      - **Default:** `false`
+      - **Example:** `"autoIndexingEnabled": true`
+    - **`autoIndexingInterval`** (number): Interval for auto-indexing checks in milliseconds.
+      - **Default:** `5000` (5 seconds)
+      - **Example:** `"autoIndexingInterval": 10000` (10 seconds)
+  - **Example:**
+    ```json
+"codebaseIndexing": {
+  "embedEndpoint": "http://localhost:11434/v1/embeddings",
+  "apiKey": "$EMBED_API_KEY",
+  "batchSize": 64,
+  "maxTextChars": 4096,
+  "autoIndexingEnabled": true,
+  "autoIndexingInterval": 10000
+}
+    ```
 ### Troubleshooting File Search Performance
 
 If you are experiencing performance issues with file searching (e.g., with `@` completions), especially in projects with a very large number of files, here are a few things you can try in order of recommendation:
