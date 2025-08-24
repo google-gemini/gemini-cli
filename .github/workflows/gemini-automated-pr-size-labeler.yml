@@ -28,16 +28,20 @@ jobs:
           private-key: ${{ secrets.PRIVATE_KEY }}
 
       - name: Run Gemini PR size and complexity labeller
-        uses: google-gemini/gemini-cli-action@df3f890f003d28c60a2a09d2c29e0126e4d1e2ff # Use the specific commit SHA
+        uses: google-github-actions/run-gemini-cli@e4b071635b36562c88d9af4746884501fda9344a # Use the specific commit SHA
         env:
           GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: '${{ github.repository }}'
         with:
-          version: 0.1.8-rc.0
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OTLP_GCP_WIF_PROVIDER: ${{ secrets.OTLP_GCP_WIF_PROVIDER }}
-          OTLP_GOOGLE_CLOUD_PROJECT: ${{ secrets.OTLP_GOOGLE_CLOUD_PROJECT }}
-          settings_json: |
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          settings: |
             {
               "coreTools": [
                 "run_shell_command(gh pr diff)",
@@ -56,14 +60,14 @@ jobs:
 
             Steps:
             1. Retrieve Pull Request Information:
-               - Use `gh pr diff ${{ env.PR_NUMBER }} --repo ${{ github.repository }}` to get the diff content.
+               - Use `gh pr diff ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }}` to get the diff content.
                - Parse the output from `gh pr diff` to determine the total lines of code added and deleted. Calculate `TOTAL_LINES_CHANGED`.
 
             2. Determine Pull Request Size:
-               - Use `gh pr view ${{ env.PR_NUMBER }} --repo ${{ github.repository }} --json labels` to get the current labels on the PR.
+               - Use `gh pr view ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }} --json labels` to get the current labels on the PR.
                - Check the current labels and identify if any `size/*` labels already exist (e.g., `size/xs`, `size/s`, etc.).
                - If an old `size/*` label is found and it is different from the newly calculated size, remove it using:
-                 `gh pr edit ${{ env.PR_NUMBER }} --repo ${{ github.repository }} --remove-label "size-label-to-remove"`
+                 `gh pr edit ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }} --remove-label "size-label-to-remove"`
                - Based on `TOTAL_LINES_CHANGED`, select the appropriate new size label:
                  - `size/xs`: < 10 lines changed
                  - `size/s`: 10-50 lines changed
@@ -72,10 +76,10 @@ jobs:
                  - `size/xl`: > 1000 lines changed
                - Do not invent new size labels.
                - Apply the newly determined `size/*` label to the pull request using:
-                 `gh pr edit ${{ env.PR_NUMBER }} --repo ${{ github.repository }} --add-label "your-new-size-label"`
+                 `gh pr edit ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }} --add-label "your-new-size-label"`
 
             3. Analyze Pull Request Complexity:
-                - Perform Code Change Analysis: Examine the content of the code changes obtained from `gh pr diff ${{ env.PR_NUMBER }} --repo ${{ github.repository }}`. Look for indicators of complexity such as:
+                - Perform Code Change Analysis: Examine the content of the code changes obtained from `gh pr diff ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }}`. Look for indicators of complexity such as:
                  - Number of files changed (can be inferred from the diff headers).
                  - Diversity of file types (e.g., changes across different languages, configuration files, documentation).
                  - Presence of new external dependencies.
@@ -88,12 +92,12 @@ jobs:
                - **Only use the labels `review/quick` or `review/involved` for complexity. Do not invent new complexity labels.**
                - **Remove any previous `review/*` labels if they no longer apply, similar to the size label process.**
                - Apply the determined `review/*` label to the pull request using:
-                 `gh pr edit ${{ env.PR_NUMBER }} --repo ${{ github.repository }} --add-label "your-complexity-label"`
+                 `gh pr edit ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }} --add-label "your-complexity-label"`
 
             4. Handle Overly Large Pull Requests (`size/xl`):
                - **Conditional Check:** If the pull request has been labeled `size/xl` (i.e., > 1000 lines of code changed) in Step 2, proceed to the next sub-step.
                - **Post Constructive Comment:** Post a polite and helpful comment on the pull request using:
-                 `gh pr comment ${{ env.PR_NUMBER }} --repo ${{ github.repository }} --body "Your comment here"`
+                 `gh pr comment ${{ env.PR_NUMBER }} --repo ${{ env.REPOSITORY }} --body "Your comment here"`
                  The comment body should be:
                  """
                  Thanks for your hard work on this pull request!
