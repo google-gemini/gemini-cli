@@ -122,6 +122,11 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
   - **Default:** `false`
   - **Example:** `"vimMode": true`
 
+- **`showStatusInTitle`** (boolean):
+  - **Description:** Shows the current operational status of the CLI in the terminal window's title. This is useful for seeing the current status when the window is minimized.
+  - **Default:** `false`
+  - **Example:** `"showStatusInTitle": true`
+
 - **`sandbox`** (boolean or string):
   - **Description:** Controls whether and how to use sandboxing for tool execution. If set to `true`, Gemini CLI uses a pre-built `gemini-cli-sandbox` Docker image. For more information, see [Sandboxing](#sandboxing).
   - **Default:** `false`

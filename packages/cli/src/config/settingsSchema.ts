@@ -68,6 +68,15 @@ export const SETTINGS_SCHEMA = {
     description: 'Hide the window title bar',
     showInDialog: true,
   },
+  showStatusInTitle: {
+    type: 'boolean',
+    label: 'Show Status in Title',
+    category: 'UI',
+    requiresRestart: false,
+    default: false,
+    description: 'Show the current status in the terminal title.',
+    showInDialog: true,
+  },
   hideTips: {
     type: 'boolean',
     label: 'Hide Tips',

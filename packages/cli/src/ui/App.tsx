@@ -741,6 +741,46 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     isActive: true,
   });
 
+  const originalTitleRef = useRef(process.title);
+
+  // Effect to update the terminal title with the current status.
+  useEffect(() => {
+    if (!settings.merged.showStatusInTitle) return;
+
+    let title;
+    if (streamingState === StreamingState.Idle) {
+      title = originalTitleRef.current;
+    } else {
+      const statusText =
+        thought?.subject || currentLoadingPhrase || 'Working...';
+      title = statusText;
+    }
+
+    // Pad the title to a fixed width to prevent taskbar icon resizing.
+    const paddedTitle = title.padEnd(80, ' ');
+
+    // Use ANSI escape code to set terminal title.
+    stdout.write(`\x1b]0;${paddedTitle}\x07`);
+  }, [
+    streamingState,
+    thought,
+    currentLoadingPhrase,
+    settings.merged.showStatusInTitle,
+    stdout,
+  ]);
+
+  // Cleanup effect to restore the original title when the app exits.
+  useEffect(() => {
+    if (!settings.merged.showStatusInTitle) return;
+
+    // Capture the ref's value at the time the effect runs to satisfy the linter.
+    const titleToRestore = originalTitleRef.current;
+    return () => {
+      // Use the captured value in the cleanup function.
+      stdout.write(`\x1b]0;${titleToRestore}\x07`);
+    };
+  }, [settings.merged.showStatusInTitle, stdout]);
+
   useEffect(() => {
     if (config) {
       setGeminiMdFileCount(config.getGeminiMdFileCount());
