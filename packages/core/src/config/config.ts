@@ -133,6 +133,8 @@ export class MCPServerConfig {
     // OAuth configuration
     readonly oauth?: MCPOAuthConfig,
     readonly authProviderType?: AuthProviderType,
+    // Enable strict validation of the scheme if needed
+    readonly strictSchemeValidation?: boolean,
   ) {}
 }
 
