@@ -145,7 +145,7 @@ export class McpPromptLoader implements ICommandLoader {
             }
           },
           completion: async (_: CommandContext, partialArg: string) => {
-            if (!prompt || !prompt.arguments) {
+            if (!prompt || !prompt.arguments || !partialArg.startsWith('-')) {
               return [];
             }
 
