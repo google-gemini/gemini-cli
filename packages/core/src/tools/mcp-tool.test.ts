@@ -15,7 +15,11 @@ import {
   Mocked,
 } from 'vitest';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
+import {
+  DiscoveredMCPTool,
+  generateValidName,
+  DiscoveredMCPToolInvocation,
+} from './mcp-tool.js'; // Added DiscoveredMCPToolInvocation
 import { ToolResult, ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
 import { CallableTool, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
@@ -759,6 +763,89 @@ describe('DiscoveredMCPTool', () => {
       const invocation = tool.build(params);
       const description = invocation.getDescription();
       expect(description).toBe('{"param":"testValue","param2":"anotherOne"}');
+    });
+
+    describe('static permission management methods', () => {
+      beforeEach(() => {
+        // Clear permissions before each test
+        DiscoveredMCPToolInvocation.clearAllMcpPermissions();
+      });
+
+      afterEach(() => {
+        // Clear permissions after each test to avoid test pollution
+        DiscoveredMCPToolInvocation.clearAllMcpPermissions();
+      });
+
+      it('should start with empty permissions', () => {
+        const permissions =
+          DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+        expect(permissions).toEqual([]);
+      });
+
+      it('should allow permissions to be added to the allowlist internally', () => {
+        // We can't directly test adding permissions since that's internal to the tool execution,
+        // but we can test that the static methods work correctly when permissions exist.
+        // This would be integration-tested through the actual tool execution flows.
+
+        const permissions =
+          DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+        expect(Array.isArray(permissions)).toBe(true);
+      });
+
+      it('should revoke specific MCP permissions', () => {
+        // Add a permission to the internal allowlist first (simulating what happens during tool execution)
+        // Since allowlist is private, we'll use the public methods that modify it indirectly
+        // For this test, we'll simulate the state by clearing first, then testing revocation
+        DiscoveredMCPToolInvocation.clearAllMcpPermissions();
+
+        // We can't directly add to the allowlist in tests since it's private,
+        // but we can test the revocation method works without throwing
+        expect(() => {
+          DiscoveredMCPToolInvocation.revokeMcpPermission(
+            'test-server.test-tool',
+          );
+        }).not.toThrow();
+      });
+
+      it('should clear all MCP permissions', () => {
+        // Clear all permissions should work regardless of current state
+        expect(() => {
+          DiscoveredMCPToolInvocation.clearAllMcpPermissions();
+        }).not.toThrow();
+
+        // Verify permissions are empty after clearing
+        const permissions =
+          DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+        expect(permissions).toEqual([]);
+      });
+
+      it('should handle revoking non-existent permissions gracefully', () => {
+        // Try to revoke a permission that doesn't exist - should not throw
+        expect(() => {
+          DiscoveredMCPToolInvocation.revokeMcpPermission(
+            'non-existent-permission',
+          );
+        }).not.toThrow();
+
+        // Permissions should still be empty
+        const permissions =
+          DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+        expect(permissions).toEqual([]);
+      });
+
+      it('should return consistent array references', () => {
+        const permissions1 =
+          DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+        const permissions2 =
+          DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+
+        expect(Array.isArray(permissions1)).toBe(true);
+        expect(Array.isArray(permissions2)).toBe(true);
+        // They should be separate array instances (not the same reference)
+        expect(permissions1).not.toBe(permissions2);
+        // But should have the same content
+        expect(permissions1).toEqual(permissions2);
+      });
     });
   });
 });

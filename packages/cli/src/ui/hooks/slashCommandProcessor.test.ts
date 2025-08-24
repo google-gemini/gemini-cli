@@ -146,8 +146,10 @@ describe('useSlashCommandProcessor', () => {
         mockSetQuittingMessages,
         vi.fn(), // openPrivacyNotice
         vi.fn(), // openSettingsDialog
+        vi.fn(), // openPermissionsDialog
         vi.fn(), // toggleVimEnabled
         setIsProcessing,
+        vi.fn(), // setGeminiMdFileCount
       ),
     );
 
@@ -386,6 +388,248 @@ describe('useSlashCommandProcessor', () => {
       });
 
       expect(mockOpenThemeDialog).toHaveBeenCalled();
+    });
+
+    it('should handle "dialog: permissions" action', async () => {
+      const mockOpenPermissionsDialog = vi.fn();
+      const command = createTestCommand({
+        name: 'permissions',
+        action: vi
+          .fn()
+          .mockResolvedValue({ type: 'dialog', dialog: 'permissions' }),
+      });
+
+      // Mock the setup to include the permissions dialog handler
+      mockBuiltinLoadCommands.mockResolvedValue(Object.freeze([command]));
+      mockFileLoadCommands.mockResolvedValue(Object.freeze([]));
+      mockMcpLoadCommands.mockResolvedValue(Object.freeze([]));
+
+      const { result } = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          mockSettings,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          vi.fn(), // refreshStatic
+          vi.fn(), // onDebugMessage
+          mockOpenThemeDialog, // openThemeDialog
+          mockOpenAuthDialog,
+          vi.fn(), // openEditorDialog
+          vi.fn(), // toggleCorgiMode
+          mockSetQuittingMessages,
+          vi.fn(), // openPrivacyNotice
+          vi.fn(), // openSettingsDialog
+          mockOpenPermissionsDialog, // openPermissionsDialog
+          vi.fn(), // toggleVimEnabled
+          vi.fn(), // setIsProcessing
+          vi.fn(), // setGeminiMdFileCount
+        ),
+      );
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/permissions');
+      });
+
+      expect(mockOpenPermissionsDialog).toHaveBeenCalled();
+    });
+
+    it('should handle permissions command with arguments', async () => {
+      const mockOpenPermissionsDialog = vi.fn();
+      const command = createTestCommand({
+        name: 'permissions',
+        action: vi
+          .fn()
+          .mockResolvedValue({ type: 'dialog', dialog: 'permissions' }),
+      });
+
+      mockBuiltinLoadCommands.mockResolvedValue(Object.freeze([command]));
+      mockFileLoadCommands.mockResolvedValue(Object.freeze([]));
+      mockMcpLoadCommands.mockResolvedValue(Object.freeze([]));
+
+      const { result } = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          mockSettings,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          vi.fn(),
+          vi.fn(),
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          vi.fn(),
+          vi.fn(),
+          mockSetQuittingMessages,
+          vi.fn(),
+          vi.fn(),
+          mockOpenPermissionsDialog,
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+        ),
+      );
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      // Test with arguments (should still work the same)
+      await act(async () => {
+        await result.current.handleSlashCommand('/permissions --some-args');
+      });
+
+      expect(mockOpenPermissionsDialog).toHaveBeenCalled();
+      expect(mockAddItem).toHaveBeenCalledWith(
+        { type: 'user', text: '/permissions --some-args' },
+        expect.any(Number),
+      );
+    });
+
+    it('should add permissions command to history', async () => {
+      const mockOpenPermissionsDialog = vi.fn();
+      const command = createTestCommand({
+        name: 'permissions',
+        action: vi
+          .fn()
+          .mockResolvedValue({ type: 'dialog', dialog: 'permissions' }),
+      });
+
+      mockBuiltinLoadCommands.mockResolvedValue(Object.freeze([command]));
+      mockFileLoadCommands.mockResolvedValue(Object.freeze([]));
+      mockMcpLoadCommands.mockResolvedValue(Object.freeze([]));
+
+      const { result } = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          mockSettings,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          vi.fn(),
+          vi.fn(),
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          vi.fn(),
+          vi.fn(),
+          mockSetQuittingMessages,
+          vi.fn(),
+          vi.fn(),
+          mockOpenPermissionsDialog,
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+        ),
+      );
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/permissions');
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        { type: 'user', text: '/permissions' },
+        expect.any(Number),
+      );
+    });
+
+    it('should handle permissions dialog opening from built-in command', async () => {
+      const mockOpenPermissionsDialog = vi.fn();
+
+      // Use the actual permissions command instead of a test command
+      const { permissionsCommand } = await import(
+        '../commands/permissionsCommand.js'
+      );
+
+      mockBuiltinLoadCommands.mockResolvedValue(
+        Object.freeze([permissionsCommand]),
+      );
+      mockFileLoadCommands.mockResolvedValue(Object.freeze([]));
+      mockMcpLoadCommands.mockResolvedValue(Object.freeze([]));
+
+      const { result } = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          mockSettings,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          vi.fn(),
+          vi.fn(),
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          vi.fn(),
+          vi.fn(),
+          mockSetQuittingMessages,
+          vi.fn(),
+          vi.fn(),
+          mockOpenPermissionsDialog,
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+        ),
+      );
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      // Verify the command is loaded correctly
+      expect(result.current.slashCommands[0]?.name).toBe('permissions');
+      expect(result.current.slashCommands[0]?.description).toBe(
+        'Manage tool permissions and reset "Always Allow" settings',
+      );
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/permissions');
+      });
+
+      expect(mockOpenPermissionsDialog).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle unknown dialog type gracefully', async () => {
+      const mockOpenPermissionsDialog = vi.fn();
+      const command = createTestCommand({
+        name: 'unknownDialog',
+        action: vi
+          .fn()
+          .mockResolvedValue({ type: 'dialog', dialog: 'unknown' }),
+      });
+
+      mockBuiltinLoadCommands.mockResolvedValue(Object.freeze([command]));
+      mockFileLoadCommands.mockResolvedValue(Object.freeze([]));
+      mockMcpLoadCommands.mockResolvedValue(Object.freeze([]));
+
+      const { result } = renderHook(() =>
+        useSlashCommandProcessor(
+          mockConfig,
+          mockSettings,
+          mockAddItem,
+          mockClearItems,
+          mockLoadHistory,
+          vi.fn(),
+          vi.fn(),
+          mockOpenThemeDialog,
+          mockOpenAuthDialog,
+          vi.fn(),
+          vi.fn(),
+          mockSetQuittingMessages,
+          vi.fn(),
+          vi.fn(),
+          mockOpenPermissionsDialog,
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+        ),
+      );
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/unknownDialog');
+      });
+
+      // Should not crash and should not call permissions dialog
+      expect(mockOpenPermissionsDialog).not.toHaveBeenCalled();
     });
 
     it('should handle "load_history" action', async () => {
@@ -896,11 +1140,11 @@ describe('useSlashCommandProcessor', () => {
           vi.fn(), // toggleCorgiMode
           mockSetQuittingMessages,
           vi.fn(), // openPrivacyNotice
-
           vi.fn(), // openSettingsDialog
+          vi.fn(), // openPermissionsDialog
           vi.fn(), // toggleVimEnabled
-          vi.fn().mockResolvedValue(false), // toggleVimEnabled
           vi.fn(), // setIsProcessing
+          vi.fn(), // setGeminiMdFileCount
         ),
       );
 

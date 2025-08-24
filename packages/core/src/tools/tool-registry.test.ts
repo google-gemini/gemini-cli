@@ -418,4 +418,118 @@ describe('ToolRegistry', () => {
       expect(description).toBe(JSON.stringify(params));
     });
   });
+
+  describe('getToolByType', () => {
+    let toolRegistry: ToolRegistry;
+
+    beforeEach(() => {
+      toolRegistry = new ToolRegistry(config);
+    });
+
+    it('should return tool of specified type when it exists', () => {
+      const mcpTool = new DiscoveredMCPTool(
+        createMockCallableTool([]),
+        'test-server',
+        'test-tool',
+        'A test MCP tool',
+        {},
+      );
+      const mockTool = new MockTool('mock-tool');
+
+      toolRegistry.registerTool(mcpTool);
+      toolRegistry.registerTool(mockTool);
+
+      const foundMcpTool = toolRegistry.getToolByType(DiscoveredMCPTool);
+      const foundMockTool = toolRegistry.getToolByType(MockTool);
+
+      expect(foundMcpTool).toBeInstanceOf(DiscoveredMCPTool);
+      expect(foundMcpTool?.name).toBe('test-tool');
+      expect(foundMockTool).toBeInstanceOf(MockTool);
+      expect(foundMockTool?.name).toBe('mock-tool');
+    });
+
+    it('should return undefined when tool of specified type does not exist', () => {
+      const mockTool = new MockTool('mock-tool');
+      toolRegistry.registerTool(mockTool);
+
+      const foundMcpTool = toolRegistry.getToolByType(DiscoveredMCPTool);
+
+      expect(foundMcpTool).toBeUndefined();
+    });
+
+    it('should return first tool found when multiple tools of same type exist', () => {
+      const mcpTool1 = new DiscoveredMCPTool(
+        createMockCallableTool([]),
+        'server1',
+        'tool1',
+        'First MCP tool',
+        {},
+      );
+      const mcpTool2 = new DiscoveredMCPTool(
+        createMockCallableTool([]),
+        'server2',
+        'tool2',
+        'Second MCP tool',
+        {},
+      );
+
+      toolRegistry.registerTool(mcpTool1);
+      toolRegistry.registerTool(mcpTool2);
+
+      const foundTool = toolRegistry.getToolByType(DiscoveredMCPTool);
+
+      expect(foundTool).toBeInstanceOf(DiscoveredMCPTool);
+      // Should return the first one registered
+      expect(foundTool?.name).toBe('tool1');
+    });
+
+    it('should work with inheritance hierarchy', () => {
+      // Create a custom tool class for testing inheritance
+      class CustomTool extends DiscoveredTool {
+        constructor(name: string) {
+          super(config, name, 'A custom tool', {});
+        }
+      }
+
+      const customTool = new CustomTool('custom-tool');
+      toolRegistry.registerTool(customTool);
+
+      // Should find the tool by its exact class
+      const foundCustomTool = toolRegistry.getToolByType(CustomTool);
+      expect(foundCustomTool).toBeInstanceOf(CustomTool);
+      expect(foundCustomTool?.name).toBe('custom-tool');
+
+      // Should also find it by parent class
+      const foundDiscoveredTool = toolRegistry.getToolByType(DiscoveredTool);
+      expect(foundDiscoveredTool).toBeInstanceOf(DiscoveredTool);
+      expect(foundDiscoveredTool?.name).toBe('custom-tool');
+    });
+
+    it('should handle empty registry', () => {
+      const foundTool = toolRegistry.getToolByType(DiscoveredMCPTool);
+      expect(foundTool).toBeUndefined();
+    });
+
+    it('should return correct tool type casting', () => {
+      const mcpTool = new DiscoveredMCPTool(
+        createMockCallableTool([]),
+        'test-server',
+        'test-tool',
+        'A test MCP tool',
+        {},
+      );
+
+      toolRegistry.registerTool(mcpTool);
+
+      const foundTool = toolRegistry.getToolByType(DiscoveredMCPTool);
+
+      // TypeScript should correctly infer the type
+      expect(foundTool).toBeInstanceOf(DiscoveredMCPTool);
+      if (foundTool) {
+        // Should have MCP-specific properties without type assertion
+        expect(foundTool.serverName).toBe('test-server');
+        expect(foundTool.serverToolName).toBe('test-tool');
+      }
+    });
+  });
 });
