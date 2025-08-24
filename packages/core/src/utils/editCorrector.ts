@@ -160,12 +160,26 @@ export async function ensureCorrectEdit(
   originalParams: EditToolParams, // This is the EditToolParams from edit.ts, without \'corrected\'
   client: GeminiClient,
   abortSignal: AbortSignal,
+  maxCorrectionAttempts: number = 3, // Limit correction attempts to prevent cascading LLM calls
 ): Promise<CorrectedEditResult> {
   const cacheKey = `${currentContent}---${originalParams.old_string}---${originalParams.new_string}`;
   const cachedResult = editCorrectionCache.get(cacheKey);
   if (cachedResult) {
     return cachedResult;
   }
+
+  let correctionAttempts = 0; // Track correction attempts to prevent cascading LLM calls
+
+  // Helper function to check if we can make more correction attempts
+  const canMakeCorrection = (): boolean => {
+    if (correctionAttempts >= maxCorrectionAttempts) {
+      console.warn(
+        `Edit correction limit reached (${maxCorrectionAttempts} attempts). Stopping to prevent cascading LLM calls.`,
+      );
+      return false;
+    }
+    return true;
+  };
 
   let finalNewString = originalParams.new_string;
   const newStringPotentiallyEscaped =
@@ -178,7 +192,8 @@ export async function ensureCorrectEdit(
   let occurrences = countOccurrences(currentContent, finalOldString);
 
   if (occurrences === expectedReplacements) {
-    if (newStringPotentiallyEscaped) {
+    if (newStringPotentiallyEscaped && canMakeCorrection()) {
+      correctionAttempts++;
       finalNewString = await correctNewStringEscaping(
         client,
         finalOldString,
@@ -225,7 +240,8 @@ export async function ensureCorrectEdit(
 
     if (occurrences === expectedReplacements) {
       finalOldString = unescapedOldStringAttempt;
-      if (newStringPotentiallyEscaped) {
+      if (newStringPotentiallyEscaped && canMakeCorrection()) {
+        correctionAttempts++;
         finalNewString = await correctNewString(
           client,
           originalParams.old_string, // original old
@@ -263,6 +279,17 @@ export async function ensureCorrectEdit(
         }
       }
 
+      if (!canMakeCorrection()) {
+        // Hit correction limit, return with 0 occurrences
+        const result: CorrectedEditResult = {
+          params: { ...originalParams },
+          occurrences: 0,
+        };
+        editCorrectionCache.set(cacheKey, result);
+        return result;
+      }
+
+      correctionAttempts++;
       const llmCorrectedOldString = await correctOldStringMismatch(
         client,
         currentContent,
@@ -278,7 +305,8 @@ export async function ensureCorrectEdit(
         finalOldString = llmCorrectedOldString;
         occurrences = llmOldOccurrences;
 
-        if (newStringPotentiallyEscaped) {
+        if (newStringPotentiallyEscaped && canMakeCorrection()) {
+          correctionAttempts++;
           const baseNewStringForLLMCorrection = unescapeStringForGeminiBug(
             originalParams.new_string,
           );
