@@ -21,7 +21,10 @@ import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { Settings as SettingsFromSchema, MemoryImportFormat } from './settingsSchema.js';
+import {
+  Settings as SettingsFromSchema,
+  MemoryImportFormat,
+} from './settingsSchema.js';
 import { CustomTheme } from '../ui/themes/theme.js';
 
 export type { MemoryImportFormat };
