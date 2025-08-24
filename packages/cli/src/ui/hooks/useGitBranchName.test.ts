@@ -16,34 +16,18 @@ import {
 import { act } from 'react';
 import { renderHook } from '@testing-library/react';
 import { useGitBranchName } from './useGitBranchName.js';
-import { fs, vol } from 'memfs'; // For mocking fs
 import { EventEmitter } from 'node:events';
 import { exec as mockExec, type ChildProcess } from 'node:child_process';
-import type { FSWatcher } from 'memfs/lib/volume.js';
+import type { FSWatcher } from 'node:fs';
 
 // Mock child_process
 vi.mock('child_process');
 
-// Mock fs and fs/promises
-vi.mock('node:fs', async () => {
-  const memfs = await vi.importActual<typeof import('memfs')>('memfs');
-  return memfs.fs;
-});
-
-vi.mock('node:fs/promises', async () => {
-  const memfs = await vi.importActual<typeof import('memfs')>('memfs');
-  return memfs.fs.promises;
-});
-
 const CWD = '/test/project';
-const GIT_HEAD_PATH = `${CWD}/.git/HEAD`;
+const GIT_LOGS_HEAD_PATH = `${CWD}/.git/logs/HEAD`;
 
 describe('useGitBranchName', () => {
   beforeEach(() => {
-    vol.reset(); // Reset in-memory filesystem
-    vol.fromJSON({
-      [GIT_HEAD_PATH]: 'ref: refs/heads/main',
-    });
     vi.useFakeTimers(); // Use fake timers for async operations
   });
 
@@ -128,8 +112,25 @@ describe('useGitBranchName', () => {
     expect(result.current).toBeUndefined();
   });
 
-  it('should update branch name when .git/HEAD changes', async ({ skip }) => {
-    skip(); // TODO: fix
+  it('should update branch name when .git/logs/HEAD changes', async () => {
+    let watchCallback: ((eventType: string) => void) | undefined;
+    
+    // Create mock fs dependencies
+    const mockFs = {
+      watch: vi.fn().mockImplementation((path: string, callback: (eventType: string) => void) => {
+        watchCallback = callback;
+        return {
+          close: vi.fn(),
+        } as unknown as FSWatcher;
+      }),
+      constants: { F_OK: 0 },
+    };
+
+    const mockFsPromises = {
+      access: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // Mock initial call to return 'main'
     (mockExec as MockedFunction<typeof mockExec>).mockImplementationOnce(
       (_command, _options, callback) => {
         callback?.(null, 'main\n', '');
@@ -137,15 +138,28 @@ describe('useGitBranchName', () => {
       },
     );
 
-    const { result, rerender } = renderHook(() => useGitBranchName(CWD));
+    const { result, rerender } = renderHook(() => 
+      useGitBranchName(CWD, { fs: mockFs as any, fsPromises: mockFsPromises as any })
+    );
 
+    // Wait for initial branch name to be set
     await act(async () => {
       vi.runAllTimers();
       rerender();
     });
     expect(result.current).toBe('main');
 
-    // Simulate a branch change
+    // Wait for async watcher setup to complete
+    await act(async () => {
+      await Promise.resolve();
+      vi.runAllTimers();
+      rerender();
+    });
+
+    // Verify watcher was set up
+    expect(mockFs.watch).toHaveBeenCalledWith(GIT_LOGS_HEAD_PATH, expect.any(Function));
+
+    // Mock subsequent call for file change to return 'develop'
     (mockExec as MockedFunction<typeof mockExec>).mockImplementationOnce(
       (_command, _options, callback) => {
         callback?.(null, 'develop\n', '');
@@ -153,11 +167,10 @@ describe('useGitBranchName', () => {
       },
     );
 
-    // Simulate file change event
-    // Ensure the watcher is set up before triggering the change
+    // Now simulate the file change event
     await act(async () => {
-      fs.writeFileSync(GIT_HEAD_PATH, 'ref: refs/heads/develop'); // Trigger watcher
-      vi.runAllTimers(); // Process timers for watcher and exec
+      watchCallback?.('change');
+      vi.runAllTimers();
       rerender();
     });
 
@@ -165,8 +178,15 @@ describe('useGitBranchName', () => {
   });
 
   it('should handle watcher setup error silently', async () => {
-    // Remove .git/HEAD to cause an error in fs.watch setup
-    vol.unlinkSync(GIT_HEAD_PATH);
+    // Create mock fs dependencies that fail on access
+    const mockFs = {
+      watch: vi.fn(),
+      constants: { F_OK: 0 },
+    };
+
+    const mockFsPromises = {
+      access: vi.fn().mockRejectedValue(new Error('ENOENT: no such file or directory')),
+    };
 
     (mockExec as MockedFunction<typeof mockExec>).mockImplementation(
       (_command, _options, callback) => {
@@ -175,7 +195,9 @@ describe('useGitBranchName', () => {
       },
     );
 
-    const { result, rerender } = renderHook(() => useGitBranchName(CWD));
+    const { result, rerender } = renderHook(() => 
+      useGitBranchName(CWD, { fs: mockFs as any, fsPromises: mockFsPromises as any })
+    );
 
     await act(async () => {
       vi.runAllTimers();
@@ -184,37 +206,34 @@ describe('useGitBranchName', () => {
 
     expect(result.current).toBe('main'); // Branch name should still be fetched initially
 
-    // Try to trigger a change that would normally be caught by the watcher
-    (mockExec as MockedFunction<typeof mockExec>).mockImplementationOnce(
-      (_command, _options, callback) => {
-        callback?.(null, 'develop\n', '');
-        return new EventEmitter() as ChildProcess;
-      },
-    );
-
-    // This write would trigger the watcher if it was set up
-    // but since it failed, the branch name should not update
-    // We need to create the file again for writeFileSync to not throw
-    vol.fromJSON({
-      [GIT_HEAD_PATH]: 'ref: refs/heads/develop',
-    });
-
+    // Wait for async watcher setup attempt to complete
     await act(async () => {
-      fs.writeFileSync(GIT_HEAD_PATH, 'ref: refs/heads/develop');
+      await Promise.resolve();
       vi.runAllTimers();
       rerender();
     });
 
-    // Branch name should not change because watcher setup failed
+    // Verify that fs.watch was never called because access failed
+    expect(mockFs.watch).not.toHaveBeenCalled();
+    
+    // Branch name should remain the same since no watcher was set up
     expect(result.current).toBe('main');
   });
 
-  it('should cleanup watcher on unmount', async ({ skip }) => {
-    skip(); // TODO: fix
+  it('should cleanup watcher on unmount', async () => {
     const closeMock = vi.fn();
-    const watchMock = vi.spyOn(fs, 'watch').mockReturnValue({
-      close: closeMock,
-    } as unknown as FSWatcher);
+    
+    // Create mock fs dependencies
+    const mockFs = {
+      watch: vi.fn().mockReturnValue({
+        close: closeMock,
+      } as unknown as FSWatcher),
+      constants: { F_OK: 0 },
+    };
+
+    const mockFsPromises = {
+      access: vi.fn().mockResolvedValue(undefined),
+    };
 
     (mockExec as MockedFunction<typeof mockExec>).mockImplementation(
       (_command, _options, callback) => {
@@ -223,15 +242,25 @@ describe('useGitBranchName', () => {
       },
     );
 
-    const { unmount, rerender } = renderHook(() => useGitBranchName(CWD));
+    const { unmount, rerender } = renderHook(() => 
+      useGitBranchName(CWD, { fs: mockFs as any, fsPromises: mockFsPromises as any })
+    );
 
+    // Wait for initial setup
     await act(async () => {
       vi.runAllTimers();
       rerender();
     });
 
+    // Wait for async watcher setup to complete
+    await act(async () => {
+      await Promise.resolve();
+      vi.runAllTimers();
+      rerender();
+    });
+
     unmount();
-    expect(watchMock).toHaveBeenCalledWith(GIT_HEAD_PATH, expect.any(Function));
+    expect(mockFs.watch).toHaveBeenCalledWith(GIT_LOGS_HEAD_PATH, expect.any(Function));
     expect(closeMock).toHaveBeenCalled();
   });
 });
