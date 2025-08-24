@@ -37,7 +37,7 @@ export const MAC_DRAG_MODE_PREFIX = `${ESC}[I`;
 export const MAC_FOCUS_EVENT_OUT_OF_EDITOR = "'"; // When editor does NOT have focus (macOS Finder.app)
 
 export const DRAG_START_TIMEOUT_MS = 200;
-export const DRAG_COMPLETION_TIMEOUT_MS = 500;
+export const DRAG_COMPLETION_TIMEOUT_MS = 200;
 
 export interface Key {
   name: string;
