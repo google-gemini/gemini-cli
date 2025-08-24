@@ -219,6 +219,9 @@ export enum EventMetadataKey {
   // Logs user removed lines in edit/write tool response.
   GEMINI_CLI_USER_REMOVED_LINES = 50,
 
+  // Logs the programming language of the project.
+  GEMINI_CLI_PROGRAMMING_LANGUAGE = 56,
+
   // ==========================================================================
   // Kitty Sequence Overflow Event Keys
   // ===========================================================================
@@ -228,17 +231,38 @@ export enum EventMetadataKey {
 
   // Logs the length of the kitty sequence that overflowed.
   GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,
-}
 
-export function getEventMetadataKey(
-  keyName: string,
-): EventMetadataKey | undefined {
-  // Access the enum member by its string name
-  const key = EventMetadataKey[keyName as keyof typeof EventMetadataKey];
+  // Logs the number of tokens before context window compression.
+  GEMINI_CLI_COMPRESSION_TOKENS_BEFORE = 60,
 
-  // Check if the result is a valid enum member (not undefined and is a number)
-  if (typeof key === 'number') {
-    return key;
-  }
-  return undefined;
+  // Logs the number of tokens after context window compression.
+  GEMINI_CLI_COMPRESSION_TOKENS_AFTER = 61,
+
+  // Logs tool type whether it is mcp or native.
+  GEMINI_CLI_TOOL_TYPE = 62,
+
+  // Logs count of MCP servers in Start Session Event
+  GEMINI_CLI_START_SESSION_MCP_SERVERS_COUNT = 63,
+
+  // Logs count of MCP tools in Start Session Event
+  GEMINI_CLI_START_SESSION_MCP_TOOLS_COUNT = 64,
+
+  // Logs name of MCP tools as comma seperated string
+  GEMINI_CLI_START_SESSION_MCP_TOOLS = 65,
+
+  // ==========================================================================
+  // File Operation Event Keys
+  // ===========================================================================
+
+  // Logs the operation type of the file operation.
+  GEMINI_CLI_FILE_OPERATION_TYPE = 66,
+
+  // Logs the number of lines in the file operation.
+  GEMINI_CLI_FILE_OPERATION_LINES = 67,
+
+  // Logs the mimetype of the file in the file operation.
+  GEMINI_CLI_FILE_OPERATION_MIMETYPE = 68,
+
+  // Logs the extension of the file in the file operation.
+  GEMINI_CLI_FILE_OPERATION_EXTENSION = 69,
 }

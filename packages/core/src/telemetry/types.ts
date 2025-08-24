@@ -7,14 +7,18 @@
 import { GenerateContentResponseUsageMetadata } from '@google/genai';
 import { Config } from '../config/config.js';
 import { CompletedToolCall } from '../core/coreToolScheduler.js';
-import { FileDiff } from '../tools/tools.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { DiffStat, FileDiff } from '../tools/tools.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   getDecisionFromOutcome,
   ToolCallDecision,
 } from './tool-call-decision.js';
+import { FileOperation } from './metrics.js';
+export { ToolCallDecision };
+import { ToolRegistry } from '../tools/tool-registry.js';
 
-interface BaseTelemetryEvent {
+export interface BaseTelemetryEvent {
   'event.name': string;
   /** Current timestamp in ISO 8601 format */
   'event.timestamp': string;
@@ -37,8 +41,11 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   telemetry_enabled: boolean;
   telemetry_log_user_prompts_enabled: boolean;
   file_filtering_respect_git_ignore: boolean;
+  mcp_servers_count: number;
+  mcp_tools_count?: number;
+  mcp_tools?: string;
 
-  constructor(config: Config) {
+  constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
     const mcpServers = config.getMcpServers();
 
@@ -65,6 +72,16 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       config.getTelemetryLogPromptsEnabled();
     this.file_filtering_respect_git_ignore =
       config.getFileFilteringRespectGitIgnore();
+    this.mcp_servers_count = mcpServers ? Object.keys(mcpServers).length : 0;
+    if (toolRegistry) {
+      const mcpTools = toolRegistry
+        .getAllTools()
+        .filter((tool) => tool instanceof DiscoveredMCPTool);
+      this.mcp_tools_count = mcpTools.length;
+      this.mcp_tools = mcpTools
+        .map((tool) => (tool as DiscoveredMCPTool).name)
+        .join(',');
+    }
   }
 }
 
@@ -114,6 +131,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   error?: string;
   error_type?: string;
   prompt_id: string;
+  tool_type: 'native' | 'mcp';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
 
@@ -130,6 +148,10 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     this.error = call.response.error?.message;
     this.error_type = call.response.errorType;
     this.prompt_id = call.request.prompt_id;
+    this.tool_type =
+      typeof call.tool !== 'undefined' && call.tool instanceof DiscoveredMCPTool
+        ? 'mcp'
+        : 'native';
 
     if (
       call.status === 'success' &&
@@ -292,7 +314,7 @@ export class NextSpeakerCheckEvent implements BaseTelemetryEvent {
 
 export interface SlashCommandEvent extends BaseTelemetryEvent {
   'event.name': 'slash_command';
-  'event.timestamp': string; // ISO 8106
+  'event.timestamp': string;
   command: string;
   subcommand?: string;
   status?: SlashCommandStatus;
@@ -315,6 +337,25 @@ export function makeSlashCommandEvent({
 export enum SlashCommandStatus {
   SUCCESS = 'success',
   ERROR = 'error',
+}
+
+export interface ChatCompressionEvent extends BaseTelemetryEvent {
+  'event.name': 'chat_compression';
+  'event.timestamp': string;
+  tokens_before: number;
+  tokens_after: number;
+}
+
+export function makeChatCompressionEvent({
+  tokens_before,
+  tokens_after,
+}: Omit<ChatCompressionEvent, CommonFields>): ChatCompressionEvent {
+  return {
+    'event.name': 'chat_compression',
+    'event.timestamp': new Date().toISOString(),
+    tokens_before,
+    tokens_after,
+  };
 }
 
 export class MalformedJsonResponseEvent implements BaseTelemetryEvent {
@@ -360,6 +401,38 @@ export class KittySequenceOverflowEvent {
   }
 }
 
+export class FileOperationEvent implements BaseTelemetryEvent {
+  'event.name': 'file_operation';
+  'event.timestamp': string;
+  tool_name: string;
+  operation: FileOperation;
+  lines?: number;
+  mimetype?: string;
+  extension?: string;
+  diff_stat?: DiffStat;
+  programming_language?: string;
+
+  constructor(
+    tool_name: string,
+    operation: FileOperation,
+    lines?: number,
+    mimetype?: string,
+    extension?: string,
+    diff_stat?: DiffStat,
+    programming_language?: string,
+  ) {
+    this['event.name'] = 'file_operation';
+    this['event.timestamp'] = new Date().toISOString();
+    this.tool_name = tool_name;
+    this.operation = operation;
+    this.lines = lines;
+    this.mimetype = mimetype;
+    this.extension = extension;
+    this.diff_stat = diff_stat;
+    this.programming_language = programming_language;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -374,4 +447,5 @@ export type TelemetryEvent =
   | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
-  | SlashCommandEvent;
+  | SlashCommandEvent
+  | FileOperationEvent;

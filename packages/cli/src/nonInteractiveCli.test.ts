@@ -18,6 +18,7 @@ import { runNonInteractive } from './nonInteractiveCli.js';
 import { vi } from 'vitest';
 
 // Mock core modules
+vi.mock('./ui/hooks/atCommandProcessor.js');
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -41,7 +42,7 @@ describe('runNonInteractive', () => {
     sendMessageStream: vi.Mock;
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockCoreExecuteToolCall = vi.mocked(executeToolCall);
     mockShutdownTelemetry = vi.mocked(shutdownTelemetry);
 
@@ -65,13 +66,21 @@ describe('runNonInteractive', () => {
     mockConfig = {
       initialize: vi.fn().mockResolvedValue(undefined),
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
-      getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
+      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getMaxSessionTurns: vi.fn().mockReturnValue(10),
       getIdeMode: vi.fn().mockReturnValue(false),
       getFullContext: vi.fn().mockReturnValue(false),
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
       getDebugMode: vi.fn().mockReturnValue(false),
     } as unknown as Config;
+
+    const { handleAtCommand } = await import(
+      './ui/hooks/atCommandProcessor.js'
+    );
+    vi.mocked(handleAtCommand).mockImplementation(async ({ query }) => ({
+      processedQuery: [{ text: query }],
+      shouldProceed: true,
+    }));
   });
 
   afterEach(() => {
@@ -137,7 +146,6 @@ describe('runNonInteractive', () => {
     expect(mockCoreExecuteToolCall).toHaveBeenCalledWith(
       mockConfig,
       expect.objectContaining({ name: 'testTool' }),
-      mockToolRegistry,
       expect.any(AbortSignal),
     );
     expect(mockGeminiClient.sendMessageStream).toHaveBeenNthCalledWith(
@@ -150,7 +158,7 @@ describe('runNonInteractive', () => {
     expect(processStdoutSpy).toHaveBeenCalledWith('\n');
   });
 
-  it('should handle error during tool execution', async () => {
+  it('should handle error during tool execution and should send error back to the model', async () => {
     const toolCallEvent: ServerGeminiStreamEvent = {
       type: GeminiEventType.ToolCallRequest,
       value: {
@@ -162,20 +170,54 @@ describe('runNonInteractive', () => {
       },
     };
     mockCoreExecuteToolCall.mockResolvedValue({
-      error: new Error('Tool execution failed badly'),
-      errorType: ToolErrorType.UNHANDLED_EXCEPTION,
+      error: new Error('Execution failed'),
+      errorType: ToolErrorType.EXECUTION_FAILED,
+      responseParts: [
+        {
+          functionResponse: {
+            name: 'errorTool',
+            response: {
+              output: 'Error: Execution failed',
+            },
+          },
+        },
+      ],
+      resultDisplay: 'Execution failed',
     });
-    mockGeminiClient.sendMessageStream.mockReturnValue(
-      createStreamFromEvents([toolCallEvent]),
-    );
+    const finalResponse: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Content,
+        value: 'Sorry, let me try again.',
+      },
+    ];
+    mockGeminiClient.sendMessageStream
+      .mockReturnValueOnce(createStreamFromEvents([toolCallEvent]))
+      .mockReturnValueOnce(createStreamFromEvents(finalResponse));
 
     await runNonInteractive(mockConfig, 'Trigger tool error', 'prompt-id-3');
 
     expect(mockCoreExecuteToolCall).toHaveBeenCalled();
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Error executing tool errorTool: Tool execution failed badly',
+      'Error executing tool errorTool: Execution failed',
     );
-    expect(processExitSpy).toHaveBeenCalledWith(1);
+    expect(processExitSpy).not.toHaveBeenCalled();
+    expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(2);
+    expect(mockGeminiClient.sendMessageStream).toHaveBeenNthCalledWith(
+      2,
+      [
+        {
+          functionResponse: {
+            name: 'errorTool',
+            response: {
+              output: 'Error: Execution failed',
+            },
+          },
+        },
+      ],
+      expect.any(AbortSignal),
+      'prompt-id-3',
+    );
+    expect(processStdoutSpy).toHaveBeenCalledWith('Sorry, let me try again.');
   });
 
   it('should exit with error if sendMessageStream throws initially', async () => {
@@ -241,5 +283,49 @@ describe('runNonInteractive', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       '\n Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
     );
+  });
+
+  it('should preprocess @include commands before sending to the model', async () => {
+    // 1. Mock the imported atCommandProcessor
+    const { handleAtCommand } = await import(
+      './ui/hooks/atCommandProcessor.js'
+    );
+    const mockHandleAtCommand = vi.mocked(handleAtCommand);
+
+    // 2. Define the raw input and the expected processed output
+    const rawInput = 'Summarize @file.txt';
+    const processedParts: Part[] = [
+      { text: 'Summarize @file.txt' },
+      { text: '\n--- Content from referenced files ---\n' },
+      { text: 'This is the content of the file.' },
+      { text: '\n--- End of content ---' },
+    ];
+
+    // 3. Setup the mock to return the processed parts
+    mockHandleAtCommand.mockResolvedValue({
+      processedQuery: processedParts,
+      shouldProceed: true,
+    });
+
+    // Mock a simple stream response from the Gemini client
+    const events: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Summary complete.' },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    // 4. Run the non-interactive mode with the raw input
+    await runNonInteractive(mockConfig, rawInput, 'prompt-id-7');
+
+    // 5. Assert that sendMessageStream was called with the PROCESSED parts, not the raw input
+    expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledWith(
+      processedParts,
+      expect.any(AbortSignal),
+      'prompt-id-7',
+    );
+
+    // 6. Assert the final output is correct
+    expect(processStdoutSpy).toHaveBeenCalledWith('Summary complete.');
   });
 });

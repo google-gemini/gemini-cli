@@ -17,8 +17,8 @@ describe('AuthDialog', () => {
 
   beforeEach(() => {
     originalEnv = { ...process.env };
-    process.env.GEMINI_API_KEY = '';
-    process.env.GEMINI_DEFAULT_AUTH_TYPE = '';
+    process.env['GEMINI_API_KEY'] = '';
+    process.env['GEMINI_DEFAULT_AUTH_TYPE'] = '';
     vi.clearAllMocks();
   });
 
@@ -27,7 +27,7 @@ describe('AuthDialog', () => {
   });
 
   it('should show an error if the initial auth type is invalid', () => {
-    process.env.GEMINI_API_KEY = '';
+    process.env['GEMINI_API_KEY'] = '';
 
     const settings: LoadedSettings = new LoadedSettings(
       {
@@ -45,6 +45,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       [],
+      true,
     );
 
     const { lastFrame } = renderWithProviders(
@@ -62,7 +63,7 @@ describe('AuthDialog', () => {
 
   describe('GEMINI_API_KEY environment variable', () => {
     it('should detect GEMINI_API_KEY environment variable', () => {
-      process.env.GEMINI_API_KEY = 'foobar';
+      process.env['GEMINI_API_KEY'] = 'foobar';
 
       const settings: LoadedSettings = new LoadedSettings(
         {
@@ -82,6 +83,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -94,8 +96,8 @@ describe('AuthDialog', () => {
     });
 
     it('should not show the GEMINI_API_KEY message if GEMINI_DEFAULT_AUTH_TYPE is set to something else', () => {
-      process.env.GEMINI_API_KEY = 'foobar';
-      process.env.GEMINI_DEFAULT_AUTH_TYPE = AuthType.LOGIN_WITH_GOOGLE;
+      process.env['GEMINI_API_KEY'] = 'foobar';
+      process.env['GEMINI_DEFAULT_AUTH_TYPE'] = AuthType.LOGIN_WITH_GOOGLE;
 
       const settings: LoadedSettings = new LoadedSettings(
         {
@@ -115,6 +117,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -127,8 +130,8 @@ describe('AuthDialog', () => {
     });
 
     it('should show the GEMINI_API_KEY message if GEMINI_DEFAULT_AUTH_TYPE is set to use api key', () => {
-      process.env.GEMINI_API_KEY = 'foobar';
-      process.env.GEMINI_DEFAULT_AUTH_TYPE = AuthType.USE_GEMINI;
+      process.env['GEMINI_API_KEY'] = 'foobar';
+      process.env['GEMINI_DEFAULT_AUTH_TYPE'] = AuthType.USE_GEMINI;
 
       const settings: LoadedSettings = new LoadedSettings(
         {
@@ -148,6 +151,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -162,7 +166,7 @@ describe('AuthDialog', () => {
 
   describe('GEMINI_DEFAULT_AUTH_TYPE environment variable', () => {
     it('should select the auth type specified by GEMINI_DEFAULT_AUTH_TYPE', () => {
-      process.env.GEMINI_DEFAULT_AUTH_TYPE = AuthType.LOGIN_WITH_GOOGLE;
+      process.env['GEMINI_DEFAULT_AUTH_TYPE'] = AuthType.LOGIN_WITH_GOOGLE;
 
       const settings: LoadedSettings = new LoadedSettings(
         {
@@ -182,6 +186,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -211,6 +216,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -222,7 +228,7 @@ describe('AuthDialog', () => {
     });
 
     it('should show an error and fall back to default if GEMINI_DEFAULT_AUTH_TYPE is invalid', () => {
-      process.env.GEMINI_DEFAULT_AUTH_TYPE = 'invalid-auth-type';
+      process.env['GEMINI_DEFAULT_AUTH_TYPE'] = 'invalid-auth-type';
 
       const settings: LoadedSettings = new LoadedSettings(
         {
@@ -242,6 +248,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -277,6 +284,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       [],
+      true,
     );
 
     const { lastFrame, stdin, unmount } = renderWithProviders(
@@ -316,6 +324,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       [],
+      true,
     );
 
     const { lastFrame, stdin, unmount } = renderWithProviders(
@@ -358,6 +367,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       [],
+      true,
     );
 
     const { stdin, unmount } = renderWithProviders(
