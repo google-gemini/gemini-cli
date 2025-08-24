@@ -20,6 +20,7 @@ export interface MCPOAuthConfig {
   clientId?: string;
   clientSecret?: string;
   authorizationUrl?: string;
+  registrationUrl?: string;
   tokenUrl?: string;
   scopes?: string[];
   audiences?: string[];
@@ -95,14 +96,19 @@ export class MCPOAuthProvider {
   /**
    * Register a client dynamically with the OAuth server.
    *
-   * @param registrationUrl The client registration endpoint URL
    * @param config OAuth configuration
    * @returns The registered client information
    */
   private static async registerClient(
-    registrationUrl: string,
     config: MCPOAuthConfig,
   ): Promise<OAuthClientRegistrationResponse> {
+    const registrationUrl = config.registrationUrl;
+    if (!registrationUrl) {
+      throw new Error(
+        'Client registration failed: No registration endpoint available',
+      );
+    }
+
     const redirectUri =
       config.redirectUri ||
       `http://localhost:${this.REDIRECT_PORT}${this.REDIRECT_PATH}`;
@@ -613,6 +619,7 @@ export class MCPOAuthProvider {
               config = {
                 ...config,
                 authorizationUrl: discoveredConfig.authorizationUrl,
+                registrationUrl: discoveredConfig.registrationUrl,
                 tokenUrl: discoveredConfig.tokenUrl,
                 scopes: discoveredConfig.scopes || config.scopes || [],
                 // Preserve existing client credentials
@@ -637,6 +644,7 @@ export class MCPOAuthProvider {
           config = {
             ...config,
             authorizationUrl: discoveredConfig.authorizationUrl,
+            registrationUrl: discoveredConfig.registrationUrl,
             tokenUrl: discoveredConfig.tokenUrl,
             scopes: discoveredConfig.scopes || config.scopes || [],
             // Preserve existing client credentials
@@ -653,42 +661,34 @@ export class MCPOAuthProvider {
 
     // If no client ID is provided, try dynamic client registration
     if (!config.clientId) {
-      // Extract server URL from authorization URL
       if (!config.authorizationUrl) {
         throw new Error(
           'Cannot perform dynamic registration without authorization URL',
         );
       }
 
-      const authUrl = new URL(config.authorizationUrl);
-      const serverUrl = `${authUrl.protocol}//${authUrl.host}`;
-
       console.log(
         'No client ID provided, attempting dynamic client registration...',
       );
 
-      // Get the authorization server metadata for registration
-      const authServerMetadataUrl = new URL(
-        '/.well-known/oauth-authorization-server',
-        serverUrl,
-      ).toString();
-
-      const authServerMetadata =
-        await OAuthUtils.fetchAuthorizationServerMetadata(
-          authServerMetadataUrl,
-        );
-      if (!authServerMetadata) {
-        throw new Error(
-          'Failed to fetch authorization server metadata for client registration',
-        );
+      // Try obtaining registration URL using authorization URL if it's not
+      // provided nor already obtained in previous steps
+      if (!config.registrationUrl) {
+        const authServerMetadata =
+          await OAuthUtils.discoverAuthorizationServerMetadata(
+            config.authorizationUrl,
+          );
+        if (!authServerMetadata) {
+          throw new Error(
+            'Failed to fetch authorization server metadata for client registration',
+          );
+        }
+        config.registrationUrl = authServerMetadata.registration_endpoint;
       }
 
       // Register client if registration endpoint is available
-      if (authServerMetadata.registration_endpoint) {
-        const clientRegistration = await this.registerClient(
-          authServerMetadata.registration_endpoint,
-          config,
-        );
+      if (config.registrationUrl) {
+        const clientRegistration = await this.registerClient(config);
 
         config.clientId = clientRegistration.client_id;
         if (clientRegistration.client_secret) {

@@ -165,6 +165,7 @@ Use the `/mcp auth` command to manage OAuth authentication:
 - **`clientId`** (string): OAuth client identifier (optional with dynamic registration)
 - **`clientSecret`** (string): OAuth client secret (optional for public clients)
 - **`authorizationUrl`** (string): OAuth authorization endpoint (auto-discovered if omitted)
+- **`registrationUrl`** (string): OAuth client registration endpoint (auto-discovered if omitted)
 - **`tokenUrl`** (string): OAuth token endpoint (auto-discovered if omitted)
 - **`scopes`** (string[]): Required OAuth scopes
 - **`redirectUri`** (string): Custom redirect URI (defaults to `http://localhost:7777/oauth/callback`)
