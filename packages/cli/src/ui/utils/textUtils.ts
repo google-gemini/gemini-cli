@@ -5,6 +5,7 @@
  */
 
 import stripAnsi from 'strip-ansi';
+import stringWidth from 'string-width';
 import { stripVTControlCharacters } from 'util';
 
 /**
@@ -26,20 +27,94 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
  *  code units so that surrogate‑pair emoji count as one "column".)
  * ---------------------------------------------------------------------- */
 
+const codePointsCache = new Map<string, string[]>();
+const stringWidthCache = new Map<string, number>();
+const CACHE_SIZE_LIMIT = 1000;
+
+function clearOldestCacheEntries() {
+  if (codePointsCache.size > CACHE_SIZE_LIMIT) {
+    const entriesToDelete = Array.from(codePointsCache.keys()).slice(
+      0,
+      Math.floor(CACHE_SIZE_LIMIT * 0.1),
+    );
+    entriesToDelete.forEach((key) => codePointsCache.delete(key));
+  }
+  if (stringWidthCache.size > CACHE_SIZE_LIMIT) {
+    const entriesToDelete = Array.from(stringWidthCache.keys()).slice(
+      0,
+      Math.floor(CACHE_SIZE_LIMIT * 0.1),
+    );
+    entriesToDelete.forEach((key) => stringWidthCache.delete(key));
+  }
+}
+
+export function getCachedStringWidth(str: string): number {
+  if (stringWidthCache.has(str)) {
+    return stringWidthCache.get(str)!;
+  }
+
+  // Fast path for single ASCII characters
+  if (str.length === 1) {
+    const code = str.charCodeAt(0);
+    if (code >= 32 && code <= 126) {
+      // printable ASCII
+      stringWidthCache.set(str, 1);
+      return 1;
+    }
+  }
+
+  const width = stringWidth(str);
+  stringWidthCache.set(str, width);
+  if (stringWidthCache.size > CACHE_SIZE_LIMIT) {
+    clearOldestCacheEntries();
+  }
+  return width;
+}
+
 export function toCodePoints(str: string): string[] {
-  // [...str] or Array.from both iterate by UTF‑32 code point, handling
-  // surrogate pairs correctly.
-  return Array.from(str);
+  if (codePointsCache.has(str)) {
+    return codePointsCache.get(str)!;
+  }
+
+  // Fast path for ASCII strings
+  // eslint-disable-next-line no-control-regex
+  if (/^[\u0000-\u007F]*$/.test(str)) {
+    const codePoints = str.split('');
+    codePointsCache.set(str, codePoints);
+    return codePoints;
+  }
+
+  const codePoints = Array.from(str);
+  codePointsCache.set(str, codePoints);
+  if (codePointsCache.size > CACHE_SIZE_LIMIT) {
+    clearOldestCacheEntries();
+  }
+  return codePoints;
 }
 
 export function cpLen(str: string): number {
   return toCodePoints(str).length;
 }
 
+const sliceCache = new Map<string, string>();
+
 export function cpSlice(str: string, start: number, end?: number): string {
-  // Slice by code‑point indices and re‑join.
+  const cacheKey = `${str}:${start}:${end ?? 'undefined'}`;
+  if (sliceCache.has(cacheKey)) {
+    return sliceCache.get(cacheKey)!;
+  }
+
   const arr = toCodePoints(str).slice(start, end);
-  return arr.join('');
+  const result = arr.join('');
+  sliceCache.set(cacheKey, result);
+  if (sliceCache.size > CACHE_SIZE_LIMIT) {
+    const entriesToDelete = Array.from(sliceCache.keys()).slice(
+      0,
+      Math.floor(CACHE_SIZE_LIMIT * 0.1),
+    );
+    entriesToDelete.forEach((key) => sliceCache.delete(key));
+  }
+  return result;
 }
 
 /**
