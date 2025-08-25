@@ -22,6 +22,7 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { EventEmitter } from 'node:events';
 
 type ToolParams = Record<string, unknown>;
 
@@ -172,7 +173,7 @@ export class ToolRegistry {
   private config: Config;
   private mcpClientManager: McpClientManager;
 
-  constructor(config: Config) {
+  constructor(config: Config, eventEmitter?: EventEmitter) {
     this.config = config;
     this.mcpClientManager = new McpClientManager(
       this.config.getMcpServers() ?? {},
@@ -181,6 +182,7 @@ export class ToolRegistry {
       this.config.getPromptRegistry(),
       this.config.getDebugMode(),
       this.config.getWorkspaceContext(),
+      eventEmitter,
     );
   }
 
