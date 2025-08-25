@@ -19,16 +19,16 @@ import type {
 } from './useReactToolScheduler.js';
 import { useReactToolScheduler } from './useReactToolScheduler.js';
 import type {
-  ApprovalMode,
   Config,
   EditorType,
   GeminiClient,
   AnyToolInvocation,
 } from '@google/gemini-cli-core';
 import {
+  ApprovalMode,
   AuthType,
   GeminiEventType as ServerGeminiEventType,
-  ToolErrorType, // <-- Import ToolErrorType
+  ToolErrorType,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
