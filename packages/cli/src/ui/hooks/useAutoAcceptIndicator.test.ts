@@ -22,6 +22,7 @@ import {
   ApprovalMode,
 } from '@google/gemini-cli-core';
 import { useKeypress, Key } from './useKeypress.js';
+import { MessageType } from '../types.js';
 
 vi.mock('./useKeypress.js');
 
@@ -38,6 +39,7 @@ vi.mock('@google/gemini-cli-core', async () => {
 interface MockConfigInstanceShape {
   getApprovalMode: Mock<() => ApprovalMode>;
   setApprovalMode: Mock<(value: ApprovalMode) => void>;
+  isTrustedFolder: Mock<() => boolean>;
   getCoreTools: Mock<() => string[]>;
   getToolDiscoveryCommand: Mock<() => string | undefined>;
   getTargetDir: Mock<() => string>;
@@ -76,6 +78,7 @@ describe('useAutoAcceptIndicator', () => {
         setApprovalMode: instanceSetApprovalModeMock as Mock<
           (value: ApprovalMode) => void
         >,
+        isTrustedFolder: vi.fn().mockReturnValue(true) as Mock<() => boolean>,
         getCoreTools: vi.fn().mockReturnValue([]) as Mock<() => string[]>,
         getToolDiscoveryCommand: vi.fn().mockReturnValue(undefined) as Mock<
           () => string | undefined
@@ -126,6 +129,7 @@ describe('useAutoAcceptIndicator', () => {
     const { result } = renderHook(() =>
       useAutoAcceptIndicator({
         config: mockConfigInstance as unknown as ActualConfigType,
+        addItem: vi.fn(),
       }),
     );
     expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
@@ -137,6 +141,7 @@ describe('useAutoAcceptIndicator', () => {
     const { result } = renderHook(() =>
       useAutoAcceptIndicator({
         config: mockConfigInstance as unknown as ActualConfigType,
+        addItem: vi.fn(),
       }),
     );
     expect(result.current).toBe(ApprovalMode.DEFAULT);
@@ -148,6 +153,7 @@ describe('useAutoAcceptIndicator', () => {
     const { result } = renderHook(() =>
       useAutoAcceptIndicator({
         config: mockConfigInstance as unknown as ActualConfigType,
+        addItem: vi.fn(),
       }),
     );
     expect(result.current).toBe(ApprovalMode.YOLO);
@@ -159,6 +165,7 @@ describe('useAutoAcceptIndicator', () => {
     const { result } = renderHook(() =>
       useAutoAcceptIndicator({
         config: mockConfigInstance as unknown as ActualConfigType,
+        addItem: vi.fn(),
       }),
     );
     expect(result.current).toBe(ApprovalMode.DEFAULT);
@@ -226,6 +233,7 @@ describe('useAutoAcceptIndicator', () => {
     renderHook(() =>
       useAutoAcceptIndicator({
         config: mockConfigInstance as unknown as ActualConfigType,
+        addItem: vi.fn(),
       }),
     );
 
@@ -282,10 +290,12 @@ describe('useAutoAcceptIndicator', () => {
   it('should update indicator when config value changes externally (useEffect dependency)', () => {
     mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
     const { result, rerender } = renderHook(
-      (props: { config: ActualConfigType }) => useAutoAcceptIndicator(props),
+      (props: { config: ActualConfigType; addItem: () => void }) =>
+        useAutoAcceptIndicator(props),
       {
         initialProps: {
           config: mockConfigInstance as unknown as ActualConfigType,
+          addItem: vi.fn(),
         },
       },
     );
@@ -293,8 +303,140 @@ describe('useAutoAcceptIndicator', () => {
 
     mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.AUTO_EDIT);
 
-    rerender({ config: mockConfigInstance as unknown as ActualConfigType });
+    rerender({
+      config: mockConfigInstance as unknown as ActualConfigType,
+      addItem: vi.fn(),
+    });
     expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
     expect(mockConfigInstance.getApprovalMode).toHaveBeenCalledTimes(3);
+  });
+
+  describe('in untrusted folders', () => {
+    beforeEach(() => {
+      mockConfigInstance.isTrustedFolder.mockReturnValue(false);
+    });
+
+    it('should not enable YOLO mode when Ctrl+Y is pressed', () => {
+      mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      const mockAddItem = vi.fn();
+      renderHook(() =>
+        useAutoAcceptIndicator({
+          config: mockConfigInstance as unknown as ActualConfigType,
+          addItem: mockAddItem,
+        }),
+      );
+
+      act(() => {
+        capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
+      });
+
+      expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
+    });
+
+    it('should not enable AUTO_EDIT mode when Shift+Tab is pressed', () => {
+      mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      const mockAddItem = vi.fn();
+      renderHook(() =>
+        useAutoAcceptIndicator({
+          config: mockConfigInstance as unknown as ActualConfigType,
+          addItem: mockAddItem,
+        }),
+      );
+
+      act(() => {
+        capturedUseKeypressHandler({
+          name: 'tab',
+          shift: true,
+        } as Key);
+      });
+
+      expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
+    });
+
+    it('should disable YOLO mode when Ctrl+Y is pressed', () => {
+      mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.YOLO);
+      const mockAddItem = vi.fn();
+      renderHook(() =>
+        useAutoAcceptIndicator({
+          config: mockConfigInstance as unknown as ActualConfigType,
+          addItem: mockAddItem,
+        }),
+      );
+
+      act(() => {
+        capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
+      });
+
+      expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+        ApprovalMode.DEFAULT,
+      );
+    });
+
+    it('should disable AUTO_EDIT mode when Shift+Tab is pressed', () => {
+      mockConfigInstance.getApprovalMode.mockReturnValue(
+        ApprovalMode.AUTO_EDIT,
+      );
+      const mockAddItem = vi.fn();
+      renderHook(() =>
+        useAutoAcceptIndicator({
+          config: mockConfigInstance as unknown as ActualConfigType,
+          addItem: mockAddItem,
+        }),
+      );
+
+      act(() => {
+        capturedUseKeypressHandler({
+          name: 'tab',
+          shift: true,
+        } as Key);
+      });
+
+      expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+        ApprovalMode.DEFAULT,
+      );
+    });
+
+    it('should show a warning when trying to enable privileged modes', () => {
+      mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      const mockAddItem = vi.fn();
+      renderHook(() =>
+        useAutoAcceptIndicator({
+          config: mockConfigInstance as unknown as ActualConfigType,
+          addItem: mockAddItem,
+        }),
+      );
+
+      // Try to enable YOLO mode
+      act(() => {
+        capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'Cannot enable privileged approval modes in an untrusted folder.',
+        },
+        expect.any(Number),
+      );
+
+      // Try to enable AUTO_EDIT mode
+      act(() => {
+        capturedUseKeypressHandler({
+          name: 'tab',
+          shift: true,
+        } as Key);
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'Cannot enable privileged approval modes in an untrusted folder.',
+        },
+        expect.any(Number),
+      );
+
+      expect(mockAddItem).toHaveBeenCalledTimes(2);
+      expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
+    });
   });
 });
