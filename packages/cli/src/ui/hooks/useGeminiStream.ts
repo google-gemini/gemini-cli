@@ -55,7 +55,6 @@ import {
 } from './useReactToolScheduler.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
-import { SHELL_COMMAND_NAME } from '../constants.js';
 
 export function mergePartListUnions(list: PartListUnion[]): PartListUnion {
   const resultParts: PartListUnion = [];
@@ -96,7 +95,6 @@ export const useGeminiStream = (
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
   onEditorClose: () => void,
   onCancelSubmit: () => void,
-  setIsChildProcessRunning: (isChildProcessRunning: boolean) => void,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -129,14 +127,6 @@ export const useGeminiStream = (
             Date.now(),
           );
 
-          if (
-            completedToolCallsFromScheduler.some(
-              (tool) => tool.request.name === SHELL_COMMAND_NAME,
-            )
-          ) {
-            setIsChildProcessRunning(false);
-          }
-
           // Handle tool response submission immediately when tools complete
           await handleCompletedTools(
             completedToolCallsFromScheduler as TrackedToolCall[],
@@ -151,12 +141,9 @@ export const useGeminiStream = (
 
   const scheduleToolCallsWithState = useCallback(
     (requests: ToolCallRequestInfo[], signal: AbortSignal) => {
-      if (requests.some((req) => req.name === SHELL_COMMAND_NAME)) {
-        setIsChildProcessRunning(true);
-      }
       scheduleToolCalls(requests, signal);
     },
-    [scheduleToolCalls, setIsChildProcessRunning],
+    [scheduleToolCalls],
   );
 
   const pendingToolCallGroupDisplay = useMemo(

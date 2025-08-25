@@ -14,7 +14,13 @@ import {
   useStdin,
   useStdout,
 } from 'ink';
-import { StreamingState, type HistoryItem, MessageType } from './types.js';
+import {
+  StreamingState,
+  type HistoryItem,
+  MessageType,
+  ToolCallStatus,
+  HistoryItemWithoutId,
+} from './types.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
@@ -113,6 +119,17 @@ interface AppProps {
   version: string;
 }
 
+function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
+  return pendingHistoryItems.some((item) => {
+    if (item && item.type === 'tool_group') {
+      return item.tools.some(
+        (tool) => ToolCallStatus.Executing === tool.status,
+      );
+    }
+    return false;
+  });
+}
+
 export const AppWrapper = (props: AppProps) => {
   const kittyProtocolStatus = useKittyKeyboardProtocol();
   return (
@@ -209,8 +226,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [isChildProcessRunning, setIsChildProcessRunning] =
-    useState<boolean>(false);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
@@ -574,7 +589,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setModelSwitchedFromQuotaError,
     refreshStatic,
     () => cancelHandlerRef.current(),
-    setIsChildProcessRunning,
+  );
+
+  const pendingHistoryItems = useMemo(
+    () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
+    [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
   );
 
   // Message queue for handling input during streaming
@@ -586,7 +605,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   // Update the cancel handler with message queue support
   cancelHandlerRef.current = useCallback(() => {
-    if (isChildProcessRunning) {
+    if (isToolExecuting(pendingHistoryItems)) {
       buffer.setText(''); // Just clear the prompt
       return;
     }
@@ -609,7 +628,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     userMessages,
     getQueuedMessagesText,
     clearQueue,
-    isChildProcessRunning,
+    pendingHistoryItems,
   ]);
 
   // Input handling - queue messages for processing
@@ -646,8 +665,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   );
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
-  const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
-  pendingHistoryItems.push(...pendingGeminiHistoryItems);
 
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
@@ -1231,7 +1248,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   focus={isFocused}
                   vimHandleInput={vimHandleInput}
                   placeholder={placeholder}
-                  isChildProcessRunning={isChildProcessRunning}
                 />
               )}
             </>
