@@ -69,7 +69,7 @@ export const ShellConfirmationDialog: React.FC<
   return (
     <Box
       flexDirection="column"
-      borderStyle="round"
+      borderStyle="classic"
       borderColor={Colors.AccentYellow}
       padding={1}
       width="100%"
@@ -80,7 +80,7 @@ export const ShellConfirmationDialog: React.FC<
         <Text>A custom command wants to run the following shell commands:</Text>
         <Box
           flexDirection="column"
-          borderStyle="round"
+          borderStyle="classic"
           borderColor={Colors.Gray}
           paddingX={1}
           marginTop={1}
