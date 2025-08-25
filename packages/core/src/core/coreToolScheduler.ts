@@ -4,29 +4,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   ToolCallRequestInfo,
   ToolCallResponseInfo,
-  ToolConfirmationOutcome,
   ToolCallConfirmationDetails,
   ToolResult,
   ToolResultDisplay,
   ToolRegistry,
-  ApprovalMode,
   EditorType,
   Config,
-  logToolCall,
-  ToolCallEvent,
   ToolConfirmationPayload,
-  ToolErrorType,
   AnyDeclarativeTool,
   AnyToolInvocation,
 } from '../index.js';
-import { Part, PartListUnion } from '@google/genai';
+import {
+  ToolConfirmationOutcome,
+  ApprovalMode,
+  logToolCall,
+  ToolErrorType,
+  ToolCallEvent,
+} from '../index.js';
+import type { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
+import type { ModifyContext } from '../tools/modifiable-tool.js';
 import {
   isModifiableDeclarativeTool,
-  ModifyContext,
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
 import * as Diff from 'diff';

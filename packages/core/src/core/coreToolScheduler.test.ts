@@ -5,26 +5,27 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import type { ToolCall, WaitingToolCall } from './coreToolScheduler.js';
 import {
   CoreToolScheduler,
-  ToolCall,
-  WaitingToolCall,
   convertToFunctionResponse,
 } from './coreToolScheduler.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
+import type {
   ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
   ToolConfirmationPayload,
   ToolInvocation,
   ToolResult,
   Config,
-  Kind,
-  ApprovalMode,
   ToolRegistry,
 } from '../index.js';
-import { Part, PartListUnion } from '@google/genai';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  ToolConfirmationOutcome,
+  Kind,
+  ApprovalMode,
+} from '../index.js';
+import type { Part, PartListUnion } from '@google/genai';
 import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
 
 class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {

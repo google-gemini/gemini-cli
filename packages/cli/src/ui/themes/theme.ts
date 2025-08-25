@@ -5,7 +5,7 @@
  */
 
 import type { CSSProperties } from 'react';
-import { SemanticColors } from './semantic-tokens.js';
+import type { SemanticColors } from './semantic-tokens.js';
 import { resolveColor } from './color-utils.js';
 
 export type ThemeType = 'light' | 'dark' | 'ansi' | 'custom';

@@ -4,16 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { WritableStream, ReadableStream } from 'node:stream/web';
+import type { WritableStream, ReadableStream } from 'node:stream/web';
 
-import {
-  AuthType,
+import type {
   Config,
   GeminiChat,
-  logToolCall,
   ToolResult,
-  convertToFunctionResponse,
   ToolCallConfirmationDetails,
+} from '@google/gemini-cli-core';
+import {
+  AuthType,
+  logToolCall,
+  convertToFunctionResponse,
   ToolConfirmationOutcome,
   clearCachedCredentialFile,
   isNodeError,
@@ -26,15 +28,17 @@ import {
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
 import { Readable, Writable } from 'node:stream';
-import { Content, Part, FunctionCall } from '@google/genai';
-import { LoadedSettings, SettingScope } from '../config/settings.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import type { Content, Part, FunctionCall } from '@google/genai';
+import type { LoadedSettings } from '../config/settings.js';
+import { SettingScope } from '../config/settings.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { z } from 'zod';
 
-import { randomUUID } from 'crypto';
-import { Extension } from '../config/extension.js';
-import { CliArgs, loadCliConfig } from '../config/config.js';
+import { randomUUID } from 'node:crypto';
+import type { Extension } from '../config/extension.js';
+import type { CliArgs } from '../config/config.js';
+import { loadCliConfig } from '../config/config.js';
 
 export async function runZedIntegration(
   config: Config,
@@ -370,74 +374,75 @@ class Session {
       );
     }
 
-    const invocation = tool.build(args);
-    const confirmationDetails =
-      await invocation.shouldConfirmExecute(abortSignal);
+    try {
+      const invocation = tool.build(args);
 
-    if (confirmationDetails) {
-      const content: acp.ToolCallContent[] = [];
+      const confirmationDetails =
+        await invocation.shouldConfirmExecute(abortSignal);
 
-      if (confirmationDetails.type === 'edit') {
-        content.push({
-          type: 'diff',
-          path: confirmationDetails.fileName,
-          oldText: confirmationDetails.originalContent,
-          newText: confirmationDetails.newContent,
+      if (confirmationDetails) {
+        const content: acp.ToolCallContent[] = [];
+
+        if (confirmationDetails.type === 'edit') {
+          content.push({
+            type: 'diff',
+            path: confirmationDetails.fileName,
+            oldText: confirmationDetails.originalContent,
+            newText: confirmationDetails.newContent,
+          });
+        }
+
+        const params: acp.RequestPermissionRequest = {
+          sessionId: this.id,
+          options: toPermissionOptions(confirmationDetails),
+          toolCall: {
+            toolCallId: callId,
+            status: 'pending',
+            title: invocation.getDescription(),
+            content,
+            locations: invocation.toolLocations(),
+            kind: tool.kind,
+          },
+        };
+
+        const output = await this.client.requestPermission(params);
+        const outcome =
+          output.outcome.outcome === 'cancelled'
+            ? ToolConfirmationOutcome.Cancel
+            : z
+                .nativeEnum(ToolConfirmationOutcome)
+                .parse(output.outcome.optionId);
+
+        await confirmationDetails.onConfirm(outcome);
+
+        switch (outcome) {
+          case ToolConfirmationOutcome.Cancel:
+            return errorResponse(
+              new Error(`Tool "${fc.name}" was canceled by the user.`),
+            );
+          case ToolConfirmationOutcome.ProceedOnce:
+          case ToolConfirmationOutcome.ProceedAlways:
+          case ToolConfirmationOutcome.ProceedAlwaysServer:
+          case ToolConfirmationOutcome.ProceedAlwaysTool:
+          case ToolConfirmationOutcome.ModifyWithEditor:
+            break;
+          default: {
+            const resultOutcome: never = outcome;
+            throw new Error(`Unexpected: ${resultOutcome}`);
+          }
+        }
+      } else {
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call',
+          toolCallId: callId,
+          status: 'in_progress',
+          title: invocation.getDescription(),
+          content: [],
+          locations: invocation.toolLocations(),
+          kind: tool.kind,
         });
       }
 
-      const params: acp.RequestPermissionRequest = {
-        sessionId: this.id,
-        options: toPermissionOptions(confirmationDetails),
-        toolCall: {
-          toolCallId: callId,
-          status: 'pending',
-          title: invocation.getDescription(),
-          content,
-          locations: invocation.toolLocations(),
-          kind: tool.kind,
-        },
-      };
-
-      const output = await this.client.requestPermission(params);
-      const outcome =
-        output.outcome.outcome === 'cancelled'
-          ? ToolConfirmationOutcome.Cancel
-          : z
-              .nativeEnum(ToolConfirmationOutcome)
-              .parse(output.outcome.optionId);
-
-      await confirmationDetails.onConfirm(outcome);
-
-      switch (outcome) {
-        case ToolConfirmationOutcome.Cancel:
-          return errorResponse(
-            new Error(`Tool "${fc.name}" was canceled by the user.`),
-          );
-        case ToolConfirmationOutcome.ProceedOnce:
-        case ToolConfirmationOutcome.ProceedAlways:
-        case ToolConfirmationOutcome.ProceedAlwaysServer:
-        case ToolConfirmationOutcome.ProceedAlwaysTool:
-        case ToolConfirmationOutcome.ModifyWithEditor:
-          break;
-        default: {
-          const resultOutcome: never = outcome;
-          throw new Error(`Unexpected: ${resultOutcome}`);
-        }
-      }
-    } else {
-      await this.sendUpdate({
-        sessionUpdate: 'tool_call',
-        toolCallId: callId,
-        status: 'in_progress',
-        title: invocation.getDescription(),
-        content: [],
-        locations: invocation.toolLocations(),
-        kind: tool.kind,
-      });
-    }
-
-    try {
       const toolResult: ToolResult = await invocation.execute(abortSignal);
       const content = toToolCallContent(toolResult);
 

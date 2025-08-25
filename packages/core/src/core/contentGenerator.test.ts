@@ -5,15 +5,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { ContentGenerator } from './contentGenerator.js';
 import {
   createContentGenerator,
   AuthType,
   createContentGeneratorConfig,
-  ContentGenerator,
 } from './contentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
 
 vi.mock('../code_assist/codeAssist.js');
