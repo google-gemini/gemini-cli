@@ -548,7 +548,7 @@ export class GeminiChat {
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
           const visibleParts = content.parts.filter(
-            part => !('thought' in part),
+            (part) => !('thought' in part),
           );
           modelResponseParts.push(...visibleParts);
         }
