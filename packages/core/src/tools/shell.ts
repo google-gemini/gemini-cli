@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
-import os, { EOL } from 'os';
-import crypto from 'crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import os, { EOL } from 'node:os';
+import crypto from 'node:crypto';
 import { Config } from '../config/config.js';
 import {
   BaseDeclarativeTool,

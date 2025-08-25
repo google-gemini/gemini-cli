@@ -9,8 +9,8 @@ import { renderHook, act } from '@testing-library/react';
 import { useKeypress, Key } from './useKeypress.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { useStdin } from 'ink';
-import { EventEmitter } from 'events';
-import { PassThrough } from 'stream';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 
 // Mock the 'ink' module to control stdin
 vi.mock('ink', async (importOriginal) => {

@@ -9,9 +9,9 @@ import {
   GeminiCLIExtension,
   Storage,
 } from '@google/gemini-cli-core';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import { simpleGit } from 'simple-git';
 import { SettingScope, loadSettings } from '../config/settings.js';
 
@@ -447,7 +447,7 @@ export function disableExtension(name: string, scope: SettingScope) {
   }
   const settings = loadSettings(process.cwd());
   const settingsFile = settings.forScope(scope);
-  let extensionSettings = settingsFile.settings.extensions || { disabled: [] };
+  const extensionSettings = settingsFile.settings.extensions || { disabled: [] };
   const disabledExtensions = extensionSettings.disabled || [];
   if (!disabledExtensions.includes(name)) {
     disabledExtensions.push(name);
@@ -465,7 +465,7 @@ function removeFromDisabledExtensions(name: string, scopes: SettingScope[]) {
   const settings = loadSettings(process.cwd());
   for (const scope of scopes) {
     const settingsFile = settings.forScope(scope);
-    let extensionSettings = settingsFile.settings.extensions || {
+    const extensionSettings = settingsFile.settings.extensions || {
       disabled: [],
     };
     const disabledExtensions = extensionSettings.disabled || [];

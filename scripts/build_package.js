@@ -17,9 +17,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { execSync } from 'child_process';
-import { writeFileSync } from 'fs';
-import { join } from 'path';
+import { execSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 if (!process.cwd().includes('packages')) {
   console.error('must be invoked from a package directory');
