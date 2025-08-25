@@ -162,26 +162,28 @@ describe('EditTool', () => {
 
   describe('applyReplacement', () => {
     it('should return newString if isNewFile is true', () => {
-      expect(applyReplacement(null, 'old', 'new', true)).toBe('new');
-      expect(applyReplacement('existing', 'old', 'new', true)).toBe('new');
-    });
-
-    it('should return newString if currentContent is null and oldString is empty (defensive)', () => {
-      expect(applyReplacement(null, '', 'new', false)).toBe('new');
-    });
-
-    it('should return empty string if currentContent is null and oldString is not empty (defensive)', () => {
-      expect(applyReplacement(null, 'old', 'new', false)).toBe('');
-    });
-
-    it('should replace oldString with newString in currentContent', () => {
-      expect(applyReplacement('hello old world old', 'old', 'new', false)).toBe(
-        'hello new world new',
+      expect(applyReplacement(null, 'old', 'new', true, false)).toBe('new');
+      expect(applyReplacement('existing', 'old', 'new', true, false)).toBe(
+        'new',
       );
     });
 
+    it('should return newString if currentContent is null and oldString is empty (defensive)', () => {
+      expect(applyReplacement(null, '', 'new', false, false)).toBe('new');
+    });
+
+    it('should return empty string if currentContent is null and oldString is not empty (defensive)', () => {
+      expect(applyReplacement(null, 'old', 'new', false, false)).toBe('');
+    });
+
+    it('should replace oldString with newString in currentContent', () => {
+      expect(
+        applyReplacement('hello old world old', 'old', 'new', false, false),
+      ).toBe('hello new world new');
+    });
+
     it('should return currentContent if oldString is empty and not a new file', () => {
-      expect(applyReplacement('hello world', '', 'new', false)).toBe(
+      expect(applyReplacement('hello world', '', 'new', false, false)).toBe(
         'hello world',
       );
     });
@@ -888,6 +890,124 @@ describe('EditTool', () => {
 
       expect(params.old_string).toBe(initialContent);
       expect(params.new_string).toBe(modifiedContent);
+    });
+  });
+
+  describe('Line Number Targeting', () => {
+    const testFile = 'line_targeting_test.txt';
+    let filePath: string;
+    const initialContent =
+      'line 1: foo\nline 2: bar\nline 3: foo\nline 4: baz';
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, testFile);
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+    });
+
+    it('should replace string on a specific line', async () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'foo',
+        new_string: 'qux',
+        start_line: 1,
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      const expectedContent =
+        'line 1: qux\nline 2: bar\nline 3: foo\nline 4: baz';
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(expectedContent);
+      expect(result.llmContent).toMatch(/Successfully modified file/);
+    });
+
+    it('should replace string in a line range', async () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'foo',
+        new_string: 'qux',
+        start_line: 1,
+        end_line: 3,
+        expected_replacements: 2,
+      };
+      const invocation = tool.build(params);
+      await invocation.execute(new AbortController().signal);
+      const expectedContent =
+        'line 1: qux\nline 2: bar\nline 3: qux\nline 4: baz';
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(expectedContent);
+    });
+
+    it('should return error for invalid start_line', async () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'foo',
+        new_string: 'qux',
+        start_line: 0,
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_LINE_RANGE);
+    });
+
+    it('should return error for invalid end_line', async () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'foo',
+        new_string: 'qux',
+        start_line: 3,
+        end_line: 2,
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_LINE_RANGE);
+    });
+
+    it('should return error if old_string is not in range', async () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'baz',
+        new_string: 'qux',
+        start_line: 1,
+        end_line: 3,
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND);
+    });
+  });
+
+  describe('Dry Run Mode', () => {
+    const testFile = 'dry_run_test.txt';
+    let filePath: string;
+    const initialContent = 'line 1: foo\nline 2: bar\nline 3: foo';
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, testFile);
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+    });
+
+    it('should not write to file if dry_run is true', async () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'foo',
+        new_string: 'qux',
+        dry_run: true,
+      };
+      const invocation = tool.build(params);
+      await invocation.execute(new AbortController().signal);
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent);
+    });
+
+    it('should return the new content in returnDisplay on dry_run', async () => {
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'foo',
+        new_string: 'qux',
+        dry_run: true,
+        expected_replacements: 2,
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      const expectedContent = 'line 1: qux\nline 2: bar\nline 3: qux';
+      expect(result.returnDisplay).toBe(expectedContent);
     });
   });
 });
