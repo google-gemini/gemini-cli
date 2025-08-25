@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
-import { spawn, SpawnOptions } from 'child_process';
-import { EventEmitter } from 'events';
+import type { Mock } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import type { spawn, SpawnOptions } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import {
   isAtCommand,
   isSlashCommand,
@@ -44,7 +45,7 @@ describe('commandUtils', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     // Dynamically import and set up spawn mock
-    const { spawn } = await import('child_process');
+    const { spawn } = await import('node:child_process');
     mockSpawn = spawn as Mock;
 
     // Create mock child process with stdout/stderr emitters
