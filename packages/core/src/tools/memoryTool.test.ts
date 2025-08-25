@@ -12,14 +12,14 @@ import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
 } from './memoryTool.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as os from 'os';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
 // Mock dependencies
-vi.mock(import('fs/promises'), async (importOriginal) => {
+vi.mock(import('node:fs/promises'), async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
