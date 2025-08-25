@@ -338,6 +338,14 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     }
     ```
 
+- **`ctrlBackspaceModeFix`** (boolean):
+  - **Description:** Enables a fix for `Ctrl+Backspace` functionality in the CLI prompt. This is useful if you are experiencing issues with word deletion in your terminal.
+  - **Default:** `false`
+  - **Example:**
+    ```json
+    "ctrlBackspaceModeFix": true
+    ```
+
 ### Example `settings.json`:
 
 ```json

@@ -573,6 +573,16 @@ export const SETTINGS_SCHEMA = {
     description: 'Enable debug logging of keystrokes to the console.',
     showInDialog: true,
   },
+  ctrlBackspaceModeFix: {
+    type: 'boolean',
+    label: 'Ctrl+Backspace mode fix',
+    category: 'General',
+    requiresRestart: true,
+    default: false,
+    description:
+      'Enable fix for Ctrl+Backspace functionality on non-kitty terminals',
+    showInDialog: false,
+  },
 } as const;
 
 type InferSettings<T extends SettingsSchema> = {
