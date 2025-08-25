@@ -262,10 +262,10 @@ describe('GeminiChat', () => {
       expect(modelTurn.role).toBe('model');
 
       // The model turn should have 3 distinct parts: the merged text, the function call, and the final text.
-      expect(modelTurn.parts.length).toBe(3);
-      expect(modelTurn.parts[0]!.text).toBe('This is the first part.');
-      expect(modelTurn.parts[1]!.functionCall).toBeDefined();
-      expect(modelTurn.parts[2]!.text).toBe('This is the second part.');
+      expect(modelTurn?.parts?.length).toBe(3);
+      expect(modelTurn?.parts![0]!.text).toBe('This is the first part.');
+      expect(modelTurn.parts![1]!.functionCall).toBeDefined();
+      expect(modelTurn.parts![2]!.text).toBe('This is the second part.');
     });
     it('should preserve text parts that stream in the same chunk as a thought', async () => {
       // 1. Mock the API to return a single chunk containing both a thought and visible text.
