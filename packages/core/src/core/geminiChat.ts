@@ -276,12 +276,7 @@ export class GeminiChat {
 
       this.sendPromise = (async () => {
         const outputContent = response.candidates?.[0]?.content;
-        const initialModelOutput = outputContent ? [outputContent] : [];
-
-        // Pre-process the model output to filter thought parts before passing to recordHistory.
-        // This makes the non-streaming path consistent with the streaming path's logic.
-        const cleanedModelOutput =
-          this.getVisibleModelOutput(initialModelOutput);
+        const modelOutput = outputContent ? [outputContent] : [];
 
         // Because the AFC input contains the entire curated chat history in
         // addition to the new user input, we need to truncate the AFC history
@@ -297,7 +292,7 @@ export class GeminiChat {
 
         this.recordHistory(
           userContent,
-          cleanedModelOutput, // Pass the cleaned data instead of the original
+          modelOutput,
           automaticFunctionCallingHistory,
         );
       })();
@@ -554,7 +549,6 @@ export class GeminiChat {
       if (isValidResponse(chunk)) {
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
-          // Collect all parts; they will be filtered by the new helper method.
           modelResponseParts.push(...content.parts);
         }
       } else {
@@ -570,15 +564,14 @@ export class GeminiChat {
       );
     }
 
-    const initialModelOutput: Content[] =
+    // Bundle all streamed parts into a single Content object
+    const modelOutput: Content[] =
       modelResponseParts.length > 0
         ? [{ role: 'model', parts: modelResponseParts }]
         : [];
 
-    // UNIFIED LOGIC: Call the new helper to get only visible content.
-    const visibleModelOutput = this.getVisibleModelOutput(initialModelOutput);
-
-    this.recordHistory(userInput, visibleModelOutput);
+    // Pass the raw, bundled data to the new, robust recordHistory
+    this.recordHistory(userInput, modelOutput);
   }
 
   /**
@@ -607,7 +600,7 @@ export class GeminiChat {
     modelOutput: Content[],
     automaticFunctionCallingHistory?: Content[],
   ) {
-    // Part 1: Handle the user's part of the turn.
+    // Part 1: Handle the user's turn.
     if (
       automaticFunctionCallingHistory &&
       automaticFunctionCallingHistory.length > 0
@@ -616,42 +609,69 @@ export class GeminiChat {
         ...extractCuratedHistory(automaticFunctionCallingHistory),
       );
     } else {
-      // In non-streaming, userInput is not in history yet.
-      // In streaming, it was pushed before the call.
-      if (this.history[this.history.length - 1] !== userInput) {
+      if (
+        this.history.length === 0 ||
+        this.history[this.history.length - 1] !== userInput
+      ) {
         this.history.push(userInput);
       }
     }
 
-    // Part 3: Consolidate adjacent text parts from the visible model output.
-    const consolidatedOutput: Content[] = [];
+    // Part 2: Process the model output into a final, consolidated list of turns.
+    const finalModelTurns: Content[] = [];
     for (const content of modelOutput) {
-      // Don't consolidate malformed content.
+      // A. Preserve malformed content that has no 'parts' array.
       if (!content.parts) {
-        consolidatedOutput.push(content);
+        finalModelTurns.push(content);
         continue;
       }
-      const lastContent = consolidatedOutput[consolidatedOutput.length - 1];
-      if (this.isLastPartText(lastContent) && this.isFirstPartText(content)) {
-        lastContent.parts[lastContent.parts.length - 1].text +=
-          content.parts[0].text || '';
-        if (content.parts.length > 1) {
-          lastContent.parts.push(...content.parts.slice(1));
-        }
+
+      // B. Filter out 'thought' parts.
+      const visibleParts = content.parts.filter((part) => !part.thought);
+
+      // C. THE FIX: We no longer skip thought-only content here.
+      // Instead, we let it continue as a turn with an empty `parts` array.
+
+      const newTurn = { ...content, parts: visibleParts };
+      const lastTurnInFinal = finalModelTurns[finalModelTurns.length - 1];
+
+      // D. Consolidate this new turn with the PREVIOUS turn if they are adjacent text.
+      if (
+        lastTurnInFinal &&
+        this.isLastPartText(lastTurnInFinal) &&
+        this.isFirstPartText(newTurn)
+      ) {
+        lastTurnInFinal.parts.push(...newTurn.parts);
       } else {
-        consolidatedOutput.push(content);
+        finalModelTurns.push(newTurn);
       }
     }
 
-    // Part 4: Add the processed model entries to the history.
-    if (consolidatedOutput.length > 0) {
-      this.history.push(...consolidatedOutput);
-    } else if (
-      !automaticFunctionCallingHistory ||
-      automaticFunctionCallingHistory.length === 0
-    ) {
-      // If, after all processing, there's NO model output, AND it wasn't
-      // an AFC turn, add the empty placeholder to maintain alternation.
+    // Part 3: Add the processed model turns to the history.
+    if (finalModelTurns.length > 0) {
+      // Re-consolidate parts within any turns that were merged in the previous step.
+      for (const turn of finalModelTurns) {
+        if (turn.parts && turn.parts.length > 1) {
+          const consolidatedParts: Part[] = [];
+          for (const part of turn.parts) {
+            const lastPart = consolidatedParts[consolidatedParts.length - 1];
+            if (
+              lastPart &&
+              'text' in lastPart &&
+              'text' in part &&
+              typeof part.text === 'string'
+            ) {
+              lastPart.text += part.text;
+            } else {
+              consolidatedParts.push({ ...part });
+            }
+          }
+          turn.parts = consolidatedParts;
+        }
+      }
+      this.history.push(...finalModelTurns);
+    } else if (!automaticFunctionCallingHistory) {
+      // If, after all processing, there's NO model output, add the placeholder.
       this.history.push({ role: 'model', parts: [] });
     }
   }
@@ -671,6 +691,8 @@ export class GeminiChat {
   private isLastPartText(
     content: Content | undefined,
   ): content is Content & { parts: [...Part[], { text: string }] } {
+    // FIX: This check was too strict and was breaking consolidation.
+    // The `text !== ''` check is incorrect for intermediate consolidation steps.
     if (
       !content ||
       content.role !== 'model' ||
@@ -680,10 +702,16 @@ export class GeminiChat {
       return false;
     }
     const lastPart = content.parts[content.parts.length - 1];
-    return typeof lastPart.text === 'string' && lastPart.text !== '';
+    return (
+      typeof lastPart.text === 'string' &&
+      !('functionCall' in lastPart) &&
+      !('functionResponse' in lastPart) &&
+      !('inlineData' in lastPart) &&
+      !('fileData' in lastPart) &&
+      !('thought' in lastPart)
+    );
   }
 }
-
 /** Visible for Testing */
 export function isSchemaDepthError(errorMessage: string): boolean {
   return errorMessage.includes('maximum schema depth exceeded');

@@ -159,7 +159,6 @@ describe('GeminiChat', () => {
       const history = chat.getHistory();
 
       // The history should be: [user, model(tool_call), user(tool_response), user(new_prompt), model(empty)]
-      //. expect(history).toBe([])
       expect(history.length).toBe(5);
 
       // The final turn should be the empty model response.
