@@ -25,6 +25,24 @@ export function getErrorMessage(error: unknown): string {
   }
 }
 
+/**
+ * Sanitizes an error message by redacting sensitive OAuth-related fields.
+ * This function replaces occurrences of known sensitive keys with '[REDACTED]'.
+ */
+export function sanitizeErrorMessage(message: string): string {
+  // Redact common OAuth fields (client_id, client_secret, token, authorizationUrl, tokenUrl)
+  // This is a simple regex-based approach; adjust as needed for your context.
+  let sanitized = message;
+  sanitized = sanitized.replace(/(client_id=)[^&\s]+/gi, '$1[REDACTED]');
+  sanitized = sanitized.replace(/(client_secret=)[^&\s]+/gi, '$1[REDACTED]');
+  sanitized = sanitized.replace(/(token=)[^&\s]+/gi, '$1[REDACTED]');
+  sanitized = sanitized.replace(/(authorizationUrl=)[^&\s]+/gi, '$1[REDACTED]');
+  sanitized = sanitized.replace(/(tokenUrl=)[^&\s]+/gi, '$1[REDACTED]');
+  // Redact URLs that may contain sensitive query params
+  sanitized = sanitized.replace(/https?:\/\/[^\s]+/gi, '[REDACTED_URL]');
+  return sanitized;
+}
+
 export class ForbiddenError extends Error {}
 export class UnauthorizedError extends Error {}
 export class BadRequestError extends Error {}

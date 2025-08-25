@@ -78,10 +78,18 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     let url = urls[0];
 
     // Convert GitHub blob URL to raw URL
-    if (url.includes('github.com') && url.includes('/blob/')) {
-      url = url
-        .replace('github.com', 'raw.githubusercontent.com')
-        .replace('/blob/', '/');
+    try {
+      const parsedUrl = new URL(url);
+      if (
+        (parsedUrl.host === 'github.com' || parsedUrl.host.endsWith('.github.com')) &&
+        parsedUrl.pathname.includes('/blob/')
+      ) {
+        url = url
+          .replace('github.com', 'raw.githubusercontent.com')
+          .replace('/blob/', '/');
+      }
+    } catch (e) {
+      // If URL parsing fails, leave url unchanged
     }
 
     try {
@@ -151,10 +159,19 @@ ${textContent}
     // Perform GitHub URL conversion here to differentiate between user-provided
     // URL and the actual URL to be fetched.
     const urls = extractUrls(this.params.prompt).map((url) => {
-      if (url.includes('github.com') && url.includes('/blob/')) {
-        return url
-          .replace('github.com', 'raw.githubusercontent.com')
-          .replace('/blob/', '/');
+      try {
+        const parsed = new URL(url);
+        // Check for github.com or subdomains (e.g., gist.github.com)
+        if (
+          (parsed.hostname === 'github.com' || parsed.hostname.endsWith('.github.com')) &&
+          parsed.pathname.includes('/blob/')
+        ) {
+          return url
+            .replace(parsed.hostname, 'raw.githubusercontent.com')
+            .replace('/blob/', '/');
+        }
+      } catch (e) {
+        // If URL parsing fails, fall back to original logic (or skip transformation)
       }
       return url;
     });
