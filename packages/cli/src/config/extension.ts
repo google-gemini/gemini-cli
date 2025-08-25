@@ -39,6 +39,11 @@ export interface ExtensionInstallMetadata {
   type: 'git' | 'local';
 }
 
+export interface ExtensionUpdateInfo {
+  originalVersion: string;
+  updatedVersion: string;
+}
+
 export class ExtensionStorage {
   private readonly extensionName: string;
 
@@ -321,7 +326,7 @@ export async function installExtension(
       )
     ) {
       throw new Error(
-        `Error: Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
+        `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
       );
     }
 
@@ -337,4 +342,89 @@ export async function installExtension(
   }
 
   return newExtensionName;
+}
+
+export async function uninstallExtension(extensionName: string): Promise<void> {
+  const installedExtensions = loadUserExtensions();
+  if (
+    !installedExtensions.some(
+      (installed) => installed.config.name === extensionName,
+    )
+  ) {
+    throw new Error(`Extension "${extensionName}" not found.`);
+  }
+  const storage = new ExtensionStorage(extensionName);
+  return await fs.promises.rm(storage.getExtensionDir(), {
+    recursive: true,
+    force: true,
+  });
+}
+
+export function toOutputString(extension: Extension): string {
+  let output = `${extension.config.name} (${extension.config.version})`;
+  output += `\n Path: ${extension.path}`;
+  if (extension.installMetadata) {
+    output += `\n Source: ${extension.installMetadata.source}`;
+  }
+  if (extension.contextFiles.length > 0) {
+    output += `\n Context files:`;
+    extension.contextFiles.forEach((contextFile) => {
+      output += `\n  ${contextFile}`;
+    });
+  }
+  if (extension.config.mcpServers) {
+    output += `\n MCP servers:`;
+    Object.keys(extension.config.mcpServers).forEach((key) => {
+      output += `\n  ${key}`;
+    });
+  }
+  if (extension.config.excludeTools) {
+    output += `\n Excluded tools:`;
+    extension.config.excludeTools.forEach((tool) => {
+      output += `\n  ${tool}`;
+    });
+  }
+  return output;
+}
+
+export async function updateExtension(
+  extensionName: string,
+): Promise<ExtensionUpdateInfo | undefined> {
+  const installedExtensions = loadUserExtensions();
+  const extension = installedExtensions.find(
+    (installed) => installed.config.name === extensionName,
+  );
+  if (!extension) {
+    throw new Error(
+      `Extension "${extensionName}" not found. Run gemini extensions list to see available extensions.`,
+    );
+  }
+  if (!extension.installMetadata) {
+    throw new Error(
+      `Extension cannot be updated because it is missing the .gemini-extension.install.json file. To update manually, uninstall and then reinstall the updated version.`,
+    );
+  }
+  const originalVersion = extension.config.version;
+  const tempDir = await ExtensionStorage.createTmpDir();
+  try {
+    await copyExtension(extension.path, tempDir);
+    await uninstallExtension(extensionName);
+    await installExtension(extension.installMetadata);
+
+    const updatedExtension = loadExtension(extension.path);
+    if (!updatedExtension) {
+      throw new Error('Updated extension not found after installation.');
+    }
+    const updatedVersion = updatedExtension.config.version;
+    return {
+      originalVersion,
+      updatedVersion,
+    };
+  } catch (e) {
+    console.error(`Error updating extension, rolling back. ${e}`);
+    await copyExtension(tempDir, extension.path);
+    throw e;
+  } finally {
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+  }
 }
