@@ -15,6 +15,7 @@ import os from 'node:os';
 import dns from 'node:dns';
 import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
+
 import {
   DnsResolutionOrder,
   LoadedSettings,
@@ -47,91 +48,10 @@ import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
-
-export function validateDnsResolutionOrder(
-  order: string | undefined,
-): DnsResolutionOrder {
-  const defaultValue: DnsResolutionOrder = 'ipv4first';
-  if (order === undefined) {
-    return defaultValue;
-  }
-  if (order === 'ipv4first' || order === 'verbatim') {
-    return order;
-  }
-  // We don't want to throw here, just warn and use the default.
-  console.warn(
-    `Invalid value for dnsResolutionOrder in settings: "${order}". Using default "${defaultValue}".`,
-  );
-  return defaultValue;
-}
-
-function getNodeMemoryArgs(config: Config): string[] {
-  const totalMemoryMB = os.totalmem() / (1024 * 1024);
-  const heapStats = v8.getHeapStatistics();
-  const currentMaxOldSpaceSizeMb = Math.floor(
-    heapStats.heap_size_limit / 1024 / 1024,
-  );
-
-  // Set target to 50% of total memory
-  const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
-  if (config.getDebugMode()) {
-    console.debug(
-      `Current heap size ${currentMaxOldSpaceSizeMb.toFixed(2)} MB`,
-    );
-  }
-
-  if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
-    return [];
-  }
-
-  if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
-    if (config.getDebugMode()) {
-      console.debug(
-        `Need to relaunch with more memory: ${targetMaxOldSpaceSizeInMB.toFixed(2)} MB`,
-      );
-    }
-    return [`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`];
-  }
-
-  return [];
-}
-
-async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
-  const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
-  const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
-
-  const child = spawn(process.execPath, nodeArgs, {
-    stdio: 'inherit',
-    env: newEnv,
-  });
-
-  await new Promise((resolve) => child.on('close', resolve));
-  process.exit(0);
-}
+import { loadThemesFromExtensions } from './services/ExtensionLoader.js';
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
 
-export function setupUnhandledRejectionHandler() {
-  let unhandledRejectionOccurred = false;
-  process.on('unhandledRejection', (reason, _promise) => {
-    const errorMessage = `=========================================
-This is an unexpected error. Please file a bug report using the /bug tool.
-CRITICAL: Unhandled Promise Rejection!
-=========================================
-Reason: ${reason}${
-      reason instanceof Error && reason.stack
-        ? `
-Stack trace:
-${reason.stack}`
-        : ''
-    }`;
-    appEvents.emit(AppEvent.LogError, errorMessage);
-    if (!unhandledRejectionOccurred) {
-      unhandledRejectionOccurred = true;
-      appEvents.emit(AppEvent.OpenDebugConsole);
-    }
-  });
-}
-
+// --- THIS IS THE NEW EXPORTED FUNCTION THAT THE TEST FILE NEEDS ---
 export async function startInteractiveUI(
   config: Config,
   settings: LoadedSettings,
@@ -139,7 +59,6 @@ export async function startInteractiveUI(
   workspaceRoot: string,
 ) {
   const version = await getCliVersion();
-  // Detect and enable Kitty keyboard protocol once at startup
   await detectAndEnableKittyProtocol();
   setWindowTitle(basename(workspaceRoot), settings);
   const instance = render(
@@ -153,7 +72,7 @@ export async function startInteractiveUI(
         />
       </SettingsContext.Provider>
     </React.StrictMode>,
-    { exitOnCtrlC: false, isScreenReaderEnabled: config.getScreenReader() },
+    { exitOnCtrlC: false },
   );
 
   checkForUpdates()
@@ -161,13 +80,86 @@ export async function startInteractiveUI(
       handleAutoUpdate(info, settings, config.getProjectRoot());
     })
     .catch((err) => {
-      // Silently ignore update check errors.
       if (config.getDebugMode()) {
         console.error('Update check failed:', err);
       }
     });
 
   registerCleanup(() => instance.unmount());
+}
+// ----------------------------------------------------------------
+
+export function validateDnsResolutionOrder(
+  order: string | undefined,
+): DnsResolutionOrder {
+  const defaultValue: DnsResolutionOrder = 'ipv4first';
+  if (order === undefined) {
+    return defaultValue;
+  }
+  if (order === 'ipv4first' || order === 'verbatim') {
+    return order;
+  }
+  console.warn(
+    `Invalid value for dnsResolutionOrder in settings: "${order}". Using default "${defaultValue}".`,
+  );
+  return defaultValue;
+}
+
+function getNodeMemoryArgs(config: Config): string[] {
+  const totalMemoryMB = os.totalmem() / (1024 * 1024);
+  const heapStats = v8.getHeapStatistics();
+  const currentMaxOldSpaceSizeMb = Math.floor(
+    heapStats.heap_size_limit / 1024 / 1024,
+  );
+  const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
+  if (config.getDebugMode()) {
+    console.debug(
+      `Current heap size ${currentMaxOldSpaceSizeMb.toFixed(2)} MB`,
+    );
+  }
+  if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
+    return [];
+  }
+  if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
+    if (config.getDebugMode()) {
+      console.debug(
+        `Need to relaunch with more memory: ${targetMaxOldSpaceSizeInMB.toFixed(2)} MB`,
+      );
+    }
+    return [`--max-old-space-size=${targetMaxOldSpaceSizeInMB}`];
+  }
+  return [];
+}
+
+async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
+  const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
+  const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+  const child = spawn(process.execPath, nodeArgs, {
+    stdio: 'inherit',
+    env: newEnv,
+  });
+  await new Promise((resolve) => child.on('close', resolve));
+  process.exit(0);
+}
+
+export function setupUnhandledRejectionHandler() {
+  let unhandledRejectionOccurred = false;
+  process.on('unhandledRejection', (reason, _promise) => {
+    const errorMessage = `=========================================
+This is an unexpected error. Please file a bug report using the /bug tool.
+CRITICAL: Unhandled Promise Rejection!
+=========================================
+Reason: ${reason}${
+      reason instanceof Error && reason.stack
+        ? `\nStack trace:\n${reason.stack}`
+        : ''
+    }`;
+    appEvents.emit(AppEvent.LogError, errorMessage);
+    if (!unhandledRejectionOccurred) {
+      unhandledRejectionOccurred = true;
+      appEvents.emit(AppEvent.OpenDebugConsole);
+    }
+  });
 }
 
 export async function main() {
@@ -190,6 +182,10 @@ export async function main() {
 
   const argv = await parseArguments();
   const extensions = loadExtensions(workspaceRoot);
+
+  // Load themes contributed by extensions right after extensions are loaded.
+  loadThemesFromExtensions(settings);
+
   const config = await loadCliConfig(
     settings.merged,
     extensions,
@@ -223,7 +219,6 @@ export async function main() {
     process.exit(0);
   }
 
-  // Set a default auth type if one isn't set.
   if (!settings.merged.selectedAuthType) {
     if (process.env['CLOUD_SHELL'] === 'true') {
       settings.setValue(
@@ -243,18 +238,14 @@ export async function main() {
     logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
   }
 
-  // Load custom themes from settings
   themeManager.loadCustomThemes(settings.merged.customThemes);
 
   if (settings.merged.theme) {
     if (!themeManager.setActiveTheme(settings.merged.theme)) {
-      // If the theme is not found during initial load, log a warning and continue.
-      // The useThemeCommand hook in App.tsx will handle opening the dialog.
       console.warn(`Warning: Theme "${settings.merged.theme}" not found.`);
     }
   }
 
-  // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
     const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
       ? getNodeMemoryArgs(config)
@@ -265,7 +256,6 @@ export async function main() {
         settings.merged.selectedAuthType &&
         !settings.merged.useExternalAuth
       ) {
-        // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
         try {
           const err = validateAuthMethod(settings.merged.selectedAuthType);
           if (err) {
@@ -277,41 +267,9 @@ export async function main() {
           process.exit(1);
         }
       }
-      let stdinData = '';
-      if (!process.stdin.isTTY) {
-        stdinData = await readStdin();
-      }
-
-      // This function is a copy of the one from sandbox.ts
-      // It is moved here to decouple sandbox.ts from the CLI's argument structure.
-      const injectStdinIntoArgs = (
-        args: string[],
-        stdinData?: string,
-      ): string[] => {
-        const finalArgs = [...args];
-        if (stdinData) {
-          const promptIndex = finalArgs.findIndex(
-            (arg) => arg === '--prompt' || arg === '-p',
-          );
-          if (promptIndex > -1 && finalArgs.length > promptIndex + 1) {
-            // If there's a prompt argument, prepend stdin to it
-            finalArgs[promptIndex + 1] =
-              `${stdinData}\n\n${finalArgs[promptIndex + 1]}`;
-          } else {
-            // If there's no prompt argument, add stdin as the prompt
-            finalArgs.push('--prompt', stdinData);
-          }
-        }
-        return finalArgs;
-      };
-
-      const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
-
-      await start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs);
+      await start_sandbox(sandboxConfig, memoryArgs, config);
       process.exit(0);
     } else {
-      // Not in a sandbox and not entering one, so relaunch with additional
-      // arguments to control memory usage if needed.
       if (memoryArgs.length > 0) {
         await relaunchWithAdditionalArgs(memoryArgs);
         process.exit(0);
@@ -323,7 +281,6 @@ export async function main() {
     settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
     config.isBrowserLaunchSuppressed()
   ) {
-    // Do oauth before app renders to make copying the link possible.
     await getOauthClient(settings.merged.selectedAuthType, config);
   }
 
@@ -337,13 +294,12 @@ export async function main() {
     ...(await getUserStartupWarnings(workspaceRoot)),
   ];
 
-  // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {
+    // The logic is now in the separate, exported function.
     await startInteractiveUI(config, settings, startupWarnings, workspaceRoot);
     return;
   }
-  // If not a TTY, read from stdin
-  // This is for cases where the user pipes input directly into the command
+
   if (!process.stdin.isTTY) {
     const stdinData = await readStdin();
     if (stdinData) {
@@ -351,9 +307,7 @@ export async function main() {
     }
   }
   if (!input) {
-    console.error(
-      `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
-    );
+    console.error('No input provided via stdin.');
     process.exit(1);
   }
 

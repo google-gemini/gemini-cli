@@ -71,6 +71,7 @@ export function ThemeDialog({
       themeTypeDisplay: 'Custom',
     })),
   ];
+  console.log('--- [UI DIALOG DEBUG] Final theme items to render:', themeItems);
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
 
   // Find the index of the selected theme, but only if it exists in the list
