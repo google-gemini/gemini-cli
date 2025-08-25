@@ -1412,13 +1412,13 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      
+
       // Enter reverse search mode with Ctrl+R
       act(() => {
         stdin.write('\x12');
       });
       await wait();
-      
+
       // Verify reverse search is active
       expect(stdout.lastFrame()).toContain('(r:)');
 
