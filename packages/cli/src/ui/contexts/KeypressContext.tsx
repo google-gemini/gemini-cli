@@ -21,6 +21,7 @@ import readline from 'node:readline';
 import { PassThrough } from 'node:stream';
 import {
   BACKSLASH_ENTER_DETECTION_WINDOW_MS,
+  CHAR_CODE_ESC,
   KITTY_CTRL_C,
   KITTY_KEYCODE_BACKSPACE,
   KITTY_KEYCODE_ENTER,
@@ -127,7 +128,7 @@ export function KeypressProvider({
       const ctrl = (modifierBits & 4) === 4;
 
       const keyNameMap: Record<number, string> = {
-        27: 'escape',
+        [CHAR_CODE_ESC]: 'escape',
         [KITTY_KEYCODE_TAB]: 'tab',
         [KITTY_KEYCODE_BACKSPACE]: 'backspace',
         [KITTY_KEYCODE_ENTER]: 'return',
