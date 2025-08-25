@@ -139,13 +139,6 @@ export const useGeminiStream = (
       onEditorClose,
     );
 
-  const scheduleToolCallsWithState = useCallback(
-    (requests: ToolCallRequestInfo[], signal: AbortSignal) => {
-      scheduleToolCalls(requests, signal);
-    },
-    [scheduleToolCalls],
-  );
-
   const pendingToolCallGroupDisplay = useMemo(
     () =>
       toolCalls.length ? mapTrackedToolCallsToDisplay(toolCalls) : undefined,
@@ -277,7 +270,7 @@ export const useGeminiStream = (
                 isClientInitiated: true,
                 prompt_id,
               };
-              scheduleToolCallsWithState([toolCallRequest], abortSignal);
+              scheduleToolCalls([toolCallRequest], abortSignal);
               return { queryToSend: null, shouldProceed: false };
             }
             case 'submit_prompt': {
@@ -354,7 +347,7 @@ export const useGeminiStream = (
       handleSlashCommand,
       logger,
       shellModeActive,
-      scheduleToolCallsWithState,
+      scheduleToolCalls,
     ],
   );
 
@@ -615,7 +608,7 @@ export const useGeminiStream = (
         }
       }
       if (toolCallRequests.length > 0) {
-        scheduleToolCallsWithState(toolCallRequests, signal);
+        scheduleToolCalls(toolCallRequests, signal);
       }
       return StreamProcessingStatus.Completed;
     },
@@ -623,7 +616,7 @@ export const useGeminiStream = (
       handleContentEvent,
       handleUserCancelledEvent,
       handleErrorEvent,
-      scheduleToolCallsWithState,
+      scheduleToolCalls,
       handleChatCompressionEvent,
       handleFinishedEvent,
       handleMaxSessionTurnsEvent,
