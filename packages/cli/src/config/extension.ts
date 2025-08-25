@@ -447,7 +447,7 @@ export function disableExtension(name: string, scope: SettingScope) {
   }
   const settings = loadSettings(process.cwd());
   const settingsFile = settings.forScope(scope);
-  let extensionSettings = settingsFile.settings.extensions || { disabled: [] };
+  const extensionSettings = settingsFile.settings.extensions || { disabled: [] };
   const disabledExtensions = extensionSettings.disabled || [];
   if (!disabledExtensions.includes(name)) {
     disabledExtensions.push(name);
@@ -469,7 +469,7 @@ function removeFromDisabledExtensions(name: string, scopes: SettingScope[]) {
   const settings = loadSettings(process.cwd());
   for (const scope of scopes) {
     const settingsFile = settings.forScope(scope);
-    let extensionSettings = settingsFile.settings.extensions || {
+    const extensionSettings = settingsFile.settings.extensions || {
       disabled: [],
     };
     const disabledExtensions = extensionSettings.disabled || [];
