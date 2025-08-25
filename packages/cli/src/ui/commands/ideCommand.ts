@@ -9,7 +9,6 @@ import {
   getIdeInstaller,
   IDEConnectionStatus,
   ideContext,
-  DetectedIde,
   GEMINI_CLI_COMPANION_EXTENSION_NAME,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
