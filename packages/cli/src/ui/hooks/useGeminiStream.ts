@@ -59,6 +59,7 @@ import path from 'node:path';
 import {
   useReactToolScheduler,
   mapToDisplay as mapTrackedToolCallsToDisplay,
+  type TrackedWaitingToolCall,
 } from './useReactToolScheduler.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';

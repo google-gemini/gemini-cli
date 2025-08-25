@@ -87,12 +87,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       {toolCalls.map((tool) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
         return (
-          <Box
-            key={tool.callId}
-            flexDirection="column"
-            minHeight={1}
-            marginBottom={1}
-          >
+          <Box key={tool.callId} flexDirection="column" minHeight={1}>
             <Box flexDirection="row" alignItems="center">
               <ToolMessage
                 callId={tool.callId}
