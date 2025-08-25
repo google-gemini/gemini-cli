@@ -121,6 +121,13 @@ const MAX_EVENTS = 1000;
  */
 const MAX_RETRY_EVENTS = 100;
 
+export class ClearcutDecodeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ClearcutDecodeError';
+  }
+}
+
 // Singleton class for batch posting log events to Clearcut. When a new event comes in, the elapsed time
 // is checked and events are flushed to Clearcut if at least a minute has passed since the last flush.
 export class ClearcutLogger {
@@ -322,6 +329,44 @@ export class ClearcutLogger {
     return result;
   }
 
+  // Visible for testing. Decodes protobuf-encoded response from Clearcut server.
+  decodeLogResponse(buf: Buffer): LogResponse {
+    if (buf.length < 1) {
+      throw new ClearcutDecodeError('empty response buffer');
+    }
+
+    // The first byte of the buffer is `field<<3 | type`. We're looking for field
+    // 1, with type varint, represented by type=0. If the first byte isn't 8, that
+    // means field 1 is missing or the message is corrupted. Either way, we return
+    // ClearcutDecodeError.
+    if (buf.readUInt8(0) !== 8) {
+      throw new ClearcutDecodeError('missing field 1 in response');
+    }
+
+    let ms = BigInt(0);
+    let cont = true;
+
+    // In each byte, the most significant bit is the continuation bit. If it's
+    // set, we keep going. The lowest 7 bits, are data bits. They are concatenated
+    // in reverse order to form the final number.
+    for (let i = 1; cont && i < buf.length; i++) {
+      const byte = buf.readUInt8(i);
+      ms |= BigInt(byte & 0x7f) << BigInt(7 * (i - 1));
+      cont = (byte & 0x80) !== 0;
+    }
+
+    if (cont) {
+      // We have fallen off the buffer without seeing a terminating byte. The
+      // message is corrupted.
+      throw new ClearcutDecodeError('unterminated varint in response');
+    }
+
+    const returnVal = {
+      nextRequestWaitMs: Number(ms),
+    };
+    return returnVal;
+  }
+
   logStartSessionEvent(event: StartSessionEvent): void {
     const data: EventValue[] = [
       {
@@ -352,11 +397,6 @@ export class ClearcutLogger {
       },
       {
         gemini_cli_key:
-          EventMetadataKey.GEMINI_CLI_START_SESSION_VERTEX_API_ENABLED,
-        value: event.vertex_ai_enabled.toString(),
-      },
-      {
-        gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_START_SESSION_DEBUG_MODE_ENABLED,
         value: event.debug_enabled.toString(),
       },
@@ -368,11 +408,6 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_MCP_SERVERS,
         value: event.mcp_servers,
-      },
-      {
-        gemini_cli_key:
-          EventMetadataKey.GEMINI_CLI_START_SESSION_VERTEX_API_ENABLED,
-        value: event.vertex_ai_enabled.toString(),
       },
       {
         gemini_cli_key:
