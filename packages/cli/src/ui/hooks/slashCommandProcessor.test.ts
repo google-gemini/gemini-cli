@@ -71,14 +71,14 @@ vi.mock('../../utils/cleanup.js', () => ({
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
-import {
+import type {
   CommandContext,
-  CommandKind,
   ConfirmShellCommandsActionReturn,
   SlashCommand,
 } from '../commands/types.js';
+import { CommandKind } from '../commands/types.js';
 import { ToolConfirmationOutcome } from '@google/gemini-cli-core';
-import { LoadedSettings } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
