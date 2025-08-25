@@ -455,7 +455,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (keyMatchers[Command.SUBMIT](key)) {
-        if (buffer.text.trim()) {
+        const trimmedText = buffer.text.trim();
+        if (trimmedText === ':q' || trimmedText === ':q!') {
+          handleSubmitAndClear('/quit');
+          return;
+        }
+        if (trimmedText) {
           const [row, col] = buffer.cursor;
           const line = buffer.lines[row];
           const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
