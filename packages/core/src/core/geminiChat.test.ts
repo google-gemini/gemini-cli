@@ -204,66 +204,65 @@ describe('GeminiChat', () => {
 
   describe('sendMessageStream', () => {
     it('should not consolidate text into a part that also contains a functionCall', async () => {
-  // 1. Mock the API to stream a malformed part followed by a valid text part.
-  const multiChunkStream = (async function* () {
-    // This malformed part has both text and a functionCall.
-    yield {
-      candidates: [
-        {
-          content: {
-            role: 'model',
-            parts: [
-              {
-                text: 'Some text',
-                functionCall: { name: 'do_stuff', args: {} },
+      // 1. Mock the API to stream a malformed part followed by a valid text part.
+      const multiChunkStream = (async function* () {
+        // This malformed part has both text and a functionCall.
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    text: 'Some text',
+                    functionCall: { name: 'do_stuff', args: {} },
+                  },
+                ],
               },
-            ],
-          },
-        },
-      ],
-    } as unknown as GenerateContentResponse;
-    // This valid text part should NOT be merged into the malformed one.
-    yield {
-      candidates: [
-        {
-          content: {
-            role: 'model',
-            parts: [{ text: ' that should not be merged.' }],
-          },
-        },
-      ],
-    } as unknown as GenerateContentResponse;
-  })();
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+        // This valid text part should NOT be merged into the malformed one.
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: ' that should not be merged.' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
 
-  vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
-    multiChunkStream,
-  );
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        multiChunkStream,
+      );
 
-  // 2. Action: Send a message and consume the stream.
-  const stream = await chat.sendMessageStream(
-    { message: 'test message' },
-    'prompt-id-malformed-chunk',
-  );
-  for await (const _ of stream) {
-    // Consume the stream to trigger history recording.
-  }
+      // 2. Action: Send a message and consume the stream.
+      const stream = await chat.sendMessageStream(
+        { message: 'test message' },
+        'prompt-id-malformed-chunk',
+      );
+      for await (const _ of stream) {
+        // Consume the stream to trigger history recording.
+      }
 
-  // 3. Assert: Check that the final history was not incorrectly consolidated.
-  const history = chat.getHistory();
+      // 3. Assert: Check that the final history was not incorrectly consolidated.
+      const history = chat.getHistory();
 
-  expect(history.length).toBe(2);
-  const modelTurn = history[1]!;
-  
-  // CRUCIAL ASSERTION: There should be two separate parts.
-  // The old, non-strict logic would incorrectly merge them, resulting in one part.
-  expect(modelTurn.parts.length).toBe(2);
-  
-  // Verify the contents of each part.
-  expect(modelTurn.parts[0]!.text).toBe('Some text');
-  expect(modelTurn.parts[0]!.functionCall).toBeDefined();
-  expect(modelTurn.parts[1]!.text).toBe(' that should not be merged.');
-});
+      expect(history.length).toBe(2);
+      const modelTurn = history[1]!;
 
+      // CRUCIAL ASSERTION: There should be two separate parts.
+      // The old, non-strict logic would incorrectly merge them, resulting in one part.
+      expect(modelTurn.parts.length).toBe(2);
+
+      // Verify the contents of each part.
+      expect(modelTurn.parts[0]!.text).toBe('Some text');
+      expect(modelTurn.parts[0]!.functionCall).toBeDefined();
+      expect(modelTurn.parts[1]!.text).toBe(' that should not be merged.');
+    });
 
     it('should consolidate subsequent text chunks after receiving an empty text chunk', async () => {
       // 1. Mock the API to return a stream where one chunk is just an empty text part.
