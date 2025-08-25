@@ -1029,7 +1029,26 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       );
       expect(state.cursor).toEqual(expectedCursorPos);
     });
+
+    it('deleteWordLeft: should delete word to the left of cursor', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'some text to delete',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+      
+      // Position cursor at end: "some text to delete|"
+      act(() => result.current.moveToOffset(19));
+      act(() => result.current.deleteWordLeft());
+      
+      const state = getBufferState(result);
+      expect(state.text).toBe('some text to ');
+      expect(state.cursor).toEqual([0, 13]);
+    });
   });
+  
 
   // More tests would be needed for:
   // - setText, replaceRange
