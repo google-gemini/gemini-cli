@@ -19,6 +19,7 @@ import {
   EVENT_NEXT_SPEAKER_CHECK,
   SERVICE_NAME,
   EVENT_SLASH_COMMAND,
+  EVENT_CONVERSATION_FINISHED,
   EVENT_CHAT_COMPRESSION,
   EVENT_MALFORMED_JSON_RESPONSE,
 } from './constants.js';
@@ -35,6 +36,7 @@ import {
   NextSpeakerCheckEvent,
   LoopDetectedEvent,
   SlashCommandEvent,
+  ConversationFinishedEvent,
   KittySequenceOverflowEvent,
   ChatCompressionEvent,
   MalformedJsonResponseEvent,
@@ -404,6 +406,27 @@ export function logIdeConnection(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Ide connection. Type: ${event.connection_type}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logConversationFinishedEvent(
+  config: Config,
+  event: ConversationFinishedEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logConversationFinishedEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_CONVERSATION_FINISHED,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Conversation finished.`,
     attributes,
   };
   logger.emit(logRecord);

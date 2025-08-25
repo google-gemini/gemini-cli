@@ -17,6 +17,7 @@ import {
   SlashCommandEvent,
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
+  ConversationFinishedEvent,
   KittySequenceOverflowEvent,
   ChatCompressionEvent,
   FileOperationEvent,
@@ -47,6 +48,7 @@ export enum EventNames {
   IDE_CONNECTION = 'ide_connection',
   KITTY_SEQUENCE_OVERFLOW = 'kitty_sequence_overflow',
   CHAT_COMPRESSION = 'chat_compression',
+  CONVERSATION_FINISHED = 'conversation_finished',
 }
 
 export interface LogResponse {
@@ -725,6 +727,28 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.IDE_CONNECTION, data));
+    this.flushIfNeeded();
+  }
+
+  logConversationFinishedEvent(event: ConversationFinishedEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CONVERSATION_TURN_COUNT,
+        value: JSON.stringify(event.turnCount),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE,
+        value: event.approvalMode,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.CONVERSATION_FINISHED, data),
+    );
     this.flushIfNeeded();
   }
 
