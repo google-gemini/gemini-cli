@@ -44,7 +44,6 @@ export interface InputPromptProps {
   setShellModeActive: (value: boolean) => void;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
-  isChildProcessRunning?: boolean;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
