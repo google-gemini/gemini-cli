@@ -77,16 +77,16 @@ import {
   ConfirmShellCommandsActionReturn,
   SlashCommand,
 } from '../commands/types.js';
-import { ToolConfirmationOutcome } from '@google/gemini-cli-core';
+import {
+  ToolConfirmationOutcome,
+  SlashCommandStatus,
+  makeFakeConfig,
+} from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
-import {
-  SlashCommandStatus,
-  makeFakeConfig,
-} from '@google/gemini-cli-core/index.js';
 
 function createTestCommand(
   overrides: Partial<SlashCommand>,
