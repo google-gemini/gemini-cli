@@ -84,7 +84,7 @@ import { useKeypress, Key } from './hooks/useKeypress.js';
 import { KeypressProvider } from './contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './hooks/useKittyKeyboardProtocol.js';
 import { keyMatchers, Command } from './keyMatchers.js';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
 import {
   isProQuotaExceededError,

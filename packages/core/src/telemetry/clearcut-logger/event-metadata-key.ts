@@ -232,6 +232,16 @@ export enum EventMetadataKey {
   // Logs the length of the kitty sequence that overflowed.
   GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,
 
+  // ==========================================================================
+  // Conversation Finished Event Keys
+  // ===========================================================================
+
+  // Logs the approval mode
+  GEMINI_CLI_APPROVAL_MODE = 70,
+
+  // Logs the number of turns
+  GEMINI_CLI_CONVERSATION_TURN_COUNT = 71,
+
   // Logs the number of tokens before context window compression.
   GEMINI_CLI_COMPRESSION_TOKENS_BEFORE = 60,
 

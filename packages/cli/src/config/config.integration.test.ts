@@ -5,9 +5,9 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
-import { tmpdir } from 'os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { tmpdir } from 'node:os';
 import {
   Config,
   ConfigParameters,
