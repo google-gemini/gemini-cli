@@ -418,6 +418,46 @@ describe('GeminiChat', () => {
       expect(history[2]).toEqual(mixedOutput[1]);
       expect(history[3]).toEqual(mixedOutput[2]);
     });
+
+    it('should process and consolidate parts across multiple content objects', () => {
+      const userInput: Content = {
+        role: 'user',
+        parts: [{ text: 'User input' }],
+      };
+      const modelOutput: Content[] = [
+        { role: 'model', parts: [{ text: 'This is the first part.' }] },
+        // This text part should be merged with the one above.
+        { role: 'model', parts: [{ text: ' This is the second part.' }] },
+        // This function call should NOT be merged.
+        {
+          role: 'model',
+          parts: [{ functionCall: { name: 'do_something', args: {} } }],
+        },
+        // This text part should also NOT be merged with the function call.
+        { role: 'model', parts: [{ text: ' This is the third part.' }] },
+      ];
+
+      // @ts-expect-error Accessing private method for testing
+      chat.recordHistory(userInput, modelOutput);
+      const history = chat.getHistory();
+
+      // Expecting userInput + 3 consolidated model turns
+      expect(history.length).toBe(4);
+
+      // 1. The first two text parts should be merged into one.
+      const firstModelTurn = history[1]!;
+      expect(firstModelTurn?.parts![0]!.text).toBe(
+        'This is the first part. This is the second part.',
+      );
+
+      // 2. The function call should be its own turn.
+      const secondModelTurn = history[2]!;
+      expect(secondModelTurn?.parts![0]!.functionCall).toBeDefined();
+
+      // 3. The final text part should be its own turn.
+      const thirdModelTurn = history[3]!;
+      expect(thirdModelTurn?.parts![0]!.text).toBe(' This is the third part.');
+    });
   });
 
   describe('addHistory', () => {
