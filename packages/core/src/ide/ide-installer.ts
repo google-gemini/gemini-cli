@@ -9,7 +9,7 @@ import * as process from 'process';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { DetectedIde } from './detect-ide.js';
+import { DetectedIde, getIdeInfo, IdeInfo } from './detect-ide.js';
 import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
 
 const VSCODE_COMMAND = process.platform === 'win32' ? 'code.cmd' : 'code';
@@ -23,10 +23,12 @@ export interface InstallResult {
   message: string;
 }
 
-async function findVsCodeCommand(): Promise<string | null> {
+async function findVsCodeCommand(
+  platform: NodeJS.Platform = process.platform,
+): Promise<string | null> {
   // 1. Check PATH first.
   try {
-    if (process.platform === 'win32') {
+    if (platform === 'win32') {
       const result = child_process
         .execSync(`where.exe ${VSCODE_COMMAND}`)
         .toString()
@@ -48,7 +50,6 @@ async function findVsCodeCommand(): Promise<string | null> {
 
   // 2. Check common installation locations.
   const locations: string[] = [];
-  const platform = process.platform;
   const homeDir = os.homedir();
 
   if (platform === 'darwin') {
@@ -96,9 +97,14 @@ async function findVsCodeCommand(): Promise<string | null> {
 
 class VsCodeInstaller implements IdeInstaller {
   private vsCodeCommand: Promise<string | null>;
+  private readonly ideInfo: IdeInfo;
 
-  constructor() {
-    this.vsCodeCommand = findVsCodeCommand();
+  constructor(
+    readonly ide: DetectedIde,
+    readonly platform = process.platform,
+  ) {
+    this.vsCodeCommand = findVsCodeCommand(platform);
+    this.ideInfo = getIdeInfo(ide);
   }
 
   async install(): Promise<InstallResult> {
@@ -106,7 +112,7 @@ class VsCodeInstaller implements IdeInstaller {
     if (!commandPath) {
       return {
         success: false,
-        message: `VS Code CLI not found. Please ensure 'code' is in your system's PATH. For help, see https://code.visualstudio.com/docs/configure/command-line#_code-is-not-recognized-as-an-internal-or-external-command. You can also install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the VS Code marketplace.`,
+        message: `${this.ideInfo.displayName} CLI not found. Please ensure 'code' is in your system's PATH. For help, see https://code.visualstudio.com/docs/configure/command-line#_code-is-not-recognized-as-an-internal-or-external-command. You can also install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the VS Code marketplace.`,
       };
     }
 
@@ -115,22 +121,25 @@ class VsCodeInstaller implements IdeInstaller {
       child_process.execSync(command, { stdio: 'pipe' });
       return {
         success: true,
-        message: 'VS Code companion extension was installed successfully.',
+        message: `${this.ideInfo.displayName} companion extension was installed successfully.`,
       };
     } catch (_error) {
       return {
         success: false,
-        message: `Failed to install VS Code companion extension. Please try installing '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' manually from the VS Code extension marketplace.`,
+        message: `Failed to install ${this.ideInfo.displayName} companion extension. Please try installing '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' manually from the ${this.ideInfo.displayName} extension marketplace.`,
       };
     }
   }
 }
 
-export function getIdeInstaller(ide: DetectedIde): IdeInstaller | null {
+export function getIdeInstaller(
+  ide: DetectedIde,
+  platform = process.platform,
+): IdeInstaller | null {
   switch (ide) {
     case DetectedIde.VSCode:
     case DetectedIde.FirebaseStudio:
-      return new VsCodeInstaller();
+      return new VsCodeInstaller(ide, platform);
     default:
       return null;
   }

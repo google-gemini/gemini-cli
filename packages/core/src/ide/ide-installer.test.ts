@@ -37,27 +37,108 @@ describe('ide-installer', () => {
   });
 
   describe('VsCodeInstaller', () => {
-    let installer: IdeInstaller;
+    function setup({
+      ide = DetectedIde.VSCode,
+      existsResult = false,
+      execSync = () => '',
+      platform = 'linux' as NodeJS.Platform,
+    } = {}) {
+      vi.spyOn(child_process, 'execSync').mockImplementation(execSync);
+      vi.spyOn(fs, 'existsSync').mockReturnValue(existsResult);
+      const installer = getIdeInstaller(ide, platform)!;
 
-    beforeEach(() => {
-      // We get a new installer for each test to reset the find command logic
-      installer = getIdeInstaller(DetectedIde.VSCode)!;
-      vi.spyOn(child_process, 'execSync').mockImplementation(() => '');
-      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-    });
+      return { installer };
+    }
 
     describe('install', () => {
-      it('should return a failure message if VS Code is not installed', async () => {
-        vi.spyOn(child_process, 'execSync').mockImplementation(() => {
-          throw new Error('Command not found');
+      it.each([
+        {
+          platform: 'win32' as NodeJS.Platform,
+          expectedLookupPaths: [
+            'C:\\Program Files/Microsoft VS Code/bin/code.cmd',
+            '/home/user/AppData/Local/Programs/Microsoft VS Code/bin/code.cmd',
+          ],
+        },
+        {
+          platform: 'darwin' as NodeJS.Platform,
+          expectedLookupPaths: [
+            '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
+            '/home/user/Library/Application Support/Code/bin/code',
+          ],
+        },
+        {
+          platform: 'linux' as NodeJS.Platform,
+          expectedLookupPaths: ['/usr/share/code/bin/code'],
+        },
+      ])(
+        'identifies the path to code cli on platform: $platform',
+        async ({ platform, expectedLookupPaths }) => {
+          const { installer } = setup({
+            platform,
+            execSync: () => {
+              throw new Error('Command not found'); // `code` is not in PATH
+            },
+          });
+          await installer.install();
+          for (const [idx, path] of expectedLookupPaths.entries()) {
+            expect(fs.existsSync).toHaveBeenNthCalledWith(idx + 1, path);
+          }
+        },
+      );
+
+      it('installs the extension using code cli', async () => {
+        const { installer } = setup({
+          platform: 'linux',
         });
-        vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-        // Re-create the installer so it re-runs findVsCodeCommand
-        installer = getIdeInstaller(DetectedIde.VSCode)!;
-        const result = await installer.install();
-        expect(result.success).toBe(false);
-        expect(result.message).toContain('VS Code CLI not found');
+        await installer.install();
+        expect(child_process.execSync).toHaveBeenCalledWith(
+          '"code" --install-extension google.gemini-cli-vscode-ide-companion --force',
+          { stdio: 'pipe' },
+        );
       });
+
+      it.each([
+        {
+          ide: DetectedIde.VSCode,
+          expectedMessage:
+            'VS Code companion extension was installed successfully',
+        },
+        {
+          ide: DetectedIde.FirebaseStudio,
+          expectedMessage:
+            'Firebase Studio companion extension was installed successfully',
+        },
+      ])(
+        'returns that the cli was installed successfully',
+        async ({ ide, expectedMessage }) => {
+          const { installer } = setup({ ide });
+          const result = await installer.install();
+          expect(result.success).toBe(true);
+          expect(result.message).toContain(expectedMessage);
+        },
+      );
+
+      it.each([
+        { ide: DetectedIde.VSCode, expectedErr: 'VS Code CLI not found' },
+        {
+          ide: DetectedIde.FirebaseStudio,
+          expectedErr: 'Firebase Studio CLI not found',
+        },
+      ])(
+        'should return a failure message if $ide is not installed',
+        async ({ ide, expectedErr }) => {
+          let { installer } = setup({
+            ide,
+            execSync: () => {
+              throw new Error('Command not found');
+            },
+            existsResult: false,
+          });
+          const result = await installer.install();
+          expect(result.success).toBe(false);
+          expect(result.message).toContain(expectedErr);
+        },
+      );
     });
   });
 });
