@@ -49,4 +49,64 @@ export {
 } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
-export * from './uiTelemetry.js';
+export {
+  uiTelemetryService,
+  SessionMetrics,
+  ModelMetrics,
+  ToolCallStats,
+  UiTelemetryService,
+  UiEvent,
+} from './uiTelemetry.js';
+export {
+  // Core metrics functions
+  recordToolCallMetrics,
+  recordTokenUsageMetrics,
+  recordApiResponseMetrics,
+  recordApiErrorMetrics,
+  recordFileOperationMetric,
+  // Performance monitoring functions
+  recordStartupPerformance,
+  recordMemoryUsage,
+  recordCpuUsage,
+  recordToolQueueDepth,
+  recordToolExecutionBreakdown,
+  recordTokenEfficiency,
+  recordApiRequestBreakdown,
+  recordPerformanceScore,
+  recordPerformanceRegression,
+  recordBaselineComparison,
+  isPerformanceMonitoringActive,
+  // Performance monitoring types
+  PerformanceMetricType,
+  MemoryMetricType,
+  ToolExecutionPhase,
+  ApiRequestPhase,
+  FileOperation,
+} from './metrics.js';
+export {
+  MemoryMonitor,
+  MemorySnapshot,
+  ProcessMetrics,
+  initializeMemoryMonitor,
+  getMemoryMonitor,
+  recordCurrentMemoryUsage,
+  startGlobalMemoryMonitoring,
+  stopGlobalMemoryMonitoring,
+} from './memory-monitor.js';
+export {
+  ActivityDetector,
+  initializeActivityDetector,
+  getActivityDetector,
+  recordUserActivity,
+  isUserActive,
+} from './activity-detector.js';
+export { HighWaterMarkTracker } from './high-water-mark-tracker.js';
+export { RateLimiter } from './rate-limiter.js';
+export { ActivityType } from './activity-types.js';
+export {
+  ActivityMonitor,
+  initializeActivityMonitor,
+  getActivityMonitor,
+  startGlobalActivityMonitoring,
+  stopGlobalActivityMonitoring,
+} from './activity-monitor.js';
