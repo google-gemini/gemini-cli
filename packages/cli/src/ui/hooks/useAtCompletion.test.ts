@@ -204,7 +204,11 @@ describe('useAtCompletion', () => {
       // Mock that returns results immediately but we'll control timing with fake timers
       const mockFileSearch: FileSearch = {
         initialize: vi.fn().mockResolvedValue(undefined),
-        search: vi.fn().mockImplementation(async (...args) => realFileSearch.search(...args)),
+        search: vi
+          .fn()
+          .mockImplementation(async (...args) =>
+            realFileSearch.search(...args),
+          ),
       };
       vi.spyOn(FileSearchFactory, 'create').mockReturnValue(mockFileSearch);
 
