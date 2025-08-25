@@ -15,8 +15,8 @@ import {
   USER_SETTINGS_DIR,
   SETTINGS_DIRECTORY_NAME,
 } from '../config/settings.js';
-import { promisify } from 'util';
-import { Config, SandboxConfig } from '@google/gemini-cli-core';
+import { promisify } from 'node:util';
+import type { Config, SandboxConfig } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 
 const execAsync = promisify(exec);
@@ -206,7 +206,6 @@ export async function start_sandbox(
       let profileFile = fileURLToPath(
         new URL(`sandbox-macos-${profile}.sb`, import.meta.url),
       );
-
       // if profile name is not recognized, then look for file under project settings directory
       if (!BUILTIN_SEATBELT_PROFILES.includes(profile)) {
         profileFile = path.join(

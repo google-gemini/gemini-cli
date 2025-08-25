@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   MCPServerConfig,
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
-import { CustomTheme } from '../ui/themes/theme.js';
+import type { CustomTheme } from '../ui/themes/theme.js';
 
 export interface SettingDefinition {
   type: 'boolean' | 'string' | 'number' | 'array' | 'object';
@@ -535,6 +535,15 @@ export const SETTINGS_SCHEMA = {
     description: 'Show line numbers in the chat.',
     showInDialog: true,
   },
+  extensionManagement: {
+    type: 'boolean',
+    label: 'Extension Management',
+    category: 'Feature Flag',
+    requiresRestart: true,
+    default: false,
+    description: 'Enable extension management features.',
+    showInDialog: false,
+  },
   skipNextSpeakerCheck: {
     type: 'boolean',
     label: 'Skip Next Speaker Check',
@@ -562,6 +571,15 @@ export const SETTINGS_SCHEMA = {
     default: false,
     description:
       'Enable AI-powered prompt completion suggestions while typing.',
+    showInDialog: true,
+  },
+  debugKeystrokeLogging: {
+    type: 'boolean',
+    label: 'Debug Keystroke Logging',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Enable debug logging of keystrokes to the console.',
     showInDialog: true,
   },
 } as const;
