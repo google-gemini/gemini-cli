@@ -184,10 +184,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description: 'Enables checkpointing of file edits',
           default: false,
         })
-        .option('use-smart-edit', {
-          type: 'boolean',
-          description: 'Enable the smart-edit tool instead of the replace tool',
-        })
         .option('experimental-acp', {
           type: 'boolean',
           description: 'Starts the agent in ACP mode',
