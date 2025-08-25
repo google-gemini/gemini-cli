@@ -74,6 +74,7 @@ export interface CliArgs {
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
+  useSmartEdit: boolean | undefined;
 }
 
 export async function parseArguments(): Promise<CliArgs> {
@@ -195,6 +196,10 @@ export async function parseArguments(): Promise<CliArgs> {
           type: 'boolean',
           description: 'Enables checkpointing of file edits',
           default: false,
+        })
+        .option('use-smart-edit', {
+          type: 'boolean',
+          description: 'Enable the smart-edit tool instead of the replace tool',
         })
         .option('experimental-acp', {
           type: 'boolean',
@@ -557,6 +562,7 @@ export async function loadCliConfig(
     shouldUseNodePtyShell: settings.shouldUseNodePtyShell,
     skipNextSpeakerCheck: settings.skipNextSpeakerCheck,
     enablePromptCompletion: settings.enablePromptCompletion ?? false,
+    useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
   });
 }
 

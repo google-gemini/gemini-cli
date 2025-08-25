@@ -407,6 +407,15 @@ export const SETTINGS_SCHEMA = {
     description: 'A blacklist of MCP servers to exclude.',
     showInDialog: false,
   },
+  useSmartEdit: {
+    type: 'boolean',
+    label: 'Use Smart Edit',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: false,
+    description: 'Enable the smart-edit tool instead of the replace tool.',
+    showInDialog: false,
+  },
   telemetry: {
     type: 'object',
     label: 'Telemetry',
