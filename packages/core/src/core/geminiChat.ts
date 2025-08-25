@@ -280,15 +280,8 @@ export class GeminiChat {
 
         // Pre-process the model output to filter thought parts before passing to recordHistory.
         // This makes the non-streaming path consistent with the streaming path's logic.
-        const cleanedModelOutput = initialModelOutput.map((content) => {
-          if (!content.parts) {
-            return content;
-          }
-          const visibleParts = content.parts.filter(
-            (part) => !('thought' in part),
-          );
-          return { ...content, parts: visibleParts };
-        });
+        const cleanedModelOutput =
+          this.getVisibleModelOutput(initialModelOutput);
 
         // Because the AFC input contains the entire curated chat history in
         // addition to the new user input, we need to truncate the AFC history
@@ -561,32 +554,45 @@ export class GeminiChat {
       if (isValidResponse(chunk)) {
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
-          const visibleParts = content.parts.filter(
-            (part) => !('thought' in part),
-          );
-          modelResponseParts.push(...visibleParts);
+          // Collect all parts; they will be filtered by the new helper method.
+          modelResponseParts.push(...content.parts);
         }
       } else {
         recordInvalidChunk(this.config);
         isStreamInvalid = true;
       }
-      yield chunk; // Yield every chunk to the UI immediately.
+      yield chunk;
     }
 
-    // Now that the stream is finished, make a decision.
-    // Throw an error if the stream was invalid OR if it was completely empty.
     if (isStreamInvalid || !hasReceivedAnyChunk) {
       throw new EmptyStreamError(
         'Model stream was invalid or completed without valid content.',
       );
     }
 
-    // Use recordHistory to correctly save the conversation turn.
-    const modelOutput: Content[] =
+    const initialModelOutput: Content[] =
       modelResponseParts.length > 0
         ? [{ role: 'model', parts: modelResponseParts }]
         : [];
-    this.recordHistory(userInput, modelOutput);
+
+    // UNIFIED LOGIC: Call the new helper to get only visible content.
+    const visibleModelOutput = this.getVisibleModelOutput(initialModelOutput);
+
+    this.recordHistory(userInput, visibleModelOutput);
+  }
+
+  private getVisibleModelOutput(modelOutput: Content[]): Content[] {
+    return modelOutput
+      .map((content) => {
+        if (!content.parts) {
+          return content;
+        }
+        const visibleParts = content.parts.filter(
+          (part) => !('thought' in part),
+        );
+        return { ...content, parts: visibleParts };
+      })
+      .filter((content) => content.parts == null || content.parts.length > 0);
   }
 
   private recordHistory(
