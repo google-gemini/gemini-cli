@@ -426,6 +426,18 @@ export async function loadCliConfig(
       argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
   }
 
+  // Force approval mode to default if the folder is not trusted.
+  if (
+    !trustedFolder &&
+    (approvalMode === ApprovalMode.YOLO ||
+      approvalMode === ApprovalMode.AUTO_EDIT)
+  ) {
+    logger.warn(
+      `Approval mode overridden to "default" because the current folder is not trusted.`,
+    );
+    approvalMode = ApprovalMode.DEFAULT;
+  }
+
   const interactive =
     !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
   // In non-interactive mode, exclude tools that require a prompt.

@@ -7,13 +7,16 @@
 import { useState, useEffect } from 'react';
 import { ApprovalMode, type Config } from '@google/gemini-cli-core';
 import { useKeypress } from './useKeypress.js';
+import { HistoryItemWithoutId, MessageType } from '../types.js';
 
 export interface UseAutoAcceptIndicatorArgs {
   config: Config;
+  addItem: (item: HistoryItemWithoutId, timestamp: number) => void;
 }
 
 export function useAutoAcceptIndicator({
   config,
+  addItem,
 }: UseAutoAcceptIndicatorArgs): ApprovalMode {
   const currentConfigValue = config.getApprovalMode();
   const [showAutoAcceptIndicator, setShowAutoAcceptIndicator] =
@@ -40,6 +43,20 @@ export function useAutoAcceptIndicator({
       }
 
       if (nextApprovalMode) {
+        // Do not allow enabling privileged modes in untrusted folders.
+        if (
+          !config.isTrustedFolder() &&
+          nextApprovalMode !== ApprovalMode.DEFAULT
+        ) {
+          addItem(
+            {
+              type: MessageType.INFO,
+              text: 'Cannot enable privileged approval modes in an untrusted folder.',
+            },
+            Date.now(),
+          );
+          return;
+        }
         config.setApprovalMode(nextApprovalMode);
         // Update local state immediately for responsiveness
         setShowAutoAcceptIndicator(nextApprovalMode);
