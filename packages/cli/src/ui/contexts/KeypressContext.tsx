@@ -21,6 +21,7 @@ import readline from 'node:readline';
 import { PassThrough } from 'node:stream';
 import {
   BACKSLASH_ENTER_DETECTION_WINDOW_MS,
+  CHAR_CODE_ESC,
   KITTY_CTRL_C,
   KITTY_KEYCODE_BACKSPACE,
   KITTY_KEYCODE_ENTER,
@@ -126,48 +127,17 @@ export function KeypressProvider({
       const alt = (modifierBits & 2) === 2;
       const ctrl = (modifierBits & 4) === 4;
 
-      if (keyCode === 27) {
-        return {
-          name: 'escape',
-          ctrl,
-          meta: alt,
-          shift,
-          paste: false,
-          sequence,
-          kittyProtocol: true,
-        };
-      }
+      const keyNameMap: Record<number, string> = {
+        [CHAR_CODE_ESC]: 'escape',
+        [KITTY_KEYCODE_TAB]: 'tab',
+        [KITTY_KEYCODE_BACKSPACE]: 'backspace',
+        [KITTY_KEYCODE_ENTER]: 'return',
+        [KITTY_KEYCODE_NUMPAD_ENTER]: 'return',
+      };
 
-      if (keyCode === KITTY_KEYCODE_TAB) {
+      if (keyCode in keyNameMap) {
         return {
-          name: 'tab',
-          ctrl,
-          meta: alt,
-          shift,
-          paste: false,
-          sequence,
-          kittyProtocol: true,
-        };
-      }
-
-      if (keyCode === KITTY_KEYCODE_BACKSPACE) {
-        return {
-          name: 'backspace',
-          ctrl,
-          meta: alt,
-          shift,
-          paste: false,
-          sequence,
-          kittyProtocol: true,
-        };
-      }
-
-      if (
-        keyCode === KITTY_KEYCODE_ENTER ||
-        keyCode === KITTY_KEYCODE_NUMPAD_ENTER
-      ) {
-        return {
-          name: 'return',
+          name: keyNameMap[keyCode],
           ctrl,
           meta: alt,
           shift,
