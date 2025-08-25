@@ -17,8 +17,8 @@ import React, {
   useEffect,
   useRef,
 } from 'react';
-import readline from 'readline';
-import { PassThrough } from 'stream';
+import readline from 'node:readline';
+import { PassThrough } from 'node:stream';
 import {
   BACKSLASH_ENTER_DETECTION_WINDOW_MS,
   KITTY_CTRL_C,
