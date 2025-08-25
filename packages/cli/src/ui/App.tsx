@@ -5,15 +5,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import {
-  Box,
-  DOMElement,
-  measureElement,
-  Static,
-  Text,
-  useStdin,
-  useStdout,
-} from 'ink';
+import type { DOMElement } from 'ink';
+import { Box, measureElement, Static, Text, useStdin, useStdout } from 'ink';
 import { StreamingState, type HistoryItem, MessageType } from './types.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
@@ -41,7 +34,8 @@ import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js
 import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
 import { Colors } from './colors.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
-import { LoadedSettings, SettingScope } from '../config/settings.js';
+import type { LoadedSettings } from '../config/settings.js';
+import { SettingScope } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup } from '../utils/cleanup.js';
@@ -50,23 +44,22 @@ import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
+import type { EditorType, Config, IdeContext } from '@google/gemini-cli-core';
 import {
-  getErrorMessage,
-  type Config,
-  getAllGeminiMdFilenames,
   ApprovalMode,
+  getAllGeminiMdFilenames,
   isEditorAvailable,
-  EditorType,
-  FlashFallbackEvent,
-  logFlashFallback,
+  getErrorMessage,
   AuthType,
-  type IdeContext,
+  logFlashFallback,
+  FlashFallbackEvent,
   ideContext,
+  isProQuotaExceededError,
+  isGenericQuotaExceededError,
+  UserTierId,
 } from '@google/gemini-cli-core';
-import {
-  IdeIntegrationNudge,
-  IdeIntegrationNudgeResult,
-} from './IdeIntegrationNudge.js';
+import type { IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
+import { IdeIntegrationNudge } from './IdeIntegrationNudge.js';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
@@ -80,18 +73,14 @@ import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useVimMode, VimModeProvider } from './contexts/VimModeContext.js';
 import { useVim } from './hooks/vim.js';
-import { useKeypress, Key } from './hooks/useKeypress.js';
+import type { Key } from './hooks/useKeypress.js';
+import { useKeypress } from './hooks/useKeypress.js';
 import { KeypressProvider } from './contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './hooks/useKittyKeyboardProtocol.js';
 import { keyMatchers, Command } from './keyMatchers.js';
 import * as fs from 'node:fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
-import {
-  isProQuotaExceededError,
-  isGenericQuotaExceededError,
-  UserTierId,
-} from '@google/gemini-cli-core';
-import { UpdateObject } from './utils/updateCheck.js';
+import type { UpdateObject } from './utils/updateCheck.js';
 import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
