@@ -16,14 +16,9 @@ export interface VariableSchema {
 }
 
 export const VARIABLE_SCHEMA = {
-  extensionFolder: {
+  extensionPath: {
     type: 'string',
-    description: 'The folder for this extension.',
-  },
-  extensionsDir: {
-    type: 'string',
-    description:
-      'The top-level extension directory where this extension is stored.',
+    description: 'The path of the extension in the filesystem.',
   },
   '/': {
     type: 'string',

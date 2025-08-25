@@ -146,8 +146,7 @@ export function loadExtension(extensionDir: string): Extension | null {
   try {
     let configContent = fs.readFileSync(configFilePath, 'utf-8');
     configContent = hydrateString(configContent, {
-      extensionFolder: path.basename(extensionDir),
-      extensionsDir: path.dirname(extensionDir),
+      extensionPath: extensionDir,
       '/': path.sep,
       pathSeparator: path.sep,
     });

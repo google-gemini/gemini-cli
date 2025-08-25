@@ -145,7 +145,7 @@ describe('loadExtensions', () => {
       undefined,
       {
         'test-server': {
-          cwd: '${extensionsDir}${/}${extensionName}${/}server',
+          cwd: '${extensionPath}${/}server',
         },
       },
     );
