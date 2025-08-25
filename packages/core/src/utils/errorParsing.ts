@@ -57,7 +57,8 @@ const getRateLimitErrorMessageDefault = (
   fallbackModel: string = DEFAULT_GEMINI_FLASH_MODEL,
 ) =>
   `\nPossible quota limitations in place or slow response times detected. Switching to the ${fallbackModel} model for the rest of this session.`;
-const INVALID_IMAGE_CONTEXT_MESSAGE = '\nImage is possibly corrupt or has high dimensions.';
+const INVALID_IMAGE_CONTEXT_MESSAGE =
+  '\nImage is possibly corrupt or has high dimensions.';
 
 function getRateLimitMessage(
   authType?: AuthType,
@@ -175,8 +176,11 @@ export function parseAndFormatApiError(
 }
 
 function wasCausedByInvalidImageUpload(err: string, request?: PartListUnion) {
-  return err.includes('Provided image is not valid.')
-  && request && requestContainedImage(request);
+  return (
+    err.includes('Provided image is not valid.') &&
+    request &&
+    requestContainedImage(request)
+  );
 }
 
 function requestContainedImage(parts: PartListUnion): boolean {
@@ -188,11 +192,15 @@ function requestContainedImage(parts: PartListUnion): boolean {
   }
   if (Array.isArray(parts)) {
     for (const part of parts) {
-      if (typeof part !== 'string' && part.inlineData?.mimeType?.startsWith('image/')) {
+      if (
+        typeof part !== 'string' &&
+        part.inlineData?.mimeType?.startsWith('image/')
+      ) {
         return true;
       }
     }
-  } else { // It's a single Part
+  } else {
+    // It's a single Part
     if (parts.inlineData?.mimeType?.startsWith('image/')) {
       return true;
     }

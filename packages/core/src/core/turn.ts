@@ -279,7 +279,10 @@ export class Turn {
         status,
       };
       await this.chat.maybeIncludeSchemaDepthContext(structuredError);
-      yield { type: GeminiEventType.Error, value: { error: structuredError, request: req } };
+      yield {
+        type: GeminiEventType.Error,
+        value: { error: structuredError, request: req },
+      };
       return;
     }
   }
