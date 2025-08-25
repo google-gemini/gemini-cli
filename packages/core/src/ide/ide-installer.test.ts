@@ -5,7 +5,7 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { getIdeInstaller, IdeInstaller } from './ide-installer.js';
+import { getIdeInstaller } from './ide-installer.js';
 import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -127,7 +127,7 @@ describe('ide-installer', () => {
       ])(
         'should return a failure message if $ide is not installed',
         async ({ ide, expectedErr }) => {
-          let { installer } = setup({
+          const { installer } = setup({
             ide,
             execSync: () => {
               throw new Error('Command not found');
