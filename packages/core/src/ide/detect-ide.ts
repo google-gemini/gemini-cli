@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { detectVsCode } from './tmux-utils.js';
+
 export enum DetectedIde {
   Devin = 'devin',
   Replit = 'replit',
@@ -63,7 +65,7 @@ export function getIdeInfo(ide: DetectedIde): IdeInfo {
 
 export function detectIde(): DetectedIde | undefined {
   // Only VSCode-based integrations are currently supported.
-  if (process.env['TERM_PROGRAM'] !== 'vscode') {
+  if (!detectVsCode()) {
     return undefined;
   }
   if (process.env['__COG_BASHRC_SOURCED']) {

@@ -16,6 +16,10 @@ import {
   DiffUpdateResult,
 } from '../ide/ideContext.js';
 import { getIdeProcessId } from './process-utils.js';
+import {
+  detectCurrentVsCodePort,
+  syncVsCodeEnvironmentToTmux,
+} from '../ide/tmux-env-sync.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -114,6 +118,9 @@ export class IdeClient {
     }
 
     this.setState(IDEConnectionStatus.Connecting);
+
+    // Sync essential VS Code environment to TMUX
+    syncVsCodeEnvironmentToTmux();
 
     const configFromFile = await this.getConnectionConfigFromFile();
     const workspacePath =
@@ -339,7 +346,8 @@ export class IdeClient {
   }
 
   private getPortFromEnv(): string | undefined {
-    const port = process.env['GEMINI_CLI_IDE_SERVER_PORT'];
+    const port = detectCurrentVsCodePort();
+
     if (!port) {
       return undefined;
     }
@@ -533,5 +541,8 @@ export class IdeClient {
 function getIdeServerHost() {
   const isInContainer =
     fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
-  return isInContainer ? 'host.docker.internal' : 'localhost';
+  if (isInContainer) {
+    return 'host.docker.internal';
+  }
+  return 'localhost';
 }
