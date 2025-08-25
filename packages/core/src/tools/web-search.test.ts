@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import { WebSearchTool, WebSearchToolParams } from './web-search.js';
-import { Config } from '../config/config.js';
+import type { Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { WebSearchToolParams } from './web-search.js';
+import { WebSearchTool } from './web-search.js';
+import type { Config } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
 import { ToolErrorType } from './tool-error.js';
 
@@ -172,6 +174,78 @@ Sources:
         'Search results for "grounding query" returned.',
       );
       expect(result.sources).toHaveLength(2);
+    });
+
+    it('should insert markers at correct byte positions for multibyte text', async () => {
+      const params: WebSearchToolParams = { query: 'multibyte query' };
+      (mockGeminiClient.generateContent as Mock).mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [{ text: 'こんにちは! Gemini CLI✨️' }],
+            },
+            groundingMetadata: {
+              groundingChunks: [
+                {
+                  web: {
+                    title: 'Japanese Greeting',
+                    uri: 'https://example.test/japanese-greeting',
+                  },
+                },
+                {
+                  web: {
+                    title: 'google-gemini/gemini-cli',
+                    uri: 'https://github.com/google-gemini/gemini-cli',
+                  },
+                },
+                {
+                  web: {
+                    title: 'Gemini CLI: your open-source AI agent',
+                    uri: 'https://blog.google/technology/developers/introducing-gemini-cli-open-source-ai-agent/',
+                  },
+                },
+              ],
+              groundingSupports: [
+                {
+                  segment: {
+                    // Byte range of "こんにちは!" (utf-8 encoded)
+                    startIndex: 0,
+                    endIndex: 16,
+                  },
+                  groundingChunkIndices: [0],
+                },
+                {
+                  segment: {
+                    // Byte range of "Gemini CLI✨️" (utf-8 encoded)
+                    startIndex: 17,
+                    endIndex: 33,
+                  },
+                  groundingChunkIndices: [1, 2],
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      const expectedLlmContent = `Web search results for "multibyte query":
+
+こんにちは![1] Gemini CLI✨️[2][3]
+
+Sources:
+[1] Japanese Greeting (https://example.test/japanese-greeting)
+[2] google-gemini/gemini-cli (https://github.com/google-gemini/gemini-cli)
+[3] Gemini CLI: your open-source AI agent (https://blog.google/technology/developers/introducing-gemini-cli-open-source-ai-agent/)`;
+
+      expect(result.llmContent).toBe(expectedLlmContent);
+      expect(result.returnDisplay).toBe(
+        'Search results for "multibyte query" returned.',
+      );
+      expect(result.sources).toHaveLength(3);
     });
   });
 });

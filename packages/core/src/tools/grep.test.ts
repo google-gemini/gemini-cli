@@ -5,11 +5,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { GrepTool, GrepToolParams } from './grep.js';
-import path from 'path';
-import fs from 'fs/promises';
-import os from 'os';
-import { Config } from '../config/config.js';
+import type { GrepToolParams } from './grep.js';
+import { GrepTool } from './grep.js';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import type { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { ToolErrorType } from './tool-error.js';
 import * as glob from 'glob';
@@ -39,6 +40,9 @@ describe('GrepTool', () => {
   const mockConfig = {
     getTargetDir: () => tempRootDir,
     getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+    getFileExclusions: () => ({
+      getGlobExcludes: () => [],
+    }),
   } as unknown as Config;
 
   beforeEach(async () => {
@@ -258,6 +262,9 @@ describe('GrepTool', () => {
         getTargetDir: () => tempRootDir,
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, [secondDir]),
+        getFileExclusions: () => ({
+          getGlobExcludes: () => [],
+        }),
       } as unknown as Config;
 
       const multiDirGrepTool = new GrepTool(multiDirConfig);
@@ -308,6 +315,9 @@ describe('GrepTool', () => {
         getTargetDir: () => tempRootDir,
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, [secondDir]),
+        getFileExclusions: () => ({
+          getGlobExcludes: () => [],
+        }),
       } as unknown as Config;
 
       const multiDirGrepTool = new GrepTool(multiDirConfig);
@@ -367,6 +377,9 @@ describe('GrepTool', () => {
         getTargetDir: () => tempRootDir,
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, ['/another/dir']),
+        getFileExclusions: () => ({
+          getGlobExcludes: () => [],
+        }),
       } as unknown as Config;
 
       const multiDirGrepTool = new GrepTool(multiDirConfig);

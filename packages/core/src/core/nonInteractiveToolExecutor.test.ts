@@ -6,15 +6,14 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
-import {
+import type {
   ToolRegistry,
   ToolCallRequestInfo,
   ToolResult,
   Config,
-  ToolErrorType,
-  ApprovalMode,
 } from '../index.js';
-import { Part } from '@google/genai';
+import { ToolErrorType, ApprovalMode } from '../index.js';
+import type { Part } from '@google/genai';
 import { MockTool } from '../test-utils/tools.js';
 
 describe('executeToolCall', () => {
@@ -73,13 +72,15 @@ describe('executeToolCall', () => {
       error: undefined,
       errorType: undefined,
       resultDisplay: 'Success!',
-      responseParts: {
-        functionResponse: {
-          name: 'testTool',
-          id: 'call1',
-          response: { output: 'Tool executed successfully' },
+      responseParts: [
+        {
+          functionResponse: {
+            name: 'testTool',
+            id: 'call1',
+            response: { output: 'Tool executed successfully' },
+          },
         },
-      },
+      ],
     });
   });
 
@@ -104,13 +105,17 @@ describe('executeToolCall', () => {
       error: new Error('Tool "nonexistentTool" not found in registry.'),
       errorType: ToolErrorType.TOOL_NOT_REGISTERED,
       resultDisplay: 'Tool "nonexistentTool" not found in registry.',
-      responseParts: {
-        functionResponse: {
-          name: 'nonexistentTool',
-          id: 'call2',
-          response: { error: 'Tool "nonexistentTool" not found in registry.' },
+      responseParts: [
+        {
+          functionResponse: {
+            name: 'nonexistentTool',
+            id: 'call2',
+            response: {
+              error: 'Tool "nonexistentTool" not found in registry.',
+            },
+          },
         },
-      },
+      ],
     });
   });
 
@@ -137,15 +142,17 @@ describe('executeToolCall', () => {
       callId: 'call3',
       error: new Error('Invalid parameters'),
       errorType: ToolErrorType.INVALID_TOOL_PARAMS,
-      responseParts: {
-        functionResponse: {
-          id: 'call3',
-          name: 'testTool',
-          response: {
-            error: 'Invalid parameters',
+      responseParts: [
+        {
+          functionResponse: {
+            id: 'call3',
+            name: 'testTool',
+            response: {
+              error: 'Invalid parameters',
+            },
           },
         },
-      },
+      ],
       resultDisplay: 'Invalid parameters',
     });
   });
@@ -178,15 +185,17 @@ describe('executeToolCall', () => {
       callId: 'call4',
       error: new Error('Execution failed'),
       errorType: ToolErrorType.EXECUTION_FAILED,
-      responseParts: {
-        functionResponse: {
-          id: 'call4',
-          name: 'testTool',
-          response: {
-            error: 'Execution failed',
+      responseParts: [
+        {
+          functionResponse: {
+            id: 'call4',
+            name: 'testTool',
+            response: {
+              error: 'Execution failed',
+            },
           },
         },
-      },
+      ],
       resultDisplay: 'Execution failed',
     });
   });
@@ -215,13 +224,15 @@ describe('executeToolCall', () => {
       error: new Error('Something went very wrong'),
       errorType: ToolErrorType.UNHANDLED_EXCEPTION,
       resultDisplay: 'Something went very wrong',
-      responseParts: {
-        functionResponse: {
-          name: 'testTool',
-          id: 'call5',
-          response: { error: 'Something went very wrong' },
+      responseParts: [
+        {
+          functionResponse: {
+            name: 'testTool',
+            id: 'call5',
+            response: { error: 'Something went very wrong' },
+          },
         },
-      },
+      ],
     });
   });
 

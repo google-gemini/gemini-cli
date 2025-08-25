@@ -4,31 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, Mock, afterEach } from 'vitest';
-import {
-  ContextState,
-  SubAgentScope,
-  SubagentTerminateMode,
+import type { Mock } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type {
   PromptConfig,
   ModelConfig,
   RunConfig,
   OutputConfig,
   ToolConfig,
 } from './subagent.js';
-import { Config, ConfigParameters } from '../config/config.js';
+import {
+  ContextState,
+  SubAgentScope,
+  SubagentTerminateMode,
+} from './subagent.js';
+import type { ConfigParameters } from '../config/config.js';
+import { Config } from '../config/config.js';
 import { GeminiChat } from './geminiChat.js';
 import { createContentGenerator } from './contentGenerator.js';
 import { getEnvironmentContext } from '../utils/environmentContext.js';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
-import { ToolRegistry } from '../tools/tool-registry.js';
+import type { ToolRegistry } from '../tools/tool-registry.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
-import {
+import type {
   Content,
   FunctionCall,
   FunctionDeclaration,
   GenerateContentConfig,
-  Type,
 } from '@google/genai';
+import { Type } from '@google/genai';
 import { ToolErrorType } from '../tools/tool-error.js';
 
 vi.mock('./geminiChat.js');
@@ -559,7 +563,7 @@ describe('subagent.ts', () => {
         // Mock the tool execution result
         vi.mocked(executeToolCall).mockResolvedValue({
           callId: 'call_1',
-          responseParts: 'file1.txt\nfile2.ts',
+          responseParts: [{ text: 'file1.txt\nfile2.ts' }],
           resultDisplay: 'Listed 2 files',
           error: undefined,
           errorType: undefined, // Or ToolErrorType.NONE if available and appropriate
@@ -614,7 +618,7 @@ describe('subagent.ts', () => {
         // Mock the tool execution failure.
         vi.mocked(executeToolCall).mockResolvedValue({
           callId: 'call_fail',
-          responseParts: 'ERROR: Tool failed catastrophically', // This should be sent to the model
+          responseParts: [{ text: 'ERROR: Tool failed catastrophically' }], // This should be sent to the model
           resultDisplay: 'Tool failed catastrophically',
           error: new Error('Failure'),
           errorType: ToolErrorType.INVALID_TOOL_PARAMS,
