@@ -27,8 +27,10 @@ import {
 } from '../services/shellExecutionService.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import {
+  getCommandRoot,
   getCommandRoots,
   isCommandAllowed,
+  splitCommands,
   stripShellWrapper,
 } from '../utils/shell-utils.js';
 
@@ -70,7 +72,10 @@ class ShellToolInvocation extends BaseToolInvocation<
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
-    const rootCommands = [...new Set(getCommandRoots(command))];
+    const fullCommands = splitCommands(command).filter(
+      (command) => !this.config.getPreapprovedShellCommandRegexes().some((regex) => regex.test(command)));
+
+    const rootCommands = [...new Set(fullCommands.map(getCommandRoot).filter((c): c is string => !!c))];
     const commandsToConfirm = rootCommands.filter(
       (command) => !this.allowlist.has(command),
     );
