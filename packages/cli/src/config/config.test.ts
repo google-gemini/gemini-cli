@@ -1868,28 +1868,28 @@ describe('loadCliConfig approval mode', () => {
 
     it('should override --approval-mode=yolo to DEFAULT', async () => {
       process.argv = ['node', 'script.js', '--approval-mode', 'yolo'];
-      const argv = await parseArguments();
+      const argv = await parseArguments({} as Settings);
       const config = await loadCliConfig({}, [], 'test-session', argv);
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
     });
 
     it('should override --approval-mode=auto_edit to DEFAULT', async () => {
       process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
-      const argv = await parseArguments();
+      const argv = await parseArguments({} as Settings);
       const config = await loadCliConfig({}, [], 'test-session', argv);
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
     });
 
     it('should override --yolo flag to DEFAULT', async () => {
       process.argv = ['node', 'script.js', '--yolo'];
-      const argv = await parseArguments();
+      const argv = await parseArguments({} as Settings);
       const config = await loadCliConfig({}, [], 'test-session', argv);
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
     });
 
     it('should remain DEFAULT when --approval-mode=default', async () => {
       process.argv = ['node', 'script.js', '--approval-mode', 'default'];
-      const argv = await parseArguments();
+      const argv = await parseArguments({} as Settings);
       const config = await loadCliConfig({}, [], 'test-session', argv);
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
     });
