@@ -21,7 +21,7 @@ import {
   isEditorAvailable,
   type EditorType,
 } from './editor.js';
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn } from 'node:child_process';
 
 vi.mock('child_process', () => ({
   execSync: vi.fn(),

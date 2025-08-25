@@ -6,9 +6,9 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getInstallationInfo, PackageManager } from './installationInfo.js';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as childProcess from 'child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as childProcess from 'node:child_process';
 import { isGitRepository } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', () => ({

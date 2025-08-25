@@ -13,7 +13,7 @@ import {
   LoadedTrustedFolders,
   TrustLevel,
 } from '../../config/trustedFolders.js';
-import * as process from 'process';
+import * as process from 'node:process';
 
 import * as trustedFolders from '../../config/trustedFolders.js';
 

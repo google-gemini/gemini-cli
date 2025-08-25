@@ -9,7 +9,7 @@ import { InstallationManager } from './installationManager.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import path from 'node:path';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();

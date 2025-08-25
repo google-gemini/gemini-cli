@@ -27,9 +27,9 @@ import {
 import { type EditToolParams } from './edit.js';
 import { ApprovalMode, Config } from '../config/config.js';
 import { ToolRegistry } from './tool-registry.js';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
 import { GeminiClient } from '../core/client.js';
 import {
   ensureCorrectEdit,

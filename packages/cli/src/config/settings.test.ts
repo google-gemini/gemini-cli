@@ -7,7 +7,7 @@
 /// <reference types="vitest/globals" />
 
 // Mock 'os' first.
-import * as osActual from 'os'; // Import for type info for the mock factory
+import * as osActual from 'node:os'; // Import for type info for the mock factory
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof osActual>();
   return {
@@ -33,7 +33,7 @@ vi.mock('./trustedFolders.js', () => ({
 }));
 
 // NOW import everything else, including the (now effectively re-exported) settings.js
-import * as pathActual from 'path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
+import * as pathActual from 'node:path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
 import {
   describe,
   it,
@@ -44,7 +44,7 @@ import {
   type Mocked,
   type Mock,
 } from 'vitest';
-import * as fs from 'fs'; // fs will be mocked separately
+import * as fs from 'node:fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
 import { isWorkspaceTrusted } from './trustedFolders.js';
 

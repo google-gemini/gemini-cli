@@ -13,12 +13,12 @@ import {
 } from './oauth2.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import { OAuth2Client, Compute } from 'google-auth-library';
-import * as fs from 'fs';
-import * as path from 'path';
-import http from 'http';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import http from 'node:http';
 import open from 'open';
-import crypto from 'crypto';
-import * as os from 'os';
+import crypto from 'node:crypto';
+import * as os from 'node:os';
 import { AuthType } from '../core/contentGenerator.js';
 import { Config } from '../config/config.js';
 import readline from 'node:readline';

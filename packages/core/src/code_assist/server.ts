@@ -21,7 +21,7 @@ import {
   GenerateContentParameters,
   GenerateContentResponse,
 } from '@google/genai';
-import * as readline from 'readline';
+import * as readline from 'node:readline';
 import { ContentGenerator } from '../core/contentGenerator.js';
 import { UserTierId } from './types.js';
 import {

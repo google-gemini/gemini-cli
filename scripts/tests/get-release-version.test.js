@@ -14,7 +14,7 @@ vi.mock('child_process', () => ({
 
 describe('getReleaseVersion', async () => {
   // Dynamically import execSync after mocking
-  const { execSync } = await import('child_process');
+  const { execSync } = await import('node:child_process');
   const originalEnv = { ...process.env };
 
   beforeEach(() => {

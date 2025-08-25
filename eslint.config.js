@@ -13,7 +13,7 @@ import importPlugin from 'eslint-plugin-import';
 import vitest from '@vitest/eslint-plugin';
 import globals from 'globals';
 import licenseHeader from 'eslint-plugin-license-header';
-import path from 'node:path'; // Use node: prefix for built-ins
+import path from 'node:path';
 import url from 'node:url';
 
 // --- ESM way to get __dirname ---
@@ -175,6 +175,7 @@ export default tseslint.config(
     files: ['./**/*.{tsx,ts,js}'],
     plugins: {
       'license-header': licenseHeader,
+      import: importPlugin,
     },
     rules: {
       'license-header/header': [
@@ -187,6 +188,7 @@ export default tseslint.config(
           ' */',
         ],
       ],
+      'import/enforce-node-protocol-usage': ['error', 'always'],
     },
   },
   // extra settings for scripts that we run directly with node

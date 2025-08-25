@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import { homedir, platform } from 'os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { homedir, platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,

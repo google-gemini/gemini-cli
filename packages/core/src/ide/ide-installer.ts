@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as child_process from 'child_process';
-import * as process from 'process';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as os from 'os';
+import * as child_process from 'node:child_process';
+import * as process from 'node:process';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import { DetectedIde } from './detect-ide.js';
 import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
 
