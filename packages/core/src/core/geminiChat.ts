@@ -676,52 +676,6 @@ export class GeminiChat {
       this.history.push({ role: 'model', parts: [] });
     }
   }
-
-  private isFirstPartText(
-    content: Content | undefined,
-  ): content is Content & { parts: [{ text: string }, ...Part[]] } {
-    if (
-      !content ||
-      content.role !== 'model' ||
-      !content.parts ||
-      content.parts.length === 0
-    ) {
-      return false;
-    }
-    const firstPart = content.parts[0];
-    return (
-      typeof firstPart.text === 'string' &&
-      !('functionCall' in firstPart) &&
-      !('functionResponse' in firstPart) &&
-      !('inlineData' in firstPart) &&
-      !('fileData' in firstPart) &&
-      !('thought' in firstPart)
-    );
-  }
-
-  private isLastPartText(
-    content: Content | undefined,
-  ): content is Content & { parts: [...Part[], { text: string }] } {
-    // FIX: This check was too strict and was breaking consolidation.
-    // The `text !== ''` check is incorrect for intermediate consolidation steps.
-    if (
-      !content ||
-      content.role !== 'model' ||
-      !content.parts ||
-      content.parts.length === 0
-    ) {
-      return false;
-    }
-    const lastPart = content.parts[content.parts.length - 1];
-    return (
-      typeof lastPart.text === 'string' &&
-      !('functionCall' in lastPart) &&
-      !('functionResponse' in lastPart) &&
-      !('inlineData' in lastPart) &&
-      !('fileData' in lastPart) &&
-      !('thought' in lastPart)
-    );
-  }
 }
 /** Visible for Testing */
 export function isSchemaDepthError(errorMessage: string): boolean {

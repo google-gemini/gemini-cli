@@ -592,9 +592,9 @@ describe('GeminiChat', () => {
       expect(modelTurn.role).toBe('model');
 
       // The consolidated turn should contain both the text part and the functionCall part.
-      expect(modelTurn.parts.length).toBe(2);
-      expect(modelTurn.parts[0]!.text).toBe('Thinking...');
-      expect(modelTurn.parts[1]!.functionCall).toBeDefined();
+      expect(modelTurn?.parts?.length).toBe(2);
+      expect(modelTurn?.parts![0]!.text).toBe('Thinking...');
+      expect(modelTurn?.parts![1]!.functionCall).toBeDefined();
     });
 
     it('should add a placeholder model turn when a tool call is followed by an empty response', () => {
