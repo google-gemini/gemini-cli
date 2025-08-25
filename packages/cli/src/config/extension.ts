@@ -9,9 +9,9 @@ import {
   GeminiCLIExtension,
   Storage,
 } from '@google/gemini-cli-core';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import { simpleGit } from 'simple-git';
 
 export const EXTENSIONS_DIRECTORY_NAME = '.gemini/extensions';
