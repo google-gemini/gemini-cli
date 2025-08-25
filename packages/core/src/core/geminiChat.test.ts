@@ -203,6 +203,70 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessageStream', () => {
+    it('should consolidate adjacent text parts that arrive in separate stream chunks', async () => {
+      // 1. Mock the API to return a stream of multiple, adjacent text chunks.
+      const multiChunkStream = (async function* () {
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'This is the ' }] } },
+          ],
+        } as unknown as GenerateContentResponse;
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'first part.' }] } },
+          ],
+        } as unknown as GenerateContentResponse;
+        // This function call should break the consolidation.
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'do_stuff', args: {} } }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'This is the second part.' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        multiChunkStream,
+      );
+
+      // 2. Action: Send a message and consume the stream.
+      const stream = await chat.sendMessageStream(
+        { message: 'test message' },
+        'prompt-id-multi-chunk',
+      );
+      for await (const _ of stream) {
+        // Consume the stream to trigger history recording.
+      }
+
+      // 3. Assert: Check that the final history was correctly consolidated.
+      const history = chat.getHistory();
+
+      // The history should contain the user's turn and ONE consolidated model turn.
+      expect(history.length).toBe(2);
+
+      const modelTurn = history[1]!;
+      expect(modelTurn.role).toBe('model');
+
+      // The model turn should have 3 distinct parts: the merged text, the function call, and the final text.
+      expect(modelTurn.parts.length).toBe(3);
+      expect(modelTurn.parts[0]!.text).toBe('This is the first part.');
+      expect(modelTurn.parts[1]!.functionCall).toBeDefined();
+      expect(modelTurn.parts[2]!.text).toBe('This is the second part.');
+    });
     it('should preserve text parts that stream in the same chunk as a thought', async () => {
       // 1. Mock the API to return a single chunk containing both a thought and visible text.
       const mixedContentStream = (async function* () {
