@@ -12,14 +12,14 @@ describe('extensions install command', () => {
   it('should fail if no source is provided', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);
     expect(() => validationParser.parse('install')).toThrow(
-      'Either a git URL or a --path must be provided.',
+      'Either a git URL --source or a --path must be provided.',
     );
   });
 
   it('should fail if both git source and local path are provided', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);
     expect(() =>
-      validationParser.parse('install some-url --path /some/path'),
+      validationParser.parse('install --source some-url --path /some/path'),
     ).toThrow('Arguments source and path are mutually exclusive');
   });
 });

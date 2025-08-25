@@ -253,6 +253,7 @@ async function cloneFromGit(
   destination: string,
 ): Promise<void> {
   try {
+    // TODO(chrstnb): Download the archive instead to avoid unnecessary .git info.
     await simpleGit().clone(gitUrl, destination, ['--depth', '1']);
   } catch (error) {
     throw new Error(`Failed to clone Git repository from ${gitUrl}`, {
