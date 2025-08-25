@@ -6,10 +6,8 @@
 
 import {
   Config,
-  DetectedIde,
   GEMINI_CLI_COMPANION_EXTENSION_NAME,
   IDEConnectionStatus,
-  getIdeInfo,
   getIdeInstaller,
   IdeClient,
   type File,
@@ -130,11 +128,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         ({
           type: 'message',
           messageType: 'error',
-          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: ${Object.values(
-            DetectedIde,
-          )
-            .map((ide) => getIdeInfo(ide).displayName)
-            .join(', ')}`,
+          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks.`,
         }) as const,
     };
   }

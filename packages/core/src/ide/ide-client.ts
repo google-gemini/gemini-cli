@@ -15,7 +15,7 @@ import {
   CloseDiffResponseSchema,
   DiffUpdateResult,
 } from '../ide/ideContext.js';
-import { getIdeProcessId } from './process-utils.js';
+import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -72,21 +72,25 @@ export class IdeClient {
     details:
       'IDE integration is currently disabled. To enable it, run /ide enable.',
   };
-  private readonly currentIde: DetectedIde | undefined;
-  private readonly currentIdeDisplayName: string | undefined;
+  private currentIde: DetectedIde | undefined;
+  private currentIdeDisplayName: string | undefined;
+  private ideProcessInfo: { pid: number; command: string } | undefined;
   private diffResponses = new Map<string, (result: DiffUpdateResult) => void>();
   private statusListeners = new Set<(state: IDEConnectionState) => void>();
 
-  private constructor() {
-    this.currentIde = detectIde();
-    if (this.currentIde) {
-      this.currentIdeDisplayName = getIdeInfo(this.currentIde).displayName;
-    }
-  }
+  private constructor() {}
 
-  static getInstance(): IdeClient {
+  static async getInstance(): Promise<IdeClient> {
     if (!IdeClient.instance) {
-      IdeClient.instance = new IdeClient();
+      const client = new IdeClient();
+      client.ideProcessInfo = await getIdeProcessInfo();
+      client.currentIde = detectIde(client.ideProcessInfo);
+      if (client.currentIde) {
+        client.currentIdeDisplayName = getIdeInfo(
+          client.currentIde,
+        ).displayName;
+      }
+      IdeClient.instance = client;
     }
     return IdeClient.instance;
   }
@@ -103,11 +107,7 @@ export class IdeClient {
     if (!this.currentIde || !this.currentIdeDisplayName) {
       this.setState(
         IDEConnectionStatus.Disconnected,
-        `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: ${Object.values(
-          DetectedIde,
-        )
-          .map((ide) => getIdeInfo(ide).displayName)
-          .join(', ')}`,
+        `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks`,
         false,
       );
       return;
@@ -168,7 +168,7 @@ export class IdeClient {
 
     this.setState(
       IDEConnectionStatus.Disconnected,
-      `Failed to connect to IDE companion extension for ${this.currentIdeDisplayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
+      `Failed to connect to IDE companion extension in ${this.currentIdeDisplayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
       true,
     );
   }
@@ -309,7 +309,7 @@ export class IdeClient {
     if (ideWorkspacePath === undefined) {
       return {
         isValid: false,
-        error: `Failed to connect to IDE companion extension for ${currentIdeDisplayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
+        error: `Failed to connect to IDE companion extension in ${currentIdeDisplayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
       };
     }
 
@@ -375,11 +375,13 @@ export class IdeClient {
   private async getConnectionConfigFromFile(): Promise<
     (ConnectionConfig & { workspacePath?: string }) | undefined
   > {
+    if (!this.ideProcessInfo) {
+      return {};
+    }
     try {
-      const ideProcessId = await getIdeProcessId();
       const portFile = path.join(
         os.tmpdir(),
-        `gemini-ide-server-${ideProcessId}.json`,
+        `gemini-ide-server-${this.ideProcessInfo.pid}.json`,
       );
       const portFileContents = await fs.promises.readFile(portFile, 'utf8');
       return JSON.parse(portFileContents);
