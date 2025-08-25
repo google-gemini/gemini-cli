@@ -25,12 +25,15 @@ describe('ide-installer', () => {
   });
 
   describe('getIdeInstaller', () => {
-    it('should return a VsCodeInstaller for "vscode"', () => {
-      const installer = getIdeInstaller(DetectedIde.VSCode);
-      expect(installer).not.toBeNull();
-      // A more specific check might be needed if we export the class
-      expect(installer).toBeInstanceOf(Object);
-    });
+    it.each([{ ide: DetectedIde.VSCode }, { ide: DetectedIde.FirebaseStudio }])(
+      'returns a VsCodeInstaller for "$ide"',
+      ({ ide }) => {
+        const installer = getIdeInstaller(ide);
+
+        expect(installer).not.toBeNull();
+        expect(installer?.install).toEqual(expect.any(Function));
+      },
+    );
   });
 
   describe('VsCodeInstaller', () => {
