@@ -46,13 +46,13 @@ import { ideContext } from '../ide/ideContext.js';
 import {
   logChatCompression,
   logNextSpeakerCheck,
+  logMalformedJsonResponse,
 } from '../telemetry/loggers.js';
 import {
   makeChatCompressionEvent,
   MalformedJsonResponseEvent,
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
-import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import { IdeContext, File } from '../ide/ideContext.js';
 
 function isThinkingSupported(model: string) {
@@ -201,7 +201,7 @@ export class GeminiClient {
   }
 
   async setTools(): Promise<void> {
-    const toolRegistry = await this.config.getToolRegistry();
+    const toolRegistry = this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     this.getChat().setTools(tools);
@@ -225,7 +225,7 @@ export class GeminiClient {
   async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
     const envParts = await getEnvironmentContext(this.config);
-    const toolRegistry = await this.config.getToolRegistry();
+    const toolRegistry = this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     const history: Content[] = [
@@ -527,6 +527,10 @@ export class GeminiClient {
         return turn;
       }
 
+      if (this.config.getSkipNextSpeakerCheck()) {
+        return turn;
+      }
+
       const nextSpeakerCheck = await checkNextSpeaker(
         this.getChat(),
         this,
@@ -613,7 +617,8 @@ export class GeminiClient {
       const prefix = '```json';
       const suffix = '```';
       if (text.startsWith(prefix) && text.endsWith(suffix)) {
-        ClearcutLogger.getInstance(this.config)?.logMalformedJsonResponseEvent(
+        logMalformedJsonResponse(
+          this.config,
           new MalformedJsonResponseEvent(modelToUse),
         );
         text = text

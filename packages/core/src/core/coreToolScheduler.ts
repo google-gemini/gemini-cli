@@ -150,14 +150,14 @@ export function convertToFunctionResponse(
   toolName: string,
   callId: string,
   llmContent: PartListUnion,
-): PartListUnion {
+): Part[] {
   const contentToProcess =
     Array.isArray(llmContent) && llmContent.length === 1
       ? llmContent[0]
       : llmContent;
 
   if (typeof contentToProcess === 'string') {
-    return createFunctionResponsePart(callId, toolName, contentToProcess);
+    return [createFunctionResponsePart(callId, toolName, contentToProcess)];
   }
 
   if (Array.isArray(contentToProcess)) {
@@ -166,7 +166,7 @@ export function convertToFunctionResponse(
       toolName,
       'Tool execution succeeded.',
     );
-    return [functionResponse, ...contentToProcess];
+    return [functionResponse, ...toParts(contentToProcess)];
   }
 
   // After this point, contentToProcess is a single Part object.
@@ -176,10 +176,10 @@ export function convertToFunctionResponse(
         getResponseTextFromParts(
           contentToProcess.functionResponse.response['content'] as Part[],
         ) || '';
-      return createFunctionResponsePart(callId, toolName, stringifiedOutput);
+      return [createFunctionResponsePart(callId, toolName, stringifiedOutput)];
     }
     // It's a functionResponse that we should pass through as is.
-    return contentToProcess;
+    return [contentToProcess];
   }
 
   if (contentToProcess.inlineData || contentToProcess.fileData) {
@@ -196,15 +196,27 @@ export function convertToFunctionResponse(
   }
 
   if (contentToProcess.text !== undefined) {
-    return createFunctionResponsePart(callId, toolName, contentToProcess.text);
+    return [
+      createFunctionResponsePart(callId, toolName, contentToProcess.text),
+    ];
   }
 
   // Default case for other kinds of parts.
-  return createFunctionResponsePart(
-    callId,
-    toolName,
-    'Tool execution succeeded.',
-  );
+  return [
+    createFunctionResponsePart(callId, toolName, 'Tool execution succeeded.'),
+  ];
+}
+
+function toParts(input: PartListUnion): Part[] {
+  const parts: Part[] = [];
+  for (const part of Array.isArray(input) ? input : [input]) {
+    if (typeof part === 'string') {
+      parts.push({ text: part });
+    } else if (part) {
+      parts.push(part);
+    }
+  }
+  return parts;
 }
 
 const createErrorResponse = (
@@ -214,29 +226,30 @@ const createErrorResponse = (
 ): ToolCallResponseInfo => ({
   callId: request.callId,
   error,
-  responseParts: {
-    functionResponse: {
-      id: request.callId,
-      name: request.name,
-      response: { error: error.message },
+  responseParts: [
+    {
+      functionResponse: {
+        id: request.callId,
+        name: request.name,
+        response: { error: error.message },
+      },
     },
-  },
+  ],
   resultDisplay: error.message,
   errorType,
 });
 
 interface CoreToolSchedulerOptions {
-  toolRegistry: Promise<ToolRegistry>;
+  config: Config;
   outputUpdateHandler?: OutputUpdateHandler;
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
   getPreferredEditor: () => EditorType | undefined;
-  config: Config;
   onEditorClose: () => void;
 }
 
 export class CoreToolScheduler {
-  private toolRegistry: Promise<ToolRegistry>;
+  private toolRegistry: ToolRegistry;
   private toolCalls: ToolCall[] = [];
   private outputUpdateHandler?: OutputUpdateHandler;
   private onAllToolCallsComplete?: AllToolCallsCompleteHandler;
@@ -255,7 +268,7 @@ export class CoreToolScheduler {
 
   constructor(options: CoreToolSchedulerOptions) {
     this.config = options.config;
-    this.toolRegistry = options.toolRegistry;
+    this.toolRegistry = options.config.getToolRegistry();
     this.outputUpdateHandler = options.outputUpdateHandler;
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
@@ -383,15 +396,17 @@ export class CoreToolScheduler {
             status: 'cancelled',
             response: {
               callId: currentCall.request.callId,
-              responseParts: {
-                functionResponse: {
-                  id: currentCall.request.callId,
-                  name: currentCall.request.name,
-                  response: {
-                    error: `[Operation Cancelled] Reason: ${auxiliaryData}`,
+              responseParts: [
+                {
+                  functionResponse: {
+                    id: currentCall.request.callId,
+                    name: currentCall.request.name,
+                    response: {
+                      error: `[Operation Cancelled] Reason: ${auxiliaryData}`,
+                    },
                   },
                 },
-              },
+              ],
               resultDisplay,
               error: undefined,
               errorType: undefined,
@@ -534,11 +549,10 @@ export class CoreToolScheduler {
         );
       }
       const requestsToProcess = Array.isArray(request) ? request : [request];
-      const toolRegistry = await this.toolRegistry;
 
       const newToolCalls: ToolCall[] = requestsToProcess.map(
         (reqInfo): ToolCall => {
-          const toolInstance = toolRegistry.getTool(reqInfo.name);
+          const toolInstance = this.toolRegistry.getTool(reqInfo.name);
           if (!toolInstance) {
             return {
               status: 'error',
@@ -694,6 +708,10 @@ export class CoreToolScheduler {
 
     if (toolCall && toolCall.status === 'awaiting_approval') {
       await originalOnConfirm(outcome);
+    }
+
+    if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+      await this.autoApproveCompatiblePendingTools(signal, callId);
     }
 
     this.setToolCallOutcome(callId, outcome);
@@ -928,5 +946,36 @@ export class CoreToolScheduler {
         outcome,
       };
     });
+  }
+
+  private async autoApproveCompatiblePendingTools(
+    signal: AbortSignal,
+    triggeringCallId: string,
+  ): Promise<void> {
+    const pendingTools = this.toolCalls.filter(
+      (call) =>
+        call.status === 'awaiting_approval' &&
+        call.request.callId !== triggeringCallId,
+    ) as WaitingToolCall[];
+
+    for (const pendingTool of pendingTools) {
+      try {
+        const stillNeedsConfirmation =
+          await pendingTool.invocation.shouldConfirmExecute(signal);
+
+        if (!stillNeedsConfirmation) {
+          this.setToolCallOutcome(
+            pendingTool.request.callId,
+            ToolConfirmationOutcome.ProceedAlways,
+          );
+          this.setStatusInternal(pendingTool.request.callId, 'scheduled');
+        }
+      } catch (error) {
+        console.error(
+          `Error checking confirmation for tool ${pendingTool.request.callId}:`,
+          error,
+        );
+      }
+    }
   }
 }

@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { quote, parse } from 'shell-quote';
 import {
   USER_SETTINGS_DIR,
@@ -24,6 +25,7 @@ function getContainerPath(hostPath: string): string {
   if (os.platform() !== 'win32') {
     return hostPath;
   }
+
   const withForwardSlashes = hostPath.replace(/\\/g, '/');
   const match = withForwardSlashes.match(/^([A-Z]):\/(.*)/i);
   if (match) {
@@ -114,7 +116,7 @@ function ports(): string[] {
     .map((p) => p.trim());
 }
 
-function entrypoint(workdir: string): string[] {
+function entrypoint(workdir: string, cliArgs: string[]): string[] {
   const isWindows = os.platform() === 'win32';
   const containerWorkdir = getContainerPath(workdir);
   const shellCmds = [];
@@ -166,7 +168,7 @@ function entrypoint(workdir: string): string[] {
     ),
   );
 
-  const cliArgs = process.argv.slice(2).map((arg) => quote([arg]));
+  const quotedCliArgs = cliArgs.slice(2).map((arg) => quote([arg]));
   const cliCmd =
     process.env['NODE_ENV'] === 'development'
       ? process.env['DEBUG']
@@ -176,8 +178,7 @@ function entrypoint(workdir: string): string[] {
         ? `node --inspect-brk=0.0.0.0:${process.env['DEBUG_PORT'] || '9229'} $(which gemini)`
         : 'gemini';
 
-  const args = [...shellCmds, cliCmd, ...cliArgs];
-
+  const args = [...shellCmds, cliCmd, ...quotedCliArgs];
   return ['bash', '-c', args.join(' ')];
 }
 
@@ -185,6 +186,7 @@ export async function start_sandbox(
   config: SandboxConfig,
   nodeArgs: string[] = [],
   cliConfig?: Config,
+  cliArgs: string[] = [],
 ) {
   const patcher = new ConsolePatcher({
     debugMode: cliConfig?.getDebugMode() || !!process.env['DEBUG'],
@@ -199,9 +201,11 @@ export async function start_sandbox(
         console.error('ERROR: cannot BUILD_SANDBOX when using macOS Seatbelt');
         process.exit(1);
       }
+
       const profile = (process.env['SEATBELT_PROFILE'] ??= 'permissive-open');
-      let profileFile = new URL(`sandbox-macos-${profile}.sb`, import.meta.url)
-        .pathname;
+      let profileFile = fileURLToPath(
+        new URL(`sandbox-macos-${profile}.sb`, import.meta.url),
+      );
       // if profile name is not recognized, then look for file under project settings directory
       if (!BUILTIN_SEATBELT_PROFILES.includes(profile)) {
         profileFile = path.join(
@@ -263,6 +267,8 @@ export async function start_sandbox(
         args.push('-D', `INCLUDE_DIR_${i}=${dirPath}`);
       }
 
+      const finalArgv = cliArgs;
+
       args.push(
         '-f',
         profileFile,
@@ -271,7 +277,7 @@ export async function start_sandbox(
         [
           `SANDBOX=sandbox-exec`,
           `NODE_OPTIONS="${nodeOptions}"`,
-          ...process.argv.map((arg) => quote([arg])),
+          ...finalArgv.map((arg) => quote([arg])),
         ].join(' '),
       );
       // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
@@ -692,7 +698,7 @@ export async function start_sandbox(
     // Determine if the current user's UID/GID should be passed to the sandbox.
     // See shouldUseCurrentUserInSandbox for more details.
     let userFlag = '';
-    const finalEntrypoint = entrypoint(workdir);
+    const finalEntrypoint = entrypoint(workdir, cliArgs);
 
     if (process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true') {
       args.push('--user', 'root');

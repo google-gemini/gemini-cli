@@ -16,9 +16,22 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { ToolConfirmationOutcome } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 
 // Mock dependencies
-vi.mock('fs/promises');
+vi.mock(import('fs/promises'), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    mkdir: vi.fn(),
+    readFile: vi.fn(),
+  };
+});
+
+vi.mock('fs', () => ({
+  mkdirSync: vi.fn(),
+}));
+
 vi.mock('os');
 
 const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
@@ -274,6 +287,9 @@ describe('MemoryTool', () => {
       );
       expect(result.returnDisplay).toBe(
         `Error saving memory: ${underlyingError.message}`,
+      );
+      expect(result.error?.type).toBe(
+        ToolErrorType.MEMORY_TOOL_EXECUTION_ERROR,
       );
     });
   });
