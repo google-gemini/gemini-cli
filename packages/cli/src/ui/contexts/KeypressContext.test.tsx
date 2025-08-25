@@ -17,6 +17,8 @@ import { EventEmitter } from 'events';
 import {
   KITTY_KEYCODE_ENTER,
   KITTY_KEYCODE_NUMPAD_ENTER,
+  KITTY_KEYCODE_TAB,
+  KITTY_KEYCODE_BACKSPACE,
   CHAR_CODE_ESC,
   CHAR_CODE_LEFT_BRACKET,
   CHAR_CODE_1,
@@ -282,10 +284,86 @@ describe('KeypressContext - Kitty Protocol', () => {
     });
   });
 
+  describe('Tab and Backspace handling', () => {
+    it('should recognize Tab key in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_TAB}u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'tab',
+          kittyProtocol: true,
+          shift: false,
+        }),
+      );
+    });
+
+    it('should recognize Shift+Tab in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Modifier 2 is Shift
+      act(() => {
+        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_TAB};2u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'tab',
+          kittyProtocol: true,
+          shift: true,
+        }),
+      );
+    });
+
+    it('should recognize Backspace key in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_BACKSPACE}u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          kittyProtocol: true,
+          meta: false,
+        }),
+      );
+    });
+
+    it('should recognize Option+Backspace in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Modifier 3 is Alt/Option
+      act(() => {
+        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_BACKSPACE};3u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          kittyProtocol: true,
+          meta: true,
+        }),
+      );
+    });
+  });
+
   describe('paste mode', () => {
     it('should handle multiline paste as a single event', async () => {
       const keyHandler = vi.fn();
-      const pastedText = 'This \nis \na \nmultiline \npaste.';
+      const pastedText = 'This \n is \n a \n multiline \n paste.';
 
       const { result } = renderHook(() => useKeypressContext(), {
         wrapper,

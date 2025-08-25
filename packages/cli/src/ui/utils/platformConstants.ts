@@ -22,6 +22,8 @@ export const KITTY_CTRL_C = '[99;5u';
  */
 export const KITTY_KEYCODE_ENTER = 13;
 export const KITTY_KEYCODE_NUMPAD_ENTER = 57414;
+export const KITTY_KEYCODE_TAB = 9;
+export const KITTY_KEYCODE_BACKSPACE = 127;
 
 /**
  * Timing constants for terminal interactions
