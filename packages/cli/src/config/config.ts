@@ -11,6 +11,7 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
+import { extensionsCommand } from '../commands/extensions.js';
 import {
   Config,
   loadServerHierarchicalMemory,
@@ -76,7 +77,7 @@ export interface CliArgs {
   screenReader: boolean | undefined;
 }
 
-export async function parseArguments(): Promise<CliArgs> {
+export async function parseArguments(settings: Settings): Promise<CliArgs> {
   const yargsInstance = yargs(hideBin(process.argv))
     .locale('en')
     .scriptName('gemini')
@@ -252,7 +253,13 @@ export async function parseArguments(): Promise<CliArgs> {
         }),
     )
     // Register MCP subcommands
-    .command(mcpCommand)
+    .command(mcpCommand);
+
+  if (settings?.extensionManagement ?? false) {
+    yargsInstance.command(extensionsCommand);
+  }
+
+  yargsInstance
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -265,7 +272,10 @@ export async function parseArguments(): Promise<CliArgs> {
 
   // Handle case where MCP subcommands are executed - they should exit the process
   // and not return to main CLI logic
-  if (result._.length > 0 && result._[0] === 'mcp') {
+  if (
+    result._.length > 0 &&
+    (result._[0] === 'mcp' || result._[0] === 'extensions')
+  ) {
     // MCP commands handle their own execution and process exit
     process.exit(0);
   }
