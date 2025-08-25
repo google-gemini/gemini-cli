@@ -4,25 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  type Mock,
-} from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type {
+  ModifyContext,
+  ModifiableDeclarativeTool,
+} from './modifiable-tool.js';
 import {
   modifyWithEditor,
-  ModifyContext,
-  ModifiableTool,
-  isModifiableTool,
+  isModifiableDeclarativeTool,
 } from './modifiable-tool.js';
-import { EditorType } from '../utils/editor.js';
-import fs from 'fs';
-import os from 'os';
-import * as path from 'path';
+import type { EditorType } from '../utils/editor.js';
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import os from 'node:os';
+import * as path from 'node:path';
 
 // Mock dependencies
 const mockOpenDiff = vi.hoisted(() => vi.fn());
@@ -36,9 +31,6 @@ vi.mock('diff', () => ({
   createPatch: mockCreatePatch,
 }));
 
-vi.mock('fs');
-vi.mock('os');
-
 interface TestParams {
   filePath: string;
   someOtherParam: string;
@@ -46,7 +38,7 @@ interface TestParams {
 }
 
 describe('modifyWithEditor', () => {
-  let tempDir: string;
+  let testProjectDir: string;
   let mockModifyContext: ModifyContext<TestParams>;
   let mockParams: TestParams;
   let currentContent: string;
@@ -54,17 +46,19 @@ describe('modifyWithEditor', () => {
   let modifiedContent: string;
   let abortSignal: AbortSignal;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetAllMocks();
 
-    tempDir = '/tmp/test-dir';
+    testProjectDir = await fsp.mkdtemp(
+      path.join(os.tmpdir(), 'modifiable-tool-test-'),
+    );
     abortSignal = new AbortController().signal;
 
     currentContent = 'original content\nline 2\nline 3';
     proposedContent = 'modified content\nline 2\nline 3';
     modifiedContent = 'user modified content\nline 2\nline 3\nnew line';
     mockParams = {
-      filePath: path.join(tempDir, 'test.txt'),
+      filePath: path.join(testProjectDir, 'test.txt'),
       someOtherParam: 'value',
     };
 
@@ -81,26 +75,18 @@ describe('modifyWithEditor', () => {
         })),
     };
 
-    (os.tmpdir as Mock).mockReturnValue(tempDir);
-
-    (fs.existsSync as Mock).mockReturnValue(true);
-    (fs.mkdirSync as Mock).mockImplementation(() => undefined);
-    (fs.writeFileSync as Mock).mockImplementation(() => {});
-    (fs.unlinkSync as Mock).mockImplementation(() => {});
-
-    (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
-      if (filePath.includes('-new-')) {
-        return modifiedContent;
-      }
-      return currentContent;
+    mockOpenDiff.mockImplementation(async (_oldPath, newPath) => {
+      await fsp.writeFile(newPath, modifiedContent, 'utf8');
     });
 
     mockCreatePatch.mockReturnValue('mock diff content');
-    mockOpenDiff.mockResolvedValue(undefined);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
+    await fsp.rm(testProjectDir, { recursive: true, force: true });
+    const diffDir = path.join(os.tmpdir(), 'gemini-cli-tool-modify-diffs');
+    await fsp.rm(diffDir, { recursive: true, force: true });
   });
 
   describe('successful modification', () => {
@@ -110,6 +96,7 @@ describe('modifyWithEditor', () => {
         mockModifyContext,
         'vscode' as EditorType,
         abortSignal,
+        vi.fn(),
       );
 
       expect(mockModifyContext.getCurrentContent).toHaveBeenCalledWith(
@@ -120,38 +107,8 @@ describe('modifyWithEditor', () => {
       );
       expect(mockModifyContext.getFilePath).toHaveBeenCalledWith(mockParams);
 
-      expect(fs.writeFileSync).toHaveBeenCalledTimes(2);
-      expect(fs.writeFileSync).toHaveBeenNthCalledWith(
-        1,
-        expect.stringContaining(
-          path.join(tempDir, 'gemini-cli-tool-modify-diffs'),
-        ),
-        currentContent,
-        'utf8',
-      );
-      expect(fs.writeFileSync).toHaveBeenNthCalledWith(
-        2,
-        expect.stringContaining(
-          path.join(tempDir, 'gemini-cli-tool-modify-diffs'),
-        ),
-        proposedContent,
-        'utf8',
-      );
-
-      expect(mockOpenDiff).toHaveBeenCalledWith(
-        expect.stringContaining('-old-'),
-        expect.stringContaining('-new-'),
-        'vscode',
-      );
-
-      expect(fs.readFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('-old-'),
-        'utf8',
-      );
-      expect(fs.readFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('-new-'),
-        'utf8',
-      );
+      expect(mockOpenDiff).toHaveBeenCalledOnce();
+      const [oldFilePath, newFilePath] = mockOpenDiff.mock.calls[0];
 
       expect(mockModifyContext.createUpdatedParams).toHaveBeenCalledWith(
         currentContent,
@@ -171,15 +128,9 @@ describe('modifyWithEditor', () => {
         }),
       );
 
-      expect(fs.unlinkSync).toHaveBeenCalledTimes(2);
-      expect(fs.unlinkSync).toHaveBeenNthCalledWith(
-        1,
-        expect.stringContaining('-old-'),
-      );
-      expect(fs.unlinkSync).toHaveBeenNthCalledWith(
-        2,
-        expect.stringContaining('-new-'),
-      );
+      // Check that temp files are deleted.
+      await expect(fsp.access(oldFilePath)).rejects.toThrow();
+      await expect(fsp.access(newFilePath)).rejects.toThrow();
 
       expect(result).toEqual({
         updatedParams: {
@@ -192,43 +143,44 @@ describe('modifyWithEditor', () => {
     });
 
     it('should create temp directory if it does not exist', async () => {
-      (fs.existsSync as Mock).mockReturnValue(false);
+      const diffDir = path.join(os.tmpdir(), 'gemini-cli-tool-modify-diffs');
+      await fsp.rm(diffDir, { recursive: true, force: true }).catch(() => {});
 
       await modifyWithEditor(
         mockParams,
         mockModifyContext,
         'vscode' as EditorType,
         abortSignal,
+        vi.fn(),
       );
 
-      expect(fs.mkdirSync).toHaveBeenCalledWith(
-        path.join(tempDir, 'gemini-cli-tool-modify-diffs'),
-        { recursive: true },
-      );
+      const stats = await fsp.stat(diffDir);
+      expect(stats.isDirectory()).toBe(true);
     });
 
     it('should not create temp directory if it already exists', async () => {
-      (fs.existsSync as Mock).mockReturnValue(true);
+      const diffDir = path.join(os.tmpdir(), 'gemini-cli-tool-modify-diffs');
+      await fsp.mkdir(diffDir, { recursive: true });
+
+      const mkdirSpy = vi.spyOn(fs, 'mkdirSync');
 
       await modifyWithEditor(
         mockParams,
         mockModifyContext,
         'vscode' as EditorType,
         abortSignal,
+        vi.fn(),
       );
 
-      expect(fs.mkdirSync).not.toHaveBeenCalled();
+      expect(mkdirSpy).not.toHaveBeenCalled();
+      mkdirSpy.mockRestore();
     });
   });
 
   it('should handle missing old temp file gracefully', async () => {
-    (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
-      if (filePath.includes('-old-')) {
-        const error = new Error('ENOENT: no such file or directory');
-        (error as NodeJS.ErrnoException).code = 'ENOENT';
-        throw error;
-      }
-      return modifiedContent;
+    mockOpenDiff.mockImplementation(async (oldPath, newPath) => {
+      await fsp.writeFile(newPath, modifiedContent, 'utf8');
+      await fsp.unlink(oldPath);
     });
 
     const result = await modifyWithEditor(
@@ -236,6 +188,7 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
+      vi.fn(),
     );
 
     expect(mockCreatePatch).toHaveBeenCalledWith(
@@ -255,13 +208,8 @@ describe('modifyWithEditor', () => {
   });
 
   it('should handle missing new temp file gracefully', async () => {
-    (fs.readFileSync as Mock).mockImplementation((filePath: string) => {
-      if (filePath.includes('-new-')) {
-        const error = new Error('ENOENT: no such file or directory');
-        (error as NodeJS.ErrnoException).code = 'ENOENT';
-        throw error;
-      }
-      return currentContent;
+    mockOpenDiff.mockImplementation(async (_oldPath, newPath) => {
+      await fsp.unlink(newPath);
     });
 
     const result = await modifyWithEditor(
@@ -269,6 +217,7 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
+      vi.fn(),
     );
 
     expect(mockCreatePatch).toHaveBeenCalledWith(
@@ -291,23 +240,33 @@ describe('modifyWithEditor', () => {
     const editorError = new Error('Editor failed to open');
     mockOpenDiff.mockRejectedValue(editorError);
 
+    const writeSpy = vi.spyOn(fs, 'writeFileSync');
+
     await expect(
       modifyWithEditor(
         mockParams,
         mockModifyContext,
         'vscode' as EditorType,
         abortSignal,
+        vi.fn(),
       ),
     ).rejects.toThrow('Editor failed to open');
 
-    expect(fs.unlinkSync).toHaveBeenCalledTimes(2);
+    expect(writeSpy).toHaveBeenCalledTimes(2);
+    const oldFilePath = writeSpy.mock.calls[0][0] as string;
+    const newFilePath = writeSpy.mock.calls[1][0] as string;
+
+    await expect(fsp.access(oldFilePath)).rejects.toThrow();
+    await expect(fsp.access(newFilePath)).rejects.toThrow();
+
+    writeSpy.mockRestore();
   });
 
   it('should handle temp file cleanup errors gracefully', async () => {
     const consoleErrorSpy = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
-    (fs.unlinkSync as Mock).mockImplementation((_filePath: string) => {
+    vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {
       throw new Error('Failed to delete file');
     });
 
@@ -316,6 +275,7 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
+      vi.fn(),
     );
 
     expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
@@ -327,7 +287,11 @@ describe('modifyWithEditor', () => {
   });
 
   it('should create temp files with correct naming with extension', async () => {
-    const testFilePath = path.join(tempDir, 'subfolder', 'test-file.txt');
+    const testFilePath = path.join(
+      testProjectDir,
+      'subfolder',
+      'test-file.txt',
+    );
     mockModifyContext.getFilePath = vi.fn().mockReturnValue(testFilePath);
 
     await modifyWithEditor(
@@ -335,22 +299,21 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
+      vi.fn(),
     );
 
-    const writeFileCalls = (fs.writeFileSync as Mock).mock.calls;
-    expect(writeFileCalls).toHaveLength(2);
-
-    const oldFilePath = writeFileCalls[0][0];
-    const newFilePath = writeFileCalls[1][0];
-
+    expect(mockOpenDiff).toHaveBeenCalledOnce();
+    const [oldFilePath, newFilePath] = mockOpenDiff.mock.calls[0];
     expect(oldFilePath).toMatch(/gemini-cli-modify-test-file-old-\d+\.txt$/);
     expect(newFilePath).toMatch(/gemini-cli-modify-test-file-new-\d+\.txt$/);
-    expect(oldFilePath).toContain(`${tempDir}/gemini-cli-tool-modify-diffs/`);
-    expect(newFilePath).toContain(`${tempDir}/gemini-cli-tool-modify-diffs/`);
+
+    const diffDir = path.join(os.tmpdir(), 'gemini-cli-tool-modify-diffs');
+    expect(path.dirname(oldFilePath)).toBe(diffDir);
+    expect(path.dirname(newFilePath)).toBe(diffDir);
   });
 
   it('should create temp files with correct naming without extension', async () => {
-    const testFilePath = path.join(tempDir, 'subfolder', 'test-file');
+    const testFilePath = path.join(testProjectDir, 'subfolder', 'test-file');
     mockModifyContext.getFilePath = vi.fn().mockReturnValue(testFilePath);
 
     await modifyWithEditor(
@@ -358,18 +321,17 @@ describe('modifyWithEditor', () => {
       mockModifyContext,
       'vscode' as EditorType,
       abortSignal,
+      vi.fn(),
     );
 
-    const writeFileCalls = (fs.writeFileSync as Mock).mock.calls;
-    expect(writeFileCalls).toHaveLength(2);
-
-    const oldFilePath = writeFileCalls[0][0];
-    const newFilePath = writeFileCalls[1][0];
-
+    expect(mockOpenDiff).toHaveBeenCalledOnce();
+    const [oldFilePath, newFilePath] = mockOpenDiff.mock.calls[0];
     expect(oldFilePath).toMatch(/gemini-cli-modify-test-file-old-\d+$/);
     expect(newFilePath).toMatch(/gemini-cli-modify-test-file-new-\d+$/);
-    expect(oldFilePath).toContain(`${tempDir}/gemini-cli-tool-modify-diffs/`);
-    expect(newFilePath).toContain(`${tempDir}/gemini-cli-tool-modify-diffs/`);
+
+    const diffDir = path.join(os.tmpdir(), 'gemini-cli-tool-modify-diffs');
+    expect(path.dirname(oldFilePath)).toBe(diffDir);
+    expect(path.dirname(newFilePath)).toBe(diffDir);
   });
 });
 
@@ -378,16 +340,16 @@ describe('isModifiableTool', () => {
     const mockTool = {
       name: 'test-tool',
       getModifyContext: vi.fn(),
-    } as unknown as ModifiableTool<TestParams>;
+    } as unknown as ModifiableDeclarativeTool<TestParams>;
 
-    expect(isModifiableTool(mockTool)).toBe(true);
+    expect(isModifiableDeclarativeTool(mockTool)).toBe(true);
   });
 
   it('should return false for objects without getModifyContext method', () => {
     const mockTool = {
       name: 'test-tool',
-    } as unknown as ModifiableTool<TestParams>;
+    } as unknown as ModifiableDeclarativeTool<TestParams>;
 
-    expect(isModifiableTool(mockTool)).toBe(false);
+    expect(isModifiableDeclarativeTool(mockTool)).toBe(false);
   });
 });

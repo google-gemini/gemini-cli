@@ -5,6 +5,7 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
+import { darkSemanticColors } from './semantic-tokens.js';
 
 const githubDarkColors: ColorsTheme = {
   type: 'dark',
@@ -17,6 +18,8 @@ const githubDarkColors: ColorsTheme = {
   AccentGreen: '#85E89D',
   AccentYellow: '#FFAB70',
   AccentRed: '#F97583',
+  DiffAdded: '#3C4636',
+  DiffRemoved: '#502125',
   Comment: '#6A737D',
   Gray: '#6A737D',
   GradientColors: ['#79B8FF', '#85E89D'],
@@ -140,4 +143,5 @@ export const GitHubDark: Theme = new Theme(
     },
   },
   githubDarkColors,
+  darkSemanticColors,
 );

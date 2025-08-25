@@ -4,20 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
+import type React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
-import {
-  shortenPath,
-  tildeifyPath,
-  tokenLimit,
-  ideContext,
-  ActiveFile,
-} from '@google/gemini-cli-core';
+import { theme } from '../semantic-colors.js';
+import { shortenPath, tildeifyPath } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
+import path from 'node:path';
 import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
+import { ContextUsageDisplay } from './ContextUsageDisplay.js';
+import { DebugProfiler } from './DebugProfiler.js';
+
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 
 interface FooterProps {
   model: string;
@@ -31,6 +31,8 @@ interface FooterProps {
   showMemoryUsage?: boolean;
   promptTokenCount: number;
   nightly: boolean;
+  vimMode?: string;
+  isTrustedFolder?: boolean;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -45,109 +47,104 @@ export const Footer: React.FC<FooterProps> = ({
   showMemoryUsage,
   promptTokenCount,
   nightly,
+  vimMode,
+  isTrustedFolder,
 }) => {
-  const limit = tokenLimit(model);
-  const percentage = promptTokenCount / limit;
+  const { columns: terminalWidth } = useTerminalSize();
 
-  const [activeFile, setActiveFile] = useState<ActiveFile | undefined>(
-    undefined,
-  );
+  const isNarrow = isNarrowWidth(terminalWidth);
 
-  useEffect(() => {
-    const updateActiveFile = () => {
-      const currentActiveFile = ideContext.getActiveFileContext();
-      setActiveFile(currentActiveFile);
-    };
-
-    updateActiveFile();
-
-    const unsubscribe = ideContext.subscribeToActiveFile(setActiveFile);
-    return () => {
-      unsubscribe();
-    };
-  }, []);
+  // Adjust path length based on terminal width
+  const pathLength = Math.max(20, Math.floor(terminalWidth * 0.4));
+  const displayPath = isNarrow
+    ? path.basename(tildeifyPath(targetDir))
+    : shortenPath(tildeifyPath(targetDir), pathLength);
 
   return (
-    <Box marginTop={1} justifyContent="space-between" width="100%">
+    <Box
+      justifyContent="space-between"
+      width="100%"
+      flexDirection={isNarrow ? 'column' : 'row'}
+      alignItems={isNarrow ? 'flex-start' : 'center'}
+    >
       <Box>
+        {debugMode && <DebugProfiler />}
+        {vimMode && <Text color={theme.text.secondary}>[{vimMode}] </Text>}
         {nightly ? (
-          <Gradient colors={Colors.GradientColors}>
+          <Gradient colors={theme.ui.gradient}>
             <Text>
-              {shortenPath(tildeifyPath(targetDir), 70)}
+              {displayPath}
               {branchName && <Text> ({branchName}*)</Text>}
             </Text>
           </Gradient>
         ) : (
-          <Text color={Colors.LightBlue}>
-            {shortenPath(tildeifyPath(targetDir), 70)}
-            {branchName && <Text color={Colors.Gray}> ({branchName}*)</Text>}
-          </Text>
-        )}
-        {activeFile && activeFile.filePath && (
-          <Text>
-            <Text color={Colors.Gray}> | </Text>
-            <Text color={Colors.LightBlue}>
-              {shortenPath(tildeifyPath(activeFile.filePath), 70)}
-            </Text>
-            {activeFile.cursor && (
-              <Text color={Colors.Gray}>
-                :{activeFile.cursor.line}:{activeFile.cursor.character}
-              </Text>
+          <Text color={theme.text.link}>
+            {displayPath}
+            {branchName && (
+              <Text color={theme.text.secondary}> ({branchName}*)</Text>
             )}
           </Text>
         )}
         {debugMode && (
-          <Text color={Colors.AccentRed}>
+          <Text color={theme.status.error}>
             {' ' + (debugMessage || '--debug')}
           </Text>
         )}
       </Box>
 
-      {/* Middle Section: Centered Sandbox Info */}
+      {/* Middle Section: Centered Trust/Sandbox Info */}
       <Box
-        flexGrow={1}
+        flexGrow={isNarrow ? 0 : 1}
         alignItems="center"
-        justifyContent="center"
+        justifyContent={isNarrow ? 'flex-start' : 'center'}
         display="flex"
+        paddingX={isNarrow ? 0 : 1}
+        paddingTop={isNarrow ? 1 : 0}
       >
-        {process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec' ? (
+        {isTrustedFolder === false ? (
+          <Text color={theme.status.warning}>untrusted</Text>
+        ) : process.env['SANDBOX'] &&
+          process.env['SANDBOX'] !== 'sandbox-exec' ? (
           <Text color="green">
-            {process.env.SANDBOX.replace(/^gemini-(?:cli-)?/, '')}
+            {process.env['SANDBOX'].replace(/^gemini-(?:cli-)?/, '')}
           </Text>
-        ) : process.env.SANDBOX === 'sandbox-exec' ? (
-          <Text color={Colors.AccentYellow}>
-            MacOS Seatbelt{' '}
-            <Text color={Colors.Gray}>({process.env.SEATBELT_PROFILE})</Text>
+        ) : process.env['SANDBOX'] === 'sandbox-exec' ? (
+          <Text color={theme.status.warning}>
+            macOS Seatbelt{' '}
+            <Text color={theme.text.secondary}>
+              ({process.env['SEATBELT_PROFILE']})
+            </Text>
           </Text>
         ) : (
-          <Text color={Colors.AccentRed}>
-            no sandbox <Text color={Colors.Gray}>(see /docs)</Text>
+          <Text color={theme.status.error}>
+            no sandbox <Text color={theme.text.secondary}>(see /docs)</Text>
           </Text>
         )}
       </Box>
 
       {/* Right Section: Gemini Label and Console Summary */}
-      <Box alignItems="center">
-        <Text color={Colors.AccentBlue}>
-          {' '}
+      <Box alignItems="center" paddingTop={isNarrow ? 1 : 0}>
+        <Text color={theme.text.accent}>
+          {isNarrow ? '' : ' '}
           {model}{' '}
-          <Text color={Colors.Gray}>
-            ({((1 - percentage) * 100).toFixed(0)}% context left)
-          </Text>
+          <ContextUsageDisplay
+            promptTokenCount={promptTokenCount}
+            model={model}
+          />
         </Text>
         {corgiMode && (
           <Text>
-            <Text color={Colors.Gray}>| </Text>
-            <Text color={Colors.AccentRed}>▼</Text>
-            <Text color={Colors.Foreground}>(´</Text>
-            <Text color={Colors.AccentRed}>ᴥ</Text>
-            <Text color={Colors.Foreground}>`)</Text>
-            <Text color={Colors.AccentRed}>▼ </Text>
+            <Text color={theme.ui.symbol}>| </Text>
+            <Text color={theme.status.error}>▼</Text>
+            <Text color={theme.text.primary}>(´</Text>
+            <Text color={theme.status.error}>ᴥ</Text>
+            <Text color={theme.text.primary}>`)</Text>
+            <Text color={theme.status.error}>▼ </Text>
           </Text>
         )}
         {!showErrorDetails && errorCount > 0 && (
           <Box>
-            <Text color={Colors.Gray}>| </Text>
+            <Text color={theme.ui.symbol}>| </Text>
             <ConsoleSummaryDisplay errorCount={errorCount} />
           </Box>
         )}

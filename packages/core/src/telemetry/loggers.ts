@@ -4,46 +4,68 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logs, LogRecord, LogAttributes } from '@opentelemetry/api-logs';
+import type { LogRecord, LogAttributes } from '@opentelemetry/api-logs';
+import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import {
   EVENT_API_ERROR,
   EVENT_API_REQUEST,
   EVENT_API_RESPONSE,
   EVENT_CLI_CONFIG,
+  EVENT_IDE_CONNECTION,
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
+  EVENT_NEXT_SPEAKER_CHECK,
   SERVICE_NAME,
+  EVENT_SLASH_COMMAND,
+  EVENT_CONVERSATION_FINISHED,
+  EVENT_CHAT_COMPRESSION,
+  EVENT_MALFORMED_JSON_RESPONSE,
 } from './constants.js';
-import {
+import type {
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
+  FileOperationEvent,
+  IdeConnectionEvent,
   StartSessionEvent,
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  NextSpeakerCheckEvent,
   LoopDetectedEvent,
+  SlashCommandEvent,
+  ConversationFinishedEvent,
+  KittySequenceOverflowEvent,
+  ChatCompressionEvent,
+  MalformedJsonResponseEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
   recordTokenUsageMetrics,
   recordApiResponseMetrics,
   recordToolCallMetrics,
+  recordChatCompressionMetrics,
+  recordFileOperationMetric,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
-import { uiTelemetryService, UiEvent } from './uiTelemetry.js';
+import type { UiEvent } from './uiTelemetry.js';
+import { uiTelemetryService } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { UserAccountManager } from '../utils/userAccountManager.js';
 
 const shouldLogUserPrompts = (config: Config): boolean =>
   config.getTelemetryLogPromptsEnabled();
 
 function getCommonAttributes(config: Config): LogAttributes {
+  const userAccountManager = new UserAccountManager();
+  const email = userAccountManager.getCachedGoogleAccount();
   return {
     'session.id': config.getSessionId(),
+    ...(email && { 'user.email': email }),
   };
 }
 
@@ -69,6 +91,9 @@ export function logCliConfiguration(
     file_filtering_respect_git_ignore: event.file_filtering_respect_git_ignore,
     debug_mode: event.debug_enabled,
     mcp_servers: event.mcp_servers,
+    mcp_servers_count: event.mcp_servers_count,
+    mcp_tools: event.mcp_tools,
+    mcp_tools_count: event.mcp_tools_count,
   };
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -91,7 +116,7 @@ export function logUserPrompt(config: Config, event: UserPromptEvent): void {
   };
 
   if (shouldLogUserPrompts(config)) {
-    attributes.prompt = event.prompt;
+    attributes['prompt'] = event.prompt;
   }
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -138,6 +163,25 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     event.duration_ms,
     event.success,
     event.decision,
+    event.tool_type,
+  );
+}
+
+export function logFileOperation(
+  config: Config,
+  event: FileOperationEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logFileOperationEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  recordFileOperationMetric(
+    config,
+    event.operation,
+    event.lines,
+    event.mimetype,
+    event.extension,
+    event.diff_stat,
+    event.programming_language,
   );
 }
 
@@ -164,7 +208,7 @@ export function logFlashFallback(
   config: Config,
   event: FlashFallbackEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logFlashFallbackEvent(event);
+  ClearcutLogger.getInstance(config)?.logFlashFallbackEvent();
   if (!isTelemetrySdkInitialized()) return;
 
   const attributes: LogAttributes = {
@@ -240,7 +284,7 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
     'event.timestamp': new Date().toISOString(),
   };
   if (event.response_text) {
-    attributes.response_text = event.response_text;
+    attributes['response_text'] = event.response_text;
   }
   if (event.error) {
     attributes['error.message'] = event.error;
@@ -305,6 +349,154 @@ export function logLoopDetected(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Loop detected. Type: ${event.loop_type}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logNextSpeakerCheck(
+  config: Config,
+  event: NextSpeakerCheckEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logNextSpeakerCheck(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_NEXT_SPEAKER_CHECK,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Next speaker check.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logSlashCommand(
+  config: Config,
+  event: SlashCommandEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logSlashCommandEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_SLASH_COMMAND,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Slash command: ${event.command}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logIdeConnection(
+  config: Config,
+  event: IdeConnectionEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logIdeConnectionEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_IDE_CONNECTION,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Ide connection. Type: ${event.connection_type}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logConversationFinishedEvent(
+  config: Config,
+  event: ConversationFinishedEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logConversationFinishedEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_CONVERSATION_FINISHED,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Conversation finished.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logChatCompression(
+  config: Config,
+  event: ChatCompressionEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logChatCompressionEvent(event);
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_CHAT_COMPRESSION,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Chat compression (Saved ${event.tokens_before - event.tokens_after} tokens)`,
+    attributes,
+  };
+  logger.emit(logRecord);
+
+  recordChatCompressionMetrics(config, {
+    tokens_before: event.tokens_before,
+    tokens_after: event.tokens_after,
+  });
+}
+
+export function logKittySequenceOverflow(
+  config: Config,
+  event: KittySequenceOverflowEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logKittySequenceOverflowEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+  };
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Kitty sequence buffer overflow: ${event.sequence_length} bytes`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logMalformedJsonResponse(
+  config: Config,
+  event: MalformedJsonResponseEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logMalformedJsonResponseEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_MALFORMED_JSON_RESPONSE,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Malformed JSON response from ${event.model}.`,
     attributes,
   };
   logger.emit(logRecord);

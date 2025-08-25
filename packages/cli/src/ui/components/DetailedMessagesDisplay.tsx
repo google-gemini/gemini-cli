@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { ConsoleMessageItem } from '../types.js';
+import type { ConsoleMessageItem } from '../types.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 
 interface DetailedMessagesDisplayProps {
@@ -56,7 +56,7 @@ export const DetailedMessagesDisplay: React.FC<
               break;
             case 'debug':
               textColor = Colors.Gray; // Or Colors.Gray
-              icon = '\u1F50D'; // Left-pointing magnifying glass (????)
+              icon = '\u{1F50D}'; // Left-pointing magnifying glass (🔍)
               break;
             case 'log':
             default:

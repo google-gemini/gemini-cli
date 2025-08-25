@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   ToolCallConfirmationDetails,
   ToolResultDisplay,
+  UserTierId,
 } from '@google/gemini-cli-core';
 
 // Only defining the state enum needed by the UI
@@ -95,6 +96,13 @@ export type HistoryItemAbout = HistoryItemBase & {
   modelVersion: string;
   selectedAuthType: string;
   gcpProject: string;
+  ideClient: string;
+  userTier?: UserTierId;
+};
+
+export type HistoryItemHelp = HistoryItemBase & {
+  type: 'help';
+  timestamp: Date;
 };
 
 export type HistoryItemStats = HistoryItemBase & {
@@ -142,6 +150,7 @@ export type HistoryItemWithoutId =
   | HistoryItemInfo
   | HistoryItemError
   | HistoryItemAbout
+  | HistoryItemHelp
   | HistoryItemToolGroup
   | HistoryItemStats
   | HistoryItemModelStats
@@ -157,6 +166,7 @@ export enum MessageType {
   ERROR = 'error',
   USER = 'user',
   ABOUT = 'about',
+  HELP = 'help',
   STATS = 'stats',
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
@@ -181,7 +191,13 @@ export type Message =
       modelVersion: string;
       selectedAuthType: string;
       gcpProject: string;
+      ideClient: string;
       content?: string; // Optional content, not really used for ABOUT
+    }
+  | {
+      type: MessageType.HELP;
+      timestamp: Date;
+      content?: string; // Optional content, not really used for HELP
     }
   | {
       type: MessageType.STATS;
@@ -212,9 +228,18 @@ export type Message =
     };
 
 export interface ConsoleMessageItem {
-  type: 'log' | 'warn' | 'error' | 'debug';
+  type: 'log' | 'warn' | 'error' | 'debug' | 'info';
   content: string;
   count: number;
+}
+
+/**
+ * Result type for a slash command that should immediately result in a prompt
+ * being submitted to the Gemini model.
+ */
+export interface SubmitPromptResult {
+  type: 'submit_prompt';
+  content: string;
 }
 
 /**
@@ -228,4 +253,5 @@ export type SlashCommandProcessorResult =
     }
   | {
       type: 'handled'; // Indicates the command was processed and no further action is needed.
-    };
+    }
+  | SubmitPromptResult;

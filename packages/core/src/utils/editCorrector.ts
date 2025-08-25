@@ -4,27 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  Content,
-  GenerateContentConfig,
-  SchemaUnion,
-  Type,
-} from '@google/genai';
-import { GeminiClient } from '../core/client.js';
-import { EditToolParams, EditTool } from '../tools/edit.js';
+import type { Content, GenerateContentConfig } from '@google/genai';
+import type { GeminiClient } from '../core/client.js';
+import type { EditToolParams } from '../tools/edit.js';
+import { EditTool } from '../tools/edit.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { GrepTool } from '../tools/grep.js';
 import { LruCache } from './LruCache.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../config/models.js';
 import {
   isFunctionResponse,
   isFunctionCall,
 } from '../utils/messageInspectors.js';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 
-const EditModel = DEFAULT_GEMINI_FLASH_MODEL;
+const EditModel = DEFAULT_GEMINI_FLASH_LITE_MODEL;
 const EditConfig: GenerateContentConfig = {
   thinkingConfig: {
     thinkingBudget: 0,
@@ -77,10 +73,10 @@ function getTimestampFromFunctionId(fcnId: string): number {
 
 /**
  * Will look through the gemini client history and determine when the most recent
- * edit to a target file occured. If no edit happened, it will return -1
+ * edit to a target file occurred. If no edit happened, it will return -1
  * @param filePath the path to the file
  * @param client the geminiClient, so that we can get the history
- * @returns a DateTime (as a number) of when the last edit occured, or -1 if no edit was found.
+ * @returns a DateTime (as a number) of when the last edit occurred, or -1 if no edit was found.
  */
 async function findLastEditTimestamp(
   filePath: string,
@@ -124,7 +120,7 @@ async function findLastEditTimestamp(
         const { response } = part.functionResponse;
         if (response && !('error' in response) && 'output' in response) {
           id = part.functionResponse.id;
-          content = response.output;
+          content = response['output'];
         }
       }
 
@@ -132,8 +128,8 @@ async function findLastEditTimestamp(
 
       // Use the "blunt hammer" approach to find the file path in the content.
       // Note that the tool response data is inconsistent in their formatting
-      // with successes and errors - so, we just check for the existance
-      // as the best guess to if error/failed occured with the response.
+      // with successes and errors - so, we just check for the existence
+      // as the best guess to if error/failed occurred with the response.
       const stringified = JSON.stringify(content);
       if (
         !stringified.includes('Error') && // only applicable for functionResponse
@@ -364,11 +360,11 @@ export async function ensureCorrectFileContent(
 }
 
 // Define the expected JSON schema for the LLM response for old_string correction
-const OLD_STRING_CORRECTION_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const OLD_STRING_CORRECTION_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     corrected_target_snippet: {
-      type: Type.STRING,
+      type: 'string',
       description:
         'The corrected version of the target snippet that exactly and uniquely matches a segment within the provided file content.',
     },
@@ -416,10 +412,10 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
 
     if (
       result &&
-      typeof result.corrected_target_snippet === 'string' &&
-      result.corrected_target_snippet.length > 0
+      typeof result['corrected_target_snippet'] === 'string' &&
+      result['corrected_target_snippet'].length > 0
     ) {
-      return result.corrected_target_snippet;
+      return result['corrected_target_snippet'];
     } else {
       return problematicSnippet;
     }
@@ -438,11 +434,11 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
 }
 
 // Define the expected JSON schema for the new_string correction LLM response
-const NEW_STRING_CORRECTION_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const NEW_STRING_CORRECTION_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     corrected_new_string: {
-      type: Type.STRING,
+      type: 'string',
       description:
         'The original_new_string adjusted to be a suitable replacement for the corrected_old_string, while maintaining the original intent of the change.',
     },
@@ -504,10 +500,10 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
 
     if (
       result &&
-      typeof result.corrected_new_string === 'string' &&
-      result.corrected_new_string.length > 0
+      typeof result['corrected_new_string'] === 'string' &&
+      result['corrected_new_string'].length > 0
     ) {
-      return result.corrected_new_string;
+      return result['corrected_new_string'];
     } else {
       return originalNewString;
     }
@@ -521,11 +517,11 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   }
 }
 
-const CORRECT_NEW_STRING_ESCAPING_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const CORRECT_NEW_STRING_ESCAPING_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     corrected_new_string_escaping: {
-      type: Type.STRING,
+      type: 'string',
       description:
         'The new_string with corrected escaping, ensuring it is a proper replacement for the old_string, especially considering potential over-escaping issues from previous LLM generations.',
     },
@@ -573,10 +569,10 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
 
     if (
       result &&
-      typeof result.corrected_new_string_escaping === 'string' &&
-      result.corrected_new_string_escaping.length > 0
+      typeof result['corrected_new_string_escaping'] === 'string' &&
+      result['corrected_new_string_escaping'].length > 0
     ) {
-      return result.corrected_new_string_escaping;
+      return result['corrected_new_string_escaping'];
     } else {
       return potentiallyProblematicNewString;
     }
@@ -593,11 +589,11 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   }
 }
 
-const CORRECT_STRING_ESCAPING_SCHEMA: SchemaUnion = {
-  type: Type.OBJECT,
+const CORRECT_STRING_ESCAPING_SCHEMA: Record<string, unknown> = {
+  type: 'object',
   properties: {
     corrected_string_escaping: {
-      type: Type.STRING,
+      type: 'string',
       description:
         'The string with corrected escaping, ensuring it is valid, specially considering potential over-escaping issues from previous LLM generations.',
     },
@@ -639,10 +635,10 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
 
     if (
       result &&
-      typeof result.corrected_string_escaping === 'string' &&
-      result.corrected_string_escaping.length > 0
+      typeof result['corrected_string_escaping'] === 'string' &&
+      result['corrected_string_escaping'].length > 0
     ) {
-      return result.corrected_string_escaping;
+      return result['corrected_string_escaping'];
     } else {
       return potentiallyProblematicString;
     }

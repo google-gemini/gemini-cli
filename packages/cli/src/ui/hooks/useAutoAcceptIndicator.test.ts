@@ -16,14 +16,12 @@ import {
 import { renderHook, act } from '@testing-library/react';
 import { useAutoAcceptIndicator } from './useAutoAcceptIndicator.js';
 
-import {
-  Config,
-  Config as ActualConfigType,
-  ApprovalMode,
-} from '@google/gemini-cli-core';
-import { useInput, type Key as InkKey } from 'ink';
+import type { Config as ActualConfigType } from '@google/gemini-cli-core';
+import { Config, ApprovalMode } from '@google/gemini-cli-core';
+import type { Key } from './useKeypress.js';
+import { useKeypress } from './useKeypress.js';
 
-vi.mock('ink');
+vi.mock('./useKeypress.js');
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actualServerModule = (await vi.importActual(
@@ -53,13 +51,12 @@ interface MockConfigInstanceShape {
   getToolRegistry: Mock<() => { discoverTools: Mock<() => void> }>;
 }
 
-type UseInputKey = InkKey;
-type UseInputHandler = (input: string, key: UseInputKey) => void;
+type UseKeypressHandler = (key: Key) => void;
 
 describe('useAutoAcceptIndicator', () => {
   let mockConfigInstance: MockConfigInstanceShape;
-  let capturedUseInputHandler: UseInputHandler;
-  let mockedInkUseInput: MockedFunction<typeof useInput>;
+  let capturedUseKeypressHandler: UseKeypressHandler;
+  let mockedUseKeypress: MockedFunction<typeof useKeypress>;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -111,10 +108,12 @@ describe('useAutoAcceptIndicator', () => {
       return instance;
     });
 
-    mockedInkUseInput = useInput as MockedFunction<typeof useInput>;
-    mockedInkUseInput.mockImplementation((handler: UseInputHandler) => {
-      capturedUseInputHandler = handler;
-    });
+    mockedUseKeypress = useKeypress as MockedFunction<typeof useKeypress>;
+    mockedUseKeypress.mockImplementation(
+      (handler: UseKeypressHandler, _options) => {
+        capturedUseKeypressHandler = handler;
+      },
+    );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockConfigInstance = new (Config as any)() as MockConfigInstanceShape;
@@ -163,7 +162,10 @@ describe('useAutoAcceptIndicator', () => {
     expect(result.current).toBe(ApprovalMode.DEFAULT);
 
     act(() => {
-      capturedUseInputHandler('', { tab: true, shift: true } as InkKey);
+      capturedUseKeypressHandler({
+        name: 'tab',
+        shift: true,
+      } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
       ApprovalMode.AUTO_EDIT,
@@ -171,7 +173,7 @@ describe('useAutoAcceptIndicator', () => {
     expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
 
     act(() => {
-      capturedUseInputHandler('y', { ctrl: true } as InkKey);
+      capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
       ApprovalMode.YOLO,
@@ -179,7 +181,7 @@ describe('useAutoAcceptIndicator', () => {
     expect(result.current).toBe(ApprovalMode.YOLO);
 
     act(() => {
-      capturedUseInputHandler('y', { ctrl: true } as InkKey);
+      capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
       ApprovalMode.DEFAULT,
@@ -187,7 +189,7 @@ describe('useAutoAcceptIndicator', () => {
     expect(result.current).toBe(ApprovalMode.DEFAULT);
 
     act(() => {
-      capturedUseInputHandler('y', { ctrl: true } as InkKey);
+      capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
       ApprovalMode.YOLO,
@@ -195,7 +197,10 @@ describe('useAutoAcceptIndicator', () => {
     expect(result.current).toBe(ApprovalMode.YOLO);
 
     act(() => {
-      capturedUseInputHandler('', { tab: true, shift: true } as InkKey);
+      capturedUseKeypressHandler({
+        name: 'tab',
+        shift: true,
+      } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
       ApprovalMode.AUTO_EDIT,
@@ -203,7 +208,10 @@ describe('useAutoAcceptIndicator', () => {
     expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
 
     act(() => {
-      capturedUseInputHandler('', { tab: true, shift: true } as InkKey);
+      capturedUseKeypressHandler({
+        name: 'tab',
+        shift: true,
+      } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
       ApprovalMode.DEFAULT,
@@ -220,37 +228,51 @@ describe('useAutoAcceptIndicator', () => {
     );
 
     act(() => {
-      capturedUseInputHandler('', { tab: true, shift: false } as InkKey);
+      capturedUseKeypressHandler({
+        name: 'tab',
+        shift: false,
+      } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
 
     act(() => {
-      capturedUseInputHandler('', { tab: false, shift: true } as InkKey);
+      capturedUseKeypressHandler({
+        name: 'unknown',
+        shift: true,
+      } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
 
     act(() => {
-      capturedUseInputHandler('a', { tab: false, shift: false } as InkKey);
+      capturedUseKeypressHandler({
+        name: 'a',
+        shift: false,
+        ctrl: false,
+      } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
 
     act(() => {
-      capturedUseInputHandler('y', { tab: true } as InkKey);
+      capturedUseKeypressHandler({ name: 'y', ctrl: false } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
 
     act(() => {
-      capturedUseInputHandler('a', { ctrl: true } as InkKey);
+      capturedUseKeypressHandler({ name: 'a', ctrl: true } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
 
     act(() => {
-      capturedUseInputHandler('y', { shift: true } as InkKey);
+      capturedUseKeypressHandler({ name: 'y', shift: true } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
 
     act(() => {
-      capturedUseInputHandler('a', { ctrl: true, shift: true } as InkKey);
+      capturedUseKeypressHandler({
+        name: 'a',
+        ctrl: true,
+        shift: true,
+      } as Key);
     });
     expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
   });

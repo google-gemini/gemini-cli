@@ -5,16 +5,9 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  Mock,
-  type Mocked,
-} from 'vitest';
-import * as fs from 'fs';
+import type { Mock } from 'vitest';
+import { vi, describe, it, expect, beforeEach, type Mocked } from 'vitest';
+import * as fs from 'node:fs';
 import { EditTool } from '../tools/edit.js';
 
 // MOCKS
@@ -27,6 +20,7 @@ let mockSendMessageStream: any;
 
 vi.mock('fs', () => ({
   statSync: vi.fn(),
+  mkdirSync: vi.fn(),
 }));
 
 vi.mock('../core/client.js', () => ({
@@ -81,7 +75,7 @@ describe('editCorrector', () => {
     it('should correctly count occurrences when substring is longer', () => {
       expect(countOccurrences('abc', 'abcdef')).toBe(0);
     });
-    it('should be case sensitive', () => {
+    it('should be case-sensitive', () => {
       expect(countOccurrences('abcABC', 'a')).toBe(1);
       expect(countOccurrences('abcABC', 'A')).toBe(1);
     });

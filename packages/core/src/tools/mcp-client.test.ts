@@ -4,32 +4,53 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import {
   populateMcpServerCommand,
   createTransport,
-  generateValidName,
   isEnabled,
-  discoverTools,
+  hasValidTypes,
+  McpClient,
+  hasNetworkTransport,
 } from './mcp-client.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
 import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import * as GenAiLib from '@google/genai';
+import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
+import { AuthProviderType } from '../config/config.js';
+import type { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { ToolRegistry } from './tool-registry.js';
+import type { WorkspaceContext } from '../utils/workspaceContext.js';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 vi.mock('@google/genai');
+vi.mock('../mcp/oauth-provider.js');
+vi.mock('../mcp/oauth-token-storage.js');
 
 describe('mcp-client', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  describe('discoverTools', () => {
+  describe('McpClient', () => {
     it('should discover tools', async () => {
-      const mockedClient = {} as unknown as ClientLib.Client;
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
       const mockedMcpToTool = vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () => ({
           functionDeclarations: [
@@ -39,14 +60,135 @@ describe('mcp-client', () => {
           ],
         }),
       } as unknown as GenAiLib.CallableTool);
-
-      const tools = await discoverTools('test-server', {}, mockedClient);
-
-      expect(tools.length).toBe(1);
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+      } as unknown as ToolRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        {} as PromptRegistry,
+        {} as WorkspaceContext,
+        false,
+      );
+      await client.connect();
+      await client.discover();
       expect(mockedMcpToTool).toHaveBeenCalledOnce();
     });
-  });
 
+    it('should skip tools if a parameter is missing a type', async () => {
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        tool: vi.fn(),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'validTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: { type: 'string' },
+                  },
+                },
+              },
+              {
+                name: 'invalidTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: { description: 'a param with no type' },
+                  },
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+      } as unknown as ToolRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        {} as PromptRegistry,
+        {} as WorkspaceContext,
+        false,
+      );
+      await client.connect();
+      await client.discover();
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+      expect(consoleWarnSpy).toHaveBeenCalledOnce();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
+          `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
+      );
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should handle errors when discovering prompts', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
+        request: vi.fn().mockRejectedValue(new Error('Test error')),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () => Promise.resolve({ functionDeclarations: [] }),
+      } as unknown as GenAiLib.CallableTool);
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        {} as ToolRegistry,
+        {} as PromptRegistry,
+        {} as WorkspaceContext,
+        false,
+      );
+      await client.connect();
+      await expect(client.discover()).rejects.toThrow(
+        'No prompts or tools found on the server.',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        `Error discovering prompts from test-server: Test error`,
+      );
+      consoleErrorSpy.mockRestore();
+    });
+  });
   describe('appendMcpServerCommand', () => {
     it('should do nothing if no MCP servers or command are configured', () => {
       const out = populateMcpServerCommand({}, undefined);
@@ -70,20 +212,9 @@ describe('mcp-client', () => {
   });
 
   describe('createTransport', () => {
-    const originalEnv = process.env;
-
-    beforeEach(() => {
-      vi.resetModules();
-      process.env = {};
-    });
-
-    afterEach(() => {
-      process.env = originalEnv;
-    });
-
     describe('should connect via httpUrl', () => {
       it('without headers', async () => {
-        const transport = createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             httpUrl: 'http://test-server',
@@ -97,7 +228,7 @@ describe('mcp-client', () => {
       });
 
       it('with headers', async () => {
-        const transport = createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             httpUrl: 'http://test-server',
@@ -118,7 +249,7 @@ describe('mcp-client', () => {
 
     describe('should connect via url', () => {
       it('without headers', async () => {
-        const transport = createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             url: 'http://test-server',
@@ -131,7 +262,7 @@ describe('mcp-client', () => {
       });
 
       it('with headers', async () => {
-        const transport = createTransport(
+        const transport = await createTransport(
           'test-server',
           {
             url: 'http://test-server',
@@ -150,10 +281,12 @@ describe('mcp-client', () => {
       });
     });
 
-    it('should connect via command', () => {
-      const mockedTransport = vi.mocked(SdkClientStdioLib.StdioClientTransport);
+    it('should connect via command', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
 
-      createTransport(
+      await createTransport(
         'test-server',
         {
           command: 'test-command',
@@ -168,95 +301,66 @@ describe('mcp-client', () => {
         command: 'test-command',
         args: ['--foo', 'bar'],
         cwd: 'test/cwd',
-        env: { FOO: 'bar' },
+        env: { ...process.env, FOO: 'bar' },
         stderr: 'pipe',
       });
     });
-  });
-  describe('generateValidName', () => {
-    it('should return a valid name for a simple function', () => {
-      const funcDecl = { name: 'myFunction' };
-      const serverName = 'myServer';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('myServer__myFunction');
-    });
 
-    it('should prepend the server name', () => {
-      const funcDecl = { name: 'anotherFunction' };
-      const serverName = 'production-server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('production-server__anotherFunction');
-    });
+    describe('useGoogleCredentialProvider', () => {
+      it('should use GoogleCredentialProvider when specified', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            httpUrl: 'http://test.googleapis.com',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+          },
+          false,
+        );
 
-    it('should replace invalid characters with underscores', () => {
-      const funcDecl = { name: 'invalid-name with spaces' };
-      const serverName = 'test_server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('test_server__invalid-name_with_spaces');
-    });
+        expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const authProvider = (transport as any)._authProvider;
+        expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
+      });
 
-    it('should truncate long names', () => {
-      const funcDecl = {
-        name: 'a_very_long_function_name_that_will_definitely_exceed_the_limit',
-      };
-      const serverName = 'a_long_server_name';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result.length).toBe(63);
-      expect(result).toBe(
-        'a_long_server_name__a_very_l___will_definitely_exceed_the_limit',
-      );
-    });
+      it('should use GoogleCredentialProvider with SSE transport', async () => {
+        const transport = await createTransport(
+          'test-server',
+          {
+            url: 'http://test.googleapis.com',
+            authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+            oauth: {
+              scopes: ['scope1'],
+            },
+          },
+          false,
+        );
 
-    it('should handle names with only invalid characters', () => {
-      const funcDecl = { name: '!@#$%^&*()' };
-      const serverName = 'special-chars';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('special-chars____________');
-    });
+        expect(transport).toBeInstanceOf(SSEClientTransport);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const authProvider = (transport as any)._authProvider;
+        expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
+      });
 
-    it('should handle names that are already valid', () => {
-      const funcDecl = { name: 'already_valid' };
-      const serverName = 'validator';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('validator__already_valid');
-    });
-
-    it('should handle names with leading/trailing invalid characters', () => {
-      const funcDecl = { name: '-_invalid-_' };
-      const serverName = 'trim-test';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe('trim-test__-_invalid-_');
-    });
-
-    it('should handle names that are exactly 63 characters long', () => {
-      const longName = 'a'.repeat(45);
-      const funcDecl = { name: longName };
-      const serverName = 'server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result).toBe(`server__${longName}`);
-      expect(result.length).toBe(53);
-    });
-
-    it('should handle names that are exactly 64 characters long', () => {
-      const longName = 'a'.repeat(55);
-      const funcDecl = { name: longName };
-      const serverName = 'server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result.length).toBe(63);
-      expect(result).toBe(
-        'server__aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      );
-    });
-
-    it('should handle names that are longer than 64 characters', () => {
-      const longName = 'a'.repeat(100);
-      const funcDecl = { name: longName };
-      const serverName = 'long-server';
-      const result = generateValidName(funcDecl, serverName);
-      expect(result.length).toBe(63);
-      expect(result).toBe(
-        'long-server__aaaaaaaaaaaaaaa___aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      );
+      it('should throw an error if no URL is provided with GoogleCredentialProvider', async () => {
+        await expect(
+          createTransport(
+            'test-server',
+            {
+              authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
+              oauth: {
+                scopes: ['scope1'],
+              },
+            },
+            false,
+          ),
+        ).rejects.toThrow(
+          'URL must be provided in the config for Google Credentials provider',
+        );
+      });
     });
   });
   describe('isEnabled', () => {
@@ -302,6 +406,195 @@ describe('mcp-client', () => {
       expect(isEnabled(namelessFuncDecl, serverName, mcpServerConfig)).toBe(
         false,
       );
+    });
+  });
+
+  describe('hasValidTypes', () => {
+    it('should return true for a valid schema with anyOf', () => {
+      const schema = {
+        anyOf: [{ type: 'string' }, { type: 'number' }],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with anyOf', () => {
+      const schema = {
+        anyOf: [{ type: 'string' }, { description: 'no type' }],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema with allOf', () => {
+      const schema = {
+        allOf: [
+          { type: 'string' },
+          { type: 'object', properties: { foo: { type: 'string' } } },
+        ],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with allOf', () => {
+      const schema = {
+        allOf: [{ type: 'string' }, { description: 'no type' }],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema with oneOf', () => {
+      const schema = {
+        oneOf: [{ type: 'string' }, { type: 'number' }],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with oneOf', () => {
+      const schema = {
+        oneOf: [{ type: 'string' }, { description: 'no type' }],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema with nested subschemas', () => {
+      const schema = {
+        anyOf: [
+          { type: 'string' },
+          {
+            allOf: [
+              { type: 'object', properties: { a: { type: 'string' } } },
+              { type: 'object', properties: { b: { type: 'number' } } },
+            ],
+          },
+        ],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with nested subschemas', () => {
+      const schema = {
+        anyOf: [
+          { type: 'string' },
+          {
+            allOf: [
+              { type: 'object', properties: { a: { type: 'string' } } },
+              { description: 'no type' },
+            ],
+          },
+        ],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a schema with a type and subschemas', () => {
+      const schema = {
+        type: 'string',
+        anyOf: [{ minLength: 1 }, { maxLength: 5 }],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for a schema with no type and no subschemas', () => {
+      const schema = {
+        description: 'a schema with no type',
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: { type: 'string' },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false if a parameter is missing a type', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: { description: 'a param with no type' },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return false if a nested parameter is missing a type', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: {
+            type: 'object',
+            properties: {
+              nestedParam: {
+                description: 'a nested param with no type',
+              },
+            },
+          },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return false if an array item is missing a type', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: {
+            type: 'array',
+            items: {
+              description: 'an array item with no type',
+            },
+          },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a schema with no properties', () => {
+      const schema = {
+        type: 'object',
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for a schema with an empty properties object', () => {
+      const schema = {
+        type: 'object',
+        properties: {},
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+  });
+
+  describe('hasNetworkTransport', () => {
+    it('should return true if only url is provided', () => {
+      const config = { url: 'http://example.com' };
+      expect(hasNetworkTransport(config)).toBe(true);
+    });
+
+    it('should return true if only httpUrl is provided', () => {
+      const config = { httpUrl: 'http://example.com' };
+      expect(hasNetworkTransport(config)).toBe(true);
+    });
+
+    it('should return true if both url and httpUrl are provided', () => {
+      const config = {
+        url: 'http://example.com/sse',
+        httpUrl: 'http://example.com/http',
+      };
+      expect(hasNetworkTransport(config)).toBe(true);
+    });
+
+    it('should return false if neither url nor httpUrl is provided', () => {
+      const config = { command: 'do-something' };
+      expect(hasNetworkTransport(config)).toBe(false);
+    });
+
+    it('should return false for an empty config object', () => {
+      const config = {};
+      expect(hasNetworkTransport(config)).toBe(false);
     });
   });
 });

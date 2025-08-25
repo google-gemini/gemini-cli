@@ -5,10 +5,9 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import type { LoadedSettings, SettingScope } from '../../config/settings.js';
+import { AuthType, type Config } from '@google/gemini-cli-core';
 import {
-  AuthType,
-  Config,
   clearCachedCredentialFile,
   getErrorMessage,
 } from '@google/gemini-cli-core';
@@ -55,8 +54,12 @@ export const useAuthCommand = (
     async (authType: AuthType | undefined, scope: SettingScope) => {
       if (authType) {
         await clearCachedCredentialFile();
+
         settings.setValue(scope, 'selectedAuthType', authType);
-        if (authType === AuthType.LOGIN_WITH_GOOGLE && config.getNoBrowser()) {
+        if (
+          authType === AuthType.LOGIN_WITH_GOOGLE &&
+          config.isBrowserLaunchSuppressed()
+        ) {
           runExitCleanup();
           console.log(
             `

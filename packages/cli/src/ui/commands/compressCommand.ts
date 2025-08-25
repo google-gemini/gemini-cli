@@ -4,13 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { HistoryItemCompression, MessageType } from '../types.js';
-import { SlashCommand } from './types.js';
+import type { HistoryItemCompression } from '../types.js';
+import { MessageType } from '../types.js';
+import type { SlashCommand } from './types.js';
+import { CommandKind } from './types.js';
 
 export const compressCommand: SlashCommand = {
   name: 'compress',
-  altName: 'summarize',
+  altNames: ['summarize'],
   description: 'Compresses the context by replacing it with a summary.',
+  kind: CommandKind.BUILT_IN,
   action: async (context) => {
     const { ui } = context;
     if (ui.pendingItem) {

@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 
 describe('Circular Reference Integration Test', () => {
   it('should handle HttpsProxyAgent-like circular references in clearcut logging', () => {
@@ -56,7 +56,8 @@ describe('Circular Reference Integration Test', () => {
     const logger = ClearcutLogger.getInstance(mockConfig);
 
     expect(() => {
-      logger?.enqueueLogEvent(problematicEvent);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      logger?.enqueueLogEvent(problematicEvent as any);
     }).not.toThrow();
   });
 });
