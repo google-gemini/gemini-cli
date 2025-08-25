@@ -231,14 +231,15 @@ describe('GeminiChat', () => {
         'prompt-id-empty-chunk-consolidation',
       );
       for await (const _ of stream) {
+        // Consume the stream
       }
 
       // 3. Assert: Check that the final history was correctly consolidated.
       const history = chat.getHistory();
       expect(history.length).toBe(2);
       const modelTurn = history[1]!;
-      expect(modelTurn.parts.length).toBe(1);
-      expect(modelTurn.parts[0]!.text).toBe('Hello World!');
+      expect(modelTurn?.parts?.length).toBe(1);
+      expect(modelTurn?.parts![0]!.text).toBe('Hello World!');
     });
 
     it('should consolidate adjacent text parts that arrive in separate stream chunks', async () => {
