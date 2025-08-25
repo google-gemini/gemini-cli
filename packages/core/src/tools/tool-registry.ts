@@ -467,4 +467,19 @@ export class ToolRegistry {
   getTool(name: string): AnyDeclarativeTool | undefined {
     return this.tools.get(name);
   }
+
+  /**
+   * Get a tool by its class type.
+   */
+  getToolByType<T extends AnyDeclarativeTool>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    toolClass: new (...args: any[]) => T,
+  ): T | undefined {
+    for (const tool of this.tools.values()) {
+      if (tool instanceof toolClass) {
+        return tool as T;
+      }
+    }
+    return undefined;
+  }
 }

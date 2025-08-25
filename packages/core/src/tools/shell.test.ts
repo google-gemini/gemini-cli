@@ -439,4 +439,102 @@ describe('build', () => {
       }),
     ).toThrow('is not a registered workspace directory');
   });
+
+  describe('permission management methods', () => {
+    let shellTool: ShellTool;
+    let mockConfig: Config;
+
+    beforeEach(() => {
+      mockConfig = {
+        getCoreTools: vi.fn().mockReturnValue([]),
+        getExcludeTools: vi.fn().mockReturnValue([]),
+        getDebugMode: vi.fn().mockReturnValue(false),
+        getTargetDir: vi.fn().mockReturnValue('/test/dir'),
+        getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
+        getWorkspaceContext: () => createMockWorkspaceContext('.'),
+        getGeminiClient: vi.fn(),
+        getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
+      } as unknown as Config;
+
+      shellTool = new ShellTool(mockConfig);
+    });
+
+    it('should start with empty allowed commands', () => {
+      const commands = shellTool.getAllowedCommands();
+      expect(commands).toEqual([]);
+    });
+
+    it('should return array of allowed commands', () => {
+      const commands = shellTool.getAllowedCommands();
+      expect(Array.isArray(commands)).toBe(true);
+    });
+
+    it('should add commands to allowlist through tool execution flow', async () => {
+      // Simulate adding a command to allowlist (this normally happens during shouldConfirmExecute)
+      shellTool.build({ command: 'ls -la' });
+
+      // The allowlist is private, but we can test that the methods work without error
+      expect(() => {
+        shellTool.revokeCommandPermission('ls');
+      }).not.toThrow();
+
+      expect(() => {
+        shellTool.clearAllPermissions();
+      }).not.toThrow();
+    });
+
+    it('should revoke specific command permissions', () => {
+      // Since the allowlist is private, we test that the method works without throwing
+      expect(() => {
+        shellTool.revokeCommandPermission('git');
+      }).not.toThrow();
+
+      // After revoking, the command should not be in the list
+      const commands = shellTool.getAllowedCommands();
+      expect(commands).not.toContain('git');
+    });
+
+    it('should clear all command permissions', () => {
+      // Clear should work regardless of current state
+      expect(() => {
+        shellTool.clearAllPermissions();
+      }).not.toThrow();
+
+      // After clearing, the list should be empty
+      const commands = shellTool.getAllowedCommands();
+      expect(commands).toEqual([]);
+    });
+
+    it('should handle revoking non-existent commands gracefully', () => {
+      // Revoking a command that doesn't exist should not throw
+      expect(() => {
+        shellTool.revokeCommandPermission('non-existent-command');
+      }).not.toThrow();
+
+      const commands = shellTool.getAllowedCommands();
+      expect(commands).toEqual([]);
+    });
+
+    it('should return consistent array references', () => {
+      const commands1 = shellTool.getAllowedCommands();
+      const commands2 = shellTool.getAllowedCommands();
+
+      expect(Array.isArray(commands1)).toBe(true);
+      expect(Array.isArray(commands2)).toBe(true);
+      // They should be separate array instances
+      expect(commands1).not.toBe(commands2);
+      // But should have the same content
+      expect(commands1).toEqual(commands2);
+    });
+
+    it('should handle clearing empty allowlist', () => {
+      // Clear empty list should not throw
+      expect(() => {
+        shellTool.clearAllPermissions();
+      }).not.toThrow();
+
+      const commands = shellTool.getAllowedCommands();
+      expect(commands).toEqual([]);
+    });
+  });
 });

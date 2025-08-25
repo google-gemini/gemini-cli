@@ -400,4 +400,25 @@ export class ShellTool extends BaseDeclarativeTool<
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(this.config, params, this.allowlist);
   }
+
+  /**
+   * Gets all commands in the allowlist for permission management
+   */
+  getAllowedCommands(): string[] {
+    return Array.from(this.allowlist);
+  }
+
+  /**
+   * Removes a specific command from the allowlist
+   */
+  revokeCommandPermission(command: string): void {
+    this.allowlist.delete(command);
+  }
+
+  /**
+   * Clears all command permissions
+   */
+  clearAllPermissions(): void {
+    this.allowlist.clear();
+  }
 }

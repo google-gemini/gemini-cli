@@ -11,6 +11,7 @@ import {
   getCurrentGeminiMdFilename,
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
+  MemoryToolInvocation,
 } from './memoryTool.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -422,6 +423,85 @@ describe('MemoryTool', () => {
         expect(result.newContent).toContain('- Old fact');
         expect(result.newContent).toContain('- New fact');
       }
+    });
+  });
+
+  describe('MemoryToolInvocation static permission management methods', () => {
+    beforeEach(() => {
+      // Clear permissions before each test
+      MemoryToolInvocation.clearAllMemoryPermissions();
+    });
+
+    afterEach(() => {
+      // Clear permissions after each test to avoid test pollution
+      MemoryToolInvocation.clearAllMemoryPermissions();
+    });
+
+    it('should start with empty memory permissions', () => {
+      const permissions = MemoryToolInvocation.getAllowedMemoryPermissions();
+      expect(permissions).toEqual([]);
+    });
+
+    it('should return array of allowed memory permissions', () => {
+      // Test that the method returns an array (even if empty)
+      const permissions = MemoryToolInvocation.getAllowedMemoryPermissions();
+      expect(Array.isArray(permissions)).toBe(true);
+    });
+
+    it('should handle revoking permissions gracefully', () => {
+      // Since allowlist is private, we can only test that the public methods work
+      expect(() => {
+        MemoryToolInvocation.revokeMemoryPermission('save_memory');
+      }).not.toThrow();
+    });
+
+    it('should clear all memory permissions', () => {
+      // Clear all permissions should work regardless of current state
+      expect(() => {
+        MemoryToolInvocation.clearAllMemoryPermissions();
+      }).not.toThrow();
+
+      // Verify permissions are empty after clearing
+      const permissions = MemoryToolInvocation.getAllowedMemoryPermissions();
+      expect(permissions).toEqual([]);
+    });
+
+    it('should handle revoking non-existent memory permissions gracefully', () => {
+      // Try to revoke a permission that doesn't exist - should not throw
+      expect(() => {
+        MemoryToolInvocation.revokeMemoryPermission('non-existent-permission');
+      }).not.toThrow();
+
+      // Permissions should still be empty
+      const permissions = MemoryToolInvocation.getAllowedMemoryPermissions();
+      expect(permissions).toEqual([]);
+    });
+
+    it('should handle clearing already empty permissions', () => {
+      // Verify permissions start empty
+      let permissions = MemoryToolInvocation.getAllowedMemoryPermissions();
+      expect(permissions).toEqual([]);
+
+      // Clear all permissions when already empty - should not throw
+      expect(() => {
+        MemoryToolInvocation.clearAllMemoryPermissions();
+      }).not.toThrow();
+
+      // Permissions should still be empty
+      permissions = MemoryToolInvocation.getAllowedMemoryPermissions();
+      expect(permissions).toEqual([]);
+    });
+
+    it('should return consistent array references', () => {
+      const permissions1 = MemoryToolInvocation.getAllowedMemoryPermissions();
+      const permissions2 = MemoryToolInvocation.getAllowedMemoryPermissions();
+
+      expect(Array.isArray(permissions1)).toBe(true);
+      expect(Array.isArray(permissions2)).toBe(true);
+      // They should be separate array instances (not the same reference)
+      expect(permissions1).not.toBe(permissions2);
+      // But should have the same content
+      expect(permissions1).toEqual(permissions2);
     });
   });
 });
