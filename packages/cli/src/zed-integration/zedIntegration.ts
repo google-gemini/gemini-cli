@@ -28,11 +28,11 @@ import { AcpFileSystemService } from './fileSystemService.js';
 import { Readable, Writable } from 'node:stream';
 import { Content, Part, FunctionCall } from '@google/genai';
 import { LoadedSettings, SettingScope } from '../config/settings.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { z } from 'zod';
 
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { Extension } from '../config/extension.js';
 import { CliArgs, loadCliConfig } from '../config/config.js';
 
