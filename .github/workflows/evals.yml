@@ -1,0 +1,45 @@
+name: 'Evals'
+
+on:
+  push:
+    branches:
+      - 'main'
+  merge_group:
+
+jobs:
+  evals-macos:
+    name: 'Evals - macOS'
+    runs-on: 'macos-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Set up Python'
+        uses: 'actions/setup-python@a26af69be951a263d495a4c3e4e4022e16d87065' # ratchet:actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 'Install and configure Poetry'
+        uses: 'snok/install-poetry@49c3080c226ba75e82813a17fe5a395ca5c69a0a' # ratchet:snok/install-poetry@v1
+
+      - name: 'Clone, install, and run evaluations'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          DEFAULT_VERTEXAI_PROJECT: '${{ secrets.DEFAULT_VERTEXAI_PROJECT }}'
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GCLI_LOCAL_FILE_TELEMETRY: true
+        run: |
+          git clone https://github.com/googlecloud-appeco-incubator/agent-prototypes.git
+          cd agent-prototypes/agent_prototypes
+
+          echo "Installing dependencies with Poetry..."
+          poetry install --no-interaction
+
+          echo "Running evaluations on Swe-bench Lite..."
+          poetry run exp_run gcli_2.5_pro
