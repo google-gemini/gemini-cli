@@ -631,7 +631,7 @@ export class GeminiChat {
     }
   }
 
-    private isFirstPartText(
+  private isFirstPartText(
     content: Content | undefined,
   ): content is Content & { parts: [{ text: string }, ...Part[]] } {
     return !!(
@@ -659,8 +659,8 @@ export class GeminiChat {
   }
 
   private isThoughtContent(content: Content): boolean {
-  // A content object is considered a "thought" if it contains any part that is a thought.
-  return !!(content.parts && content.parts.some((part) => 'thought' in part));
+    // A content object is considered a "thought" if it contains any part that is a thought.
+    return !!(content.parts && content.parts.some((part) => 'thought' in part));
   }
 }
 
