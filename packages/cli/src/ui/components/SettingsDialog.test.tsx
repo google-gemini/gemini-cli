@@ -44,6 +44,10 @@ const createMockSettings = (
       path: '/system/settings.json',
     },
     {
+      settings: {},
+      path: '/system/system-defaults.json',
+    },
+    {
       settings: {
         customThemes: {},
         mcpServers: {},
@@ -154,6 +158,10 @@ describe('SettingsDialog', () => {
       {
         settings: { customThemes: {}, mcpServers: {}, ...systemSettings },
         path: '/system/settings.json',
+      },
+      {
+        settings: {},
+        path: '/system/system-defaults.json',
       },
       {
         settings: {
