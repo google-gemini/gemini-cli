@@ -5,7 +5,6 @@
  */
 
 import { spawn, SpawnOptions } from 'child_process';
-
 /**
  * Checks if a query string potentially represents an '@' command.
  * It triggers if the query starts with '@' or contains '@' preceded by whitespace
@@ -48,7 +47,7 @@ export const copyToClipboard = async (text: string): Promise<void> => {
       });
       if (child.stdin) {
         child.stdin.on('error', reject);
-        child.stdin.write(text);
+        child.stdin.write(text, 'utf-8');
         child.stdin.end();
       } else {
         reject(new Error('Child process has no stdin stream to write to.'));
@@ -62,8 +61,15 @@ export const copyToClipboard = async (text: string): Promise<void> => {
   const linuxOptions: SpawnOptions = { stdio: ['pipe', 'inherit', 'pipe'] };
 
   switch (process.platform) {
-    case 'win32':
-      return run('clip', []);
+    case 'win32': {
+      return run('powershell', [
+        '-sta',
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        '$input|Set-Clipboard',
+      ]);
+    }
     case 'darwin':
       return run('pbcopy', []);
     case 'linux':
