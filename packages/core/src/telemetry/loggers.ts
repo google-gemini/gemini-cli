@@ -21,6 +21,7 @@ import {
   SERVICE_NAME,
   EVENT_SLASH_COMMAND,
   EVENT_CHAT_COMPRESSION,
+  EVENT_MALFORMED_JSON_RESPONSE,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -37,6 +38,7 @@ import type {
   SlashCommandEvent,
   KittySequenceOverflowEvent,
   ChatCompressionEvent,
+  MalformedJsonResponseEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -447,6 +449,27 @@ export function logKittySequenceOverflow(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Kitty sequence buffer overflow: ${event.sequence_length} bytes`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logMalformedJsonResponse(
+  config: Config,
+  event: MalformedJsonResponseEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logMalformedJsonResponseEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_MALFORMED_JSON_RESPONSE,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Malformed JSON response from ${event.model}.`,
     attributes,
   };
   logger.emit(logRecord);
