@@ -280,11 +280,13 @@ export class GeminiChat {
 
         // Pre-process the model output to filter thought parts before passing to recordHistory.
         // This makes the non-streaming path consistent with the streaming path's logic.
-        const cleanedModelOutput = initialModelOutput.map(content => {
+        const cleanedModelOutput = initialModelOutput.map((content) => {
           if (!content.parts) {
             return content;
           }
-          const visibleParts = content.parts.filter(part => !('thought' in part));
+          const visibleParts = content.parts.filter(
+            (part) => !('thought' in part),
+          );
           return { ...content, parts: visibleParts };
         });
 
@@ -299,7 +301,7 @@ export class GeminiChat {
           automaticFunctionCallingHistory =
             fullAutomaticFunctionCallingHistory.slice(index) ?? [];
         }
-        
+
         this.recordHistory(
           userContent,
           cleanedModelOutput, // Pass the cleaned data instead of the original
