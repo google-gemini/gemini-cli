@@ -92,7 +92,7 @@ You can install extensions using the `install` command. This command allows you 
 
 Gemini CLI extensions allow variable substitution in `gemini-extension.json`. This can be useful if e.g., you need the current directory to run an MCP server using `"cwd": "${extensionsDir}${/}${extensionFolder}${/}run.ts"`.
 
-## Currently-supported variables:
+**Supported variables:**
 
 | variable                   | description                                         |
 | -------------------------- | --------------------------------------------------- |
