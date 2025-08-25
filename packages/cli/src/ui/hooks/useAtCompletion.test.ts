@@ -226,12 +226,11 @@ describe('useAtCompletion', () => {
       // Now, rerender to trigger the second search
       rerender({ pattern: 'b' });
 
-      // Wait for the loading indicator to appear
-      await waitFor(() => {
-        expect(result.current.isLoadingSuggestions).toBe(true);
-      });
+      // Wait at least 250ms to ensure the 200ms timer has fired and loading state is set
+      await new Promise((resolve) => setTimeout(resolve, 250));
 
-      // Suggestions should be cleared while loading
+      // Now check that the loading indicator is shown and suggestions are cleared
+      expect(result.current.isLoadingSuggestions).toBe(true);
       expect(result.current.suggestions).toEqual([]);
 
       // Wait for the final (slow) search to complete
