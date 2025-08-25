@@ -159,6 +159,61 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessageStream', () => {
+    it('should maintain alternating history when a tool-use turn is followed by an empty model response', async () => {
+      // 1. Setup: Create a history ending with a user's tool response.
+      const functionCallTurn: Content = {
+        role: 'model',
+        parts: [{ functionCall: { name: 'test_tool', args: {} } }],
+      };
+      const functionResponseTurn: Content = {
+        role: 'user',
+        parts: [{ functionResponse: { name: 'test_tool', response: {} } }],
+      };
+      chat.addHistory({ role: 'user', parts: [{ text: 'Initial prompt' }] });
+      chat.addHistory(functionCallTurn);
+      chat.addHistory(functionResponseTurn);
+
+      // 2. Mock the API to return a stream that is "empty" from a content perspective
+      const emptyStreamResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                parts: [{ thought: true }, { text: '' }],
+                role: 'model',
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        emptyStreamResponse,
+      );
+
+      // 3. Action: Send a new message and consume the stream to trigger history recording.
+      const stream = await chat.sendMessageStream(
+        { message: 'Next question' },
+        'prompt-id-stream',
+      );
+      for await (const _ of stream) {
+        // Consume the stream to trigger history recording
+      }
+
+      // 4. Assert: Check the final state of the history.
+      const history = chat.getHistory();
+      expect(history.length).toBe(5);
+
+      // The second-to-last turn should be an empty model response to maintain the pattern.
+      const secondToLastTurn = history[history.length - 2];
+      expect(secondToLastTurn?.role).toBe('model');
+      expect(secondToLastTurn?.parts.length).toBe(0);
+
+      // The final turn should be the new user prompt.
+      const lastTurn = history[history.length - 1];
+      expect(lastTurn?.role).toBe('user');
+      expect(lastTurn?.parts[0]?.text).toBe('Next question');
+    });
+
     it('should call generateContentStream with the correct parameters', async () => {
       const response = (async function* () {
         yield {
