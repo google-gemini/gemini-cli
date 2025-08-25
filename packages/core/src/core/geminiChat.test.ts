@@ -97,7 +97,7 @@ describe('GeminiChat', () => {
         candidates: [
           {
             content: {
-              parts: [{ thought: true }, { text: '' }],
+              parts: [{ thought: true }],
               role: 'model',
             },
           },
@@ -114,19 +114,18 @@ describe('GeminiChat', () => {
       // 4. Assert: Check the final state of the history.
       const history = chat.getHistory();
 
-      // With the fix, an empty model turn should have been inserted to maintain the alternating pattern.
-      // The history should be: [user, model(tool_call), user(tool_response), model(empty), user(new_prompt)]
+      // The history should be: [user, model(tool_call), user(tool_response), user(new_prompt), model(empty)]
       expect(history.length).toBe(5);
 
-      // Crucially, the second-to-last turn must be the empty model response.
-      const secondToLastTurn = history[history.length - 2];
-      expect(secondToLastTurn?.role).toBe('model');
-      expect(secondToLastTurn?.parts.length).toBe(0);
-
-      // The final turn should be the new user prompt.
+      // The last turn should be the empty model response.
       const lastTurn = history[history.length - 1];
-      expect(lastTurn?.role).toBe('user');
-      expect(lastTurn?.parts[0]?.text).toBe('Next question');
+      expect(lastTurn?.role).toBe('model');
+      expect(lastTurn?.parts.length).toBe(0);
+
+      // The second-to-last turn should be the new user prompt.
+      const secondToLastTurn = history[history.length - 2];
+      expect(secondToLastTurn?.role).toBe('user');
+      expect(secondToLastTurn?.parts[0]?.text).toBe('Next question');
     });
     it('should call generateContent with the correct parameters', async () => {
       const response = {
@@ -179,7 +178,7 @@ describe('GeminiChat', () => {
           candidates: [
             {
               content: {
-                parts: [{ thought: true }, { text: '' }],
+                parts: [{ thought: true }],
                 role: 'model',
               },
             },
