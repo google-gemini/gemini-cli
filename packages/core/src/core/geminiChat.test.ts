@@ -545,12 +545,12 @@ describe('GeminiChat', () => {
       // The final turn must be the empty model placeholder.
       const lastTurn = history[3]!;
       expect(lastTurn.role).toBe('model');
-      expect(lastTurn.parts.length).toBe(0);
+      expect(lastTurn?.parts?.length).toBe(0);
 
       // The second-to-last turn must be the function response we provided.
       const secondToLastTurn = history[2]!;
       expect(secondToLastTurn.role).toBe('user');
-      expect(secondToLastTurn.parts[0]!.functionResponse).toBeDefined();
+      expect(secondToLastTurn?.parts![0]!.functionResponse).toBeDefined();
     });
 
     it('should add user input and a single model output to history', () => {
