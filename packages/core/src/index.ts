@@ -10,6 +10,7 @@ export * from './config/config.js';
 // Export Core Logic
 export * from './core/client.js';
 export * from './core/contentGenerator.js';
+export * from './core/loggingContentGenerator.js';
 export * from './core/geminiChat.js';
 export * from './core/logger.js';
 export * from './core/prompts.js';
@@ -31,6 +32,7 @@ export * from './utils/errors.js';
 export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
 export * from './utils/gitIgnoreParser.js';
+export * from './utils/gitUtils.js';
 export * from './utils/editor.js';
 export * from './utils/quotaErrorDetection.js';
 export * from './utils/fileUtils.js';
@@ -39,20 +41,30 @@ export * from './utils/shell-utils.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
 export * from './utils/formatters.js';
+export * from './utils/generateContentResponseUtilities.js';
+export * from './utils/filesearch/fileSearch.js';
+export * from './utils/errorParsing.js';
+export * from './utils/ignorePatterns.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
+export * from './services/chatRecordingService.js';
+export * from './services/fileSystemService.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';
 export * from './ide/ideContext.js';
+export * from './ide/ide-installer.js';
+export { getIdeInfo, DetectedIde, IdeInfo } from './ide/detect-ide.js';
+export * from './ide/constants.js';
 
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
 
 // Export base tool definitions
 export * from './tools/tools.js';
+export * from './tools/tool-error.js';
 export * from './tools/tool-registry.js';
 
 // Export prompt logic
@@ -62,6 +74,7 @@ export * from './prompts/mcp-prompts.js';
 export * from './tools/read-file.js';
 export * from './tools/ls.js';
 export * from './tools/grep.js';
+export * from './tools/ripGrep.js';
 export * from './tools/glob.js';
 export * from './tools/edit.js';
 export * from './tools/write-file.js';
@@ -91,3 +104,4 @@ export { OAuthUtils } from './mcp/oauth-utils.js';
 export * from './telemetry/index.js';
 export { sessionId } from './utils/session.js';
 export * from './utils/browser.js';
+export { Storage } from './config/storage.js';

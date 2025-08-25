@@ -9,7 +9,6 @@ import { GeminiEventType, ServerGeminiStreamEvent } from '../core/turn.js';
 import { logLoopDetected } from '../telemetry/loggers.js';
 import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
 import { Config, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
-import { SchemaUnion, Type } from '@google/genai';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -61,6 +60,7 @@ export class LoopDetectionService {
   private contentStats = new Map<string, number[]>();
   private lastContentIndex = 0;
   private loopDetected = false;
+  private inCodeBlock = false;
 
   // LLM loop track tracking
   private turnsInCurrentPrompt = 0;
@@ -156,8 +156,41 @@ export class LoopDetectionService {
    * 2. Truncating history if it exceeds the maximum length
    * 3. Analyzing content chunks for repetitive patterns using hashing
    * 4. Detecting loops when identical chunks appear frequently within a short distance
+   * 5. Disabling loop detection within code blocks to prevent false positives,
+   *    as repetitive code structures are common and not necessarily loops.
    */
   private checkContentLoop(content: string): boolean {
+    // Different content elements can often contain repetitive syntax that is not indicative of a loop.
+    // To avoid false positives, we detect when we encounter different content types and
+    // reset tracking to avoid analyzing content that spans across different element boundaries.
+    const numFences = (content.match(/```/g) ?? []).length;
+    const hasTable = /(^|\n)\s*(\|.*\||[|+-]{3,})/.test(content);
+    const hasListItem =
+      /(^|\n)\s*[*-+]\s/.test(content) || /(^|\n)\s*\d+\.\s/.test(content);
+    const hasHeading = /(^|\n)#+\s/.test(content);
+    const hasBlockquote = /(^|\n)>\s/.test(content);
+    const isDivider = /^[+-_=*\u2500-\u257F]+$/.test(content);
+
+    if (
+      numFences ||
+      hasTable ||
+      hasListItem ||
+      hasHeading ||
+      hasBlockquote ||
+      isDivider
+    ) {
+      // Reset tracking when different content elements are detected to avoid analyzing content
+      // that spans across different element boundaries.
+      this.resetContentTracking();
+    }
+
+    const wasInCodeBlock = this.inCodeBlock;
+    this.inCodeBlock =
+      numFences % 2 === 0 ? this.inCodeBlock : !this.inCodeBlock;
+    if (wasInCodeBlock || this.inCodeBlock || isDivider) {
+      return false;
+    }
+
     this.streamContentHistory += content;
 
     this.truncateAndUpdate();
@@ -315,16 +348,16 @@ Please analyze the conversation history to determine the possibility that the co
       ...recentHistory,
       { role: 'user', parts: [{ text: prompt }] },
     ];
-    const schema: SchemaUnion = {
-      type: Type.OBJECT,
+    const schema: Record<string, unknown> = {
+      type: 'object',
       properties: {
         reasoning: {
-          type: Type.STRING,
+          type: 'string',
           description:
             'Your reasoning on if the conversation is looping without forward progress.',
         },
         confidence: {
-          type: Type.NUMBER,
+          type: 'number',
           description:
             'A number between 0.0 and 1.0 representing your confidence that the conversation is in an unproductive state.',
         },
@@ -342,10 +375,10 @@ Please analyze the conversation history to determine the possibility that the co
       return false;
     }
 
-    if (typeof result.confidence === 'number') {
-      if (result.confidence > 0.9) {
-        if (typeof result.reasoning === 'string' && result.reasoning) {
-          console.warn(result.reasoning);
+    if (typeof result['confidence'] === 'number') {
+      if (result['confidence'] > 0.9) {
+        if (typeof result['reasoning'] === 'string' && result['reasoning']) {
+          console.warn(result['reasoning']);
         }
         logLoopDetected(
           this.config,
@@ -356,7 +389,7 @@ Please analyze the conversation history to determine the possibility that the co
         this.llmCheckInterval = Math.round(
           MIN_LLM_CHECK_INTERVAL +
             (MAX_LLM_CHECK_INTERVAL - MIN_LLM_CHECK_INTERVAL) *
-              (1 - result.confidence),
+              (1 - result['confidence']),
         );
       }
     }
