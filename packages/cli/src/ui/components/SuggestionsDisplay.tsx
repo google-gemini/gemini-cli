@@ -20,9 +20,11 @@ interface SuggestionsDisplayProps {
   width: number;
   scrollOffset: number;
   userInput: string;
+  expandedIndex?: number;
 }
 
 export const MAX_SUGGESTIONS_TO_SHOW = 8;
+export const MAX_SUGGESTION_WIDTH = 150; // Maximum width for the suggestion text
 
 export function SuggestionsDisplay({
   suggestions,
@@ -31,6 +33,7 @@ export function SuggestionsDisplay({
   width,
   scrollOffset,
   userInput,
+  expandedIndex,
 }: SuggestionsDisplayProps) {
   if (isLoading) {
     return (
@@ -74,18 +77,25 @@ export function SuggestionsDisplay({
       {visibleSuggestions.map((suggestion, index) => {
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
+        const isExpanded = originalIndex === expandedIndex;
         const textColor = isActive ? Colors.AccentPurple : Colors.Gray;
+        const isLong = suggestion.value.length >= MAX_SUGGESTION_WIDTH;
         const labelElement = (
           <PrepareLabel
-            label={suggestion.label}
+            label={suggestion.value}
             matchedIndex={suggestion.matchedIndex}
             userInput={userInput}
             textColor={textColor}
+            isExpanded={isExpanded}
           />
         );
 
         return (
-          <Box key={`${suggestion.value}-${originalIndex}`} width={width}>
+          <Box
+            key={`${suggestion.value}-${originalIndex}`}
+            flexDirection="column"
+            width={width}
+          >
             <Box flexDirection="row">
               {isSlashCommandMode ? (
                 <>
@@ -111,6 +121,11 @@ export function SuggestionsDisplay({
                     </Box>
                   ) : null}
                 </>
+              )}
+              {isActive && isLong && (
+                <Box marginLeft={1}>
+                  <Text color={Colors.Gray}>{isExpanded ? ' ← ' : ' → '}</Text>
+                </Box>
               )}
             </Box>
           </Box>

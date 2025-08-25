@@ -60,6 +60,8 @@ describe('keyMatchers', () => {
       key.name === 'return' && !key.ctrl,
     [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: (key: Key) =>
       key.name === 'tab',
+    [Command.EXPAND_SUGGESTION]: (key: Key) => key.name === 'right',
+    [Command.COLLAPSE_SUGGESTION]: (key: Key) => key.name === 'left',
   };
 
   // Test data for each command with positive and negative test cases
