@@ -6,9 +6,10 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getIdeInstaller } from './ide-installer.js';
-import * as child_process from 'child_process';
-import * as fs from 'fs';
-import * as os from 'os';
+import * as child_process from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { DetectedIde } from './detect-ide.js';
 
 vi.mock('child_process');
@@ -16,8 +17,10 @@ vi.mock('fs');
 vi.mock('os');
 
 describe('ide-installer', () => {
+  const HOME_DIR = '/home/user';
+
   beforeEach(() => {
-    vi.spyOn(os, 'homedir').mockReturnValue('/home/user');
+    vi.spyOn(os, 'homedir').mockReturnValue(HOME_DIR);
   });
 
   afterEach(() => {
@@ -55,15 +58,18 @@ describe('ide-installer', () => {
         {
           platform: 'win32' as NodeJS.Platform,
           expectedLookupPaths: [
-            'C:\\Program Files/Microsoft VS Code/bin/code.cmd',
-            '/home/user/AppData/Local/Programs/Microsoft VS Code/bin/code.cmd',
+            path.join('C:\\Program Files', 'Microsoft VS Code/bin/code.cmd'),
+            path.join(
+              HOME_DIR,
+              '/AppData/Local/Programs/Microsoft VS Code/bin/code.cmd',
+            ),
           ],
         },
         {
           platform: 'darwin' as NodeJS.Platform,
           expectedLookupPaths: [
             '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
-            '/home/user/Library/Application Support/Code/bin/code',
+            path.join(HOME_DIR, 'Library/Application Support/Code/bin/code'),
           ],
         },
         {
