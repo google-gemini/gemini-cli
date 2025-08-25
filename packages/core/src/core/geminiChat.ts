@@ -666,11 +666,11 @@ export class GeminiChat {
     const firstPart = content.parts[0];
     return (
       typeof firstPart.text === 'string' &&
-      !firstPart.functionCall &&
-      !firstPart.functionResponse &&
-      !firstPart.inlineData &&
-      !firstPart.fileData &&
-      !firstPart.thought
+      !('functionCall' in firstPart) &&
+      !('functionResponse' in firstPart) &&
+      !('inlineData' in firstPart) &&
+      !('fileData' in firstPart) &&
+      !('thought' in firstPart)
     );
   }
 
