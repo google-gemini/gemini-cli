@@ -97,7 +97,7 @@ describe('GeminiChat', () => {
         candidates: [
           {
             content: {
-              parts: [{ thought: 'I have processed the tool response.' }],
+              parts: [{ thought: true }, { text: '' }],
               role: 'model',
             },
           },
