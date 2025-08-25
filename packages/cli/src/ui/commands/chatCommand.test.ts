@@ -16,9 +16,9 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import type { Content } from '@google/genai';
 import type { GeminiClient } from '@google/gemini-cli-core';
 
-import * as fsPromises from 'fs/promises';
+import * as fsPromises from 'node:fs/promises';
 import { chatCommand } from './chatCommand.js';
-import type { Stats } from 'fs';
+import type { Stats } from 'node:fs';
 import type { HistoryItemWithoutId } from '../types.js';
 
 vi.mock('fs/promises', () => ({

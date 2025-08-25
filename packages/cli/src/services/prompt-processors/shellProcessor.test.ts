@@ -10,7 +10,7 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import type { CommandContext } from '../../ui/commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode } from '@google/gemini-cli-core';
-import os from 'os';
+import os from 'node:os';
 import { quote } from 'shell-quote';
 
 // Helper function to determine the expected escaped string based on the current OS,

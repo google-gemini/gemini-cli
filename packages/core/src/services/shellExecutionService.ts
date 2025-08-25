@@ -6,9 +6,9 @@
 
 import type { PtyImplementation } from '../utils/getPty.js';
 import { getPty } from '../utils/getPty.js';
-import { spawn as cpSpawn } from 'child_process';
-import { TextDecoder } from 'util';
-import os from 'os';
+import { spawn as cpSpawn } from 'node:child_process';
+import { TextDecoder } from 'node:util';
+import os from 'node:os';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import { isBinary } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';

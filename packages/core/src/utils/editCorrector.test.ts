@@ -7,7 +7,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Mock } from 'vitest';
 import { vi, describe, it, expect, beforeEach, type Mocked } from 'vitest';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { EditTool } from '../tools/edit.js';
 
 // MOCKS

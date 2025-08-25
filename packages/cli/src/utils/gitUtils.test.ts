@@ -5,7 +5,7 @@
  */
 
 import { vi, describe, expect, it, afterEach, beforeEach } from 'vitest';
-import * as child_process from 'child_process';
+import * as child_process from 'node:child_process';
 import {
   isGitHubRepository,
   getGitRepoRoot,

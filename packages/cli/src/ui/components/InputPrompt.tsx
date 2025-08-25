@@ -28,7 +28,7 @@ import {
   saveClipboardImage,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
-import * as path from 'path';
+import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../constants.js';
 
 export interface InputPromptProps {

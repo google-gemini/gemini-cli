@@ -12,7 +12,7 @@ import {
   TrustLevel,
   isWorkspaceTrusted,
 } from '../../config/trustedFolders.js';
-import * as process from 'process';
+import * as process from 'node:process';
 
 export const useFolderTrust = (
   settings: LoadedSettings,

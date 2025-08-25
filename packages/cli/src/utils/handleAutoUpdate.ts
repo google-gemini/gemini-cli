@@ -11,7 +11,7 @@ import { updateEventEmitter } from './updateEventEmitter.js';
 import type { HistoryItem } from '../ui/types.js';
 import { MessageType } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
-import type { spawn } from 'child_process';
+import type { spawn } from 'node:child_process';
 
 export function handleAutoUpdate(
   info: UpdateObject | null,

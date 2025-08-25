@@ -10,7 +10,7 @@ import { Colors } from '../colors.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import * as process from 'process';
+import * as process from 'node:process';
 
 export enum FolderTrustChoice {
   TRUST_FOLDER = 'trust_folder',

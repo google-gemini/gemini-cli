@@ -7,8 +7,8 @@
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { glob, escape } from 'glob';
 import type { ProcessedFileReadResult } from '../utils/fileUtils.js';
 import {

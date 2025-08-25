@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SpawnOptions } from 'child_process';
-import { spawn } from 'child_process';
+import type { SpawnOptions } from 'node:child_process';
+import { spawn } from 'node:child_process';
 
 /**
  * Checks if a query string potentially represents an '@' command.

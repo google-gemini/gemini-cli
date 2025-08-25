@@ -7,13 +7,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { RipGrepToolParams } from './ripGrep.js';
 import { RipGrepTool } from './ripGrep.js';
-import path from 'path';
-import fs from 'fs/promises';
-import os, { EOL } from 'os';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import os, { EOL } from 'node:os';
 import type { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
-import type { ChildProcess } from 'child_process';
-import { spawn } from 'child_process';
+import type { ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 
 // Mock @lvce-editor/ripgrep for testing
 vi.mock('@lvce-editor/ripgrep', () => ({

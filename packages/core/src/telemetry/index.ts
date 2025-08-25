@@ -27,6 +27,7 @@ export {
   logApiResponse,
   logFlashFallback,
   logSlashCommand,
+  logConversationFinishedEvent,
   logKittySequenceOverflow,
   logChatCompression,
 } from './loggers.js';
@@ -41,6 +42,7 @@ export {
   FlashFallbackEvent,
   StartSessionEvent,
   ToolCallEvent,
+  ConversationFinishedEvent,
   KittySequenceOverflowEvent,
 } from './types.js';
 export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';

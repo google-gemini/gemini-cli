@@ -11,7 +11,7 @@ import { vi } from 'vitest';
 import type { Key } from './KeypressContext.js';
 import { KeypressProvider, useKeypressContext } from './KeypressContext.js';
 import { useStdin } from 'ink';
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 import {
   KITTY_KEYCODE_ENTER,
   KITTY_KEYCODE_NUMPAD_ENTER,

@@ -31,7 +31,7 @@ import { StreamingState } from './types.js';
 import { Tips } from './components/Tips.js';
 import type { UpdateObject } from './utils/updateCheck.js';
 import { checkForUpdates } from './utils/updateCheck.js';
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 import { updateEventEmitter } from '../utils/updateEventEmitter.js';
 import * as auth from '../config/auth.js';
 import * as useTerminalSize from './hooks/useTerminalSize.js';
