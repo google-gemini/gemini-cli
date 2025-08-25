@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Credentials } from 'google-auth-library';
 import {
   OAuth2Client,
-  Credentials,
   Compute,
   CodeChallengeMethod,
 } from 'google-auth-library';
@@ -17,7 +17,7 @@ import * as net from 'node:net';
 import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import { AuthType } from '../core/contentGenerator.js';

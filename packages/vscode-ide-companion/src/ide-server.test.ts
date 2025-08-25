@@ -7,10 +7,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
-import * as os from 'node:os';
+import type * as os from 'node:os';
 import * as path from 'node:path';
 import { IDEServer } from './ide-server.js';
-import { DiffManager } from './diff-manager.js';
+import type { DiffManager } from './diff-manager.js';
 
 const mocks = vi.hoisted(() => ({
   diffManager: {

@@ -8,8 +8,11 @@ import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
 import { Text } from 'ink';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
-import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
-import { Config, ToolCallConfirmationDetails } from '@google/gemini-cli-core';
+import { type IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
+import type {
+  Config,
+  ToolCallConfirmationDetails,
+} from '@google/gemini-cli-core';
 
 // Mock child components to isolate ToolGroupMessage behavior
 vi.mock('./ToolMessage.js', () => ({

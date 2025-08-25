@@ -16,12 +16,10 @@ import {
 import { renderHook, act } from '@testing-library/react';
 import { useAutoAcceptIndicator } from './useAutoAcceptIndicator.js';
 
-import {
-  Config,
-  Config as ActualConfigType,
-  ApprovalMode,
-} from '@google/gemini-cli-core';
-import { useKeypress, Key } from './useKeypress.js';
+import type { Config as ActualConfigType } from '@google/gemini-cli-core';
+import { Config, ApprovalMode } from '@google/gemini-cli-core';
+import type { Key } from './useKeypress.js';
+import { useKeypress } from './useKeypress.js';
 
 vi.mock('./useKeypress.js');
 
