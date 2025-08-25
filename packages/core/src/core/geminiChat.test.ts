@@ -118,15 +118,16 @@ describe('GeminiChat', () => {
       //. expect(history).toBe([])
       expect(history.length).toBe(5);
 
-      // The last turn should be the empty model response.
-      const lastTurn = history[history.length - 1];
-      expect(lastTurn?.role).toBe('model');
-      expect(lastTurn?.parts.length).toBe(0);
+      // The final turn should be the empty model response.
+      const lastTurn = history[history.length - 1]!;
+      expect(lastTurn.role).toBe('model');
+      expect(lastTurn.parts?.length).toBe(0);
 
       // The second-to-last turn should be the new user prompt.
-      const secondToLastTurn = history[history.length - 2];
-      expect(secondToLastTurn?.role).toBe('user');
-      expect(secondToLastTurn?.parts[0]?.text).toBe('Next question');
+      const secondToLastTurn = history[history.length - 2]!;
+      expect(secondToLastTurn.role).toBe('user');
+      // You'll also need to assert that parts[0] exists before accessing its 'text' property
+      expect(secondToLastTurn.parts![0]!.text).toBe('Next question');
     });
     it('should call generateContent with the correct parameters', async () => {
       const response = {
