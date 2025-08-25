@@ -413,7 +413,6 @@ export class Task {
 
   private createScheduler(): CoreToolScheduler {
     const scheduler = new CoreToolScheduler({
-      toolRegistry: this.config.getToolRegistry(),
       outputUpdateHandler: this._schedulerOutputUpdate.bind(this),
       onAllToolCallsComplete: this._schedulerAllToolCallsComplete.bind(this),
       onToolCallsUpdate: this._schedulerToolCallsUpdate.bind(this),
