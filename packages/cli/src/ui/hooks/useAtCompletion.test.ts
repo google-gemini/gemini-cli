@@ -201,10 +201,10 @@ describe('useAtCompletion', () => {
       });
       await realFileSearch.initialize();
 
+      // Mock that returns results immediately but we'll control timing with fake timers
       const mockFileSearch: FileSearch = {
         initialize: vi.fn().mockResolvedValue(undefined),
         search: vi.fn().mockImplementation(async (...args) => {
-          await new Promise((resolve) => setTimeout(resolve, 300));
           return realFileSearch.search(...args);
         }),
       };
@@ -216,32 +216,42 @@ describe('useAtCompletion', () => {
         { initialProps: { pattern: 'a' } },
       );
 
-      // Wait for the initial (slow) search to complete
+      // Wait for the initial search to complete (using real timers)
       await waitFor(() => {
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
           'a.txt',
         ]);
       });
 
-      // Now, rerender to trigger the second search
-      rerender({ pattern: 'b' });
+      // Now switch to fake timers for precise control of the loading behavior
+      vi.useFakeTimers();
 
-      // Wait at least 250ms to ensure the 200ms timer has fired and loading state is set
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      // Trigger the second search
+      act(() => {
+        rerender({ pattern: 'b' });
+      });
 
-      // Now check that the loading indicator is shown and suggestions are cleared
+      // Initially, loading should be false (before 200ms timer)
+      expect(result.current.isLoadingSuggestions).toBe(false);
+
+      // Advance time by exactly 200ms to trigger the loading state
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      // Now loading should be true and suggestions should be cleared
       expect(result.current.isLoadingSuggestions).toBe(true);
       expect(result.current.suggestions).toEqual([]);
 
-      // Wait for the final (slow) search to complete
-      await waitFor(
-        () => {
-          expect(result.current.suggestions.map((s) => s.value)).toEqual([
-            'b.txt',
-          ]);
-        },
-        { timeout: 1000 },
-      ); // Increase timeout for the slow search
+      // Switch back to real timers for the final waitFor
+      vi.useRealTimers();
+
+      // Wait for the search results to be processed
+      await waitFor(() => {
+        expect(result.current.suggestions.map((s) => s.value)).toEqual([
+          'b.txt',
+        ]);
+      });
 
       expect(result.current.isLoadingSuggestions).toBe(false);
     });
