@@ -316,30 +316,50 @@ describe('useAutoAcceptIndicator', () => {
 
     it('should not enable YOLO mode when Ctrl+Y is pressed', () => {
       mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      mockConfigInstance.setApprovalMode.mockImplementation(() => {
+        throw new Error(
+          'Cannot enable privileged approval modes in an untrusted folder.',
+        );
+      });
       const mockAddItem = vi.fn();
-      renderHook(() =>
+      const { result } = renderHook(() =>
         useAutoAcceptIndicator({
           config: mockConfigInstance as unknown as ActualConfigType,
           addItem: mockAddItem,
         }),
       );
+
+      expect(result.current).toBe(ApprovalMode.DEFAULT);
 
       act(() => {
         capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
       });
 
-      expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
+      // We expect setApprovalMode to be called, and the error to be caught.
+      expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+        ApprovalMode.YOLO,
+      );
+      expect(mockAddItem).toHaveBeenCalled();
+      // Verify the underlying config value was not changed
+      expect(mockConfigInstance.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
 
     it('should not enable AUTO_EDIT mode when Shift+Tab is pressed', () => {
       mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      mockConfigInstance.setApprovalMode.mockImplementation(() => {
+        throw new Error(
+          'Cannot enable privileged approval modes in an untrusted folder.',
+        );
+      });
       const mockAddItem = vi.fn();
-      renderHook(() =>
+      const { result } = renderHook(() =>
         useAutoAcceptIndicator({
           config: mockConfigInstance as unknown as ActualConfigType,
           addItem: mockAddItem,
         }),
       );
+
+      expect(result.current).toBe(ApprovalMode.DEFAULT);
 
       act(() => {
         capturedUseKeypressHandler({
@@ -348,7 +368,13 @@ describe('useAutoAcceptIndicator', () => {
         } as Key);
       });
 
-      expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
+      // We expect setApprovalMode to be called, and the error to be caught.
+      expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+        ApprovalMode.AUTO_EDIT,
+      );
+      expect(mockAddItem).toHaveBeenCalled();
+      // Verify the underlying config value was not changed
+      expect(mockConfigInstance.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
 
     it('should disable YOLO mode when Ctrl+Y is pressed', () => {
@@ -368,6 +394,7 @@ describe('useAutoAcceptIndicator', () => {
       expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
         ApprovalMode.DEFAULT,
       );
+      expect(mockConfigInstance.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
 
     it('should disable AUTO_EDIT mode when Shift+Tab is pressed', () => {
@@ -392,10 +419,17 @@ describe('useAutoAcceptIndicator', () => {
       expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
         ApprovalMode.DEFAULT,
       );
+      expect(mockConfigInstance.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
 
     it('should show a warning when trying to enable privileged modes', () => {
-      mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      // Mock the error thrown by setApprovalMode
+      const errorMessage =
+        'Cannot enable privileged approval modes in an untrusted folder.';
+      mockConfigInstance.setApprovalMode.mockImplementation(() => {
+        throw new Error(errorMessage);
+      });
+
       const mockAddItem = vi.fn();
       renderHook(() =>
         useAutoAcceptIndicator({
@@ -412,7 +446,7 @@ describe('useAutoAcceptIndicator', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'Cannot enable privileged approval modes in an untrusted folder.',
+          text: errorMessage,
         },
         expect.any(Number),
       );
@@ -428,13 +462,12 @@ describe('useAutoAcceptIndicator', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'Cannot enable privileged approval modes in an untrusted folder.',
+          text: errorMessage,
         },
         expect.any(Number),
       );
 
       expect(mockAddItem).toHaveBeenCalledTimes(2);
-      expect(mockConfigInstance.setApprovalMode).not.toHaveBeenCalled();
     });
   });
 });

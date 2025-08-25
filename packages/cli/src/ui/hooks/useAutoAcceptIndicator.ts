@@ -43,23 +43,19 @@ export function useAutoAcceptIndicator({
       }
 
       if (nextApprovalMode) {
-        // Do not allow enabling privileged modes in untrusted folders.
-        if (
-          !config.isTrustedFolder() &&
-          nextApprovalMode !== ApprovalMode.DEFAULT
-        ) {
+        try {
+          config.setApprovalMode(nextApprovalMode);
+          // Update local state immediately for responsiveness
+          setShowAutoAcceptIndicator(nextApprovalMode);
+        } catch (e) {
           addItem(
             {
               type: MessageType.INFO,
-              text: 'Cannot enable privileged approval modes in an untrusted folder.',
+              text: (e as Error).message,
             },
             Date.now(),
           );
-          return;
         }
-        config.setApprovalMode(nextApprovalMode);
-        // Update local state immediately for responsiveness
-        setShowAutoAcceptIndicator(nextApprovalMode);
       }
     },
     { isActive: true },
