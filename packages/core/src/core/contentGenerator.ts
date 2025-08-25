@@ -12,6 +12,7 @@ import {
   EmbedContentResponse,
   EmbedContentParameters,
   GoogleGenAI,
+  HttpOptions,
 } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
@@ -111,6 +112,7 @@ export async function createContentGenerator(
   sessionId?: string,
 ): Promise<ContentGenerator> {
   const version = process.env['CLI_VERSION'] || process.version;
+  const baseUrl = process.env['GEMINI_API_BASE_URL']?.trim() || undefined;
   const userAgent = `GeminiCLI/${version} (${process.platform}; ${process.arch})`;
   const baseHeaders: Record<string, string> = {
     'User-Agent': userAgent,
@@ -146,7 +148,10 @@ export async function createContentGenerator(
         'x-gemini-api-privileged-user-id': `${installationId}`,
       };
     }
-    const httpOptions = { headers };
+    let httpOptions: HttpOptions = { headers };
+    if (baseUrl) {
+      httpOptions = { ...httpOptions, baseUrl };
+    }
 
     const googleGenAI = new GoogleGenAI({
       apiKey: config.apiKey === '' ? undefined : config.apiKey,

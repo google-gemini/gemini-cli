@@ -54,6 +54,7 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_API_BASE_URL: '${{ secrets.GEMINI_API_BASE_URL }}'
           KEEP_OUTPUT: 'true'
           SANDBOX: '${{ matrix.sandbox }}'
           VERBOSE: 'true'
@@ -84,5 +85,6 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_API_BASE_URL: '${{ secrets.GEMINI_API_BASE_URL }}'
         run: |-
           npm run test:e2e
