@@ -12,14 +12,20 @@ import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
   Storage,
+  MCPServerConfig,
+  BugCommandSettings,
+  TelemetrySettings,
+  AuthType,
+  ChatCompressionSettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { Settings, MemoryImportFormat } from './settingsSchema.js';
+import { MemoryImportFormat, DnsResolutionOrder } from './settingsSchema.js';
+import { CustomTheme } from '../ui/themes/theme.js';
 
-export type { Settings, MemoryImportFormat };
+export type { MemoryImportFormat };
 
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 
@@ -70,6 +76,95 @@ export interface SummarizeToolOutputSettings {
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
   screenReader?: boolean;
+}
+
+export interface Settings {
+  // Allow additional properties for compatibility
+  [key: string]: unknown;
+  theme?: string;
+  customThemes?: Record<string, CustomTheme>;
+  selectedAuthType?: AuthType;
+  useExternalAuth?: boolean;
+  sandbox?: boolean | string;
+  coreTools?: string[];
+  excludeTools?: string[];
+  toolDiscoveryCommand?: string;
+  toolCallCommand?: string;
+  mcpServerCommand?: string;
+  mcpServers?: Record<string, MCPServerConfig>;
+  allowMCPServers?: string[];
+  excludeMCPServers?: string[];
+  showMemoryUsage?: boolean;
+  contextFileName?: string | string[];
+  accessibility?: AccessibilitySettings;
+  telemetry?: TelemetrySettings;
+  usageStatisticsEnabled?: boolean;
+  preferredEditor?: string;
+  bugCommand?: BugCommandSettings;
+  checkpointing?: CheckpointingSettings;
+  autoConfigureMaxOldSpaceSize?: boolean;
+  /** The model name to use (e.g 'gemini-9.0-pro') */
+  model?: string;
+
+  // Git-aware file filtering settings
+  fileFiltering?: {
+    respectGitIgnore?: boolean;
+    respectGeminiIgnore?: boolean;
+    enableRecursiveFileSearch?: boolean;
+  };
+
+  hideWindowTitle?: boolean;
+
+  hideTips?: boolean;
+  hideBanner?: boolean;
+
+  // Setting for setting maximum number of user/model/tool turns in a session.
+  maxSessionTurns?: number;
+
+  // A map of tool names to their summarization settings.
+  summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
+
+  vimMode?: boolean;
+  memoryImportFormat?: 'tree' | 'flat';
+
+  // Flag to be removed post-launch.
+  ideModeFeature?: boolean;
+  folderTrustFeature?: boolean;
+  /// IDE mode setting configured via slash command toggle.
+  ideMode?: boolean;
+
+  // Setting to track if the user has seen the IDE integration nudge.
+  hasSeenIdeIntegrationNudge?: boolean;
+
+  // Setting for disabling auto-update.
+  disableAutoUpdate?: boolean;
+
+  // Setting for disabling the update nag message.
+  disableUpdateNag?: boolean;
+
+  memoryDiscoveryMaxDirs?: number;
+
+  // Environment variables to exclude from project .env files
+  excludedProjectEnvVars?: string[];
+  dnsResolutionOrder?: DnsResolutionOrder;
+
+  includeDirectories?: string[];
+
+  loadMemoryFromIncludeDirectories?: boolean;
+
+  chatCompression?: ChatCompressionSettings;
+
+  usePlanningTool?: boolean;
+
+  // New settings from main branch
+  folderTrust?: boolean;
+  useRipgrep?: boolean;
+  shouldUseNodePtyShell?: boolean;
+  skipNextSpeakerCheck?: boolean;
+  enablePromptCompletion?: boolean;
+  debugKeystrokeLogging?: boolean;
+  hideFooter?: boolean;
+  showLineNumbers?: boolean;
 }
 
 export interface SettingsError {
