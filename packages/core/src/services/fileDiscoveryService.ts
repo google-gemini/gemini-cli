@@ -73,7 +73,9 @@ export class FileDiscoveryService {
       respectGeminiIgnore: true,
     },
   ): string[] {
-    return filePaths.filter((filePath) => !this.shouldIgnoreFile(filePath, options));
+    return filePaths.filter(
+      (filePath) => !this.shouldIgnoreFile(filePath, options),
+    );
   }
 
   /**
