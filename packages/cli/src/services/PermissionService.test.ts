@@ -6,8 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PermissionService } from './PermissionService.js';
+import type { Config } from '@google/gemini-cli-core';
 import {
-  Config,
   ApprovalMode,
   MemoryToolInvocation,
   DiscoveredMCPToolInvocation,

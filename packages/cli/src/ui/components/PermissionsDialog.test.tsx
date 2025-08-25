@@ -7,12 +7,11 @@
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PermissionsDialog } from './PermissionsDialog.js';
-import {
-  PermissionService,
-  ToolPermission,
-} from '../../services/PermissionService.js';
-import { Config } from '@google/gemini-cli-core';
-import { useKeypress, Key } from '../hooks/useKeypress.js';
+import type { ToolPermission } from '../../services/PermissionService.js';
+import { PermissionService } from '../../services/PermissionService.js';
+import type { Config } from '@google/gemini-cli-core';
+import type { Key } from '../hooks/useKeypress.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 // Helper function to create Key objects with all required properties
 function createKey(overrides: Partial<Key>): Key {

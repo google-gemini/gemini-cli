@@ -4,15 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import type React from 'react';
+import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import {
-  PermissionService,
-  ToolPermission,
-} from '../../services/PermissionService.js';
-import { Config } from '@google/gemini-cli-core';
+import type { ToolPermission } from '../../services/PermissionService.js';
+import { PermissionService } from '../../services/PermissionService.js';
+import type { Config } from '@google/gemini-cli-core';
 
 interface PermissionsDialogProps {
   config: Config;
