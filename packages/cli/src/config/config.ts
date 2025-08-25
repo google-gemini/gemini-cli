@@ -4,13 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { homedir } from 'node:os';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
+import type {
+  TelemetryTarget,
+  FileFilteringOptions,
+  MCPServerConfig,
+} from '@google/gemini-cli-core';
+import { extensionsCommand } from '../commands/extensions.js';
 import {
   Config,
   loadServerHierarchicalMemory,
@@ -21,16 +27,14 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
-  TelemetryTarget,
-  FileFilteringOptions,
   ShellTool,
   EditTool,
   WriteFileTool,
-  MCPServerConfig,
 } from '@google/gemini-cli-core';
-import { Settings } from './settings.js';
+import type { Settings } from './settings.js';
 
-import { Extension, annotateActiveExtensions } from './extension.js';
+import type { Extension } from './extension.js';
+import { annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
@@ -76,7 +80,7 @@ export interface CliArgs {
   screenReader: boolean | undefined;
 }
 
-export async function parseArguments(): Promise<CliArgs> {
+export async function parseArguments(settings: Settings): Promise<CliArgs> {
   const yargsInstance = yargs(hideBin(process.argv))
     .locale('en')
     .scriptName('gemini')
@@ -252,7 +256,13 @@ export async function parseArguments(): Promise<CliArgs> {
         }),
     )
     // Register MCP subcommands
-    .command(mcpCommand)
+    .command(mcpCommand);
+
+  if (settings?.extensionManagement ?? false) {
+    yargsInstance.command(extensionsCommand);
+  }
+
+  yargsInstance
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -265,7 +275,10 @@ export async function parseArguments(): Promise<CliArgs> {
 
   // Handle case where MCP subcommands are executed - they should exit the process
   // and not return to main CLI logic
-  if (result._.length > 0 && result._[0] === 'mcp') {
+  if (
+    result._.length > 0 &&
+    (result._[0] === 'mcp' || result._[0] === 'extensions')
+  ) {
     // MCP commands handle their own execution and process exit
     process.exit(0);
   }

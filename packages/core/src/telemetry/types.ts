@@ -4,19 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GenerateContentResponseUsageMetadata } from '@google/genai';
-import { Config } from '../config/config.js';
-import { CompletedToolCall } from '../core/coreToolScheduler.js';
+import type { GenerateContentResponseUsageMetadata } from '@google/genai';
+import type { Config } from '../config/config.js';
+import type { ApprovalMode } from '../config/config.js';
+import type { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { DiffStat, FileDiff } from '../tools/tools.js';
+import type { DiffStat, FileDiff } from '../tools/tools.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   getDecisionFromOutcome,
   ToolCallDecision,
 } from './tool-call-decision.js';
-import { FileOperation } from './metrics.js';
+import type { FileOperation } from './metrics.js';
 export { ToolCallDecision };
-import { ToolRegistry } from '../tools/tool-registry.js';
+import type { ToolRegistry } from '../tools/tool-registry.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -387,6 +388,20 @@ export class IdeConnectionEvent {
   }
 }
 
+export class ConversationFinishedEvent {
+  'event_name': 'conversation_finished';
+  'event.timestamp': string; // ISO 8601;
+  approvalMode: ApprovalMode;
+  turnCount: number;
+
+  constructor(approvalMode: ApprovalMode, turnCount: number) {
+    this['event_name'] = 'conversation_finished';
+    this['event.timestamp'] = new Date().toISOString();
+    this.approvalMode = approvalMode;
+    this.turnCount = turnCount;
+  }
+}
+
 export class KittySequenceOverflowEvent {
   'event.name': 'kitty_sequence_overflow';
   'event.timestamp': string; // ISO 8601
@@ -447,5 +462,6 @@ export type TelemetryEvent =
   | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
+  | ConversationFinishedEvent
   | SlashCommandEvent
   | FileOperationEvent;
