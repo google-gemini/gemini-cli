@@ -210,7 +210,7 @@ describe('GeminiChat', () => {
       // The second-to-last turn should be the new user prompt.
       const secondToLastTurn = history[history.length - 2];
       expect(secondToLastTurn?.role).toBe('user');
-      expect(secondToLastTurn?.parts[0]?.text).toBe('Next question');
+      expect(secondToLastTurn?.parts![0]?.text).toBe('Next question');
     });
 
     it('should call generateContentStream with the correct parameters', async () => {
