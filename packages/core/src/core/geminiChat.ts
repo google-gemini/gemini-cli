@@ -623,14 +623,9 @@ export class GeminiChat {
       }
     }
 
-    // Part 2: Filter out any content that is just a thought.
-    const visibleModelOutput = modelOutput.filter(
-      (content) => !this.isThoughtContent(content),
-    );
-
     // Part 3: Consolidate adjacent text parts from the visible model output.
     const consolidatedOutput: Content[] = [];
-    for (const content of visibleModelOutput) {
+    for (const content of modelOutput) {
       // Don't consolidate malformed content.
       if (!content.parts) {
         consolidatedOutput.push(content);

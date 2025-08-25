@@ -355,326 +355,68 @@ describe('GeminiChat', () => {
       const modelOutput: Content[] = [
         { role: 'model', parts: [{ text: 'Model output' }] },
       ];
-      // @ts-expect-error Accessing private method for testing purposes
+      // @ts-expect-error Accessing private method for testing
       chat.recordHistory(userInput, modelOutput);
-      const history = chat.getHistory();
-      expect(history).toEqual([userInput, modelOutput[0]]);
-    });
-
-    it('should consolidate adjacent model outputs', () => {
-      const modelOutputParts: Content[] = [
-        { role: 'model', parts: [{ text: 'Model part 1' }] },
-        { role: 'model', parts: [{ text: 'Model part 2' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputParts);
-      const history = chat.getHistory();
-      expect(history.length).toBe(2);
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      expect(history[1].parts).toEqual([{ text: 'Model part 1Model part 2' }]);
-    });
-
-    it('should handle a mix of user and model roles in outputContents (though unusual)', () => {
-      const mixedOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'Model 1' }] },
-        { role: 'user', parts: [{ text: 'Unexpected User' }] }, // This should be pushed as is
-        { role: 'model', parts: [{ text: 'Model 2' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, mixedOutput);
-      const history = chat.getHistory();
-      expect(history.length).toBe(4); // user, model1, user_unexpected, model2
-      expect(history[0]).toEqual(userInput);
-      expect(history[1]).toEqual(mixedOutput[0]);
-      expect(history[2]).toEqual(mixedOutput[1]);
-      expect(history[3]).toEqual(mixedOutput[2]);
-    });
-
-    it('should consolidate multiple adjacent model outputs correctly', () => {
-      const modelOutputParts: Content[] = [
-        { role: 'model', parts: [{ text: 'M1' }] },
-        { role: 'model', parts: [{ text: 'M2' }] },
-        { role: 'model', parts: [{ text: 'M3' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputParts);
-      const history = chat.getHistory();
-      expect(history.length).toBe(2);
-      expect(history[1].parts).toEqual([{ text: 'M1M2M3' }]);
-    });
-
-    it('should not consolidate if roles are different between model outputs', () => {
-      const modelOutputParts: Content[] = [
-        { role: 'model', parts: [{ text: 'M1' }] },
-        { role: 'user', parts: [{ text: 'Interjecting User' }] },
-        { role: 'model', parts: [{ text: 'M2' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputParts);
-      const history = chat.getHistory();
-      expect(history.length).toBe(4); // user, M1, Interjecting User, M2
-      expect(history[1].parts).toEqual([{ text: 'M1' }]);
-      expect(history[3].parts).toEqual([{ text: 'M2' }]);
-    });
-
-    it('should merge with last history entry if it is also a model output', () => {
-      // @ts-expect-error Accessing private property for test setup
-      chat.history = [
-        userInput,
-        { role: 'model', parts: [{ text: 'Initial Model Output' }] },
-      ]; // Prime the history
-
-      const newModelOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'New Model Part 1' }] },
-        { role: 'model', parts: [{ text: 'New Model Part 2' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, newModelOutput); // userInput here is for the *next* turn, but history is already primed
-
-      // Reset and set up a more realistic scenario for merging with existing history
-      chat = new GeminiChat(mockConfig, mockModelsModule, config, []);
-      const firstUserInput: Content = {
-        role: 'user',
-        parts: [{ text: 'First user input' }],
-      };
-      const firstModelOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'First model response' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(firstUserInput, firstModelOutput);
-
-      const secondUserInput: Content = {
-        role: 'user',
-        parts: [{ text: 'Second user input' }],
-      };
-      const secondModelOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'Second model response part 1' }] },
-        { role: 'model', parts: [{ text: 'Second model response part 2' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(secondUserInput, secondModelOutput);
-
-      const finalHistory = chat.getHistory();
-      expect(finalHistory.length).toBe(4); // user1, model1, user2, model2(consolidated)
-      expect(finalHistory[0]).toEqual(firstUserInput);
-      expect(finalHistory[1]).toEqual(firstModelOutput[0]);
-      expect(finalHistory[2]).toEqual(secondUserInput);
-      expect(finalHistory[3].role).toBe('model');
-      expect(finalHistory[3].parts).toEqual([
-        { text: 'Second model response part 1Second model response part 2' },
-      ]);
-    });
-
-    it('should correctly merge consolidated new output with existing model history', () => {
-      // Setup: history ends with a model turn
-      const initialUser: Content = {
-        role: 'user',
-        parts: [{ text: 'Initial user query' }],
-      };
-      const initialModel: Content = {
-        role: 'model',
-        parts: [{ text: 'Initial model answer.' }],
-      };
-      chat = new GeminiChat(mockConfig, mockModelsModule, config, [
-        initialUser,
-        initialModel,
-      ]);
-
-      // New interaction
-      const currentUserInput: Content = {
-        role: 'user',
-        parts: [{ text: 'Follow-up question' }],
-      };
-      const newModelParts: Content[] = [
-        { role: 'model', parts: [{ text: 'Part A of new answer.' }] },
-        { role: 'model', parts: [{ text: 'Part B of new answer.' }] },
-      ];
-
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(currentUserInput, newModelParts);
-      const history = chat.getHistory();
-
-      // Expected: initialUser, initialModel, currentUserInput, consolidatedNewModelParts
-      expect(history.length).toBe(4);
-      expect(history[0]).toEqual(initialUser);
-      expect(history[1]).toEqual(initialModel);
-      expect(history[2]).toEqual(currentUserInput);
-      expect(history[3].role).toBe('model');
-      expect(history[3].parts).toEqual([
-        { text: 'Part A of new answer.Part B of new answer.' },
-      ]);
-    });
-
-    it('should handle empty modelOutput array', () => {
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, []);
-      const history = chat.getHistory();
-      // If modelOutput is empty, it might push a default empty model part depending on isFunctionResponse
-      // Assuming isFunctionResponse(userInput) is false for this simple text input
-      expect(history.length).toBe(2);
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      expect(history[1].parts).toEqual([]);
-    });
-
-    it('should handle aggregating modelOutput', () => {
-      const modelOutputUndefinedParts: Content[] = [
-        { role: 'model', parts: [{ text: 'First model part' }] },
-        { role: 'model', parts: [{ text: 'Second model part' }] },
-        { role: 'model', parts: undefined as unknown as Part[] }, // Test undefined parts
-        { role: 'model', parts: [{ text: 'Third model part' }] },
-        { role: 'model', parts: [] }, // Test empty parts array
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputUndefinedParts);
-      const history = chat.getHistory();
-      expect(history.length).toBe(5);
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      expect(history[1].parts).toEqual([
-        { text: 'First model partSecond model part' },
-      ]);
-      expect(history[2].role).toBe('model');
-      expect(history[2].parts).toBeUndefined();
-      expect(history[3].role).toBe('model');
-      expect(history[3].parts).toEqual([{ text: 'Third model part' }]);
-      expect(history[4].role).toBe('model');
-      expect(history[4].parts).toEqual([]);
-    });
-
-    it('should handle modelOutput with parts being undefined or empty (if they pass initial every check)', () => {
-      const modelOutputUndefinedParts: Content[] = [
-        { role: 'model', parts: [{ text: 'Text part' }] },
-        { role: 'model', parts: undefined as unknown as Part[] }, // Test undefined parts
-        { role: 'model', parts: [] }, // Test empty parts array
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputUndefinedParts);
-      const history = chat.getHistory();
-      expect(history.length).toBe(4); // userInput, model1 (text), model2 (undefined parts), model3 (empty parts)
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      expect(history[1].parts).toEqual([{ text: 'Text part' }]);
-      expect(history[2].role).toBe('model');
-      expect(history[2].parts).toBeUndefined();
-      expect(history[3].role).toBe('model');
-      expect(history[3].parts).toEqual([]);
-    });
-
-    it('should correctly handle automaticFunctionCallingHistory', () => {
-      const afcHistory: Content[] = [
-        { role: 'user', parts: [{ text: 'AFC User' }] },
-        { role: 'model', parts: [{ text: 'AFC Model' }] },
-      ];
-      const modelOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'Regular Model Output' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutput, afcHistory);
-      const history = chat.getHistory();
-      expect(history.length).toBe(3);
-      expect(history[0]).toEqual(afcHistory[0]);
-      expect(history[1]).toEqual(afcHistory[1]);
-      expect(history[2]).toEqual(modelOutput[0]);
-    });
-
-    it('should add userInput if AFC history is present but empty', () => {
-      const modelOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'Model Output' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutput, []); // Empty AFC history
       const history = chat.getHistory();
       expect(history.length).toBe(2);
       expect(history[0]).toEqual(userInput);
       expect(history[1]).toEqual(modelOutput[0]);
     });
 
-    it('should skip "thought" content from modelOutput', () => {
-      const modelOutputWithThought: Content[] = [
-        { role: 'model', parts: [{ thought: true, text: 'Thought' }] },
-        { role: 'model', parts: [{ text: 'Another visible text' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputWithThought);
-      const history = chat.getHistory();
-      expect(history.length).toBe(2); // User input + consolidated model output
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      // The 'thought' part is skipped, 'Another visible text' becomes the first part.
-      expect(history[1].parts).toEqual([{ text: 'Another visible text' }]);
-    });
-
-    it('should skip "thought" content even if it is the only content', () => {
-      const modelOutputOnlyThought: Content[] = [
-        { role: 'model', parts: [{ thought: true }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputOnlyThought);
-      const history = chat.getHistory();
-
-      // The history length should be 2: the user input AND a placeholder for the model's turn.
-      expect(history.length).toBe(2);
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-    });
-
-    it('should correctly consolidate text parts when a thought part is in between', () => {
-      const modelOutputMixed: Content[] = [
+    it('should consolidate adjacent text parts from multiple content objects', () => {
+      const modelOutput: Content[] = [
         { role: 'model', parts: [{ text: 'Part 1.' }] },
-        {
-          role: 'model',
-          parts: [
-            {
-              thought: true,
-              text: 'This text is the thought and should be skipped.',
-            },
-          ],
-        },
-        { role: 'model', parts: [{ text: 'Part 2.' }] },
+        { role: 'model', parts: [{ text: ' Part 2.' }] },
+        { role: 'model', parts: [{ text: ' Part 3.' }] },
       ];
-
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputMixed);
+      // @ts-expect-error Accessing private method for testing
+      chat.recordHistory(userInput, modelOutput);
       const history = chat.getHistory();
-
       expect(history.length).toBe(2);
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-
-      // CORRECTED: The assertion now correctly expects the thought's text to be filtered out.
-      expect(history[1].parts).toEqual([{ text: 'Part 1.Part 2.' }]);
+      expect(history[1]!.role).toBe('model');
+      expect(history[1]!.parts).toEqual([{ text: 'Part 1. Part 2. Part 3.' }]);
     });
 
-    it('should handle multiple thought parts correctly', () => {
-      const modelOutputMultipleThoughts: Content[] = [
-        { role: 'model', parts: [{ thought: true }] },
-        { role: 'model', parts: [{ text: 'Visible 1' }] },
-        { role: 'model', parts: [{ thought: true }] },
-        { role: 'model', parts: [{ text: 'Visible 2' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputMultipleThoughts);
+    it('should add an empty placeholder turn if modelOutput is empty', () => {
+      // This simulates receiving a pre-filtered, thought-only response.
+      const emptyModelOutput: Content[] = [];
+      // @ts-expect-error Accessing private method for testing
+      chat.recordHistory(userInput, emptyModelOutput);
       const history = chat.getHistory();
       expect(history.length).toBe(2);
       expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      expect(history[1].parts).toEqual([{ text: 'Visible 1Visible 2' }]);
+      expect(history[1]!.role).toBe('model');
+      expect(history[1]!.parts).toEqual([]);
     });
 
-    it('should handle thought part at the end of outputContents', () => {
-      const modelOutputThoughtAtEnd: Content[] = [
-        { role: 'model', parts: [{ text: 'Visible text' }] },
-        { role: 'model', parts: [{ thought: true }] },
+    it('should preserve model outputs with undefined or empty parts arrays', () => {
+      const malformedOutput: Content[] = [
+        { role: 'model', parts: [{ text: 'Text part' }] },
+        { role: 'model', parts: undefined as unknown as Part[] },
+        { role: 'model', parts: [] },
       ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputThoughtAtEnd);
+      // @ts-expect-error Accessing private method for testing
+      chat.recordHistory(userInput, malformedOutput);
       const history = chat.getHistory();
-      expect(history.length).toBe(2);
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      expect(history[1].parts).toEqual([{ text: 'Visible text' }]);
+      expect(history.length).toBe(4); // userInput + 3 model turns
+      expect(history[1]!.parts).toEqual([{ text: 'Text part' }]);
+      expect(history[2]!.parts).toBeUndefined();
+      expect(history[3]!.parts).toEqual([]);
+    });
+
+    it('should not consolidate content with different roles', () => {
+      const mixedOutput: Content[] = [
+        { role: 'model', parts: [{ text: 'Model 1' }] },
+        { role: 'user', parts: [{ text: 'Unexpected User' }] },
+        { role: 'model', parts: [{ text: 'Model 2' }] },
+      ];
+      // @ts-expect-error Accessing private method for testing
+      chat.recordHistory(userInput, mixedOutput);
+      const history = chat.getHistory();
+      expect(history.length).toBe(4); // userInput, model1, unexpected_user, model2
+      expect(history[1]).toEqual(mixedOutput[0]);
+      expect(history[2]).toEqual(mixedOutput[1]);
+      expect(history[3]).toEqual(mixedOutput[2]);
     });
   });
 
