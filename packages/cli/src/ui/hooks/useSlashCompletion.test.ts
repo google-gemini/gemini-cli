@@ -9,9 +9,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useSlashCompletion } from './useSlashCompletion.js';
-import { CommandContext, SlashCommand } from '../commands/types.js';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { useState } from 'react';
-import { Suggestion } from '../components/SuggestionsDisplay.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
 
 // Test harness to capture the state from the hook's callbacks.
 function useTestHarnessForSlashCompletion(

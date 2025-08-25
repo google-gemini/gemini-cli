@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { terminalSetupCommand } from './terminalSetupCommand.js';
 import * as terminalSetupModule from '../utils/terminalSetup.js';
-import { CommandContext } from './types.js';
+import type { CommandContext } from './types.js';
 
 vi.mock('../utils/terminalSetup.js');
 

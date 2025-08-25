@@ -5,13 +5,15 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  modifyWithEditor,
+import type {
   ModifyContext,
   ModifiableDeclarativeTool,
+} from './modifiable-tool.js';
+import {
+  modifyWithEditor,
   isModifiableDeclarativeTool,
 } from './modifiable-tool.js';
-import { EditorType } from '../utils/editor.js';
+import type { EditorType } from '../utils/editor.js';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';

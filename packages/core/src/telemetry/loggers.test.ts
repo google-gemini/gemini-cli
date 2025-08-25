@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   AnyToolInvocation,
-  AuthType,
   CompletedToolCall,
   ContentGeneratorConfig,
-  EditTool,
   ErroredToolCall,
+} from '../index.js';
+import {
+  AuthType,
+  EditTool,
   GeminiClient,
   ToolConfirmationOutcome,
   ToolErrorType,
@@ -18,7 +20,7 @@ import {
 } from '../index.js';
 import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import {
   EVENT_API_REQUEST,
   EVENT_API_RESPONSE,
@@ -52,7 +54,7 @@ import {
 import * as metrics from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect } from 'vitest';
-import { GenerateContentResponseUsageMetadata } from '@google/genai';
+import type { GenerateContentResponseUsageMetadata } from '@google/genai';
 import * as uiTelemetry from './uiTelemetry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';

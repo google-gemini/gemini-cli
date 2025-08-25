@@ -4,21 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   HistoryItemWithoutId,
   IndividualToolCallDisplay,
-  ToolCallStatus,
 } from '../types.js';
+import { ToolCallStatus } from '../types.js';
 import { useCallback } from 'react';
-import {
+import type {
   Config,
   GeminiClient,
-  isBinary,
   ShellExecutionResult,
-  ShellExecutionService,
 } from '@google/gemini-cli-core';
+import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import crypto from 'node:crypto';

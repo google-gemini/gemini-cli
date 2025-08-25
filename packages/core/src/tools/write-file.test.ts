@@ -13,28 +13,23 @@ import {
   vi,
   type Mocked,
 } from 'vitest';
-import {
-  getCorrectedFileContent,
-  WriteFileTool,
-  WriteFileToolParams,
-} from './write-file.js';
+import type { WriteFileToolParams } from './write-file.js';
+import { getCorrectedFileContent, WriteFileTool } from './write-file.js';
 import { ToolErrorType } from './tool-error.js';
-import {
-  FileDiff,
-  ToolConfirmationOutcome,
-  ToolEditConfirmationDetails,
-} from './tools.js';
+import type { FileDiff, ToolEditConfirmationDetails } from './tools.js';
+import { ToolConfirmationOutcome } from './tools.js';
 import { type EditToolParams } from './edit.js';
-import { ApprovalMode, Config } from '../config/config.js';
-import { ToolRegistry } from './tool-registry.js';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
+import type { ToolRegistry } from './tool-registry.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import { GeminiClient } from '../core/client.js';
+import type { CorrectedEditResult } from '../utils/editCorrector.js';
 import {
   ensureCorrectEdit,
   ensureCorrectFileContent,
-  CorrectedEditResult,
 } from '../utils/editCorrector.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';

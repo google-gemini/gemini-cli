@@ -4,19 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  Config,
-  getErrorMessage,
-  getMCPServerPrompts,
-} from '@google/gemini-cli-core';
-import {
+import type { Config } from '@google/gemini-cli-core';
+import { getErrorMessage, getMCPServerPrompts } from '@google/gemini-cli-core';
+import type {
   CommandContext,
-  CommandKind,
   SlashCommand,
   SlashCommandActionReturn,
 } from '../ui/commands/types.js';
-import { ICommandLoader } from './types.js';
-import { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
+import { CommandKind } from '../ui/commands/types.js';
+import type { ICommandLoader } from './types.js';
+import type { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
 
 /**
  * Discovers and loads executable slash commands from prompts exposed by

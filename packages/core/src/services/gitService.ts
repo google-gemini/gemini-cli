@@ -8,8 +8,9 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
 import { exec } from 'node:child_process';
-import { simpleGit, SimpleGit, CheckRepoActions } from 'simple-git';
-import { Storage } from '../config/storage.js';
+import type { SimpleGit } from 'simple-git';
+import { simpleGit, CheckRepoActions } from 'simple-git';
+import type { Storage } from '../config/storage.js';
 
 export class GitService {
   private projectRoot: string;

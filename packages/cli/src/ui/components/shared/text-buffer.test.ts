@@ -7,15 +7,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import { renderHook, act } from '@testing-library/react';
-import {
-  useTextBuffer,
+import type {
   Viewport,
   TextBuffer,
+  TextBufferState,
+  TextBufferAction,
+} from './text-buffer.js';
+import {
+  useTextBuffer,
   offsetToLogicalPos,
   logicalPosToOffset,
   textBufferReducer,
-  TextBufferState,
-  TextBufferAction,
   findWordEndInLine,
   findNextWordStartInLine,
   isWordCharStrict,

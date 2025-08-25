@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandModule } from 'yargs';
+import type { CommandModule } from 'yargs';
 import { uninstallExtension } from '../../config/extension.js';
 
 interface UninstallArgs {

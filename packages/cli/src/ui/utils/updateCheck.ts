@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import updateNotifier, { UpdateInfo } from 'update-notifier';
+import type { UpdateInfo } from 'update-notifier';
+import updateNotifier from 'update-notifier';
 import semver from 'semver';
 import { getPackageJson } from '../../utils/package.js';
 

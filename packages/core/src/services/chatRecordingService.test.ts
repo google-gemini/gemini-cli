@@ -4,24 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  expect,
-  it,
-  describe,
-  vi,
-  beforeEach,
-  afterEach,
-  MockInstance,
-} from 'vitest';
+import type { MockInstance } from 'vitest';
+import { expect, it, describe, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import {
-  ChatRecordingService,
+import type {
   ConversationRecord,
   ToolCallRecord,
 } from './chatRecordingService.js';
-import { Config } from '../config/config.js';
+import { ChatRecordingService } from './chatRecordingService.js';
+import type { Config } from '../config/config.js';
 import { getProjectHash } from '../utils/paths.js';
 
 vi.mock('node:fs');

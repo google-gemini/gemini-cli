@@ -5,17 +5,18 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Mock } from 'vitest';
-import { Config, ConfigParameters, SandboxConfig } from './config.js';
+import type { Mock } from 'vitest';
+import type { ConfigParameters, SandboxConfig } from './config.js';
+import { Config } from './config.js';
 import * as path from 'node:path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
 import {
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
 } from '../telemetry/index.js';
+import type { ContentGeneratorConfig } from '../core/contentGenerator.js';
 import {
   AuthType,
-  ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';

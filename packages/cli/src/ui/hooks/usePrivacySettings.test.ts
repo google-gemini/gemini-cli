@@ -6,15 +6,17 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import {
+import type {
   Config,
-  CodeAssistServer,
-  LoggingContentGenerator,
-  UserTierId,
   GeminiClient,
   ContentGenerator,
 } from '@google/gemini-cli-core';
-import { OAuth2Client } from 'google-auth-library';
+import {
+  CodeAssistServer,
+  LoggingContentGenerator,
+  UserTierId,
+} from '@google/gemini-cli-core';
+import type { OAuth2Client } from 'google-auth-library';
 import { usePrivacySettings } from './usePrivacySettings.js';
 
 // Mock the dependencies

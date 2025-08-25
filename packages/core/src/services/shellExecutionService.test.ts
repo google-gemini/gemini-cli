@@ -6,12 +6,10 @@
 
 import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import EventEmitter from 'node:events';
-import { Readable } from 'node:stream';
+import type { Readable } from 'node:stream';
 import { type ChildProcess } from 'node:child_process';
-import {
-  ShellExecutionService,
-  ShellOutputEvent,
-} from './shellExecutionService.js';
+import type { ShellOutputEvent } from './shellExecutionService.js';
+import { ShellExecutionService } from './shellExecutionService.js';
 
 // Hoisted Mocks
 const mockPtySpawn = vi.hoisted(() => vi.fn());

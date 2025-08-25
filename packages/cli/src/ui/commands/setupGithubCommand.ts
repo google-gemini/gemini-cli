@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import { Writable } from 'node:stream';
 import { ProxyAgent } from 'undici';
 
-import { CommandContext } from '../../ui/commands/types.js';
+import type { CommandContext } from '../../ui/commands/types.js';
 import {
   getGitRepoRoot,
   getLatestGitHubRelease,
@@ -17,11 +17,8 @@ import {
   getGitHubRepoInfo,
 } from '../../utils/gitUtils.js';
 
-import {
-  CommandKind,
-  SlashCommand,
-  SlashCommandActionReturn,
-} from './types.js';
+import type { SlashCommand, SlashCommandActionReturn } from './types.js';
+import { CommandKind } from './types.js';
 import { getUrlOpenCommand } from '../../ui/utils/commandUtils.js';
 
 export const GITHUB_WORKFLOW_PATHS = [

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
+import type {
   Content,
   Models,
   GenerateContentConfig,
@@ -13,7 +13,7 @@ import {
   GenerateContentResponse,
 } from '@google/genai';
 import { GeminiChat, EmptyStreamError } from './geminiChat.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 
 // Mocks

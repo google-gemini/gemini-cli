@@ -12,7 +12,7 @@ import type {
   Context,
   Histogram,
 } from '@opentelemetry/api';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { FileOperation } from './metrics.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 

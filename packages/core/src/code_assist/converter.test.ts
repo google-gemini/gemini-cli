@@ -5,19 +5,21 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import type { CaGenerateContentResponse } from './converter.js';
 import {
   toGenerateContentRequest,
   fromGenerateContentResponse,
-  CaGenerateContentResponse,
   toContents,
 } from './converter.js';
-import {
+import type {
   ContentListUnion,
   GenerateContentParameters,
+} from '@google/genai';
+import {
   GenerateContentResponse,
   FinishReason,
   BlockedReason,
-  Part,
+  type Part,
 } from '@google/genai';
 
 describe('converter', () => {

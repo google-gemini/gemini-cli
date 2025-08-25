@@ -13,7 +13,7 @@ import {
   isCommandAllowed,
   stripShellWrapper,
 } from './shell-utils.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 vi.mock('os', () => ({

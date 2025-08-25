@@ -6,8 +6,8 @@
 
 import { useEffect, useCallback } from 'react';
 import { useCompletion } from './useCompletion.js';
-import { TextBuffer } from '../components/shared/text-buffer.js';
-import { Suggestion } from '../components/SuggestionsDisplay.js';
+import type { TextBuffer } from '../components/shared/text-buffer.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
 
 export interface UseReverseSearchCompletionReturn {
   suggestions: Suggestion[];

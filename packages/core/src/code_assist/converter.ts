@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   Content,
   ContentListUnion,
   ContentUnion,
@@ -12,7 +12,6 @@ import {
   GenerateContentParameters,
   CountTokensParameters,
   CountTokensResponse,
-  GenerateContentResponse,
   GenerationConfigRoutingConfig,
   MediaResolution,
   Candidate,
@@ -27,6 +26,7 @@ import {
   ToolListUnion,
   ToolConfig,
 } from '@google/genai';
+import { GenerateContentResponse } from '@google/genai';
 
 export interface CAGenerateContentRequest {
   model: string;

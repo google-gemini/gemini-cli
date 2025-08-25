@@ -10,7 +10,7 @@ import { isProQuotaExceededError } from './quotaErrorDetection.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
-import { StructuredError } from '../core/turn.js';
+import type { StructuredError } from '../core/turn.js';
 
 describe('parseAndFormatApiError', () => {
   const vertexMessage = 'request a quota increase through Vertex';

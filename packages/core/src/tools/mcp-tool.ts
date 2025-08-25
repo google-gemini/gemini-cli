@@ -5,17 +5,19 @@
  */
 
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
+import type {
   ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
   ToolInvocation,
   ToolMcpConfirmationDetails,
   ToolResult,
 } from './tools.js';
-import { CallableTool, FunctionCall, Part } from '@google/genai';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  ToolConfirmationOutcome,
+} from './tools.js';
+import type { CallableTool, FunctionCall, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
 
 type ToolParams = Record<string, unknown>;

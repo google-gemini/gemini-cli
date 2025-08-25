@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import os from 'node:os';
 import { quote } from 'shell-quote';
 

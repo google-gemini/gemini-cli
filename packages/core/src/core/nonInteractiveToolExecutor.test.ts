@@ -6,15 +6,14 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
-import {
+import type {
   ToolRegistry,
   ToolCallRequestInfo,
   ToolResult,
   Config,
-  ToolErrorType,
-  ApprovalMode,
 } from '../index.js';
-import { Part } from '@google/genai';
+import { ToolErrorType, ApprovalMode } from '../index.js';
+import type { Part } from '@google/genai';
 import { MockTool } from '../test-utils/tools.js';
 
 describe('executeToolCall', () => {
