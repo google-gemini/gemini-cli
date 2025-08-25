@@ -338,3 +338,19 @@ export async function installExtension(
 
   return newExtensionName;
 }
+
+export async function uninstallExtension(extensionName: string): Promise<void> {
+  const installedExtensions = loadUserExtensions();
+  if (
+    !installedExtensions.some(
+      (installed) => installed.config.name === extensionName,
+    )
+  ) {
+    throw new Error(`Error: Extension "${extensionName}" not found.`);
+  }
+  const storage = new ExtensionStorage(extensionName);
+  return await fs.promises.rm(storage.getExtensionDir(), {
+    recursive: true,
+    force: true,
+  });
+}

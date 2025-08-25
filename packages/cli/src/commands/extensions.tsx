@@ -6,6 +6,7 @@
 
 import { CommandModule } from 'yargs';
 import { installCommand } from './extensions/install.js';
+import { uninstallCommand } from './extensions/uninstall.js';
 
 export const extensionsCommand: CommandModule = {
   command: 'extensions <command>',
@@ -13,6 +14,7 @@ export const extensionsCommand: CommandModule = {
   builder: (yargs) =>
     yargs
       .command(installCommand)
+      .command(uninstallCommand)
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {
