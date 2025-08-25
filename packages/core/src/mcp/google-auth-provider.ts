@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-import {
+import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+import type {
   OAuthClientInformation,
   OAuthClientInformationFull,
   OAuthClientMetadata,
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { GoogleAuth } from 'google-auth-library';
-import { MCPServerConfig } from '../config/config.js';
+import type { MCPServerConfig } from '../config/config.js';
 
 const ALLOWED_HOSTS = [/^.+\.googleapis\.com$/, /^(.*\.)?luci\.app$/];
 
