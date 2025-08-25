@@ -682,11 +682,6 @@ export class GeminiChat {
     const lastPart = content.parts[content.parts.length - 1];
     return typeof lastPart.text === 'string' && lastPart.text !== '';
   }
-
-  private isThoughtContent(content: Content): boolean {
-    // A content object is considered a "thought" if it contains any part that is a thought.
-    return !!(content.parts && content.parts.some((part) => 'thought' in part));
-  }
 }
 
 /** Visible for Testing */
