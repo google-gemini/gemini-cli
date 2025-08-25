@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Checks if the system clipboard contains an image (macOS only for now)
@@ -111,6 +112,79 @@ export async function saveClipboardImage(
   } catch (error) {
     console.error('Error saving clipboard image:', error);
     return null;
+  }
+}
+
+/**
+ * Captures a screenshot and saves it to a temporary file (macOS only for now)
+ * @param targetDir The target directory to create temp files within
+ * @param mode The capture mode: 'interactive' (default), 'fullscreen', 'window'
+ * @returns The path to the saved screenshot file, or null if cancelled or error
+ */
+export async function captureScreenshot(
+  mode: 'interactive' | 'fullscreen' | 'window' = 'interactive',
+  targetDir?: string
+): Promise<string | null> {
+  if (process.platform !== 'darwin') {
+    return null;
+  }
+
+  try {
+    // Create a temporary directory for screenshots within the target directory
+    // This avoids security restrictions on paths outside the target directory
+    const baseDir = targetDir || process.cwd();
+    const tempDir = path.join(baseDir, '.gemini-clipboard');
+    await fs.mkdir(tempDir, { recursive: true });
+
+    // Generate a unique filename with timestamp
+    const timestamp = new Date().getTime();
+    const screenshotPath = path.join(tempDir, `screenshot-${timestamp}.png`);
+
+    // Build screencapture arguments based on mode
+    const args: string[] = [];
+    switch (mode) {
+      case 'fullscreen':
+        // Capture entire screen without user interaction
+        break;
+      case 'window':
+        // Let user select a window to capture
+        args.push('-w');
+        break;
+      case 'interactive':
+      default:
+        // Interactive mode for user selection (default)
+        args.push('-i');
+        break;
+    }
+    args.push(screenshotPath);
+
+    try {
+      await execFileAsync('screencapture', args);
+    } catch {
+      return null;
+    }
+    
+    // Verify the file was created and has content
+    try {
+      const stats = await fs.stat(screenshotPath);
+      if (stats.size > 0) {
+        return screenshotPath;
+      }
+    } catch {
+      // File doesn't exist, user likely cancelled
+    }
+
+    // Clean up empty file if it exists
+    try {
+      await fs.unlink(screenshotPath);
+    } catch {
+      // Ignore cleanup errors
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error capturing screenshot:', error);  
+    throw error;
   }
 }
 
