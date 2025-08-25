@@ -1,0 +1,105 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<ToolGroupMessage /> > Border Color Logic > uses gray border when all tools are successful and no shell commands 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │MockTool[tool-123]: ✓ test-tool - A tool for testing (medium)                                     │
+ │                                                                                                  │
+ │MockTool[tool-2]: ✓ another-tool - A tool for testing (medium)                                    │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border for shell commands even when successful 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │MockTool[tool-123]: ✓ run_shell_command - A tool for testing (medium)                             │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border when tools are pending 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │MockTool[tool-123]: o test-tool - A tool for testing (medium)                                     │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialog for first confirming tool only 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │MockTool[tool-1]: ? first-confirm - A tool for testing (high)                                     │
+ │MockConfirmation: Confirm first tool                                                              │
+ │                                                                                                  │
+ │MockTool[tool-2]: ? second-confirm - A tool for testing (low)                                     │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls array 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including shell command 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │MockTool[tool-1]: ✓ read_file - Read a file (medium)                                              │
+ │                                                                                                  │
+ │MockTool[tool-2]: ⊷ run_shell_command - Run command (medium)                                      │
+ │                                                                                                  │
+ │MockTool[tool-3]: o write_file - Write to file (medium)                                           │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders multiple tool calls with different statuses 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │MockTool[tool-1]: ✓ successful-tool - This tool succeeded (medium)                                │
+ │                                                                                                  │
+ │MockTool[tool-2]: o pending-tool - This tool is pending (medium)                                  │
+ │                                                                                                  │
+ │MockTool[tool-3]: x error-tool - This tool failed (medium)                                        │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders shell command with yellow border 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │MockTool[shell-1]: ✓ run_shell_command - Execute shell command (medium)                           │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders single successful tool call 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │MockTool[tool-123]: ✓ test-tool - A tool for testing (medium)                                     │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call awaiting confirmation 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │MockTool[tool-confirm]: ? confirmation-tool - This tool needs confirmation (high)                 │
+ │MockConfirmation: Are you sure you want to proceed?                                               │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders when not focused 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │MockTool[tool-123]: ✓ test-tool - A tool for testing (medium)                                     │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal height 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │MockTool[tool-1]: ✓ tool-with-result - Tool with output (medium)                                  │
+ │                                                                                                  │
+ │MockTool[tool-2]: ✓ another-tool - Another tool (medium)                                          │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders with narrow terminal width 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │MockTool[tool-123]: ✓ very-long-tool-name-that-might-wrap - This is a very long description that  │
+ │might cause wrapping issues (medium)                                                              │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Height Calculation > calculates available height correctly with multiple tools with results 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │MockTool[tool-1]: ✓ test-tool - A tool for testing (medium)                                       │
+ │                                                                                                  │
+ │MockTool[tool-2]: ✓ test-tool - A tool for testing (medium)                                       │
+ │                                                                                                  │
+ │MockTool[tool-3]: ✓ test-tool - A tool for testing (medium)                                       │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
