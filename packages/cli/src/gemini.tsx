@@ -369,6 +369,10 @@ export async function main() {
     config,
   );
 
+  if (config.getDebugMode()) {
+    console.log('Session ID: %s', sessionId);
+  }
+
   await runNonInteractive(nonInteractiveConfig, input, prompt_id);
   process.exit(0);
 }
