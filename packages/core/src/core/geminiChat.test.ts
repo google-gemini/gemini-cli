@@ -160,6 +160,54 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessageStream', () => {
+    it('should preserve text parts that stream in the same chunk as a thought', async () => {
+      // 1. Mock the API to return a single chunk containing both a thought and visible text.
+      const mixedContentStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  { thought: 'This is a thought.' },
+                  { text: 'This is the visible text that should not be lost.' },
+                ],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        mixedContentStream,
+      );
+
+      // 2. Action: Send a message and fully consume the stream to trigger history recording.
+      const stream = await chat.sendMessageStream(
+        { message: 'test message' },
+        'prompt-id-mixed-chunk',
+      );
+      for await (const _ of stream) {
+        // This loop consumes the stream.
+      }
+
+      // 3. Assert: Check the final state of the history.
+      const history = chat.getHistory();
+
+      // The history should contain two turns: the user's message and the model's response.
+      expect(history.length).toBe(2);
+
+      const modelTurn = history[1]!;
+      expect(modelTurn.role).toBe('model');
+
+      // CRUCIAL ASSERTION:
+      // The buggy code would fail here, resulting in parts.length being 0.
+      // The corrected code will pass, preserving the single visible text part.
+      expect(modelTurn?.parts?.length).toBe(1);
+      expect(modelTurn?.parts![0]!.text).toBe(
+        'This is the visible text that should not be lost.',
+      );
+    });
     it('should maintain alternating history when a tool-use turn is followed by an empty model response', async () => {
       // 1. Setup: Create a history ending with a user's tool response.
       const functionCallTurn: Content = {
