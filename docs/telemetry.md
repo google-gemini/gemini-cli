@@ -220,6 +220,10 @@ Logs are timestamped records of specific events. The following events are logged
     - `response_text` (if applicable)
     - `auth_type`
 
+- `gemini_cli.malformed_json_response`: This event occurs when a `generateJson` response from Gemini API cannot be parsed as a json.
+  - **Attributes**:
+    - `model`
+
 - `gemini_cli.flash_fallback`: This event occurs when Gemini CLI switches to flash as fallback.
   - **Attributes**:
     - `auth_type`
