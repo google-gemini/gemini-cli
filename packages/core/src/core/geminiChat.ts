@@ -608,13 +608,10 @@ export class GeminiChat {
       // B. Filter out 'thought' parts.
       const visibleParts = content.parts.filter((part) => !part.thought);
 
-      // C. THE FIX: We no longer skip thought-only content here.
-      // Instead, we let it continue as a turn with an empty `parts` array.
-
       const newTurn = { ...content, parts: visibleParts };
       const lastTurnInFinal = finalModelTurns[finalModelTurns.length - 1];
 
-      // D. Consolidate this new turn with the PREVIOUS turn if they are adjacent text.
+      // C. Consolidate this new turn with the PREVIOUS turn if they are adjacent text.
       if (
         lastTurnInFinal &&
         this.isLastPartText(lastTurnInFinal) &&
@@ -626,7 +623,7 @@ export class GeminiChat {
       }
     }
 
-    // Part 3: Add the processed model turns to the history.
+    // Part 3: Add the processed model turns to the history, with one final consolidation pass.
     if (finalModelTurns.length > 0) {
       // Re-consolidate parts within any turns that were merged in the previous step.
       for (const turn of finalModelTurns) {

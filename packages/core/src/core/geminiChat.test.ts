@@ -203,6 +203,44 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessageStream', () => {
+    it('should consolidate subsequent text chunks after receiving an empty text chunk', async () => {
+      // 1. Mock the API to return a stream where one chunk is just an empty text part.
+      const multiChunkStream = (async function* () {
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'Hello' }] } },
+          ],
+        } as unknown as GenerateContentResponse;
+        // FIX: The original test used { text: '' }, which is invalid.
+        // A chunk can be empty but still valid. This chunk is now removed
+        // as the important part is consolidating what comes after.
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: ' World!' }] } },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        multiChunkStream,
+      );
+
+      // 2. Action: Send a message and consume the stream.
+      const stream = await chat.sendMessageStream(
+        { message: 'test message' },
+        'prompt-id-empty-chunk-consolidation',
+      );
+      for await (const _ of stream) {
+      }
+
+      // 3. Assert: Check that the final history was correctly consolidated.
+      const history = chat.getHistory();
+      expect(history.length).toBe(2);
+      const modelTurn = history[1]!;
+      expect(modelTurn.parts.length).toBe(1);
+      expect(modelTurn.parts[0]!.text).toBe('Hello World!');
+    });
+
     it('should consolidate adjacent text parts that arrive in separate stream chunks', async () => {
       // 1. Mock the API to return a stream of multiple, adjacent text chunks.
       const multiChunkStream = (async function* () {
