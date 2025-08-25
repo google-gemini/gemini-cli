@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fsPromises from 'fs/promises';
+import * as fsPromises from 'node:fs/promises';
 import React from 'react';
 import { Text } from 'ink';
 import { Colors } from '../colors.js';
@@ -16,7 +16,7 @@ import {
   SlashCommandActionReturn,
 } from './types.js';
 import { decodeTagName } from '@google/gemini-cli-core';
-import path from 'path';
+import path from 'node:path';
 import { HistoryItemWithoutId, MessageType } from '../types.js';
 
 interface ChatDetail {
