@@ -91,6 +91,11 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
   - **Default:** All tools available for use by the Gemini model.
   - **Example:** `"coreTools": ["ReadFileTool", "GlobTool", "ShellTool(ls)"]`.
 
+- **`autoApprovedTools`** (array of strings):
+  - **Default:** `undefined`
+  - **Description:** A list of tool names that will bypass the confirmation dialog. This is useful for tools that you trust and use frequently. The match semantics are the same as `coreTools`.
+  - **Example:** `"autoApprovedTools": ["ShellTool(git status)"]`.
+
 - **`excludeTools`** (array of strings):
   - **Description:** Allows you to specify a list of core tool names that should be excluded from the model. A tool listed in both `excludeTools` and `coreTools` is excluded. You can also specify command-specific restrictions for tools that support it, like the `ShellTool`. For example, `"excludeTools": ["ShellTool(rm -rf)"]` will block the `rm -rf` command.
   - **Default**: No tools excluded.
@@ -479,6 +484,9 @@ Arguments passed directly when running the CLI can override other configurations
     - `yolo`: Automatically approve all tool calls (equivalent to `--yolo`)
   - Cannot be used together with `--yolo`. Use `--approval-mode=yolo` instead of `--yolo` for the new unified approach.
   - Example: `gemini --approval-mode auto_edit`
+- **`--auto-approved-tools <tool1,tool2,...>`**:
+  - A comma-separated list of tool names that will bypass the confirmation dialog.
+  - Example: `gemini --auto-approved-tools "ShellTool(git status)"`
 - **`--telemetry`**:
   - Enables [telemetry](../telemetry.md).
 - **`--telemetry-target`**:

@@ -51,7 +51,8 @@ import { logCliConfiguration, logIdeConnection } from '../telemetry/loggers.js';
 import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 
 // Re-export OAuth config type
-export type { MCPOAuthConfig };
+export type { MCPOAuthConfig, AnyToolInvocation };
+import { AnyToolInvocation } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
@@ -161,6 +162,7 @@ export interface ConfigParameters {
   question?: string;
   fullContext?: boolean;
   coreTools?: string[];
+  autoApprovedTools?: string[];
   excludeTools?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
@@ -223,6 +225,7 @@ export class Config {
   private readonly question: string | undefined;
   private readonly fullContext: boolean;
   private readonly coreTools: string[] | undefined;
+  private readonly autoApprovedTools: string[] | undefined;
   private readonly excludeTools: string[] | undefined;
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
@@ -297,6 +300,7 @@ export class Config {
     this.question = params.question;
     this.fullContext = params.fullContext ?? false;
     this.coreTools = params.coreTools;
+    this.autoApprovedTools = params.autoApprovedTools;
     this.excludeTools = params.excludeTools;
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
     this.toolCallCommand = params.toolCallCommand;
@@ -523,6 +527,10 @@ export class Config {
 
   getCoreTools(): string[] | undefined {
     return this.coreTools;
+  }
+
+  getAutoApprovedTools(): string[] | undefined {
+    return this.autoApprovedTools;
   }
 
   getExcludeTools(): string[] | undefined {
@@ -804,12 +812,10 @@ export class Config {
       const className = ToolClass.name;
       const toolName = ToolClass.Name || className;
       const coreTools = this.getCoreTools();
-      const excludeTools = this.getExcludeTools();
+      const excludeTools = this.getExcludeTools() || [];
 
-      let isEnabled = false;
-      if (coreTools === undefined) {
-        isEnabled = true;
-      } else {
+      let isEnabled = true; // Enabled by default if coreTools is not set.
+      if (coreTools) {
         isEnabled = coreTools.some(
           (tool) =>
             tool === className ||
@@ -819,10 +825,11 @@ export class Config {
         );
       }
 
-      if (
-        excludeTools?.includes(className) ||
-        excludeTools?.includes(toolName)
-      ) {
+      const isExcluded = excludeTools.some(
+        (tool) => tool === className || tool === toolName,
+      );
+
+      if (isExcluded) {
         isEnabled = false;
       }
 

@@ -13,14 +13,17 @@ import {
   isCommandAllowed,
   stripShellWrapper,
 } from './shell-utils.js';
-import { Config } from '../config/config.js';
+import { Config } from '../index.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
+const mockHomedir = vi.hoisted(() => vi.fn());
 vi.mock('os', () => ({
   default: {
     platform: mockPlatform,
+    homedir: mockHomedir,
   },
   platform: mockPlatform,
+  homedir: mockHomedir,
 }));
 
 const mockQuote = vi.hoisted(() => vi.fn());
@@ -38,6 +41,7 @@ beforeEach(() => {
   config = {
     getCoreTools: () => [],
     getExcludeTools: () => [],
+    getAutoApprovedTools: () => [],
   } as unknown as Config;
 });
 

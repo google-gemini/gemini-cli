@@ -33,6 +33,7 @@ describe('executeToolCall', () => {
     mockConfig = {
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getAutoApprovedTools: () => [],
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, Mock } from 'vitest';
 import {
   CoreToolScheduler,
   ToolCall,
@@ -98,6 +98,41 @@ class TestApprovalInvocation extends BaseToolInvocation<
   }
 }
 
+async function waitForStatus(
+  onToolCallsUpdate: Mock,
+  status: 'awaiting_approval' | 'executing' | 'success' | 'error' | 'cancelled',
+  timeout = 5000,
+): Promise<ToolCall> {
+  return new Promise((resolve, reject) => {
+    const startTime = Date.now();
+    const check = () => {
+      if (Date.now() - startTime > timeout) {
+        const seenStatuses = onToolCallsUpdate.mock.calls
+          .flatMap((call) => call[0])
+          .map((toolCall: ToolCall) => toolCall.status);
+        reject(
+          new Error(
+            `Timed out waiting for status "${status}". Seen statuses: ${seenStatuses.join(
+              ', ',
+            )}`,
+          ),
+        );
+        return;
+      }
+
+      const foundCall = onToolCallsUpdate.mock.calls
+        .flatMap((call) => call[0])
+        .find((toolCall: ToolCall) => toolCall.status === status);
+      if (foundCall) {
+        resolve(foundCall);
+      } else {
+        setTimeout(check, 10); // Check again in 10ms
+      }
+    };
+    check();
+  });
+}
+
 describe('CoreToolScheduler', () => {
   it('should cancel a tool call if the signal is aborted before confirmation', async () => {
     const mockTool = new MockTool();
@@ -125,6 +160,7 @@ describe('CoreToolScheduler', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getAutoApprovedTools: () => [],
       getContentGeneratorConfig: () => ({
         model: 'test-model',
         authType: 'oauth-personal',
@@ -185,6 +221,7 @@ describe('CoreToolScheduler with payload', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getAutoApprovedTools: () => [],
       getContentGeneratorConfig: () => ({
         model: 'test-model',
         authType: 'oauth-personal',
@@ -211,16 +248,10 @@ describe('CoreToolScheduler with payload', () => {
 
     await scheduler.schedule([request], abortController.signal);
 
-    await vi.waitFor(() => {
-      const awaitingCall = onToolCallsUpdate.mock.calls.find(
-        (call) => call[0][0].status === 'awaiting_approval',
-      )?.[0][0];
-      expect(awaitingCall).toBeDefined();
-    });
-
-    const awaitingCall = onToolCallsUpdate.mock.calls.find(
-      (call) => call[0][0].status === 'awaiting_approval',
-    )?.[0][0];
+    const awaitingCall = (await waitForStatus(
+      onToolCallsUpdate,
+      'awaiting_approval',
+    )) as WaitingToolCall;
     const confirmationDetails = awaitingCall.confirmationDetails;
 
     if (confirmationDetails) {
@@ -496,6 +527,7 @@ describe('CoreToolScheduler edit cancellation', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getAutoApprovedTools: () => [],
       getContentGeneratorConfig: () => ({
         model: 'test-model',
         authType: 'oauth-personal',
@@ -522,12 +554,10 @@ describe('CoreToolScheduler edit cancellation', () => {
 
     await scheduler.schedule([request], abortController.signal);
 
-    // Wait for the tool to reach awaiting_approval state
-    const awaitingCall = onToolCallsUpdate.mock.calls.find(
-      (call) => call[0][0].status === 'awaiting_approval',
-    )?.[0][0];
-
-    expect(awaitingCall).toBeDefined();
+    const awaitingCall = (await waitForStatus(
+      onToolCallsUpdate,
+      'awaiting_approval',
+    )) as WaitingToolCall;
 
     // Cancel the edit
     const confirmationDetails = awaitingCall.confirmationDetails;
@@ -588,6 +618,7 @@ describe('CoreToolScheduler YOLO mode', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.YOLO,
+      getAutoApprovedTools: () => [],
       getContentGeneratorConfig: () => ({
         model: 'test-model',
         authType: 'oauth-personal',
@@ -677,6 +708,7 @@ describe('CoreToolScheduler request queueing', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
+      getAutoApprovedTools: () => [],
       getContentGeneratorConfig: () => ({
         model: 'test-model',
         authType: 'oauth-personal',
@@ -712,10 +744,7 @@ describe('CoreToolScheduler request queueing', () => {
     scheduler.schedule([request1], abortController.signal);
 
     // Wait for the first call to be in the 'executing' state.
-    await vi.waitFor(() => {
-      const calls = onToolCallsUpdate.mock.calls.at(-1)?.[0] as ToolCall[];
-      expect(calls?.[0]?.status).toBe('executing');
-    });
+    await waitForStatus(onToolCallsUpdate, 'executing');
 
     // Schedule the second call while the first is "running".
     const schedulePromise2 = scheduler.schedule(
@@ -736,16 +765,6 @@ describe('CoreToolScheduler request queueing', () => {
     // Wait for the second schedule promise to resolve.
     await schedulePromise2;
 
-    // Wait for the second call to be in the 'executing' state.
-    await vi.waitFor(() => {
-      const calls = onToolCallsUpdate.mock.calls.at(-1)?.[0] as ToolCall[];
-      expect(calls?.[0]?.status).toBe('executing');
-    });
-
-    // Now the second tool call should have been executed.
-    expect(mockTool.executeFn).toHaveBeenCalledTimes(2);
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ b: 2 });
-
     // Let the second call finish.
     const secondCallResult = {
       llmContent: 'Second call complete',
@@ -755,6 +774,12 @@ describe('CoreToolScheduler request queueing', () => {
     // In a real scenario, a new promise would be created for the second call.
     resolveFirstCall!(secondCallResult);
 
+    await vi.waitFor(() => {
+      // Now the second tool call should have been executed.
+      expect(mockTool.executeFn).toHaveBeenCalledTimes(2);
+    });
+    expect(mockTool.executeFn).toHaveBeenCalledWith({ b: 2 });
+
     // Wait for the second completion.
     await vi.waitFor(() => {
       expect(onAllToolCallsComplete).toHaveBeenCalledTimes(2);
@@ -763,6 +788,96 @@ describe('CoreToolScheduler request queueing', () => {
     // Verify the completion callbacks were called correctly.
     expect(onAllToolCallsComplete.mock.calls[0][0][0].status).toBe('success');
     expect(onAllToolCallsComplete.mock.calls[1][0][0].status).toBe('success');
+  });
+
+  it('should auto-approve a tool call if it is on the autoApprovedTools list', async () => {
+    // Arrange
+    const mockTool = new MockTool('mockTool');
+    mockTool.executeFn.mockReturnValue({
+      llmContent: 'Tool executed',
+      returnDisplay: 'Tool executed',
+    });
+    // This tool would normally require confirmation.
+    mockTool.shouldConfirm = true;
+    const declarativeTool = mockTool;
+
+    const toolRegistry = {
+      getTool: () => declarativeTool,
+      getToolByName: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    };
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    // Configure the scheduler to auto-approve the specific tool call.
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.DEFAULT, // Not YOLO mode
+      getAutoApprovedTools: () => ['mockTool'], // Auto-approve this tool
+      getToolRegistry: () => toolRegistry,
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const abortController = new AbortController();
+    const request = {
+      callId: '1',
+      name: 'mockTool',
+      args: { param: 'value' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-auto-approved',
+    };
+
+    // Act
+    await scheduler.schedule([request], abortController.signal);
+
+    // Assert
+    // 1. The tool's execute method was called directly.
+    expect(mockTool.executeFn).toHaveBeenCalledWith({ param: 'value' });
+
+    // 2. The tool call status never entered 'awaiting_approval'.
+    const statusUpdates = onToolCallsUpdate.mock.calls
+      .map((call) => (call[0][0] as ToolCall)?.status)
+      .filter(Boolean);
+    expect(statusUpdates).not.toContain('awaiting_approval');
+    expect(statusUpdates).toEqual([
+      'validating',
+      'scheduled',
+      'executing',
+      'success',
+    ]);
+
+    // 3. The final callback indicates the tool call was successful.
+    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls).toHaveLength(1);
+    const completedCall = completedCalls[0];
+    expect(completedCall.status).toBe('success');
+    if (completedCall.status === 'success') {
+      expect(completedCall.response.resultDisplay).toBe('Tool executed');
+    }
   });
 
   it('should handle two synchronous calls to schedule', async () => {
@@ -781,7 +896,6 @@ describe('CoreToolScheduler request queueing', () => {
       getAllTools: () => [],
       getToolsByServer: () => [],
     } as unknown as ToolRegistry;
-
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
 
@@ -790,6 +904,7 @@ describe('CoreToolScheduler request queueing', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => ApprovalMode.YOLO,
+      getAutoApprovedTools: () => [],
       getContentGeneratorConfig: () => ({
         model: 'test-model',
         authType: 'oauth-personal',
@@ -850,6 +965,7 @@ describe('CoreToolScheduler request queueing', () => {
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
       getApprovalMode: () => approvalMode,
+      getAutoApprovedTools: () => [],
       setApprovalMode: (mode: ApprovalMode) => {
         approvalMode = mode;
       },
