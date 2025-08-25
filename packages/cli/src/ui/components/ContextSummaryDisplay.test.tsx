@@ -82,4 +82,119 @@ describe('<ContextSummaryDisplay />', () => {
     const actualLines = lastFrame().split('\n');
     expect(actualLines).toEqual(expectedLines);
   });
+
+  describe('with selected lines', () => {
+    it('should display selected lines', () => {
+      const props = {
+        ...baseProps,
+        ideContext: {
+          workspaceState: {
+            openFiles: [
+              {
+                path: '/a/b/c',
+                isActive: true,
+                selectedText: 'line1\nline2',
+              },
+            ],
+          },
+        },
+      };
+      const { lastFrame } = renderWithWidth(120, props);
+      const output = lastFrame().replace(/\n/g, ' ');
+      const parts = output.replace('Using: ', '').split(' | ');
+      expect(parts).toEqual([
+        '1 open file (ctrl+g to view)',
+        '1 GEMINI.md file',
+        '1 MCP server (ctrl+t to view)',
+        '2 lines selected in c',
+      ]);
+    });
+
+    it('should truncate a long file name', () => {
+      const props = {
+        ...baseProps,
+        ideContext: {
+          workspaceState: {
+            openFiles: [
+              {
+                path: '/a/b/a-very-long-file-name-that-should-be-truncated.ts',
+                isActive: true,
+                selectedText: 'line1\nline2',
+              },
+            ],
+          },
+        },
+      };
+      const { lastFrame } = renderWithWidth(120, props);
+      const output = lastFrame().replace(/\n/g, ' ');
+      const parts = output.replace('Using: ', '').split(' | ');
+      expect(parts).toEqual([
+        '1 open file (ctrl+g to view)',
+        '1 GEMINI.md file',
+        '1 MCP server (ctrl+t to view)',
+        '2 lines selected in a-very-long-f***e-truncated.ts',
+      ]);
+    });
+
+    it('should not display anything if no lines are selected', () => {
+      const props = {
+        ...baseProps,
+        ideContext: {
+          workspaceState: {
+            openFiles: [
+              {
+                path: '/a/b/c',
+                isActive: true,
+                selectedText: '',
+              },
+            ],
+          },
+        },
+      };
+      const { lastFrame } = renderWithWidth(120, props);
+      expect(lastFrame()).not.toContain('selected in');
+    });
+
+    it('should count lines containing only whitespace', () => {
+      const props = {
+        ...baseProps,
+        ideContext: {
+          workspaceState: {
+            openFiles: [
+              {
+                path: '/a/b/c',
+                isActive: true,
+                selectedText: 'line1\n  \nline3',
+              },
+            ],
+          },
+        },
+      };
+      const { lastFrame } = renderWithWidth(120, props);
+      const output = lastFrame().replace(/\n/g, ' ');
+      const parts = output.replace('Using: ', '').split(' | ');
+      expect(parts).toEqual([
+        '1 open file (ctrl+g to view)',
+        '1 GEMINI.md file',
+        '1 MCP server (ctrl+t to view)',
+        '3 lines selected in c',
+      ]);
+    });
+  });
+
+  it('should render an empty string when there is no context', () => {
+    const props = {
+      geminiMdFileCount: 0,
+      contextFileNames: [],
+      mcpServers: {},
+      showToolDescriptions: false,
+      ideContext: {
+        workspaceState: {
+          openFiles: [],
+        },
+      },
+    };
+    const { lastFrame } = renderWithWidth(120, props);
+    expect(lastFrame()).toBe('');
+  });
 });

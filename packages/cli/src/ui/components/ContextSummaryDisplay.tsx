@@ -9,6 +9,7 @@ import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { type IdeContext, type MCPServerConfig } from '@google/gemini-cli-core';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import path from 'path';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 
 interface ContextSummaryDisplayProps {
@@ -19,6 +20,23 @@ interface ContextSummaryDisplayProps {
   showToolDescriptions?: boolean;
   ideContext?: IdeContext;
 }
+
+const truncateFileName = (fileName: string, maxLength: number = 30): string => {
+  if (fileName.length <= maxLength) {
+    return fileName;
+  }
+
+  const mask = '***';
+  const keepLength = Math.floor((maxLength - mask.length) / 2);
+  const startLength = keepLength;
+  const endLength = maxLength - mask.length - startLength;
+
+  return (
+    fileName.substring(0, startLength) +
+    mask +
+    fileName.substring(fileName.length - endLength)
+  );
+};
 
 export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   geminiMdFileCount,
@@ -33,12 +51,26 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   const mcpServerCount = Object.keys(mcpServers || {}).length;
   const blockedMcpServerCount = blockedMcpServers?.length || 0;
   const openFileCount = ideContext?.workspaceState?.openFiles?.length ?? 0;
+  const activeFile = ideContext?.workspaceState?.openFiles?.find(
+    (file) => file.isActive,
+  );
+  const selectedLinesCount = (() => {
+    const text = activeFile?.selectedText;
+    if (!text) {
+      return 0;
+    }
+    if (text.endsWith('\n')) {
+      return text.slice(0, -1).split('\n').length;
+    }
+    return text.split('\n').length;
+  })();
 
   if (
     geminiMdFileCount === 0 &&
     mcpServerCount === 0 &&
     blockedMcpServerCount === 0 &&
-    openFileCount === 0
+    openFileCount === 0 &&
+    selectedLinesCount === 0
   ) {
     return <Text> </Text>; // Render an empty space to reserve height
   }
@@ -47,9 +79,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     if (openFileCount === 0) {
       return '';
     }
-    return `${openFileCount} open file${
-      openFileCount > 1 ? 's' : ''
-    } (ctrl+g to view)`;
+    return `${openFileCount} open file${openFileCount > 1 ? 's' : ''} (ctrl+g to view)`;
   })();
 
   const geminiMdText = (() => {
@@ -58,9 +88,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     }
     const allNamesTheSame = new Set(contextFileNames).size < 2;
     const name = allNamesTheSame ? contextFileNames[0] : 'context';
-    return `${geminiMdFileCount} ${name} file${
-      geminiMdFileCount > 1 ? 's' : ''
-    }`;
+    return `${geminiMdFileCount} ${name} file${geminiMdFileCount > 1 ? 's' : ''}`;
   })();
 
   const mcpText = (() => {
@@ -94,7 +122,22 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     return text;
   })();
 
-  const summaryParts = [openFilesText, geminiMdText, mcpText].filter(Boolean);
+  const selectedLinesText = (() => {
+    if (selectedLinesCount === 0 || !activeFile) {
+      return '';
+    }
+    const activeFileName = truncateFileName(path.basename(activeFile.path));
+    return `${selectedLinesCount} line${
+      selectedLinesCount > 1 ? 's' : ''
+    } selected in ${activeFileName}`;
+  })();
+
+  const summaryParts = [
+    openFilesText,
+    geminiMdText,
+    mcpText,
+    selectedLinesText,
+  ].filter(Boolean);
 
   if (isNarrow) {
     return (
