@@ -12,7 +12,9 @@ import * as os from 'node:os';
 import { DetectedIde, getIdeInfo, IdeInfo } from './detect-ide.js';
 import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
 
-const VSCODE_COMMAND = process.platform === 'win32' ? 'code.cmd' : 'code';
+function getVsCodeCommand(platform: NodeJS.Platform = process.platform) {
+  return platform === 'win32' ? 'code.cmd' : 'code';
+}
 
 export interface IdeInstaller {
   install(): Promise<InstallResult>;
@@ -27,10 +29,11 @@ async function findVsCodeCommand(
   platform: NodeJS.Platform = process.platform,
 ): Promise<string | null> {
   // 1. Check PATH first.
+  const vscodeCommand = getVsCodeCommand(platform);
   try {
     if (platform === 'win32') {
       const result = child_process
-        .execSync(`where.exe ${VSCODE_COMMAND}`)
+        .execSync(`where.exe ${vscodeCommand}`)
         .toString()
         .trim();
       // `where.exe` can return multiple paths. Return the first one.
@@ -39,10 +42,10 @@ async function findVsCodeCommand(
         return firstPath;
       }
     } else {
-      child_process.execSync(`command -v ${VSCODE_COMMAND}`, {
+      child_process.execSync(`command -v ${vscodeCommand}`, {
         stdio: 'ignore',
       });
-      return VSCODE_COMMAND;
+      return vscodeCommand;
     }
   } catch {
     // Not in PATH, continue to check common locations.
