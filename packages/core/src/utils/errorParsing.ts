@@ -16,6 +16,7 @@ import {
 } from '../config/models.js';
 import { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
+import { PartListUnion } from '@google/genai';
 
 // Free Tier message functions
 const getRateLimitErrorMessageGoogleFree = (
@@ -56,6 +57,7 @@ const getRateLimitErrorMessageDefault = (
   fallbackModel: string = DEFAULT_GEMINI_FLASH_MODEL,
 ) =>
   `\nPossible quota limitations in place or slow response times detected. Switching to the ${fallbackModel} model for the rest of this session.`;
+const INVALID_IMAGE_CONTEXT_MESSAGE = '\nImage is possibly corrupt or has high dimensions.';
 
 function getRateLimitMessage(
   authType?: AuthType,
@@ -107,6 +109,7 @@ export function parseAndFormatApiError(
   userTier?: UserTierId,
   currentModel?: string,
   fallbackModel?: string,
+  request?: PartListUnion,
 ): string {
   if (isStructuredError(error)) {
     let text = `[API Error: ${error.message}]`;
@@ -118,6 +121,9 @@ export function parseAndFormatApiError(
         currentModel,
         fallbackModel,
       );
+    }
+    if (request && wasCausedByInvalidImageUpload(error.message, request)) {
+      text += INVALID_IMAGE_CONTEXT_MESSAGE;
     }
     return text;
   }
@@ -154,6 +160,9 @@ export function parseAndFormatApiError(
             fallbackModel,
           );
         }
+        if (wasCausedByInvalidImageUpload(finalMessage, request)) {
+          text += INVALID_IMAGE_CONTEXT_MESSAGE;
+        }
         return text;
       }
     } catch (_e) {
@@ -163,4 +172,30 @@ export function parseAndFormatApiError(
   }
 
   return '[API Error: An unknown error occurred.]';
+}
+
+function wasCausedByInvalidImageUpload(err: string, request?: PartListUnion) {
+  return err.includes('Provided image is not valid.')
+  && request && requestContainedImage(request);
+}
+
+function requestContainedImage(parts: PartListUnion): boolean {
+  if (!parts) {
+    return false;
+  }
+  if (typeof parts === 'string') {
+    return false;
+  }
+  if (Array.isArray(parts)) {
+    for (const part of parts) {
+      if (typeof part !== 'string' && part.inlineData?.mimeType?.startsWith('image/')) {
+        return true;
+      }
+    }
+  } else { // It's a single Part
+    if (parts.inlineData?.mimeType?.startsWith('image/')) {
+      return true;
+    }
+  }
+  return false;
 }
