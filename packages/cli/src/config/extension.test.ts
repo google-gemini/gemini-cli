@@ -12,6 +12,7 @@ import {
   EXTENSIONS_CONFIG_FILENAME,
   INSTALL_METADATA_FILENAME,
   annotateActiveExtensions,
+  disableExtension,
   installExtension,
   loadExtensions,
   uninstallExtension,
@@ -19,6 +20,7 @@ import {
 } from './extension.js';
 import { execSync } from 'child_process';
 import { SimpleGit, simpleGit } from 'simple-git';
+import { SettingScope, loadSettings } from './settings.js';
 
 vi.mock('simple-git', () => ({
   simpleGit: vi.fn(),
@@ -126,6 +128,27 @@ describe('loadExtensions', () => {
     expect(ext1?.contextFiles).toEqual([
       path.join(workspaceExtensionsDir, 'ext1', 'my-context-file.md'),
     ]);
+  });
+
+  it('should filter out disabled extensions', () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+    createExtension(workspaceExtensionsDir, 'ext1', '1.0.0');
+    createExtension(workspaceExtensionsDir, 'ext2', '2.0.0');
+
+    const settingsDir = path.join(tempWorkspaceDir, '.gemini');
+    fs.mkdirSync(settingsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(settingsDir, 'settings.json'),
+      JSON.stringify({ extensions: { disabled: ['ext1'] } }),
+    );
+
+    const extensions = loadExtensions(tempWorkspaceDir);
+    expect(extensions).toHaveLength(1);
+    expect(extensions[0].config.name).toBe('ext2');
   });
 });
 
@@ -436,5 +459,57 @@ describe('updateExtension', () => {
       ),
     );
     expect(updatedConfig.version).toBe('1.1.0');
+  });
+});
+
+describe('disableExtension', () => {
+  let tempWorkspaceDir: string;
+  let tempHomeDir: string;
+
+  beforeEach(() => {
+    tempWorkspaceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-workspace-'),
+    );
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
+  });
+
+  it('should disable an extension at the user scope', () => {
+    disableExtension('my-extension', SettingScope.User);
+    const settings = loadSettings(tempWorkspaceDir);
+    expect(
+      settings.forScope(SettingScope.User).settings.extensions?.disabled,
+    ).toEqual(['my-extension']);
+  });
+
+  it('should disable an extension at the workspace scope', () => {
+    disableExtension('my-extension', SettingScope.Workspace);
+    const settings = loadSettings(tempWorkspaceDir);
+    expect(
+      settings.forScope(SettingScope.Workspace).settings.extensions?.disabled,
+    ).toEqual(['my-extension']);
+  });
+
+  it('should not add the same extension twice', () => {
+    disableExtension('my-extension', SettingScope.User);
+    disableExtension('my-extension', SettingScope.User);
+    const settings = loadSettings(tempWorkspaceDir);
+    expect(
+      settings.forScope(SettingScope.User).settings.extensions?.disabled,
+    ).toEqual(['my-extension']);
+  });
+
+  it('should throw an error if you request system scope', () => {
+    expect(() => disableExtension('my-extension', SettingScope.System)).toThrow(
+      'System and SystemDefaults scopes are not supported.',
+    );
   });
 });

@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { simpleGit } from 'simple-git';
+import { SettingScope, loadSettings } from '../config/settings.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = '.gemini/extensions';
 
@@ -78,7 +79,11 @@ export class ExtensionStorage {
   }
 }
 
+// TODO(#7038): Standardize loading of extensions and add the 'disabled' status
+// to the extension interface.
 export function loadExtensions(workspaceDir: string): Extension[] {
+  const settings = loadSettings(workspaceDir).merged;
+  const disabledExtensions = settings.extensions?.disabled ?? [];
   const allExtensions = [
     ...loadExtensionsFromDir(workspaceDir),
     ...loadExtensionsFromDir(os.homedir()),
@@ -86,7 +91,10 @@ export function loadExtensions(workspaceDir: string): Extension[] {
 
   const uniqueExtensions = new Map<string, Extension>();
   for (const extension of allExtensions) {
-    if (!uniqueExtensions.has(extension.config.name)) {
+    if (
+      !uniqueExtensions.has(extension.config.name) &&
+      !disabledExtensions.includes(extension.config.name)
+    ) {
       uniqueExtensions.set(extension.config.name, extension);
     }
   }
@@ -353,6 +361,10 @@ export async function uninstallExtension(extensionName: string): Promise<void> {
   ) {
     throw new Error(`Extension "${extensionName}" not found.`);
   }
+  removeFromDisabledExtensions(extensionName, [
+    SettingScope.User,
+    SettingScope.Workspace,
+  ]);
   const storage = new ExtensionStorage(extensionName);
   return await fs.promises.rm(storage.getExtensionDir(), {
     recursive: true,
@@ -426,5 +438,40 @@ export async function updateExtension(
     throw e;
   } finally {
     await fs.promises.rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+export function disableExtension(name: string, scope: SettingScope) {
+  if (scope === SettingScope.System || scope === SettingScope.SystemDefaults) {
+    throw new Error('System and SystemDefaults scopes are not supported.');
+  }
+  const settings = loadSettings(process.cwd());
+  const settingsFile = settings.forScope(scope);
+  let extensionSettings = settingsFile.settings.extensions || { disabled: [] };
+  const disabledExtensions = extensionSettings.disabled || [];
+  if (!disabledExtensions.includes(name)) {
+    disabledExtensions.push(name);
+    extensionSettings.disabled = disabledExtensions;
+    settings.setValue(scope, 'extensions', extensionSettings);
+  }
+}
+
+/**
+ * Removes an extension from the list of disabled extensions.
+ * @param name The name of the extension to remove.
+ * @param scope The scopes to remove the name from.
+ */
+function removeFromDisabledExtensions(name: string, scopes: SettingScope[]) {
+  const settings = loadSettings(process.cwd());
+  for (const scope of scopes) {
+    const settingsFile = settings.forScope(scope);
+    let extensionSettings = settingsFile.settings.extensions || {
+      disabled: [],
+    };
+    const disabledExtensions = extensionSettings.disabled || [];
+    extensionSettings.disabled = disabledExtensions.filter(
+      (extension) => extension !== name,
+    );
+    settings.setValue(scope, 'extensions', extensionSettings);
   }
 }
