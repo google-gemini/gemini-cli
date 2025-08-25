@@ -14,6 +14,7 @@ import {
   annotateActiveExtensions,
   installExtension,
   loadExtensions,
+  uninstallExtension,
 } from './extension.js';
 import { execSync } from 'child_process';
 import { SimpleGit, simpleGit } from 'simple-git';
@@ -277,6 +278,65 @@ describe('installExtension', () => {
       type: 'git',
     });
     fs.rmSync(targetExtDir, { recursive: true, force: true });
+  });
+});
+
+describe('uninstallExtension', () => {
+  let tempHomeDir: string;
+  let userExtensionsDir: string;
+
+  beforeEach(() => {
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    userExtensionsDir = path.join(tempHomeDir, '.gemini', 'extensions');
+    // Clean up before each test
+    fs.rmSync(userExtensionsDir, { recursive: true, force: true });
+    fs.mkdirSync(userExtensionsDir, { recursive: true });
+
+    vi.mocked(execSync).mockClear();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
+  });
+
+  it('should uninstall an extension by name', async () => {
+    const sourceExtDir = createExtension(
+      userExtensionsDir,
+      'my-local-extension',
+      '1.0.0',
+    );
+
+    await uninstallExtension('my-local-extension');
+
+    expect(fs.existsSync(sourceExtDir)).toBe(false);
+  });
+
+  it('should uninstall an extension by name and retain existing extensions', async () => {
+    const sourceExtDir = createExtension(
+      userExtensionsDir,
+      'my-local-extension',
+      '1.0.0',
+    );
+    const otherExtDir = createExtension(
+      userExtensionsDir,
+      'other-extension',
+      '1.0.0',
+    );
+
+    await uninstallExtension('my-local-extension');
+
+    expect(fs.existsSync(sourceExtDir)).toBe(false);
+    expect(loadExtensions(tempHomeDir)).toHaveLength(1);
+    expect(fs.existsSync(otherExtDir)).toBe(true);
+  });
+
+  it('should throw an error if the extension does not exist', async () => {
+    await expect(uninstallExtension('nonexistent-extension')).rejects.toThrow(
+      'Error: Extension "nonexistent-extension" not found.',
+    );
   });
 });
 
