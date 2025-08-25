@@ -655,12 +655,22 @@ export class GeminiChat {
   private isFirstPartText(
     content: Content | undefined,
   ): content is Content & { parts: [{ text: string }, ...Part[]] } {
-    return !!(
-      content &&
-      content.role === 'model' &&
-      content.parts &&
-      content.parts.length > 0 &&
-      typeof content.parts[0].text === 'string'
+    if (
+      !content ||
+      content.role !== 'model' ||
+      !content.parts ||
+      content.parts.length === 0
+    ) {
+      return false;
+    }
+    const firstPart = content.parts[0];
+    return (
+      typeof firstPart.text === 'string' &&
+      !firstPart.functionCall &&
+      !firstPart.functionResponse &&
+      !firstPart.inlineData &&
+      !firstPart.fileData &&
+      !firstPart.thought
     );
   }
 
