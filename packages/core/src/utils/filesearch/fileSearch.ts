@@ -10,6 +10,7 @@ import { Ignore, loadIgnoreRules } from './ignore.js';
 import { ResultCache } from './result-cache.js';
 import { crawl } from './crawler.js';
 import { AsyncFzf, FzfResultItem } from 'fzf';
+import { unescapePath } from '../paths.js';
 
 export interface FileSearchOptions {
   projectRoot: string;
@@ -19,6 +20,7 @@ export interface FileSearchOptions {
   cache: boolean;
   cacheTtl: number;
   enableRecursiveFileSearch: boolean;
+  disableFuzzySearch: boolean;
   maxDepth?: number;
 }
 
@@ -116,7 +118,7 @@ class RecursiveFileSearch implements FileSearch {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
 
-    pattern = pattern || '*';
+    pattern = unescapePath(pattern) || '*';
 
     let filteredCandidates;
     const { files: candidates, isExactMatch } =
@@ -127,7 +129,7 @@ class RecursiveFileSearch implements FileSearch {
       filteredCandidates = candidates;
     } else {
       let shouldCache = true;
-      if (pattern.includes('*')) {
+      if (pattern.includes('*') || this.options.disableFuzzySearch) {
         filteredCandidates = await filter(candidates, pattern, options.signal);
       } else {
         filteredCandidates = await this.fzf

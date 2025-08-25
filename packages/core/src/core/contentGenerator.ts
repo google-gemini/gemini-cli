@@ -19,7 +19,7 @@ import { Config } from '../config/config.js';
 
 import { UserTierId } from '../code_assist/types.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
-import { getInstallationId } from '../utils/user_id.js';
+import { InstallationManager } from '../utils/installationManager.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -44,6 +44,7 @@ export interface ContentGenerator {
 
 export enum AuthType {
   LOGIN_WITH_GOOGLE = 'oauth-personal',
+  LOGIN_WITH_GOOGLE_GCA = 'oauth-gca',
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
@@ -78,6 +79,7 @@ export function createContentGeneratorConfig(
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
   if (
     authType === AuthType.LOGIN_WITH_GOOGLE ||
+    authType === AuthType.LOGIN_WITH_GOOGLE_GCA ||
     authType === AuthType.CLOUD_SHELL
   ) {
     return contentGeneratorConfig;
@@ -116,6 +118,7 @@ export async function createContentGenerator(
 
   if (
     config.authType === AuthType.LOGIN_WITH_GOOGLE ||
+    config.authType === AuthType.LOGIN_WITH_GOOGLE_GCA ||
     config.authType === AuthType.CLOUD_SHELL
   ) {
     const httpOptions = { headers: baseHeaders };
@@ -136,7 +139,8 @@ export async function createContentGenerator(
   ) {
     let headers: Record<string, string> = { ...baseHeaders };
     if (gcConfig?.getUsageStatisticsEnabled()) {
-      const installationId = getInstallationId();
+      const installationManager = new InstallationManager();
+      const installationId = installationManager.getInstallationId();
       headers = {
         ...headers,
         'x-gemini-api-privileged-user-id': `${installationId}`,

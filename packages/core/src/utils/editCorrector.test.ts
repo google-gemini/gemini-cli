@@ -14,7 +14,7 @@ import {
   Mock,
   type Mocked,
 } from 'vitest';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { EditTool } from '../tools/edit.js';
 
 // MOCKS
@@ -27,6 +27,7 @@ let mockSendMessageStream: any;
 
 vi.mock('fs', () => ({
   statSync: vi.fn(),
+  mkdirSync: vi.fn(),
 }));
 
 vi.mock('../core/client.js', () => ({

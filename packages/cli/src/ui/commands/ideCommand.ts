@@ -6,10 +6,8 @@
 
 import {
   Config,
-  DetectedIde,
   GEMINI_CLI_COMPANION_EXTENSION_NAME,
   IDEConnectionStatus,
-  getIdeInfo,
   getIdeInstaller,
   IdeClient,
   type File,
@@ -130,11 +128,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         ({
           type: 'message',
           messageType: 'error',
-          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: ${Object.values(
-            DetectedIde,
-          )
-            .map((ide) => getIdeInfo(ide).displayName)
-            .join(', ')}`,
+          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks.`,
         }) as const,
     };
   }
@@ -187,10 +181,6 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
       );
 
       const result = await installer.install();
-      if (result.success) {
-        config.setIdeMode(true);
-        context.services.settings.setValue(SettingScope.User, 'ideMode', true);
-      }
       context.ui.addItem(
         {
           type: result.success ? 'info' : 'error',
@@ -198,6 +188,39 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         },
         Date.now(),
       );
+      if (result.success) {
+        context.services.settings.setValue(SettingScope.User, 'ideMode', true);
+        // Poll for up to 5 seconds for the extension to activate.
+        for (let i = 0; i < 10; i++) {
+          await config.setIdeModeAndSyncConnection(true);
+          if (
+            ideClient.getConnectionStatus().status ===
+            IDEConnectionStatus.Connected
+          ) {
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+
+        const { messageType, content } = getIdeStatusMessage(ideClient);
+        if (messageType === 'error') {
+          context.ui.addItem(
+            {
+              type: messageType,
+              text: `Failed to automatically enable IDE integration. To fix this, run the CLI in a new terminal window.`,
+            },
+            Date.now(),
+          );
+        } else {
+          context.ui.addItem(
+            {
+              type: messageType,
+              text: content,
+            },
+            Date.now(),
+          );
+        }
+      }
     },
   };
 
@@ -237,13 +260,11 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
     },
   };
 
-  const ideModeEnabled = config.getIdeMode();
-  if (ideModeEnabled) {
-    ideSlashCommand.subCommands = [
-      disableCommand,
-      statusCommand,
-      installCommand,
-    ];
+  const { status } = ideClient.getConnectionStatus();
+  const isConnected = status === IDEConnectionStatus.Connected;
+
+  if (isConnected) {
+    ideSlashCommand.subCommands = [statusCommand, disableCommand];
   } else {
     ideSlashCommand.subCommands = [
       enableCommand,

@@ -37,7 +37,7 @@ jobs:
           password: '${{ secrets.GITHUB_TOKEN }}'
 
       - name: 'Run Gemini Issue Deduplication Refresh'
-        uses: 'google-github-actions/run-gemini-cli@06123c6a203eb7a964ce3be7c48479cc66059f23' # ratchet:google-github-actions/run-gemini-cli@v0
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
         id: 'gemini_refresh_embeddings'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'

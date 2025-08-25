@@ -24,6 +24,14 @@ import {
 } from './types.js';
 import { getUrlOpenCommand } from '../../ui/utils/commandUtils.js';
 
+export const GITHUB_WORKFLOW_PATHS = [
+  'gemini-dispatch/gemini-dispatch.yml',
+  'gemini-assistant/gemini-invoke.yml',
+  'issue-triage/gemini-triage.yml',
+  'issue-triage/gemini-scheduled-triage.yml',
+  'pr-review/gemini-review.yml',
+];
+
 // Generate OS-specific commands to open the GitHub pages needed for setup.
 function getOpenUrlsCommands(readmeUrl: string): string[] {
   // Determine the OS-specific command to open URLs, ex: 'open', 'xdg-open', etc
@@ -42,6 +50,46 @@ function getOpenUrlsCommands(readmeUrl: string): string[] {
   // Create and join the individual commands
   const commands = urlsToOpen.map((url) => `${openCmd} "${url}"`);
   return commands;
+}
+
+// Add Gemini CLI specific entries to .gitignore file
+export async function updateGitignore(gitRepoRoot: string): Promise<void> {
+  const gitignoreEntries = ['.gemini/', 'gha-creds-*.json'];
+
+  const gitignorePath = path.join(gitRepoRoot, '.gitignore');
+  try {
+    // Check if .gitignore exists and read its content
+    let existingContent = '';
+    let fileExists = true;
+    try {
+      existingContent = await fs.promises.readFile(gitignorePath, 'utf8');
+    } catch (_error) {
+      // File doesn't exist
+      fileExists = false;
+    }
+
+    if (!fileExists) {
+      // Create new .gitignore file with the entries
+      const contentToWrite = gitignoreEntries.join('\n') + '\n';
+      await fs.promises.writeFile(gitignorePath, contentToWrite);
+    } else {
+      // Check which entries are missing
+      const missingEntries = gitignoreEntries.filter(
+        (entry) =>
+          !existingContent
+            .split(/\r?\n/)
+            .some((line) => line.split('#')[0].trim() === entry),
+      );
+
+      if (missingEntries.length > 0) {
+        const contentToAdd = '\n' + missingEntries.join('\n') + '\n';
+        await fs.promises.appendFile(gitignorePath, contentToAdd);
+      }
+    }
+  } catch (error) {
+    console.debug('Failed to update .gitignore:', error);
+    // Continue without failing the whole command
+  }
 }
 
 export const setupGithubCommand: SlashCommand = {
@@ -91,15 +139,8 @@ export const setupGithubCommand: SlashCommand = {
 
     // Download each workflow in parallel - there aren't enough files to warrant
     // a full workerpool model here.
-    const workflows = [
-      'gemini-cli/gemini-cli.yml',
-      'issue-triage/gemini-issue-automated-triage.yml',
-      'issue-triage/gemini-issue-scheduled-triage.yml',
-      'pr-review/gemini-pr-review.yml',
-    ];
-
     const downloads = [];
-    for (const workflow of workflows) {
+    for (const workflow of GITHUB_WORKFLOW_PATHS) {
       downloads.push(
         (async () => {
           const endpoint = `https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/tags/${releaseTag}/examples/workflows/${workflow}`;
@@ -146,11 +187,14 @@ export const setupGithubCommand: SlashCommand = {
       abortController.abort();
     });
 
+    // Add entries to .gitignore file
+    await updateGitignore(gitRepoRoot);
+
     // Print out a message
     const commands = [];
     commands.push('set -eEuo pipefail');
     commands.push(
-      `echo "Successfully downloaded ${workflows.length} workflows. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
+      `echo "Successfully downloaded ${GITHUB_WORKFLOW_PATHS.length} workflows and updated .gitignore. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
     );
     commands.push(...getOpenUrlsCommands(readmeUrl));
 

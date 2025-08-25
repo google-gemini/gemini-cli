@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Mock } from 'vitest';
 import { Config, ConfigParameters, SandboxConfig } from './config.js';
-import * as path from 'path';
+import * as path from 'node:path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
 import {
   DEFAULT_TELEMETRY_TARGET,
@@ -488,11 +488,12 @@ describe('Server Config (config.ts)', () => {
       },
     );
 
-    it('logs the session start event', () => {
-      new Config({
+    it('logs the session start event', async () => {
+      const config = new Config({
         ...baseParams,
         usageStatisticsEnabled: true,
       });
+      await config.initialize();
 
       expect(
         ClearcutLogger.prototype.logStartSessionEvent,
@@ -591,6 +592,40 @@ describe('Server Config (config.ts)', () => {
       delete paramsWithoutTelemetry.telemetry;
       const config = new Config(paramsWithoutTelemetry);
       expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
+    });
+  });
+
+  describe('UseRipgrep Configuration', () => {
+    it('should default useRipgrep to false when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getUseRipgrep()).toBe(false);
+    });
+
+    it('should set useRipgrep to true when provided as true', () => {
+      const paramsWithRipgrep: ConfigParameters = {
+        ...baseParams,
+        useRipgrep: true,
+      };
+      const config = new Config(paramsWithRipgrep);
+      expect(config.getUseRipgrep()).toBe(true);
+    });
+
+    it('should set useRipgrep to false when explicitly provided as false', () => {
+      const paramsWithRipgrep: ConfigParameters = {
+        ...baseParams,
+        useRipgrep: false,
+      };
+      const config = new Config(paramsWithRipgrep);
+      expect(config.getUseRipgrep()).toBe(false);
+    });
+
+    it('should default useRipgrep to false when undefined', () => {
+      const paramsWithUndefinedRipgrep: ConfigParameters = {
+        ...baseParams,
+        useRipgrep: undefined,
+      };
+      const config = new Config(paramsWithUndefinedRipgrep);
+      expect(config.getUseRipgrep()).toBe(false);
     });
   });
 });

@@ -22,6 +22,8 @@ export const KITTY_CTRL_C = '[99;5u';
  */
 export const KITTY_KEYCODE_ENTER = 13;
 export const KITTY_KEYCODE_NUMPAD_ENTER = 57414;
+export const KITTY_KEYCODE_TAB = 9;
+export const KITTY_KEYCODE_BACKSPACE = 127;
 
 /**
  * Timing constants for terminal interactions
@@ -48,3 +50,11 @@ export const BACKSLASH_ENTER_DETECTION_WINDOW_MS = 5;
  * We use 12 to provide a small buffer.
  */
 export const MAX_KITTY_SEQUENCE_LENGTH = 12;
+
+/**
+ * Character codes for common escape sequences
+ */
+export const CHAR_CODE_ESC = 27;
+export const CHAR_CODE_LEFT_BRACKET = 91;
+export const CHAR_CODE_1 = 49;
+export const CHAR_CODE_2 = 50;
