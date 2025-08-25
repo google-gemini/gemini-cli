@@ -12,8 +12,8 @@
 
 import { describe, it, beforeAll, expect } from 'vitest';
 import { TestRig, validateModelOutput } from './test-helper.js';
-import { join } from 'path';
-import { writeFileSync } from 'fs';
+import { join } from 'node:path';
+import { writeFileSync } from 'node:fs';
 
 // Create a minimal MCP server that doesn't require external dependencies
 // This implements the MCP protocol directly using Node.js built-ins
@@ -186,7 +186,7 @@ describe('simple-mcp-server', () => {
 
     // Make the script executable (though running with 'node' should work anyway)
     if (process.platform !== 'win32') {
-      const { chmodSync } = await import('fs');
+      const { chmodSync } = await import('node:fs');
       chmodSync(testServerPath, 0o755);
     }
   });

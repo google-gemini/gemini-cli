@@ -24,6 +24,14 @@ import {
 } from './types.js';
 import { getUrlOpenCommand } from '../../ui/utils/commandUtils.js';
 
+export const GITHUB_WORKFLOW_PATHS = [
+  'gemini-dispatch/gemini-dispatch.yml',
+  'gemini-assistant/gemini-invoke.yml',
+  'issue-triage/gemini-triage.yml',
+  'issue-triage/gemini-scheduled-triage.yml',
+  'pr-review/gemini-review.yml',
+];
+
 // Generate OS-specific commands to open the GitHub pages needed for setup.
 function getOpenUrlsCommands(readmeUrl: string): string[] {
   // Determine the OS-specific command to open URLs, ex: 'open', 'xdg-open', etc
@@ -131,15 +139,8 @@ export const setupGithubCommand: SlashCommand = {
 
     // Download each workflow in parallel - there aren't enough files to warrant
     // a full workerpool model here.
-    const workflows = [
-      'gemini-cli/gemini-cli.yml',
-      'issue-triage/gemini-issue-automated-triage.yml',
-      'issue-triage/gemini-issue-scheduled-triage.yml',
-      'pr-review/gemini-pr-review.yml',
-    ];
-
     const downloads = [];
-    for (const workflow of workflows) {
+    for (const workflow of GITHUB_WORKFLOW_PATHS) {
       downloads.push(
         (async () => {
           const endpoint = `https://raw.githubusercontent.com/google-github-actions/run-gemini-cli/refs/tags/${releaseTag}/examples/workflows/${workflow}`;
@@ -193,7 +194,7 @@ export const setupGithubCommand: SlashCommand = {
     const commands = [];
     commands.push('set -eEuo pipefail');
     commands.push(
-      `echo "Successfully downloaded ${workflows.length} workflows and updated .gitignore. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
+      `echo "Successfully downloaded ${GITHUB_WORKFLOW_PATHS.length} workflows and updated .gitignore. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
     );
     commands.push(...getOpenUrlsCommands(readmeUrl));
 
