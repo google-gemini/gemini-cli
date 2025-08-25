@@ -26,6 +26,8 @@ import {
   UserPromptEvent,
   DEFAULT_GEMINI_FLASH_MODEL,
   parseAndFormatApiError,
+  ApprovalMode,
+  ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import {
@@ -52,6 +54,7 @@ import {
   TrackedToolCall,
   TrackedCompletedToolCall,
   TrackedCancelledToolCall,
+  TrackedWaitingToolCall,
 } from './useReactToolScheduler.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
@@ -723,6 +726,47 @@ export const useGeminiStream = (
     ],
   );
 
+  const handleApprovalModeChange = useCallback(
+    async (newApprovalMode: ApprovalMode) => {
+      // Auto-approve pending tool calls when switching to auto-approval modes
+      if (
+        newApprovalMode === ApprovalMode.YOLO ||
+        newApprovalMode === ApprovalMode.AUTO_EDIT
+      ) {
+        let awaitingApprovalCalls = toolCalls.filter(
+          (call): call is TrackedWaitingToolCall =>
+            call.status === 'awaiting_approval',
+        );
+
+        // For AUTO_EDIT mode, only approve edit tools (replace, write_file)
+        if (newApprovalMode === ApprovalMode.AUTO_EDIT) {
+          awaitingApprovalCalls = awaitingApprovalCalls.filter(
+            (call) =>
+              call.request.name === 'replace' ||
+              call.request.name === 'write_file',
+          );
+        }
+
+        // Process pending tool calls sequentially to reduce UI chaos
+        for (const call of awaitingApprovalCalls) {
+          if (call.confirmationDetails?.onConfirm) {
+            try {
+              await call.confirmationDetails.onConfirm(
+                ToolConfirmationOutcome.ProceedOnce,
+              );
+            } catch (error) {
+              console.error(
+                `Failed to auto-approve tool call ${call.request.callId}:`,
+                error,
+              );
+            }
+          }
+        }
+      }
+    },
+    [toolCalls],
+  );
+
   const handleCompletedTools = useCallback(
     async (completedToolCallsFromScheduler: TrackedToolCall[]) => {
       if (isResponding) {
@@ -977,5 +1021,7 @@ export const useGeminiStream = (
     pendingHistoryItems,
     thought,
     cancelOngoingRequest,
+    pendingToolCalls: toolCalls,
+    handleApprovalModeChange,
   };
 };

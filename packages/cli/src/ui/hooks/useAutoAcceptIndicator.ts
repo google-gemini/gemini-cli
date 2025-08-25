@@ -10,10 +10,12 @@ import { useKeypress } from './useKeypress.js';
 
 export interface UseAutoAcceptIndicatorArgs {
   config: Config;
+  onApprovalModeChange?: (mode: ApprovalMode) => void;
 }
 
 export function useAutoAcceptIndicator({
   config,
+  onApprovalModeChange,
 }: UseAutoAcceptIndicatorArgs): ApprovalMode {
   const currentConfigValue = config.getApprovalMode();
   const [showAutoAcceptIndicator, setShowAutoAcceptIndicator] =
@@ -43,6 +45,9 @@ export function useAutoAcceptIndicator({
         config.setApprovalMode(nextApprovalMode);
         // Update local state immediately for responsiveness
         setShowAutoAcceptIndicator(nextApprovalMode);
+
+        // Notify the central handler about the approval mode change
+        onApprovalModeChange?.(nextApprovalMode);
       }
     },
     { isActive: true },
