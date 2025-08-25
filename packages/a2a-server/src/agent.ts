@@ -7,6 +7,7 @@
 import express from 'express';
 import { AsyncLocalStorage } from 'async_hooks';
 import * as url from 'node:url';
+import * as path from 'node:path';
 
 import { Message, Task as SDKTask, AgentCard } from '@a2a-js/sdk';
 import {
@@ -793,10 +794,13 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-if (
-  import.meta.url.startsWith('file:') &&
-  process.argv[1] === url.fileURLToPath(import.meta.url)
-) {
+// Check if the module is the main script being run. path.resolve() creates a
+// canonical, absolute path, which avoids cross-platform issues.
+const isMainModule =
+  path.resolve(process.argv[1]) ===
+  path.resolve(url.fileURLToPath(import.meta.url));
+
+if (import.meta.url.startsWith('file:') && isMainModule) {
   main().catch((error) => {
     logger.error('[CoreAgent] Unhandled error in main:', error);
     process.exit(1);
