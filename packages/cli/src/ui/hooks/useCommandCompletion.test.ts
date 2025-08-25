@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useCommandCompletion } from './useCommandCompletion.js';
-import { CommandContext } from '../commands/types.js';
+import { CommandContext, CommandKind, SlashCommand } from '../commands/types.js';
 import { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import { useEffect } from 'react';
@@ -515,6 +515,324 @@ describe('useCommandCompletion', () => {
       expect(result.current.textBuffer.text).toBe(
         '@src/file1.txt is a good file',
       );
+    });
+  });
+
+  describe('Custom Command Dual-Mode Completion', () => {
+    const builtInCommand: SlashCommand = {
+      name: 'builtin',
+      description: 'Built-in command',
+      kind: CommandKind.BUILT_IN,
+      action: async () => ({ type: 'submit_prompt', content: 'test' }),
+    };
+
+    const customCommand: SlashCommand = {
+      name: 'custom',
+      description: 'Custom command from .toml file',
+      kind: CommandKind.FILE,
+      action: async () => ({ type: 'submit_prompt', content: 'test' }),
+    };
+
+    const commands = [builtInCommand, customCommand];
+
+    it('should enable SLASH mode only for built-in commands', async () => {
+      setupMocks({
+        slashSuggestions: [{ label: 'builtin', value: 'builtin' }],
+      });
+
+      renderHook(() =>
+        useCommandCompletion(
+          useTextBufferForTest('/builtin'),
+          testDirs,
+          testRootDir,
+          commands,
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(useSlashCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: true,
+          }),
+        );
+        expect(useAtCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: false,
+          }),
+        );
+      });
+    });
+
+    it('should enable SLASH mode for custom commands without @ symbol', async () => {
+      setupMocks({
+        slashSuggestions: [{ label: 'custom', value: 'custom' }],
+      });
+
+      renderHook(() =>
+        useCommandCompletion(
+          useTextBufferForTest('/custom'),
+          testDirs,
+          testRootDir,
+          commands,
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(useSlashCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: true,
+          }),
+        );
+        expect(useAtCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: false,
+          }),
+        );
+      });
+    });
+
+    it('should enable AT mode for custom commands with @ symbol', async () => {
+      setupMocks({
+        atSuggestions: [{ label: 'src/file.txt', value: 'src/file.txt' }],
+      });
+
+      renderHook(() =>
+        useCommandCompletion(
+          useTextBufferForTest('/custom @src/file'),
+          testDirs,
+          testRootDir,
+          commands,
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(useAtCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: true,
+            pattern: 'src/file',
+          }),
+        );
+      });
+    });
+
+    it('should NOT enable AT mode for built-in commands with @ symbol', async () => {
+      setupMocks({
+        slashSuggestions: [{ label: 'builtin', value: 'builtin' }],
+      });
+
+      renderHook(() =>
+        useCommandCompletion(
+          useTextBufferForTest('/builtin @src/file'),
+          testDirs,
+          testRootDir,
+          commands,
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(useSlashCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: true,
+          }),
+        );
+        expect(useAtCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: false,
+          }),
+        );
+      });
+    });
+
+    it('should handle custom commands with alternative names', async () => {
+      const customCommandWithAltNames: SlashCommand = {
+        name: 'my-custom',
+        altNames: ['mc', 'mycmd'],
+        description: 'Custom command with alt names',
+        kind: CommandKind.FILE,
+        action: async () => ({ type: 'submit_prompt', content: 'test' }),
+      };
+
+      setupMocks({
+        atSuggestions: [{ label: 'src/file.txt', value: 'src/file.txt' }],
+      });
+
+      renderHook(() =>
+        useCommandCompletion(
+          useTextBufferForTest('/mc @src/file'),
+          testDirs,
+          testRootDir,
+          [customCommandWithAltNames],
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(useAtCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: true,
+            pattern: 'src/file',
+          }),
+        );
+      });
+    });
+  });
+
+  describe('Paranoid Edge Case Testing', () => {
+    const customCommand: SlashCommand = {
+      name: 'my-custom',
+      description: 'Custom command for testing edge cases',
+      kind: CommandKind.FILE,
+      action: async () => ({ type: 'submit_prompt', content: 'test' }),
+    };
+
+    const builtInCommand: SlashCommand = {
+      name: 'log',
+      description: 'Built-in log command',
+      kind: CommandKind.BUILT_IN,
+      action: async () => ({ type: 'submit_prompt', content: 'test' }),
+    };
+
+    const commands = [customCommand, builtInCommand];
+
+    it('should handle input with extra whitespace correctly', async () => {
+      setupMocks({
+        atSuggestions: [{ label: 'some/path', value: 'some/path' }],
+      });
+
+      renderHook(() =>
+        useCommandCompletion(
+          useTextBufferForTest('  /my-custom   @some/path'),
+          testDirs,
+          testRootDir,
+          commands,
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(useAtCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: true,
+            pattern: 'some/path',
+          }),
+        );
+      });
+    });
+
+    it('should handle command as substring correctly', async () => {
+      const logsCommand: SlashCommand = {
+        name: 'logs',
+        description: 'Built-in logs command (longer name)',
+        kind: CommandKind.BUILT_IN,
+        action: async () => ({ type: 'submit_prompt', content: 'test' }),
+      };
+
+      const commandsWithSubstring = [customCommand, builtInCommand, logsCommand];
+
+      setupMocks({
+        slashSuggestions: [{ label: 'log', value: 'log' }],
+      });
+
+      renderHook(() =>
+        useCommandCompletion(
+          useTextBufferForTest('/log'),
+          testDirs,
+          testRootDir,
+          commandsWithSubstring,
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(useSlashCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: true,
+          }),
+        );
+        expect(useAtCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: false,
+          }),
+        );
+      });
+    });
+
+    it('should handle empty @ query gracefully', async () => {
+      setupMocks({
+        atSuggestions: [],
+      });
+
+      renderHook(() =>
+        useCommandCompletion(
+          useTextBufferForTest('/my-custom @'),
+          testDirs,
+          testRootDir,
+          commands,
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(useAtCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: true,
+            pattern: '',
+          }),
+        );
+      });
+    });
+
+    it('should handle no-op command (just /) correctly', async () => {
+      setupMocks({
+        slashSuggestions: [],
+      });
+
+      renderHook(() =>
+        useCommandCompletion(
+          useTextBufferForTest('/'),
+          testDirs,
+          testRootDir,
+          commands,
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await waitFor(() => {
+        // Should go to SLASH mode since it's a slash command, even if no command name
+        expect(useSlashCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: true,
+            query: '/',
+          }),
+        );
+        expect(useAtCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: false,
+          }),
+        );
+      });
     });
   });
 });

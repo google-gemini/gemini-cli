@@ -15,7 +15,7 @@ import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
-import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import { useCommandCompletion, CompletionMode } from '../hooks/useCommandCompletion.js';
 import { useKeypress, Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { CommandContext, SlashCommand } from '../commands/types.js';
@@ -809,6 +809,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             width={suggestionsWidth}
             scrollOffset={completion.visibleStartIndex}
             userInput={buffer.text}
+            completionMode={completion.completionMode}
           />
         </Box>
       )}
@@ -821,6 +822,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             width={suggestionsWidth}
             scrollOffset={reverseSearchCompletion.visibleStartIndex}
             userInput={buffer.text}
+            completionMode={CompletionMode.IDLE}
           />
         </Box>
       )}

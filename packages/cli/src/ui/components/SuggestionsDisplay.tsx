@@ -7,6 +7,7 @@
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { PrepareLabel } from './PrepareLabel.js';
+import { CompletionMode } from '../hooks/useCommandCompletion.js';
 export interface Suggestion {
   label: string;
   value: string;
@@ -20,9 +21,16 @@ interface SuggestionsDisplayProps {
   width: number;
   scrollOffset: number;
   userInput: string;
+  completionMode: CompletionMode;
 }
 
 export const MAX_SUGGESTIONS_TO_SHOW = 8;
+
+// Utility to truncate long text with ellipsis for better UI polish
+function truncateWithEllipsis(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength - 3) + '...';
+}
 
 export function SuggestionsDisplay({
   suggestions,
@@ -31,6 +39,7 @@ export function SuggestionsDisplay({
   width,
   scrollOffset,
   userInput,
+  completionMode,
 }: SuggestionsDisplayProps) {
   if (isLoading) {
     return (
@@ -52,7 +61,7 @@ export function SuggestionsDisplay({
   );
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
-  const isSlashCommandMode = userInput.startsWith('/');
+  const isSlashCommandMode = completionMode === CompletionMode.SLASH;
   let commandNameWidth = 0;
 
   if (isSlashCommandMode) {
@@ -75,9 +84,15 @@ export function SuggestionsDisplay({
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
         const textColor = isActive ? Colors.AccentPurple : Colors.Gray;
+        
+        // For file path completions, truncate very long paths to prevent overflow
+        const displayLabel = completionMode === CompletionMode.AT 
+          ? truncateWithEllipsis(suggestion.label, Math.floor(width * 0.8))
+          : suggestion.label;
+        
         const labelElement = (
           <PrepareLabel
-            label={suggestion.label}
+            label={displayLabel}
             matchedIndex={suggestion.matchedIndex}
             userInput={userInput}
             textColor={textColor}
