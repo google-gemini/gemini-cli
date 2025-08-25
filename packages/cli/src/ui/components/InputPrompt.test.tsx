@@ -1512,5 +1512,23 @@ describe('InputPrompt', () => {
       expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
       unmount();
     });
+
+    it.each([':q', ':q!'])(
+      'should call handleSubmitAndClear with /quit when buffer is %s and enter is pressed',
+      async (bufferText) => {
+        props.buffer.setText(bufferText);
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
+        await wait();
+
+        stdin.write('\r');
+        await wait();
+
+        expect(props.onSubmit).toHaveBeenCalledWith('/quit');
+        expect(props.buffer.setText).toHaveBeenCalledWith('');
+        unmount();
+      },
+    );
   });
 });
