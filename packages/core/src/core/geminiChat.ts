@@ -17,7 +17,6 @@ import {
   Tool,
 } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
-import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { ContentGenerator, AuthType } from './contentGenerator.js';
 import { Config } from '../config/config.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
@@ -43,6 +42,7 @@ const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
   maxAttempts: 3, // 1 initial call + 2 retries
   initialDelayMs: 500,
 };
+
 /**
  * Returns true if the response is valid, false otherwise.
  */
@@ -220,7 +220,7 @@ export class GeminiChat {
    * ```ts
    * const chat = ai.chats.create({model: 'gemini-2.0-flash'});
    * const response = await chat.sendMessage({
-   *   message: 'Why is the sky blue?'
+   * message: 'Why is the sky blue?'
    * });
    * console.log(response.text);
    * ```
@@ -276,6 +276,13 @@ export class GeminiChat {
 
       this.sendPromise = (async () => {
         const outputContent = response.candidates?.[0]?.content;
+        const initialModelOutput = outputContent ? [outputContent] : [];
+
+        // Pre-process the model output to filter thought parts before passing to recordHistory.
+        // This makes the non-streaming path consistent with the streaming path's logic.
+        const cleanedModelOutput =
+          this.getVisibleModelOutput(initialModelOutput);
+
         // Because the AFC input contains the entire curated chat history in
         // addition to the new user input, we need to truncate the AFC history
         // to deduplicate the existing chat history.
@@ -287,10 +294,10 @@ export class GeminiChat {
           automaticFunctionCallingHistory =
             fullAutomaticFunctionCallingHistory.slice(index) ?? [];
         }
-        const modelOutput = outputContent ? [outputContent] : [];
+
         this.recordHistory(
           userContent,
-          modelOutput,
+          cleanedModelOutput, // Pass the cleaned data instead of the original
           automaticFunctionCallingHistory,
         );
       })();
@@ -320,10 +327,10 @@ export class GeminiChat {
    * ```ts
    * const chat = ai.chats.create({model: 'gemini-2.0-flash'});
    * const response = await chat.sendMessageStream({
-   *   message: 'Why is the sky blue?'
+   * message: 'Why is the sky blue?'
    * });
    * for await (const chunk of response) {
-   *   console.log(chunk.text);
+   * console.log(chunk.text);
    * }
    * ```
    */
@@ -463,7 +470,7 @@ export class GeminiChat {
    * - The `curated history` contains only the valid turns between user and
    * model, which will be included in the subsequent requests sent to the model.
    * - The `comprehensive history` contains all turns, including invalid or
-   *   empty model outputs, providing a complete record of the history.
+   * empty model outputs, providing a complete record of the history.
    *
    * The history is updated after receiving the response from the model,
    * for streaming response, it means receiving the last chunk of the response.
@@ -472,9 +479,9 @@ export class GeminiChat {
    * history`, set the `curated` parameter to `true`.
    *
    * @param curated - whether to return the curated history or the comprehensive
-   *     history.
+   * history.
    * @return History contents alternating between user and model for the entire
-   *     chat session.
+   * chat session.
    */
   getHistory(curated: boolean = false): Content[] {
     const history = curated
@@ -546,32 +553,53 @@ export class GeminiChat {
       hasReceivedAnyChunk = true;
       if (isValidResponse(chunk)) {
         const content = chunk.candidates?.[0]?.content;
-        if (content) {
-          // Filter out thought parts from being added to history.
-          if (!this.isThoughtContent(content) && content.parts) {
-            modelResponseParts.push(...content.parts);
-          }
+        if (content?.parts) {
+          // Collect all parts; they will be filtered by the new helper method.
+          modelResponseParts.push(...content.parts);
         }
       } else {
         recordInvalidChunk(this.config);
         isStreamInvalid = true;
       }
-      yield chunk; // Yield every chunk to the UI immediately.
+      yield chunk;
     }
 
-    // Now that the stream is finished, make a decision.
-    // Throw an error if the stream was invalid OR if it was completely empty.
     if (isStreamInvalid || !hasReceivedAnyChunk) {
       throw new EmptyStreamError(
         'Model stream was invalid or completed without valid content.',
       );
     }
 
-    // Use recordHistory to correctly save the conversation turn.
-    const modelOutput: Content[] = [
-      { role: 'model', parts: modelResponseParts },
-    ];
-    this.recordHistory(userInput, modelOutput);
+    const initialModelOutput: Content[] =
+      modelResponseParts.length > 0
+        ? [{ role: 'model', parts: modelResponseParts }]
+        : [];
+
+    // UNIFIED LOGIC: Call the new helper to get only visible content.
+    const visibleModelOutput = this.getVisibleModelOutput(initialModelOutput);
+
+    this.recordHistory(userInput, visibleModelOutput);
+  }
+
+  /**
+   * Processes model output to filter out thought parts, returning only visible content.
+   * This is the single, unified logic for cleaning model responses for both
+   * streaming and non-streaming calls.
+   * @param modelOutput The raw model output, which may contain multiple `Content` objects.
+   * @returns A new array of `Content` objects with all `thought` parts removed.
+   */
+  private getVisibleModelOutput(modelOutput: Content[]): Content[] {
+    return modelOutput
+      .map((content) => {
+        if (!content.parts) {
+          return content;
+        }
+        const visibleParts = content.parts.filter(
+          (part) => !('thought' in part),
+        );
+        return { ...content, parts: visibleParts };
+      })
+      .filter((content) => content.parts == null || content.parts.length > 0);
   }
 
   private recordHistory(
@@ -579,65 +607,61 @@ export class GeminiChat {
     modelOutput: Content[],
     automaticFunctionCallingHistory?: Content[],
   ) {
-    const newHistoryEntries: Content[] = [];
-
     // Part 1: Handle the user's part of the turn.
     if (
       automaticFunctionCallingHistory &&
       automaticFunctionCallingHistory.length > 0
     ) {
-      newHistoryEntries.push(
+      this.history.push(
         ...extractCuratedHistory(automaticFunctionCallingHistory),
       );
     } else {
-      // Guard for streaming calls where the user input might already be in the history.
-      if (
-        this.history.length === 0 ||
-        this.history[this.history.length - 1] !== userInput
-      ) {
-        newHistoryEntries.push(userInput);
+      // In non-streaming, userInput is not in history yet.
+      // In streaming, it was pushed before the call.
+      if (this.history[this.history.length - 1] !== userInput) {
+        this.history.push(userInput);
       }
     }
 
-    // Part 2: Handle the model's part of the turn, filtering out thoughts.
-    const nonThoughtModelOutput = modelOutput.filter(
+    // Part 2: Filter out any content that is just a thought.
+    const visibleModelOutput = modelOutput.filter(
       (content) => !this.isThoughtContent(content),
     );
 
-    let outputContents: Content[] = [];
-    if (nonThoughtModelOutput.length > 0) {
-      outputContents = nonThoughtModelOutput;
-    } else if (
-      modelOutput.length === 0 &&
-      !isFunctionResponse(userInput) &&
-      !automaticFunctionCallingHistory
-    ) {
-      // Add an empty model response if the model truly returned nothing.
-      outputContents.push({ role: 'model', parts: [] } as Content);
-    }
-
-    // Part 3: Consolidate the parts of this turn's model response.
-    const consolidatedOutputContents: Content[] = [];
-    if (outputContents.length > 0) {
-      for (const content of outputContents) {
-        const lastContent =
-          consolidatedOutputContents[consolidatedOutputContents.length - 1];
-        if (this.hasTextContent(lastContent) && this.hasTextContent(content)) {
-          lastContent.parts[0].text += content.parts[0].text || '';
-          if (content.parts.length > 1) {
-            lastContent.parts.push(...content.parts.slice(1));
-          }
-        } else {
-          consolidatedOutputContents.push(content);
+    // Part 3: Consolidate adjacent text parts from the visible model output.
+    const consolidatedOutput: Content[] = [];
+    for (const content of visibleModelOutput) {
+      // Don't consolidate malformed content.
+      if (!content.parts) {
+        consolidatedOutput.push(content);
+        continue;
+      }
+      const lastContent = consolidatedOutput[consolidatedOutput.length - 1];
+      if (this.isLastPartText(lastContent) && this.isFirstPartText(content)) {
+        lastContent.parts[lastContent.parts.length - 1].text +=
+          content.parts[0].text || '';
+        if (content.parts.length > 1) {
+          lastContent.parts.push(...content.parts.slice(1));
         }
+      } else {
+        consolidatedOutput.push(content);
       }
     }
 
-    // Part 4: Add the new turn (user and model parts) to the main history.
-    this.history.push(...newHistoryEntries, ...consolidatedOutputContents);
+    // Part 4: Add the processed model entries to the history.
+    if (consolidatedOutput.length > 0) {
+      this.history.push(...consolidatedOutput);
+    } else if (
+      !automaticFunctionCallingHistory ||
+      automaticFunctionCallingHistory.length === 0
+    ) {
+      // If, after all processing, there's NO model output, AND it wasn't
+      // an AFC turn, add the empty placeholder to maintain alternation.
+      this.history.push({ role: 'model', parts: [] });
+    }
   }
 
-  private hasTextContent(
+  private isFirstPartText(
     content: Content | undefined,
   ): content is Content & { parts: [{ text: string }, ...Part[]] } {
     return !!(
@@ -645,22 +669,28 @@ export class GeminiChat {
       content.role === 'model' &&
       content.parts &&
       content.parts.length > 0 &&
-      typeof content.parts[0].text === 'string' &&
-      content.parts[0].text !== ''
+      typeof content.parts[0].text === 'string'
     );
   }
 
-  private isThoughtContent(
+  private isLastPartText(
     content: Content | undefined,
-  ): content is Content & { parts: [{ thought: boolean }, ...Part[]] } {
-    return !!(
-      content &&
-      content.role === 'model' &&
-      content.parts &&
-      content.parts.length > 0 &&
-      typeof content.parts[0].thought === 'boolean' &&
-      content.parts[0].thought === true
-    );
+  ): content is Content & { parts: [...Part[], { text: string }] } {
+    if (
+      !content ||
+      content.role !== 'model' ||
+      !content.parts ||
+      content.parts.length === 0
+    ) {
+      return false;
+    }
+    const lastPart = content.parts[content.parts.length - 1];
+    return typeof lastPart.text === 'string' && lastPart.text !== '';
+  }
+
+  private isThoughtContent(content: Content): boolean {
+    // A content object is considered a "thought" if it contains any part that is a thought.
+    return !!(content.parts && content.parts.some((part) => 'thought' in part));
   }
 }
 
