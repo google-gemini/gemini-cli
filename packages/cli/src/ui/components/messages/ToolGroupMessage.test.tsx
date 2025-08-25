@@ -28,29 +28,15 @@ vi.mock('./ToolMessage.js', () => ({
     emphasis: string;
   }) {
     // Use the same constants as the real component
-    let statusSymbol: string;
-    switch (status) {
-      case ToolCallStatus.Success:
-        statusSymbol = TOOL_STATUS.SUCCESS;
-        break;
-      case ToolCallStatus.Pending:
-        statusSymbol = TOOL_STATUS.PENDING;
-        break;
-      case ToolCallStatus.Executing:
-        statusSymbol = TOOL_STATUS.EXECUTING;
-        break;
-      case ToolCallStatus.Confirming:
-        statusSymbol = TOOL_STATUS.CONFIRMING;
-        break;
-      case ToolCallStatus.Canceled:
-        statusSymbol = TOOL_STATUS.CANCELED;
-        break;
-      case ToolCallStatus.Error:
-        statusSymbol = TOOL_STATUS.ERROR;
-        break;
-      default:
-        statusSymbol = '?';
-    }
+    const statusSymbolMap: Record<ToolCallStatus, string> = {
+      [ToolCallStatus.Success]: TOOL_STATUS.SUCCESS,
+      [ToolCallStatus.Pending]: TOOL_STATUS.PENDING,
+      [ToolCallStatus.Executing]: TOOL_STATUS.EXECUTING,
+      [ToolCallStatus.Confirming]: TOOL_STATUS.CONFIRMING,
+      [ToolCallStatus.Canceled]: TOOL_STATUS.CANCELED,
+      [ToolCallStatus.Error]: TOOL_STATUS.ERROR,
+    };
+    const statusSymbol = statusSymbolMap[status] || '?';
     return (
       <Text>
         MockTool[{callId}]: {statusSymbol} {name} - {description} ({emphasis})
