@@ -399,7 +399,6 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      // Wait longer for any potential async operations in CI environments
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(spawn).not.toHaveBeenCalled();
@@ -428,7 +427,6 @@ describe('App UI', () => {
 
       updateEventEmitter.emit('update-success', info);
 
-      // Wait longer for React state updates and re-render in CI environments
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(lastFrame()).toContain(
@@ -459,7 +457,6 @@ describe('App UI', () => {
 
       updateEventEmitter.emit('update-failed', info);
 
-      // Wait longer for React state updates and re-render in CI environments
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(lastFrame()).toContain(
@@ -492,7 +489,6 @@ describe('App UI', () => {
       // which is what should be emitted when a spawn error occurs elsewhere.
       updateEventEmitter.emit('update-failed', info);
 
-      // Wait longer for React state updates and re-render in CI environments
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(lastFrame()).toContain(
@@ -523,7 +519,6 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      // Wait longer for any potential async operations in CI environments
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(spawn).not.toHaveBeenCalled();
