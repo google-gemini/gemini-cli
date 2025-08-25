@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   MCPServerConfig,
   GeminiCLIExtension,
-  Storage,
 } from '@google/gemini-cli-core';
+import { Storage } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';

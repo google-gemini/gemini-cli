@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { IPromptProcessor } from './types.js';
-import { CommandContext } from '../../ui/commands/types.js';
+import type { IPromptProcessor } from './types.js';
+import type { CommandContext } from '../../ui/commands/types.js';
 
 /**
  * Appends the user's full command invocation to the prompt if arguments are

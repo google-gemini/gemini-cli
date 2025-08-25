@@ -6,10 +6,8 @@
 
 import { useState, useCallback } from 'react';
 
-import {
-  MAX_SUGGESTIONS_TO_SHOW,
-  Suggestion,
-} from '../components/SuggestionsDisplay.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
+import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
 
 export interface UseCompletionReturn {
   suggestions: Suggestion[];

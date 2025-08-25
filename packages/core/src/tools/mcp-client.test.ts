@@ -20,9 +20,9 @@ import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import * as GenAiLib from '@google/genai';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { AuthProviderType } from '../config/config.js';
-import { PromptRegistry } from '../prompts/prompt-registry.js';
-import { ToolRegistry } from './tool-registry.js';
-import { WorkspaceContext } from '../utils/workspaceContext.js';
+import type { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { ToolRegistry } from './tool-registry.js';
+import type { WorkspaceContext } from '../utils/workspaceContext.js';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');

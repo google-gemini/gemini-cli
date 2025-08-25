@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandModule } from 'yargs';
+import type { CommandModule } from 'yargs';
 import {
   installExtension,
-  ExtensionInstallMetadata,
+  type ExtensionInstallMetadata,
 } from '../../config/extension.js';
 
 interface InstallArgs {

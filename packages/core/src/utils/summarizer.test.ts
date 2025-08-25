@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GeminiClient } from '../core/client.js';
 import { Config } from '../config/config.js';
 import {
@@ -12,7 +13,7 @@ import {
   llmSummarizer,
   defaultSummarizer,
 } from './summarizer.js';
-import { ToolResult } from '../tools/tools.js';
+import type { ToolResult } from '../tools/tools.js';
 
 // Mock GeminiClient and Config constructor
 vi.mock('../core/client.js');

@@ -10,7 +10,7 @@ import {
   BINARY_EXTENSIONS,
   extractExtensionsFromPatterns,
 } from './ignorePatterns.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 
 // Mock the memoryTool module
 vi.mock('../tools/memoryTool.js', () => ({

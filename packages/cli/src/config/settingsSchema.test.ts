@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { SETTINGS_SCHEMA, Settings } from './settingsSchema.js';
+import type { Settings } from './settingsSchema.js';
+import { SETTINGS_SCHEMA } from './settingsSchema.js';
 
 describe('SettingsSchema', () => {
   describe('SETTINGS_SCHEMA', () => {

@@ -5,8 +5,8 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Suggestion } from '../components/SuggestionsDisplay.js';
-import { CommandContext, SlashCommand } from '../commands/types.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
 
 export interface UseSlashCompletionProps {
   enabled: boolean;

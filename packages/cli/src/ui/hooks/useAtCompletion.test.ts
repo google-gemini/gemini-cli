@@ -9,14 +9,12 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { useAtCompletion } from './useAtCompletion.js';
-import { Config, FileSearch, FileSearchFactory } from '@google/gemini-cli-core';
-import {
-  createTmpDir,
-  cleanupTmpDir,
-  FileSystemStructure,
-} from '@google/gemini-cli-test-utils';
+import type { Config, FileSearch } from '@google/gemini-cli-core';
+import { FileSearchFactory } from '@google/gemini-cli-core';
+import type { FileSystemStructure } from '@google/gemini-cli-test-utils';
+import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import { useState } from 'react';
-import { Suggestion } from '../components/SuggestionsDisplay.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
 
 // Test harness to capture the state from the hook's callbacks.
 function useTestHarnessForAtCompletion(

@@ -4,22 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Config, IdeClient, File } from '@google/gemini-cli-core';
 import {
-  Config,
-  GEMINI_CLI_COMPANION_EXTENSION_NAME,
-  IDEConnectionStatus,
   getIdeInstaller,
-  IdeClient,
-  type File,
+  IDEConnectionStatus,
   ideContext,
+  GEMINI_CLI_COMPANION_EXTENSION_NAME,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
-import {
+import type {
   CommandContext,
   SlashCommand,
   SlashCommandActionReturn,
-  CommandKind,
 } from './types.js';
+import { CommandKind } from './types.js';
 import { SettingScope } from '../../config/settings.js';
 
 function getIdeStatusMessage(ideClient: IdeClient): {

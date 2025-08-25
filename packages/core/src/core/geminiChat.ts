@@ -7,22 +7,23 @@
 // DISCLAIMER: This is a copied version of https://github.com/googleapis/js-genai/blob/main/src/chats.ts with the intention of working around a key bug
 // where function responses are not treated as "valid" responses: https://b.corp.google.com/issues/420354090
 
-import {
+import type {
   GenerateContentResponse,
   Content,
   GenerateContentConfig,
   SendMessageParameters,
-  createUserContent,
   Part,
   Tool,
 } from '@google/genai';
+import { createUserContent } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
-import { ContentGenerator, AuthType } from './contentGenerator.js';
-import { Config } from '../config/config.js';
+import type { ContentGenerator } from './contentGenerator.js';
+import { AuthType } from './contentGenerator.js';
+import type { Config } from '../config/config.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
-import { StructuredError } from './turn.js';
+import type { StructuredError } from './turn.js';
 import {
   recordContentRetry,
   recordContentRetryFailure,

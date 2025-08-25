@@ -6,9 +6,9 @@
 
 import * as path from 'node:path';
 import process from 'node:process';
+import type { ContentGeneratorConfig } from '../core/contentGenerator.js';
 import {
   AuthType,
-  ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
@@ -28,25 +28,23 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
+import type { TelemetryTarget } from '../telemetry/index.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
-  TelemetryTarget,
-  StartSessionEvent,
 } from '../telemetry/index.js';
+import { StartSessionEvent } from '../telemetry/index.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
-import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
+import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
 import type { Content } from '@google/genai';
-import {
-  FileSystemService,
-  StandardFileSystemService,
-} from '../services/fileSystemService.js';
+import type { FileSystemService } from '../services/fileSystemService.js';
+import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { logCliConfiguration, logIdeConnection } from '../telemetry/loggers.js';
 import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 

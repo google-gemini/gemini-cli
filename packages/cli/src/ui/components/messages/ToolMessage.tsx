@@ -6,7 +6,8 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
+import type { IndividualToolCallDisplay } from '../../types.js';
+import { ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';

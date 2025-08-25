@@ -7,7 +7,7 @@
 // File for 'gemini mcp add' command
 import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
-import { MCPServerConfig } from '@google/gemini-cli-core';
+import type { MCPServerConfig } from '@google/gemini-cli-core';
 
 async function addMcpServer(
   name: string,

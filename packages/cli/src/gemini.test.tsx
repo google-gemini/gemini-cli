@@ -12,13 +12,10 @@ import {
   validateDnsResolutionOrder,
   startInteractiveUI,
 } from './gemini.js';
-import {
-  LoadedSettings,
-  SettingsFile,
-  loadSettings,
-} from './config/settings.js';
+import type { SettingsFile } from './config/settings.js';
+import { LoadedSettings, loadSettings } from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import { Config } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
 
 // Custom error to identify mock process.exit calls
 class MockProcessExitError extends Error {

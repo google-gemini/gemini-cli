@@ -5,7 +5,7 @@
  */
 
 import { useState, useRef, useCallback } from 'react';
-import { HistoryItem } from '../types.js';
+import type { HistoryItem } from '../types.js';
 
 // Type for the updater function passed to updateHistoryItem
 type HistoryItemUpdater = (

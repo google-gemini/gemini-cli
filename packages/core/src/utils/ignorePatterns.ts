@@ -5,7 +5,7 @@
  */
 
 import path from 'path';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { getCurrentGeminiMdFilename } from '../tools/memoryTool.js';
 
 /**

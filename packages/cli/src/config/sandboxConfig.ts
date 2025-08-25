@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SandboxConfig } from '@google/gemini-cli-core';
+import type { SandboxConfig } from '@google/gemini-cli-core';
 import commandExists from 'command-exists';
 import * as os from 'node:os';
 import { getPackageJson } from '../utils/package.js';
-import { Settings } from './settings.js';
+import type { Settings } from './settings.js';
 
 // This is a stripped-down version of the CliArgs interface from config.ts
 // to avoid circular dependencies.

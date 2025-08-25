@@ -11,7 +11,7 @@ import fs from 'node:fs/promises';
 import { vi, describe, expect, it, afterEach, beforeEach } from 'vitest';
 import * as gitUtils from '../../utils/gitUtils.js';
 import { setupGithubCommand, updateGitignore } from './setupGithubCommand.js';
-import { CommandContext, ToolActionReturn } from './types.js';
+import type { CommandContext, ToolActionReturn } from './types.js';
 import * as commandUtils from '../utils/commandUtils.js';
 
 vi.mock('child_process');

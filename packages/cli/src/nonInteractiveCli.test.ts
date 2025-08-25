@@ -4,16 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   Config,
-  executeToolCall,
   ToolRegistry,
+  ServerGeminiStreamEvent,
+} from '@google/gemini-cli-core';
+import {
+  executeToolCall,
   ToolErrorType,
   shutdownTelemetry,
   GeminiEventType,
-  ServerGeminiStreamEvent,
 } from '@google/gemini-cli-core';
-import { Part } from '@google/genai';
+import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { vi } from 'vitest';
 

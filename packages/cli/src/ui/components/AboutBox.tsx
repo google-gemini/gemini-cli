@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
-import { UserTierId } from '@google/gemini-cli-core';
+import type { UserTierId } from '@google/gemini-cli-core';
 import { getLicenseDisplay } from '../../utils/license.js';
 
 interface AboutBoxProps {

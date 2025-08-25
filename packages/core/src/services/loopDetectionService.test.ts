@@ -5,14 +5,14 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Config } from '../config/config.js';
-import { GeminiClient } from '../core/client.js';
-import {
-  GeminiEventType,
+import type { Config } from '../config/config.js';
+import type { GeminiClient } from '../core/client.js';
+import type {
   ServerGeminiContentEvent,
   ServerGeminiStreamEvent,
   ServerGeminiToolCallRequestEvent,
 } from '../core/turn.js';
+import { GeminiEventType } from '../core/turn.js';
 import * as loggers from '../telemetry/loggers.js';
 import { LoopType } from '../telemetry/types.js';
 import { LoopDetectionService } from './loopDetectionService.js';

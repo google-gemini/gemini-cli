@@ -20,9 +20,9 @@ vi.mock('fs', () => ({
   mkdirSync: vi.fn(),
 }));
 import { LSTool } from './ls.js';
-import { Config } from '../config/config.js';
-import { WorkspaceContext } from '../utils/workspaceContext.js';
-import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import type { Config } from '../config/config.js';
+import type { WorkspaceContext } from '../utils/workspaceContext.js';
+import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { ToolErrorType } from './tool-error.js';
 
 describe('LSTool', () => {

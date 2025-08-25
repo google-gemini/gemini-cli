@@ -5,13 +5,13 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import type { Config } from '@google/gemini-cli-core';
 import {
-  Config,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   getResponseText,
 } from '@google/gemini-cli-core';
-import { Content, GenerateContentConfig } from '@google/genai';
-import { TextBuffer } from '../components/shared/text-buffer.js';
+import type { Content, GenerateContentConfig } from '@google/genai';
+import type { TextBuffer } from '../components/shared/text-buffer.js';
 
 export const PROMPT_COMPLETION_MIN_LENGTH = 5;
 export const PROMPT_COMPLETION_DEBOUNCE_MS = 250;
