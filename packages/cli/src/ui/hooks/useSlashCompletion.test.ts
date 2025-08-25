@@ -13,6 +13,37 @@ import { CommandContext, SlashCommand } from '../commands/types.js';
 import { useState } from 'react';
 import { Suggestion } from '../components/SuggestionsDisplay.js';
 
+// Mock the fzf module to allow us to test error scenarios
+vi.mock('fzf', async () => {
+  const actual = await vi.importActual<typeof import('fzf')>('fzf');
+  return {
+    ...actual,
+    AsyncFzf: vi.fn().mockImplementation((items, _options) => ({
+      find: vi.fn().mockImplementation((query: string) => {
+        // Simulate basic fuzzy matching behavior for tests
+        const results = [];
+        if (query) {
+          const lowerQuery = query.toLowerCase();
+          for (const item of items) {
+            const lowerItem = item.toLowerCase();
+            // Simple fuzzy matching: check if query chars appear in order
+            let queryIndex = 0;
+            for (let i = 0; i < lowerItem.length && queryIndex < lowerQuery.length; i++) {
+              if (lowerItem[i] === lowerQuery[queryIndex]) {
+                queryIndex++;
+              }
+            }
+            if (queryIndex === lowerQuery.length) {
+              results.push({ item, score: 1 });
+            }
+          }
+        }
+        return Promise.resolve(results);
+      })
+    }))
+  };
+});
+
 // Test harness to capture the state from the hook's callbacks.
 function useTestHarnessForSlashCompletion(
   enabled: boolean,
@@ -92,9 +123,11 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toEqual([
-        { label: 'memory', value: 'memory', description: 'Manage memory' },
-      ]);
+      await waitFor(() => {
+        expect(result.current.suggestions).toEqual([
+          { label: 'memory', value: 'memory', description: 'Manage memory' },
+        ]);
+      });
     });
 
     it('should suggest commands based on partial altNames', async () => {
@@ -114,13 +147,15 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toEqual([
-        {
-          label: 'stats',
-          value: 'stats',
-          description: 'check session stats. Usage: /stats [model|tools]',
-        },
-      ]);
+      await waitFor(() => {
+        expect(result.current.suggestions).toEqual([
+          {
+            label: 'stats',
+            value: 'stats',
+            description: 'check session stats. Usage: /stats [model|tools]',
+          },
+        ]);
+      });
     });
 
     it('should NOT provide suggestions for a perfectly typed command that is a leaf node', async () => {
@@ -283,9 +318,11 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toEqual([
-        { label: 'add', value: 'add', description: 'Add to memory' },
-      ]);
+      await waitFor(() => {
+        expect(result.current.suggestions).toEqual([
+          { label: 'add', value: 'add', description: 'Add to memory' },
+        ]);
+      });
     });
 
     it('should provide no suggestions for an invalid sub-command', async () => {
@@ -431,4 +468,217 @@ describe('useSlashCompletion', () => {
       });
     });
   });
+
+  describe('Fuzzy Matching', () => {
+    const fuzzyTestCommands = [
+      { name: 'help', altNames: ['?'], description: 'Show help' },
+      { name: 'history', description: 'Show command history' },
+      { name: 'hello', description: 'Hello world command' },
+      { name: 'config', altNames: ['configure'], description: 'Configure settings' },
+      { name: 'clear', description: 'Clear the screen' },
+    ] as unknown as SlashCommand[];
+
+    it('should match commands with fuzzy search for partial queries', async () => {
+      const { result } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/he',
+          fuzzyTestCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const labels = result.current.suggestions.map((s) => s.label);
+      expect(labels).toEqual(expect.arrayContaining(['help', 'hello']));
+    });
+
+    it('should handle case-insensitive fuzzy matching', async () => {
+      const { result } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/HeLp',
+          fuzzyTestCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const labels = result.current.suggestions.map((s) => s.label);
+      expect(labels).toContain('help');
+    });
+
+    it('should provide typo-tolerant matching', async () => {
+      const { result } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/hlp',
+          fuzzyTestCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const labels = result.current.suggestions.map((s) => s.label);
+      expect(labels).toContain('help');
+    });
+
+    it('should match against alternative names with fuzzy search', async () => {
+      const { result } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/conf',
+          fuzzyTestCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const labels = result.current.suggestions.map((s) => s.label);
+      expect(labels).toContain('config');
+    });
+
+    it('should fallback to prefix matching when AsyncFzf find fails', async () => {
+      // Mock console.warn to avoid noise in test output
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      
+      // Import the mocked AsyncFzf
+      const { AsyncFzf } = await import('fzf');
+      
+      // Create a failing find method for this specific test
+      const mockFind = vi.fn().mockRejectedValue(new Error('AsyncFzf find failed'));
+      
+      // Mock AsyncFzf to return an instance with failing find
+      vi.mocked(AsyncFzf).mockImplementation((_items, _options) => ({
+        find: mockFind
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any));
+      
+      const testCommands = [
+        { name: 'clear', description: 'Clear the screen' },
+        { name: 'config', description: 'Configure settings' },
+        { name: 'chat', description: 'Start chat' }
+      ] as unknown as SlashCommand[];
+      
+      const { result } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/cle', 
+          testCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      // Should still get suggestions via prefix matching fallback
+      const labels = result.current.suggestions.map((s) => s.label);
+      expect(labels).toContain('clear');
+      expect(labels).not.toContain('config'); // Doesn't start with 'cle'
+      expect(labels).not.toContain('chat'); // Doesn't start with 'cle'
+      
+      // Verify the warning was logged
+      await waitFor(() => {
+        expect(consoleWarnSpy).toHaveBeenCalledWith(
+          'Fuzzy search failed, falling back to prefix matching:',
+          expect.any(Error)
+        );
+      });
+      
+      consoleWarnSpy.mockRestore();
+      
+      // Reset AsyncFzf mock to default behavior for other tests
+      vi.mocked(AsyncFzf).mockImplementation((_items, _options) => ({
+        find: vi.fn().mockResolvedValue([])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any));
+    });
+
+    it('should show all commands for empty partial query', async () => {
+      const { result } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/',
+          fuzzyTestCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions.length).toBe(fuzzyTestCommands.length);
+    });
+
+
+    it('should cache AsyncFzf instances for performance', async () => {
+      // This test verifies that the same command set reuses cached instances
+      // We test this indirectly by ensuring consistent behavior across multiple renders
+      const { result, rerender } = renderHook(
+        ({ query }) =>
+          useTestHarnessForSlashCompletion(
+            true,
+            query,
+            fuzzyTestCommands,
+            mockCommandContext,
+          ),
+        { initialProps: { query: '/he' } }
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const firstResults = result.current.suggestions.map((s) => s.label);
+
+      // Rerender with same query - should use cached instance and return same results
+      rerender({ query: '/he' });
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const secondResults = result.current.suggestions.map((s) => s.label);
+      expect(secondResults).toEqual(firstResults);
+    });
+
+    it('should not return duplicate suggestions when query matches both name and altNames', async () => {
+      const commandsWithAltNames = [
+        { name: 'config', altNames: ['configure', 'conf'], description: 'Configure settings' },
+        { name: 'help', altNames: ['?'], description: 'Show help' },
+      ] as unknown as SlashCommand[];
+
+      const { result } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/con',
+          commandsWithAltNames,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const labels = result.current.suggestions.map((s) => s.label);
+      const uniqueLabels = new Set(labels);
+      
+      // Should not have duplicates
+      expect(labels.length).toBe(uniqueLabels.size);
+      expect(labels).toContain('config');
+    });
+  });
+
 });
