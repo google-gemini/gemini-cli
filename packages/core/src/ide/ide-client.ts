@@ -22,6 +22,13 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { EnvHttpProxyAgent } from 'undici';
+import { mcpToTool } from '@google/genai';
+import {
+  hasValidTypes,
+  MCP_DEFAULT_TIMEOUT_MSEC,
+} from '../tools/mcp-client.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { ToolRegistry } from '../tools/tool-registry.js';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,6 +67,30 @@ function getRealPath(path: string): string {
     return path;
   }
 }
+
+/**
+ * Always disabled tools from the IDE companion MCP server.
+ */
+const DISALLOWED_IDE_TOOLS = new Set([
+  // These are invoked explicitly, not available to the LLM
+  'openDiff',
+  'closeDiff',
+  // Duplicates, we have our own shell command handling
+  'run_in_terminal',
+  'get_terminal_output',
+  // These we may want to eventually restore but blocking them for now
+  'create_and_run_task',
+  'get_task_output',
+  'run_task',
+]);
+
+/**
+ * Patterns for tool names to disallow from the IDE companion MCP server.
+ */
+const DISALLOWED_IDE_TOOL_PATTERNS = [
+  // Ignore all copilot related tools
+  new RegExp('^copilot.*'),
+];
 
 /**
  * Manages the connection to and interaction with the IDE server.
@@ -225,6 +256,80 @@ export class IdeClient {
       logger.debug(`callTool for ${filePath} failed:`, err);
     }
     return;
+  }
+
+  async discoverTools(toolRegistry: ToolRegistry): Promise<void> {
+    if (this.state.status !== IDEConnectionStatus.Connected || !this.client) {
+      logger.debug('Cannot discover tools, IDE client not connected.');
+      return;
+    }
+
+    try {
+      const mcpCallableTool = mcpToTool(this.client);
+      const tool = await mcpCallableTool.tool();
+
+      if (!Array.isArray(tool.functionDeclarations)) {
+        return;
+      }
+
+      for (const funcDecl of tool.functionDeclarations) {
+        try {
+          if (!funcDecl.name) {
+            logger.debug(
+              `Discovered a function declaration without a name from IDE client. Skipping.`,
+            );
+            continue;
+          }
+
+          if (
+            DISALLOWED_IDE_TOOLS.has(funcDecl.name) ||
+            DISALLOWED_IDE_TOOL_PATTERNS.some((pattern) =>
+              pattern.test(funcDecl.name!),
+            )
+          ) {
+            logger.debug(
+              `Skipping explicitly blocked IDE tool ${funcDecl.name}`,
+            );
+            continue;
+          }
+
+          if (!hasValidTypes(funcDecl.parametersJsonSchema)) {
+            logger.debug(
+              `Skipping tool '${funcDecl.name}' from IDE because it has missing types in its parameter schema.`,
+            );
+            continue;
+          }
+
+          const discoveredTool = new DiscoveredMCPTool(
+            mcpCallableTool,
+            'gemini-ide-companion',
+            funcDecl.name,
+            funcDecl.description ?? '',
+            funcDecl.parametersJsonSchema ?? {
+              type: 'object',
+              properties: {},
+            },
+            MCP_DEFAULT_TIMEOUT_MSEC,
+            false,
+          );
+          logger.debug(`Registering IDE tool ${funcDecl.name}`);
+          toolRegistry.registerTool(discoveredTool);
+        } catch (error) {
+          logger.error(
+            `Error discovering tool: '${
+              funcDecl.name ?? 'unknown'
+            }' from IDE: ${(error as Error).message}`,
+          );
+        }
+      }
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        !error.message?.includes('Method not found')
+      ) {
+        logger.error(`Error discovering tools from IDE:`, error);
+      }
+    }
   }
 
   // Closes the diff. Instead of waiting for a notification,

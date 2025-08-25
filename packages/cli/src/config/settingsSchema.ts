@@ -187,6 +187,16 @@ export const SETTINGS_SCHEMA = {
     description: 'Enable IDE integration mode',
     showInDialog: true,
   },
+  enableIdeLanguageModelTools: {
+    type: 'boolean',
+    label: 'Enable IDE Language Model Tools',
+    category: 'Mode',
+    requiresRestart: true,
+    default: false,
+    description:
+      'Enables any tools registered by your IDE and its extensions/plugins.',
+    showInDialog: true,
+  },
 
   accessibility: {
     type: 'object',

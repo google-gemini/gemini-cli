@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createMcpServer } from './ide-server.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
@@ -31,7 +32,20 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 
+const registerToolsSpy = vi.hoisted(() => vi.fn());
+const mockLanguageModelTools = vi.hoisted(() => ({
+  LanguageModelTools: vi.fn().mockImplementation(() => ({
+    registerTools: registerToolsSpy,
+  })),
+}));
+
+vi.mock('./lm-tools.js', () => mockLanguageModelTools);
+
 const vscodeMock = vi.hoisted(() => ({
+  lm: {
+    tools: [],
+    invokeTool: vi.fn(),
+  },
   workspace: {
     workspaceFolders: [
       {
@@ -90,7 +104,7 @@ describe('IDEServer', () => {
 
   afterEach(async () => {
     await ideServer.stop();
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
     vscodeMock.workspace.workspaceFolders = [
       { uri: { fsPath: '/test/workspace1' } },
       { uri: { fsPath: '/test/workspace2' } },
@@ -284,4 +298,13 @@ describe('IDEServer', () => {
       );
     },
   );
+
+  it('registers the VsCode lm tools when creating the MCP server', async () => {
+    const server = createMcpServer(mocks.diffManager, mockLog);
+
+    expect(mockLanguageModelTools.LanguageModelTools).toHaveBeenCalledWith(
+      mockLog,
+    );
+    expect(registerToolsSpy).toHaveBeenCalledWith(server);
+  });
 });
