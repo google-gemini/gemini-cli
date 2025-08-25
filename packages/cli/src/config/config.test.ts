@@ -732,19 +732,23 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   //    readability, and content based on paths derived from the mocked os.homedir().
   // 3. Spies on console functions (for logger output) are correctly set up if needed.
   // Example of a previously failing test structure:
-  /*
-  it('should correctly use mocked homedir for global path', async () => {
+  it.skip('should correctly use mocked homedir for global path', async () => {
     const MOCK_GEMINI_DIR_LOCAL = path.join('/mock/home/user', '.gemini');
-    const MOCK_GLOBAL_PATH_LOCAL = path.join(MOCK_GEMINI_DIR_LOCAL, 'GEMINI.md');
+    const MOCK_GLOBAL_PATH_LOCAL = path.join(
+      MOCK_GEMINI_DIR_LOCAL,
+      'GEMINI.md',
+    );
     mockFs({
-      [MOCK_GLOBAL_PATH_LOCAL]: { type: 'file', content: 'GlobalContentOnly' }
+      [MOCK_GLOBAL_PATH_LOCAL]: { type: 'file', content: 'GlobalContentOnly' },
     });
-    const memory = await loadHierarchicalGeminiMemory("/some/other/cwd", false);
+    const memory = await loadHierarchicalGeminiMemory('/some/other/cwd', false);
     expect(memory).toBe('GlobalContentOnly');
     expect(vi.mocked(os.homedir)).toHaveBeenCalled();
-    expect(fsPromises.readFile).toHaveBeenCalledWith(MOCK_GLOBAL_PATH_LOCAL, 'utf-8');
+    expect(fsPromises.readFile).toHaveBeenCalledWith(
+      MOCK_GLOBAL_PATH_LOCAL,
+      'utf-8',
+    );
   });
-  */
 });
 
 describe('mergeMcpServers', () => {
@@ -1306,7 +1310,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     });
   });
 
-  it('should override allowMCPServers with excludeMCPServers if overlapping ', async () => {
+  it('should override allowMCPServers with excludeMCPServers if overlapping', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {
@@ -1320,7 +1324,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     });
   });
 
-  it('should prioritize mcp server flag if set ', async () => {
+  it('should prioritize mcp server flag if set', async () => {
     process.argv = [
       'node',
       'script.js',
