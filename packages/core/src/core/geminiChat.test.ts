@@ -120,57 +120,63 @@ describe('GeminiChat', () => {
         'This is the visible text that should not be lost.',
       );
     });
-    it('should maintain alternating history when a tool-use turn is followed by an empty model response', async () => {
-      // 1. Setup: Create a history ending with a user's tool response.
-      // This is the state right before the model is expected to reply.
-      const functionCallTurn: Content = {
-        role: 'model',
-        parts: [{ functionCall: { name: 'test_tool', args: {} } }],
-      };
-      const functionResponseTurn: Content = {
-        role: 'user',
-        parts: [{ functionResponse: { name: 'test_tool', response: {} } }],
-      };
-      chat.addHistory({ role: 'user', parts: [{ text: 'Initial prompt' }] });
-      chat.addHistory(functionCallTurn);
-      chat.addHistory(functionResponseTurn);
+    it('should add a placeholder model turn when a tool call is followed by an empty model response', async () => {
+      // 1. Setup: A history where the model has just made a function call.
+      const initialHistory: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Find a good Italian restaurant for me.' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'find_restaurant',
+                args: { cuisine: 'Italian' },
+              },
+            },
+          ],
+        },
+      ];
+      chat.setHistory(initialHistory);
 
-      // 2. Mock the API to return a response that is "empty" from a content perspective
-      // (i.e., it only contains a 'thought' that will be filtered out).
+      // 2. Mock the API to return an empty/thought-only response.
       const emptyModelResponse = {
         candidates: [
-          {
-            content: {
-              parts: [{ thought: true }],
-              role: 'model',
-            },
-          },
+          { content: { role: 'model', parts: [{ thought: true }] } },
         ],
       } as unknown as GenerateContentResponse;
       vi.mocked(mockModelsModule.generateContent).mockResolvedValue(
         emptyModelResponse,
       );
 
-      // 3. Action: Send a new, regular user prompt. This action triggers the recording
-      // of the previous turn's history (the tool response + the model's empty reply).
-      await chat.sendMessage({ message: 'Next question' }, 'prompt-id-1');
+      // 3. Action: Send the function response back to the model.
+      await chat.sendMessage(
+        {
+          message: {
+            functionResponse: {
+              name: 'find_restaurant',
+              response: { name: 'Vesuvio' },
+            },
+          },
+        },
+        'prompt-id-1',
+      );
 
-      // 4. Assert: Check the final state of the history.
+      // 4. Assert: The history should now have four valid, alternating turns.
       const history = chat.getHistory();
+      expect(history.length).toBe(4);
 
-      // The history should be: [user, model(tool_call), user(tool_response), user(new_prompt), model(empty)]
-      expect(history.length).toBe(5);
-
-      // The final turn should be the empty model response.
-      const lastTurn = history[history.length - 1]!;
+      // The final turn must be the empty model placeholder.
+      const lastTurn = history[3]!;
       expect(lastTurn.role).toBe('model');
-      expect(lastTurn.parts?.length).toBe(0);
+      expect(lastTurn?.parts?.length).toBe(0);
 
-      // The second-to-last turn should be the new user prompt.
-      const secondToLastTurn = history[history.length - 2]!;
+      // The second-to-last turn must be the function response we sent.
+      const secondToLastTurn = history[2]!;
       expect(secondToLastTurn.role).toBe('user');
-      // You'll also need to assert that parts[0] exists before accessing its 'text' property
-      expect(secondToLastTurn.parts).toEqual([{ text: 'Next question' }]);
+      expect(secondToLastTurn?.parts![0]!.functionResponse).toBeDefined();
     });
     it('should call generateContent with the correct parameters', async () => {
       const response = {
@@ -256,12 +262,12 @@ describe('GeminiChat', () => {
 
       // CRUCIAL ASSERTION: There should be two separate parts.
       // The old, non-strict logic would incorrectly merge them, resulting in one part.
-      expect(modelTurn.parts.length).toBe(2);
+      expect(modelTurn?.parts?.length).toBe(2);
 
       // Verify the contents of each part.
-      expect(modelTurn.parts[0]!.text).toBe('Some text');
-      expect(modelTurn.parts[0]!.functionCall).toBeDefined();
-      expect(modelTurn.parts[1]!.text).toBe(' that should not be merged.');
+      expect(modelTurn?.parts![0]!.text).toBe('Some text');
+      expect(modelTurn?.parts![0]!.functionCall).toBeDefined();
+      expect(modelTurn?.parts![1]!.text).toBe(' that should not be merged.');
     });
 
     it('should consolidate subsequent text chunks after receiving an empty text chunk', async () => {
@@ -415,30 +421,32 @@ describe('GeminiChat', () => {
         'This is the visible text that should not be lost.',
       );
     });
-    it('should maintain alternating history when a tool-use turn is followed by an empty model response', async () => {
-      // 1. Setup: Create a history ending with a user's tool response.
-      const functionCallTurn: Content = {
-        role: 'model',
-        parts: [{ functionCall: { name: 'test_tool', args: {} } }],
-      };
-      const functionResponseTurn: Content = {
-        role: 'user',
-        parts: [{ functionResponse: { name: 'test_tool', response: {} } }],
-      };
-      chat.addHistory({ role: 'user', parts: [{ text: 'Initial prompt' }] });
-      chat.addHistory(functionCallTurn);
-      chat.addHistory(functionResponseTurn);
+    it('should add a placeholder model turn when a tool call is followed by an empty stream response', async () => {
+      // 1. Setup: A history where the model has just made a function call.
+      const initialHistory: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Find a good Italian restaurant for me.' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'find_restaurant',
+                args: { cuisine: 'Italian' },
+              },
+            },
+          ],
+        },
+      ];
+      chat.setHistory(initialHistory);
 
-      // 2. Mock the API to return a stream that is "empty" from a content perspective
+      // 2. Mock the API to return an empty/thought-only stream.
       const emptyStreamResponse = (async function* () {
         yield {
           candidates: [
-            {
-              content: {
-                parts: [{ thought: true }],
-                role: 'model',
-              },
-            },
+            { content: { role: 'model', parts: [{ thought: true }] } },
           ],
         } as unknown as GenerateContentResponse;
       })();
@@ -446,26 +454,35 @@ describe('GeminiChat', () => {
         emptyStreamResponse,
       );
 
+      // 3. Action: Send the function response back to the model and consume the stream.
       const stream = await chat.sendMessageStream(
-        { message: 'Next question' },
-        'prompt-id-stream',
+        {
+          message: {
+            functionResponse: {
+              name: 'find_restaurant',
+              response: { name: 'Vesuvio' },
+            },
+          },
+        },
+        'prompt-id-stream-1',
       );
       for await (const _ of stream) {
-        // consume stream
+        // This loop consumes the stream to trigger the internal logic.
       }
 
+      // 4. Assert: The history should now have four valid, alternating turns.
       const history = chat.getHistory();
-      expect(history.length).toBe(5);
+      expect(history.length).toBe(4);
 
-      // The final turn should be the empty model response.
-      const lastTurn = history[history.length - 1];
-      expect(lastTurn?.role).toBe('model');
+      // The final turn must be the empty model placeholder.
+      const lastTurn = history[3]!;
+      expect(lastTurn.role).toBe('model');
       expect(lastTurn?.parts?.length).toBe(0);
 
-      // The second-to-last turn should be the new user prompt.
-      const secondToLastTurn = history[history.length - 2];
-      expect(secondToLastTurn?.role).toBe('user');
-      expect(secondToLastTurn?.parts).toEqual([{ text: 'Next question' }]);
+      // The second-to-last turn must be the function response we sent.
+      const secondToLastTurn = history[2]!;
+      expect(secondToLastTurn.role).toBe('user');
+      expect(secondToLastTurn?.parts![0]!.functionResponse).toBeDefined();
     });
 
     it('should call generateContentStream with the correct parameters', async () => {
