@@ -67,7 +67,8 @@ describe('IdeClient fallback connection logic', () => {
     process.env['TERM_PROGRAM'] = 'vscode';
     process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = process.cwd();
     // Reset instance
-    (IdeClient as any).instance = undefined;
+    (IdeClient as unknown as { instance: IdeClient | undefined }).instance =
+      undefined;
   });
 
   afterEach(async () => {
@@ -110,7 +111,7 @@ describe('IdeClient fallback connection logic', () => {
 });
 
 describe.skip('getIdeProcessId', () => {
-  let child: ChildProcess;
+  let child: child_process.ChildProcess;
 
   afterEach(() => {
     if (child) {
@@ -173,7 +174,8 @@ describe('IdeClient with proxy', () => {
     vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', process.cwd());
 
     // Reset instance
-    (IdeClient as any).instance = undefined;
+    (IdeClient as unknown as { instance: IdeClient | undefined }).instance =
+      undefined;
   });
 
   afterEach(async () => {
