@@ -284,6 +284,11 @@ export class SubAgentScope {
   ): Promise<SubAgentScope> {
     if (toolConfig) {
       const toolRegistry = runtimeContext.getToolRegistry();
+      if (!toolRegistry) {
+        throw new Error(
+          'Tool registry not available, but tool config was provided.',
+        );
+      }
       const toolsToLoad: string[] = [];
       for (const tool of toolConfig.tools) {
         if (typeof tool === 'string') {
@@ -361,9 +366,11 @@ export class SubAgentScope {
           toolsList.push(tool);
         }
       }
-      toolsList.push(
-        ...toolRegistry.getFunctionDeclarationsFiltered(toolsToLoad),
-      );
+      if (toolRegistry) {
+        toolsList.push(
+          ...toolRegistry.getFunctionDeclarationsFiltered(toolsToLoad),
+        );
+      }
     }
     // Add local scope functions if outputs are expected.
     if (this.outputConfig && this.outputConfig.outputs) {
@@ -573,8 +580,13 @@ export class SubAgentScope {
         generationConfig.systemInstruction = systemInstruction;
       }
 
+      const contentGeneratorConfig =
+        this.runtimeContext.getContentGeneratorConfig();
+      if (!contentGeneratorConfig) {
+        throw new Error('Content generator config not found.');
+      }
       const contentGenerator = await createContentGenerator(
-        this.runtimeContext.getContentGeneratorConfig(),
+        contentGeneratorConfig,
         this.runtimeContext,
         this.runtimeContext.getSessionId(),
       );

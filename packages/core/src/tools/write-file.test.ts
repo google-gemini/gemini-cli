@@ -764,9 +764,6 @@ describe('WriteFileTool', () => {
       const filePath = path.join(rootDir, 'generic_error_file.txt');
       const content = 'test content';
 
-      // Ensure fs.existsSync is not mocked for this test
-      vi.restoreAllMocks();
-
       // Mock FileSystemService writeTextFile to throw generic error
       vi.spyOn(fsService, 'writeTextFile').mockImplementationOnce(() =>
         Promise.reject(new Error('Generic write error')),

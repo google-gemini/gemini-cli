@@ -39,6 +39,9 @@ export async function runNonInteractive(
     });
 
     const geminiClient = config.getGeminiClient();
+    if (!geminiClient) {
+      throw new Error('Gemini client not available');
+    }
 
     const abortController = new AbortController();
 

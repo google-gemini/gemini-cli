@@ -114,7 +114,7 @@ describe('ClearcutLogger', () => {
     vi.unstubAllEnvs();
   });
 
-  function setup({
+  async function setup({
     config = {} as Partial<ConfigParameters>,
     lifetimeGoogleAccounts = 1,
     cachedGoogleAccount = 'test@google.com',
@@ -126,7 +126,7 @@ describe('ClearcutLogger', () => {
     vi.useFakeTimers();
     vi.setSystemTime(MOCK_DATE);
 
-    const loggerConfig = makeFakeConfig({
+    const loggerConfig = await makeFakeConfig({
       ...config,
     });
     ClearcutLogger.clearInstance();
@@ -159,9 +159,9 @@ describe('ClearcutLogger', () => {
       },
     ])(
       'returns an instance if usage statistics are enabled',
-      ({ usageStatisticsEnabled, expectedValue }) => {
+      async ({ usageStatisticsEnabled, expectedValue }) => {
         ClearcutLogger.clearInstance();
-        const { logger } = setup({
+        const { logger } = await setup({
           config: {
             usageStatisticsEnabled,
           },
@@ -170,9 +170,9 @@ describe('ClearcutLogger', () => {
       },
     );
 
-    it('is a singleton', () => {
+    it('is a singleton', async () => {
       ClearcutLogger.clearInstance();
-      const { loggerConfig } = setup();
+      const { loggerConfig } = await setup();
       const logger1 = ClearcutLogger.getInstance(loggerConfig);
       const logger2 = ClearcutLogger.getInstance(loggerConfig);
       expect(logger1).toBe(logger2);
@@ -180,8 +180,8 @@ describe('ClearcutLogger', () => {
   });
 
   describe('createLogEvent', () => {
-    it('logs the total number of google accounts', () => {
-      const { logger } = setup({
+    it('logs the total number of google accounts', async () => {
+      const { logger } = await setup({
         lifetimeGoogleAccounts: 9001,
       });
 
@@ -193,8 +193,8 @@ describe('ClearcutLogger', () => {
       });
     });
 
-    it('logs the current surface from a github action', () => {
-      const { logger } = setup({});
+    it('logs the current surface from a github action', async () => {
+      const { logger } = await setup({});
 
       vi.stubEnv('GITHUB_SHA', '8675309');
 
@@ -206,7 +206,7 @@ describe('ClearcutLogger', () => {
       });
     });
 
-    it('logs default metadata', () => {
+    it('logs default metadata', async () => {
       // Define expected values
       const session_id = 'my-session-id';
       const auth_type = AuthType.USE_GEMINI;
@@ -217,7 +217,7 @@ describe('ClearcutLogger', () => {
       const prompt_id = 'my-prompt-123';
 
       // Setup logger with expected values
-      const { logger, loggerConfig } = setup({
+      const { logger, loggerConfig } = await setup({
         lifetimeGoogleAccounts: google_accounts,
         config: { sessionId: session_id },
       });
@@ -265,8 +265,8 @@ describe('ClearcutLogger', () => {
       );
     });
 
-    it('logs the current surface', () => {
-      const { logger } = setup({});
+    it('logs the current surface', async () => {
+      const { logger } = await setup({});
 
       vi.stubEnv('TERM_PROGRAM', 'vscode');
       vi.stubEnv('SURFACE', 'ide-1234');
@@ -317,8 +317,8 @@ describe('ClearcutLogger', () => {
       },
     ])(
       'logs the current surface as $expectedValue, preempting vscode detection',
-      ({ env, expectedValue }) => {
-        const { logger } = setup({});
+      async ({ env, expectedValue }) => {
+        const { logger } = await setup({});
         for (const [key, value] of Object.entries(env)) {
           vi.stubEnv(key, value);
         }
@@ -333,8 +333,8 @@ describe('ClearcutLogger', () => {
   });
 
   describe('logChatCompressionEvent', () => {
-    it('logs an event with proper fields', () => {
-      const { logger } = setup();
+    it('logs an event with proper fields', async () => {
+      const { logger } = await setup();
       logger?.logChatCompressionEvent(
         makeChatCompressionEvent({
           tokens_before: 9001,
@@ -357,14 +357,14 @@ describe('ClearcutLogger', () => {
   });
 
   describe('enqueueLogEvent', () => {
-    it('should add events to the queue', () => {
-      const { logger } = setup();
+    it('should add events to the queue', async () => {
+      const { logger } = await setup();
       logger!.enqueueLogEvent(logger!.createLogEvent(EventNames.API_ERROR));
       expect(getEventsSize(logger!)).toBe(1);
     });
 
-    it('should evict the oldest event when the queue is full', () => {
-      const { logger } = setup();
+    it('should evict the oldest event when the queue is full', async () => {
+      const { logger } = await setup();
 
       for (let i = 0; i < TEST_ONLY.MAX_EVENTS; i++) {
         logger!.enqueueLogEvent(
@@ -409,7 +409,7 @@ describe('ClearcutLogger', () => {
 
   describe('flushToClearcut', () => {
     it('allows for usage with a configured proxy agent', async () => {
-      const { logger } = setup({
+      const { logger } = await setup({
         config: {
           proxy: 'http://mycoolproxy.whatever.com:3128',
         },
@@ -423,7 +423,7 @@ describe('ClearcutLogger', () => {
     });
 
     it('should clear events on successful flush', async () => {
-      const { logger } = setup();
+      const { logger } = await setup();
 
       logger!.enqueueLogEvent(logger!.createLogEvent(EventNames.API_ERROR));
       const response = await logger!.flushToClearcut();
@@ -433,7 +433,7 @@ describe('ClearcutLogger', () => {
     });
 
     it('should handle a network error and requeue events', async () => {
-      const { logger } = setup();
+      const { logger } = await setup();
 
       server.resetHandlers(http.post(CLEARCUT_URL, () => HttpResponse.error()));
       logger!.enqueueLogEvent(logger!.createLogEvent(EventNames.API_REQUEST));
@@ -451,7 +451,7 @@ describe('ClearcutLogger', () => {
     });
 
     it('should handle an HTTP error and requeue events', async () => {
-      const { logger } = setup();
+      const { logger } = await setup();
 
       server.resetHandlers(
         http.post(
@@ -479,8 +479,8 @@ describe('ClearcutLogger', () => {
   });
 
   describe('requeueFailedEvents logic', () => {
-    it('should limit the number of requeued events to max_retry_events', () => {
-      const { logger } = setup();
+    it('should limit the number of requeued events to max_retry_events', async () => {
+      const { logger } = await setup();
       const eventsToLogCount = TEST_ONLY.MAX_RETRY_EVENTS + 5;
       const eventsToSend: LogEventEntry[][] = [];
       for (let i = 0; i < eventsToLogCount; i++) {
@@ -504,8 +504,8 @@ describe('ClearcutLogger', () => {
       );
     });
 
-    it('should not requeue more events than available space in the queue', () => {
-      const { logger } = setup();
+    it('should not requeue more events than available space in the queue', async () => {
+      const { logger } = await setup();
       const maxEvents = TEST_ONLY.MAX_EVENTS;
       const spaceToLeave = 5;
       const initialEventCount = maxEvents - spaceToLeave;

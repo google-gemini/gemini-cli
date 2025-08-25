@@ -71,7 +71,7 @@ ${directoryContext}
   const toolRegistry = config.getToolRegistry();
 
   // Add full file context if the flag is set
-  if (config.getFullContext()) {
+  if (config.getFullContext() && toolRegistry) {
     try {
       const readManyFilesTool = toolRegistry.getTool('read_many_files');
       if (readManyFilesTool) {

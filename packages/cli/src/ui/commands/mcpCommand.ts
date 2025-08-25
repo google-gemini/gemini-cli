@@ -92,7 +92,7 @@ const getMcpStatus = async (
         tool instanceof DiscoveredMCPTool && tool.serverName === serverName,
     ) as DiscoveredMCPTool[];
     const promptRegistry = await config.getPromptRegistry();
-    const serverPrompts = promptRegistry.getPromptsByServer(serverName) || [];
+    const serverPrompts = promptRegistry?.getPromptsByServer(serverName) || [];
 
     const originalStatus = getMCPServerStatus(serverName);
     const hasCachedItems = serverTools.length > 0 || serverPrompts.length > 0;

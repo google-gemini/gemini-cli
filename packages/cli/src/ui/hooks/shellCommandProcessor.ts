@@ -30,10 +30,13 @@ export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const MAX_OUTPUT_LENGTH = 10000;
 
 function addShellCommandToGeminiHistory(
-  geminiClient: GeminiClient,
+  geminiClient: GeminiClient | undefined,
   rawQuery: string,
   resultText: string,
 ) {
+  if (!geminiClient) {
+    return;
+  }
   const modelContent =
     resultText.length > MAX_OUTPUT_LENGTH
       ? resultText.substring(0, MAX_OUTPUT_LENGTH) + '\n... (truncated)'
@@ -69,7 +72,7 @@ export const useShellCommandProcessor = (
   onExec: (command: Promise<void>) => void,
   onDebugMessage: (message: string) => void,
   config: Config,
-  geminiClient: GeminiClient,
+  geminiClient: GeminiClient | undefined,
 ) => {
   const handleShellCommand = useCallback(
     (rawQuery: PartListUnion, abortSignal: AbortSignal): boolean => {

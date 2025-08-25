@@ -67,7 +67,7 @@ enum StreamProcessingStatus {
  * API interaction, and tool call lifecycle.
  */
 export const useGeminiStream = (
-  geminiClient: GeminiClient,
+  geminiClient: GeminiClient | undefined,
   history: HistoryItem[],
   addItem: UseHistoryManagerReturn['addItem'],
   config: Config,
@@ -617,6 +617,16 @@ export const useGeminiStream = (
       options?: { isContinuation: boolean },
       prompt_id?: string,
     ) => {
+      if (!geminiClient) {
+        addItem(
+          {
+            type: MessageType.ERROR,
+            text: 'Gemini client not available.',
+          },
+          Date.now(),
+        );
+        return;
+      }
       if (
         (streamingState === StreamingState.Responding ||
           streamingState === StreamingState.WaitingForConfirmation) &&
@@ -725,7 +735,7 @@ export const useGeminiStream = (
 
   const handleCompletedTools = useCallback(
     async (completedToolCallsFromScheduler: TrackedToolCall[]) => {
-      if (isResponding) {
+      if (!geminiClient || isResponding) {
         return;
       }
 
@@ -852,7 +862,7 @@ export const useGeminiStream = (
 
   useEffect(() => {
     const saveRestorableToolCalls = async () => {
-      if (!config.getCheckpointingEnabled()) {
+      if (!geminiClient || !config.getCheckpointingEnabled()) {
         return;
       }
       const restorableToolCalls = toolCalls.filter(

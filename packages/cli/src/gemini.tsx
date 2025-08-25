@@ -236,8 +236,6 @@ export async function main() {
 
   setMaxSizedBoxDebugging(config.getDebugMode());
 
-  await config.initialize();
-
   if (config.getIdeMode()) {
     await config.getIdeClient().connect();
     logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));

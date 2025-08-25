@@ -148,6 +148,9 @@ class GeminiAgent {
     }
 
     const geminiClient = config.getGeminiClient();
+    if (!geminiClient) {
+      throw acp.RequestError.internalError();
+    }
     const chat = await geminiClient.startChat();
     const session = new Session(sessionId, chat, config, this.client);
     this.sessions.set(sessionId, session);
@@ -182,7 +185,6 @@ class GeminiAgent {
       cwd,
     );
 
-    await config.initialize();
     return config;
   }
 
@@ -362,6 +364,9 @@ class Session {
     }
 
     const toolRegistry = this.config.getToolRegistry();
+    if (!toolRegistry) {
+      return errorResponse(new Error('Tool registry not found.'));
+    }
     const tool = toolRegistry.getTool(fc.name as string);
 
     if (!tool) {
@@ -542,6 +547,9 @@ class Session {
     const ignoredPaths: string[] = [];
 
     const toolRegistry = this.config.getToolRegistry();
+    if (!toolRegistry) {
+      throw new Error('Tool registry not found.');
+    }
     const readManyFilesTool = toolRegistry.getTool('read_many_files');
     const globTool = toolRegistry.getTool('glob');
 

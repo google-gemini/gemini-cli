@@ -485,7 +485,7 @@ export async function loadCliConfig(
   // The screen reader argument takes precedence over the accessibility setting.
   const screenReader =
     argv.screenReader ?? settings.accessibility?.screenReader ?? false;
-  return new Config({
+  return Config.create({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,

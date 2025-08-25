@@ -20,15 +20,15 @@ import { AuthType } from '../core/contentGenerator.js';
 
 vi.mock('node:fs');
 
-describe('Flash Fallback Integration', () => {
+describe('Flash Fallback Integration', async () => {
   let config: Config;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.statSync).mockReturnValue({
       isDirectory: () => true,
     } as fs.Stats);
-    config = new Config({
+    config = await Config.create({
       sessionId: 'test-session',
       targetDir: '/test',
       debugMode: false,
@@ -135,7 +135,7 @@ describe('Flash Fallback Integration', () => {
     expect(mockFallbackHandler).not.toHaveBeenCalled();
   });
 
-  it('should properly disable simulation state after fallback', () => {
+  it('should properly disable simulation state after fallback', async () => {
     // Enable simulation
     setSimulate429(true);
 

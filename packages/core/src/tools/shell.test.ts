@@ -25,6 +25,7 @@ vi.mock('../utils/summarizer.js');
 
 import { isCommandAllowed } from '../utils/shell-utils.js';
 import { ShellTool } from './shell.js';
+import { type GeminiClient } from '../core/client.js';
 import { type Config } from '../config/config.js';
 import {
   type ShellExecutionResult,
@@ -49,6 +50,7 @@ describe('ShellTool', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    const mockGeminiClient = {} as GeminiClient;
     mockConfig = {
       getCoreTools: vi.fn().mockReturnValue([]),
       getExcludeTools: vi.fn().mockReturnValue([]),
@@ -56,7 +58,7 @@ describe('ShellTool', () => {
       getTargetDir: vi.fn().mockReturnValue('/test/dir'),
       getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
       getWorkspaceContext: () => createMockWorkspaceContext('.'),
-      getGeminiClient: vi.fn(),
+      getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
       getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 

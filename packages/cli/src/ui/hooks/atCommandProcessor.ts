@@ -155,6 +155,13 @@ export async function handleAtCommand({
   };
 
   const toolRegistry = config.getToolRegistry();
+  if (!toolRegistry) {
+    addItem(
+      { type: 'error', text: 'Error: Tool registry not found.' },
+      userMessageTimestamp,
+    );
+    return { processedQuery: null, shouldProceed: false };
+  }
   const readManyFilesTool = toolRegistry.getTool('read_many_files');
   const globTool = toolRegistry.getTool('glob');
 

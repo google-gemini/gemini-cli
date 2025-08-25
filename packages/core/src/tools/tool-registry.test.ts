@@ -52,7 +52,7 @@ const mockMcpClientOnError = vi.fn();
 const mockStdioTransportClose = vi.fn();
 const mockSseTransportClose = vi.fn();
 
-vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
+vi.mock('@modelcontextprotocol/sdk/client/index.js', async () => {
   const MockClient = vi.fn().mockImplementation(() => ({
     connect: mockMcpClientConnect,
     set onerror(handler: any) {
@@ -62,7 +62,7 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
   return { Client: MockClient };
 });
 
-vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => {
+vi.mock('@modelcontextprotocol/sdk/client/stdio.js', async () => {
   const MockStdioClientTransport = vi.fn().mockImplementation(() => ({
     stderr: {
       on: vi.fn(),
@@ -72,7 +72,7 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => {
   return { StdioClientTransport: MockStdioClientTransport };
 });
 
-vi.mock('@modelcontextprotocol/sdk/client/sse.js', () => {
+vi.mock('@modelcontextprotocol/sdk/client/sse.js', async () => {
   const MockSSEClientTransport = vi.fn().mockImplementation(() => ({
     close: mockSseTransportClose,
   }));
@@ -113,17 +113,17 @@ const baseConfigParams: ConfigParameters = {
   sessionId: 'test-session-id',
 };
 
-describe('ToolRegistry', () => {
+describe('ToolRegistry', async () => {
   let config: Config;
   let toolRegistry: ToolRegistry;
   let mockConfigGetToolDiscoveryCommand: ReturnType<typeof vi.spyOn>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.statSync).mockReturnValue({
       isDirectory: () => true,
     } as fs.Stats);
-    config = new Config(baseConfigParams);
+    config = await Config.create(baseConfigParams);
     toolRegistry = new ToolRegistry(config);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -152,16 +152,16 @@ describe('ToolRegistry', () => {
     vi.restoreAllMocks();
   });
 
-  describe('registerTool', () => {
-    it('should register a new tool', () => {
+  describe('registerTool', async () => {
+    it('should register a new tool', async () => {
       const tool = new MockTool();
       toolRegistry.registerTool(tool);
       expect(toolRegistry.getTool('mock-tool')).toBe(tool);
     });
   });
 
-  describe('getAllTools', () => {
-    it('should return all registered tools sorted alphabetically by displayName', () => {
+  describe('getAllTools', async () => {
+    it('should return all registered tools sorted alphabetically by displayName', async () => {
       // Register tools with displayNames in non-alphabetical order
       const toolC = new MockTool('c-tool', 'Tool C');
       const toolA = new MockTool('a-tool', 'Tool A');
@@ -179,8 +179,8 @@ describe('ToolRegistry', () => {
     });
   });
 
-  describe('getToolsByServer', () => {
-    it('should return an empty array if no tools match the server name', () => {
+  describe('getToolsByServer', async () => {
+    it('should return an empty array if no tools match the server name', async () => {
       toolRegistry.registerTool(new MockTool());
       expect(toolRegistry.getToolsByServer('any-mcp-server')).toEqual([]);
     });
@@ -245,7 +245,7 @@ describe('ToolRegistry', () => {
     });
   });
 
-  describe('discoverTools', () => {
+  describe('discoverTools', async () => {
     it('should will preserve tool parametersJsonSchema during discovery from command', async () => {
       const discoveryCommand = 'my-discovery-command';
       mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
@@ -409,8 +409,8 @@ describe('ToolRegistry', () => {
     });
   });
 
-  describe('DiscoveredToolInvocation', () => {
-    it('should return the stringified params from getDescription', () => {
+  describe('DiscoveredToolInvocation', async () => {
+    it('should return the stringified params from getDescription', async () => {
       const tool = new DiscoveredTool(config, 'test-tool', 'A test tool', {});
       const params = { param: 'testValue' };
       const invocation = tool.build(params);

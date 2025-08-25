@@ -81,7 +81,7 @@ describe('Configuration Integration Tests', () => {
         fileFilteringRespectGitIgnore: undefined, // Should default to true
       };
 
-      const config = new Config(configParams);
+      const config = await Config.create(configParams);
 
       expect(config.getFileFilteringRespectGitIgnore()).toBe(true);
     });
@@ -99,7 +99,7 @@ describe('Configuration Integration Tests', () => {
         },
       };
 
-      const config = new Config(configParams);
+      const config = await Config.create(configParams);
 
       expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
     });
@@ -115,7 +115,7 @@ describe('Configuration Integration Tests', () => {
         fileFilteringRespectGitIgnore: true,
       };
 
-      const config = new Config(configParams);
+      const config = await Config.create(configParams);
 
       expect(config.getFileFilteringRespectGitIgnore()).toBe(true);
     });
@@ -135,7 +135,7 @@ describe('Configuration Integration Tests', () => {
         },
       };
 
-      const config = new Config(configParams);
+      const config = await Config.create(configParams);
 
       // Specified settings should be applied
       expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
@@ -152,7 +152,7 @@ describe('Configuration Integration Tests', () => {
         fileFilteringRespectGitIgnore: undefined,
       };
 
-      const config = new Config(configParams);
+      const config = await Config.create(configParams);
 
       // All settings should use defaults
       expect(config.getFileFilteringRespectGitIgnore()).toBe(true);
@@ -169,7 +169,7 @@ describe('Configuration Integration Tests', () => {
         // Missing fileFiltering configuration
       };
 
-      const config = new Config(configParams);
+      const config = await Config.create(configParams);
 
       // All git-aware settings should use defaults
       expect(config.getFileFilteringRespectGitIgnore()).toBe(true);
@@ -188,7 +188,7 @@ describe('Configuration Integration Tests', () => {
         fileFilteringRespectGitIgnore: true,
       };
 
-      const config = new Config(configParams);
+      const config = await Config.create(configParams);
 
       expect(config.getFileFilteringRespectGitIgnore()).toBe(true);
     });
@@ -206,7 +206,7 @@ describe('Configuration Integration Tests', () => {
         }, // CI might need to see all files
       };
 
-      const config = new Config(configParams);
+      const config = await Config.create(configParams);
 
       expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
     });
@@ -224,14 +224,14 @@ describe('Configuration Integration Tests', () => {
         checkpointing: true,
       };
 
-      const config = new Config(configParams);
+      const config = await Config.create(configParams);
 
       expect(config.getCheckpointingEnabled()).toBe(true);
     });
   });
 
   describe('Extension Context Files', () => {
-    it('should have an empty array for extension context files by default', () => {
+    it('should have an empty array for extension context files by default', async () => {
       const configParams: ConfigParameters = {
         cwd: '/tmp',
         contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
@@ -240,11 +240,11 @@ describe('Configuration Integration Tests', () => {
         targetDir: tempDir,
         debugMode: false,
       };
-      const config = new Config(configParams);
+      const config = await Config.create(configParams);
       expect(config.getExtensionContextFilePaths()).toEqual([]);
     });
 
-    it('should correctly store and return extension context file paths', () => {
+    it('should correctly store and return extension context file paths', async () => {
       const contextFiles = ['/path/to/file1.txt', '/path/to/file2.js'];
       const configParams: ConfigParameters = {
         cwd: '/tmp',
@@ -255,7 +255,7 @@ describe('Configuration Integration Tests', () => {
         debugMode: false,
         extensionContextFilePaths: contextFiles,
       };
-      const config = new Config(configParams);
+      const config = await Config.create(configParams);
       expect(config.getExtensionContextFilePaths()).toEqual(contextFiles);
     });
   });

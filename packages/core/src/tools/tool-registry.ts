@@ -174,11 +174,15 @@ export class ToolRegistry {
 
   constructor(config: Config) {
     this.config = config;
+    const promptRegistry = this.config.getPromptRegistry();
+    if (!promptRegistry) {
+      throw new Error('Prompt registry not available.');
+    }
     this.mcpClientManager = new McpClientManager(
       this.config.getMcpServers() ?? {},
       this.config.getMcpServerCommand(),
       this,
-      this.config.getPromptRegistry(),
+      promptRegistry,
       this.config.getDebugMode(),
       this.config.getWorkspaceContext(),
     );
@@ -231,7 +235,7 @@ export class ToolRegistry {
     // remove any previously discovered tools
     this.removeDiscoveredTools();
 
-    this.config.getPromptRegistry().clear();
+    this.config.getPromptRegistry()?.clear();
 
     await this.discoverAndRegisterToolsFromCommand();
 
@@ -248,7 +252,7 @@ export class ToolRegistry {
     // remove any previously discovered tools
     this.removeDiscoveredTools();
 
-    this.config.getPromptRegistry().clear();
+    this.config.getPromptRegistry()?.clear();
 
     // discover tools using MCP servers, if configured
     await this.mcpClientManager.discoverAllMcpTools();
@@ -273,7 +277,11 @@ export class ToolRegistry {
       }
     }
 
-    this.config.getPromptRegistry().removePromptsByServer(serverName);
+    const promptRegistry = this.config.getPromptRegistry();
+    if (!promptRegistry) {
+      throw new Error('Prompt registry not available.');
+    }
+    promptRegistry.removePromptsByServer(serverName);
 
     const mcpServers = this.config.getMcpServers() ?? {};
     const serverConfig = mcpServers[serverName];
@@ -282,7 +290,7 @@ export class ToolRegistry {
         serverName,
         serverConfig,
         this,
-        this.config.getPromptRegistry(),
+        promptRegistry,
         this.config.getDebugMode(),
         this.config.getWorkspaceContext(),
       );

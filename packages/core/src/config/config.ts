@@ -210,11 +210,11 @@ export interface ConfigParameters {
 }
 
 export class Config {
-  private toolRegistry!: ToolRegistry;
-  private promptRegistry!: PromptRegistry;
+  private toolRegistry: ToolRegistry | undefined;
+  private promptRegistry: PromptRegistry | undefined;
   private sessionId: string;
   private fileSystemService: FileSystemService;
-  private contentGeneratorConfig!: ContentGeneratorConfig;
+  private contentGeneratorConfig: ContentGeneratorConfig | undefined;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
   private readonly targetDir: string;
@@ -235,7 +235,7 @@ export class Config {
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
-  private geminiClient!: GeminiClient;
+  private geminiClient: GeminiClient | undefined;
   private readonly fileFiltering: {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
@@ -278,11 +278,10 @@ export class Config {
   private readonly skipNextSpeakerCheck: boolean;
   private readonly extensionManagement: boolean;
   private readonly enablePromptCompletion: boolean = false;
-  private initialized: boolean = false;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
 
-  constructor(params: ConfigParameters) {
+  private constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
@@ -365,22 +364,20 @@ export class Config {
     }
   }
 
-  /**
-   * Must only be called once, throws if called again.
-   */
-  async initialize(): Promise<void> {
-    if (this.initialized) {
-      throw Error('Config was already initialized');
-    }
-    this.initialized = true;
+  static async create(params: ConfigParameters): Promise<Config> {
+    const config = new Config(params);
     // Initialize centralized FileDiscoveryService
-    this.getFileService();
-    if (this.getCheckpointingEnabled()) {
-      await this.getGitService();
+    config.getFileService();
+    if (config.getCheckpointingEnabled()) {
+      await config.getGitService();
     }
-    this.promptRegistry = new PromptRegistry();
-    this.toolRegistry = await this.createToolRegistry();
-    logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
+    config.promptRegistry = new PromptRegistry();
+    config.toolRegistry = await config.createToolRegistry();
+    logCliConfiguration(
+      config,
+      new StartSessionEvent(config, config.toolRegistry),
+    );
+    return config;
   }
 
   async refreshAuth(authMethod: AuthType) {
@@ -433,7 +430,7 @@ export class Config {
     return this.loadMemoryFromIncludeDirectories;
   }
 
-  getContentGeneratorConfig(): ContentGeneratorConfig {
+  getContentGeneratorConfig(): ContentGeneratorConfig | undefined {
     return this.contentGeneratorConfig;
   }
 
@@ -502,11 +499,11 @@ export class Config {
     return this.workspaceContext;
   }
 
-  getToolRegistry(): ToolRegistry {
+  getToolRegistry(): ToolRegistry | undefined {
     return this.toolRegistry;
   }
 
-  getPromptRegistry(): PromptRegistry {
+  getPromptRegistry(): PromptRegistry | undefined {
     return this.promptRegistry;
   }
 
@@ -601,7 +598,7 @@ export class Config {
     return this.telemetrySettings.outfile;
   }
 
-  getGeminiClient(): GeminiClient {
+  getGeminiClient(): GeminiClient | undefined {
     return this.geminiClient;
   }
 

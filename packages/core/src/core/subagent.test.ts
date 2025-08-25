@@ -19,6 +19,7 @@ import { Config, ConfigParameters } from '../config/config.js';
 import { GeminiChat } from './geminiChat.js';
 import { createContentGenerator } from './contentGenerator.js';
 import { getEnvironmentContext } from '../utils/environmentContext.js';
+import { AuthType } from './contentGenerator.js';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
@@ -47,10 +48,12 @@ async function createMockConfig(
     debugMode: false,
     cwd: process.cwd(),
   };
-  const config = new Config(configParams);
-  await config.initialize();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await config.refreshAuth('test-auth' as any);
+  const config = await Config.create(configParams);
+  vi.spyOn(config, 'getContentGeneratorConfig').mockReturnValue({
+    apiKey: 'test-key',
+    authType: AuthType.USE_GEMINI,
+    model: 'test-model',
+  });
 
   // Mock ToolRegistry
   const mockToolRegistry = {

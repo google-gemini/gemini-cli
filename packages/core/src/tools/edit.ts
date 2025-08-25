@@ -155,11 +155,15 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       };
     } else if (currentContent !== null) {
       // Editing an existing file
+      const geminiClient = this.config.getGeminiClient();
+      if (!geminiClient) {
+        throw new Error('Gemini client not available');
+      }
       const correctedEdit = await ensureCorrectEdit(
         params.file_path,
         currentContent,
         params,
-        this.config.getGeminiClient(),
+        geminiClient,
         abortSignal,
       );
       finalOldString = correctedEdit.params.old_string;

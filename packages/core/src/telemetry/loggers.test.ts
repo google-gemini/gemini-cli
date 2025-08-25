@@ -82,8 +82,8 @@ describe('loggers', () => {
       vi.spyOn(ClearcutLogger.prototype, 'logChatCompressionEvent');
     });
 
-    it('logs the chat compression event to Clearcut', () => {
-      const mockConfig = makeFakeConfig();
+    it('logs the chat compression event to Clearcut', async () => {
+      const mockConfig = await makeFakeConfig();
 
       const event = makeChatCompressionEvent({
         tokens_before: 9001,
@@ -97,8 +97,8 @@ describe('loggers', () => {
       ).toHaveBeenCalledWith(event);
     });
 
-    it('records the chat compression event to OTEL', () => {
-      const mockConfig = makeFakeConfig();
+    it('records the chat compression event to OTEL', async () => {
+      const mockConfig = await makeFakeConfig();
 
       logChatCompression(
         mockConfig,
@@ -822,13 +822,13 @@ describe('loggers', () => {
     });
   });
 
-  describe('logMalformedJsonResponse', () => {
+  describe('logMalformedJsonResponse', async () => {
     beforeEach(() => {
       vi.spyOn(ClearcutLogger.prototype, 'logMalformedJsonResponseEvent');
     });
 
-    it('logs the event to Clearcut and OTEL', () => {
-      const mockConfig = makeFakeConfig();
+    it('logs the event to Clearcut and OTEL', async () => {
+      const mockConfig = await makeFakeConfig();
       const event = new MalformedJsonResponseEvent('test-model');
 
       logMalformedJsonResponse(mockConfig, event);

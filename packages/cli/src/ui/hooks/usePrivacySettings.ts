@@ -85,7 +85,11 @@ export const usePrivacySettings = (config: Config) => {
 };
 
 function getCodeAssistServer(config: Config): CodeAssistServer {
-  let server = config.getGeminiClient().getContentGenerator();
+  const geminiClient = config.getGeminiClient();
+  if (!geminiClient) {
+    throw new Error('Gemini client not available');
+  }
+  let server = geminiClient.getContentGenerator();
 
   // Unwrap LoggingContentGenerator if present
   if (server instanceof LoggingContentGenerator) {

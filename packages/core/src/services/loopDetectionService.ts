@@ -327,8 +327,11 @@ export class LoopDetectionService {
   }
 
   private async checkForLoopWithLLM(signal: AbortSignal) {
-    const recentHistory = this.config
-      .getGeminiClient()
+    const geminiClient = this.config.getGeminiClient();
+    if (!geminiClient) {
+      return false;
+    }
+    const recentHistory = geminiClient
       .getHistory()
       .slice(-LLM_LOOP_CHECK_HISTORY_COUNT);
 
@@ -366,9 +369,12 @@ Please analyze the conversation history to determine the possibility that the co
     };
     let result;
     try {
-      result = await this.config
-        .getGeminiClient()
-        .generateJson(contents, schema, signal, DEFAULT_GEMINI_FLASH_MODEL);
+      result = await geminiClient.generateJson(
+        contents,
+        schema,
+        signal,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
     } catch (e) {
       // Do nothing, treat it as a non-loop.
       this.config.getDebugMode() ? console.error(e) : console.debug(e);

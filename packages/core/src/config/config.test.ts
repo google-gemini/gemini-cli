@@ -35,7 +35,7 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 // Mock dependencies that might be called during Config construction or createServerConfig
-vi.mock('../tools/tool-registry', () => {
+vi.mock('../tools/tool-registry', async () => {
   const ToolRegistryMock = vi.fn();
   ToolRegistryMock.prototype.registerTool = vi.fn();
   ToolRegistryMock.prototype.discoverAllTools = vi.fn();
@@ -90,13 +90,13 @@ vi.mock('../telemetry/index.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../services/gitService.js', () => {
+vi.mock('../services/gitService.js', async () => {
   const GitServiceMock = vi.fn();
   GitServiceMock.prototype.initialize = vi.fn();
   return { GitService: GitServiceMock };
 });
 
-describe('Server Config (config.ts)', () => {
+describe('Server Config (config.ts)', async () => {
   const MODEL = 'gemini-pro';
   const SANDBOX: SandboxConfig = {
     command: 'docker',
@@ -134,47 +134,35 @@ describe('Server Config (config.ts)', () => {
     ).mockImplementation(() => undefined);
   });
 
-  describe('initialize', () => {
+  describe('create', async () => {
     it('should throw an error if checkpointing is enabled and GitService fails', async () => {
       const gitError = new Error('Git is not installed');
-      (GitService.prototype.initialize as Mock).mockRejectedValue(gitError);
+      vi.mocked(GitService.prototype.initialize).mockRejectedValue(gitError);
 
-      const config = new Config({
-        ...baseParams,
-        checkpointing: true,
-      });
-
-      await expect(config.initialize()).rejects.toThrow(gitError);
+      await expect(
+        Config.create({
+          ...baseParams,
+          checkpointing: true,
+        }),
+      ).rejects.toThrow(gitError);
     });
 
     it('should not throw an error if checkpointing is disabled and GitService fails', async () => {
       const gitError = new Error('Git is not installed');
-      (GitService.prototype.initialize as Mock).mockRejectedValue(gitError);
+      vi.mocked(GitService.prototype.initialize).mockRejectedValue(gitError);
 
-      const config = new Config({
+      const config = await Config.create({
         ...baseParams,
         checkpointing: false,
       });
 
-      await expect(config.initialize()).resolves.toBeUndefined();
-    });
-
-    it('should throw an error if initialized more than once', async () => {
-      const config = new Config({
-        ...baseParams,
-        checkpointing: false,
-      });
-
-      await expect(config.initialize()).resolves.toBeUndefined();
-      await expect(config.initialize()).rejects.toThrow(
-        'Config was already initialized',
-      );
+      expect(config).toBeInstanceOf(Config);
     });
   });
 
-  describe('refreshAuth', () => {
+  describe('refreshAuth', async () => {
     it('should refresh auth and update config', async () => {
-      const config = new Config(baseParams);
+      const config = await Config.create(baseParams);
       const authType = AuthType.USE_GEMINI;
       const newModel = 'gemini-flash';
       const mockContentConfig = {
@@ -196,7 +184,7 @@ describe('Server Config (config.ts)', () => {
       );
       // Verify that contentGeneratorConfig is updated with the new model
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
-      expect(config.getContentGeneratorConfig().model).toBe(newModel);
+      expect(config.getContentGeneratorConfig()!.model).toBe(newModel);
       expect(config.getModel()).toBe(newModel); // getModel() should return the updated model
       expect(GeminiClient).toHaveBeenCalledWith(config);
       // Verify that fallback mode is reset
@@ -204,7 +192,7 @@ describe('Server Config (config.ts)', () => {
     });
 
     it('should preserve conversation history when refreshing auth', async () => {
-      const config = new Config(baseParams);
+      const config = await Config.create(baseParams);
       const authType = AuthType.USE_GEMINI;
       const mockContentConfig = {
         model: 'gemini-pro',
@@ -255,7 +243,7 @@ describe('Server Config (config.ts)', () => {
     });
 
     it('should handle case when no existing client is initialized', async () => {
-      const config = new Config(baseParams);
+      const config = await Config.create(baseParams);
       const authType = AuthType.USE_GEMINI;
       const mockContentConfig = {
         model: 'gemini-pro',
@@ -286,7 +274,7 @@ describe('Server Config (config.ts)', () => {
     });
 
     it('should strip thoughts when switching from GenAI to Vertex', async () => {
-      const config = new Config(baseParams);
+      const config = await Config.create(baseParams);
       const mockContentConfig = {
         model: 'gemini-pro',
         apiKey: 'test-key',
@@ -329,7 +317,7 @@ describe('Server Config (config.ts)', () => {
     });
 
     it('should not strip thoughts when switching from Vertex to GenAI', async () => {
-      const config = new Config(baseParams);
+      const config = await Config.create(baseParams);
       const mockContentConfig = {
         model: 'gemini-pro',
         apiKey: 'test-key',
@@ -372,60 +360,60 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
-  it('Config constructor should store userMemory correctly', () => {
-    const config = new Config(baseParams);
+  it('Config constructor should store userMemory correctly', async () => {
+    const config = await Config.create(baseParams);
 
     expect(config.getUserMemory()).toBe(USER_MEMORY);
     // Verify other getters if needed
     expect(config.getTargetDir()).toBe(path.resolve(TARGET_DIR)); // Check resolved path
   });
 
-  it('Config constructor should default userMemory to empty string if not provided', () => {
+  it('Config constructor should default userMemory to empty string if not provided', async () => {
     const paramsWithoutMemory: ConfigParameters = { ...baseParams };
     delete paramsWithoutMemory.userMemory;
-    const config = new Config(paramsWithoutMemory);
+    const config = await Config.create(paramsWithoutMemory);
 
     expect(config.getUserMemory()).toBe('');
   });
 
-  it('Config constructor should call setGeminiMdFilename with contextFileName if provided', () => {
+  it('Config constructor should call setGeminiMdFilename with contextFileName if provided', async () => {
     const contextFileName = 'CUSTOM_AGENTS.md';
     const paramsWithContextFile: ConfigParameters = {
       ...baseParams,
       contextFileName,
     };
-    new Config(paramsWithContextFile);
+    await Config.create(paramsWithContextFile);
     expect(mockSetGeminiMdFilename).toHaveBeenCalledWith(contextFileName);
   });
 
-  it('Config constructor should not call setGeminiMdFilename if contextFileName is not provided', () => {
-    new Config(baseParams); // baseParams does not have contextFileName
+  it('Config constructor should not call setGeminiMdFilename if contextFileName is not provided', async () => {
+    await Config.create(baseParams); // baseParams does not have contextFileName
     expect(mockSetGeminiMdFilename).not.toHaveBeenCalled();
   });
 
-  it('should set default file filtering settings when not provided', () => {
-    const config = new Config(baseParams);
+  it('should set default file filtering settings when not provided', async () => {
+    const config = await Config.create(baseParams);
     expect(config.getFileFilteringRespectGitIgnore()).toBe(true);
   });
 
-  it('should set custom file filtering settings when provided', () => {
+  it('should set custom file filtering settings when provided', async () => {
     const paramsWithFileFiltering: ConfigParameters = {
       ...baseParams,
       fileFiltering: {
         respectGitIgnore: false,
       },
     };
-    const config = new Config(paramsWithFileFiltering);
+    const config = await Config.create(paramsWithFileFiltering);
     expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
   });
 
-  it('should initialize WorkspaceContext with includeDirectories', () => {
+  it('should initialize WorkspaceContext with includeDirectories', async () => {
     const includeDirectories = ['/path/to/dir1', '/path/to/dir2'];
     const paramsWithIncludeDirs: ConfigParameters = {
       ...baseParams,
       includeDirectories,
     };
-    const config = new Config(paramsWithIncludeDirs);
+    const config = await Config.create(paramsWithIncludeDirs);
     const workspaceContext = config.getWorkspaceContext();
     const directories = workspaceContext.getDirectories();
 
@@ -436,40 +424,40 @@ describe('Server Config (config.ts)', () => {
     expect(directories).toContain('/path/to/dir2');
   });
 
-  it('Config constructor should set telemetry to true when provided as true', () => {
+  it('Config constructor should set telemetry to true when provided as true', async () => {
     const paramsWithTelemetry: ConfigParameters = {
       ...baseParams,
       telemetry: { enabled: true },
     };
-    const config = new Config(paramsWithTelemetry);
+    const config = await Config.create(paramsWithTelemetry);
     expect(config.getTelemetryEnabled()).toBe(true);
   });
 
-  it('Config constructor should set telemetry to false when provided as false', () => {
+  it('Config constructor should set telemetry to false when provided as false', async () => {
     const paramsWithTelemetry: ConfigParameters = {
       ...baseParams,
       telemetry: { enabled: false },
     };
-    const config = new Config(paramsWithTelemetry);
+    const config = await Config.create(paramsWithTelemetry);
     expect(config.getTelemetryEnabled()).toBe(false);
   });
 
-  it('Config constructor should default telemetry to default value if not provided', () => {
+  it('Config constructor should default telemetry to default value if not provided', async () => {
     const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
     delete paramsWithoutTelemetry.telemetry;
-    const config = new Config(paramsWithoutTelemetry);
+    const config = await Config.create(paramsWithoutTelemetry);
     expect(config.getTelemetryEnabled()).toBe(TELEMETRY_SETTINGS.enabled);
   });
 
-  it('should have a getFileService method that returns FileDiscoveryService', () => {
-    const config = new Config(baseParams);
+  it('should have a getFileService method that returns FileDiscoveryService', async () => {
+    const config = await Config.create(baseParams);
     const fileService = config.getFileService();
     expect(fileService).toBeDefined();
   });
 
-  describe('Usage Statistics', () => {
-    it('defaults usage statistics to enabled if not specified', () => {
-      const config = new Config({
+  describe('Usage Statistics', async () => {
+    it('defaults usage statistics to enabled if not specified', async () => {
+      const config = await Config.create({
         ...baseParams,
         usageStatisticsEnabled: undefined,
       });
@@ -479,8 +467,8 @@ describe('Server Config (config.ts)', () => {
 
     it.each([{ enabled: true }, { enabled: false }])(
       'sets usage statistics based on the provided value (enabled: $enabled)',
-      ({ enabled }) => {
-        const config = new Config({
+      async ({ enabled }) => {
+        const config = await Config.create({
           ...baseParams,
           usageStatisticsEnabled: enabled,
         });
@@ -489,11 +477,10 @@ describe('Server Config (config.ts)', () => {
     );
 
     it('logs the session start event', async () => {
-      const config = new Config({
+      await Config.create({
         ...baseParams,
         usageStatisticsEnabled: true,
       });
-      await config.initialize();
 
       expect(
         ClearcutLogger.prototype.logStartSessionEvent,
@@ -501,130 +488,130 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
-  describe('Telemetry Settings', () => {
-    it('should return default telemetry target if not provided', () => {
+  describe('Telemetry Settings', async () => {
+    it('should return default telemetry target if not provided', async () => {
       const params: ConfigParameters = {
         ...baseParams,
         telemetry: { enabled: true },
       };
-      const config = new Config(params);
+      const config = await Config.create(params);
       expect(config.getTelemetryTarget()).toBe(DEFAULT_TELEMETRY_TARGET);
     });
 
-    it('should return provided OTLP endpoint', () => {
+    it('should return provided OTLP endpoint', async () => {
       const endpoint = 'http://custom.otel.collector:4317';
       const params: ConfigParameters = {
         ...baseParams,
         telemetry: { enabled: true, otlpEndpoint: endpoint },
       };
-      const config = new Config(params);
+      const config = await Config.create(params);
       expect(config.getTelemetryOtlpEndpoint()).toBe(endpoint);
     });
 
-    it('should return default OTLP endpoint if not provided', () => {
+    it('should return default OTLP endpoint if not provided', async () => {
       const params: ConfigParameters = {
         ...baseParams,
         telemetry: { enabled: true },
       };
-      const config = new Config(params);
+      const config = await Config.create(params);
       expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
     });
 
-    it('should return provided logPrompts setting', () => {
+    it('should return provided logPrompts setting', async () => {
       const params: ConfigParameters = {
         ...baseParams,
         telemetry: { enabled: true, logPrompts: false },
       };
-      const config = new Config(params);
+      const config = await Config.create(params);
       expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
     });
 
-    it('should return default logPrompts setting (true) if not provided', () => {
+    it('should return default logPrompts setting (true) if not provided', async () => {
       const params: ConfigParameters = {
         ...baseParams,
         telemetry: { enabled: true },
       };
-      const config = new Config(params);
+      const config = await Config.create(params);
       expect(config.getTelemetryLogPromptsEnabled()).toBe(true);
     });
 
-    it('should return default logPrompts setting (true) if telemetry object is not provided', () => {
+    it('should return default logPrompts setting (true) if telemetry object is not provided', async () => {
       const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
       delete paramsWithoutTelemetry.telemetry;
-      const config = new Config(paramsWithoutTelemetry);
+      const config = await Config.create(paramsWithoutTelemetry);
       expect(config.getTelemetryLogPromptsEnabled()).toBe(true);
     });
 
-    it('should return default telemetry target if telemetry object is not provided', () => {
+    it('should return default telemetry target if telemetry object is not provided', async () => {
       const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
       delete paramsWithoutTelemetry.telemetry;
-      const config = new Config(paramsWithoutTelemetry);
+      const config = await Config.create(paramsWithoutTelemetry);
       expect(config.getTelemetryTarget()).toBe(DEFAULT_TELEMETRY_TARGET);
     });
 
-    it('should return default OTLP endpoint if telemetry object is not provided', () => {
+    it('should return default OTLP endpoint if telemetry object is not provided', async () => {
       const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
       delete paramsWithoutTelemetry.telemetry;
-      const config = new Config(paramsWithoutTelemetry);
+      const config = await Config.create(paramsWithoutTelemetry);
       expect(config.getTelemetryOtlpEndpoint()).toBe(DEFAULT_OTLP_ENDPOINT);
     });
 
-    it('should return provided OTLP protocol', () => {
+    it('should return provided OTLP protocol', async () => {
       const params: ConfigParameters = {
         ...baseParams,
         telemetry: { enabled: true, otlpProtocol: 'http' },
       };
-      const config = new Config(params);
+      const config = await Config.create(params);
       expect(config.getTelemetryOtlpProtocol()).toBe('http');
     });
 
-    it('should return default OTLP protocol if not provided', () => {
+    it('should return default OTLP protocol if not provided', async () => {
       const params: ConfigParameters = {
         ...baseParams,
         telemetry: { enabled: true },
       };
-      const config = new Config(params);
+      const config = await Config.create(params);
       expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
     });
 
-    it('should return default OTLP protocol if telemetry object is not provided', () => {
+    it('should return default OTLP protocol if telemetry object is not provided', async () => {
       const paramsWithoutTelemetry: ConfigParameters = { ...baseParams };
       delete paramsWithoutTelemetry.telemetry;
-      const config = new Config(paramsWithoutTelemetry);
+      const config = await Config.create(paramsWithoutTelemetry);
       expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
     });
   });
 
-  describe('UseRipgrep Configuration', () => {
-    it('should default useRipgrep to false when not provided', () => {
-      const config = new Config(baseParams);
+  describe('UseRipgrep Configuration', async () => {
+    it('should default useRipgrep to false when not provided', async () => {
+      const config = await Config.create(baseParams);
       expect(config.getUseRipgrep()).toBe(false);
     });
 
-    it('should set useRipgrep to true when provided as true', () => {
+    it('should set useRipgrep to true when provided as true', async () => {
       const paramsWithRipgrep: ConfigParameters = {
         ...baseParams,
         useRipgrep: true,
       };
-      const config = new Config(paramsWithRipgrep);
+      const config = await Config.create(paramsWithRipgrep);
       expect(config.getUseRipgrep()).toBe(true);
     });
 
-    it('should set useRipgrep to false when explicitly provided as false', () => {
+    it('should set useRipgrep to false when explicitly provided as false', async () => {
       const paramsWithRipgrep: ConfigParameters = {
         ...baseParams,
         useRipgrep: false,
       };
-      const config = new Config(paramsWithRipgrep);
+      const config = await Config.create(paramsWithRipgrep);
       expect(config.getUseRipgrep()).toBe(false);
     });
 
-    it('should default useRipgrep to false when undefined', () => {
+    it('should default useRipgrep to false when undefined', async () => {
       const paramsWithUndefinedRipgrep: ConfigParameters = {
         ...baseParams,
         useRipgrep: undefined,
       };
-      const config = new Config(paramsWithUndefinedRipgrep);
+      const config = await Config.create(paramsWithUndefinedRipgrep);
       expect(config.getUseRipgrep()).toBe(false);
     });
   });

@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { GeminiClient } from '../core/client.js';
-import { Config } from '../config/config.js';
+
 import {
   summarizeToolOutput,
   llmSummarizer,
@@ -24,7 +24,7 @@ describe('summarizers', () => {
   const abortSignal = new AbortController().signal;
 
   beforeEach(() => {
-    MockConfig = vi.mocked(Config);
+    MockConfig = vi.fn();
     const mockConfigInstance = new MockConfig(
       'test-api-key',
       'gemini-pro',

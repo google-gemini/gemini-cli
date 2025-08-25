@@ -249,7 +249,7 @@ interface CoreToolSchedulerOptions {
 }
 
 export class CoreToolScheduler {
-  private toolRegistry: ToolRegistry;
+  private toolRegistry: ToolRegistry | undefined;
   private toolCalls: ToolCall[] = [];
   private outputUpdateHandler?: OutputUpdateHandler;
   private onAllToolCallsComplete?: AllToolCallsCompleteHandler;
@@ -552,6 +552,18 @@ export class CoreToolScheduler {
 
       const newToolCalls: ToolCall[] = requestsToProcess.map(
         (reqInfo): ToolCall => {
+          if (!this.toolRegistry) {
+            return {
+              status: 'error',
+              request: reqInfo,
+              response: createErrorResponse(
+                reqInfo,
+                new Error(`Tool registry is not available.`),
+                ToolErrorType.UNHANDLED_EXCEPTION,
+              ),
+              durationMs: 0,
+            };
+          }
           const toolInstance = this.toolRegistry.getTool(reqInfo.name);
           if (!toolInstance) {
             return {

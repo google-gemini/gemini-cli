@@ -24,12 +24,12 @@ export const DEFAULT_CONFIG_PARAMETERS: ConfigParameters = {
  * {@link DEFAULT_CONFIG_PARAMETERS}, optionally, fields can be specified to
  * override those defaults.
  */
-export function makeFakeConfig(
+export async function makeFakeConfig(
   config: Partial<ConfigParameters> = {
     ...DEFAULT_CONFIG_PARAMETERS,
   },
-): Config {
-  return new Config({
+): Promise<Config> {
+  return Config.create({
     ...DEFAULT_CONFIG_PARAMETERS,
     ...config,
   });

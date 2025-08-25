@@ -104,6 +104,10 @@ export async function getCorrectedFileContent(
   // So, file was either read successfully (fileExists=true, originalContent set)
   // or it was ENOENT (fileExists=false, originalContent='').
 
+  const geminiClient = config.getGeminiClient();
+  if (!geminiClient) {
+    throw new Error('Gemini client not available');
+  }
   if (fileExists) {
     // This implies originalContent is available
     const { params: correctedParams } = await ensureCorrectEdit(
@@ -114,7 +118,7 @@ export async function getCorrectedFileContent(
         new_string: proposedContent,
         file_path: filePath,
       },
-      config.getGeminiClient(),
+      geminiClient,
       abortSignal,
     );
     correctedContent = correctedParams.new_string;
@@ -122,7 +126,7 @@ export async function getCorrectedFileContent(
     // This implies new file (ENOENT)
     correctedContent = await ensureCorrectFileContent(
       proposedContent,
-      config.getGeminiClient(),
+      geminiClient,
       abortSignal,
     );
   }

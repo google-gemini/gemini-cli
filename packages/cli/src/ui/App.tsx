@@ -298,7 +298,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   useEffect(() => {
     // Only sync when not currently authenticating
     if (!isAuthenticating) {
-      setUserTier(config.getGeminiClient()?.getUserTier());
+      const geminiClient = config.getGeminiClient();
+      if (geminiClient) {
+        setUserTier(geminiClient.getUserTier());
+      }
     }
   }, [config, isAuthenticating]);
 
@@ -390,7 +393,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       let message: string;
 
       if (
-        config.getContentGeneratorConfig().authType ===
+        config.getContentGeneratorConfig()?.authType ===
         AuthType.LOGIN_WITH_GOOGLE
       ) {
         // Use actual user tier if available; otherwise, default to FREE tier behavior (safe default)
@@ -458,7 +461,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       config.setFallbackMode(true);
       logFlashFallback(
         config,
-        new FlashFallbackEvent(config.getContentGeneratorConfig().authType!),
+        new FlashFallbackEvent(config.getContentGeneratorConfig()!.authType!),
       );
       return false; // Don't continue with current prompt
     };

@@ -93,8 +93,8 @@ describe('Telemetry Metrics', () => {
   });
 
   describe('recordChatCompressionMetrics', () => {
-    it('does not record metrics if not initialized', () => {
-      const lol = makeFakeConfig({});
+    it('does not record metrics if not initialized', async () => {
+      const lol = await makeFakeConfig({});
 
       recordChatCompressionMetricsModule(lol, {
         tokens_after: 100,
@@ -104,8 +104,8 @@ describe('Telemetry Metrics', () => {
       expect(mockCounterAddFn).not.toHaveBeenCalled();
     });
 
-    it('records token compression with the correct attributes', () => {
-      const config = makeFakeConfig({});
+    it('records token compression with the correct attributes', async () => {
+      const config = await makeFakeConfig({});
       initializeMetricsModule(config);
 
       recordChatCompressionMetricsModule(config, {
