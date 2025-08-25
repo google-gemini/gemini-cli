@@ -451,10 +451,13 @@ describe('KeypressContext - Kitty Protocol', () => {
         '[DEBUG] Kitty buffer accumulating:',
         expect.stringContaining('\x1b[27u'),
       );
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[DEBUG] Kitty sequence parsed successfully:',
-        expect.stringContaining('\x1b[27u'),
+      const parsedCall = consoleLogSpy.mock.calls.find(
+        (args) =>
+          typeof args[0] === 'string' &&
+          args[0].includes('[DEBUG] Kitty sequence parsed successfully'),
       );
+      expect(parsedCall).toBeTruthy();
+      expect(parsedCall?.[1]).toEqual(expect.stringContaining('\x1b[27u'));
     });
 
     it('should log kitty buffer overflow when debugKeystrokeLogging is true', async () => {
@@ -581,6 +584,231 @@ describe('KeypressContext - Kitty Protocol', () => {
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         'Kitty sequence buffer has char codes:',
         [27, 91, 49, 50],
+      );
+    });
+  });
+
+  describe('Parameterized functional keys', () => {
+    it('should recognize Home/End with modifiers using ESC[1;NmX', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Shift+Home: mods=2, symbol=H
+      act(() => stdin.sendKittySequence(`\x1b[1;2H`));
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'home', shift: true }),
+      );
+
+      // Ctrl+End: mods=5, symbol=F
+      act(() => stdin.sendKittySequence(`\x1b[1;5F`));
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'end', ctrl: true }),
+      );
+    });
+
+    it('should recognize F1–F4 using ESC[1;NmP/Q/R/S', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.sendKittySequence(`\x1b[1;1P`)); // F1 no modifiers
+      act(() => stdin.sendKittySequence(`\x1b[1;3Q`)); // F2 Alt
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'f1' }),
+      );
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'f2', meta: true }),
+      );
+    });
+
+    it('should recognize Delete via CSI[3~', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+      act(() => stdin.sendKittySequence(`\x1b[3~`));
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'delete' }),
+      );
+    });
+
+    it('should recognize PageUp via CSI[5~', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+      act(() => stdin.sendKittySequence(`\x1b[5~`));
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'pageup' }),
+      );
+    });
+
+    it('should recognize PageDown via CSI[6~', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+      act(() => stdin.sendKittySequence(`\x1b[6~`));
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'pagedown' }),
+      );
+    });
+
+    it('should recognize Home via CSI[1~', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+      act(() => stdin.sendKittySequence(`\x1b[1~`));
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'home' }),
+      );
+    });
+
+    it('should recognize End via CSI[4~', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+      act(() => stdin.sendKittySequence(`\x1b[4~`));
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'end' }),
+      );
+    });
+
+    it('should recognize Insert via CSI[2~', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+      act(() => stdin.sendKittySequence(`\x1b[2~`));
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'insert' }),
+      );
+    });
+  });
+
+  describe('Shift+Tab forms', () => {
+    it('should recognize legacy reverse Tab ESC[Z as Shift+Tab', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.sendKittySequence(`\x1b[Z`));
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'tab', shift: true }),
+      );
+    });
+
+    it('should recognize parameterized reverse Tab ESC[1;2Z as Shift+Tab', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.sendKittySequence(`\x1b[1;2Z`));
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'tab', shift: true }),
+      );
+    });
+  });
+
+  describe('Legacy arrows while Kitty enabled', () => {
+    it('should parse ESC[A/B/C/D as arrows without modifiers', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.sendKittySequence(`\x1b[A`));
+      act(() => stdin.sendKittySequence(`\x1b[B`));
+      act(() => stdin.sendKittySequence(`\x1b[C`));
+      act(() => stdin.sendKittySequence(`\x1b[D`));
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'up',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        }),
+      );
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'down',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        }),
+      );
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'right',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        }),
+      );
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'left',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        }),
+      );
+    });
+  });
+
+  describe('Double-tap and batching', () => {
+    it('should emit two delete events for double-tap CSI[3~', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.sendKittySequence(`\x1b[3~`));
+      act(() => stdin.sendKittySequence(`\x1b[3~`));
+
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ name: 'delete' }),
+      );
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ name: 'delete' }),
+      );
+    });
+
+    it('should parse two concatenated tilde-coded sequences in one chunk', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.sendKittySequence(`\x1b[3~\x1b[5~`));
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'delete' }),
+      );
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'pageup' }),
+      );
+    });
+
+    it('should ignore incomplete CSI then parse the next complete sequence', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Incomplete ESC sequence then a complete Delete
+      act(() => {
+        // Provide an incomplete ESC sequence chunk with a real ESC character
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          sequence: '\x1b[1;',
+        });
+      });
+      act(() => stdin.sendKittySequence(`\x1b[3~`));
+
+      expect(keyHandler).toHaveBeenCalledTimes(1);
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'delete' }),
       );
     });
   });
