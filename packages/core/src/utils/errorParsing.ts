@@ -16,6 +16,7 @@ import {
 } from '../config/models.js';
 import { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
+import { PartListUnion } from '@google/genai';
 
 // Free Tier message functions
 const getRateLimitErrorMessageGoogleFree = (
@@ -56,6 +57,8 @@ const getRateLimitErrorMessageDefault = (
   fallbackModel: string = DEFAULT_GEMINI_FLASH_MODEL,
 ) =>
   `\nPossible quota limitations in place or slow response times detected. Switching to the ${fallbackModel} model for the rest of this session.`;
+const INVALID_IMAGE_CONTEXT_MESSAGE =
+  '\nImage is possibly corrupt or has high dimensions.';
 
 function getRateLimitMessage(
   authType?: AuthType,
@@ -107,6 +110,7 @@ export function parseAndFormatApiError(
   userTier?: UserTierId,
   currentModel?: string,
   fallbackModel?: string,
+  request?: PartListUnion,
 ): string {
   if (isStructuredError(error)) {
     let text = `[API Error: ${error.message}]`;
@@ -119,14 +123,14 @@ export function parseAndFormatApiError(
         fallbackModel,
       );
     }
-    return text;
+    return appendContextToText(text, error.message, request);
   }
 
   // The error message might be a string containing a JSON object.
   if (typeof error === 'string') {
     const jsonStart = error.indexOf('{');
     if (jsonStart === -1) {
-      return `[API Error: ${error}]`; // Not a JSON error, return as is.
+      return appendContextToText(`[API Error: ${error}]`, error, request); // Not a JSON error, return as is.
     }
 
     const jsonString = error.substring(jsonStart);
@@ -159,8 +163,52 @@ export function parseAndFormatApiError(
     } catch (_e) {
       // Not a valid JSON, fall through and return the original message.
     }
-    return `[API Error: ${error}]`;
+    return appendContextToText(`[API Error: ${error}]`, error, request);
   }
 
   return '[API Error: An unknown error occurred.]';
+}
+
+function appendContextToText(
+  text: string,
+  error: string,
+  request?: PartListUnion,
+) {
+  if (request && wasCausedByInvalidImageUpload(error, request)) {
+    text += INVALID_IMAGE_CONTEXT_MESSAGE;
+  }
+  return text;
+}
+
+function wasCausedByInvalidImageUpload(err: string, request?: PartListUnion) {
+  return (
+    err.includes('Provided image is not valid.') &&
+    request &&
+    requestContainedImage(request)
+  );
+}
+
+function requestContainedImage(parts: PartListUnion): boolean {
+  if (!parts) {
+    return false;
+  }
+  if (typeof parts === 'string') {
+    return false;
+  }
+  if (Array.isArray(parts)) {
+    for (const part of parts) {
+      if (
+        typeof part !== 'string' &&
+        part.inlineData?.mimeType?.startsWith('image/')
+      ) {
+        return true;
+      }
+    }
+  } else {
+    // It's a single Part
+    if (parts.inlineData?.mimeType?.startsWith('image/')) {
+      return true;
+    }
+  }
+  return false;
 }
