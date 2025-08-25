@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { promises as fs } from 'fs';
-import { join } from 'path';
+import { promises as fs } from 'node:fs';
+import { join } from 'node:path';
 import { Storage } from '@google/gemini-cli-core';
 
 const cleanupFunctions: Array<(() => void) | (() => Promise<void>)> = [];

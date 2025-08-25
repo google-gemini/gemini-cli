@@ -8,7 +8,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import { FolderTrustDialog, FolderTrustChoice } from './FolderTrustDialog.js';
-import * as process from 'process';
+import * as process from 'node:process';
 
 vi.mock('process', async () => {
   const actual = await vi.importActual('process');

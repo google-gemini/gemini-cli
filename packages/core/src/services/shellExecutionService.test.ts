@@ -5,9 +5,9 @@
  */
 
 import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
-import EventEmitter from 'events';
-import { Readable } from 'stream';
-import { type ChildProcess } from 'child_process';
+import EventEmitter from 'node:events';
+import { Readable } from 'node:stream';
+import { type ChildProcess } from 'node:child_process';
 import {
   ShellExecutionService,
   ShellOutputEvent,

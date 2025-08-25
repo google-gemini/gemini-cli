@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MarkdownDisplay } from './MarkdownDisplay.js';
 import { LoadedSettings } from '../../config/settings.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
-import { EOL } from 'os';
+import { EOL } from 'node:os';
 
 describe('<MarkdownDisplay />', () => {
   const baseProps = {

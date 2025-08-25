@@ -5,9 +5,9 @@
  */
 
 import { vi } from 'vitest';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import {
   EXTENSIONS_CONFIG_FILENAME,
   INSTALL_METADATA_FILENAME,
@@ -17,7 +17,7 @@ import {
   uninstallExtension,
   updateExtension,
 } from './extension.js';
-import { execSync } from 'child_process';
+import { execSync } from 'node:child_process';
 import { SimpleGit, simpleGit } from 'simple-git';
 
 vi.mock('simple-git', () => ({

@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
-import { EOL } from 'os';
-import { spawn } from 'child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { EOL } from 'node:os';
+import { spawn } from 'node:child_process';
 import { rgPath } from '@lvce-editor/ripgrep';
 import {
   BaseDeclarativeTool,

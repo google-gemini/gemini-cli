@@ -5,7 +5,7 @@
  */
 
 import { getErrorMessage, isNodeError } from './errors.js';
-import { URL } from 'url';
+import { URL } from 'node:url';
 
 const PRIVATE_IP_RANGES = [
   /^10\./,

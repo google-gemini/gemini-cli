@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import fs from 'fs/promises';
+import fs from 'node:fs/promises';
 import { StandardFileSystemService } from './fileSystemService.js';
 
 vi.mock('fs/promises');

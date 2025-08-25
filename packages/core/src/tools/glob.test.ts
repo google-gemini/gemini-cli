@@ -6,9 +6,9 @@
 
 import { GlobTool, GlobToolParams, GlobPath, sortFileEntries } from './glob.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
-import path from 'path';
-import fs from 'fs/promises';
-import os from 'os';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import os from 'node:os';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { Config } from '../config/config.js';

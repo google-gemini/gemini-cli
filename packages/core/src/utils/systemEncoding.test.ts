@@ -5,8 +5,8 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { execSync } from 'child_process';
-import * as os from 'os';
+import { execSync } from 'node:child_process';
+import * as os from 'node:os';
 import { detect as chardetDetect } from 'chardet';
 
 // Mock dependencies

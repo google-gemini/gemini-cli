@@ -10,7 +10,7 @@ import { getInstallationInfo } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
 import { HistoryItem, MessageType } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
-import { spawn } from 'child_process';
+import { spawn } from 'node:child_process';
 
 export function handleAutoUpdate(
   info: UpdateObject | null,
