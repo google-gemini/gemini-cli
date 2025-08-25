@@ -43,6 +43,7 @@ const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
   maxAttempts: 3, // 1 initial call + 2 retries
   initialDelayMs: 500,
 };
+
 /**
  * Returns true if the response is valid, false otherwise.
  */
@@ -579,20 +580,6 @@ export class GeminiChat {
     modelOutput: Content[],
     automaticFunctionCallingHistory?: Content[],
   ) {
-    const lastHistoryEntry =
-      this.history.length > 0
-        ? this.history[this.history.length - 1]
-        : undefined;
-
-    // FIX: Before processing the new turn, check if the previous turn was an
-    // incomplete tool call. If the last history item is a function response,
-    // we must insert an empty model turn to maintain the alternating pattern.
-    if (lastHistoryEntry && isFunctionResponse(lastHistoryEntry)) {
-      this.history.push({ role: 'model', parts: [] });
-    }
-
-    // --- The rest of the function proceeds as before ---
-
     const newHistoryEntries: Content[] = [];
 
     // Part 1: Handle the user's part of the turn.
