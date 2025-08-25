@@ -399,7 +399,8 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait longer for any potential async operations in CI environments
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(spawn).not.toHaveBeenCalled();
     });
@@ -427,7 +428,8 @@ describe('App UI', () => {
 
       updateEventEmitter.emit('update-success', info);
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait longer for React state updates and re-render in CI environments
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(lastFrame()).toContain(
         'Update successful! The new version will be used on your next run.',
@@ -457,7 +459,8 @@ describe('App UI', () => {
 
       updateEventEmitter.emit('update-failed', info);
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait longer for React state updates and re-render in CI environments
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(lastFrame()).toContain(
         'Automatic update failed. Please try updating manually',
@@ -489,7 +492,8 @@ describe('App UI', () => {
       // which is what should be emitted when a spawn error occurs elsewhere.
       updateEventEmitter.emit('update-failed', info);
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait longer for React state updates and re-render in CI environments
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(lastFrame()).toContain(
         'Automatic update failed. Please try updating manually',
@@ -519,7 +523,8 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait longer for any potential async operations in CI environments
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(spawn).not.toHaveBeenCalled();
     });
