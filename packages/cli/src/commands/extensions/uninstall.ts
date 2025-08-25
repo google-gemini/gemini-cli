@@ -22,7 +22,7 @@ export async function handleUninstall(args: UninstallArgs) {
 }
 
 export const uninstallCommand: CommandModule = {
-  command: 'uninstall [name]',
+  command: 'uninstall <name>',
   describe: 'Uninstalls an extension.',
   builder: (yargs) =>
     yargs
@@ -30,7 +30,14 @@ export const uninstallCommand: CommandModule = {
         describe: 'The name of the extension to uninstall.',
         type: 'string',
       })
-      .check((_argv) => true),
+      .check((argv) => {
+        if (!argv.name) {
+          throw new Error(
+            'Please include the name of the extension to uninstall as a positional argument.',
+          );
+        }
+        return true;
+      }),
   handler: async (argv) => {
     await handleUninstall({
       name: argv['name'] as string,
