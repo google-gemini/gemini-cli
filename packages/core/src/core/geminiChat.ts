@@ -622,11 +622,13 @@ export class GeminiChat {
       const newTurn = { ...content, parts: visibleParts };
       const lastTurnInFinal = finalModelTurns[finalModelTurns.length - 1];
 
-      // C. Consolidate this new turn with the PREVIOUS turn if they are adjacent text.
+      // Consolidate this new turn with the PREVIOUS turn if they are adjacent model turns.
       if (
         lastTurnInFinal &&
-        this.isLastPartText(lastTurnInFinal) &&
-        this.isFirstPartText(newTurn)
+        lastTurnInFinal.role === 'model' &&
+        newTurn.role === 'model' &&
+        lastTurnInFinal.parts && // SAFETY CHECK: Ensure the destination has a parts array.
+        newTurn.parts
       ) {
         lastTurnInFinal.parts.push(...newTurn.parts);
       } else {

@@ -565,6 +565,38 @@ describe('GeminiChat', () => {
       parts: [{ text: 'User input' }],
     };
 
+    it('should consolidate all consecutive model turns into a single turn', () => {
+      const userInput: Content = {
+        role: 'user',
+        parts: [{ text: 'User input' }],
+      };
+      // This simulates a multi-part model response with different part types.
+      const modelOutput: Content[] = [
+        { role: 'model', parts: [{ text: 'Thinking...' }] },
+        {
+          role: 'model',
+          parts: [{ functionCall: { name: 'do_stuff', args: {} } }],
+        },
+      ];
+
+      // @ts-expect-error Accessing private method for testing
+      chat.recordHistory(userInput, modelOutput);
+      const history = chat.getHistory();
+
+      // The history should contain the user's turn and ONE consolidated model turn.
+      // The old code would fail here, resulting in a length of 3.
+      //expect(history).toBe([]);
+      expect(history.length).toBe(2);
+
+      const modelTurn = history[1]!;
+      expect(modelTurn.role).toBe('model');
+
+      // The consolidated turn should contain both the text part and the functionCall part.
+      expect(modelTurn.parts.length).toBe(2);
+      expect(modelTurn.parts[0]!.text).toBe('Thinking...');
+      expect(modelTurn.parts[1]!.functionCall).toBeDefined();
+    });
+
     it('should add a placeholder model turn when a tool call is followed by an empty response', () => {
       // 1. Setup: A history where the model has just made a function call.
       const initialHistory: Content[] = [
