@@ -276,6 +276,18 @@ export class GeminiChat {
 
       this.sendPromise = (async () => {
         const outputContent = response.candidates?.[0]?.content;
+        const initialModelOutput = outputContent ? [outputContent] : [];
+
+        // Pre-process the model output to filter thought parts before passing to recordHistory.
+        // This makes the non-streaming path consistent with the streaming path's logic.
+        const cleanedModelOutput = initialModelOutput.map(content => {
+          if (!content.parts) {
+            return content;
+          }
+          const visibleParts = content.parts.filter(part => !('thought' in part));
+          return { ...content, parts: visibleParts };
+        });
+
         // Because the AFC input contains the entire curated chat history in
         // addition to the new user input, we need to truncate the AFC history
         // to deduplicate the existing chat history.
@@ -287,10 +299,10 @@ export class GeminiChat {
           automaticFunctionCallingHistory =
             fullAutomaticFunctionCallingHistory.slice(index) ?? [];
         }
-        const modelOutput = outputContent ? [outputContent] : [];
+        
         this.recordHistory(
           userContent,
-          modelOutput,
+          cleanedModelOutput, // Pass the cleaned data instead of the original
           automaticFunctionCallingHistory,
         );
       })();
