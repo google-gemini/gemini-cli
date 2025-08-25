@@ -76,6 +76,40 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessage', () => {
+    it('should throw an error when attempting to add a user turn after another user turn', async () => {
+      // 1. Setup: Create a history that already ends with a user turn (a functionResponse).
+      const initialHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'Initial prompt' }] },
+        {
+          role: 'model',
+          parts: [{ functionCall: { name: 'test_tool', args: {} } }],
+        },
+        {
+          role: 'user',
+          parts: [{ functionResponse: { name: 'test_tool', response: {} } }],
+        },
+      ];
+      chat.setHistory(initialHistory);
+
+      // 2. Mock a valid model response so the call doesn't fail for other reasons.
+      const mockResponse = {
+        candidates: [
+          { content: { role: 'model', parts: [{ text: 'some response' }] } },
+        ],
+      } as unknown as GenerateContentResponse;
+      vi.mocked(mockModelsModule.generateContent).mockResolvedValue(
+        mockResponse,
+      );
+
+      // 3. Action & Assert: Expect that sending another user message immediately
+      //    after a user-role turn throws the specific error.
+      await expect(
+        chat.sendMessage(
+          { message: 'This is an invalid consecutive user message' },
+          'prompt-id-1',
+        ),
+      ).rejects.toThrow('Cannot add a user turn after another user turn.');
+    });
     it('should preserve text parts that are in the same response as a thought', async () => {
       // 1. Mock the API to return a single response containing both a thought and visible text.
       const mixedContentResponse = {

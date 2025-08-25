@@ -296,9 +296,11 @@ export class GeminiChat {
           automaticFunctionCallingHistory,
         );
       })();
-      await this.sendPromise.catch(() => {
+      await this.sendPromise.catch((error) => {
         // Resets sendPromise to avoid subsequent calls failing
         this.sendPromise = Promise.resolve();
+        // Re-throw the error so the caller knows something went wrong.
+        throw error;
       });
       return response;
     } catch (error) {
@@ -592,7 +594,16 @@ export class GeminiChat {
         this.history.length === 0 ||
         this.history[this.history.length - 1] !== userInput
       ) {
-        this.history.push(userInput);
+        const lastTurn = this.history[this.history.length - 1];
+        // The only time we don't push is if it's the *exact same* object,
+        // which happens in streaming where we add it preemptively.
+        if (lastTurn !== userInput) {
+          if (lastTurn?.role === 'user') {
+            // This is an invalid sequence.
+            throw new Error('Cannot add a user turn after another user turn.');
+          }
+          this.history.push(userInput);
+        }
       }
     }
 
