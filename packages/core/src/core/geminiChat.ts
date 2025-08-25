@@ -657,7 +657,7 @@ export class GeminiChat {
         }
       }
       this.history.push(...finalModelTurns);
-    } else if (!automaticFunctionCallingHistory) {
+    } else {
       // If, after all processing, there's NO model output, add the placeholder.
       this.history.push({ role: 'model', parts: [] });
     }

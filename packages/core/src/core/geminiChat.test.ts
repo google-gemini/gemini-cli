@@ -514,6 +514,45 @@ describe('GeminiChat', () => {
       parts: [{ text: 'User input' }],
     };
 
+    it('should add a placeholder model turn when a tool call is followed by an empty response', () => {
+      // 1. Setup: A history where the model has just made a function call.
+      const initialHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'Initial prompt' }] },
+        {
+          role: 'model',
+          parts: [{ functionCall: { name: 'test_tool', args: {} } }],
+        },
+      ];
+      chat.setHistory(initialHistory);
+
+      // 2. Action: The user provides the tool's response, and the model's
+      // final output is empty (e.g., just a thought, which gets filtered out).
+      const functionResponse: Content = {
+        role: 'user',
+        parts: [{ functionResponse: { name: 'test_tool', response: {} } }],
+      };
+      const emptyModelOutput: Content[] = [];
+
+      // @ts-expect-error Accessing private method for testing
+      chat.recordHistory(functionResponse, emptyModelOutput, [
+        functionResponse,
+      ]);
+
+      // 3. Assert: The history should now have four valid, alternating turns.
+      const history = chat.getHistory();
+      expect(history.length).toBe(4);
+
+      // The final turn must be the empty model placeholder.
+      const lastTurn = history[3]!;
+      expect(lastTurn.role).toBe('model');
+      expect(lastTurn.parts.length).toBe(0);
+
+      // The second-to-last turn must be the function response we provided.
+      const secondToLastTurn = history[2]!;
+      expect(secondToLastTurn.role).toBe('user');
+      expect(secondToLastTurn.parts[0]!.functionResponse).toBeDefined();
+    });
+
     it('should add user input and a single model output to history', () => {
       const modelOutput: Content[] = [
         { role: 'model', parts: [{ text: 'Model output' }] },
