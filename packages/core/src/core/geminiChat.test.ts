@@ -205,7 +205,7 @@ describe('GeminiChat', () => {
       // The final turn should be the empty model response.
       const lastTurn = history[history.length - 1];
       expect(lastTurn?.role).toBe('model');
-      expect(lastTurn?.parts.length).toBe(0);
+      expect(lastTurn?.parts?.length).toBe(0);
 
       // The second-to-last turn should be the new user prompt.
       const secondToLastTurn = history[history.length - 2];
