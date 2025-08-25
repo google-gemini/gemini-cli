@@ -17,7 +17,7 @@ import {
   uninstallExtension,
 } from './extension.js';
 import { execSync } from 'child_process';
-import { SimpleGit, simpleGit } from 'simple-git';
+import { type SimpleGit, simpleGit } from 'simple-git';
 
 vi.mock('simple-git', () => ({
   simpleGit: vi.fn(),
