@@ -10,9 +10,17 @@ import * as os from 'os';
 import * as path from 'path';
 import {
   EXTENSIONS_CONFIG_FILENAME,
+  INSTALL_METADATA_FILENAME,
   annotateActiveExtensions,
+  installExtension,
   loadExtensions,
 } from './extension.js';
+import { execSync } from 'child_process';
+import { SimpleGit, simpleGit } from 'simple-git';
+
+vi.mock('simple-git', () => ({
+  simpleGit: vi.fn(),
+}));
 
 vi.mock('os', async (importOriginal) => {
   const os = await importOriginal<typeof import('os')>();
@@ -22,6 +30,13 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    execSync: vi.fn(),
+  };
+});
 const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
 
 describe('loadExtensions', () => {
@@ -163,15 +178,117 @@ describe('annotateActiveExtensions', () => {
   });
 });
 
+describe('installExtension', () => {
+  let tempHomeDir: string;
+  let userExtensionsDir: string;
+
+  beforeEach(() => {
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    userExtensionsDir = path.join(tempHomeDir, '.gemini', 'extensions');
+    // Clean up before each test
+    fs.rmSync(userExtensionsDir, { recursive: true, force: true });
+    fs.mkdirSync(userExtensionsDir, { recursive: true });
+
+    vi.mocked(execSync).mockClear();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
+  });
+
+  it('should install an extension from a local path', async () => {
+    const sourceExtDir = createExtension(
+      tempHomeDir,
+      'my-local-extension',
+      '1.0.0',
+    );
+    const targetExtDir = path.join(userExtensionsDir, 'my-local-extension');
+    const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
+
+    await installExtension({ source: sourceExtDir, type: 'local' });
+
+    expect(fs.existsSync(targetExtDir)).toBe(true);
+    expect(fs.existsSync(metadataPath)).toBe(true);
+    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+    expect(metadata).toEqual({
+      source: sourceExtDir,
+      type: 'local',
+    });
+    fs.rmSync(targetExtDir, { recursive: true, force: true });
+  });
+
+  it('should throw an error if the extension already exists', async () => {
+    const sourceExtDir = createExtension(
+      tempHomeDir,
+      'my-local-extension',
+      '1.0.0',
+    );
+    await installExtension({ source: sourceExtDir, type: 'local' });
+    await expect(
+      installExtension({ source: sourceExtDir, type: 'local' }),
+    ).rejects.toThrow(
+      'Error: Extension "my-local-extension" is already installed. Please uninstall it first.',
+    );
+  });
+
+  it('should throw an error and cleanup if gemini-extension.json is missing', async () => {
+    const sourceExtDir = path.join(tempHomeDir, 'bad-extension');
+    fs.mkdirSync(sourceExtDir, { recursive: true });
+
+    await expect(
+      installExtension({ source: sourceExtDir, type: 'local' }),
+    ).rejects.toThrow(
+      `Invalid extension at ${sourceExtDir}. Please make sure it has a valid gemini-extension.json file.`,
+    );
+
+    const targetExtDir = path.join(userExtensionsDir, 'bad-extension');
+    expect(fs.existsSync(targetExtDir)).toBe(false);
+  });
+
+  it('should install an extension from a git URL', async () => {
+    const gitUrl = 'https://github.com/google/gemini-extensions.git';
+    const extensionName = 'gemini-extensions';
+    const targetExtDir = path.join(userExtensionsDir, extensionName);
+    const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
+
+    const clone = vi.fn().mockImplementation(async (_, destination) => {
+      fs.mkdirSync(destination, { recursive: true });
+      fs.writeFileSync(
+        path.join(destination, EXTENSIONS_CONFIG_FILENAME),
+        JSON.stringify({ name: extensionName, version: '1.0.0' }),
+      );
+    });
+
+    const mockedSimpleGit = simpleGit as vi.MockedFunction<typeof simpleGit>;
+    mockedSimpleGit.mockReturnValue({
+      clone,
+    } as unknown as SimpleGit);
+
+    await installExtension({ source: gitUrl, type: 'git' });
+
+    expect(fs.existsSync(targetExtDir)).toBe(true);
+    expect(fs.existsSync(metadataPath)).toBe(true);
+    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+    expect(metadata).toEqual({
+      source: gitUrl,
+      type: 'git',
+    });
+    fs.rmSync(targetExtDir, { recursive: true, force: true });
+  });
+});
+
 function createExtension(
   extensionsDir: string,
   name: string,
   version: string,
   addContextFile = false,
   contextFileName?: string,
-): void {
+): string {
   const extDir = path.join(extensionsDir, name);
-  fs.mkdirSync(extDir);
+  fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(
     path.join(extDir, EXTENSIONS_CONFIG_FILENAME),
     JSON.stringify({ name, version, contextFileName }),
@@ -184,4 +301,5 @@ function createExtension(
   if (contextFileName) {
     fs.writeFileSync(path.join(extDir, contextFileName), 'context');
   }
+  return extDir;
 }

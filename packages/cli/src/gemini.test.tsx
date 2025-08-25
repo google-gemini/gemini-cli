@@ -10,6 +10,7 @@ import {
   main,
   setupUnhandledRejectionHandler,
   validateDnsResolutionOrder,
+  startInteractiveUI,
 } from './gemini.js';
 import {
   LoadedSettings,
@@ -17,6 +18,7 @@ import {
   loadSettings,
 } from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { Config } from '@google/gemini-cli-core';
 
 // Custom error to identify mock process.exit calls
 class MockProcessExitError extends Error {
@@ -144,8 +146,13 @@ describe('gemini.tsx main function', () => {
       path: '/system/settings.json',
       settings: {},
     };
+    const systemDefaultsFile: SettingsFile = {
+      path: '/system/system-defaults.json',
+      settings: {},
+    };
     const mockLoadedSettings = new LoadedSettings(
       systemSettingsFile,
+      systemDefaultsFile,
       userSettingsFile,
       workspaceSettingsFile,
       [settingsError],
@@ -249,5 +256,100 @@ describe('validateDnsResolutionOrder', () => {
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       'Invalid value for dnsResolutionOrder in settings: "invalid-value". Using default "ipv4first".',
     );
+  });
+});
+
+describe('startInteractiveUI', () => {
+  // Mock dependencies
+  const mockConfig = {
+    getProjectRoot: () => '/root',
+    getScreenReader: () => false,
+  } as Config;
+  const mockSettings = {
+    merged: {
+      hideWindowTitle: false,
+    },
+  } as LoadedSettings;
+  const mockStartupWarnings = ['warning1'];
+  const mockWorkspaceRoot = '/root';
+
+  vi.mock('./utils/version.js', () => ({
+    getCliVersion: vi.fn(() => Promise.resolve('1.0.0')),
+  }));
+
+  vi.mock('./ui/utils/kittyProtocolDetector.js', () => ({
+    detectAndEnableKittyProtocol: vi.fn(() => Promise.resolve()),
+  }));
+
+  vi.mock('./ui/utils/updateCheck.js', () => ({
+    checkForUpdates: vi.fn(() => Promise.resolve(null)),
+  }));
+
+  vi.mock('./utils/cleanup.js', () => ({
+    cleanupCheckpoints: vi.fn(() => Promise.resolve()),
+    registerCleanup: vi.fn(),
+  }));
+
+  vi.mock('ink', () => ({
+    render: vi.fn().mockReturnValue({ unmount: vi.fn() }),
+  }));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should render the UI with proper React context and exitOnCtrlC disabled', async () => {
+    const { render } = await import('ink');
+    const renderSpy = vi.mocked(render);
+
+    await startInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+    );
+
+    // Verify render was called with correct options
+    expect(renderSpy).toHaveBeenCalledTimes(1);
+    const [reactElement, options] = renderSpy.mock.calls[0];
+
+    // Verify render options
+    expect(options).toEqual({
+      exitOnCtrlC: false,
+      isScreenReaderEnabled: false,
+    });
+
+    // Verify React element structure is valid (but don't deep dive into JSX internals)
+    expect(reactElement).toBeDefined();
+  });
+
+  it('should perform all startup tasks in correct order', async () => {
+    const { getCliVersion } = await import('./utils/version.js');
+    const { detectAndEnableKittyProtocol } = await import(
+      './ui/utils/kittyProtocolDetector.js'
+    );
+    const { checkForUpdates } = await import('./ui/utils/updateCheck.js');
+    const { registerCleanup } = await import('./utils/cleanup.js');
+
+    await startInteractiveUI(
+      mockConfig,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+    );
+
+    // Verify all startup tasks were called
+    expect(getCliVersion).toHaveBeenCalledTimes(1);
+    expect(detectAndEnableKittyProtocol).toHaveBeenCalledTimes(1);
+    expect(registerCleanup).toHaveBeenCalledTimes(1);
+
+    // Verify cleanup handler is registered with unmount function
+    const cleanupFn = vi.mocked(registerCleanup).mock.calls[0][0];
+    expect(typeof cleanupFn).toBe('function');
+
+    // checkForUpdates should be called asynchronously (not waited for)
+    // We need a small delay to let it execute
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(checkForUpdates).toHaveBeenCalledTimes(1);
   });
 });
