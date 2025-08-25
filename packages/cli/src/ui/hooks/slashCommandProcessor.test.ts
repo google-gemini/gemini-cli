@@ -77,16 +77,17 @@ import {
   ConfirmShellCommandsActionReturn,
   SlashCommand,
 } from '../commands/types.js';
-import {
-  ToolConfirmationOutcome,
-  SlashCommandStatus,
-  makeFakeConfig,
-} from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
+import {
+  SlashCommandStatus,
+  ToolConfirmationOutcome,
+  makeFakeConfig,
+  type IdeClient,
+} from '@google/gemini-cli-core/index.js';
 
 function createTestCommand(
   overrides: Partial<SlashCommand>,
@@ -109,6 +110,10 @@ describe('useSlashCommandProcessor', () => {
   const mockSetQuittingMessages = vi.fn();
 
   const mockConfig = makeFakeConfig({});
+  vi.spyOn(mockConfig, 'getIdeClient').mockReturnValue({
+    addStatusChangeListener: vi.fn(),
+    removeStatusChangeListener: vi.fn(),
+  } as unknown as IdeClient);
 
   const mockSettings = {} as LoadedSettings;
 
