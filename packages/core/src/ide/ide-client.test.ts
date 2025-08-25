@@ -92,7 +92,7 @@ describe('IdeClient', () => {
     vi.mocked(StreamableHTTPClientTransport).mockReturnValue(mockHttpTransport);
     vi.mocked(StdioClientTransport).mockReturnValue(mockStdioTransport);
 
-    await IdeClient.initialize();
+    await IdeClient.getInstance();
   });
 
   afterEach(() => {
@@ -104,7 +104,7 @@ describe('IdeClient', () => {
       const config = { port: '8080' };
       vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
 
-      const ideClient = IdeClient.getInstance();
+      const ideClient = await IdeClient.getInstance();
       await ideClient.connect();
 
       expect(fs.promises.readFile).toHaveBeenCalledWith(
@@ -125,7 +125,7 @@ describe('IdeClient', () => {
       const config = { stdio: { command: 'test-cmd', args: ['--foo'] } };
       vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
 
-      const ideClient = IdeClient.getInstance();
+      const ideClient = await IdeClient.getInstance();
       await ideClient.connect();
 
       expect(StdioClientTransport).toHaveBeenCalledWith({
@@ -145,7 +145,7 @@ describe('IdeClient', () => {
       };
       vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
 
-      const ideClient = IdeClient.getInstance();
+      const ideClient = await IdeClient.getInstance();
       await ideClient.connect();
 
       expect(StreamableHTTPClientTransport).toHaveBeenCalled();
@@ -161,7 +161,7 @@ describe('IdeClient', () => {
       );
       process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '9090';
 
-      const ideClient = IdeClient.getInstance();
+      const ideClient = await IdeClient.getInstance();
       await ideClient.connect();
 
       expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
@@ -181,7 +181,7 @@ describe('IdeClient', () => {
       process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'] = 'env-cmd';
       process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'] = '["--bar"]';
 
-      const ideClient = IdeClient.getInstance();
+      const ideClient = await IdeClient.getInstance();
       await ideClient.connect();
 
       expect(StdioClientTransport).toHaveBeenCalledWith({
@@ -199,7 +199,7 @@ describe('IdeClient', () => {
       vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
       process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '9090';
 
-      const ideClient = IdeClient.getInstance();
+      const ideClient = await IdeClient.getInstance();
       await ideClient.connect();
 
       expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
@@ -216,7 +216,7 @@ describe('IdeClient', () => {
         new Error('File not found'),
       );
 
-      const ideClient = IdeClient.getInstance();
+      const ideClient = await IdeClient.getInstance();
       await ideClient.connect();
 
       expect(StreamableHTTPClientTransport).not.toHaveBeenCalled();

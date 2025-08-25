@@ -366,7 +366,7 @@ export class Config {
       throw Error('Config was already initialized');
     }
     this.initialized = true;
-    this.ideClient = await IdeClient.initialize();
+    this.ideClient = await IdeClient.getInstance();
     // Initialize centralized FileDiscoveryService
     this.getFileService();
     if (this.getCheckpointingEnabled()) {

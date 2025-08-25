@@ -24,7 +24,7 @@ describe.skip('IdeClient', () => {
     process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = process.cwd();
     process.env['TERM_PROGRAM'] = 'vscode';
 
-    const ideClient = IdeClient.getInstance();
+    const ideClient = await IdeClient.getInstance();
     await ideClient.connect();
 
     expect(ideClient.getConnectionStatus()).toEqual({
@@ -67,7 +67,7 @@ describe('IdeClient fallback connection logic', () => {
     process.env['TERM_PROGRAM'] = 'vscode';
     process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = process.cwd();
     // Reset instance
-    IdeClient.instance = undefined;
+    (IdeClient as any).instance = undefined;
   });
 
   afterEach(async () => {
@@ -85,7 +85,7 @@ describe('IdeClient fallback connection logic', () => {
       fs.unlinkSync(portFile);
     }
 
-    const ideClient = IdeClient.getInstance();
+    const ideClient = await IdeClient.getInstance();
     await ideClient.connect();
 
     expect(ideClient.getConnectionStatus()).toEqual({
@@ -99,7 +99,7 @@ describe('IdeClient fallback connection logic', () => {
     // Write port file with a port that is not listening
     fs.writeFileSync(portFile, JSON.stringify({ port: filePort }));
 
-    const ideClient = IdeClient.getInstance();
+    const ideClient = await IdeClient.getInstance();
     await ideClient.connect();
 
     expect(ideClient.getConnectionStatus()).toEqual({
@@ -173,11 +173,11 @@ describe('IdeClient with proxy', () => {
     vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', process.cwd());
 
     // Reset instance
-    IdeClient.instance = undefined;
+    (IdeClient as any).instance = undefined;
   });
 
   afterEach(async () => {
-    IdeClient.getInstance().disconnect();
+    (await IdeClient.getInstance()).disconnect();
     await mcpServer.stop();
     proxyServer.close();
     vi.unstubAllEnvs();
@@ -188,7 +188,7 @@ describe('IdeClient with proxy', () => {
     vi.stubEnv('HTTPS_PROXY', `http://localhost:${proxyServerPort}`);
     vi.stubEnv('NO_PROXY', 'example.com,127.0.0.1,::1');
 
-    const ideClient = IdeClient.getInstance();
+    const ideClient = await IdeClient.getInstance();
     await ideClient.connect();
 
     expect(ideClient.getConnectionStatus()).toEqual({

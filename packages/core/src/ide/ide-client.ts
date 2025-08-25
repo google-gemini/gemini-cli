@@ -80,7 +80,7 @@ export class IdeClient {
 
   private constructor() {}
 
-  static async initialize(): Promise<IdeClient> {
+  static async getInstance(): Promise<IdeClient> {
     if (!IdeClient.instance) {
       const client = new IdeClient();
       client.ideProcessInfo = await getIdeProcessInfo();
@@ -91,13 +91,6 @@ export class IdeClient {
         ).displayName;
       }
       IdeClient.instance = client;
-    }
-    return IdeClient.instance;
-  }
-
-  static getInstance(): IdeClient {
-    if (!IdeClient.instance) {
-      throw new Error('IdeClient has not been initialized.');
     }
     return IdeClient.instance;
   }
