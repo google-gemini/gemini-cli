@@ -893,7 +893,7 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
-    it('should handle inserts that contain delete characters ', () => {
+    it('should handle inserts that contain delete characters', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: 'abcde',
@@ -911,7 +911,7 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
-    it('should handle inserts with a mix of regular and delete characters ', () => {
+    it('should handle inserts with a mix of regular and delete characters', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: 'abcde',

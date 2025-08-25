@@ -1464,6 +1464,64 @@ describe('useGeminiStream', () => {
     });
   });
 
+  it('should process @include commands, adding user turn after processing to prevent race conditions', async () => {
+    const rawQuery = '@include file.txt Summarize this.';
+    const processedQueryParts = [
+      { text: 'Summarize this with content from @file.txt' },
+      { text: 'File content...' },
+    ];
+    const userMessageTimestamp = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(userMessageTimestamp);
+
+    handleAtCommandSpy.mockResolvedValue({
+      processedQuery: processedQueryParts,
+      shouldProceed: true,
+    });
+
+    const { result } = renderHook(() =>
+      useGeminiStream(
+        mockConfig.getGeminiClient() as GeminiClient,
+        [],
+        mockAddItem,
+        mockConfig,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        false, // shellModeActive
+        vi.fn(), // getPreferredEditor
+        vi.fn(), // onAuthError
+        vi.fn(), // performMemoryRefresh
+        false, // modelSwitched
+        vi.fn(), // setModelSwitched
+        vi.fn(), // onEditorClose
+        vi.fn(), // onCancelSubmit
+      ),
+    );
+
+    await act(async () => {
+      await result.current.submitQuery(rawQuery);
+    });
+
+    expect(handleAtCommandSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: rawQuery,
+      }),
+    );
+
+    expect(mockAddItem).toHaveBeenCalledWith(
+      {
+        type: MessageType.USER,
+        text: rawQuery,
+      },
+      userMessageTimestamp,
+    );
+
+    // FIX: The expectation now matches the actual call signature.
+    expect(mockSendMessageStream).toHaveBeenCalledWith(
+      processedQueryParts, // Argument 1: The parts array directly
+      expect.any(AbortSignal), // Argument 2: An AbortSignal
+      expect.any(String), // Argument 3: The prompt_id string
+    );
+  });
   describe('Thought Reset', () => {
     it('should reset thought to null when starting a new prompt', async () => {
       // First, simulate a response with a thought
@@ -1659,302 +1717,5 @@ describe('useGeminiStream', () => {
         'gemini-2.5-flash',
       );
     });
-  });
-
-  it('should process @include commands, adding user turn after processing to prevent race conditions', async () => {
-    const rawQuery = '@include file.txt Summarize this.';
-    const processedQueryParts = [
-      { text: 'Summarize this with content from @file.txt' },
-      { text: 'File content...' },
-    ];
-    const userMessageTimestamp = Date.now();
-    vi.spyOn(Date, 'now').mockReturnValue(userMessageTimestamp);
-
-    handleAtCommandSpy.mockResolvedValue({
-      processedQuery: processedQueryParts,
-      shouldProceed: true,
-    });
-
-    const { result } = renderHook(() =>
-      useGeminiStream(
-        mockConfig.getGeminiClient() as GeminiClient,
-        [],
-        mockAddItem,
-        mockConfig,
-        mockOnDebugMessage,
-        mockHandleSlashCommand,
-        false, // shellModeActive
-        vi.fn(), // getPreferredEditor
-        vi.fn(), // onAuthError
-        vi.fn(), // performMemoryRefresh
-        false, // modelSwitched
-        vi.fn(), // setModelSwitched
-        vi.fn(), // onEditorClose
-        vi.fn(), // onCancelSubmit
-      ),
-    );
-
-    await act(async () => {
-      await result.current.submitQuery(rawQuery);
-    });
-
-    expect(handleAtCommandSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        query: rawQuery,
-      }),
-    );
-
-    expect(mockAddItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.USER,
-        text: rawQuery,
-      },
-      userMessageTimestamp,
-    );
-
-    // FIX: The expectation now matches the actual call signature.
-    expect(mockSendMessageStream).toHaveBeenCalledWith(
-      processedQueryParts, // Argument 1: The parts array directly
-      expect.any(AbortSignal), // Argument 2: An AbortSignal
-      expect.any(String), // Argument 3: The prompt_id string
-    );
-  });
-  describe('Thought Reset', () => {
-    it('should reset thought to null when starting a new prompt', async () => {
-      mockSendMessageStream.mockReturnValue(
-        (async function* () {
-          yield {
-            type: ServerGeminiEventType.Thought,
-            value: {
-              subject: 'Previous thought',
-              description: 'Old description',
-            },
-          };
-          yield {
-            type: ServerGeminiEventType.Content,
-            value: 'Some response content',
-          };
-          yield { type: ServerGeminiEventType.Finished, value: 'STOP' };
-        })(),
-      );
-
-      const { result } = renderHook(() =>
-        useGeminiStream(
-          new MockedGeminiClientClass(mockConfig),
-          [],
-          mockAddItem,
-          mockConfig,
-          mockOnDebugMessage,
-          mockHandleSlashCommand,
-          false,
-          () => 'vscode' as EditorType,
-          () => {},
-          () => Promise.resolve(),
-          false,
-          () => {},
-          () => {},
-          () => {},
-        ),
-      );
-
-      await act(async () => {
-        await result.current.submitQuery('First query');
-      });
-
-      await waitFor(() => {
-        expect(mockAddItem).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: 'gemini',
-            text: 'Some response content',
-          }),
-          expect.any(Number),
-        );
-      });
-
-      mockSendMessageStream.mockReturnValue(
-        (async function* () {
-          yield {
-            type: ServerGeminiEventType.Content,
-            value: 'New response content',
-          };
-          yield { type: ServerGeminiEventType.Finished, value: 'STOP' };
-        })(),
-      );
-
-      await act(async () => {
-        await result.current.submitQuery('Second query');
-      });
-
-      await waitFor(() => {
-        expect(mockAddItem).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: 'gemini',
-            text: 'New response content',
-          }),
-          expect.any(Number),
-        );
-      });
-    });
-
-    it('should reset thought to null when user cancels', async () => {
-      mockSendMessageStream.mockReturnValue(
-        (async function* () {
-          yield {
-            type: ServerGeminiEventType.Thought,
-            value: { subject: 'Some thought', description: 'Description' },
-          };
-          yield { type: ServerGeminiEventType.UserCancelled };
-        })(),
-      );
-
-      const { result } = renderHook(() =>
-        useGeminiStream(
-          new MockedGeminiClientClass(mockConfig),
-          [],
-          mockAddItem,
-          mockConfig,
-          mockOnDebugMessage,
-          mockHandleSlashCommand,
-          false,
-          () => 'vscode' as EditorType,
-          () => {},
-          () => Promise.resolve(),
-          false,
-          () => {},
-          () => {},
-          () => {},
-        ),
-      );
-
-      await act(async () => {
-        await result.current.submitQuery('Test query');
-      });
-
-      await waitFor(() => {
-        expect(mockAddItem).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: 'info',
-            text: 'User cancelled the request.',
-          }),
-          expect.any(Number),
-        );
-      });
-
-      expect(result.current.streamingState).toBe(StreamingState.Idle);
-    });
-
-    it('should reset thought to null when there is an error', async () => {
-      mockSendMessageStream.mockReturnValue(
-        (async function* () {
-          yield {
-            type: ServerGeminiEventType.Thought,
-            value: { subject: 'Some thought', description: 'Description' },
-          };
-          yield {
-            type: ServerGeminiEventType.Error,
-            value: { error: { message: 'Test error' } },
-          };
-        })(),
-      );
-
-      const { result } = renderHook(() =>
-        useGeminiStream(
-          new MockedGeminiClientClass(mockConfig),
-          [],
-          mockAddItem,
-          mockConfig,
-          mockOnDebugMessage,
-          mockHandleSlashCommand,
-          false,
-          () => 'vscode' as EditorType,
-          () => {},
-          () => Promise.resolve(),
-          false,
-          () => {},
-          () => {},
-          () => {},
-        ),
-      );
-
-      await act(async () => {
-        await result.current.submitQuery('Test query');
-      });
-
-      await waitFor(() => {
-        expect(mockAddItem).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: 'error',
-          }),
-          expect.any(Number),
-        );
-      });
-
-      expect(mockParseAndFormatApiError).toHaveBeenCalledWith(
-        { message: 'Test error' },
-        expect.any(String),
-        undefined,
-        'gemini-2.5-pro',
-        'gemini-2.5-flash',
-      );
-    });
-  });
-
-  it('should process @include commands, adding user turn after processing to prevent race conditions', async () => {
-    const rawQuery = '@include file.txt Summarize this.';
-    const processedQueryParts = [
-      { text: 'Summarize this with content from @file.txt' },
-      { text: 'File content...' },
-    ];
-    const userMessageTimestamp = Date.now();
-    vi.spyOn(Date, 'now').mockReturnValue(userMessageTimestamp);
-
-    handleAtCommandSpy.mockResolvedValue({
-      processedQuery: processedQueryParts,
-      shouldProceed: true,
-    });
-
-    const { result } = renderHook(() =>
-      useGeminiStream(
-        mockConfig.getGeminiClient() as GeminiClient,
-        [],
-        mockAddItem,
-        mockConfig,
-        mockOnDebugMessage,
-        mockHandleSlashCommand,
-        false,
-        vi.fn(),
-        vi.fn(),
-        vi.fn(),
-        false,
-        vi.fn(),
-        vi.fn(),
-        vi.fn(),
-      ),
-    );
-
-    await act(async () => {
-      await result.current.submitQuery(rawQuery);
-    });
-
-    expect(handleAtCommandSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        query: rawQuery,
-      }),
-    );
-
-    expect(mockAddItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.USER,
-        text: rawQuery,
-      },
-      userMessageTimestamp,
-    );
-
-    // FIX: This expectation now correctly matches the actual function call signature.
-    expect(mockSendMessageStream).toHaveBeenCalledWith(
-      processedQueryParts, // Argument 1: The parts array directly
-      expect.any(AbortSignal), // Argument 2: An AbortSignal
-      expect.any(String), // Argument 3: The prompt_id string
-    );
   });
 });
