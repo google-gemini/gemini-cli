@@ -82,6 +82,7 @@ interface MockServerConfig {
   getVertexAI: Mock<() => boolean | undefined>;
   getShowMemoryUsage: Mock<() => boolean>;
   getAccessibility: Mock<() => AccessibilitySettings>;
+  getDisplay: Mock<() => { footer?: boolean }>;
   getProjectRoot: Mock<() => string | undefined>;
   getAllGeminiMdFilenames: Mock<() => string[]>;
   getGeminiClient: Mock<() => GeminiClient | undefined>;
@@ -147,6 +148,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getVertexAI: vi.fn(() => opts.vertexai),
         getShowMemoryUsage: vi.fn(() => opts.showMemoryUsage ?? false),
         getAccessibility: vi.fn(() => opts.accessibility ?? {}),
+        getDisplay: vi.fn(() => opts.display ?? {}),
         getProjectRoot: vi.fn(() => opts.targetDir),
         getEnablePromptCompletion: vi.fn(() => false),
         getGeminiClient: vi.fn(() => ({

@@ -11,15 +11,23 @@ import * as dotenv from 'dotenv';
 import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
+  MCPServerConfig,
+  BugCommandSettings,
+  TelemetrySettings,
+  AuthType,
   Storage,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { Settings, MemoryImportFormat } from './settingsSchema.js';
+import {
+  Settings as SettingsFromSchema,
+  MemoryImportFormat,
+} from './settingsSchema.js';
+import { CustomTheme } from '../ui/themes/theme.js';
 
-export type { Settings, MemoryImportFormat };
+export type { MemoryImportFormat };
 
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 
@@ -71,6 +79,19 @@ export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
+
+export interface DisplaySettings {
+  footer?: boolean;
+}
+
+export type Settings = SettingsFromSchema & {
+  display?: DisplaySettings;
+  customThemes?: Record<string, CustomTheme>;
+  mcpServers?: Record<string, MCPServerConfig>;
+  telemetry?: TelemetrySettings;
+  bugCommand?: BugCommandSettings;
+  selectedAuthType?: AuthType;
+};
 
 export interface SettingsError {
   message: string;
