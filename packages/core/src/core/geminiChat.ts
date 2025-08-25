@@ -574,27 +574,6 @@ export class GeminiChat {
     this.recordHistory(userInput, modelOutput);
   }
 
-  /**
-   * Processes model output to filter out thought parts, returning only visible content.
-   * This is the single, unified logic for cleaning model responses for both
-   * streaming and non-streaming calls.
-   * @param modelOutput The raw model output, which may contain multiple `Content` objects.
-   * @returns A new array of `Content` objects with all `thought` parts removed.
-   */
-  private getVisibleModelOutput(modelOutput: Content[]): Content[] {
-    return modelOutput
-      .map((content) => {
-        if (!content.parts) {
-          return content;
-        }
-        const visibleParts = content.parts.filter(
-          (part) => !('thought' in part),
-        );
-        return { ...content, parts: visibleParts };
-      })
-      .filter((content) => content.parts == null || content.parts.length > 0);
-  }
-
   private recordHistory(
     userInput: Content,
     modelOutput: Content[],
