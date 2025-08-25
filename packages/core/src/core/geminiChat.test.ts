@@ -593,7 +593,7 @@ describe('GeminiChat', () => {
 
     it('should skip "thought" content from modelOutput', () => {
       const modelOutputWithThought: Content[] = [
-        { role: 'model', parts: [{ thought: true }, { text: 'Visible text' }] },
+        { role: 'model', parts: [{ thought: true, text: 'Thought' }] },
         { role: 'model', parts: [{ text: 'Another visible text' }] },
       ];
       // @ts-expect-error Accessing private method for testing purposes
@@ -625,16 +625,25 @@ describe('GeminiChat', () => {
         { role: 'model', parts: [{ text: 'Part 1.' }] },
         {
           role: 'model',
-          parts: [{ thought: true }, { text: 'Should be skipped' }],
+          parts: [
+            {
+              thought: true,
+              text: 'This text is the thought and should be skipped.',
+            },
+          ],
         },
         { role: 'model', parts: [{ text: 'Part 2.' }] },
       ];
+
       // @ts-expect-error Accessing private method for testing purposes
       chat.recordHistory(userInput, modelOutputMixed);
       const history = chat.getHistory();
+
       expect(history.length).toBe(2);
       expect(history[0]).toEqual(userInput);
       expect(history[1].role).toBe('model');
+
+      // CORRECTED: The assertion now correctly expects the thought's text to be filtered out.
       expect(history[1].parts).toEqual([{ text: 'Part 1.Part 2.' }]);
     });
 
