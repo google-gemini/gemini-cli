@@ -401,6 +401,54 @@ export class KittySequenceOverflowEvent {
   }
 }
 
+
+export interface ResearchOptInEvent extends BaseTelemetryEvent {
+  'event.name': 'research_opt_in';
+  'event.timestamp': string;
+  opt_in_status: boolean;
+  contact_email?: string;
+  user_id?: string;
+}
+
+export function makeResearchOptInEvent({
+  opt_in_status,
+  contact_email,
+  user_id,
+}: Omit<ResearchOptInEvent, CommonFields>): ResearchOptInEvent {
+  return {
+    'event.name': 'research_opt_in',
+    'event.timestamp': new Date().toISOString(),
+    opt_in_status,
+    contact_email,
+    user_id,
+  };
+}
+
+export interface ResearchFeedbackEvent extends BaseTelemetryEvent {
+  'event.name': 'research_feedback';
+  'event.timestamp': string;
+  feedback_type: 'survey' | 'conversational' | 'web';
+  feedback_content?: string;
+  survey_responses?: Record<string, unknown>;
+  user_id?: string;
+}
+
+export function makeResearchFeedbackEvent({
+  feedback_type,
+  feedback_content,
+  survey_responses,
+  user_id,
+}: Omit<ResearchFeedbackEvent, CommonFields>): ResearchFeedbackEvent {
+  return {
+    'event.name': 'research_feedback',
+    'event.timestamp': new Date().toISOString(),
+    feedback_type,
+    feedback_content,
+    survey_responses,
+    user_id,
+  };
+}
+
 export class FileOperationEvent implements BaseTelemetryEvent {
   'event.name': 'file_operation';
   'event.timestamp': string;
@@ -448,4 +496,6 @@ export type TelemetryEvent =
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
   | SlashCommandEvent
+  | ResearchOptInEvent
+  | ResearchFeedbackEvent
   | FileOperationEvent;
