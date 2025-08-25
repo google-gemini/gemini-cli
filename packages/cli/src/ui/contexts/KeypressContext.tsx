@@ -22,8 +22,10 @@ import { PassThrough } from 'stream';
 import {
   BACKSLASH_ENTER_DETECTION_WINDOW_MS,
   KITTY_CTRL_C,
+  KITTY_KEYCODE_BACKSPACE,
   KITTY_KEYCODE_ENTER,
   KITTY_KEYCODE_NUMPAD_ENTER,
+  KITTY_KEYCODE_TAB,
   MAX_KITTY_SEQUENCE_LENGTH,
 } from '../utils/platformConstants.js';
 
@@ -125,6 +127,30 @@ export function KeypressProvider({
       if (keyCode === 27) {
         return {
           name: 'escape',
+          ctrl,
+          meta: alt,
+          shift,
+          paste: false,
+          sequence,
+          kittyProtocol: true,
+        };
+      }
+
+      if (keyCode === KITTY_KEYCODE_TAB) {
+        return {
+          name: 'tab',
+          ctrl,
+          meta: alt,
+          shift,
+          paste: false,
+          sequence,
+          kittyProtocol: true,
+        };
+      }
+
+      if (keyCode === KITTY_KEYCODE_BACKSPACE) {
+        return {
+          name: 'backspace',
           ctrl,
           meta: alt,
           shift,
