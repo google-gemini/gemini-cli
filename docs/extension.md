@@ -87,3 +87,15 @@ You can install extensions using the `install` command. This command allows you 
 
 - `source <url> positional argument`: The URL of a Git repository to install the extension from. The repository must contain a `gemini-extension.json` file in its root.
 - `--path <path>`: The path to a local directory to install as an extension. The directory must contain a `gemini-extension.json` file.
+
+# Variables
+
+Gemini CLI extensions allow variable substitution in `gemini-extension.json`. This can be useful if e.g., you need the current directory to run an MCP server using `"cwd": "${extensionsDir}${/}${extensionFolder}${/}run.ts"`.
+
+## Currently-supported variables:
+
+| variable                   | description                                                       |
+| -------------------------- | ----------------------------------------------------------------- |
+| `${extensionFolder}`       | The folder for this extension.                                    |
+| `${extensionsDir}`         | The top-level extension directory where this extension is stored. |
+| `${/} or ${pathSeparator}` | The path separator (differs per OS).                              |

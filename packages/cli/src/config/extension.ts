@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { simpleGit } from 'simple-git';
+import { hydrateString } from './extensions/variables.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = '.gemini/extensions';
 
@@ -138,7 +139,13 @@ export function loadExtension(extensionDir: string): Extension | null {
   }
 
   try {
-    const configContent = fs.readFileSync(configFilePath, 'utf-8');
+    let configContent = fs.readFileSync(configFilePath, 'utf-8');
+    configContent = hydrateString(configContent, {
+      extensionFolder: path.basename(extensionDir),
+      extensionsDir: path.dirname(extensionDir),
+      '/': path.sep,
+      pathSeparator: path.sep,
+    });
     const config = JSON.parse(configContent) as ExtensionConfig;
     if (!config.name || !config.version) {
       console.error(

@@ -15,6 +15,7 @@ import {
   installExtension,
   loadExtensions,
 } from './extension.js';
+import { MCPServerConfig } from '@google/gemini-cli-core';
 import { execSync } from 'child_process';
 import { SimpleGit, simpleGit } from 'simple-git';
 
@@ -56,6 +57,7 @@ describe('loadExtensions', () => {
   afterEach(() => {
     fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
   });
 
   it('should include extension path in loaded extension', () => {
@@ -124,6 +126,37 @@ describe('loadExtensions', () => {
     expect(ext1?.contextFiles).toEqual([
       path.join(workspaceExtensionsDir, 'ext1', 'my-context-file.md'),
     ]);
+  });
+
+  it('should hydrate variables', () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+
+    createExtension(
+      workspaceExtensionsDir,
+      'test-extension',
+      '1.0.0',
+      false,
+      undefined,
+      {
+        'test-server': {
+          cwd: '${extensionsDir}${/}${extensionName}${/}server',
+        },
+      },
+    );
+
+    const extensions = loadExtensions(tempWorkspaceDir);
+    expect(extensions).toHaveLength(1);
+    const loadedConfig = extensions[0].config;
+    const expectedCwd = path.join(
+      workspaceExtensionsDir,
+      'test-extension',
+      'server',
+    );
+    expect(loadedConfig.mcpServers?.['test-server'].cwd).toBe(expectedCwd);
   });
 });
 
@@ -263,9 +296,7 @@ describe('installExtension', () => {
     });
 
     const mockedSimpleGit = simpleGit as vi.MockedFunction<typeof simpleGit>;
-    mockedSimpleGit.mockReturnValue({
-      clone,
-    } as unknown as SimpleGit);
+    mockedSimpleGit.mockReturnValue({ clone } as unknown as SimpleGit);
 
     await installExtension({ source: gitUrl, type: 'git' });
 
@@ -286,12 +317,13 @@ function createExtension(
   version: string,
   addContextFile = false,
   contextFileName?: string,
+  mcpServers?: Record<string, MCPServerConfig>,
 ): string {
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(
     path.join(extDir, EXTENSIONS_CONFIG_FILENAME),
-    JSON.stringify({ name, version, contextFileName }),
+    JSON.stringify({ name, version, contextFileName, mcpServers }),
   );
 
   if (addContextFile) {
