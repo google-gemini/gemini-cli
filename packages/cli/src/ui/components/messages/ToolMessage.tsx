@@ -128,7 +128,7 @@ const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
       />
     )}
     {status === ToolCallStatus.Success && (
-      <Text color={Colors.AccentGreen}>√</Text>
+      <Text color={Colors.AccentGreen}>✓</Text>
     )}
     {status === ToolCallStatus.Confirming && (
       <Text color={Colors.AccentYellow}>?</Text>
