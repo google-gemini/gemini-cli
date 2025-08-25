@@ -73,21 +73,7 @@ export class FileDiscoveryService {
       respectGeminiIgnore: true,
     },
   ): string[] {
-    if (!this.unifiedIgnore) return filePaths;
-    if (options.respectGitIgnore && options.respectGeminiIgnore) {
-      return filePaths.filter((filePath) => !this.isUnifiedIgnored(filePath));
-    }
-    if (options.respectGitIgnore && !options.respectGeminiIgnore) {
-      return filePaths.filter(
-        (filePath) => !this.shouldGitIgnoreFile(filePath),
-      );
-    }
-    if (!options.respectGitIgnore && options.respectGeminiIgnore) {
-      return filePaths.filter(
-        (filePath) => !this.shouldGeminiIgnoreFile(filePath),
-      );
-    }
-    return filePaths;
+    return filePaths.filter((filePath) => !this.shouldIgnoreFile(filePath, options));
   }
 
   /**
