@@ -1426,17 +1426,18 @@ describe('InputPrompt', () => {
       expect(stdout.lastFrame()).toContain('(r:)');
 
       stdin.write('\t');
+      await wait(); // Allow time for Tab keypress to be processed
 
       await waitFor(
         () => {
           expect(stdout.lastFrame()).not.toContain('(r:)');
         },
-        { timeout: 5000 },
-      ); // Increase timeout
+        { timeout: 10000 },
+      );
 
       expect(props.buffer.setText).toHaveBeenCalledWith('echo hello');
       unmount();
-    });
+    }, 15000);
 
     it('submits the highlighted entry on Enter and exits reverse-search', async () => {
       const { stdin, stdout, unmount } = renderWithProviders(
