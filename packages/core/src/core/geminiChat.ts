@@ -633,9 +633,20 @@ export class GeminiChat {
             const lastPart = consolidatedParts[consolidatedParts.length - 1];
             if (
               lastPart &&
-              'text' in lastPart &&
-              'text' in part &&
-              typeof part.text === 'string'
+              // Ensure lastPart is a pure text part
+              typeof lastPart.text === 'string' &&
+              !lastPart.functionCall &&
+              !lastPart.functionResponse &&
+              !lastPart.inlineData &&
+              !lastPart.fileData &&
+              !lastPart.thought &&
+              // Ensure current part is a pure text part
+              typeof part.text === 'string' &&
+              !part.functionCall &&
+              !part.functionResponse &&
+              !part.inlineData &&
+              !part.fileData &&
+              !part.thought
             ) {
               lastPart.text += part.text;
             } else {
