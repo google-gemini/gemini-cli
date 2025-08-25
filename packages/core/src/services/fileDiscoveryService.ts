@@ -6,7 +6,7 @@
 
 import { GitIgnoreParser, GitIgnoreFilter } from '../utils/gitIgnoreParser.js';
 import { isGitRepository } from '../utils/gitUtils.js';
-import * as path from 'path';
+import * as path from 'node:path';
 import ignore, { type Ignore } from 'ignore';
 
 const GEMINI_IGNORE_FILE_NAME = '.geminiignore';

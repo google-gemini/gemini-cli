@@ -26,6 +26,7 @@ import {
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
+  EVENT_MALFORMED_JSON_RESPONSE,
 } from './constants.js';
 import {
   logApiRequest,
@@ -35,6 +36,7 @@ import {
   logToolCall,
   logFlashFallback,
   logChatCompression,
+  logMalformedJsonResponse,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -44,6 +46,7 @@ import {
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  MalformedJsonResponseEvent,
   makeChatCompressionEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
@@ -495,7 +498,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -562,7 +565,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -628,7 +631,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -696,7 +699,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -762,7 +765,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: {
             name: 'test-error-type',
@@ -815,6 +818,33 @@ describe('loggers', () => {
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
+      });
+    });
+  });
+
+  describe('logMalformedJsonResponse', () => {
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logMalformedJsonResponseEvent');
+    });
+
+    it('logs the event to Clearcut and OTEL', () => {
+      const mockConfig = makeFakeConfig();
+      const event = new MalformedJsonResponseEvent('test-model');
+
+      logMalformedJsonResponse(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logMalformedJsonResponseEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Malformed JSON response from test-model.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'event.name': EVENT_MALFORMED_JSON_RESPONSE,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          model: 'test-model',
+        },
       });
     });
   });

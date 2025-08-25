@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { glob, escape } from 'glob';
 import {
   BaseDeclarativeTool,
@@ -155,7 +155,7 @@ class GlobToolInvocation extends BaseToolInvocation<
           stat: true,
           nocase: !this.params.case_sensitive,
           dot: true,
-          ignore: ['**/node_modules/**', '**/.git/**'],
+          ignore: this.config.getFileExclusions().getGlobExcludes(),
           follow: false,
           signal,
         })) as GlobPath[];

@@ -27,6 +27,7 @@ vi.mock('node:process', () => {
   const mockProcess: Partial<NodeJS.Process> = {
     exit: mockProcessExit,
     platform: 'sunos',
+    cwd: () => '/fake/dir',
   } as unknown as NodeJS.Process;
   return {
     ...mockProcess,
@@ -85,6 +86,7 @@ import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import {
   SlashCommandStatus,
   makeFakeConfig,
+  type IdeClient,
 } from '@google/gemini-cli-core/index.js';
 
 function createTestCommand(
@@ -108,6 +110,10 @@ describe('useSlashCommandProcessor', () => {
   const mockSetQuittingMessages = vi.fn();
 
   const mockConfig = makeFakeConfig({});
+  vi.spyOn(mockConfig, 'getIdeClient').mockReturnValue({
+    addStatusChangeListener: vi.fn(),
+    removeStatusChangeListener: vi.fn(),
+  } as unknown as IdeClient);
 
   const mockSettings = {} as LoadedSettings;
 

@@ -5,7 +5,7 @@
  */
 
 // Mock 'os' first.
-import * as osActual from 'os';
+import * as osActual from 'node:os';
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof osActual>();
   return {
@@ -25,9 +25,9 @@ import {
   type Mocked,
   type Mock,
 } from 'vitest';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import stripJsonComments from 'strip-json-comments';
-import * as path from 'path';
+import * as path from 'node:path';
 
 import {
   loadTrustedFolders,

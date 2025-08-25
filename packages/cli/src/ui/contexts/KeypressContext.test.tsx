@@ -13,10 +13,16 @@ import {
   Key,
 } from './KeypressContext.js';
 import { useStdin } from 'ink';
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 import {
   KITTY_KEYCODE_ENTER,
   KITTY_KEYCODE_NUMPAD_ENTER,
+  KITTY_KEYCODE_TAB,
+  KITTY_KEYCODE_BACKSPACE,
+  CHAR_CODE_ESC,
+  CHAR_CODE_LEFT_BRACKET,
+  CHAR_CODE_1,
+  CHAR_CODE_2,
 } from '../utils/platformConstants.js';
 
 // Mock the 'ink' module to control stdin
@@ -278,10 +284,86 @@ describe('KeypressContext - Kitty Protocol', () => {
     });
   });
 
+  describe('Tab and Backspace handling', () => {
+    it('should recognize Tab key in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_TAB}u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'tab',
+          kittyProtocol: true,
+          shift: false,
+        }),
+      );
+    });
+
+    it('should recognize Shift+Tab in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Modifier 2 is Shift
+      act(() => {
+        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_TAB};2u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'tab',
+          kittyProtocol: true,
+          shift: true,
+        }),
+      );
+    });
+
+    it('should recognize Backspace key in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_BACKSPACE}u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          kittyProtocol: true,
+          meta: false,
+        }),
+      );
+    });
+
+    it('should recognize Option+Backspace in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Modifier 3 is Alt/Option
+      act(() => {
+        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_BACKSPACE};3u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          kittyProtocol: true,
+          meta: true,
+        }),
+      );
+    });
+  });
+
   describe('paste mode', () => {
     it('should handle multiline paste as a single event', async () => {
       const keyHandler = vi.fn();
-      const pastedText = 'This \nis \na \nmultiline \npaste.';
+      const pastedText = 'This \n is \n a \n multiline \n paste.';
 
       const { result } = renderHook(() => useKeypressContext(), {
         wrapper,
@@ -307,6 +389,210 @@ describe('KeypressContext - Kitty Protocol', () => {
           paste: true,
           sequence: pastedText,
         }),
+      );
+    });
+  });
+
+  describe('debug keystroke logging', () => {
+    let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+    let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleLogSpy.mockRestore();
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should not log keystrokes when debugKeystrokeLogging is false', async () => {
+      const keyHandler = vi.fn();
+
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <KeypressProvider
+          kittyProtocolEnabled={true}
+          debugKeystrokeLogging={false}
+        >
+          {children}
+        </KeypressProvider>
+      );
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Send a kitty sequence
+      act(() => {
+        stdin.sendKittySequence('\x1b[27u');
+      });
+
+      expect(keyHandler).toHaveBeenCalled();
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('[DEBUG] Kitty'),
+      );
+    });
+
+    it('should log kitty buffer accumulation when debugKeystrokeLogging is true', async () => {
+      const keyHandler = vi.fn();
+
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <KeypressProvider
+          kittyProtocolEnabled={true}
+          debugKeystrokeLogging={true}
+        >
+          {children}
+        </KeypressProvider>
+      );
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Send a complete kitty sequence for escape
+      act(() => {
+        stdin.sendKittySequence('\x1b[27u');
+      });
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[DEBUG] Kitty buffer accumulating:',
+        expect.stringContaining('\x1b[27u'),
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[DEBUG] Kitty sequence parsed successfully:',
+        expect.stringContaining('\x1b[27u'),
+      );
+    });
+
+    it('should log kitty buffer overflow when debugKeystrokeLogging is true', async () => {
+      const keyHandler = vi.fn();
+
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <KeypressProvider
+          kittyProtocolEnabled={true}
+          debugKeystrokeLogging={true}
+        >
+          {children}
+        </KeypressProvider>
+      );
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Send an invalid long sequence to trigger overflow
+      const longInvalidSequence = '\x1b[' + 'x'.repeat(100);
+      act(() => {
+        stdin.sendKittySequence(longInvalidSequence);
+      });
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[DEBUG] Kitty buffer overflow, clearing:',
+        expect.any(String),
+      );
+    });
+
+    it('should log kitty buffer clear on Ctrl+C when debugKeystrokeLogging is true', async () => {
+      const keyHandler = vi.fn();
+
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <KeypressProvider
+          kittyProtocolEnabled={true}
+          debugKeystrokeLogging={true}
+        >
+          {children}
+        </KeypressProvider>
+      );
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Send incomplete kitty sequence
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          sequence: '\x1b[1',
+        });
+      });
+
+      // Send Ctrl+C
+      act(() => {
+        stdin.pressKey({
+          name: 'c',
+          ctrl: true,
+          meta: false,
+          shift: false,
+          sequence: '\x03',
+        });
+      });
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[DEBUG] Kitty buffer cleared on Ctrl+C:',
+        '\x1b[1',
+      );
+
+      // Verify Ctrl+C was handled
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'c',
+          ctrl: true,
+        }),
+      );
+    });
+
+    it('should show char codes when debugKeystrokeLogging is true even without debug mode', async () => {
+      const keyHandler = vi.fn();
+
+      const wrapper = ({ children }: { children: React.ReactNode }) => (
+        <KeypressProvider
+          kittyProtocolEnabled={true}
+          debugKeystrokeLogging={true}
+        >
+          {children}
+        </KeypressProvider>
+      );
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Send incomplete kitty sequence
+      const sequence = '\x1b[12';
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          sequence,
+        });
+      });
+
+      // Verify debug logging for accumulation
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        '[DEBUG] Kitty buffer accumulating:',
+        sequence,
+      );
+
+      // Verify warning for char codes
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Kitty sequence buffer has char codes:',
+        [CHAR_CODE_ESC, CHAR_CODE_LEFT_BRACKET, CHAR_CODE_1, CHAR_CODE_2],
       );
     });
   });

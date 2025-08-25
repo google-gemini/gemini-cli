@@ -19,12 +19,15 @@ import {
   EVENT_NEXT_SPEAKER_CHECK,
   SERVICE_NAME,
   EVENT_SLASH_COMMAND,
+  EVENT_CONVERSATION_FINISHED,
   EVENT_CHAT_COMPRESSION,
+  EVENT_MALFORMED_JSON_RESPONSE,
 } from './constants.js';
 import {
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
+  FileOperationEvent,
   IdeConnectionEvent,
   StartSessionEvent,
   ToolCallEvent,
@@ -33,8 +36,10 @@ import {
   NextSpeakerCheckEvent,
   LoopDetectedEvent,
   SlashCommandEvent,
+  ConversationFinishedEvent,
   KittySequenceOverflowEvent,
   ChatCompressionEvent,
+  MalformedJsonResponseEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -42,18 +47,23 @@ import {
   recordApiResponseMetrics,
   recordToolCallMetrics,
   recordChatCompressionMetrics,
+  recordFileOperationMetric,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import { uiTelemetryService, UiEvent } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { UserAccountManager } from '../utils/userAccountManager.js';
 
 const shouldLogUserPrompts = (config: Config): boolean =>
   config.getTelemetryLogPromptsEnabled();
 
 function getCommonAttributes(config: Config): LogAttributes {
+  const userAccountManager = new UserAccountManager();
+  const email = userAccountManager.getCachedGoogleAccount();
   return {
     'session.id': config.getSessionId(),
+    ...(email && { 'user.email': email }),
   };
 }
 
@@ -152,6 +162,24 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     event.success,
     event.decision,
     event.tool_type,
+  );
+}
+
+export function logFileOperation(
+  config: Config,
+  event: FileOperationEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logFileOperationEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  recordFileOperationMetric(
+    config,
+    event.operation,
+    event.lines,
+    event.mimetype,
+    event.extension,
+    event.diff_stat,
+    event.programming_language,
   );
 }
 
@@ -387,6 +415,27 @@ export function logIdeConnection(
   logger.emit(logRecord);
 }
 
+export function logConversationFinishedEvent(
+  config: Config,
+  event: ConversationFinishedEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logConversationFinishedEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_CONVERSATION_FINISHED,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Conversation finished.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
 export function logChatCompression(
   config: Config,
   event: ChatCompressionEvent,
@@ -425,6 +474,27 @@ export function logKittySequenceOverflow(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Kitty sequence buffer overflow: ${event.sequence_length} bytes`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logMalformedJsonResponse(
+  config: Config,
+  event: MalformedJsonResponseEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logMalformedJsonResponseEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_MALFORMED_JSON_RESPONSE,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Malformed JSON response from ${event.model}.`,
     attributes,
   };
   logger.emit(logRecord);

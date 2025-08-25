@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn, SpawnOptions } from 'child_process';
+import { spawn, SpawnOptions } from 'node:child_process';
 
 /**
  * Checks if a query string potentially represents an '@' command.
@@ -74,16 +74,35 @@ export const copyToClipboard = async (text: string): Promise<void> => {
           // If xclip fails for any reason, try xsel as a fallback.
           await run('xsel', ['--clipboard', '--input'], linuxOptions);
         } catch (fallbackError) {
-          const primaryMsg =
+          const xclipNotFound =
+            primaryError instanceof Error &&
+            (primaryError as NodeJS.ErrnoException).code === 'ENOENT';
+          const xselNotFound =
+            fallbackError instanceof Error &&
+            (fallbackError as NodeJS.ErrnoException).code === 'ENOENT';
+          if (xclipNotFound && xselNotFound) {
+            throw new Error(
+              'Please ensure xclip or xsel is installed and configured.',
+            );
+          }
+
+          let primaryMsg =
             primaryError instanceof Error
               ? primaryError.message
               : String(primaryError);
-          const fallbackMsg =
+          if (xclipNotFound) {
+            primaryMsg = `xclip not found`;
+          }
+          let fallbackMsg =
             fallbackError instanceof Error
               ? fallbackError.message
               : String(fallbackError);
+          if (xselNotFound) {
+            fallbackMsg = `xsel not found`;
+          }
+
           throw new Error(
-            `All copy commands failed. xclip: "${primaryMsg}", xsel: "${fallbackMsg}". Please ensure xclip or xsel is installed and configured.`,
+            `All copy commands failed. "${primaryMsg}", "${fallbackMsg}". `,
           );
         }
       }
