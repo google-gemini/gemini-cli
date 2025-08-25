@@ -9,8 +9,8 @@ import { directoryCommand, expandHomeDir } from './directoryCommand.js';
 import { Config, WorkspaceContext } from '@google/gemini-cli-core';
 import { CommandContext } from './types.js';
 import { MessageType } from '../types.js';
-import * as os from 'os';
-import * as path from 'path';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 describe('directoryCommand', () => {
   let mockContext: CommandContext;

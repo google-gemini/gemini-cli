@@ -13,8 +13,8 @@ import {
   ToolResult,
 } from './tools.js';
 import { FunctionDeclaration } from '@google/genai';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
 import * as Diff from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';

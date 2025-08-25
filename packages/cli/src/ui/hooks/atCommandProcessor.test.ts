@@ -16,11 +16,11 @@ import {
   COMMON_IGNORE_PATTERNS,
   DEFAULT_FILE_EXCLUDES,
 } from '@google/gemini-cli-core';
-import * as os from 'os';
+import * as os from 'node:os';
 import { ToolCallStatus } from '../types.js';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
-import * as fsPromises from 'fs/promises';
-import * as path from 'path';
+import * as fsPromises from 'node:fs/promises';
+import * as path from 'node:path';
 
 describe('handleAtCommand', () => {
   let testRootDir: string;
