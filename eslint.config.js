@@ -10,6 +10,7 @@ import reactPlugin from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
+import vitest from '@vitest/eslint-plugin';
 import globals from 'globals';
 import licenseHeader from 'eslint-plugin-license-header';
 import path from 'node:path'; // Use node: prefix for built-ins
@@ -157,6 +158,17 @@ export default tseslint.config(
       'prefer-const': ['error', { destructuring: 'all' }],
       radix: 'error',
       'default-case': 'error',
+    },
+  },
+  {
+    files: ['packages/*/src/**/*.test.{ts,tsx}'],
+    plugins: {
+      vitest,
+    },
+    rules: {
+      ...vitest.configs.recommended.rules,
+      'vitest/expect-expect': 'off',
+      'vitest/no-commented-out-tests': 'off',
     },
   },
   {
