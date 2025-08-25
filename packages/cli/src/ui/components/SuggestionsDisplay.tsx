@@ -7,6 +7,7 @@
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { PrepareLabel } from './PrepareLabel.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
 export interface Suggestion {
   label: string;
   value: string;
@@ -52,7 +53,7 @@ export function SuggestionsDisplay({
   );
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
-  const isSlashCommandMode = userInput.startsWith('/');
+  const isSlashCommandMode = isSlashCommand(userInput);
   let commandNameWidth = 0;
 
   if (isSlashCommandMode) {
