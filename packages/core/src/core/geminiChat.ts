@@ -631,25 +631,15 @@ export class GeminiChat {
     }
   }
 
-  private isFirstPartText(
+    private isFirstPartText(
     content: Content | undefined,
   ): content is Content & { parts: [{ text: string }, ...Part[]] } {
-    if (
-      !content ||
-      content.role !== 'model' ||
-      !content.parts ||
-      content.parts.length === 0
-    ) {
-      return false;
-    }
-    const firstPart = content.parts[0];
-    return (
-      typeof firstPart.text === 'string' &&
-      !('functionCall' in firstPart) &&
-      !('functionResponse' in firstPart) &&
-      !('inlineData' in firstPart) &&
-      !('fileData' in firstPart) &&
-      !('thought' in firstPart)
+    return !!(
+      content &&
+      content.role === 'model' &&
+      content.parts &&
+      content.parts.length > 0 &&
+      typeof content.parts[0].text === 'string'
     );
   }
 
@@ -665,15 +655,7 @@ export class GeminiChat {
       return false;
     }
     const lastPart = content.parts[content.parts.length - 1];
-    return (
-      typeof lastPart.text === 'string' &&
-      lastPart.text !== '' &&
-      !('functionCall' in lastPart) &&
-      !('functionResponse' in lastPart) &&
-      !('inlineData' in lastPart) &&
-      !('fileData' in lastPart) &&
-      !('thought' in lastPart)
-    );
+    return typeof lastPart.text === 'string' && lastPart.text !== '';
   }
 
   private isThoughtContent(content: Content): boolean {
