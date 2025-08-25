@@ -123,17 +123,14 @@ export function parseAndFormatApiError(
         fallbackModel,
       );
     }
-    if (request && wasCausedByInvalidImageUpload(error.message, request)) {
-      text += INVALID_IMAGE_CONTEXT_MESSAGE;
-    }
-    return text;
+    return appendContextToText(text, error.message, request);
   }
 
   // The error message might be a string containing a JSON object.
   if (typeof error === 'string') {
     const jsonStart = error.indexOf('{');
     if (jsonStart === -1) {
-      return `[API Error: ${error}]`; // Not a JSON error, return as is.
+      return appendContextToText(`[API Error: ${error}]`, error, request); // Not a JSON error, return as is.
     }
 
     const jsonString = error.substring(jsonStart);
@@ -161,18 +158,26 @@ export function parseAndFormatApiError(
             fallbackModel,
           );
         }
-        if (wasCausedByInvalidImageUpload(finalMessage, request)) {
-          text += INVALID_IMAGE_CONTEXT_MESSAGE;
-        }
         return text;
       }
     } catch (_e) {
       // Not a valid JSON, fall through and return the original message.
     }
-    return `[API Error: ${error}]`;
+    return appendContextToText(`[API Error: ${error}]`, error, request);
   }
 
   return '[API Error: An unknown error occurred.]';
+}
+
+function appendContextToText(
+  text: string,
+  error: string,
+  request?: PartListUnion,
+) {
+  if (request && wasCausedByInvalidImageUpload(error, request)) {
+    text += INVALID_IMAGE_CONTEXT_MESSAGE;
+  }
+  return text;
 }
 
 function wasCausedByInvalidImageUpload(err: string, request?: PartListUnion) {
