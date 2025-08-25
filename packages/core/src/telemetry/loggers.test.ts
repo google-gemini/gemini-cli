@@ -58,6 +58,7 @@ import type { GenerateContentResponseUsageMetadata } from '@google/genai';
 import * as uiTelemetry from './uiTelemetry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
+import { UserAccountManager } from '../utils/userAccountManager.js';
 
 describe('loggers', () => {
   const mockLogger = {
@@ -74,6 +75,10 @@ describe('loggers', () => {
     vi.spyOn(uiTelemetry.uiTelemetryService, 'addEvent').mockImplementation(
       mockUiEvent.addEvent,
     );
+    vi.spyOn(
+      UserAccountManager.prototype,
+      'getCachedGoogleAccount',
+    ).mockReturnValue('test-user@example.com');
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T00:00:00.000Z'));
   });
@@ -154,6 +159,7 @@ describe('loggers', () => {
         body: 'CLI configuration loaded.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_CLI_CONFIG,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -197,6 +203,7 @@ describe('loggers', () => {
         body: 'User prompt. Length: 11.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_USER_PROMPT,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           prompt_length: 11,
@@ -225,6 +232,7 @@ describe('loggers', () => {
         body: 'User prompt. Length: 11.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_USER_PROMPT,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           prompt_length: 11,
@@ -279,6 +287,7 @@ describe('loggers', () => {
         body: 'API response from test-model. Status: 200. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_API_RESPONSE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           [SemanticAttributes.HTTP_STATUS_CODE]: 200,
@@ -294,6 +303,7 @@ describe('loggers', () => {
           response_text: 'test-response',
           prompt_id: 'prompt-id-1',
           auth_type: 'oauth-personal',
+          error: undefined,
         },
       });
 
@@ -343,6 +353,7 @@ describe('loggers', () => {
         body: 'API response from test-model. Status: 200. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           ...event,
           'event.name': EVENT_API_RESPONSE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -380,6 +391,7 @@ describe('loggers', () => {
         body: 'API request to test-model.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -398,6 +410,7 @@ describe('loggers', () => {
         body: 'API request to test-model.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -422,6 +435,7 @@ describe('loggers', () => {
         body: 'Switching to flash as Fallback.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_FLASH_FALLBACK,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           auth_type: 'vertex-ai',
@@ -518,6 +532,7 @@ describe('loggers', () => {
         body: 'Tool call: test-function. Decision: accept. Success: true. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -534,6 +549,9 @@ describe('loggers', () => {
           decision: ToolCallDecision.ACCEPT,
           prompt_id: 'prompt-id-1',
           tool_type: 'native',
+          error: undefined,
+          error_type: undefined,
+          metadata: undefined,
         },
       });
 
@@ -583,6 +601,7 @@ describe('loggers', () => {
         body: 'Tool call: test-function. Decision: reject. Success: false. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -599,6 +618,9 @@ describe('loggers', () => {
           decision: ToolCallDecision.REJECT,
           prompt_id: 'prompt-id-2',
           tool_type: 'native',
+          error: undefined,
+          error_type: undefined,
+          metadata: undefined,
         },
       });
 
@@ -651,6 +673,7 @@ describe('loggers', () => {
         body: 'Tool call: test-function. Decision: modify. Success: true. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -667,6 +690,9 @@ describe('loggers', () => {
           decision: ToolCallDecision.MODIFY,
           prompt_id: 'prompt-id-3',
           tool_type: 'native',
+          error: undefined,
+          error_type: undefined,
+          metadata: undefined,
         },
       });
 
@@ -718,6 +744,7 @@ describe('loggers', () => {
         body: 'Tool call: test-function. Success: true. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -733,6 +760,10 @@ describe('loggers', () => {
           success: true,
           prompt_id: 'prompt-id-4',
           tool_type: 'native',
+          decision: undefined,
+          error: undefined,
+          error_type: undefined,
+          metadata: undefined,
         },
       });
 
@@ -785,6 +816,7 @@ describe('loggers', () => {
         body: 'Tool call: test-function. Success: false. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -804,6 +836,8 @@ describe('loggers', () => {
           'error.type': ToolErrorType.UNKNOWN,
           prompt_id: 'prompt-id-5',
           tool_type: 'native',
+          decision: undefined,
+          metadata: undefined,
         },
       });
 
@@ -843,6 +877,7 @@ describe('loggers', () => {
         body: 'Malformed JSON response from test-model.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_MALFORMED_JSON_RESPONSE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
