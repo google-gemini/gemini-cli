@@ -546,8 +546,11 @@ export class GeminiChat {
       hasReceivedAnyChunk = true;
       if (isValidResponse(chunk)) {
         const content = chunk.candidates?.[0]?.content;
-        if (content && !this.isThoughtContent(content)) {
-          modelResponseParts.push(...(content.parts || []));
+        if (content?.parts) {
+          const visibleParts = content.parts.filter(
+            part => !('thought' in part),
+          );
+          modelResponseParts.push(...visibleParts);
         }
       } else {
         recordInvalidChunk(this.config);
