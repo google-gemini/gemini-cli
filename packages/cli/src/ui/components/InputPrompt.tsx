@@ -10,7 +10,7 @@ import { theme } from '../semantic-colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { TextBuffer, logicalPosToOffset } from './shared/text-buffer.js';
-import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
+import { cpSlice, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
@@ -721,41 +721,76 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 const isOnCursorLine =
                   focus && visualIdxInRenderedSet === cursorVisualRow;
                 const currentLineGhost = isOnCursorLine ? inlineGhost : '';
-
                 const ghostWidth = stringWidth(currentLineGhost);
 
+                // Apply transformation coloring first
+                const codePoints = toCodePoints(display);
+                const outputChars = [];
+                const absoluteVisualIdx =
+                  visualIdxInRenderedSet + scrollVisualRow;
+
+                // First pass: Apply transformation coloring
+                for (let i = 0; i < codePoints.length; i++) {
+                  const char = codePoints[i];
+                  const [logicalLineIndex, startColInTransformedLine] =
+                    buffer.visualToLogicalMap[absoluteVisualIdx] ?? [];
+
+                  let isTransform = false;
+                  if (logicalLineIndex !== undefined) {
+                    const transformedToLogMap =
+                      buffer.transformedToLogicalMaps[logicalLineIndex];
+                    if (transformedToLogMap) {
+                      const transformedMapIdx =
+                        (startColInTransformedLine ?? 0) + i;
+                      const currentLogPos =
+                        transformedToLogMap[transformedMapIdx];
+                      const nextLogPos =
+                        transformedToLogMap[transformedMapIdx + 1];
+                      const prevLogPos =
+                        transformedToLogMap[transformedMapIdx - 1];
+
+                      if (
+                        (currentLogPos !== undefined &&
+                          currentLogPos === nextLogPos) ||
+                        (currentLogPos !== undefined &&
+                          currentLogPos === prevLogPos)
+                      ) {
+                        isTransform = true;
+                      }
+                    }
+                  }
+                  outputChars.push(
+                    isTransform ? chalk.hex(theme.text.accent)(char) : char,
+                  );
+                }
+
+                // Apply cursor highlighting on the array of styled characters
                 if (focus && visualIdxInRenderedSet === cursorVisualRow) {
                   const relativeVisualColForHighlight = cursorVisualColAbsolute;
 
                   if (relativeVisualColForHighlight >= 0) {
-                    if (relativeVisualColForHighlight < cpLen(display)) {
-                      const charToHighlight =
-                        cpSlice(
-                          display,
-                          relativeVisualColForHighlight,
-                          relativeVisualColForHighlight + 1,
-                        ) || ' ';
-                      const highlighted = chalk.inverse(charToHighlight);
-                      display =
-                        cpSlice(display, 0, relativeVisualColForHighlight) +
-                        highlighted +
-                        cpSlice(display, relativeVisualColForHighlight + 1);
+                    if (relativeVisualColForHighlight < outputChars.length) {
+                      outputChars[relativeVisualColForHighlight] =
+                        chalk.inverse(
+                          outputChars[relativeVisualColForHighlight],
+                        );
                     } else if (
-                      relativeVisualColForHighlight === cpLen(display)
+                      relativeVisualColForHighlight === outputChars.length &&
+                      outputChars.length < inputWidth
                     ) {
-                      if (!currentLineGhost) {
-                        display = display + chalk.inverse(' ');
-                      }
+                      // Handle cursor at the end of the line
+                      outputChars.push(chalk.inverse(' '));
                     }
                   }
                 }
 
+                // Join the characters back into a string
+                display = outputChars.join('');
+
                 const showCursorBeforeGhost =
                   focus &&
                   visualIdxInRenderedSet === cursorVisualRow &&
-                  cursorVisualColAbsolute ===
-                    // eslint-disable-next-line no-control-regex
-                    cpLen(display.replace(/\x1b\[[0-9;]*m/g, '')) &&
+                  cursorVisualColAbsolute === outputChars.length &&
                   currentLineGhost;
 
                 const actualDisplayWidth = stringWidth(display);
