@@ -115,6 +115,7 @@ describe('GeminiChat', () => {
       const history = chat.getHistory();
 
       // The history should be: [user, model(tool_call), user(tool_response), user(new_prompt), model(empty)]
+      //. expect(history).toBe([])
       expect(history.length).toBe(5);
 
       // The last turn should be the empty model response.
@@ -189,28 +190,26 @@ describe('GeminiChat', () => {
         emptyStreamResponse,
       );
 
-      // 3. Action: Send a new message and consume the stream to trigger history recording.
       const stream = await chat.sendMessageStream(
         { message: 'Next question' },
         'prompt-id-stream',
       );
       for await (const _ of stream) {
-        // Consume the stream to trigger history recording
+        // consume stream
       }
 
-      // 4. Assert: Check the final state of the history.
       const history = chat.getHistory();
       expect(history.length).toBe(5);
 
-      // The second-to-last turn should be an empty model response to maintain the pattern.
-      const secondToLastTurn = history[history.length - 2];
-      expect(secondToLastTurn?.role).toBe('model');
-      expect(secondToLastTurn?.parts.length).toBe(0);
-
-      // The final turn should be the new user prompt.
+      // The final turn should be the empty model response.
       const lastTurn = history[history.length - 1];
-      expect(lastTurn?.role).toBe('user');
-      expect(lastTurn?.parts[0]?.text).toBe('Next question');
+      expect(lastTurn?.role).toBe('model');
+      expect(lastTurn?.parts.length).toBe(0);
+
+      // The second-to-last turn should be the new user prompt.
+      const secondToLastTurn = history[history.length - 2];
+      expect(secondToLastTurn?.role).toBe('user');
+      expect(secondToLastTurn?.parts[0]?.text).toBe('Next question');
     });
 
     it('should call generateContentStream with the correct parameters', async () => {
@@ -521,8 +520,11 @@ describe('GeminiChat', () => {
       // @ts-expect-error Accessing private method for testing purposes
       chat.recordHistory(userInput, modelOutputOnlyThought);
       const history = chat.getHistory();
-      expect(history.length).toBe(1); // User input + default empty model part
+
+      // The history length should be 2: the user input AND a placeholder for the model's turn.
+      expect(history.length).toBe(2);
       expect(history[0]).toEqual(userInput);
+      expect(history[1].role).toBe('model');
     });
 
     it('should correctly consolidate text parts when a thought part is in between', () => {
