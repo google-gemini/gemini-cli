@@ -26,6 +26,7 @@ import {
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
+  EVENT_MALFORMED_JSON_RESPONSE,
 } from './constants.js';
 import {
   logApiRequest,
@@ -34,6 +35,8 @@ import {
   logUserPrompt,
   logToolCall,
   logFlashFallback,
+  logChatCompression,
+  logMalformedJsonResponse,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -43,12 +46,16 @@ import {
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  MalformedJsonResponseEvent,
+  makeChatCompressionEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect } from 'vitest';
 import { GenerateContentResponseUsageMetadata } from '@google/genai';
 import * as uiTelemetry from './uiTelemetry.js';
+import { makeFakeConfig } from '../test-utils/config.js';
+import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 
 describe('loggers', () => {
   const mockLogger = {
@@ -59,6 +66,7 @@ describe('loggers', () => {
   };
 
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(true);
     vi.spyOn(logs, 'getLogger').mockReturnValue(mockLogger);
     vi.spyOn(uiTelemetry.uiTelemetryService, 'addEvent').mockImplementation(
@@ -66,6 +74,45 @@ describe('loggers', () => {
     );
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T00:00:00.000Z'));
+  });
+
+  describe('logChatCompression', () => {
+    beforeEach(() => {
+      vi.spyOn(metrics, 'recordChatCompressionMetrics');
+      vi.spyOn(ClearcutLogger.prototype, 'logChatCompressionEvent');
+    });
+
+    it('logs the chat compression event to Clearcut', () => {
+      const mockConfig = makeFakeConfig();
+
+      const event = makeChatCompressionEvent({
+        tokens_before: 9001,
+        tokens_after: 9000,
+      });
+
+      logChatCompression(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logChatCompressionEvent,
+      ).toHaveBeenCalledWith(event);
+    });
+
+    it('records the chat compression event to OTEL', () => {
+      const mockConfig = makeFakeConfig();
+
+      logChatCompression(
+        mockConfig,
+        makeChatCompressionEvent({
+          tokens_before: 9001,
+          tokens_after: 9000,
+        }),
+      );
+
+      expect(metrics.recordChatCompressionMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        { tokens_before: 9001, tokens_after: 9000 },
+      );
+    });
   });
 
   describe('logCliConfiguration', () => {
@@ -118,6 +165,9 @@ describe('loggers', () => {
           file_filtering_respect_git_ignore: true,
           debug_mode: true,
           mcp_servers: 'test-server',
+          mcp_servers_count: 1,
+          mcp_tools: undefined,
+          mcp_tools_count: undefined,
         },
       });
     });
@@ -448,7 +498,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -481,6 +531,7 @@ describe('loggers', () => {
           success: true,
           decision: ToolCallDecision.ACCEPT,
           prompt_id: 'prompt-id-1',
+          tool_type: 'native',
         },
       });
 
@@ -490,6 +541,7 @@ describe('loggers', () => {
         100,
         true,
         ToolCallDecision.ACCEPT,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -513,7 +565,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -544,6 +596,7 @@ describe('loggers', () => {
           success: false,
           decision: ToolCallDecision.REJECT,
           prompt_id: 'prompt-id-2',
+          tool_type: 'native',
         },
       });
 
@@ -553,6 +606,7 @@ describe('loggers', () => {
         100,
         false,
         ToolCallDecision.REJECT,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -577,7 +631,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -610,6 +664,7 @@ describe('loggers', () => {
           success: true,
           decision: ToolCallDecision.MODIFY,
           prompt_id: 'prompt-id-3',
+          tool_type: 'native',
         },
       });
 
@@ -619,6 +674,7 @@ describe('loggers', () => {
         100,
         true,
         ToolCallDecision.MODIFY,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -643,7 +699,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -674,6 +730,7 @@ describe('loggers', () => {
           duration_ms: 100,
           success: true,
           prompt_id: 'prompt-id-4',
+          tool_type: 'native',
         },
       });
 
@@ -683,6 +740,7 @@ describe('loggers', () => {
         100,
         true,
         undefined,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -707,7 +765,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: {
             name: 'test-error-type',
@@ -743,6 +801,7 @@ describe('loggers', () => {
           error_type: ToolErrorType.UNKNOWN,
           'error.type': ToolErrorType.UNKNOWN,
           prompt_id: 'prompt-id-5',
+          tool_type: 'native',
         },
       });
 
@@ -752,12 +811,40 @@ describe('loggers', () => {
         100,
         false,
         undefined,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
         ...event,
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
+      });
+    });
+  });
+
+  describe('logMalformedJsonResponse', () => {
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logMalformedJsonResponseEvent');
+    });
+
+    it('logs the event to Clearcut and OTEL', () => {
+      const mockConfig = makeFakeConfig();
+      const event = new MalformedJsonResponseEvent('test-model');
+
+      logMalformedJsonResponse(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logMalformedJsonResponseEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Malformed JSON response from test-model.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'event.name': EVENT_MALFORMED_JSON_RESPONSE,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          model: 'test-model',
+        },
       });
     });
   });

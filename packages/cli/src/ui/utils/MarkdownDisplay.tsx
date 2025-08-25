@@ -6,7 +6,8 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import { theme } from '../semantic-colors.js';
+import { EOL } from 'os';
+import { Colors } from '../colors.js';
 import { colorizeCode } from './CodeColorizer.js';
 import { TableRenderer } from './TableRenderer.js';
 import { RenderInline } from './InlineMarkdownRenderer.js';
@@ -34,7 +35,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
 }) => {
   if (!text) return <></>;
 
-  const lines = text.split('\n');
+  const lines = text.split(EOL);
   const headerRegex = /^ *(#{1,4}) +(.*)/;
   const codeFenceRegex = /^ *(`{3,}|~{3,}) *(\w*?) *$/;
   const ulItemRegex = /^([ \t]*)([-*+]) +(.*)/;
@@ -115,7 +116,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
         // Not a table, treat as regular text
         addContentBlock(
           <Box key={key}>
-            <Text wrap="wrap" color={theme.text.primary}>
+            <Text wrap="wrap">
               <RenderInline text={line} />
             </Text>
           </Box>,
@@ -154,7 +155,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       if (line.trim().length > 0) {
         addContentBlock(
           <Box key={key}>
-            <Text wrap="wrap" color={theme.text.primary}>
+            <Text wrap="wrap">
               <RenderInline text={line} />
             </Text>
           </Box>,
@@ -173,35 +174,35 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       switch (level) {
         case 1:
           headerNode = (
-            <Text bold color={theme.text.accent}>
+            <Text bold color={Colors.AccentCyan}>
               <RenderInline text={headerText} />
             </Text>
           );
           break;
         case 2:
           headerNode = (
-            <Text bold color={theme.text.link}>
+            <Text bold color={Colors.AccentBlue}>
               <RenderInline text={headerText} />
             </Text>
           );
           break;
         case 3:
           headerNode = (
-            <Text bold color={theme.text.primary}>
+            <Text bold>
               <RenderInline text={headerText} />
             </Text>
           );
           break;
         case 4:
           headerNode = (
-            <Text italic color={theme.text.secondary}>
+            <Text italic color={Colors.Gray}>
               <RenderInline text={headerText} />
             </Text>
           );
           break;
         default:
           headerNode = (
-            <Text color={theme.text.primary}>
+            <Text>
               <RenderInline text={headerText} />
             </Text>
           );
@@ -245,7 +246,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       } else {
         addContentBlock(
           <Box key={key}>
-            <Text wrap="wrap" color={theme.text.primary}>
+            <Text wrap="wrap">
               <RenderInline text={line} />
             </Text>
           </Box>,
@@ -314,9 +315,7 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
         // Not enough space to even show the message meaningfully
         return (
           <Box paddingLeft={CODE_BLOCK_PREFIX_PADDING}>
-            <Text color={theme.text.secondary}>
-              ... code is being written ...
-            </Text>
+            <Text color={Colors.Gray}>... code is being written ...</Text>
           </Box>
         );
       }
@@ -332,7 +331,7 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
       return (
         <Box paddingLeft={CODE_BLOCK_PREFIX_PADDING} flexDirection="column">
           {colorizedTruncatedCode}
-          <Text color={theme.text.secondary}>... generating more ...</Text>
+          <Text color={Colors.Gray}>... generating more ...</Text>
         </Box>
       );
     }
@@ -385,10 +384,10 @@ const RenderListItemInternal: React.FC<RenderListItemProps> = ({
       flexDirection="row"
     >
       <Box width={prefixWidth}>
-        <Text color={theme.text.accent}>{prefix}</Text>
+        <Text>{prefix}</Text>
       </Box>
       <Box flexGrow={LIST_ITEM_TEXT_FLEX_GROW}>
-        <Text wrap="wrap" color={theme.text.primary}>
+        <Text wrap="wrap">
           <RenderInline text={itemText} />
         </Text>
       </Box>

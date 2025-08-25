@@ -55,6 +55,11 @@ const mockConfig = {
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
   getUsageStatisticsEnabled: () => true,
   getDebugMode: () => false,
+  getSessionId: () => 'test-session-id',
+  getContentGeneratorConfig: () => ({
+    model: 'test-model',
+    authType: 'oauth-personal',
+  }),
 };
 
 class MockToolInvocation extends BaseToolInvocation<object, ToolResult> {
@@ -189,7 +194,6 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     (mockToolRequiresConfirmation.execute as Mock).mockResolvedValue({
       llmContent: expectedOutput,
       returnDisplay: 'YOLO Formatted tool output',
-      summary: 'YOLO summary',
     } as ToolResult);
 
     const { result } = renderSchedulerInYoloMode();
@@ -235,13 +239,15 @@ describe('useReactToolScheduler in YOLO Mode', () => {
         request,
         response: expect.objectContaining({
           resultDisplay: 'YOLO Formatted tool output',
-          responseParts: {
-            functionResponse: {
-              id: 'yoloCall',
-              name: 'mockToolRequiresConfirmation',
-              response: { output: expectedOutput },
+          responseParts: [
+            {
+              functionResponse: {
+                id: 'yoloCall',
+                name: 'mockToolRequiresConfirmation',
+                response: { output: expectedOutput },
+              },
             },
-          },
+          ],
         }),
       }),
     ]);
@@ -347,7 +353,6 @@ describe('useReactToolScheduler', () => {
     (mockTool.execute as Mock).mockResolvedValue({
       llmContent: 'Tool output',
       returnDisplay: 'Formatted tool output',
-      summary: 'Formatted summary',
     } as ToolResult);
     (mockTool.shouldConfirmExecute as Mock).mockResolvedValue(null);
 
@@ -385,13 +390,15 @@ describe('useReactToolScheduler', () => {
         request,
         response: expect.objectContaining({
           resultDisplay: 'Formatted tool output',
-          responseParts: {
-            functionResponse: {
-              id: 'call1',
-              name: 'mockTool',
-              response: { output: 'Tool output' },
+          responseParts: [
+            {
+              functionResponse: {
+                id: 'call1',
+                name: 'mockTool',
+                response: { output: 'Tool output' },
+              },
             },
-          },
+          ],
         }),
       }),
     ]);
@@ -512,7 +519,6 @@ describe('useReactToolScheduler', () => {
     (mockToolRequiresConfirmation.execute as Mock).mockResolvedValue({
       llmContent: expectedOutput,
       returnDisplay: 'Confirmed display',
-      summary: 'Confirmed summary',
     } as ToolResult);
 
     const { result } = renderScheduler();
@@ -679,7 +685,6 @@ describe('useReactToolScheduler', () => {
       resolveExecutePromise({
         llmContent: 'Final output',
         returnDisplay: 'Final display',
-        summary: 'Final summary',
       } as ToolResult);
     });
     await act(async () => {
@@ -713,7 +718,6 @@ describe('useReactToolScheduler', () => {
     tool1.execute.mockResolvedValue({
       llmContent: 'Output 1',
       returnDisplay: 'Display 1',
-      summary: 'Summary 1',
     } as ToolResult);
     tool1.shouldConfirmExecute.mockResolvedValue(null);
 
@@ -721,7 +725,6 @@ describe('useReactToolScheduler', () => {
     tool2.execute.mockResolvedValue({
       llmContent: 'Output 2',
       returnDisplay: 'Display 2',
-      summary: 'Summary 2',
     } as ToolResult);
     tool2.shouldConfirmExecute.mockResolvedValue(null);
 
@@ -770,13 +773,15 @@ describe('useReactToolScheduler', () => {
       request: requests[0],
       response: expect.objectContaining({
         resultDisplay: 'Display 1',
-        responseParts: {
-          functionResponse: {
-            id: 'multi1',
-            name: 'tool1',
-            response: { output: 'Output 1' },
+        responseParts: [
+          {
+            functionResponse: {
+              id: 'multi1',
+              name: 'tool1',
+              response: { output: 'Output 1' },
+            },
           },
-        },
+        ],
       }),
     });
     expect(call2Result).toMatchObject({
@@ -784,13 +789,15 @@ describe('useReactToolScheduler', () => {
       request: requests[1],
       response: expect.objectContaining({
         resultDisplay: 'Display 2',
-        responseParts: {
-          functionResponse: {
-            id: 'multi2',
-            name: 'tool2',
-            response: { output: 'Output 2' },
+        responseParts: [
+          {
+            functionResponse: {
+              id: 'multi2',
+              name: 'tool2',
+              response: { output: 'Output 2' },
+            },
           },
-        },
+        ],
       }),
     });
     expect(result.current[0]).toEqual([]);
@@ -804,7 +811,6 @@ describe('useReactToolScheduler', () => {
           resolve({
             llmContent: 'done',
             returnDisplay: 'done display',
-            summary: 'done summary',
           }),
         50,
       ),

@@ -8,7 +8,8 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { CompressionProps } from '../../types.js';
 import Spinner from 'ink-spinner';
-import { theme } from '../../semantic-colors.js';
+import { Colors } from '../../colors.js';
+import { SCREEN_READER_MODEL_PREFIX } from '../../constants.js';
 
 export interface CompressionDisplayProps {
   compression: CompressionProps;
@@ -32,14 +33,15 @@ export const CompressionMessage: React.FC<CompressionDisplayProps> = ({
         {compression.isPending ? (
           <Spinner type="dots" />
         ) : (
-          <Text color={theme.text.accent}>✦</Text>
+          <Text color={Colors.AccentPurple}>✦</Text>
         )}
       </Box>
       <Box>
         <Text
           color={
-            compression.isPending ? theme.text.accent : theme.status.success
+            compression.isPending ? Colors.AccentPurple : Colors.AccentGreen
           }
+          aria-label={SCREEN_READER_MODEL_PREFIX}
         >
           {text}
         </Text>

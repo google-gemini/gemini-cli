@@ -7,7 +7,7 @@
 import * as fsPromises from 'fs/promises';
 import React from 'react';
 import { Text } from 'ink';
-import { theme } from '../semantic-colors.js';
+import { Colors } from '../colors.js';
 import {
   CommandContext,
   SlashCommand,
@@ -28,7 +28,8 @@ const getSavedChatTags = async (
   context: CommandContext,
   mtSortDesc: boolean,
 ): Promise<ChatDetail[]> => {
-  const geminiDir = context.services.config?.getProjectTempDir();
+  const cfg = context.services.config;
+  const geminiDir = cfg?.storage?.getProjectTempDir();
   if (!geminiDir) {
     return [];
   }
@@ -124,7 +125,7 @@ const saveCommand: SlashCommand = {
             Text,
             null,
             'A checkpoint with the tag ',
-            React.createElement(Text, { color: theme.text.accent }, tag),
+            React.createElement(Text, { color: Colors.AccentPurple }, tag),
             ' already exists. Do you want to overwrite it?',
           ),
           originalInvocation: {
