@@ -4,13 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { ShellTool, EditTool, WriteFileTool } from '@google/gemini-cli-core';
-import { loadCliConfig, parseArguments, CliArgs } from './config.js';
-import { Settings } from './settings.js';
-import { Extension } from './extension.js';
+import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
+import type { Settings } from './settings.js';
+import type { Extension } from './extension.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 

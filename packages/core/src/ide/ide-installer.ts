@@ -9,7 +9,7 @@ import * as process from 'node:process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { DetectedIde, getIdeInfo, IdeInfo } from './detect-ide.js';
+import { DetectedIde, getIdeInfo, type IdeInfo } from './detect-ide.js';
 import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
 
 function getVsCodeCommand(platform: NodeJS.Platform = process.platform) {
