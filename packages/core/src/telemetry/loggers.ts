@@ -520,11 +520,12 @@ export function logInvalidChunk(
 
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
-    ...event,
     'event.name': EVENT_INVALID_CHUNK,
+    'event.timestamp': event['event.timestamp'],
   };
 
   if (event.error_message) {
+    attributes.error_message = event.error_message;
     attributes['error.message'] = event.error_message;
   }
 
