@@ -48,7 +48,7 @@ I've implemented a comprehensive solution by creating a dedicated `NotebookEditT
 5. **`packages/core/src/core/prompts.ts`** - Updated system prompt to include notebook guidance
 6. **`packages/core/src/index.ts`** - Exported the new tool
 
-### Key Features:
+### Key Features :
 
 #### Tool Parameters:
 - `file_path`: Absolute path to notebook file (required)
