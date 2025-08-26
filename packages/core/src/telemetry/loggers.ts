@@ -577,7 +577,7 @@ export function logContentRetryFailure(
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     'event.name': EVENT_CONTENT_RETRY_FAILURE,
-    'event.timestamp': new Date().toISOString(),
+    'event.timestamp': event['event.timestamp'],
     total_attempts: event.total_attempts,
     final_error_type: event.final_error_type,
   };
