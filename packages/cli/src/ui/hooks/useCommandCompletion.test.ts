@@ -9,16 +9,15 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useCommandCompletion } from './useCommandCompletion.js';
-import { CommandContext } from '../commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import type { CommandContext } from '../commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import { useEffect } from 'react';
-import { Suggestion } from '../components/SuggestionsDisplay.js';
-import { UseAtCompletionProps, useAtCompletion } from './useAtCompletion.js';
-import {
-  UseSlashCompletionProps,
-  useSlashCompletion,
-} from './useSlashCompletion.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
+import type { UseAtCompletionProps } from './useAtCompletion.js';
+import { useAtCompletion } from './useAtCompletion.js';
+import type { UseSlashCompletionProps } from './useSlashCompletion.js';
+import { useSlashCompletion } from './useSlashCompletion.js';
 
 vi.mock('./useAtCompletion', () => ({
   useAtCompletion: vi.fn(),

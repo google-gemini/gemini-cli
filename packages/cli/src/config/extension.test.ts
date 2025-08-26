@@ -5,9 +5,9 @@
  */
 
 import { vi } from 'vitest';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import {
   EXTENSIONS_CONFIG_FILENAME,
   INSTALL_METADATA_FILENAME,
@@ -19,14 +19,14 @@ import {
 } from './extension.js';
 import { MCPServerConfig } from '@google/gemini-cli-core';
 import { execSync } from 'child_process';
-import { SimpleGit, simpleGit } from 'simple-git';
+import { type SimpleGit, simpleGit } from 'simple-git';
 
 vi.mock('simple-git', () => ({
   simpleGit: vi.fn(),
 }));
 
 vi.mock('os', async (importOriginal) => {
-  const os = await importOriginal<typeof import('os')>();
+  const os = await importOriginal<typeof os>();
   return {
     ...os,
     homedir: vi.fn(),

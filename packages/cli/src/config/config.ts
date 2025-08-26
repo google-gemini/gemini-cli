@@ -4,13 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { homedir } from 'node:os';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
+import type {
+  TelemetryTarget,
+  FileFilteringOptions,
+  MCPServerConfig,
+} from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
 import {
   Config,
@@ -22,16 +27,14 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
-  TelemetryTarget,
-  FileFilteringOptions,
   ShellTool,
   EditTool,
   WriteFileTool,
-  MCPServerConfig,
 } from '@google/gemini-cli-core';
-import { Settings } from './settings.js';
+import type { Settings } from './settings.js';
 
-import { Extension, annotateActiveExtensions } from './extension.js';
+import type { Extension } from './extension.js';
+import { annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';

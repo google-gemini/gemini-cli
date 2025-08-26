@@ -4,13 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import * as os from 'os';
-import * as path from 'path';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { ShellTool, EditTool, WriteFileTool } from '@google/gemini-cli-core';
-import { loadCliConfig, parseArguments, CliArgs } from './config.js';
-import { Settings } from './settings.js';
-import { Extension } from './extension.js';
+import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
+import type { Settings } from './settings.js';
+import type { Extension } from './extension.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
@@ -20,7 +28,7 @@ vi.mock('./trustedFolders.js', () => ({
 
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof import('fs')>();
-  const pathMod = await import('path');
+  const pathMod = await import('node:path');
   const mockHome = '/mock/home/user';
   const MOCK_CWD1 = process.cwd();
   const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
