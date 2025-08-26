@@ -821,12 +821,12 @@ export class ClearcutLogger {
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_FAILURE_TOTAL_ATTEMPTS,
-        value: JSON.stringify(event.total_attempts),
+        value: String(event.total_attempts),
       },
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_FAILURE_FINAL_ERROR_TYPE,
-        value: JSON.stringify(event.final_error_type),
+        value: event.final_error_type,
       },
     ];
 
@@ -834,7 +834,7 @@ export class ClearcutLogger {
       data.push({
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_FAILURE_TOTAL_DURATION_MS,
-        value: JSON.stringify(event.total_duration_ms),
+        value: String(event.total_duration_ms),
       });
     }
 
