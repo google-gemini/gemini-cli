@@ -120,6 +120,7 @@ jobs:
         run: |-
           npm run preflight
           npm run test:integration:sandbox:none
+          npm run build:sandbox
           npm run test:integration:sandbox:docker
 
       - name: 'Configure Git User'
