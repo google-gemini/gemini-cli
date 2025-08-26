@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
+import React from 'react';
 import { Text } from 'ink';
 import { Colors } from '../colors.js';
 
