@@ -44,6 +44,8 @@ import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
+import { runZedIntegration } from './zed-integration/zedIntegration.js';
+import { runServerMode } from './serverMode.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -105,7 +107,6 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   await new Promise((resolve) => child.on('close', resolve));
   process.exit(0);
 }
-import { runZedIntegration } from './zed-integration/zedIntegration.js';
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
@@ -114,7 +115,7 @@ export function setupUnhandledRejectionHandler() {
 This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Unhandled Promise Rejection!
 =========================================
-Reason: ${reason}${
+Reason: ${reason}${ 
       reason instanceof Error && reason.stack
         ? `
 Stack trace:
@@ -168,6 +169,11 @@ export async function startInteractiveUI(
 }
 
 export async function main() {
+  if (process.argv.includes('--server-mode')) {
+    await runServerMode();
+    return;
+  }
+
   setupUnhandledRejectionHandler();
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
