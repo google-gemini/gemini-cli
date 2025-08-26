@@ -16,9 +16,9 @@ let currentSettings: NotificationSettings = DEFAULT_NOTIFICATION_SETTINGS;
  * Initializes the notification manager by loading settings.
  * @param config The Config object to load settings from.
  */
-export async function initNotifications(config: Config): Promise<void> {
+export function initNotifications(config: Config): void {
   try {
-    const loadedSettings = await loadSettings(config, SettingScope.USER);
+    const loadedSettings = loadSettings(config.getProjectRoot());
     if (loadedSettings.merged.notifications) {
       currentSettings = loadedSettings.merged.notifications as NotificationSettings;
     }
