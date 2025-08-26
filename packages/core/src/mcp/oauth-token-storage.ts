@@ -32,7 +32,7 @@ export class MCPOAuthTokenStorage {
   }
 
   /**
-   * Load all stored  OAuth tokens.
+   * Load all stored MCP OAuth tokens.
    *
    * @returns A map of server names to credentials
    */
@@ -66,7 +66,7 @@ export class MCPOAuthTokenStorage {
    * @param token The OAuth token to save
    * @param clientId Optional client ID used for this token
    * @param tokenUrl Optional token URL used for this token
-   * @param ServerUrl Optional MCP server URL
+   * @param mcpServerUrl Optional MCP server URL
    */
   static async saveToken(
     serverName: string,
