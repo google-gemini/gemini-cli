@@ -344,6 +344,16 @@ export const SETTINGS_SCHEMA = {
     description: 'Paths to core tool definitions.',
     showInDialog: false,
   },
+  allowedTools: {
+    type: 'array',
+    label: 'Allowed Tools',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: undefined as string[] | undefined,
+    description:
+      'A list of tool names that will bypass the confirmation dialog.',
+    showInDialog: false,
+  },
   excludeTools: {
     type: 'array',
     label: 'Exclude Tools',
