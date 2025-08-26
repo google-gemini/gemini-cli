@@ -8,12 +8,12 @@ jobs:
     permissions:
       contents: 'write'
     steps:
-      - uses: 'actions/checkout@v4'
+      - uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
           repository: '${{ github.event.pull_request.head.repo.full_name }}'
           ref: '${{ github.event.pull_request.head.ref }}'
       - name: 'Set up Node.js'
-        uses: 'actions/setup-node@v4'
+        uses: 'actions/setup-node@v4' # ratchet:actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
@@ -22,7 +22,7 @@ jobs:
       - name: 'Fix lint issues'
         run: 'npm run lint:fix'
       - name: 'Suggest changes'
-        uses: 'reviewdog/action-suggester@4747dbc9f9e37adba0943e681cc20db466642158' # v1.21.0
+        uses: 'reviewdog/action-suggester@4747dbc9f9e37adba0943e681cc20db466642158' # ratchet:reviewdog/action-suggester@v1.21.0
         with:
           tool_name: 'eslint'
           level: 'warning'
