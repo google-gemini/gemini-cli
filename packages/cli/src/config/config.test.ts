@@ -4,18 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { ShellTool, EditTool, WriteFileTool } from '@google/gemini-cli-core';
-import { loadCliConfig, parseArguments, CliArgs } from './config.js';
-import { Settings } from './settings.js';
-import { Extension } from './extension.js';
+import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
+import type { Settings } from './settings.js';
+import type { Extension } from './extension.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
 vi.mock('./trustedFolders.js', () => ({
-  isWorkspaceTrusted: vi.fn(),
+  isWorkspaceTrusted: vi.fn().mockReturnValue(true), // Default to trusted
 }));
 
 vi.mock('fs', async (importOriginal) => {
@@ -994,6 +1002,7 @@ describe('Approval mode tool exclusion logic', () => {
 
   beforeEach(() => {
     process.stdin.isTTY = false; // Ensure non-interactive mode
+    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -1672,6 +1681,7 @@ describe('loadCliConfig tool exclusions', () => {
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.stdin.isTTY = true;
+    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -1781,6 +1791,7 @@ describe('loadCliConfig approval mode', () => {
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.argv = ['node', 'script.js']; // Reset argv for each test
+    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -1847,6 +1858,41 @@ describe('loadCliConfig approval mode', () => {
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, [], 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+  });
+
+  // --- Untrusted Folder Scenarios ---
+  describe('when folder is NOT trusted', () => {
+    beforeEach(() => {
+      vi.mocked(isWorkspaceTrusted).mockReturnValue(false);
+    });
+
+    it('should override --approval-mode=yolo to DEFAULT', async () => {
+      process.argv = ['node', 'script.js', '--approval-mode', 'yolo'];
+      const argv = await parseArguments({} as Settings);
+      const config = await loadCliConfig({}, [], 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+    });
+
+    it('should override --approval-mode=auto_edit to DEFAULT', async () => {
+      process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
+      const argv = await parseArguments({} as Settings);
+      const config = await loadCliConfig({}, [], 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+    });
+
+    it('should override --yolo flag to DEFAULT', async () => {
+      process.argv = ['node', 'script.js', '--yolo'];
+      const argv = await parseArguments({} as Settings);
+      const config = await loadCliConfig({}, [], 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+    });
+
+    it('should remain DEFAULT when --approval-mode=default', async () => {
+      process.argv = ['node', 'script.js', '--approval-mode', 'default'];
+      const argv = await parseArguments({} as Settings);
+      const config = await loadCliConfig({}, [], 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+    });
   });
 });
 

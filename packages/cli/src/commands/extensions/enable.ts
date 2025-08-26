@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandModule } from 'yargs';
+import { type CommandModule } from 'yargs';
+import { FatalConfigError, getErrorMessage } from '@google/gemini-cli-core';
 import { enableExtension } from '../../config/extension.js';
 import { SettingScope } from '../../config/settings.js';
 
@@ -29,13 +30,12 @@ export async function handleEnable(args: EnableArgs) {
       );
     }
   } catch (error) {
-    console.error((error as Error).message);
-    throw error;
+    throw new FatalConfigError(getErrorMessage(error));
   }
 }
 
 export const enableCommand: CommandModule = {
-  command: 'enable <name>',
+  command: 'disable [--scope] <name>',
   describe: 'Enables an extension.',
   builder: (yargs) =>
     yargs
