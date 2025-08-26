@@ -17,8 +17,14 @@ export function playSound(soundPath: string, isCommand: boolean = false): void {
   const args: string[] = [];
 
   if (isCommand) {
-    console.warn('Direct command execution is disabled for security reasons.');
-    return;
+    // Execute shell commands. WARNING: This can be a security risk if commands are from untrusted sources.
+    if (os.platform() === 'win32') {
+      command = 'powershell.exe';
+      args.push('-c', soundPath);
+    } else {
+      command = '/bin/sh';
+      args.push('-c', soundPath);
+    }
   } else {
     switch (os.platform()) {
       case 'darwin': // macOS
