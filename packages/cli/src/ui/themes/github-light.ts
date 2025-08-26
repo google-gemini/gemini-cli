@@ -5,7 +5,6 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
-import { lightSemanticColors } from './semantic-tokens.js';
 
 const githubLightColors: ColorsTheme = {
   type: 'light',
@@ -145,5 +144,4 @@ export const GitHubLight: Theme = new Theme(
     },
   },
   githubLightColors,
-  lightSemanticColors,
 );
