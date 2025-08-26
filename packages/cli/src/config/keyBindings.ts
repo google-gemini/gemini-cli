@@ -20,6 +20,7 @@ export enum Command {
   KILL_LINE_RIGHT = 'killLineRight',
   KILL_LINE_LEFT = 'killLineLeft',
   CLEAR_INPUT = 'clearInput',
+  DELETE_WORD_BACKWARD = 'deleteWordBackward',
 
   // Screen control
   CLEAR_SCREEN = 'clearScreen',
@@ -105,6 +106,12 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.KILL_LINE_LEFT]: [{ key: 'u', ctrl: true }],
   // Original: key.ctrl && key.name === 'c'
   [Command.CLEAR_INPUT]: [{ key: 'c', ctrl: true }],
+  // Original: key.ctrl && key.name === 'backspace'
+  // Added command (meta/alt/option) for mac compatibility
+  [Command.DELETE_WORD_BACKWARD]: [
+    { key: 'backspace', ctrl: true },
+    { key: 'backspace', command: true },
+  ],
 
   // Screen control
   // Original: key.ctrl && key.name === 'l'

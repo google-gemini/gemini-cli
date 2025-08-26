@@ -887,6 +887,7 @@ export type TextBufferAction =
   | { type: 'delete' }
   | { type: 'delete_word_left' }
   | { type: 'delete_word_right' }
+  | { type: 'delete_word_backward' }
   | { type: 'kill_line_right' }
   | { type: 'kill_line_left' }
   | { type: 'undo' }
@@ -1299,6 +1300,45 @@ export function textBufferReducer(
       return { ...nextState, lines: newLines, preferredCol: null };
     }
 
+    case 'delete_word_backward': {
+      const { cursorRow, cursorCol } = state;
+      if (cursorCol === 0 && cursorRow === 0) return state;
+
+      const nextState = pushUndoLocal(state);
+      const newLines = [...nextState.lines];
+      let newCursorRow = cursorRow;
+      let newCursorCol = cursorCol;
+
+      if (newCursorCol > 0) {
+        const lineContent = currentLine(newCursorRow);
+        const prevWordStart = findPrevWordStartInLine(
+          lineContent,
+          newCursorCol,
+        );
+        const start = prevWordStart === null ? 0 : prevWordStart;
+        newLines[newCursorRow] =
+          cpSlice(lineContent, 0, start) + cpSlice(lineContent, newCursorCol);
+        newCursorCol = start;
+      } else {
+        // Act as a backspace
+        const prevLineContent = currentLine(cursorRow - 1);
+        const currentLineContentVal = currentLine(cursorRow);
+        const newCol = cpLen(prevLineContent);
+        newLines[cursorRow - 1] = prevLineContent + currentLineContentVal;
+        newLines.splice(cursorRow, 1);
+        newCursorRow--;
+        newCursorCol = newCol;
+      }
+
+      return {
+        ...nextState,
+        lines: newLines,
+        cursorRow: newCursorRow,
+        cursorCol: newCursorCol,
+        preferredCol: null,
+      };
+    }
+
     case 'kill_line_right': {
       const { cursorRow, cursorCol, lines } = state;
       const lineContent = currentLine(cursorRow);
@@ -1593,6 +1633,10 @@ export function useTextBuffer({
 
   const deleteWordRight = useCallback((): void => {
     dispatch({ type: 'delete_word_right' });
+  }, []);
+
+  const deleteWordBackward = useCallback((): void => {
+    dispatch({ type: 'delete_word_backward' });
   }, []);
 
   const killLineRight = useCallback((): void => {
@@ -1902,6 +1946,7 @@ export function useTextBuffer({
     moveToOffset,
     deleteWordLeft,
     deleteWordRight,
+    deleteWordBackward,
     killLineRight,
     killLineLeft,
     handleInput,
@@ -2011,6 +2056,11 @@ export interface TextBuffer {
    * follows the caret and the next contiguous run of word characters.
    */
   deleteWordRight: () => void;
+  /**
+   * Deletes the word to the *left* of the caret, moving backward.
+   * This is the behavior expected from Ctrl+Backspace.
+   */
+  deleteWordBackward: () => void;
   /**
    * Deletes text from the cursor to the end of the current line.
    */
