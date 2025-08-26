@@ -13,12 +13,16 @@ import {
   INSTALL_METADATA_FILENAME,
   annotateActiveExtensions,
   disableExtension,
+  enableExtension,
   installExtension,
   loadExtensions,
   uninstallExtension,
   updateExtension,
 } from './extension.js';
-import { type MCPServerConfig } from '@google/gemini-cli-core';
+import {
+  type GeminiCLIExtension,
+  type MCPServerConfig,
+} from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
 import { SettingScope, loadSettings } from './settings.js';
 import { type SimpleGit, simpleGit } from 'simple-git';
@@ -574,5 +578,67 @@ describe('disableExtension', () => {
     expect(() => disableExtension('my-extension', SettingScope.System)).toThrow(
       'System and SystemDefaults scopes are not supported.',
     );
+  });
+});
+
+describe('enableExtension', () => {
+  let tempWorkspaceDir: string;
+  let tempHomeDir: string;
+  let userExtensionsDir: string;
+
+  beforeEach(() => {
+    tempWorkspaceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-workspace-'),
+    );
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
+    userExtensionsDir = path.join(tempHomeDir, '.gemini', 'extensions');
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    fs.rmSync(userExtensionsDir, { recursive: true, force: true });
+  });
+
+  afterAll(() => {
+    vi.restoreAllMocks();
+  });
+
+  const getActiveExtensions = (): GeminiCLIExtension[] => {
+    const extensions = loadExtensions(tempWorkspaceDir);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      [],
+      tempWorkspaceDir,
+    );
+    return activeExtensions.filter((e) => e.isActive);
+  };
+
+  it('should enable an extension at the user scope', () => {
+    createExtension(userExtensionsDir, 'ext1', '1.0.0');
+    disableExtension('ext1', SettingScope.User);
+    let activeExtensions = getActiveExtensions();
+    expect(activeExtensions).toHaveLength(0);
+
+    enableExtension('ext1', [SettingScope.User]);
+    activeExtensions = getActiveExtensions();
+    expect(activeExtensions).toHaveLength(1);
+    expect(activeExtensions[0].name).toBe('ext1');
+  });
+
+  it('should enable an extension at the workspace scope', () => {
+    createExtension(userExtensionsDir, 'ext1', '1.0.0');
+    disableExtension('ext1', SettingScope.Workspace);
+    let activeExtensions = getActiveExtensions();
+    expect(activeExtensions).toHaveLength(0);
+
+    enableExtension('ext1', [SettingScope.Workspace]);
+    activeExtensions = getActiveExtensions();
+    expect(activeExtensions).toHaveLength(1);
+    expect(activeExtensions[0].name).toBe('ext1');
   });
 });

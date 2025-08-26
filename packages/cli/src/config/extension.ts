@@ -475,6 +475,10 @@ export function disableExtension(
   }
 }
 
+export function enableExtension(name: string, scopes: SettingScope[]) {
+  removeFromDisabledExtensions(name, scopes);
+}
+
 /**
  * Removes an extension from the list of disabled extensions.
  * @param name The name of the extension to remove.

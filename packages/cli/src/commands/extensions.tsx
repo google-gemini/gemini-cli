@@ -10,6 +10,7 @@ import { uninstallCommand } from './extensions/uninstall.js';
 import { listCommand } from './extensions/list.js';
 import { updateCommand } from './extensions/update.js';
 import { disableCommand } from './extensions/disable.js';
+import { enableCommand } from './extensions/enable.js';
 
 export const extensionsCommand: CommandModule = {
   command: 'extensions <command>',
@@ -21,6 +22,7 @@ export const extensionsCommand: CommandModule = {
       .command(listCommand)
       .command(updateCommand)
       .command(disableCommand)
+      .command(enableCommand)
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {
