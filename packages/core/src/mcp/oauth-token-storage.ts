@@ -60,13 +60,13 @@ export class MCPOAuthTokenStorage {
   }
 
   /**
-   * Save a token for a specific  server.
+   * Save a token for a specific MCP server.
    *
-   * @param serverName The name of the  server
+   * @param serverName The name of the MCP server
    * @param token The OAuth token to save
    * @param clientId Optional client ID used for this token
    * @param tokenUrl Optional token URL used for this token
-   * @param ServerUrl Optional  server URL
+   * @param ServerUrl Optional MCP server URL
    */
   static async saveToken(
     serverName: string,
@@ -100,15 +100,15 @@ export class MCPOAuthTokenStorage {
         { mode: 0o600 }, // Restrict file permissions
       );
     } catch (error) {
-      console.error(`Failed to save  OAuth token: ${getErrorMessage(error)}`);
+      console.error(`Failed to save MCP OAuth token: ${getErrorMessage(error)}`);
       throw error;
     }
   }
 
   /**
-   * Get a token for a specific  server.
+   * Get a token for a specific MCP server.
    *
-   * @param serverName The name of the  server
+   * @param serverName The name of the MCP server
    * @returns The stored credentials or null if not found
    */
   static async getToken(serverName: string): Promise<OAuthCredentials | null> {
@@ -117,9 +117,9 @@ export class MCPOAuthTokenStorage {
   }
 
   /**
-   * Remove a token for a specific  server.
+   * Remove a token for a specific MCP server.
    *
-   * @param serverName The name of the  server
+   * @param serverName The name of the MCP server
    */
   static async removeToken(serverName: string): Promise<void> {
     const tokens = await this.loadTokens();
@@ -162,7 +162,7 @@ export class MCPOAuthTokenStorage {
   }
 
   /**
-   * Clear all stored  OAuth tokens.
+   * Clear all stored MCP OAuth tokens.
    */
   static async clearAllTokens(): Promise<void> {
     try {
