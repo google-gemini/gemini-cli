@@ -3,7 +3,7 @@ name: 'Eval'
 on: workflow_dispatch
 
 jobs:
-  evals-macos:
+  evals:
     name: 'Eval'
     runs-on: 'ubuntu-latest'
     strategy:
