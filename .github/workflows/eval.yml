@@ -1,10 +1,6 @@
 name: 'Eval'
 
-on:
-  push:
-    branches:
-      - 'main'
-  merge_group:
+on: workflow_dispatch
 
 jobs:
   evals-macos:
