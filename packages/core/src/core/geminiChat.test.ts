@@ -25,20 +25,17 @@ const mockModelsModule = {
   batchEmbedContents: vi.fn(),
 } as unknown as Models;
 
-const {
-  mockRecordInvalidChunk,
-  mockRecordContentRetry,
-  mockRecordContentRetryFailure,
-} = vi.hoisted(() => ({
-  mockRecordInvalidChunk: vi.fn(),
-  mockRecordContentRetry: vi.fn(),
-  mockRecordContentRetryFailure: vi.fn(),
-}));
+const { mockLogInvalidChunk, mockLogContentRetry, mockLogContentRetryFailure } =
+  vi.hoisted(() => ({
+    mockLogInvalidChunk: vi.fn(),
+    mockLogContentRetry: vi.fn(),
+    mockLogContentRetryFailure: vi.fn(),
+  }));
 
-vi.mock('../telemetry/metrics.js', () => ({
-  recordInvalidChunk: mockRecordInvalidChunk,
-  recordContentRetry: mockRecordContentRetry,
-  recordContentRetryFailure: mockRecordContentRetryFailure,
+vi.mock('../telemetry/loggers.js', () => ({
+  logInvalidChunk: mockLogInvalidChunk,
+  logContentRetry: mockLogContentRetry,
+  logContentRetryFailure: mockLogContentRetryFailure,
 }));
 
 describe('GeminiChat', () => {
@@ -767,9 +764,9 @@ describe('GeminiChat', () => {
       }
 
       // Assertions
-      expect(mockRecordInvalidChunk).toHaveBeenCalledTimes(1);
-      expect(mockRecordContentRetry).toHaveBeenCalledTimes(1);
-      expect(mockRecordContentRetryFailure).not.toHaveBeenCalled();
+      expect(mockLogInvalidChunk).toHaveBeenCalledTimes(1);
+      expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
+      expect(mockLogContentRetryFailure).not.toHaveBeenCalled();
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(2);
       expect(
         chunks.some(
@@ -826,9 +823,9 @@ describe('GeminiChat', () => {
 
       // Should be called 3 times (initial + 2 retries)
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(3);
-      expect(mockRecordInvalidChunk).toHaveBeenCalledTimes(3);
-      expect(mockRecordContentRetry).toHaveBeenCalledTimes(2);
-      expect(mockRecordContentRetryFailure).toHaveBeenCalledTimes(1);
+      expect(mockLogInvalidChunk).toHaveBeenCalledTimes(3);
+      expect(mockLogContentRetry).toHaveBeenCalledTimes(2);
+      expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
       // History should be clean, as if the failed turn never happened.
       const history = chat.getHistory();
@@ -875,7 +872,7 @@ describe('GeminiChat', () => {
     expect(history.length).toBe(4);
 
     // Assert that the correct metrics were reported for one empty-stream retry
-    expect(mockRecordContentRetry).toHaveBeenCalledTimes(1);
+    expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
 
     // Explicitly verify the structure of each part to satisfy TypeScript
     const turn1 = history[0];

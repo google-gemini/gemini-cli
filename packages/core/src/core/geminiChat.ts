@@ -24,10 +24,15 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import {
-  recordContentRetry,
-  recordContentRetryFailure,
-  recordInvalidChunk,
-} from '../telemetry/metrics.js';
+  logContentRetry,
+  logContentRetryFailure,
+  logInvalidChunk,
+} from '../telemetry/loggers.js';
+import {
+  ContentRetryEvent,
+  ContentRetryFailureEvent,
+  InvalidChunkEvent,
+} from '../telemetry/types.js';
 
 /**
  * Options for retrying due to invalid content from the model.
@@ -382,7 +387,14 @@ export class GeminiChat {
             if (isContentError) {
               // Check if we have more attempts left.
               if (attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts - 1) {
-                recordContentRetry(self.config);
+                logContentRetry(
+                  self.config,
+                  new ContentRetryEvent(
+                    attempt,
+                    'EmptyStreamError',
+                    INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs,
+                  ),
+                );
                 await new Promise((res) =>
                   setTimeout(
                     res,
@@ -399,7 +411,13 @@ export class GeminiChat {
 
         if (lastError) {
           if (lastError instanceof EmptyStreamError) {
-            recordContentRetryFailure(self.config);
+            logContentRetryFailure(
+              self.config,
+              new ContentRetryFailureEvent(
+                INVALID_CONTENT_RETRY_OPTIONS.maxAttempts,
+                'EmptyStreamError',
+              ),
+            );
           }
           // If the stream fails, remove the user message that was added.
           if (self.history[self.history.length - 1] === userContent) {
@@ -555,7 +573,10 @@ export class GeminiChat {
           modelResponseParts.push(...content.parts);
         }
       } else {
-        recordInvalidChunk(this.config);
+        logInvalidChunk(
+          this.config,
+          new InvalidChunkEvent('Invalid chunk received from stream.'),
+        );
         isStreamInvalid = true;
       }
       yield chunk;
