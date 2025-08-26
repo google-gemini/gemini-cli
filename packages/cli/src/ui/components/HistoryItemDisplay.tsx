@@ -74,7 +74,6 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         selectedAuthType={item.selectedAuthType}
         gcpProject={item.gcpProject}
         ideClient={item.ideClient}
-        userTier={item.userTier}
       />
     )}
     {item.type === 'help' && commands && <Help commands={commands} />}

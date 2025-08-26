@@ -7,7 +7,6 @@
 import type {
   ToolCallConfirmationDetails,
   ToolResultDisplay,
-  UserTierId,
 } from '@google/gemini-cli-core';
 
 // Only defining the state enum needed by the UI
@@ -97,7 +96,6 @@ export type HistoryItemAbout = HistoryItemBase & {
   selectedAuthType: string;
   gcpProject: string;
   ideClient: string;
-  userTier?: UserTierId;
 };
 
 export type HistoryItemHelp = HistoryItemBase & {
