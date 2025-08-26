@@ -580,7 +580,7 @@ describe('useSlashCompletion', () => {
       await waitFor(() => {
         expect(consoleWarnSpy).toHaveBeenCalledWith(
           'Fuzzy search failed, falling back to prefix matching:',
-          expect.any(Error)
+          'AsyncFzf find failed'
         );
       });
       
