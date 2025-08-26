@@ -393,8 +393,8 @@ describe('KeypressContext - Kitty Protocol', () => {
     let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
-      consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
+      consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     });
 
     afterEach(() => {
