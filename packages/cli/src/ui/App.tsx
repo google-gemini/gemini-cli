@@ -547,6 +547,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
     cancelOngoingRequest,
+    pendingToolCalls,
     handleApprovalModeChange,
   } = useGeminiStream(
     config.getGeminiClient(),

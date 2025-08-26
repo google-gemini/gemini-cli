@@ -99,7 +99,10 @@ export function useAutoAcceptIndicator({
                 }
               }),
             ).catch((error) => {
-              console.error('Failed to process some tool call approvals:', error);
+              console.error(
+                'Failed to process some tool call approvals:',
+                error,
+              );
             });
           }
 

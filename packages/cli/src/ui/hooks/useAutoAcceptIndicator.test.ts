@@ -18,10 +18,10 @@ import { useAutoAcceptIndicator } from './useAutoAcceptIndicator.js';
 
 import {
   Config,
-  Config as ActualConfigType,
   ApprovalMode,
   ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
+import type { Config as ActualConfigType } from '@google/gemini-cli-core';
 import type { Key } from './useKeypress.js';
 import { useKeypress } from './useKeypress.js';
 import { MessageType } from '../types.js';
@@ -637,8 +637,14 @@ describe('useAutoAcceptIndicator', () => {
     });
 
     expect(mockOnApprovalModeChange).toHaveBeenCalledTimes(2);
-    expect(mockOnApprovalModeChange).toHaveBeenNthCalledWith(1, ApprovalMode.YOLO);
-    expect(mockOnApprovalModeChange).toHaveBeenNthCalledWith(2, ApprovalMode.AUTO_EDIT);
+    expect(mockOnApprovalModeChange).toHaveBeenNthCalledWith(
+      1,
+      ApprovalMode.YOLO,
+    );
+    expect(mockOnApprovalModeChange).toHaveBeenNthCalledWith(
+      2,
+      ApprovalMode.AUTO_EDIT,
+    );
   });
 
   it('should auto-approve only edit tool calls when switching to AUTO_EDIT mode', async () => {

@@ -24,13 +24,13 @@ import type {
   EditorType,
   GeminiClient,
   AnyToolInvocation,
-  ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import {
   ApprovalMode,
   AuthType,
   GeminiEventType as ServerGeminiEventType,
   ToolErrorType,
+  ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
