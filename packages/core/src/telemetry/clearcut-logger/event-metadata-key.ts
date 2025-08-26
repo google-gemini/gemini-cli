@@ -276,17 +276,24 @@ export enum EventMetadataKey {
   // Logs the extension of the file in the file operation.
   GEMINI_CLI_FILE_OPERATION_EXTENSION = 69,
 
+  // Logs the error message for an invalid chunk.
   GEMINI_CLI_INVALID_CHUNK_ERROR_MESSAGE = 72,
 
+  // Logs the attempt number for a content retry.
   GEMINI_CLI_CONTENT_RETRY_ATTEMPT_NUMBER = 73,
 
+  // Logs the error type for a content retry.
   GEMINI_CLI_CONTENT_RETRY_ERROR_TYPE = 74,
 
+  // Logs the delay in milliseconds for a content retry.
   GEMINI_CLI_CONTENT_RETRY_DELAY_MS = 75,
 
+  // Logs the total number of attempts for a content retry failure.
   GEMINI_CLI_CONTENT_RETRY_FAILURE_TOTAL_ATTEMPTS = 76,
 
+  // Logs the final error type for a content retry failure.
   GEMINI_CLI_CONTENT_RETRY_FAILURE_FINAL_ERROR_TYPE = 77,
 
+  // Logs the total duration in milliseconds for a content retry failure.
   GEMINI_CLI_CONTENT_RETRY_FAILURE_TOTAL_DURATION_MS = 78,
 }
