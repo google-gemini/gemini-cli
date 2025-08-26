@@ -19,15 +19,15 @@ import {
   updateExtension,
 } from './extension.js';
 import { execSync } from 'node:child_process';
-import { SimpleGit, simpleGit } from 'simple-git';
-import { SettingScope, loadSettings } from './settings.js';
+import { type SettingScope, loadSettings } from './settings.js';
+import { type SimpleGit, simpleGit } from 'simple-git';
 
 vi.mock('simple-git', () => ({
   simpleGit: vi.fn(),
 }));
 
 vi.mock('os', async (importOriginal) => {
-  const os = await importOriginal<typeof import('os')>();
+  const os = await importOriginal<typeof os>();
   return {
     ...os,
     homedir: vi.fn(),

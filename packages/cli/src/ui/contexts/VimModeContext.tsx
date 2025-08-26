@@ -11,7 +11,8 @@ import {
   useEffect,
   useState,
 } from 'react';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
+import { SettingScope } from '../../config/settings.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 

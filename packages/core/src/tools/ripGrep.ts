@@ -9,17 +9,12 @@ import path from 'node:path';
 import { EOL } from 'node:os';
 import { spawn } from 'node:child_process';
 import { rgPath } from '@lvce-editor/ripgrep';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
-  ToolInvocation,
-  ToolResult,
-} from './tools.js';
+import type { ToolInvocation, ToolResult } from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
