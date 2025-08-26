@@ -15,7 +15,7 @@ import {
   updateGitignore,
   GITHUB_WORKFLOW_PATHS,
 } from './setupGithubCommand.js';
-import { CommandContext, ToolActionReturn } from './types.js';
+import type { CommandContext, ToolActionReturn } from './types.js';
 import * as commandUtils from '../utils/commandUtils.js';
 
 vi.mock('child_process');

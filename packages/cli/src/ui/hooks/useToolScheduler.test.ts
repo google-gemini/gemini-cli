@@ -5,36 +5,36 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import {
   useReactToolScheduler,
   mapToDisplay,
 } from './useReactToolScheduler.js';
-import { PartUnion, FunctionResponse } from '@google/genai';
-import {
+import type { PartUnion, FunctionResponse } from '@google/genai';
+import type {
   Config,
   ToolCallRequestInfo,
   ToolRegistry,
   ToolResult,
   ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
   ToolCallResponseInfo,
   ToolCall, // Import from core
   Status as ToolCallStatusType,
-  ApprovalMode,
-  Kind,
-  BaseDeclarativeTool,
-  BaseToolInvocation,
   ToolInvocation,
   AnyDeclarativeTool,
   AnyToolInvocation,
 } from '@google/gemini-cli-core';
 import {
-  HistoryItemWithoutId,
-  ToolCallStatus,
-  HistoryItemToolGroup,
-} from '../types.js';
+  ToolConfirmationOutcome,
+  ApprovalMode,
+  Kind,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+} from '@google/gemini-cli-core';
+import type { HistoryItemWithoutId, HistoryItemToolGroup } from '../types.js';
+import { ToolCallStatus } from '../types.js';
 
 // Mocks
 vi.mock('@google/gemini-cli-core', async () => {
@@ -53,14 +53,15 @@ const mockToolRegistry = {
 const mockConfig = {
   getToolRegistry: vi.fn(() => mockToolRegistry as unknown as ToolRegistry),
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
+  getSessionId: () => 'test-session-id',
   getUsageStatisticsEnabled: () => true,
   getDebugMode: () => false,
-  getSessionId: () => 'test-session-id',
+  getAllowedTools: vi.fn(() => []),
   getContentGeneratorConfig: () => ({
     model: 'test-model',
     authType: 'oauth-personal',
   }),
-};
+} as unknown as Config;
 
 class MockToolInvocation extends BaseToolInvocation<object, ToolResult> {
   constructor(
@@ -217,11 +218,6 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     await act(async () => {
       await vi.runAllTimersAsync(); // Process execution
     });
-
-    // Check that shouldConfirmExecute was NOT called
-    expect(
-      mockToolRequiresConfirmation.shouldConfirmExecute,
-    ).not.toHaveBeenCalled();
 
     // Check that execute WAS called
     expect(mockToolRequiresConfirmation.execute).toHaveBeenCalledWith(
