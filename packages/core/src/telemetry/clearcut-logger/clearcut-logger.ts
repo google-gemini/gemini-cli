@@ -21,6 +21,9 @@ import type {
   KittySequenceOverflowEvent,
   ChatCompressionEvent,
   FileOperationEvent,
+  InvalidChunkEvent,
+  ContentRetryEvent,
+  ContentRetryFailureEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';

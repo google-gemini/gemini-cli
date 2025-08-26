@@ -449,21 +449,58 @@ export class FileOperationEvent implements BaseTelemetryEvent {
 }
 
 // Add these new event interfaces
-export interface InvalidChunkEvent {
+export class InvalidChunkEvent implements BaseTelemetryEvent {
+  'event.name': 'invalid_chunk';
+  'event.timestamp': string;
   chunk_data?: string; // Optional: truncated chunk data for debugging
   error_message?: string; // Optional: validation error details
+
+  constructor(chunk_data?: string, error_message?: string) {
+    this['event.name'] = 'invalid_chunk';
+    this['event.timestamp'] = new Date().toISOString();
+    this.chunk_data = chunk_data;
+    this.error_message = error_message;
+  }
 }
 
-export interface ContentRetryEvent {
+export class ContentRetryEvent implements BaseTelemetryEvent {
+  'event.name': 'content_retry';
+  'event.timestamp': string;
   attempt_number: number;
   error_type: string; // e.g., 'EmptyStreamError'
   retry_delay_ms: number;
+
+  constructor(
+    attempt_number: number,
+    error_type: string,
+    retry_delay_ms: number,
+  ) {
+    this['event.name'] = 'content_retry';
+    this['event.timestamp'] = new Date().toISOString();
+    this.attempt_number = attempt_number;
+    this.error_type = error_type;
+    this.retry_delay_ms = retry_delay_ms;
+  }
 }
 
-export interface ContentRetryFailureEvent {
+export class ContentRetryFailureEvent implements BaseTelemetryEvent {
+  'event.name': 'content_retry_failure';
+  'event.timestamp': string;
   total_attempts: number;
   final_error_type: string;
   total_duration_ms?: number; // Optional: total time spent retrying
+
+  constructor(
+    total_attempts: number,
+    final_error_type: string,
+    total_duration_ms?: number,
+  ) {
+    this['event.name'] = 'content_retry_failure';
+    this['event.timestamp'] = new Date().toISOString();
+    this.total_attempts = total_attempts;
+    this.final_error_type = final_error_type;
+    this.total_duration_ms = total_duration_ms;
+  }
 }
 
 export type TelemetryEvent =
@@ -482,4 +519,7 @@ export type TelemetryEvent =
   | IdeConnectionEvent
   | ConversationFinishedEvent
   | SlashCommandEvent
-  | FileOperationEvent;
+  | FileOperationEvent
+  | InvalidChunkEvent
+  | ContentRetryEvent
+  | ContentRetryFailureEvent;
