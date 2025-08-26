@@ -5,7 +5,7 @@
  */
 
 import React, { useContext } from 'react';
-import { LoadedSettings } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
 
 export const SettingsContext = React.createContext<LoadedSettings | undefined>(
   undefined,
