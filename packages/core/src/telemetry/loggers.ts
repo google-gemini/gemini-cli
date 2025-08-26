@@ -552,7 +552,7 @@ export function logContentRetry(
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     'event.name': EVENT_CONTENT_RETRY,
-    'event.timestamp': new Date().toISOString(),
+    'event.timestamp': event['event.timestamp'],
     attempt_number: event.attempt_number,
     error_type: event.error_type,
     retry_delay_ms: event.retry_delay_ms,
