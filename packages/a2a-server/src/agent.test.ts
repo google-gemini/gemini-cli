@@ -72,6 +72,7 @@ vi.mock('./config.js', async () => {
         getToolRegistry: getToolRegistrySpy,
         getApprovalMode: getApprovalModeSpy,
         getIdeMode: vi.fn().mockReturnValue(false),
+        getAllowedTools: vi.fn().mockReturnValue([]),
         getIdeClient: vi.fn(),
         getWorkspaceContext: vi.fn().mockReturnValue({
           isPathWithinWorkspace: () => true,
