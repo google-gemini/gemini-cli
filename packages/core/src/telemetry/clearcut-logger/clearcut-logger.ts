@@ -800,15 +800,15 @@ export class ClearcutLogger {
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_ATTEMPT_NUMBER,
-        value: JSON.stringify(event.attempt_number),
+        value: String(event.attempt_number),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_ERROR_TYPE,
-        value: JSON.stringify(event.error_type),
+        value: event.error_type,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_DELAY_MS,
-        value: JSON.stringify(event.retry_delay_ms),
+        value: String(event.retry_delay_ms),
       },
     ];
 
