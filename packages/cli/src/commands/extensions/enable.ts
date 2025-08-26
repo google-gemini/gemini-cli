@@ -5,9 +5,9 @@
  */
 
 import { type CommandModule } from 'yargs';
+import { FatalConfigError, getErrorMessage } from '@google/gemini-cli-core';
 import { enableExtension } from '../../config/extension.js';
 import { SettingScope } from '../../config/settings.js';
-import { getErrorMessage } from '../../utils/errors.js';
 
 interface EnableArgs {
   name: string;
@@ -30,8 +30,7 @@ export async function handleEnable(args: EnableArgs) {
       );
     }
   } catch (error) {
-    console.error(getErrorMessage(error));
-    throw error;
+    throw new FatalConfigError(getErrorMessage(error));
   }
 }
 
