@@ -19,7 +19,7 @@ import {
   updateExtension,
 } from './extension.js';
 import { execSync } from 'node:child_process';
-import { type SettingScope, loadSettings } from './settings.js';
+import { SettingScope, loadSettings } from './settings.js';
 import { type SimpleGit, simpleGit } from 'simple-git';
 
 vi.mock('simple-git', () => ({
@@ -147,29 +147,51 @@ describe('loadExtensions', () => {
     );
 
     const extensions = loadExtensions(tempWorkspaceDir);
-    expect(extensions).toHaveLength(1);
-    expect(extensions[0].config.name).toBe('ext2');
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      [],
+      tempWorkspaceDir,
+    ).filter((e) => e.isActive);
+    expect(activeExtensions).toHaveLength(1);
+    expect(activeExtensions[0].name).toBe('ext2');
   });
 });
 
 describe('annotateActiveExtensions', () => {
   const extensions = [
-    { config: { name: 'ext1', version: '1.0.0' }, contextFiles: [] },
-    { config: { name: 'ext2', version: '1.0.0' }, contextFiles: [] },
-    { config: { name: 'ext3', version: '1.0.0' }, contextFiles: [] },
+    {
+      path: '/path/to/ext1',
+      config: { name: 'ext1', version: '1.0.0' },
+      contextFiles: [],
+    },
+    {
+      path: '/path/to/ext2',
+      config: { name: 'ext2', version: '1.0.0' },
+      contextFiles: [],
+    },
+    {
+      path: '/path/to/ext3',
+      config: { name: 'ext3', version: '1.0.0' },
+      contextFiles: [],
+    },
   ];
 
   it('should mark all extensions as active if no enabled extensions are provided', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, []);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      [],
+      '/path/to/workspace',
+    );
     expect(activeExtensions).toHaveLength(3);
     expect(activeExtensions.every((e) => e.isActive)).toBe(true);
   });
 
   it('should mark only the enabled extensions as active', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, [
-      'ext1',
-      'ext3',
-    ]);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      ['ext1', 'ext3'],
+      '/path/to/workspace',
+    );
     expect(activeExtensions).toHaveLength(3);
     expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
       true,
@@ -183,13 +205,21 @@ describe('annotateActiveExtensions', () => {
   });
 
   it('should mark all extensions as inactive when "none" is provided', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, ['none']);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      ['none'],
+      '/path/to/workspace',
+    );
     expect(activeExtensions).toHaveLength(3);
     expect(activeExtensions.every((e) => !e.isActive)).toBe(true);
   });
 
   it('should handle case-insensitivity', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, ['EXT1']);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      ['EXT1'],
+      '/path/to/workspace',
+    );
     expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
       true,
     );
@@ -197,7 +227,7 @@ describe('annotateActiveExtensions', () => {
 
   it('should log an error for unknown extensions', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    annotateActiveExtensions(extensions, ['ext4']);
+    annotateActiveExtensions(extensions, ['ext4'], '/path/to/workspace');
     expect(consoleSpy).toHaveBeenCalledWith('Extension not found: ext4');
     consoleSpy.mockRestore();
   });

@@ -6,6 +6,7 @@
 
 import type { CommandModule } from 'yargs';
 import { uninstallExtension } from '../../config/extension.js';
+import { getErrorMessage } from '../../utils/errors.js';
 
 interface UninstallArgs {
   name: string;
@@ -16,7 +17,7 @@ export async function handleUninstall(args: UninstallArgs) {
     await uninstallExtension(args.name);
     console.log(`Extension "${args.name}" successfully uninstalled.`);
   } catch (error) {
-    console.error((error as Error).message);
+    console.error(getErrorMessage(error));
     process.exit(1);
   }
 }
