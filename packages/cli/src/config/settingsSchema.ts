@@ -544,6 +544,26 @@ export const SETTINGS_SCHEMA = {
     description: 'Enable extension management features.',
     showInDialog: false,
   },
+  extensions: {
+    type: 'object',
+    label: 'Extensions',
+    category: 'Extensions',
+    requiresRestart: true,
+    default: {},
+    description: 'Settings for extensions.',
+    showInDialog: false,
+    properties: {
+      disabled: {
+        type: 'array',
+        label: 'Disabled Extensions',
+        category: 'Extensions',
+        requiresRestart: true,
+        default: [] as string[],
+        description: 'List of disabled extensions.',
+        showInDialog: false,
+      },
+    },
+  },
   skipNextSpeakerCheck: {
     type: 'boolean',
     label: 'Skip Next Speaker Check',
