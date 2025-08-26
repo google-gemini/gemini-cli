@@ -4,16 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   Config,
-  executeToolCall,
   ToolRegistry,
+  ServerGeminiStreamEvent,
+} from '@google/gemini-cli-core';
+import {
+  executeToolCall,
   ToolErrorType,
   shutdownTelemetry,
   GeminiEventType,
-  ServerGeminiStreamEvent,
 } from '@google/gemini-cli-core';
-import { Part } from '@google/genai';
+import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { vi } from 'vitest';
 
@@ -36,7 +38,6 @@ describe('runNonInteractive', () => {
   let mockCoreExecuteToolCall: vi.Mock;
   let mockShutdownTelemetry: vi.Mock;
   let consoleErrorSpy: vi.SpyInstance;
-  let processExitSpy: vi.SpyInstance;
   let processStdoutSpy: vi.SpyInstance;
   let mockGeminiClient: {
     sendMessageStream: vi.Mock;
@@ -47,9 +48,6 @@ describe('runNonInteractive', () => {
     mockShutdownTelemetry = vi.mocked(shutdownTelemetry);
 
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    processExitSpy = vi
-      .spyOn(process, 'exit')
-      .mockImplementation((() => {}) as (code?: number) => never);
     processStdoutSpy = vi
       .spyOn(process.stdout, 'write')
       .mockImplementation(() => true);
@@ -200,7 +198,6 @@ describe('runNonInteractive', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Error executing tool errorTool: Execution failed',
     );
-    expect(processExitSpy).not.toHaveBeenCalled();
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(2);
     expect(mockGeminiClient.sendMessageStream).toHaveBeenNthCalledWith(
       2,
@@ -226,12 +223,9 @@ describe('runNonInteractive', () => {
       throw apiError;
     });
 
-    await runNonInteractive(mockConfig, 'Initial fail', 'prompt-id-4');
-
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '[API Error: API connection failed]',
-    );
-    expect(processExitSpy).toHaveBeenCalledWith(1);
+    await expect(
+      runNonInteractive(mockConfig, 'Initial fail', 'prompt-id-4'),
+    ).rejects.toThrow(apiError);
   });
 
   it('should not exit if a tool is not found, and should send error back to model', async () => {
@@ -270,7 +264,6 @@ describe('runNonInteractive', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Error executing tool nonexistentTool: Tool "nonexistentTool" not found in registry.',
     );
-    expect(processExitSpy).not.toHaveBeenCalled();
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(2);
     expect(processStdoutSpy).toHaveBeenCalledWith(
       "Sorry, I can't find that tool.",
@@ -279,9 +272,10 @@ describe('runNonInteractive', () => {
 
   it('should exit when max session turns are exceeded', async () => {
     vi.mocked(mockConfig.getMaxSessionTurns).mockReturnValue(0);
-    await runNonInteractive(mockConfig, 'Trigger loop', 'prompt-id-6');
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      '\n Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
+    await expect(
+      runNonInteractive(mockConfig, 'Trigger loop', 'prompt-id-6'),
+    ).rejects.toThrow(
+      'Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
     );
   });
 

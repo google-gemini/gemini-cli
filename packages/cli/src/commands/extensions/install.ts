@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandModule } from 'yargs';
+import type { CommandModule } from 'yargs';
 import {
   installExtension,
-  ExtensionInstallMetadata,
+  type ExtensionInstallMetadata,
 } from '../../config/extension.js';
+
+import { getErrorMessage } from '../../utils/errors.js';
 
 interface InstallArgs {
   source?: string;
@@ -26,7 +28,7 @@ export async function handleInstall(args: InstallArgs) {
       `Extension "${extensionName}" installed successfully and enabled.`,
     );
   } catch (error) {
-    console.error((error as Error).message);
+    console.error(getErrorMessage(error));
     process.exit(1);
   }
 }

@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logs, LogRecord, LogAttributes } from '@opentelemetry/api-logs';
+import type { LogRecord, LogAttributes } from '@opentelemetry/api-logs';
+import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import {
   EVENT_API_ERROR,
   EVENT_API_REQUEST,
@@ -23,7 +24,7 @@ import {
   EVENT_CHAT_COMPRESSION,
   EVENT_MALFORMED_JSON_RESPONSE,
 } from './constants.js';
-import {
+import type {
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
@@ -50,7 +51,8 @@ import {
   recordFileOperationMetric,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
-import { uiTelemetryService, UiEvent } from './uiTelemetry.js';
+import type { UiEvent } from './uiTelemetry.js';
+import { uiTelemetryService } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';

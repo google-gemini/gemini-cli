@@ -18,16 +18,17 @@ import {
   uninstallExtension,
   updateExtension,
 } from './extension.js';
+import { type MCPServerConfig } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
-import { SimpleGit, simpleGit } from 'simple-git';
 import { SettingScope, loadSettings } from './settings.js';
+import { type SimpleGit, simpleGit } from 'simple-git';
 
 vi.mock('simple-git', () => ({
   simpleGit: vi.fn(),
 }));
 
 vi.mock('os', async (importOriginal) => {
-  const os = await importOriginal<typeof import('os')>();
+  const os = await importOriginal<typeof os>();
   return {
     ...os,
     homedir: vi.fn(),
@@ -60,6 +61,7 @@ describe('loadExtensions', () => {
   afterEach(() => {
     fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
   });
 
   it('should include extension path in loaded extension', () => {
@@ -136,6 +138,7 @@ describe('loadExtensions', () => {
       EXTENSIONS_DIRECTORY_NAME,
     );
     fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+
     createExtension(workspaceExtensionsDir, 'ext1', '1.0.0');
     createExtension(workspaceExtensionsDir, 'ext2', '2.0.0');
 
@@ -147,29 +150,82 @@ describe('loadExtensions', () => {
     );
 
     const extensions = loadExtensions(tempWorkspaceDir);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      [],
+      tempWorkspaceDir,
+    ).filter((e) => e.isActive);
+    expect(activeExtensions).toHaveLength(1);
+    expect(activeExtensions[0].name).toBe('ext2');
+  });
+
+  it('should hydrate variables', () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+
+    createExtension(
+      workspaceExtensionsDir,
+      'test-extension',
+      '1.0.0',
+      false,
+      undefined,
+      {
+        'test-server': {
+          cwd: '${extensionPath}${/}server',
+        },
+      },
+    );
+
+    const extensions = loadExtensions(tempWorkspaceDir);
     expect(extensions).toHaveLength(1);
-    expect(extensions[0].config.name).toBe('ext2');
+    const loadedConfig = extensions[0].config;
+    const expectedCwd = path.join(
+      workspaceExtensionsDir,
+      'test-extension',
+      'server',
+    );
+    expect(loadedConfig.mcpServers?.['test-server'].cwd).toBe(expectedCwd);
   });
 });
 
 describe('annotateActiveExtensions', () => {
   const extensions = [
-    { config: { name: 'ext1', version: '1.0.0' }, contextFiles: [] },
-    { config: { name: 'ext2', version: '1.0.0' }, contextFiles: [] },
-    { config: { name: 'ext3', version: '1.0.0' }, contextFiles: [] },
+    {
+      path: '/path/to/ext1',
+      config: { name: 'ext1', version: '1.0.0' },
+      contextFiles: [],
+    },
+    {
+      path: '/path/to/ext2',
+      config: { name: 'ext2', version: '1.0.0' },
+      contextFiles: [],
+    },
+    {
+      path: '/path/to/ext3',
+      config: { name: 'ext3', version: '1.0.0' },
+      contextFiles: [],
+    },
   ];
 
   it('should mark all extensions as active if no enabled extensions are provided', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, []);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      [],
+      '/path/to/workspace',
+    );
     expect(activeExtensions).toHaveLength(3);
     expect(activeExtensions.every((e) => e.isActive)).toBe(true);
   });
 
   it('should mark only the enabled extensions as active', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, [
-      'ext1',
-      'ext3',
-    ]);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      ['ext1', 'ext3'],
+      '/path/to/workspace',
+    );
     expect(activeExtensions).toHaveLength(3);
     expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
       true,
@@ -183,13 +239,21 @@ describe('annotateActiveExtensions', () => {
   });
 
   it('should mark all extensions as inactive when "none" is provided', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, ['none']);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      ['none'],
+      '/path/to/workspace',
+    );
     expect(activeExtensions).toHaveLength(3);
     expect(activeExtensions.every((e) => !e.isActive)).toBe(true);
   });
 
   it('should handle case-insensitivity', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, ['EXT1']);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      ['EXT1'],
+      '/path/to/workspace',
+    );
     expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
       true,
     );
@@ -197,7 +261,7 @@ describe('annotateActiveExtensions', () => {
 
   it('should log an error for unknown extensions', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    annotateActiveExtensions(extensions, ['ext4']);
+    annotateActiveExtensions(extensions, ['ext4'], '/path/to/workspace');
     expect(consoleSpy).toHaveBeenCalledWith('Extension not found: ext4');
     consoleSpy.mockRestore();
   });
@@ -288,9 +352,7 @@ describe('installExtension', () => {
     });
 
     const mockedSimpleGit = simpleGit as vi.MockedFunction<typeof simpleGit>;
-    mockedSimpleGit.mockReturnValue({
-      clone,
-    } as unknown as SimpleGit);
+    mockedSimpleGit.mockReturnValue({ clone } as unknown as SimpleGit);
 
     await installExtension({ source: gitUrl, type: 'git' });
 
@@ -370,12 +432,13 @@ function createExtension(
   version: string,
   addContextFile = false,
   contextFileName?: string,
+  mcpServers?: Record<string, MCPServerConfig>,
 ): string {
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(
     path.join(extDir, EXTENSIONS_CONFIG_FILENAME),
-    JSON.stringify({ name, version, contextFileName }),
+    JSON.stringify({ name, version, contextFileName, mcpServers }),
   );
 
   if (addContextFile) {
@@ -498,7 +561,7 @@ describe('disableExtension', () => {
     ).toEqual(['my-extension']);
   });
 
-  it('should not add the same extension twice', () => {
+  it('should handle disabling the same extension twice', () => {
     disableExtension('my-extension', SettingScope.User);
     disableExtension('my-extension', SettingScope.User);
     const settings = loadSettings(tempWorkspaceDir);
