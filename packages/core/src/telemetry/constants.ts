@@ -20,6 +20,7 @@ export const EVENT_CONVERSATION_FINISHED = 'gemini_cli.conversation_finished';
 export const EVENT_CHAT_COMPRESSION = 'gemini_cli.chat_compression';
 export const EVENT_MALFORMED_JSON_RESPONSE =
   'gemini_cli.malformed_json_response';
+export const EVENT_FILE_OPERATION = 'gemini_cli.file_operation';
 export const METRIC_TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
 export const METRIC_TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
 export const METRIC_API_REQUEST_COUNT = 'gemini_cli.api.request.count';
