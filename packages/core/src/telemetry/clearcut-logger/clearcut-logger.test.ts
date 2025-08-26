@@ -285,7 +285,6 @@ describe('ClearcutLogger', () => {
           TERM_PROGRAM: 'vscode',
           GITHUB_SHA: undefined,
           MONOSPACE_ENV: '',
-          FIREBASE_DEPLOY_AGENT: '',
         },
         expectedValue: 'vscode',
       },
