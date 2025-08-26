@@ -500,34 +500,34 @@ export function logMalformedJsonResponse(
     'event.name': EVENT_MALFORMED_JSON_RESPONSE,
   };
 
-  export function logInvalidChunk(
-    config: Config,
-    event: InvalidChunkEvent,
-  ): void {
-    ClearcutLogger.getInstance(config)?.logInvalidChunkEvent(event);
-    if (!isTelemetrySdkInitialized()) return;
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Malformed JSON response from ${event.model}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
 
-    const attributes: LogAttributes = {
-      ...getCommonAttributes(config),
-      'event.name': EVENT_INVALID_CHUNK,
-      'event.timestamp': new Date().toISOString(),
-    };
+export function logInvalidChunk(
+  config: Config,
+  event: InvalidChunkEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logInvalidChunkEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
 
-    if (event.error_message) {
-      attributes['error.message'] = event.error_message;
-    }
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    'event.name': EVENT_INVALID_CHUNK,
+    'event.timestamp': new Date().toISOString(),
+  };
 
-    const logger = logs.getLogger(SERVICE_NAME);
-    const logRecord: LogRecord = {
-      body: `Invalid chunk received from stream.`,
-      attributes,
-    };
-    logger.emit(logRecord);
+  if (event.error_message) {
+    attributes['error.message'] = event.error_message;
   }
 
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Malformed JSON response from ${event.model}.`,
+    body: `Invalid chunk received from stream.`,
     attributes,
   };
   logger.emit(logRecord);
