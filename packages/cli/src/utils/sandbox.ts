@@ -15,8 +15,8 @@ import {
   USER_SETTINGS_DIR,
   SETTINGS_DIRECTORY_NAME,
 } from '../config/settings.js';
-import { promisify } from 'util';
-import { Config, SandboxConfig } from '@google/gemini-cli-core';
+import { promisify } from 'node:util';
+import type { Config, SandboxConfig } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 
 const execAsync = promisify(exec);

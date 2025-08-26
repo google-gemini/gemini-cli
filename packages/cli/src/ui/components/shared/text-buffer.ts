@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawnSync } from 'child_process';
-import fs from 'fs';
-import os from 'os';
-import pathMod from 'path';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import pathMod from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
 import stringWidth from 'string-width';
 import { unescapePath } from '@google/gemini-cli-core';
@@ -17,7 +17,8 @@ import {
   cpSlice,
   stripUnsafeCharacters,
 } from '../../utils/textUtils.js';
-import { handleVimAction, VimAction } from './vim-buffer-actions.js';
+import type { VimAction } from './vim-buffer-actions.js';
+import { handleVimAction } from './vim-buffer-actions.js';
 
 export type Direction =
   | 'left'

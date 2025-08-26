@@ -5,7 +5,7 @@
  */
 
 import { vi } from 'vitest';
-import { WorkspaceContext } from '../utils/workspaceContext.js';
+import type { WorkspaceContext } from '../utils/workspaceContext.js';
 
 /**
  * Creates a mock WorkspaceContext for testing

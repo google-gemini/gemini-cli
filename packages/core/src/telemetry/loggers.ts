@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { logs, LogRecord, LogAttributes } from '@opentelemetry/api-logs';
+import type { LogRecord, LogAttributes } from '@opentelemetry/api-logs';
+import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import {
   EVENT_API_ERROR,
   EVENT_API_REQUEST,
@@ -22,9 +23,11 @@ import {
   EVENT_RESEARCH_OPT_IN,
   EVENT_RESEARCH_FEEDBACK,
   truncateFeedbackContent,
+  EVENT_CONVERSATION_FINISHED,
   EVENT_CHAT_COMPRESSION,
+  EVENT_MALFORMED_JSON_RESPONSE,
 } from './constants.js';
-import {
+import type {
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
@@ -37,10 +40,12 @@ import {
   NextSpeakerCheckEvent,
   LoopDetectedEvent,
   SlashCommandEvent,
+  ConversationFinishedEvent,
   KittySequenceOverflowEvent,
   ResearchOptInEvent,
   ResearchFeedbackEvent,
   ChatCompressionEvent,
+  MalformedJsonResponseEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -51,16 +56,21 @@ import {
   recordFileOperationMetric,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
-import { uiTelemetryService, UiEvent } from './uiTelemetry.js';
+import type { UiEvent } from './uiTelemetry.js';
+import { uiTelemetryService } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { UserAccountManager } from '../utils/userAccountManager.js';
 
 const shouldLogUserPrompts = (config: Config): boolean =>
   config.getTelemetryLogPromptsEnabled();
 
 function getCommonAttributes(config: Config): LogAttributes {
+  const userAccountManager = new UserAccountManager();
+  const email = userAccountManager.getCachedGoogleAccount();
   return {
     'session.id': config.getSessionId(),
+    ...(email && { 'user.email': email }),
   };
 }
 
@@ -412,6 +422,27 @@ export function logIdeConnection(
   logger.emit(logRecord);
 }
 
+export function logConversationFinishedEvent(
+  config: Config,
+  event: ConversationFinishedEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logConversationFinishedEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_CONVERSATION_FINISHED,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Conversation finished.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
 export function logChatCompression(
   config: Config,
   event: ChatCompressionEvent,
@@ -500,6 +531,27 @@ export function logResearchFeedback(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Research feedback: ${event.feedback_type}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logMalformedJsonResponse(
+  config: Config,
+  event: MalformedJsonResponseEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logMalformedJsonResponseEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_MALFORMED_JSON_RESPONSE,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Malformed JSON response from ${event.model}.`,
     attributes,
   };
   logger.emit(logRecord);
