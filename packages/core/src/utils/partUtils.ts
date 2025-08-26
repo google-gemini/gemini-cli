@@ -8,6 +8,7 @@ import type {
   GenerateContentResponse,
   PartListUnion,
   Part,
+  PartUnion,
 } from '@google/genai';
 
 /**
@@ -86,4 +87,44 @@ export function getResponseText(
     }
   }
   return null;
+}
+
+/**
+ * Asynchronously maps over a PartListUnion, applying a transformation function
+ * to the text content of each text-based part.
+ *
+ * @param parts The PartListUnion to process.
+ * @param transform A function that takes a string of text and returns a Promise
+ *   resolving to an array of new PartUnions.
+ * @returns A Promise that resolves to a new array of PartUnions with the
+ *   transformations applied.
+ */
+export async function flatMapTextParts(
+  parts: PartListUnion,
+  transform: (text: string) => Promise<PartUnion[]>,
+): Promise<PartUnion[]> {
+  const result: PartUnion[] = [];
+  const partArray = Array.isArray(parts)
+    ? parts
+    : typeof parts === 'string'
+      ? [{ text: parts }]
+      : [parts];
+
+  for (const part of partArray) {
+    let textToProcess: string | undefined;
+    if (typeof part === 'string') {
+      textToProcess = part;
+    } else if ('text' in part) {
+      textToProcess = part.text;
+    }
+
+    if (textToProcess !== undefined) {
+      const transformedParts = await transform(textToProcess);
+      result.push(...transformedParts);
+    } else {
+      // Pass through non-text parts unmodified.
+      result.push(part);
+    }
+  }
+  return result;
 }

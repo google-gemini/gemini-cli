@@ -46,6 +46,7 @@ export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
 export * from './utils/workspaceContext.js';
 export * from './utils/ignorePatterns.js';
+export * from './utils/partUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

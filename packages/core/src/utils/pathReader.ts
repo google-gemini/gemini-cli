@@ -4,23 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { promises as fs } from 'fs';
-import * as path from 'path';
-import { WorkspaceContext } from './workspaceContext.js';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { glob } from 'glob';
+import type { PartUnion } from '@google/genai';
+import { processSingleFileContent } from './fileUtils.js';
+import type { Config } from '../config/config.js';
 
 /**
- * Reads the content of a file or a formatted listing of a directory from
- * within the workspace.
+ * Reads the content of a file or recursively expands a directory from
+ * within the workspace, returning content suitable for LLM input.
  *
  * @param pathStr The path to read (can be absolute or relative).
- * @param workspace The WorkspaceContext containing all allowed directories.
- * @returns A promise that resolves to the file content or directory listing.
+ * @param config The application configuration, providing workspace context and services.
+ * @returns A promise that resolves to an array of PartUnion (string | Part).
  * @throws An error if the path is not found or is outside the workspace.
  */
 export async function readPathFromWorkspace(
   pathStr: string,
-  workspace: WorkspaceContext,
-): Promise<string> {
+  config: Config,
+): Promise<PartUnion[]> {
+  const workspace = config.getWorkspaceContext();
   let absolutePath: string | null = null;
 
   if (path.isAbsolute(pathStr)) {
@@ -51,9 +55,40 @@ export async function readPathFromWorkspace(
 
   const stats = await fs.stat(absolutePath);
   if (stats.isDirectory()) {
-    const entries = await fs.readdir(absolutePath);
-    return `Directory listing for ${pathStr}:\n- ${entries.join('\n- ')}`;
+    const allParts: PartUnion[] = [];
+    allParts.push({
+      text: `--- Start of content for directory: ${pathStr} ---\n`,
+    });
+
+    // Use glob to recursively find all files within the directory.
+    const files = await glob('**/*', {
+      cwd: absolutePath,
+      nodir: true, // We only want files
+      dot: true, // Include dotfiles
+      absolute: true,
+    });
+
+    for (const filePath of files) {
+      const relativePathForDisplay = path.relative(absolutePath, filePath);
+      allParts.push({ text: `--- ${relativePathForDisplay} ---\n` });
+      const result = await processSingleFileContent(
+        filePath,
+        config.getTargetDir(),
+        config.getFileSystemService(),
+      );
+      allParts.push(result.llmContent);
+      allParts.push({ text: '\n' }); // Add a newline for separation
+    }
+
+    allParts.push({ text: `--- End of content for directory: ${pathStr} ---` });
+    return allParts;
   } else {
-    return fs.readFile(absolutePath, 'utf-8');
+    // It's a single file, process it directly.
+    const result = await processSingleFileContent(
+      absolutePath,
+      config.getTargetDir(),
+      config.getFileSystemService(),
+    );
+    return [result.llmContent];
   }
 }

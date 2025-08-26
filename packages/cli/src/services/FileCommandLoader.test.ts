@@ -14,6 +14,7 @@ import { createMockCommandContext } from '../test-utils/mockCommandContext.js';
 import {
   SHELL_INJECTION_TRIGGER,
   SHORTHAND_ARGS_PLACEHOLDER,
+  type PromptPipelineContent,
 } from './prompt-processors/types.js';
 import {
   ConfirmationRequiredError,
@@ -75,13 +76,25 @@ describe('FileCommandLoader', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockShellProcess.mockImplementation(
-      (prompt: string, context: CommandContext) => {
+      (prompt: PromptPipelineContent, context: CommandContext) => {
         const userArgsRaw = context?.invocation?.args || '';
-        const processedPrompt = prompt.replaceAll(
+        // This is a simplified mock. A real implementation would need to iterate
+        // through all parts and process only the text parts.
+        const firstTextPart = prompt.find(
+          (p) => typeof p === 'string' || 'text' in p,
+        );
+        let textContent = '';
+        if (typeof firstTextPart === 'string') {
+          textContent = firstTextPart;
+        } else if (firstTextPart && 'text' in firstTextPart) {
+          textContent = firstTextPart.text ?? '';
+        }
+
+        const processedText = textContent.replaceAll(
           SHORTHAND_ARGS_PLACEHOLDER,
           userArgsRaw,
         );
-        return Promise.resolve(processedPrompt);
+        return Promise.resolve([{ text: processedText }]);
       },
     );
     mockAtFileProcess.mockImplementation(async (prompt: string) => prompt);
@@ -118,7 +131,7 @@ describe('FileCommandLoader', () => {
       '',
     );
     if (result?.type === 'submit_prompt') {
-      expect(result.content).toBe('This is a test prompt');
+      expect(result.content).toEqual([{ text: 'This is a test prompt' }]);
     } else {
       assert.fail('Incorrect action type');
     }
@@ -270,7 +283,7 @@ describe('FileCommandLoader', () => {
       '',
     );
     if (userResult?.type === 'submit_prompt') {
-      expect(userResult.content).toBe('User prompt');
+      expect(userResult.content).toEqual([{ text: 'User prompt' }]);
     } else {
       assert.fail('Incorrect action type for user command');
     }
@@ -285,7 +298,7 @@ describe('FileCommandLoader', () => {
       '',
     );
     if (projectResult?.type === 'submit_prompt') {
-      expect(projectResult.content).toBe('Project prompt');
+      expect(projectResult.content).toEqual([{ text: 'Project prompt' }]);
     } else {
       assert.fail('Incorrect action type for project command');
     }
@@ -615,7 +628,7 @@ describe('FileCommandLoader', () => {
       );
       expect(result0?.type).toBe('submit_prompt');
       if (result0?.type === 'submit_prompt') {
-        expect(result0.content).toBe('User deploy command');
+        expect(result0.content).toEqual([{ text: 'User deploy command' }]);
       }
 
       expect(commands[1].name).toBe('deploy');
@@ -632,7 +645,7 @@ describe('FileCommandLoader', () => {
       );
       expect(result1?.type).toBe('submit_prompt');
       if (result1?.type === 'submit_prompt') {
-        expect(result1.content).toBe('Project deploy command');
+        expect(result1.content).toEqual([{ text: 'Project deploy command' }]);
       }
 
       expect(commands[2].name).toBe('deploy');
@@ -650,7 +663,7 @@ describe('FileCommandLoader', () => {
       );
       expect(result2?.type).toBe('submit_prompt');
       if (result2?.type === 'submit_prompt') {
-        expect(result2.content).toBe('Extension deploy command');
+        expect(result2.content).toEqual([{ text: 'Extension deploy command' }]);
       }
     });
 
@@ -793,7 +806,9 @@ describe('FileCommandLoader', () => {
         '',
       );
       if (result?.type === 'submit_prompt') {
-        expect(result.content).toBe('Nested command from extension a');
+        expect(result.content).toEqual([
+          { text: 'Nested command from extension a' },
+        ]);
       } else {
         assert.fail('Incorrect action type');
       }
@@ -827,7 +842,9 @@ describe('FileCommandLoader', () => {
       );
       expect(result?.type).toBe('submit_prompt');
       if (result?.type === 'submit_prompt') {
-        expect(result.content).toBe('The user wants to: do something cool');
+        expect(result.content).toEqual([
+          { text: 'The user wants to: do something cool' },
+        ]);
       }
     });
   });
@@ -861,7 +878,7 @@ describe('FileCommandLoader', () => {
       if (result?.type === 'submit_prompt') {
         const expectedContent =
           'This is the instruction.\n\n/model_led 1.2.0 added "a feature"';
-        expect(result.content).toBe(expectedContent);
+        expect(result.content).toEqual([{ text: expectedContent }]);
       }
     });
   });
@@ -915,7 +932,7 @@ describe('FileCommandLoader', () => {
           'shell.toml': `prompt = "Run !{echo 'hello'}"`,
         },
       });
-      mockShellProcess.mockResolvedValue('Run hello');
+      mockShellProcess.mockResolvedValue([{ text: 'Run hello' }]);
 
       const loader = new FileCommandLoader(null as unknown as Config);
       const commands = await loader.loadCommands(signal);
@@ -931,7 +948,7 @@ describe('FileCommandLoader', () => {
 
       expect(result?.type).toBe('submit_prompt');
       if (result?.type === 'submit_prompt') {
-        expect(result.content).toBe('Run hello');
+        expect(result.content).toEqual([{ text: 'Run hello' }]);
       }
     });
 
@@ -994,7 +1011,7 @@ describe('FileCommandLoader', () => {
         ),
       ).rejects.toThrow('Something else went wrong');
     });
-    it('assembles the processor pipeline in the correct order (Shell -> AtFile -> Default)', async () => {
+    it('assembles the processor pipeline in the correct order (AtFile -> Shell -> Default)', async () => {
       const userCommandsDir = Storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
@@ -1008,14 +1025,22 @@ describe('FileCommandLoader', () => {
 
       const defaultProcessMock = vi
         .fn()
-        .mockImplementation((p) => Promise.resolve(`${p}-default-processed`));
+        .mockImplementation((p: PromptPipelineContent) =>
+          Promise.resolve([
+            { text: `${(p[0] as { text: string }).text}-default-processed` },
+          ]),
+        );
 
-      mockShellProcess.mockImplementation((p) =>
-        Promise.resolve(`${p}-shell-processed`),
+      mockShellProcess.mockImplementation((p: PromptPipelineContent) =>
+        Promise.resolve([
+          { text: `${(p[0] as { text: string }).text}-shell-processed` },
+        ]),
       );
 
-      mockAtFileProcess.mockImplementation((p) =>
-        Promise.resolve(`${p}-at-file-processed`),
+      mockAtFileProcess.mockImplementation((p: PromptPipelineContent) =>
+        Promise.resolve([
+          { text: `${(p[0] as { text: string }).text}-at-file-processed` },
+        ]),
       );
 
       vi.mocked(DefaultArgumentProcessor).mockImplementation(
@@ -1041,34 +1066,46 @@ describe('FileCommandLoader', () => {
         'baz',
       );
 
-      expect(mockShellProcess.mock.invocationCallOrder[0]).toBeLessThan(
-        mockAtFileProcess.mock.invocationCallOrder[0],
-      );
       expect(mockAtFileProcess.mock.invocationCallOrder[0]).toBeLessThan(
+        mockShellProcess.mock.invocationCallOrder[0],
+      );
+      expect(mockShellProcess.mock.invocationCallOrder[0]).toBeLessThan(
         defaultProcessMock.mock.invocationCallOrder[0],
       );
 
       // Verify the flow of the prompt through the processors
-      // 1. Shell processor runs first
-      expect(mockShellProcess).toHaveBeenCalledWith(
-        expect.stringContaining('!{echo foo}'),
+      // 1. AtFile processor runs first
+      expect(mockAtFileProcess).toHaveBeenCalledWith(
+        [{ text: expect.stringContaining('@{./bar.txt}') }],
         expect.any(Object),
       );
-      // 2. AtFile processor runs second
-      expect(mockAtFileProcess).toHaveBeenCalledWith(
-        expect.stringContaining('-shell-processed'),
+      // 2. Shell processor runs second
+      expect(mockShellProcess).toHaveBeenCalledWith(
+        [{ text: expect.stringContaining('-at-file-processed') }],
         expect.any(Object),
       );
       // 3. Default processor runs third
       expect(defaultProcessMock).toHaveBeenCalledWith(
-        expect.stringContaining('-at-file-processed'),
+        [{ text: expect.stringContaining('-shell-processed') }],
         expect.any(Object),
       );
 
       if (result?.type === 'submit_prompt') {
-        expect(result.content).toContain(
-          '-shell-processed-at-file-processed-default-processed',
-        );
+        const contentAsArray = Array.isArray(result.content)
+          ? result.content
+          : [result.content];
+        expect(contentAsArray.length).toBeGreaterThan(0);
+        const firstPart = contentAsArray[0];
+
+        if (typeof firstPart === 'object' && firstPart && 'text' in firstPart) {
+          expect(firstPart.text).toContain(
+            '-at-file-processed-shell-processed-default-processed',
+          );
+        } else {
+          assert.fail(
+            'First part of content is not a text part or is a string',
+          );
+        }
       } else {
         assert.fail('Incorrect action type');
       }
@@ -1086,19 +1123,26 @@ describe('FileCommandLoader', () => {
         './test.txt': 'file content',
       });
 
-      mockAtFileProcess.mockImplementation(async (prompt: string) => {
-        // A simplified mock of AtFileProcessor's behavior
-        if (prompt.includes('@{./test.txt}')) {
-          return prompt.replace('@{./test.txt}', 'file content');
-        }
-        return prompt;
-      });
+      mockAtFileProcess.mockImplementation(
+        async (prompt: PromptPipelineContent) => {
+          // A simplified mock of AtFileProcessor's behavior
+          const textContent = (prompt[0] as { text: string }).text;
+          if (textContent.includes('@{./test.txt}')) {
+            return [
+              {
+                text: textContent.replace('@{./test.txt}', 'file content'),
+              },
+            ];
+          }
+          return prompt;
+        },
+      );
 
       // Prevent default processor from interfering
       vi.mocked(DefaultArgumentProcessor).mockImplementation(
         () =>
           ({
-            process: (p: string) => Promise.resolve(p),
+            process: (p: PromptPipelineContent) => Promise.resolve(p),
           }) as unknown as DefaultArgumentProcessor,
       );
 
@@ -1119,7 +1163,9 @@ describe('FileCommandLoader', () => {
       );
       expect(result?.type).toBe('submit_prompt');
       if (result?.type === 'submit_prompt') {
-        expect(result.content).toBe('Context from file: file content');
+        expect(result.content).toEqual([
+          { text: 'Context from file: file content' },
+        ]);
       }
     });
   });

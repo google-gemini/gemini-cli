@@ -10,10 +10,11 @@ import {
   escapeShellArg,
   getShellConfiguration,
   ShellExecutionService,
+  flatMapTextParts,
 } from '@google/gemini-cli-core';
 
 import type { CommandContext } from '../../ui/commands/types.js';
-import type { IPromptProcessor } from './types.js';
+import type { IPromptProcessor, PromptPipelineContent } from './types.js';
 import {
   SHELL_INJECTION_TRIGGER,
   SHORTHAND_ARGS_PLACEHOLDER,
@@ -56,11 +57,25 @@ interface ShellInjection {
 export class ShellProcessor implements IPromptProcessor {
   constructor(private readonly commandName: string) {}
 
-  async process(prompt: string, context: CommandContext): Promise<string> {
+  async process(
+    prompt: PromptPipelineContent,
+    context: CommandContext,
+  ): Promise<PromptPipelineContent> {
+    return flatMapTextParts(prompt, (text) =>
+      this.processString(text, context),
+    );
+  }
+
+  private async processString(
+    prompt: string,
+    context: CommandContext,
+  ): Promise<PromptPipelineContent> {
     const userArgsRaw = context.invocation?.args || '';
 
     if (!prompt.includes(SHELL_INJECTION_TRIGGER)) {
-      return prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, userArgsRaw);
+      return [
+        { text: prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, userArgsRaw) },
+      ];
     }
 
     const config = context.services.config;
@@ -74,7 +89,9 @@ export class ShellProcessor implements IPromptProcessor {
     const injections = this.extractInjections(prompt);
     // If extractInjections found no closed blocks (and didn't throw), treat as raw.
     if (injections.length === 0) {
-      return prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, userArgsRaw);
+      return [
+        { text: prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, userArgsRaw) },
+      ];
     }
 
     const { shell } = getShellConfiguration();
@@ -180,7 +197,7 @@ export class ShellProcessor implements IPromptProcessor {
       userArgsRaw,
     );
 
-    return processedPrompt;
+    return [{ text: processedPrompt }];
   }
 
   /**

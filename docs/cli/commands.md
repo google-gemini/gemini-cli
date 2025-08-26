@@ -308,27 +308,29 @@ You can directly embed the content of a file or a directory listing into your pr
 - **File Injection**: `@{path/to/file.txt}` is replaced by the content of `file.txt`.
 - **Directory Listing**: `@{path/to/dir}` is replaced by a formatted list of the directory's contents.
 - **Workspace-Aware**: The command searches for the path in the current directory and any other workspace directories. Absolute paths are allowed if they are within the workspace.
-- **Dynamic Paths**: This processing happens _after_ shell and argument injection, so you can dynamically construct the path.
+- **Processing Order**: File content injection with `@{...}` is processed _before_ shell commands (`!{...}`) and argument substitution (`{{args}}`).
 
 **Example (`review.toml`):**
 
-This command takes a filename as an argument and injects its content into the prompt.
+This command injects the content of a _fixed_ best practices file (`docs/best-practices.md`) and uses the user's arguments to provide context for the review.
 
-````toml
+```toml
 # In: <project>/.gemini/commands/review.toml
-# Invoked via: /review src/index.ts
+# Invoked via: /review FileCommandLoader.ts
 
-description = "Reviews a specific file."
+description = "Reviews the provided context using a best practice guide."
 prompt = """
-Please review the following code from the file `{{args}}`:
+You are an expert code reviewer.
 
-```typescript
-@{ {{args}} }
-```
+Your task is to review {{args}}.
+
+Use the following best practices when providing your review:
+
+@{docs/best-practices.md}
 """
-````
+```
 
-When you run `/review src/index.ts`, the `{{args}}` placeholder is first replaced, resulting in the `@{src/index.ts}` placeholder, which is then replaced by the content of that file.
+When you run `/review FileCommandLoader.ts`, the `@{docs/best-practices.md}` placeholder is replaced by the content of that file, and `{{args}}` is replaced by the text you provided, before the final prompt is sent to the model.
 
 ---
 

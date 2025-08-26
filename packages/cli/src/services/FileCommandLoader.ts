@@ -19,7 +19,10 @@ import type {
 } from '../ui/commands/types.js';
 import { CommandKind } from '../ui/commands/types.js';
 import { DefaultArgumentProcessor } from './prompt-processors/argumentProcessor.js';
-import type { IPromptProcessor } from './prompt-processors/types.js';
+import type {
+  IPromptProcessor,
+  PromptPipelineContent,
+} from './prompt-processors/types.js';
 import {
   SHORTHAND_ARGS_PLACEHOLDER,
   SHELL_INJECTION_TRIGGER,
@@ -230,16 +233,17 @@ export class FileCommandLoader implements ICommandLoader {
       AT_FILE_INJECTION_TRIGGER,
     );
 
-    // 1. Argument and Shell Injection.
-    // This must run before the AtFileProcessor to inject dynamic @-paths.
-    if (usesShellInjection || usesArgs) {
-      processors.push(new ShellProcessor(baseCommandName));
+    // 1. @-File Injection (Security First).
+    // This runs first to ensure we're not executing shell commands that
+    // could dynamically generate malicious @-paths.
+    if (usesAtFileInjection) {
+      processors.push(new AtFileProcessor(baseCommandName));
     }
 
-    // 2. @-File Injection.
-    // This runs after shell args have been injected into the prompt.
-    if (usesAtFileInjection) {
-      processors.push(new AtFileProcessor());
+    // 2. Argument and Shell Injection.
+    // This runs after file content has been safely injected.
+    if (usesShellInjection || usesArgs) {
+      processors.push(new ShellProcessor(baseCommandName));
     }
 
     // 3. Default Argument Handling.
@@ -263,19 +267,24 @@ export class FileCommandLoader implements ICommandLoader {
           );
           return {
             type: 'submit_prompt',
-            content: validDef.prompt, // Fallback to unprocessed prompt
+            content: [{ text: validDef.prompt }], // Fallback to unprocessed prompt
           };
         }
 
         try {
-          let processedPrompt = validDef.prompt;
+          let processedContent: PromptPipelineContent = [
+            { text: validDef.prompt },
+          ];
           for (const processor of processors) {
-            processedPrompt = await processor.process(processedPrompt, context);
+            processedContent = await processor.process(
+              processedContent,
+              context,
+            );
           }
 
           return {
             type: 'submit_prompt',
-            content: processedPrompt,
+            content: processedContent,
           };
         } catch (e) {
           // Check if it's our specific error type
