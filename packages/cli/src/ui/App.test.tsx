@@ -25,7 +25,7 @@ import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { StreamingState, ConsoleMessageItem } from './types.js';
 import { Tips } from './components/Tips.js';
 import { checkForUpdates, UpdateObject } from './utils/updateCheck.js';
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 import { updateEventEmitter } from '../utils/updateEventEmitter.js';
 import * as auth from '../config/auth.js';
 import * as useTerminalSize from './hooks/useTerminalSize.js';
@@ -287,6 +287,10 @@ describe('App UI', () => {
       path: '/system/settings.json',
       settings: settings.system || {},
     };
+    const systemDefaultsFile: SettingsFile = {
+      path: '/system/system-defaults.json',
+      settings: {},
+    };
     const userSettingsFile: SettingsFile = {
       path: '/user/settings.json',
       settings: settings.user || {},
@@ -297,6 +301,7 @@ describe('App UI', () => {
     };
     return new LoadedSettings(
       systemSettingsFile,
+      systemDefaultsFile,
       userSettingsFile,
       workspaceSettingsFile,
       [],
