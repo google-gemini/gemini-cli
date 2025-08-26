@@ -55,6 +55,9 @@ import {
   recordToolCallMetrics,
   recordChatCompressionMetrics,
   recordFileOperationMetric,
+  recordInvalidChunk,
+  recordContentRetry,
+  recordContentRetryFailure,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -531,6 +534,7 @@ export function logInvalidChunk(
     attributes,
   };
   logger.emit(logRecord);
+  recordInvalidChunk(config);
 }
 
 export function logContentRetry(
@@ -555,6 +559,7 @@ export function logContentRetry(
     attributes,
   };
   logger.emit(logRecord);
+  recordContentRetry(config);
 }
 
 export function logContentRetryFailure(
@@ -582,4 +587,5 @@ export function logContentRetryFailure(
     attributes,
   };
   logger.emit(logRecord);
+  recordContentRetryFailure(config);
 }
