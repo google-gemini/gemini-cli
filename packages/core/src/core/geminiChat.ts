@@ -34,7 +34,6 @@ import {
   ContentRetryFailureEvent,
   InvalidChunkEvent,
 } from '../telemetry/types.js';
-import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 
 /**
  * Options for retrying due to invalid content from the model.
