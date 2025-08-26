@@ -23,7 +23,7 @@ import type {
   OAuthClientRegistrationResponse,
 } from './oauth-provider.js';
 import { MCPOAuthProvider } from './oauth-provider.js';
-import type { MCPOAuthToken } from './oauth-token-storage.js';
+import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 
 // Mock fetch globally
@@ -101,7 +101,7 @@ describe('MCPOAuthProvider', () => {
     audiences: ['https://api.example.com'],
   };
 
-  const mockToken: MCPOAuthToken = {
+  const mockToken: OAuthToken = {
     accessToken: 'access_token_123',
     refreshToken: 'refresh_token_456',
     tokenType: 'Bearer',
