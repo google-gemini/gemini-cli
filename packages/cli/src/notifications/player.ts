@@ -17,7 +17,8 @@ export function playSound(soundPath: string, isCommand: boolean = false): void {
   const args: string[] = [];
 
   if (isCommand) {
-    command = soundPath;
+    console.warn('Direct command execution is disabled for security reasons.');
+    return;
   } else {
     switch (os.platform()) {
       case 'darwin': // macOS
@@ -34,7 +35,10 @@ export function playSound(soundPath: string, isCommand: boolean = false): void {
         break;
       case 'win32': // Windows
         command = 'powershell.exe';
-        args.push('-c', `(New-Object Media.SoundPlayer '${soundPath}').PlaySync();`);
+        args.push(
+          '-c',
+          `(New-Object Media.SoundPlayer '${soundPath}').PlaySync();`,
+        );
         break;
       default:
         console.warn(`Audio notifications not supported on ${os.platform()}`);
@@ -42,11 +46,19 @@ export function playSound(soundPath: string, isCommand: boolean = false): void {
     }
   }
 
-  const child = spawn(command, args, { detached: true, stdio: 'ignore', shell: isCommand });
+  try {
+    const child = spawn(command, args, { detached: true, stdio: 'ignore' });
 
-  child.on('error', (err) => {
-    console.error(`Failed to play sound: ${err.message}`);
-  });
+    child.on('error', (err) => {
+      console.error(`Failed to play sound: ${err.message}`);
+    });
 
-  child.unref(); // Allow the parent process to exit independently
+    child.unref(); // Allow the parent process to exit independently
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(`Error spawning process: ${error.message}`);
+    } else {
+      console.error('An unknown error occurred while spawning the process.');
+    }
+  }
 }
