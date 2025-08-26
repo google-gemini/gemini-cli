@@ -528,7 +528,7 @@ describe('disableExtension', () => {
     ).toEqual(['my-extension']);
   });
 
-  it('should not add the same extension twice', () => {
+  it('should handle disabling the same extension twice', () => {
     disableExtension('my-extension', SettingScope.User);
     disableExtension('my-extension', SettingScope.User);
     const settings = loadSettings(tempWorkspaceDir);

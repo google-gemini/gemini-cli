@@ -27,7 +27,7 @@ export async function handleDisable(args: DisableArgs) {
 }
 
 export const disableCommand: CommandModule = {
-  command: 'disable <name>',
+  command: 'disable [--scope] <name>',
   describe: 'Disables an extension.',
   builder: (yargs) =>
     yargs
