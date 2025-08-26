@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   Box,
-  DOMElement,
+  type DOMElement,
   measureElement,
   Static,
   Text,
@@ -19,7 +19,7 @@ import {
   type HistoryItem,
   MessageType,
   ToolCallStatus,
-  HistoryItemWithoutId,
+  type HistoryItemWithoutId,
 } from './types.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
