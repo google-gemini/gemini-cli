@@ -80,10 +80,11 @@ export function triggerNotification(eventType: NotificationEventType): void {
             : '/System/Library/Sounds/Pop.aiff';
         break;
       case 'linux':
-        // For Linux, we'll use a simple beep command as a placeholder for system sound.
-        // A more robust solution would involve checking for XDG sound themes or specific sound utilities.
-        playSound('echo -e "\a"', true); // ASCII bell character
-        return;
+        systemSoundPath =
+          eventType === 'inputRequired'
+            ? '/usr/share/sounds/freedesktop/stereo/dialog-warning.oga' // A more urgent sound for input required
+            : '/usr/share/sounds/freedesktop/stereo/message.oga'; // A general notification sound
+        break;
       case 'win32':
         systemSoundPath =
           eventType === 'inputRequired'
