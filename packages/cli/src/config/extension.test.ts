@@ -17,8 +17,8 @@ import {
   uninstallExtension,
   updateExtension,
 } from './extension.js';
-import { MCPServerConfig } from '@google/gemini-cli-core';
-import { execSync } from 'child_process';
+import { type MCPServerConfig } from '@google/gemini-cli-core';
+import { execSync } from 'node:child_process';
 import { type SimpleGit, simpleGit } from 'simple-git';
 
 vi.mock('simple-git', () => ({

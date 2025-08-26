@@ -15,17 +15,16 @@ export interface VariableSchema {
   [key: string]: VariableDefinition;
 }
 
+const PATH_SEPARATOR_DEFINITION = {
+  type: 'string',
+  description: 'The path separator.',
+} as const;
+
 export const VARIABLE_SCHEMA = {
   extensionPath: {
     type: 'string',
     description: 'The path of the extension in the filesystem.',
   },
-  '/': {
-    type: 'string',
-    description: 'The path separator.',
-  },
-  pathSeparator: {
-    type: 'string',
-    description: 'The path separator.',
-  },
+  '/': PATH_SEPARATOR_DEFINITION,
+  pathSeparator: PATH_SEPARATOR_DEFINITION,
 } as const;

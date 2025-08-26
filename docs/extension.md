@@ -94,7 +94,7 @@ Gemini CLI extensions allow variable substitution in `gemini-extension.json`. Th
 
 **Supported variables:**
 
-| variable                   | description                                         |
-| -------------------------- | --------------------------------------------------- |
-| `${extensionPath}`         | The path of the extension in the user's filesystem. |
-| `${/} or ${pathSeparator}` | The path separator (differs per OS).                |
+| variable                   | description                                                                                                                                                     |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `${extensionPath}`         | The fully-qualified path of the extension in the user's filesystem e.g., '/Users/username/.gemini/extensions/example-extension'. This will not unwrap symlinks. |
+| `${/} or ${pathSeparator}` | The path separator (differs per OS).                                                                                                                            |

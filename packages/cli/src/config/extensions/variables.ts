@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { VariableSchema, VARIABLE_SCHEMA } from './variableSchema.js';
+import { type VariableSchema, VARIABLE_SCHEMA } from './variableSchema.js';
 
 export type VariableContext = {
   [key in keyof typeof VARIABLE_SCHEMA]?: string;
@@ -25,11 +25,11 @@ export function validateVariables(
 export function hydrateString(str: string, context: VariableContext): string {
   validateVariables(context, VARIABLE_SCHEMA);
   const regex = /\${(.*?)}/g;
-  return str.replace(regex, (match, key) => {
-    return context[key as keyof VariableContext] == null
+  return str.replace(regex, (match, key) =>
+    context[key as keyof VariableContext] == null
       ? match
-      : (context[key as keyof VariableContext] as string);
-  });
+      : (context[key as keyof VariableContext] as string),
+  );
 }
 
 export function recursivelyHydrateStrings(
