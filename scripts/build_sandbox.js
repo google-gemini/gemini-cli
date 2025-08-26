@@ -59,8 +59,9 @@ try {
   sandboxCommand = execSync('node scripts/sandbox_command.js')
     .toString()
     .trim();
-} catch {
+} catch (e) {
   console.warn('ERROR: could not detect sandbox container command');
+  console.error(e);
   process.exit(0);
 }
 
