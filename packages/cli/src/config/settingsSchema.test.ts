@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { SETTINGS_SCHEMA, Settings } from './settingsSchema.js';
+import type { Settings } from './settingsSchema.js';
+import { SETTINGS_SCHEMA } from './settingsSchema.js';
 
 describe('SettingsSchema', () => {
   describe('SETTINGS_SCHEMA', () => {
@@ -53,6 +54,7 @@ describe('SettingsSchema', () => {
         'hasSeenIdeIntegrationNudge',
         'folderTrustFeature',
         'useRipgrep',
+        'debugKeystrokeLogging',
       ];
 
       expectedSettings.forEach((setting) => {
@@ -248,6 +250,18 @@ describe('SettingsSchema', () => {
       expect(SETTINGS_SCHEMA.folderTrustFeature.category).toBe('General');
       expect(SETTINGS_SCHEMA.folderTrustFeature.default).toBe(false);
       expect(SETTINGS_SCHEMA.folderTrustFeature.showInDialog).toBe(true);
+    });
+
+    it('should have debugKeystrokeLogging setting in schema', () => {
+      expect(SETTINGS_SCHEMA.debugKeystrokeLogging).toBeDefined();
+      expect(SETTINGS_SCHEMA.debugKeystrokeLogging.type).toBe('boolean');
+      expect(SETTINGS_SCHEMA.debugKeystrokeLogging.category).toBe('General');
+      expect(SETTINGS_SCHEMA.debugKeystrokeLogging.default).toBe(false);
+      expect(SETTINGS_SCHEMA.debugKeystrokeLogging.requiresRestart).toBe(false);
+      expect(SETTINGS_SCHEMA.debugKeystrokeLogging.showInDialog).toBe(true);
+      expect(SETTINGS_SCHEMA.debugKeystrokeLogging.description).toBe(
+        'Enable debug logging of keystrokes to the console.',
+      );
     });
   });
 });

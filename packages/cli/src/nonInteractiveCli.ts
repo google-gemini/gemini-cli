@@ -4,16 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Config, ToolCallRequestInfo } from '@google/gemini-cli-core';
 import {
-  Config,
-  ToolCallRequestInfo,
   executeToolCall,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   GeminiEventType,
   parseAndFormatApiError,
 } from '@google/gemini-cli-core';
-import { Content, Part } from '@google/genai';
+import type { Content, Part } from '@google/genai';
 
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
@@ -111,16 +110,7 @@ export async function runNonInteractive(
           }
 
           if (toolResponse.responseParts) {
-            const parts = Array.isArray(toolResponse.responseParts)
-              ? toolResponse.responseParts
-              : [toolResponse.responseParts];
-            for (const part of parts) {
-              if (typeof part === 'string') {
-                toolResponseParts.push({ text: part });
-              } else if (part) {
-                toolResponseParts.push(part);
-              }
-            }
+            toolResponseParts.push(...toolResponse.responseParts);
           }
         }
         currentMessages = [{ role: 'user', parts: toolResponseParts }];

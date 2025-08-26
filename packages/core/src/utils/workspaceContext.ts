@@ -5,8 +5,9 @@
  */
 
 import { isNodeError } from '../utils/errors.js';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as process from 'node:process';
 
 export type Unsubscribe = () => void;
 
@@ -30,7 +31,6 @@ export class WorkspaceContext {
     for (const additionalDirectory of additionalDirectories) {
       this.addDirectory(additionalDirectory);
     }
-
     this.initialDirectories = new Set(this.directories);
   }
 
@@ -64,12 +64,18 @@ export class WorkspaceContext {
    * @param basePath Optional base path for resolving relative paths (defaults to cwd)
    */
   addDirectory(directory: string, basePath: string = process.cwd()): void {
-    const resolved = this.resolveAndValidateDir(directory, basePath);
-    if (this.directories.has(resolved)) {
-      return;
+    try {
+      const resolved = this.resolveAndValidateDir(directory, basePath);
+      if (this.directories.has(resolved)) {
+        return;
+      }
+      this.directories.add(resolved);
+      this.notifyDirectoriesChanged();
+    } catch (err) {
+      console.warn(
+        `[WARN] Skipping unreadable directory: ${directory} (${err instanceof Error ? err.message : String(err)})`,
+      );
     }
-    this.directories.add(resolved);
-    this.notifyDirectoriesChanged();
   }
 
   private resolveAndValidateDir(

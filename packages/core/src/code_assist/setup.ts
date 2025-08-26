@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   ClientMetadata,
   GeminiUserTier,
   LoadCodeAssistResponse,
   OnboardUserRequest,
-  UserTierId,
 } from './types.js';
+import { UserTierId } from './types.js';
 import { CodeAssistServer } from './server.js';
-import { OAuth2Client } from 'google-auth-library';
+import type { OAuth2Client } from 'google-auth-library';
 
 export class ProjectIdRequiredError extends Error {
   constructor() {

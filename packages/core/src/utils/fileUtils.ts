@@ -6,10 +6,11 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { PartUnion } from '@google/genai';
+import type { PartUnion } from '@google/genai';
 import mime from 'mime-types';
-import { FileSystemService } from '../services/fileSystemService.js';
+import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
+import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 
 // Constants for text file processing
 const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
@@ -153,38 +154,7 @@ export async function detectFileType(
 
   // Stricter binary check for common non-text extensions before content check
   // These are often not well-covered by mime-types or might be misidentified.
-  if (
-    [
-      '.zip',
-      '.tar',
-      '.gz',
-      '.exe',
-      '.dll',
-      '.so',
-      '.class',
-      '.jar',
-      '.war',
-      '.7z',
-      '.doc',
-      '.docx',
-      '.xls',
-      '.xlsx',
-      '.ppt',
-      '.pptx',
-      '.odt',
-      '.ods',
-      '.odp',
-      '.bin',
-      '.dat',
-      '.obj',
-      '.o',
-      '.a',
-      '.lib',
-      '.wasm',
-      '.pyc',
-      '.pyo',
-    ].includes(ext)
-  ) {
+  if (BINARY_EXTENSIONS.includes(ext)) {
     return 'binary';
   }
 
