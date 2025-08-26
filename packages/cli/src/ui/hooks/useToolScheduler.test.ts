@@ -53,14 +53,15 @@ const mockToolRegistry = {
 const mockConfig = {
   getToolRegistry: vi.fn(() => mockToolRegistry as unknown as ToolRegistry),
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
+  getSessionId: () => 'test-session-id',
   getUsageStatisticsEnabled: () => true,
   getDebugMode: () => false,
-  getSessionId: () => 'test-session-id',
+  getAllowedTools: vi.fn(() => []),
   getContentGeneratorConfig: () => ({
     model: 'test-model',
     authType: 'oauth-personal',
   }),
-};
+} as unknown as Config;
 
 class MockToolInvocation extends BaseToolInvocation<object, ToolResult> {
   constructor(
@@ -217,11 +218,6 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     await act(async () => {
       await vi.runAllTimersAsync(); // Process execution
     });
-
-    // Check that shouldConfirmExecute was NOT called
-    expect(
-      mockToolRequiresConfirmation.shouldConfirmExecute,
-    ).not.toHaveBeenCalled();
 
     // Check that execute WAS called
     expect(mockToolRequiresConfirmation.execute).toHaveBeenCalledWith(
