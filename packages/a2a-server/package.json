@@ -23,21 +23,22 @@
     "dist"
   ],
   "dependencies": {
-    "@google/gemini-cli-core": "file:../core",
     "@a2a-js/sdk": "^0.3.2",
     "@google-cloud/storage": "^7.16.0",
+    "@google/gemini-cli-core": "file:../core",
     "express": "^5.1.0",
+    "fecha": "^4.2.3",
     "fs-extra": "^11.3.0",
+    "stubs": "^3.0.0",
     "tar": "^7.4.3",
     "uuid": "^11.1.0",
-    "winston": "^3.17.0",
-    "fecha": "^4.2.3"
+    "winston": "^3.17.0"
   },
   "devDependencies": {
+    "@types/express": "^5.0.3",
     "@types/fs-extra": "^11.0.4",
     "@types/supertest": "^6.0.3",
     "@types/tar": "^6.1.13",
-    "@types/express": "^5.0.3",
     "dotenv": "^16.4.5",
     "supertest": "^7.1.4",
     "typescript": "^5.3.3",

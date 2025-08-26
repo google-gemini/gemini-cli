@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AgentSettings } from './types.js';
-import { TaskState } from '@a2a-js/sdk';
+import type { AgentSettings } from './types.js';
+import type { TaskState } from '@a2a-js/sdk';
 
 export interface PersistedStateMetadata {
   _agentSettings: AgentSettings;

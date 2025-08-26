@@ -10,18 +10,10 @@ import { promises as fsPromises, createReadStream } from 'node:fs';
 import * as tar from 'tar';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { v4 as uuidv4 } from 'uuid';
-import { Task as SDKTask } from '@a2a-js/sdk';
-import { TaskStore } from '@a2a-js/sdk/server';
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  vi,
-  Mocked,
-  MockedClass,
-  Mock,
-} from 'vitest';
+import type { Task as SDKTask } from '@a2a-js/sdk';
+import type { TaskStore } from '@a2a-js/sdk/server';
+import type { Mocked, MockedClass, Mock } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { GCSTaskStore, NoOpTaskStore } from './gcs.js';
 import { logger } from './logger.js';

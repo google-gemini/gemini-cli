@@ -5,27 +5,30 @@
  */
 
 import {
-  Config,
   CoreToolScheduler,
   GeminiClient,
-  ServerGeminiStreamEvent,
-  ToolCallConfirmationDetails,
   GeminiEventType,
-  CompletedToolCall,
-  ToolCall,
   ToolConfirmationOutcome,
-  ToolCallRequestInfo,
   ApprovalMode,
-  ServerGeminiErrorEvent,
   getAllMCPServerStatuses,
   MCPServerStatus,
-  ToolConfirmationPayload,
   isNodeError,
-  UserTierId,
   parseAndFormatApiError,
 } from '@google/gemini-cli-core';
-import { RequestContext, ExecutionEventBus } from '@a2a-js/sdk/server';
-import {
+import type {
+  ToolConfirmationPayload,
+  CompletedToolCall,
+  ToolCall,
+  ToolCallRequestInfo,
+  ServerGeminiErrorEvent,
+  ServerGeminiStreamEvent,
+  ToolCallConfirmationDetails,
+  Config,
+  UserTierId,
+} from '@google/gemini-cli-core';
+import type { RequestContext } from '@a2a-js/sdk/server';
+import { type ExecutionEventBus } from '@a2a-js/sdk/server';
+import type {
   TaskStatusUpdateEvent,
   TaskArtifactUpdateEvent,
   TaskState,
@@ -37,8 +40,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { logger } from './logger.js';
 import * as fs from 'node:fs';
 
-import {
-  CoderAgentEvent,
+import { CoderAgentEvent } from './types.js';
+import type {
   CoderAgentMessage,
   StateChange,
   ToolCallUpdate,
@@ -47,7 +50,7 @@ import {
   Thought,
   ThoughtSummary,
 } from './types.js';
-import { PartUnion, Part as genAiPart } from '@google/genai';
+import type { PartUnion, Part as genAiPart } from '@google/genai';
 
 export class Task {
   id: string;

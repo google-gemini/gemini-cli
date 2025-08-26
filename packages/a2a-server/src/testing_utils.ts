@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   Task as SDKTask,
   TaskStatusUpdateEvent,
   SendStreamingMessageSuccessResponse,
@@ -13,6 +13,8 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+} from '@google/gemini-cli-core';
+import type {
   ToolCallConfirmationDetails,
   ToolResult,
   ToolInvocation,

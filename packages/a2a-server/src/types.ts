@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   MCPServerStatus,
   ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
-import { TaskState } from '@a2a-js/sdk';
+import type { TaskState } from '@a2a-js/sdk';
 
 // Interfaces and enums for the CoderAgent protocol.
 

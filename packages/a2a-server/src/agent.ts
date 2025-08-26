@@ -7,36 +7,33 @@
 import express from 'express';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { Message, Task as SDKTask, AgentCard } from '@a2a-js/sdk';
-import {
+import type { Message, Task as SDKTask, AgentCard } from '@a2a-js/sdk';
+import type {
   TaskStore,
   AgentExecutor,
   AgentExecutionEvent,
   RequestContext,
   ExecutionEventBus,
-  DefaultRequestHandler,
-  InMemoryTaskStore,
 } from '@a2a-js/sdk/server';
+import { DefaultRequestHandler, InMemoryTaskStore } from '@a2a-js/sdk/server';
 import { A2AExpressApp } from '@a2a-js/sdk/server/express'; // Import server components
-import {
-  GeminiEventType,
+import type {
   ToolCallRequestInfo,
   ServerGeminiToolCallRequestEvent,
   Config,
 } from '@google/gemini-cli-core';
+import { GeminiEventType } from '@google/gemini-cli-core';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from './logger.js';
-import { CoderAgentEvent, StateChange, AgentSettings } from './types.js';
+import type { StateChange, AgentSettings } from './types.js';
+import { CoderAgentEvent } from './types.js';
 import { loadConfig, loadEnvironment, setTargetDir } from './config.js';
 import { loadSettings } from './settings.js';
 import { loadExtensions } from './extension.js';
 import { Task } from './task.js';
 import { GCSTaskStore, NoOpTaskStore } from './gcs.js';
-import {
-  PersistedStateMetadata,
-  getPersistedState,
-  setPersistedState,
-} from './metadata_types.js';
+import type { PersistedStateMetadata } from './metadata_types.js';
+import { getPersistedState, setPersistedState } from './metadata_types.js';
 
 const requestStorage = new AsyncLocalStorage<{ req: express.Request }>();
 

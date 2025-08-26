@@ -11,11 +11,14 @@ import * as fse from 'fs-extra';
 import { promises as fsPromises, createReadStream } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Task as SDKTask } from '@a2a-js/sdk';
-import { TaskStore } from '@a2a-js/sdk/server';
+import type { Task as SDKTask } from '@a2a-js/sdk';
+import type { TaskStore } from '@a2a-js/sdk/server';
 import { logger } from './logger.js';
 import { setTargetDir } from './config.js';
-import { getPersistedState, PersistedTaskMetadata } from './metadata_types.js';
+import {
+  getPersistedState,
+  type PersistedTaskMetadata,
+} from './metadata_types.js';
 import { v4 as uuidv4 } from 'uuid';
 
 type ObjectType = 'metadata' | 'workspace';

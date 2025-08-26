@@ -8,10 +8,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { homedir } from 'node:os';
 
+import type { MCPServerConfig } from '@google/gemini-cli-core';
 import {
   getErrorMessage,
-  MCPServerConfig,
-  TelemetrySettings,
+  type TelemetrySettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 

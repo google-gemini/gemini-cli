@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Config } from '@google/gemini-cli-core';
 import {
-  Config,
   GeminiEventType,
   ApprovalMode,
-  ToolCallConfirmationDetails,
+  type ToolCallConfirmationDetails,
 } from '@google/gemini-cli-core';
-import {
+import type {
   TaskStatusUpdateEvent,
   SendStreamingMessageSuccessResponse,
 } from '@a2a-js/sdk';
-import express from 'express';
+import type express from 'express';
 import type { Server } from 'node:http';
 import request from 'supertest';
 import {

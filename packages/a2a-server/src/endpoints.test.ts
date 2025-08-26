@@ -6,14 +6,14 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
-import express from 'express';
+import type express from 'express';
 import { createApp, updateCoderAgentCardUrl } from './agent.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import type { Server } from 'node:http';
 import type { TaskMetadata } from './types.js';
-import { AddressInfo } from 'node:net';
+import type { AddressInfo } from 'node:net';
 
 // Mock the logger to avoid polluting test output
 // Comment out to help debug

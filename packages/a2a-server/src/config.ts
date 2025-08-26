@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { homedir } from 'node:os';
 import * as dotenv from 'dotenv';
 
+import type { TelemetryTarget } from '@google/gemini-cli-core';
 import {
   AuthType,
   Config,
@@ -16,16 +17,15 @@ import {
   FileDiscoveryService,
   ApprovalMode,
   loadServerHierarchicalMemory,
-  TelemetryTarget,
   GEMINI_CONFIG_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 
 import { logger } from './logger.js';
-import { Settings } from './settings.js';
-import { Extension } from './extension.js';
-import { AgentSettings, CoderAgentEvent } from './types.js';
+import type { Settings } from './settings.js';
+import type { Extension } from './extension.js';
+import { type AgentSettings, CoderAgentEvent } from './types.js';
 
 export async function loadConfig(
   settings: Settings,
