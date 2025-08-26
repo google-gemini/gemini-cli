@@ -284,6 +284,8 @@ describe('ClearcutLogger', () => {
         env: {
           TERM_PROGRAM: 'vscode',
           GITHUB_SHA: undefined,
+          MONOSPACE_ENV: '',
+          FIREBASE_DEPLOY_AGENT: '',
         },
         expectedValue: 'vscode',
       },
@@ -315,7 +317,6 @@ describe('ClearcutLogger', () => {
         for (const [key, value] of Object.entries(env)) {
           vi.stubEnv(key, value);
         }
-        vi.stubEnv('TERM_PROGRAM', 'vscode');
         const event = logger?.createLogEvent(EventNames.API_ERROR, []);
         expect(event?.event_metadata[0][3]).toEqual({
           gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
