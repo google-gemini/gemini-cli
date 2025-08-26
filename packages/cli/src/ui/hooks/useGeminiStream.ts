@@ -40,7 +40,7 @@ import type {
   SlashCommandProcessorResult,
 } from '../types.js';
 import { StreamingState, MessageType, ToolCallStatus } from '../types.js';
-import { isAtCommand } from '../utils/commandUtils.js';
+import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
@@ -271,7 +271,9 @@ export const useGeminiStream = (
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 
         // Handle UI-only commands first
-        const slashCommandResult = await handleSlashCommand(trimmedQuery);
+        const slashCommandResult = isSlashCommand(trimmedQuery)
+          ? await handleSlashCommand(trimmedQuery)
+          : false;
 
         if (slashCommandResult) {
           switch (slashCommandResult.type) {

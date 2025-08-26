@@ -25,6 +25,41 @@ export function getErrorMessage(error: unknown): string {
   }
 }
 
+export class FatalError extends Error {
+  constructor(
+    message: string,
+    readonly exitCode: number,
+  ) {
+    super(message);
+  }
+}
+
+export class FatalAuthenticationError extends FatalError {
+  constructor(message: string) {
+    super(message, 41);
+  }
+}
+export class FatalInputError extends FatalError {
+  constructor(message: string) {
+    super(message, 42);
+  }
+}
+export class FatalSandboxError extends FatalError {
+  constructor(message: string) {
+    super(message, 44);
+  }
+}
+export class FatalConfigError extends FatalError {
+  constructor(message: string) {
+    super(message, 52);
+  }
+}
+export class FatalTurnLimitedError extends FatalError {
+  constructor(message: string) {
+    super(message, 53);
+  }
+}
+
 export class ForbiddenError extends Error {}
 export class UnauthorizedError extends Error {}
 export class BadRequestError extends Error {}
