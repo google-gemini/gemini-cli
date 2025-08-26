@@ -111,6 +111,11 @@ describe('keyMatchers', () => {
       negative: [createKey('u'), createKey('k', { ctrl: true })],
     },
     {
+      command: Command.CLEAR_INPUT,
+      positive: [createKey('c', { ctrl: true })],
+      negative: [createKey('c'), createKey('k', { ctrl: true })],
+    },
+    {
       command: Command.DELETE_WORD_BACKWARD,
       positive: [
         createKey('backspace', { ctrl: true }),
