@@ -6,9 +6,9 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { feedbackCommand } from './feedbackCommand.js';
-import { CommandContext, MessageActionReturn } from './types.js';
+import type { CommandContext, MessageActionReturn } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { Settings } from '../../config/settings.js';
+import type { Settings } from '../../config/settings.js';
 
 // Mock the telemetry functions
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {

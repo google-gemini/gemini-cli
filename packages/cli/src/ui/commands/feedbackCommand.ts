@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  CommandKind,
+import { CommandKind } from './types.js';
+import type {
   SlashCommand,
   MessageActionReturn,
   CommandContext,

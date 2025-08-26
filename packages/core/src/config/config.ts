@@ -34,7 +34,7 @@ import {
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
 } from '../telemetry/index.js';
-import { StartSessionEvent } from '../telemetry/index.js';
+import { StartSessionEvent } from '../telemetry/types.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,

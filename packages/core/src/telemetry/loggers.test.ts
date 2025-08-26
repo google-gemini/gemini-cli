@@ -901,7 +901,8 @@ describe('loggers', () => {
       expect(Array.from(feedbackBase).length).toBe(FEEDBACK_CONTENT_MAX_LENGTH);
       expect(feedbackBase.endsWith('👍')).toBe(true);
     });
-    
+  });
+
   describe('logMalformedJsonResponse', () => {
     beforeEach(() => {
       vi.spyOn(ClearcutLogger.prototype, 'logMalformedJsonResponseEvent');
@@ -927,5 +928,6 @@ describe('loggers', () => {
           model: 'test-model',
         },
       });
+    });
   });
 });

@@ -31,9 +31,8 @@ import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
-import { DetectedIde, detectIde } from '../../ide/detect-ide.js';
-import { truncateFeedbackContent } from '../constants.js';
 import { DetectedIde, detectIdeFromEnv } from '../../ide/detect-ide.js';
+import { truncateFeedbackContent } from '../constants.js';
 
 export enum EventNames {
   START_SESSION = 'start_session',

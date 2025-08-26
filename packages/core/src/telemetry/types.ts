@@ -416,7 +416,6 @@ export class KittySequenceOverflowEvent {
   }
 }
 
-
 export interface ResearchOptInEvent extends BaseTelemetryEvent {
   'event.name': 'research_opt_in';
   'event.timestamp': string;

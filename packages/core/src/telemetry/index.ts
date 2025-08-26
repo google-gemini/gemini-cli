@@ -33,7 +33,13 @@ export {
   logResearchFeedback,
   logChatCompression,
 } from './loggers.js';
-export type { SlashCommandEvent, ChatCompressionEvent } from './types.js';
+export type {
+  SlashCommandEvent,
+  ChatCompressionEvent,
+  TelemetryEvent,
+  ResearchOptInEvent,
+  ResearchFeedbackEvent,
+} from './types.js';
 export {
   SlashCommandStatus,
   EndSessionEvent,
@@ -46,18 +52,11 @@ export {
   ToolCallEvent,
   ConversationFinishedEvent,
   KittySequenceOverflowEvent,
-  SlashCommandEvent,
   makeSlashCommandEvent,
-  SlashCommandStatus,
-  ResearchOptInEvent,
   makeResearchOptInEvent,
-  ResearchFeedbackEvent,
   makeResearchFeedbackEvent,
-  ChatCompressionEvent,
   makeChatCompressionEvent,
 } from './types.js';
-export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';
-export type { TelemetryEvent } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 export * from './uiTelemetry.js';

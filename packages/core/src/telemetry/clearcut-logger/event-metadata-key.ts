@@ -266,22 +266,22 @@ export enum EventMetadataKey {
   // ===========================================================================
 
   // Logs the research opt-in status (true/false)
-  GEMINI_CLI_RESEARCH_OPT_IN_STATUS = 70,
+  GEMINI_CLI_RESEARCH_OPT_IN_STATUS = 72,
 
   // Logs the contact email for research participation
-  GEMINI_CLI_RESEARCH_CONTACT_EMAIL = 71,
+  GEMINI_CLI_RESEARCH_CONTACT_EMAIL = 73,
 
   // Logs the user ID for research events
-  GEMINI_CLI_RESEARCH_USER_ID = 72,
+  GEMINI_CLI_RESEARCH_USER_ID = 74,
 
   // Logs the type of research feedback
-  GEMINI_CLI_RESEARCH_FEEDBACK_TYPE = 73,
+  GEMINI_CLI_RESEARCH_FEEDBACK_TYPE = 75,
 
   // Logs the content of research feedback
-  GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT = 74,
+  GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT = 76,
 
   // Logs survey responses for research feedback (JSON stringified)
-  GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 75,
+  GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 77,
 
   // File Operation Event Keys
   // ===========================================================================
