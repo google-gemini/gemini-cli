@@ -1572,4 +1572,59 @@ describe('App UI', () => {
       expect(mockSettings.merged.debugKeystrokeLogging).toBeUndefined();
     });
   });
+
+  describe('Ctrl+C behavior', () => {
+    it('should call cancel but only clear the prompt when a tool is executing', async () => {
+      const mockCancel = vi.fn();
+
+      // Simulate a tool in the "Executing" state.
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Responding,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                name: 'test_tool',
+                status: 'Executing',
+                result: '',
+                args: {},
+              },
+            ],
+          },
+        ],
+        thought: null,
+        cancelOngoingRequest: mockCancel,
+      });
+
+      const { stdin, lastFrame, unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Simulate user typing something into the prompt while a tool is running.
+      stdin.write('some text');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Verify the text is in the prompt.
+      expect(lastFrame()).toContain('some text');
+
+      // Simulate Ctrl+C.
+      stdin.write('\x03');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // The main cancellation handler SHOULD be called.
+      expect(mockCancel).toHaveBeenCalled();
+
+      // The prompt should now be empty as a result of the cancellation handler's logic.
+      // We can't directly test the buffer's state, but we can see the rendered output.
+      expect(lastFrame()).not.toContain('some text');
+    });
+  });
 });
