@@ -100,7 +100,9 @@ export class MCPOAuthTokenStorage {
         { mode: 0o600 }, // Restrict file permissions
       );
     } catch (error) {
-      console.error(`Failed to save MCP OAuth token: ${getErrorMessage(error)}`);
+      console.error(
+        `Failed to save MCP OAuth token: ${getErrorMessage(error)}`,
+      );
       throw error;
     }
   }
@@ -139,7 +141,7 @@ export class MCPOAuthTokenStorage {
         }
       } catch (error) {
         console.error(
-          `Failed to remove  OAuth token: ${getErrorMessage(error)}`,
+          `Failed to remove MCP OAuth token: ${getErrorMessage(error)}`,
         );
       }
     }
