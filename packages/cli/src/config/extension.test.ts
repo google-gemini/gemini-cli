@@ -13,6 +13,7 @@ import {
   INSTALL_METADATA_FILENAME,
   annotateActiveExtensions,
   disableExtension,
+  enableExtension,
   installExtension,
   loadExtensions,
   uninstallExtension,
@@ -574,5 +575,54 @@ describe('disableExtension', () => {
     expect(() => disableExtension('my-extension', SettingScope.System)).toThrow(
       'System and SystemDefaults scopes are not supported.',
     );
+  });
+});
+
+describe('enableExtension', () => {
+  let tempWorkspaceDir: string;
+  let tempHomeDir: string;
+
+  beforeEach(() => {
+    tempWorkspaceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-workspace-'),
+    );
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
+  });
+
+  it('should enable an extension at the user scope', () => {
+    disableExtension('my-extension', SettingScope.User);
+    let settings = loadSettings(tempWorkspaceDir);
+    expect(
+      settings.forScope(SettingScope.User).settings.extensions?.disabled,
+    ).toEqual(['my-extension']);
+
+    enableExtension('my-extension', [SettingScope.User]);
+    settings = loadSettings(tempWorkspaceDir);
+    expect(
+      settings.forScope(SettingScope.User).settings.extensions?.disabled,
+    ).toEqual([]);
+  });
+
+  it('should enable an extension at the workspace scope', () => {
+    disableExtension('my-extension', SettingScope.Workspace);
+    let settings = loadSettings(tempWorkspaceDir);
+    expect(
+      settings.forScope(SettingScope.Workspace).settings.extensions?.disabled,
+    ).toEqual(['my-extension']);
+
+    enableExtension('my-extension', [SettingScope.Workspace]);
+    settings = loadSettings(tempWorkspaceDir);
+    expect(
+      settings.forScope(SettingScope.Workspace).settings.extensions?.disabled,
+    ).toEqual([]);
   });
 });

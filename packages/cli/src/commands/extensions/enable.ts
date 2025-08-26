@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandModule } from 'yargs';
+import { type CommandModule } from 'yargs';
 import { enableExtension } from '../../config/extension.js';
 import { SettingScope } from '../../config/settings.js';
+import { getErrorMessage } from '../../utils/errors.js';
 
 interface EnableArgs {
   name: string;
@@ -29,13 +30,13 @@ export async function handleEnable(args: EnableArgs) {
       );
     }
   } catch (error) {
-    console.error((error as Error).message);
+    console.error(getErrorMessage(error));
     throw error;
   }
 }
 
 export const enableCommand: CommandModule = {
-  command: 'enable <name>',
+  command: 'disable [--scope] <name>',
   describe: 'Enables an extension.',
   builder: (yargs) =>
     yargs
