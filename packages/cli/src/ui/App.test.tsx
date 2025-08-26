@@ -1506,15 +1506,27 @@ describe('App UI', () => {
   });
 
   describe('Ctrl+C behavior', () => {
-    it('should clear the prompt when Ctrl+C is pressed during a shell command', async () => {
-      const mockSubmitQuery = vi.fn();
+    it('should call cancel but only clear the prompt when a tool is executing', async () => {
       const mockCancel = vi.fn();
 
+      // Simulate a tool in the "Executing" state.
       vi.mocked(useGeminiStream).mockReturnValue({
         streamingState: StreamingState.Responding,
-        submitQuery: mockSubmitQuery,
+        submitQuery: vi.fn(),
         initError: null,
-        pendingHistoryItems: [],
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                name: 'test_tool',
+                status: 'Executing',
+                result: '',
+                args: {},
+              },
+            ],
+          },
+        ],
         thought: null,
         cancelOngoingRequest: mockCancel,
       });
@@ -1528,22 +1540,23 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      // Simulate user typing a command
-      stdin.write('/tools shell sleep 1');
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for UI to update
+      // Simulate user typing something into the prompt while a tool is running.
+      stdin.write('some text');
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Verify the command is in the prompt
-      expect(lastFrame()).toContain('/tools shell sleep 1');
+      // Verify the text is in the prompt.
+      expect(lastFrame()).toContain('some text');
 
-      // Simulate Ctrl+C
+      // Simulate Ctrl+C.
       stdin.write('\x03');
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Wait for UI to update
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Verify the cancellation was triggered
+      // The main cancellation handler SHOULD be called.
       expect(mockCancel).toHaveBeenCalled();
 
-      // Verify the prompt is now empty
-      expect(lastFrame()).not.toContain('/tools shell sleep 1');
+      // The prompt should now be empty as a result of the cancellation handler's logic.
+      // We can't directly test the buffer's state, but we can see the rendered output.
+      expect(lastFrame()).not.toContain('some text');
     });
   });
 });
