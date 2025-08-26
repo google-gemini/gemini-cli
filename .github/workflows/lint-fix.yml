@@ -13,7 +13,7 @@ jobs:
           repository: '${{ github.event.pull_request.head.repo.full_name }}'
           ref: '${{ github.event.pull_request.head.ref }}'
       - name: 'Set up Node.js'
-        uses: 'actions/setup-node@v4' # ratchet:actions/setup-node@v4
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
