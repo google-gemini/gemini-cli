@@ -171,7 +171,7 @@ export class MCPOAuthTokenStorage {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         console.error(
-          `Failed to clear  OAuth tokens: ${getErrorMessage(error)}`,
+          `Failed to clear MCP OAuth tokens: ${getErrorMessage(error)}`,
         );
       }
     }
