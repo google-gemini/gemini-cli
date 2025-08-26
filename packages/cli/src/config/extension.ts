@@ -13,6 +13,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { simpleGit } from 'simple-git';
+import { recursivelyHydrateStrings } from './extensions/variables.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = '.gemini/extensions';
 
@@ -144,7 +145,11 @@ export function loadExtension(extensionDir: string): Extension | null {
 
   try {
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
-    const config = JSON.parse(configContent) as ExtensionConfig;
+    const config = recursivelyHydrateStrings(JSON.parse(configContent), {
+      extensionPath: extensionDir,
+      '/': path.sep,
+      pathSeparator: path.sep,
+    }) as unknown as ExtensionConfig;
     if (!config.name || !config.version) {
       console.error(
         `Invalid extension config in ${configFilePath}: missing name or version.`,
