@@ -49,6 +49,9 @@ export enum EventNames {
   KITTY_SEQUENCE_OVERFLOW = 'kitty_sequence_overflow',
   CHAT_COMPRESSION = 'chat_compression',
   CONVERSATION_FINISHED = 'conversation_finished',
+  INVALID_CHUNK = 'invalid_chunk',
+  CONTENT_RETRY = 'content_retry',
+  CONTENT_RETRY_FAILURE = 'content_retry_failure',
 }
 
 export interface LogResponse {
@@ -776,6 +779,69 @@ export class ClearcutLogger {
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
+  }
+
+  logInvalidChunkEvent(event: InvalidChunkEvent): void {
+    const data: EventValue[] = [];
+
+    if (event.error_message) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_INVALID_CHUNK_ERROR_MESSAGE,
+        value: JSON.stringify(event.error_message),
+      });
+    }
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.INVALID_CHUNK, data));
+    this.flushIfNeeded();
+  }
+
+  logContentRetryEvent(event: ContentRetryEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_ATTEMPT_NUMBER,
+        value: JSON.stringify(event.attempt_number),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_ERROR_TYPE,
+        value: JSON.stringify(event.error_type),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_DELAY_MS,
+        value: JSON.stringify(event.retry_delay_ms),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.CONTENT_RETRY, data));
+    this.flushIfNeeded();
+  }
+
+  logContentRetryFailureEvent(event: ContentRetryFailureEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_FAILURE_TOTAL_ATTEMPTS,
+        value: JSON.stringify(event.total_attempts),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_FAILURE_FINAL_ERROR_TYPE,
+        value: JSON.stringify(event.final_error_type),
+      },
+    ];
+
+    if (event.total_duration_ms) {
+      data.push({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_FAILURE_TOTAL_DURATION_MS,
+        value: JSON.stringify(event.total_duration_ms),
+      });
+    }
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.CONTENT_RETRY_FAILURE, data),
+    );
+    this.flushIfNeeded();
   }
 
   /**

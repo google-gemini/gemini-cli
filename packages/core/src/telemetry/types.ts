@@ -448,6 +448,24 @@ export class FileOperationEvent implements BaseTelemetryEvent {
   }
 }
 
+// Add these new event interfaces
+export interface InvalidChunkEvent {
+  chunk_data?: string; // Optional: truncated chunk data for debugging
+  error_message?: string; // Optional: validation error details
+}
+
+export interface ContentRetryEvent {
+  attempt_number: number;
+  error_type: string; // e.g., 'EmptyStreamError'
+  retry_delay_ms: number;
+}
+
+export interface ContentRetryFailureEvent {
+  total_attempts: number;
+  final_error_type: string;
+  total_duration_ms?: number; // Optional: total time spent retrying
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent

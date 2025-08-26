@@ -494,6 +494,82 @@ export function logMalformedJsonResponse(
     'event.name': EVENT_MALFORMED_JSON_RESPONSE,
   };
 
+  export function logInvalidChunk(
+    config: Config,
+    event: InvalidChunkEvent,
+  ): void {
+    ClearcutLogger.getInstance(config)?.logInvalidChunkEvent(event);
+    if (!isTelemetrySdkInitialized()) return;
+
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_INVALID_CHUNK,
+      'event.timestamp': new Date().toISOString(),
+    };
+
+    if (event.error_message) {
+      attributes['error.message'] = event.error_message;
+    }
+
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: `Invalid chunk received from stream.`,
+      attributes,
+    };
+    logger.emit(logRecord);
+  }
+
+  export function logContentRetry(
+    config: Config,
+    event: ContentRetryEvent,
+  ): void {
+    ClearcutLogger.getInstance(config)?.logContentRetryEvent(event);
+    if (!isTelemetrySdkInitialized()) return;
+
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_CONTENT_RETRY,
+      'event.timestamp': new Date().toISOString(),
+      attempt_number: event.attempt_number,
+      error_type: event.error_type,
+      retry_delay_ms: event.retry_delay_ms,
+    };
+
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: `Content retry attempt ${event.attempt_number} due to ${event.error_type}.`,
+      attributes,
+    };
+    logger.emit(logRecord);
+  }
+
+  export function logContentRetryFailure(
+    config: Config,
+    event: ContentRetryFailureEvent,
+  ): void {
+    ClearcutLogger.getInstance(config)?.logContentRetryFailureEvent(event);
+    if (!isTelemetrySdkInitialized()) return;
+
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_CONTENT_RETRY_FAILURE,
+      'event.timestamp': new Date().toISOString(),
+      total_attempts: event.total_attempts,
+      final_error_type: event.final_error_type,
+    };
+
+    if (event.total_duration_ms) {
+      attributes.total_duration_ms = event.total_duration_ms;
+    }
+
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: `All content retries failed after ${event.total_attempts} attempts.`,
+      attributes,
+    };
+    logger.emit(logRecord);
+  }
+
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Malformed JSON response from ${event.model}.`,
