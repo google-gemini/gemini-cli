@@ -787,7 +787,7 @@ export class ClearcutLogger {
     if (event.error_message) {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_INVALID_CHUNK_ERROR_MESSAGE,
-        value: JSON.stringify(event.error_message),
+        value: event.error_message,
       });
     }
 
