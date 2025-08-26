@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  evals:
+  eval:
     name: 'Eval'
     runs-on: 'ubuntu-latest'
     strategy:
@@ -27,4 +27,3 @@ jobs:
 
       - name: 'Install and configure Poetry'
         uses: 'snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a' # ratchet:snok/install-poetry@v1
-        
