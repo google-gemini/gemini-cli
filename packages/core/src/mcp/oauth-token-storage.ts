@@ -8,10 +8,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
 import { getErrorMessage } from '../utils/errors.js';
-import type {
-  OAuthToken,
-  OAuthCredentials,
-} from './token-storage/types.js';
+import type { OAuthToken, OAuthCredentials } from './token-storage/types.js';
 
 /**
  * Class for managing MCP OAuth token storage and retrieval.
@@ -103,9 +100,7 @@ export class MCPOAuthTokenStorage {
         { mode: 0o600 }, // Restrict file permissions
       );
     } catch (error) {
-      console.error(
-        `Failed to save  OAuth token: ${getErrorMessage(error)}`,
-      );
+      console.error(`Failed to save  OAuth token: ${getErrorMessage(error)}`);
       throw error;
     }
   }
@@ -116,9 +111,7 @@ export class MCPOAuthTokenStorage {
    * @param serverName The name of the  server
    * @returns The stored credentials or null if not found
    */
-  static async getToken(
-    serverName: string,
-  ): Promise<OAuthCredentials | null> {
+  static async getToken(serverName: string): Promise<OAuthCredentials | null> {
     const tokens = await this.loadTokens();
     return tokens.get(serverName) || null;
   }
