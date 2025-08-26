@@ -79,15 +79,66 @@ export class ExtensionStorage {
   }
 }
 
-// TODO(#7038): Standardize loading of extensions and add the 'disabled' status
-// to the extension interface.
+export function getWorkspaceExtensions(workspaceDir: string): Extension[] {
+  return loadExtensionsFromDir(workspaceDir);
+}
+
+async function copyExtension(
+  source: string,
+  destination: string,
+): Promise<void> {
+  await fs.promises.cp(source, destination, { recursive: true });
+}
+
+export async function performWorkspaceExtensionMigration(
+  workspaceDir: string,
+  extensions: Extension[],
+): Promise<string[]> {
+  const userExtensions = loadUserExtensions();
+  const userExtensionNames = new Set(
+    userExtensions.map((extension) => extension.config.name),
+  );
+  const failedInstallNames: string[] = [];
+
+  for (const extension of extensions) {
+    try {
+      if (userExtensionNames.has(extension.config.name)) {
+        let newName = extension.config.name;
+        if (!newName.endsWith('-workspace')) {
+          newName = `${newName}-workspace`;
+        }
+        const configPath = path.join(
+          extension.path,
+          EXTENSIONS_CONFIG_FILENAME,
+        );
+        const configContent = await fs.promises.readFile(configPath, 'utf-8');
+        const config = JSON.parse(configContent) as ExtensionConfig;
+        config.name = newName;
+        await fs.promises.writeFile(
+          configPath,
+          JSON.stringify(config, null, 2),
+        );
+      }
+
+      const installMetadata: ExtensionInstallMetadata = {
+        source: extension.path,
+        type: 'local',
+      };
+      await installExtension(installMetadata);
+    } catch (_) {
+      failedInstallNames.push(extension.config.name);
+    }
+  }
+  return failedInstallNames;
+}
 export function loadExtensions(workspaceDir: string): Extension[] {
   const settings = loadSettings(workspaceDir).merged;
   const disabledExtensions = settings.extensions?.disabled ?? [];
-  const allExtensions = [
-    ...loadExtensionsFromDir(workspaceDir),
-    ...loadExtensionsFromDir(os.homedir()),
-  ];
+  const allExtensions = [...loadUserExtensions()];
+
+  if (!settings.extensionManagement) {
+    allExtensions.push(...getWorkspaceExtensions(workspaceDir));
+  }
 
   const uniqueExtensions = new Map<string, Extension>();
   for (const extension of allExtensions) {
@@ -275,18 +326,6 @@ async function cloneFromGit(
   }
 }
 
-/**
- * Copies an extension from a source to a destination path.
- * @param source The source path of the extension.
- * @param destination The destination path to copy the extension to.
- */
-async function copyExtension(
-  source: string,
-  destination: string,
-): Promise<void> {
-  await fs.promises.cp(source, destination, { recursive: true });
-}
-
 export async function installExtension(
   installMetadata: ExtensionInstallMetadata,
 ): Promise<string> {
@@ -447,7 +486,9 @@ export function disableExtension(name: string, scope: SettingScope) {
   }
   const settings = loadSettings(process.cwd());
   const settingsFile = settings.forScope(scope);
-  const extensionSettings = settingsFile.settings.extensions || { disabled: [] };
+  const extensionSettings = settingsFile.settings.extensions || {
+    disabled: [],
+  };
   const disabledExtensions = extensionSettings.disabled || [];
   if (!disabledExtensions.includes(name)) {
     disabledExtensions.push(name);
