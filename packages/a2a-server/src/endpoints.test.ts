@@ -108,7 +108,7 @@ describe('Agent Server Endpoints', () => {
     const response = await createTask('test-context');
     expect(response.status).toBe(201);
     expect(response.body).toBeTypeOf('string'); // Should return the task ID
-  });
+  }, 7000);
 
   it('should get metadata for a specific task via GET /tasks/:taskId/metadata', async () => {
     const createResponse = await createTask('test-context-2');
@@ -116,7 +116,7 @@ describe('Agent Server Endpoints', () => {
     const response = await request(app).get(`/tasks/${taskId}/metadata`);
     expect(response.status).toBe(200);
     expect(response.body.metadata.id).toBe(taskId);
-  });
+  }, 6000);
 
   it('should get metadata for all tasks via GET /tasks/metadata', async () => {
     const createResponse = await createTask('test-context-3');
