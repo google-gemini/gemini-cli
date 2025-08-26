@@ -90,8 +90,8 @@ export * from './tools/mcp-tool.js';
 // MCP OAuth
 export { MCPOAuthProvider } from './mcp/oauth-provider.js';
 export type {
-  MCPOAuthToken,
-  MCPOAuthCredentials,
+  OAuthToken,
+  OAuthCredentials,
 } from './mcp/token-storage/types.js';
 export { MCPOAuthTokenStorage } from './mcp/oauth-token-storage.js';
 export type { MCPOAuthConfig } from './mcp/oauth-provider.js';

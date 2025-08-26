@@ -9,8 +9,8 @@ import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type {
-  MCPOAuthToken,
-  MCPOAuthCredentials,
+  OAuthToken,
+  OAuthCredentials,
 } from './token-storage/types.js';
 
 /**
@@ -35,17 +35,17 @@ export class MCPOAuthTokenStorage {
   }
 
   /**
-   * Load all stored MCP OAuth tokens.
+   * Load all stored  OAuth tokens.
    *
    * @returns A map of server names to credentials
    */
-  static async loadTokens(): Promise<Map<string, MCPOAuthCredentials>> {
-    const tokenMap = new Map<string, MCPOAuthCredentials>();
+  static async loadTokens(): Promise<Map<string, OAuthCredentials>> {
+    const tokenMap = new Map<string, OAuthCredentials>();
 
     try {
       const tokenFile = this.getTokenFilePath();
       const data = await fs.readFile(tokenFile, 'utf-8');
-      const tokens = JSON.parse(data) as MCPOAuthCredentials[];
+      const tokens = JSON.parse(data) as OAuthCredentials[];
 
       for (const credential of tokens) {
         tokenMap.set(credential.serverName, credential);
@@ -54,7 +54,7 @@ export class MCPOAuthTokenStorage {
       // File doesn't exist or is invalid, return empty map
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         console.error(
-          `Failed to load MCP OAuth tokens: ${getErrorMessage(error)}`,
+          `Failed to load  OAuth tokens: ${getErrorMessage(error)}`,
         );
       }
     }
@@ -63,17 +63,17 @@ export class MCPOAuthTokenStorage {
   }
 
   /**
-   * Save a token for a specific MCP server.
+   * Save a token for a specific  server.
    *
-   * @param serverName The name of the MCP server
+   * @param serverName The name of the  server
    * @param token The OAuth token to save
    * @param clientId Optional client ID used for this token
    * @param tokenUrl Optional token URL used for this token
-   * @param mcpServerUrl Optional MCP server URL
+   * @param ServerUrl Optional  server URL
    */
   static async saveToken(
     serverName: string,
-    token: MCPOAuthToken,
+    token: OAuthToken,
     clientId?: string,
     tokenUrl?: string,
     mcpServerUrl?: string,
@@ -82,7 +82,7 @@ export class MCPOAuthTokenStorage {
 
     const tokens = await this.loadTokens();
 
-    const credential: MCPOAuthCredentials = {
+    const credential: OAuthCredentials = {
       serverName,
       token,
       clientId,
@@ -104,29 +104,29 @@ export class MCPOAuthTokenStorage {
       );
     } catch (error) {
       console.error(
-        `Failed to save MCP OAuth token: ${getErrorMessage(error)}`,
+        `Failed to save  OAuth token: ${getErrorMessage(error)}`,
       );
       throw error;
     }
   }
 
   /**
-   * Get a token for a specific MCP server.
+   * Get a token for a specific  server.
    *
-   * @param serverName The name of the MCP server
+   * @param serverName The name of the  server
    * @returns The stored credentials or null if not found
    */
   static async getToken(
     serverName: string,
-  ): Promise<MCPOAuthCredentials | null> {
+  ): Promise<OAuthCredentials | null> {
     const tokens = await this.loadTokens();
     return tokens.get(serverName) || null;
   }
 
   /**
-   * Remove a token for a specific MCP server.
+   * Remove a token for a specific  server.
    *
-   * @param serverName The name of the MCP server
+   * @param serverName The name of the  server
    */
   static async removeToken(serverName: string): Promise<void> {
     const tokens = await this.loadTokens();
@@ -146,7 +146,7 @@ export class MCPOAuthTokenStorage {
         }
       } catch (error) {
         console.error(
-          `Failed to remove MCP OAuth token: ${getErrorMessage(error)}`,
+          `Failed to remove  OAuth token: ${getErrorMessage(error)}`,
         );
       }
     }
@@ -158,7 +158,7 @@ export class MCPOAuthTokenStorage {
    * @param token The token to check
    * @returns True if the token is expired
    */
-  static isTokenExpired(token: MCPOAuthToken): boolean {
+  static isTokenExpired(token: OAuthToken): boolean {
     if (!token.expiresAt) {
       return false; // No expiry, assume valid
     }
@@ -169,7 +169,7 @@ export class MCPOAuthTokenStorage {
   }
 
   /**
-   * Clear all stored MCP OAuth tokens.
+   * Clear all stored  OAuth tokens.
    */
   static async clearAllTokens(): Promise<void> {
     try {
@@ -178,7 +178,7 @@ export class MCPOAuthTokenStorage {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         console.error(
-          `Failed to clear MCP OAuth tokens: ${getErrorMessage(error)}`,
+          `Failed to clear  OAuth tokens: ${getErrorMessage(error)}`,
         );
       }
     }

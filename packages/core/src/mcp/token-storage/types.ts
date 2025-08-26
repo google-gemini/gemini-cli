@@ -5,9 +5,9 @@
  */
 
 /**
- * Interface for MCP OAuth tokens.
+ * Interface for OAuth tokens.
  */
-export interface MCPOAuthToken {
+export interface OAuthToken {
   accessToken: string;
   refreshToken?: string;
   expiresAt?: number;
@@ -16,11 +16,11 @@ export interface MCPOAuthToken {
 }
 
 /**
- * Interface for stored MCP OAuth credentials.
+ * Interface for stored OAuth credentials.
  */
-export interface MCPOAuthCredentials {
+export interface OAuthCredentials {
   serverName: string;
-  token: MCPOAuthToken;
+  token: OAuthToken;
   clientId?: string;
   tokenUrl?: string;
   mcpServerUrl?: string;
@@ -28,10 +28,10 @@ export interface MCPOAuthCredentials {
 }
 
 export interface TokenStorage {
-  getCredentials(serverName: string): Promise<MCPOAuthCredentials | null>;
-  setCredentials(credentials: MCPOAuthCredentials): Promise<void>;
+  getCredentials(serverName: string): Promise<OAuthCredentials | null>;
+  setCredentials(credentials: OAuthCredentials): Promise<void>;
   deleteCredentials(serverName: string): Promise<void>;
   listServers(): Promise<string[]>;
-  getAllCredentials(): Promise<Map<string, MCPOAuthCredentials>>;
+  getAllCredentials(): Promise<Map<string, OAuthCredentials>>;
   clearAll(): Promise<void>;
 }
