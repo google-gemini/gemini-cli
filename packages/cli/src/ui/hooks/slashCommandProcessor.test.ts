@@ -77,7 +77,6 @@ import type {
   SlashCommand,
 } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
-import { ToolConfirmationOutcome } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
@@ -86,8 +85,9 @@ import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import {
   SlashCommandStatus,
   makeFakeConfig,
+  ToolConfirmationOutcome,
   type IdeClient,
-} from '@google/gemini-cli-core/index.js';
+} from '@google/gemini-cli-core';
 
 function createTestCommand(
   overrides: Partial<SlashCommand>,
