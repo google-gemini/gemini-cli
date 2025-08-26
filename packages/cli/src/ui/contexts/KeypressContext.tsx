@@ -17,7 +17,6 @@ import {
   useContext,
   useEffect,
   useRef,
-  useState,
 } from 'react';
 import readline from 'node:readline';
 import { PassThrough } from 'node:stream';
@@ -88,7 +87,7 @@ export function KeypressProvider({
   const { stdin, setRawMode } = useStdin();
   const subscribers = useRef<Set<KeypressHandler>>(new Set()).current;
 
-  const [, setDragBuffer] = useState('');
+  const dragBufferRef = useRef('');
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isDragCollectingRef = useRef(false);
 
@@ -213,7 +212,7 @@ export function KeypressProvider({
           dragTimeoutRef.current = null;
         }
         isDragCollectingRef.current = false;
-        setDragBuffer('');
+        dragBufferRef.current = '';
       };
 
       const isDragFocusEvent = (sequence: string) =>
@@ -222,7 +221,7 @@ export function KeypressProvider({
 
       if (isDragFocusEvent(key.sequence) && !key.paste) {
         isDragCollectingRef.current = true;
-        setDragBuffer('');
+        dragBufferRef.current = '';
 
         if (dragTimeoutRef.current) {
           clearTimeout(dragTimeoutRef.current);
@@ -240,30 +239,27 @@ export function KeypressProvider({
         key.sequence.length === 1 &&
         !key.paste
       ) {
-        setDragBuffer((prev: string) => {
-          const newBuffer = prev + key.sequence;
+        dragBufferRef.current += key.sequence;
+        const newBuffer = dragBufferRef.current;
 
-          if (dragTimeoutRef.current) {
-            clearTimeout(dragTimeoutRef.current);
+        if (dragTimeoutRef.current) {
+          clearTimeout(dragTimeoutRef.current);
+        }
+
+        dragTimeoutRef.current = setTimeout(() => {
+          const trimmedPath = newBuffer.trim();
+          if (trimmedPath) {
+            broadcast({
+              name: '',
+              ctrl: false,
+              meta: false,
+              shift: false,
+              paste: true,
+              sequence: trimmedPath,
+            });
           }
-
-          dragTimeoutRef.current = setTimeout(() => {
-            const trimmedPath = newBuffer.trim();
-            if (trimmedPath) {
-              broadcast({
-                name: '',
-                ctrl: false,
-                meta: false,
-                shift: false,
-                paste: true,
-                sequence: trimmedPath,
-              });
-            }
-            resetDragState();
-          }, DRAG_COMPLETION_TIMEOUT_MS);
-
-          return newBuffer;
-        });
+          resetDragState();
+        }, DRAG_COMPLETION_TIMEOUT_MS);
 
         return;
       }
