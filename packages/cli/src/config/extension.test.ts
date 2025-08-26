@@ -12,6 +12,7 @@ import {
   EXTENSIONS_CONFIG_FILENAME,
   INSTALL_METADATA_FILENAME,
   annotateActiveExtensions,
+  disableExtension,
   installExtension,
   loadExtensions,
   uninstallExtension,
@@ -19,6 +20,7 @@ import {
 } from './extension.js';
 import { type MCPServerConfig } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
+import { SettingScope, loadSettings } from './settings.js';
 import { type SimpleGit, simpleGit } from 'simple-git';
 
 vi.mock('simple-git', () => ({
@@ -130,6 +132,33 @@ describe('loadExtensions', () => {
     ]);
   });
 
+  it('should filter out disabled extensions', () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+
+    createExtension(workspaceExtensionsDir, 'ext1', '1.0.0');
+    createExtension(workspaceExtensionsDir, 'ext2', '2.0.0');
+
+    const settingsDir = path.join(tempWorkspaceDir, '.gemini');
+    fs.mkdirSync(settingsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(settingsDir, 'settings.json'),
+      JSON.stringify({ extensions: { disabled: ['ext1'] } }),
+    );
+
+    const extensions = loadExtensions(tempWorkspaceDir);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      [],
+      tempWorkspaceDir,
+    ).filter((e) => e.isActive);
+    expect(activeExtensions).toHaveLength(1);
+    expect(activeExtensions[0].name).toBe('ext2');
+  });
+
   it('should hydrate variables', () => {
     const workspaceExtensionsDir = path.join(
       tempWorkspaceDir,
@@ -164,22 +193,39 @@ describe('loadExtensions', () => {
 
 describe('annotateActiveExtensions', () => {
   const extensions = [
-    { config: { name: 'ext1', version: '1.0.0' }, contextFiles: [] },
-    { config: { name: 'ext2', version: '1.0.0' }, contextFiles: [] },
-    { config: { name: 'ext3', version: '1.0.0' }, contextFiles: [] },
+    {
+      path: '/path/to/ext1',
+      config: { name: 'ext1', version: '1.0.0' },
+      contextFiles: [],
+    },
+    {
+      path: '/path/to/ext2',
+      config: { name: 'ext2', version: '1.0.0' },
+      contextFiles: [],
+    },
+    {
+      path: '/path/to/ext3',
+      config: { name: 'ext3', version: '1.0.0' },
+      contextFiles: [],
+    },
   ];
 
   it('should mark all extensions as active if no enabled extensions are provided', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, []);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      [],
+      '/path/to/workspace',
+    );
     expect(activeExtensions).toHaveLength(3);
     expect(activeExtensions.every((e) => e.isActive)).toBe(true);
   });
 
   it('should mark only the enabled extensions as active', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, [
-      'ext1',
-      'ext3',
-    ]);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      ['ext1', 'ext3'],
+      '/path/to/workspace',
+    );
     expect(activeExtensions).toHaveLength(3);
     expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
       true,
@@ -193,13 +239,21 @@ describe('annotateActiveExtensions', () => {
   });
 
   it('should mark all extensions as inactive when "none" is provided', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, ['none']);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      ['none'],
+      '/path/to/workspace',
+    );
     expect(activeExtensions).toHaveLength(3);
     expect(activeExtensions.every((e) => !e.isActive)).toBe(true);
   });
 
   it('should handle case-insensitivity', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, ['EXT1']);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      ['EXT1'],
+      '/path/to/workspace',
+    );
     expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
       true,
     );
@@ -207,7 +261,7 @@ describe('annotateActiveExtensions', () => {
 
   it('should log an error for unknown extensions', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    annotateActiveExtensions(extensions, ['ext4']);
+    annotateActiveExtensions(extensions, ['ext4'], '/path/to/workspace');
     expect(consoleSpy).toHaveBeenCalledWith('Extension not found: ext4');
     consoleSpy.mockRestore();
   });
@@ -468,5 +522,57 @@ describe('updateExtension', () => {
       ),
     );
     expect(updatedConfig.version).toBe('1.1.0');
+  });
+});
+
+describe('disableExtension', () => {
+  let tempWorkspaceDir: string;
+  let tempHomeDir: string;
+
+  beforeEach(() => {
+    tempWorkspaceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-workspace-'),
+    );
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
+  });
+
+  it('should disable an extension at the user scope', () => {
+    disableExtension('my-extension', SettingScope.User);
+    const settings = loadSettings(tempWorkspaceDir);
+    expect(
+      settings.forScope(SettingScope.User).settings.extensions?.disabled,
+    ).toEqual(['my-extension']);
+  });
+
+  it('should disable an extension at the workspace scope', () => {
+    disableExtension('my-extension', SettingScope.Workspace);
+    const settings = loadSettings(tempWorkspaceDir);
+    expect(
+      settings.forScope(SettingScope.Workspace).settings.extensions?.disabled,
+    ).toEqual(['my-extension']);
+  });
+
+  it('should handle disabling the same extension twice', () => {
+    disableExtension('my-extension', SettingScope.User);
+    disableExtension('my-extension', SettingScope.User);
+    const settings = loadSettings(tempWorkspaceDir);
+    expect(
+      settings.forScope(SettingScope.User).settings.extensions?.disabled,
+    ).toEqual(['my-extension']);
+  });
+
+  it('should throw an error if you request system scope', () => {
+    expect(() => disableExtension('my-extension', SettingScope.System)).toThrow(
+      'System and SystemDefaults scopes are not supported.',
+    );
   });
 });
