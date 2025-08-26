@@ -5,7 +5,7 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
-import { waitFor } from '@testing-library/react';
+import { waitFor, act } from '@testing-library/react';
 import type { InputPromptProps } from './InputPrompt.js';
 import { InputPrompt } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
@@ -1412,12 +1412,20 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      stdin.write('\x12');
+
+      // Enter reverse search mode with Ctrl+R
+      act(() => {
+        stdin.write('\x12');
+      });
       await wait();
+
       // Verify reverse search is active
       expect(stdout.lastFrame()).toContain('(r:)');
 
-      stdin.write('\t');
+      // Press Tab to complete the highlighted entry
+      act(() => {
+        stdin.write('\t');
+      });
 
       await waitFor(
         () => {
