@@ -136,12 +136,12 @@ export function updateNotificationEventSettings(
  * @param enabled Whether to enable or disable notifications.
  * @param config The Config object to save settings to.
  */
-export async function setGlobalNotificationsEnabled(
+export function setGlobalNotificationsEnabled(
   enabled: boolean,
   config: Config,
-): Promise<void> {
+): void {
   currentSettings.enabled = enabled;
-  await saveNotificationSettings(config);
+  saveNotificationSettings(config);
 }
 
 /**
