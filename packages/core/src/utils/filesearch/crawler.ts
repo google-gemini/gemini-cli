@@ -6,7 +6,7 @@
 
 import path from 'node:path';
 import { fdir } from 'fdir';
-import { Ignore } from './ignore.js';
+import type { Ignore } from './ignore.js';
 import * as cache from './crawlCache.js';
 
 export interface CrawlOptions {
