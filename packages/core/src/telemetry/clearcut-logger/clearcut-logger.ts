@@ -5,7 +5,7 @@
  */
 
 import { HttpsProxyAgent } from 'https-proxy-agent';
-import {
+import type {
   StartSessionEvent,
   UserPromptEvent,
   ToolCallEvent,
@@ -17,22 +17,25 @@ import {
   SlashCommandEvent,
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
+  ConversationFinishedEvent,
   KittySequenceOverflowEvent,
   ChatCompressionEvent,
+  FileOperationEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
-import { Config } from '../../config/config.js';
+import type { Config } from '../../config/config.js';
 import { InstallationManager } from '../../utils/installationManager.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
-import { DetectedIde, detectIde } from '../../ide/detect-ide.js';
+import { DetectedIde, detectIdeFromEnv } from '../../ide/detect-ide.js';
 
 export enum EventNames {
   START_SESSION = 'start_session',
   NEW_PROMPT = 'new_prompt',
   TOOL_CALL = 'tool_call',
+  FILE_OPERATION = 'file_operation',
   API_REQUEST = 'api_request',
   API_RESPONSE = 'api_response',
   API_ERROR = 'api_error',
@@ -45,6 +48,7 @@ export enum EventNames {
   IDE_CONNECTION = 'ide_connection',
   KITTY_SEQUENCE_OVERFLOW = 'kitty_sequence_overflow',
   CHAT_COMPRESSION = 'chat_compression',
+  CONVERSATION_FINISHED = 'conversation_finished',
 }
 
 export interface LogResponse {
@@ -91,7 +95,7 @@ function determineSurface(): string {
   } else if (process.env['GITHUB_SHA']) {
     return 'GitHub';
   } else if (process.env['TERM_PROGRAM'] === 'vscode') {
-    return detectIde() || DetectedIde.VSCode;
+    return detectIdeFromEnv() || DetectedIde.VSCode;
   } else {
     return 'SURFACE_NOT_SET';
   }
@@ -476,6 +480,64 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logFileOperationEvent(event: FileOperationEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
+        value: JSON.stringify(event.tool_name),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_TYPE,
+        value: JSON.stringify(event.operation),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_LINES,
+        value: JSON.stringify(event.lines),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_MIMETYPE,
+        value: JSON.stringify(event.mimetype),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_EXTENSION,
+        value: JSON.stringify(event.extension),
+      },
+    ];
+
+    if (event.programming_language) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROGRAMMING_LANGUAGE,
+        value: event.programming_language,
+      });
+    }
+
+    if (event.diff_stat) {
+      const metadataMapping: { [key: string]: EventMetadataKey } = {
+        ai_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
+        ai_removed_lines: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
+        user_added_lines: EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
+        user_removed_lines: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
+      };
+
+      for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {
+        if (
+          event.diff_stat[key as keyof typeof event.diff_stat] !== undefined
+        ) {
+          data.push({
+            gemini_cli_key,
+            value: JSON.stringify(
+              event.diff_stat[key as keyof typeof event.diff_stat],
+            ),
+          });
+        }
+      }
+    }
+
+    const logEvent = this.createLogEvent(EventNames.FILE_OPERATION, data);
+    this.enqueueLogEvent(logEvent);
+    this.flushIfNeeded();
+  }
+
   logApiRequestEvent(event: ApiRequestEvent): void {
     const data: EventValue[] = [
       {
@@ -665,6 +727,28 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.IDE_CONNECTION, data));
+    this.flushIfNeeded();
+  }
+
+  logConversationFinishedEvent(event: ConversationFinishedEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
+        value: this.config?.getSessionId() ?? '',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CONVERSATION_TURN_COUNT,
+        value: JSON.stringify(event.turnCount),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE,
+        value: event.approvalMode,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.CONVERSATION_FINISHED, data),
+    );
     this.flushIfNeeded();
   }
 

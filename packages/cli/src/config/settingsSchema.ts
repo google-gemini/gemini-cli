@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   MCPServerConfig,
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
-import { CustomTheme } from '../ui/themes/theme.js';
+import type { CustomTheme } from '../ui/themes/theme.js';
 
 export interface SettingDefinition {
   type: 'boolean' | 'string' | 'number' | 'array' | 'object';
@@ -206,6 +206,16 @@ export const SETTINGS_SCHEMA = {
         description: 'Disable loading phrases for accessibility',
         showInDialog: true,
       },
+      screenReader: {
+        type: 'boolean',
+        label: 'Screen Reader Mode',
+        category: 'Accessibility',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Render output in plain-text to be more screen reader accessible',
+        showInDialog: true,
+      },
     },
   },
   checkpointing: {
@@ -262,6 +272,15 @@ export const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: true,
         description: 'Enable recursive file search functionality',
+        showInDialog: true,
+      },
+      disableFuzzySearch: {
+        type: 'boolean',
+        label: 'Disable Fuzzy Search',
+        category: 'File Filtering',
+        requiresRestart: true,
+        default: false,
+        description: 'Disable fuzzy search when searching for files.',
         showInDialog: true,
       },
     },
@@ -449,7 +468,8 @@ export const SETTINGS_SCHEMA = {
     category: 'General',
     requiresRestart: false,
     default: [] as string[],
-    description: 'Additional directories to include in the workspace context.',
+    description:
+      'Additional directories to include in the workspace context. Missing directories will be skipped with a warning.',
     showInDialog: false,
   },
   loadMemoryFromIncludeDirectories: {
@@ -515,6 +535,15 @@ export const SETTINGS_SCHEMA = {
     description: 'Show line numbers in the chat.',
     showInDialog: true,
   },
+  extensionManagement: {
+    type: 'boolean',
+    label: 'Extension Management',
+    category: 'Feature Flag',
+    requiresRestart: true,
+    default: false,
+    description: 'Enable extension management features.',
+    showInDialog: false,
+  },
   skipNextSpeakerCheck: {
     type: 'boolean',
     label: 'Skip Next Speaker Check',
@@ -522,6 +551,16 @@ export const SETTINGS_SCHEMA = {
     requiresRestart: false,
     default: false,
     description: 'Skip the next speaker check.',
+    showInDialog: true,
+  },
+  useRipgrep: {
+    type: 'boolean',
+    label: 'Use Ripgrep',
+    category: 'Tools',
+    requiresRestart: false,
+    default: false,
+    description:
+      'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
     showInDialog: true,
   },
   enablePromptCompletion: {
@@ -532,6 +571,15 @@ export const SETTINGS_SCHEMA = {
     default: false,
     description:
       'Enable AI-powered prompt completion suggestions while typing.',
+    showInDialog: true,
+  },
+  debugKeystrokeLogging: {
+    type: 'boolean',
+    label: 'Debug Keystroke Logging',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Enable debug logging of keystrokes to the console.',
     showInDialog: true,
   },
 } as const;

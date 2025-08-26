@@ -5,15 +5,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import {
-  Box,
-  DOMElement,
-  measureElement,
-  Static,
-  Text,
-  useStdin,
-  useStdout,
-} from 'ink';
+import type { DOMElement } from 'ink';
+import { Box, measureElement, Static, Text, useStdin, useStdout } from 'ink';
 import { StreamingState, type HistoryItem, MessageType } from './types.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
@@ -41,7 +34,8 @@ import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js
 import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
 import { Colors } from './colors.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
-import { LoadedSettings, SettingScope } from '../config/settings.js';
+import type { LoadedSettings } from '../config/settings.js';
+import { SettingScope } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup } from '../utils/cleanup.js';
@@ -50,23 +44,22 @@ import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
+import type { EditorType, Config, IdeContext } from '@google/gemini-cli-core';
 import {
-  getErrorMessage,
-  type Config,
-  getAllGeminiMdFilenames,
   ApprovalMode,
+  getAllGeminiMdFilenames,
   isEditorAvailable,
-  EditorType,
-  FlashFallbackEvent,
-  logFlashFallback,
+  getErrorMessage,
   AuthType,
-  type IdeContext,
+  logFlashFallback,
+  FlashFallbackEvent,
   ideContext,
+  isProQuotaExceededError,
+  isGenericQuotaExceededError,
+  UserTierId,
 } from '@google/gemini-cli-core';
-import {
-  IdeIntegrationNudge,
-  IdeIntegrationNudgeResult,
-} from './IdeIntegrationNudge.js';
+import type { IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
+import { IdeIntegrationNudge } from './IdeIntegrationNudge.js';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
@@ -80,18 +73,14 @@ import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useVimMode, VimModeProvider } from './contexts/VimModeContext.js';
 import { useVim } from './hooks/vim.js';
-import { useKeypress, Key } from './hooks/useKeypress.js';
+import type { Key } from './hooks/useKeypress.js';
+import { useKeypress } from './hooks/useKeypress.js';
 import { KeypressProvider } from './contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './hooks/useKittyKeyboardProtocol.js';
 import { keyMatchers, Command } from './keyMatchers.js';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
-import {
-  isProQuotaExceededError,
-  isGenericQuotaExceededError,
-  UserTierId,
-} from '@google/gemini-cli-core';
-import { UpdateObject } from './utils/updateCheck.js';
+import type { UpdateObject } from './utils/updateCheck.js';
 import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
@@ -119,6 +108,7 @@ export const AppWrapper = (props: AppProps) => {
     <KeypressProvider
       kittyProtocolEnabled={kittyProtocolStatus.enabled}
       config={props.config}
+      debugKeystrokeLogging={props.settings.merged.debugKeystrokeLogging}
     >
       <SessionStatsProvider>
         <VimModeProvider settings={props.settings}>
@@ -637,7 +627,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
-  const showAutoAcceptIndicator = useAutoAcceptIndicator({ config });
+  const showAutoAcceptIndicator = useAutoAcceptIndicator({ config, addItem });
 
   const handleExit = useCallback(
     (
@@ -664,6 +654,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const handleGlobalKeypress = useCallback(
     (key: Key) => {
+      // Debug log keystrokes if enabled
+      if (settings.merged.debugKeystrokeLogging) {
+        console.log('[DEBUG] Keystroke:', JSON.stringify(key));
+      }
+
       let enteringConstrainHeightMode = false;
       if (!constrainHeight) {
         enteringConstrainHeightMode = true;
@@ -727,6 +722,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       handleSlashCommand,
       isAuthenticating,
       cancelOngoingRequest,
+      settings.merged.debugKeystrokeLogging,
     ],
   );
 
@@ -923,10 +919,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           key={staticKey}
           items={[
             <Box flexDirection="column" key="header">
-              {!settings.merged.hideBanner && (
+              {!(settings.merged.hideBanner || config.getScreenReader()) && (
                 <Header version={version} nightly={nightly} />
               )}
-              {!settings.merged.hideTips && <Tips config={config} />}
+              {!(settings.merged.hideTips || config.getScreenReader()) && (
+                <Tips config={config} />
+              )}
             </Box>,
             ...history.map((h) => (
               <HistoryItemDisplay
@@ -1093,12 +1091,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               <LoadingIndicator
                 thought={
                   streamingState === StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.disableLoadingPhrases
+                  config.getAccessibility()?.disableLoadingPhrases ||
+                  config.getScreenReader()
                     ? undefined
                     : thought
                 }
                 currentLoadingPhrase={
-                  config.getAccessibility()?.disableLoadingPhrases
+                  config.getAccessibility()?.disableLoadingPhrases ||
+                  config.getScreenReader()
                     ? undefined
                     : currentLoadingPhrase
                 }

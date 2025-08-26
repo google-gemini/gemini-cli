@@ -5,14 +5,14 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
-import { tmpdir } from 'os';
-import {
-  Config,
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { tmpdir } from 'node:os';
+import type {
   ConfigParameters,
   ContentGeneratorConfig,
 } from '@google/gemini-cli-core';
+import { Config } from '@google/gemini-cli-core';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 
@@ -282,7 +282,7 @@ describe('Configuration Integration Tests', () => {
           'test',
         ];
 
-        const argv = await parseArguments();
+        const argv = await parseArguments({} as Settings);
 
         // Verify that the argument was parsed correctly
         expect(argv.approvalMode).toBe('auto_edit');
@@ -306,7 +306,7 @@ describe('Configuration Integration Tests', () => {
           'test',
         ];
 
-        const argv = await parseArguments();
+        const argv = await parseArguments({} as Settings);
 
         expect(argv.approvalMode).toBe('yolo');
         expect(argv.prompt).toBe('test');
@@ -329,7 +329,7 @@ describe('Configuration Integration Tests', () => {
           'test',
         ];
 
-        const argv = await parseArguments();
+        const argv = await parseArguments({} as Settings);
 
         expect(argv.approvalMode).toBe('default');
         expect(argv.prompt).toBe('test');
@@ -345,7 +345,7 @@ describe('Configuration Integration Tests', () => {
       try {
         process.argv = ['node', 'script.js', '--yolo', '-p', 'test'];
 
-        const argv = await parseArguments();
+        const argv = await parseArguments({} as Settings);
 
         expect(argv.yolo).toBe(true);
         expect(argv.approvalMode).toBeUndefined(); // Should NOT be set when using --yolo
@@ -362,7 +362,7 @@ describe('Configuration Integration Tests', () => {
         process.argv = ['node', 'script.js', '--approval-mode', 'invalid_mode'];
 
         // Should throw during argument parsing due to yargs validation
-        await expect(parseArguments()).rejects.toThrow();
+        await expect(parseArguments({} as Settings)).rejects.toThrow();
       } finally {
         process.argv = originalArgv;
       }
@@ -381,7 +381,7 @@ describe('Configuration Integration Tests', () => {
         ];
 
         // Should throw during argument parsing due to conflict validation
-        await expect(parseArguments()).rejects.toThrow();
+        await expect(parseArguments({} as Settings)).rejects.toThrow();
       } finally {
         process.argv = originalArgv;
       }
@@ -394,7 +394,7 @@ describe('Configuration Integration Tests', () => {
         // Test that no approval mode arguments defaults to no flags set
         process.argv = ['node', 'script.js', '-p', 'test'];
 
-        const argv = await parseArguments();
+        const argv = await parseArguments({} as Settings);
 
         expect(argv.approvalMode).toBeUndefined();
         expect(argv.yolo).toBe(false);

@@ -5,26 +5,27 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import type { ToolCall, WaitingToolCall } from './coreToolScheduler.js';
 import {
   CoreToolScheduler,
-  ToolCall,
-  WaitingToolCall,
   convertToFunctionResponse,
 } from './coreToolScheduler.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
+import type {
   ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
   ToolConfirmationPayload,
   ToolInvocation,
   ToolResult,
   Config,
-  Kind,
-  ApprovalMode,
   ToolRegistry,
 } from '../index.js';
-import { Part, PartListUnion } from '@google/genai';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  ToolConfirmationOutcome,
+  Kind,
+  ApprovalMode,
+} from '../index.js';
+import type { Part, PartListUnion } from '@google/genai';
 import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
 
 class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
@@ -129,11 +130,11 @@ describe('CoreToolScheduler', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getToolRegistry: () => mockToolRegistry,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: mockToolRegistry,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -189,11 +190,11 @@ describe('CoreToolScheduler with payload', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getToolRegistry: () => mockToolRegistry,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: mockToolRegistry,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -248,37 +249,43 @@ describe('convertToFunctionResponse', () => {
   it('should handle simple string llmContent', () => {
     const llmContent = 'Simple text output';
     const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual({
-      functionResponse: {
-        name: toolName,
-        id: callId,
-        response: { output: 'Simple text output' },
+    expect(result).toEqual([
+      {
+        functionResponse: {
+          name: toolName,
+          id: callId,
+          response: { output: 'Simple text output' },
+        },
       },
-    });
+    ]);
   });
 
   it('should handle llmContent as a single Part with text', () => {
     const llmContent: Part = { text: 'Text from Part object' };
     const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual({
-      functionResponse: {
-        name: toolName,
-        id: callId,
-        response: { output: 'Text from Part object' },
+    expect(result).toEqual([
+      {
+        functionResponse: {
+          name: toolName,
+          id: callId,
+          response: { output: 'Text from Part object' },
+        },
       },
-    });
+    ]);
   });
 
   it('should handle llmContent as a PartListUnion array with a single text Part', () => {
     const llmContent: PartListUnion = [{ text: 'Text from array' }];
     const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual({
-      functionResponse: {
-        name: toolName,
-        id: callId,
-        response: { output: 'Text from array' },
+    expect(result).toEqual([
+      {
+        functionResponse: {
+          name: toolName,
+          id: callId,
+          response: { output: 'Text from array' },
+        },
       },
-    });
+    ]);
   });
 
   it('should handle llmContent with inlineData', () => {
@@ -360,25 +367,29 @@ describe('convertToFunctionResponse', () => {
   it('should handle llmContent as a generic Part (not text, inlineData, or fileData)', () => {
     const llmContent: Part = { functionCall: { name: 'test', args: {} } };
     const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual({
-      functionResponse: {
-        name: toolName,
-        id: callId,
-        response: { output: 'Tool execution succeeded.' },
+    expect(result).toEqual([
+      {
+        functionResponse: {
+          name: toolName,
+          id: callId,
+          response: { output: 'Tool execution succeeded.' },
+        },
       },
-    });
+    ]);
   });
 
   it('should handle empty string llmContent', () => {
     const llmContent = '';
     const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual({
-      functionResponse: {
-        name: toolName,
-        id: callId,
-        response: { output: '' },
+    expect(result).toEqual([
+      {
+        functionResponse: {
+          name: toolName,
+          id: callId,
+          response: { output: '' },
+        },
       },
-    });
+    ]);
   });
 
   it('should handle llmContent as an empty array', () => {
@@ -398,13 +409,15 @@ describe('convertToFunctionResponse', () => {
   it('should handle llmContent as a Part with undefined inlineData/fileData/text', () => {
     const llmContent: Part = {}; // An empty part object
     const result = convertToFunctionResponse(toolName, callId, llmContent);
-    expect(result).toEqual({
-      functionResponse: {
-        name: toolName,
-        id: callId,
-        response: { output: 'Tool execution succeeded.' },
+    expect(result).toEqual([
+      {
+        functionResponse: {
+          name: toolName,
+          id: callId,
+          response: { output: 'Tool execution succeeded.' },
+        },
       },
-    });
+    ]);
   });
 });
 
@@ -462,15 +475,14 @@ class MockEditTool extends BaseDeclarativeTool<
 describe('CoreToolScheduler edit cancellation', () => {
   it('should preserve diff when an edit is cancelled', async () => {
     const mockEditTool = new MockEditTool();
-    const declarativeTool = mockEditTool;
     const mockToolRegistry = {
-      getTool: () => declarativeTool,
+      getTool: () => mockEditTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
       discovery: {},
       registerTool: () => {},
-      getToolByName: () => declarativeTool,
-      getToolByDisplayName: () => declarativeTool,
+      getToolByName: () => mockEditTool,
+      getToolByDisplayName: () => mockEditTool,
       getTools: () => [],
       discoverTools: async () => {},
       getAllTools: () => [],
@@ -489,11 +501,11 @@ describe('CoreToolScheduler edit cancellation', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getToolRegistry: () => mockToolRegistry,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: mockToolRegistry,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -581,11 +593,11 @@ describe('CoreToolScheduler YOLO mode', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getToolRegistry: () => mockToolRegistry,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: mockToolRegistry,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -670,11 +682,11 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getToolRegistry: () => mockToolRegistry,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: mockToolRegistry,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -783,11 +795,11 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getToolRegistry: () => mockToolRegistry,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: mockToolRegistry,
       onAllToolCallsComplete,
       onToolCallsUpdate,
       getPreferredEditor: () => 'vscode',
@@ -864,7 +876,9 @@ describe('CoreToolScheduler request queueing', () => {
       getTools: () => [],
       discoverTools: async () => {},
       discovery: {},
-    };
+    } as unknown as ToolRegistry;
+
+    mockConfig.getToolRegistry = () => toolRegistry;
 
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
@@ -874,7 +888,6 @@ describe('CoreToolScheduler request queueing', () => {
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
-      toolRegistry: toolRegistry as unknown as ToolRegistry,
       onAllToolCallsComplete,
       onToolCallsUpdate: (toolCalls) => {
         onToolCallsUpdate(toolCalls);
