@@ -9,8 +9,8 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useCommandCompletion } from './useCommandCompletion.js';
-import { CommandContext, CommandKind, SlashCommand } from '../commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import { type CommandContext, CommandKind, type SlashCommand } from '../commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import { useEffect } from 'react';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
