@@ -5,7 +5,6 @@
  */
 
 import { type ColorsTheme, Theme } from './theme.js';
-import { darkSemanticColors } from './semantic-tokens.js';
 
 const ayuDarkColors: ColorsTheme = {
   type: 'dark',
@@ -109,5 +108,4 @@ export const AyuDark: Theme = new Theme(
     },
   },
   ayuDarkColors,
-  darkSemanticColors,
 );
