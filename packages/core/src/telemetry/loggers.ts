@@ -23,6 +23,9 @@ import {
   EVENT_CONVERSATION_FINISHED,
   EVENT_CHAT_COMPRESSION,
   EVENT_MALFORMED_JSON_RESPONSE,
+  EVENT_INVALID_CHUNK,
+  EVENT_CONTENT_RETRY,
+  EVENT_CONTENT_RETRY_FAILURE,
   EVENT_FILE_OPERATION,
 } from './constants.js';
 import type {
@@ -42,6 +45,9 @@ import type {
   KittySequenceOverflowEvent,
   ChatCompressionEvent,
   MalformedJsonResponseEvent,
+  InvalidChunkEvent,
+  ContentRetryEvent,
+  ContentRetryFailureEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -50,6 +56,9 @@ import {
   recordToolCallMetrics,
   recordChatCompressionMetrics,
   recordFileOperationMetric,
+  recordInvalidChunk,
+  recordContentRetry,
+  recordContentRetryFailure,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -532,4 +541,74 @@ export function logMalformedJsonResponse(
     attributes,
   };
   logger.emit(logRecord);
+}
+
+export function logInvalidChunk(
+  config: Config,
+  event: InvalidChunkEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logInvalidChunkEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    'event.name': EVENT_INVALID_CHUNK,
+    'event.timestamp': event['event.timestamp'],
+  };
+
+  if (event.error_message) {
+    attributes['error.message'] = event.error_message;
+  }
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Invalid chunk received from stream.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+  recordInvalidChunk(config);
+}
+
+export function logContentRetry(
+  config: Config,
+  event: ContentRetryEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logContentRetryEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_CONTENT_RETRY,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Content retry attempt ${event.attempt_number} due to ${event.error_type}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+  recordContentRetry(config);
+}
+
+export function logContentRetryFailure(
+  config: Config,
+  event: ContentRetryFailureEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logContentRetryFailureEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_CONTENT_RETRY_FAILURE,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `All content retries failed after ${event.total_attempts} attempts.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+  recordContentRetryFailure(config);
 }

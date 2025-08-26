@@ -5,6 +5,13 @@
     "target": "ES2022",
     "lib": ["ES2022", "dom"],
     "sourceMap": true,
+    /*
+     * skipLibCheck is necessary because the a2a-server package depends on
+     * @google-cloud/storage which pulls in @types/request which depends on
+     * tough-cookie@4.x while jsdom requires tough-cookie@5.x. This causes a
+     * type checking error in ../../node_modules/@types/request/index.d.ts.
+     */
+    "skipLibCheck": true,
     "rootDir": "src",
     "strict": true /* enable all strict type-checking options */
     /* Additional Checks */
