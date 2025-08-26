@@ -579,10 +579,6 @@ export function logContentRetryFailure(
     'event.name': EVENT_CONTENT_RETRY_FAILURE,
   };
 
-  if (event.total_duration_ms) {
-    attributes['total_duration_ms'] = event.total_duration_ms;
-  }
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `All content retries failed after ${event.total_attempts} attempts.`,
