@@ -13,6 +13,11 @@ import type {
 import { renderWithProviders } from '../../../test-utils/render.js';
 
 describe('ToolConfirmationMessage', () => {
+  const mockConfig = {
+    isTrustedFolder: () => true,
+    getIdeMode: () => false,
+  } as unknown as Config;
+
   it('should not display urls if prompt and url are the same', () => {
     const confirmationDetails: ToolCallConfirmationDetails = {
       type: 'info',
@@ -25,6 +30,7 @@ describe('ToolConfirmationMessage', () => {
     const { lastFrame } = renderWithProviders(
       <ToolConfirmationMessage
         confirmationDetails={confirmationDetails}
+        config={mockConfig}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -48,6 +54,7 @@ describe('ToolConfirmationMessage', () => {
     const { lastFrame } = renderWithProviders(
       <ToolConfirmationMessage
         confirmationDetails={confirmationDetails}
+        config={mockConfig}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,

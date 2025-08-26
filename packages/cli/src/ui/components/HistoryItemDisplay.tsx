@@ -29,7 +29,7 @@ interface HistoryItemDisplayProps {
   availableTerminalHeight?: number;
   terminalWidth: number;
   isPending: boolean;
-  config?: Config;
+  config: Config;
   isFocused?: boolean;
   commands?: readonly SlashCommand[];
 }
