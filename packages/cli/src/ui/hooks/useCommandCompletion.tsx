@@ -5,11 +5,11 @@
  */
 
 import { useCallback, useMemo, useEffect } from 'react';
-import { Suggestion } from '../components/SuggestionsDisplay.js';
-import { CommandContext, SlashCommand, CommandKind } from '../commands/types.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
+import { type CommandContext, type SlashCommand, CommandKind } from '../commands/types.js';
 import {
   logicalPosToOffset,
-  TextBuffer,
+  type TextBuffer,
 } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
