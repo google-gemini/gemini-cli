@@ -27,9 +27,7 @@
     "@google-cloud/storage": "^7.16.0",
     "@google/gemini-cli-core": "file:../core",
     "express": "^5.1.0",
-    "fecha": "^4.2.3",
     "fs-extra": "^11.3.0",
-    "stubs": "^3.0.0",
     "tar": "^7.4.3",
     "uuid": "^11.1.0",
     "winston": "^3.17.0"
