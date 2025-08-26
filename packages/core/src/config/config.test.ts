@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ConfigParameters, SandboxConfig } from './config.js';
-import { Config } from './config.js';
+import { Config, ApprovalMode } from './config.js';
 import * as path from 'node:path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
 import {
@@ -628,5 +628,61 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(paramsWithUndefinedRipgrep);
       expect(config.getUseRipgrep()).toBe(false);
     });
+  });
+});
+
+describe('setApprovalMode with folder trust', () => {
+  it('should throw an error when setting YOLO mode in an untrusted folder', () => {
+    const config = new Config({
+      sessionId: 'test',
+      targetDir: '.',
+      debugMode: false,
+      model: 'test-model',
+      cwd: '.',
+      trustedFolder: false, // Untrusted
+    });
+    expect(() => config.setApprovalMode(ApprovalMode.YOLO)).toThrow(
+      'Cannot enable privileged approval modes in an untrusted folder.',
+    );
+  });
+
+  it('should throw an error when setting AUTO_EDIT mode in an untrusted folder', () => {
+    const config = new Config({
+      sessionId: 'test',
+      targetDir: '.',
+      debugMode: false,
+      model: 'test-model',
+      cwd: '.',
+      trustedFolder: false, // Untrusted
+    });
+    expect(() => config.setApprovalMode(ApprovalMode.AUTO_EDIT)).toThrow(
+      'Cannot enable privileged approval modes in an untrusted folder.',
+    );
+  });
+
+  it('should NOT throw an error when setting DEFAULT mode in an untrusted folder', () => {
+    const config = new Config({
+      sessionId: 'test',
+      targetDir: '.',
+      debugMode: false,
+      model: 'test-model',
+      cwd: '.',
+      trustedFolder: false, // Untrusted
+    });
+    expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
+  });
+
+  it('should NOT throw an error when setting any mode in a trusted folder', () => {
+    const config = new Config({
+      sessionId: 'test',
+      targetDir: '.',
+      debugMode: false,
+      model: 'test-model',
+      cwd: '.',
+      trustedFolder: true, // Trusted
+    });
+    expect(() => config.setApprovalMode(ApprovalMode.YOLO)).not.toThrow();
+    expect(() => config.setApprovalMode(ApprovalMode.AUTO_EDIT)).not.toThrow();
+    expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
   });
 });
