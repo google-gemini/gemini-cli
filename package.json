@@ -92,7 +92,6 @@
   },
   "dependencies": {
     "@lvce-editor/ripgrep": "^2.1.0",
-    "node-fetch": "^3.3.2",
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0"
   },
