@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Box, Text } from 'ink';
-import { CompressionProps } from '../../types.js';
+import type { CompressionProps } from '../../types.js';
 import Spinner from 'ink-spinner';
 import { Colors } from '../../colors.js';
 import { SCREEN_READER_MODEL_PREFIX } from '../../constants.js';

@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, {
+import type React from 'react';
+import {
   createContext,
   useCallback,
   useContext,
@@ -13,12 +14,8 @@ import React, {
   useEffect,
 } from 'react';
 
-import {
-  uiTelemetryService,
-  SessionMetrics,
-  ModelMetrics,
-  sessionId,
-} from '@google/gemini-cli-core';
+import type { SessionMetrics, ModelMetrics } from '@google/gemini-cli-core';
+import { uiTelemetryService, sessionId } from '@google/gemini-cli-core';
 
 // --- Interface Definitions ---
 

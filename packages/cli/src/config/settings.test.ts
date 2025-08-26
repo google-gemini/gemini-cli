@@ -7,7 +7,7 @@
 /// <reference types="vitest/globals" />
 
 // Mock 'os' first.
-import * as osActual from 'os'; // Import for type info for the mock factory
+import * as osActual from 'node:os'; // Import for type info for the mock factory
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof osActual>();
   return {
@@ -33,7 +33,7 @@ vi.mock('./trustedFolders.js', () => ({
 }));
 
 // NOW import everything else, including the (now effectively re-exported) settings.js
-import * as pathActual from 'path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
+import * as pathActual from 'node:path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
 import {
   describe,
   it,
@@ -44,7 +44,7 @@ import {
   type Mocked,
   type Mock,
 } from 'vitest';
-import * as fs from 'fs'; // fs will be mocked separately
+import * as fs from 'node:fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
@@ -53,6 +53,7 @@ import {
   loadSettings,
   USER_SETTINGS_PATH, // This IS the mocked path.
   getSystemSettingsPath,
+  getSystemDefaultsPath,
   SETTINGS_DIRECTORY_NAME, // This is from the original module, but used by the mock.
   SettingScope,
 } from './settings.js';
@@ -313,6 +314,68 @@ describe('Settings Loading and Merging', () => {
         customThemes: {},
         mcpServers: {},
         includeDirectories: [],
+        chatCompression: {},
+      });
+    });
+
+    it('should merge all settings files with the correct precedence', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const systemDefaultsContent = {
+        theme: 'default-theme',
+        sandbox: true,
+        telemetry: true,
+        includeDirectories: ['/system/defaults/dir'],
+      };
+      const userSettingsContent = {
+        theme: 'user-theme',
+        contextFileName: 'USER_CONTEXT.md',
+        includeDirectories: ['/user/dir1', '/user/dir2'],
+      };
+      const workspaceSettingsContent = {
+        sandbox: false,
+        contextFileName: 'WORKSPACE_CONTEXT.md',
+        includeDirectories: ['/workspace/dir'],
+      };
+      const systemSettingsContent = {
+        theme: 'system-theme',
+        telemetry: false,
+        includeDirectories: ['/system/dir'],
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemDefaultsPath())
+            return JSON.stringify(systemDefaultsContent);
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.systemDefaults.settings).toEqual(systemDefaultsContent);
+      expect(settings.system.settings).toEqual(systemSettingsContent);
+      expect(settings.user.settings).toEqual(userSettingsContent);
+      expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
+      expect(settings.merged).toEqual({
+        theme: 'system-theme',
+        sandbox: false,
+        telemetry: false,
+        contextFileName: 'WORKSPACE_CONTEXT.md',
+        customThemes: {},
+        mcpServers: {},
+        includeDirectories: [
+          '/system/defaults/dir',
+          '/user/dir1',
+          '/user/dir2',
+          '/workspace/dir',
+          '/system/dir',
+        ],
         chatCompression: {},
       });
     });
@@ -806,6 +869,9 @@ describe('Settings Loading and Merging', () => {
       const systemSettingsContent = {
         includeDirectories: ['/system/dir'],
       };
+      const systemDefaultsContent = {
+        includeDirectories: ['/system/defaults/dir'],
+      };
       const userSettingsContent = {
         includeDirectories: ['/user/dir1', '/user/dir2'],
       };
@@ -817,6 +883,8 @@ describe('Settings Loading and Merging', () => {
         (p: fs.PathOrFileDescriptor) => {
           if (p === getSystemSettingsPath())
             return JSON.stringify(systemSettingsContent);
+          if (p === getSystemDefaultsPath())
+            return JSON.stringify(systemDefaultsContent);
           if (p === USER_SETTINGS_PATH)
             return JSON.stringify(userSettingsContent);
           if (p === MOCK_WORKSPACE_SETTINGS_PATH)
@@ -828,10 +896,11 @@ describe('Settings Loading and Merging', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
       expect(settings.merged.includeDirectories).toEqual([
-        '/system/dir',
+        '/system/defaults/dir',
         '/user/dir1',
         '/user/dir2',
         '/workspace/dir',
+        '/system/dir',
       ]);
     });
 
@@ -1289,6 +1358,11 @@ describe('Settings Loading and Merging', () => {
       loadedSettings.setValue(SettingScope.System, 'theme', 'ocean');
 
       expect(loadedSettings.system.settings.theme).toBe('ocean');
+      expect(loadedSettings.merged.theme).toBe('ocean');
+
+      // SystemDefaults theme is overridden by user, workspace, and system themes
+      loadedSettings.setValue(SettingScope.SystemDefaults, 'theme', 'default');
+      expect(loadedSettings.systemDefaults.settings.theme).toBe('default');
       expect(loadedSettings.merged.theme).toBe('ocean');
     });
   });
