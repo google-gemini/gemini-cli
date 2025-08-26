@@ -520,8 +520,8 @@ export function logInvalidChunk(
 
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
-    'event.name': EVENT_INVALID_CHUNK,
-    'event.timestamp': event['event.timestamp'],
+    ...event,
+    'event.name': EVENT_CONTENT_RETRY,
   };
 
   if (event.error_message) {
@@ -575,10 +575,8 @@ export function logContentRetryFailure(
 
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
+    ...event,
     'event.name': EVENT_CONTENT_RETRY_FAILURE,
-    'event.timestamp': event['event.timestamp'],
-    total_attempts: event.total_attempts,
-    final_error_type: event.final_error_type,
   };
 
   if (event.total_duration_ms) {
