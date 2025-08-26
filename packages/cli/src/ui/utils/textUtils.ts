@@ -5,7 +5,7 @@
  */
 
 import stripAnsi from 'strip-ansi';
-import { stripVTControlCharacters } from 'util';
+import { stripVTControlCharacters } from 'node:util';
 
 /**
  * Calculates the maximum width of a multi-line ASCII art string.

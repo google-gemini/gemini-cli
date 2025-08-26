@@ -5,26 +5,34 @@
  */
 
 import { vi } from 'vitest';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import {
   EXTENSIONS_CONFIG_FILENAME,
   INSTALL_METADATA_FILENAME,
   annotateActiveExtensions,
+  disableExtension,
+  enableExtension,
   installExtension,
   loadExtensions,
   uninstallExtension,
+  updateExtension,
 } from './extension.js';
-import { execSync } from 'child_process';
-import { SimpleGit, simpleGit } from 'simple-git';
+import {
+  type GeminiCLIExtension,
+  type MCPServerConfig,
+} from '@google/gemini-cli-core';
+import { execSync } from 'node:child_process';
+import { SettingScope, loadSettings } from './settings.js';
+import { type SimpleGit, simpleGit } from 'simple-git';
 
 vi.mock('simple-git', () => ({
   simpleGit: vi.fn(),
 }));
 
 vi.mock('os', async (importOriginal) => {
-  const os = await importOriginal<typeof import('os')>();
+  const os = await importOriginal<typeof os>();
   return {
     ...os,
     homedir: vi.fn(),
@@ -57,6 +65,7 @@ describe('loadExtensions', () => {
   afterEach(() => {
     fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
   });
 
   it('should include extension path in loaded extension', () => {
@@ -126,26 +135,101 @@ describe('loadExtensions', () => {
       path.join(workspaceExtensionsDir, 'ext1', 'my-context-file.md'),
     ]);
   });
+
+  it('should filter out disabled extensions', () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+
+    createExtension(workspaceExtensionsDir, 'ext1', '1.0.0');
+    createExtension(workspaceExtensionsDir, 'ext2', '2.0.0');
+
+    const settingsDir = path.join(tempWorkspaceDir, '.gemini');
+    fs.mkdirSync(settingsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(settingsDir, 'settings.json'),
+      JSON.stringify({ extensions: { disabled: ['ext1'] } }),
+    );
+
+    const extensions = loadExtensions(tempWorkspaceDir);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      [],
+      tempWorkspaceDir,
+    ).filter((e) => e.isActive);
+    expect(activeExtensions).toHaveLength(1);
+    expect(activeExtensions[0].name).toBe('ext2');
+  });
+
+  it('should hydrate variables', () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+
+    createExtension(
+      workspaceExtensionsDir,
+      'test-extension',
+      '1.0.0',
+      false,
+      undefined,
+      {
+        'test-server': {
+          cwd: '${extensionPath}${/}server',
+        },
+      },
+    );
+
+    const extensions = loadExtensions(tempWorkspaceDir);
+    expect(extensions).toHaveLength(1);
+    const loadedConfig = extensions[0].config;
+    const expectedCwd = path.join(
+      workspaceExtensionsDir,
+      'test-extension',
+      'server',
+    );
+    expect(loadedConfig.mcpServers?.['test-server'].cwd).toBe(expectedCwd);
+  });
 });
 
 describe('annotateActiveExtensions', () => {
   const extensions = [
-    { config: { name: 'ext1', version: '1.0.0' }, contextFiles: [] },
-    { config: { name: 'ext2', version: '1.0.0' }, contextFiles: [] },
-    { config: { name: 'ext3', version: '1.0.0' }, contextFiles: [] },
+    {
+      path: '/path/to/ext1',
+      config: { name: 'ext1', version: '1.0.0' },
+      contextFiles: [],
+    },
+    {
+      path: '/path/to/ext2',
+      config: { name: 'ext2', version: '1.0.0' },
+      contextFiles: [],
+    },
+    {
+      path: '/path/to/ext3',
+      config: { name: 'ext3', version: '1.0.0' },
+      contextFiles: [],
+    },
   ];
 
   it('should mark all extensions as active if no enabled extensions are provided', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, []);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      [],
+      '/path/to/workspace',
+    );
     expect(activeExtensions).toHaveLength(3);
     expect(activeExtensions.every((e) => e.isActive)).toBe(true);
   });
 
   it('should mark only the enabled extensions as active', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, [
-      'ext1',
-      'ext3',
-    ]);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      ['ext1', 'ext3'],
+      '/path/to/workspace',
+    );
     expect(activeExtensions).toHaveLength(3);
     expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
       true,
@@ -159,13 +243,21 @@ describe('annotateActiveExtensions', () => {
   });
 
   it('should mark all extensions as inactive when "none" is provided', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, ['none']);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      ['none'],
+      '/path/to/workspace',
+    );
     expect(activeExtensions).toHaveLength(3);
     expect(activeExtensions.every((e) => !e.isActive)).toBe(true);
   });
 
   it('should handle case-insensitivity', () => {
-    const activeExtensions = annotateActiveExtensions(extensions, ['EXT1']);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      ['EXT1'],
+      '/path/to/workspace',
+    );
     expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
       true,
     );
@@ -173,7 +265,7 @@ describe('annotateActiveExtensions', () => {
 
   it('should log an error for unknown extensions', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    annotateActiveExtensions(extensions, ['ext4']);
+    annotateActiveExtensions(extensions, ['ext4'], '/path/to/workspace');
     expect(consoleSpy).toHaveBeenCalledWith('Extension not found: ext4');
     consoleSpy.mockRestore();
   });
@@ -231,7 +323,7 @@ describe('installExtension', () => {
     await expect(
       installExtension({ source: sourceExtDir, type: 'local' }),
     ).rejects.toThrow(
-      'Error: Extension "my-local-extension" is already installed. Please uninstall it first.',
+      'Extension "my-local-extension" is already installed. Please uninstall it first.',
     );
   });
 
@@ -264,9 +356,7 @@ describe('installExtension', () => {
     });
 
     const mockedSimpleGit = simpleGit as vi.MockedFunction<typeof simpleGit>;
-    mockedSimpleGit.mockReturnValue({
-      clone,
-    } as unknown as SimpleGit);
+    mockedSimpleGit.mockReturnValue({ clone } as unknown as SimpleGit);
 
     await installExtension({ source: gitUrl, type: 'git' });
 
@@ -335,7 +425,7 @@ describe('uninstallExtension', () => {
 
   it('should throw an error if the extension does not exist', async () => {
     await expect(uninstallExtension('nonexistent-extension')).rejects.toThrow(
-      'Error: Extension "nonexistent-extension" not found.',
+      'Extension "nonexistent-extension" not found.',
     );
   });
 });
@@ -346,12 +436,13 @@ function createExtension(
   version: string,
   addContextFile = false,
   contextFileName?: string,
+  mcpServers?: Record<string, MCPServerConfig>,
 ): string {
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(
     path.join(extDir, EXTENSIONS_CONFIG_FILENAME),
-    JSON.stringify({ name, version, contextFileName }),
+    JSON.stringify({ name, version, contextFileName, mcpServers }),
   );
 
   if (addContextFile) {
@@ -363,3 +454,191 @@ function createExtension(
   }
   return extDir;
 }
+
+describe('updateExtension', () => {
+  let tempHomeDir: string;
+  let userExtensionsDir: string;
+
+  beforeEach(() => {
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    userExtensionsDir = path.join(tempHomeDir, '.gemini', 'extensions');
+    // Clean up before each test
+    fs.rmSync(userExtensionsDir, { recursive: true, force: true });
+    fs.mkdirSync(userExtensionsDir, { recursive: true });
+
+    vi.mocked(execSync).mockClear();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
+  });
+
+  it('should update a git-installed extension', async () => {
+    // 1. "Install" an extension
+    const gitUrl = 'https://github.com/google/gemini-extensions.git';
+    const extensionName = 'gemini-extensions';
+    const targetExtDir = path.join(userExtensionsDir, extensionName);
+    const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
+
+    // Create the "installed" extension directory and files
+    fs.mkdirSync(targetExtDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(targetExtDir, EXTENSIONS_CONFIG_FILENAME),
+      JSON.stringify({ name: extensionName, version: '1.0.0' }),
+    );
+    fs.writeFileSync(
+      metadataPath,
+      JSON.stringify({ source: gitUrl, type: 'git' }),
+    );
+
+    // 2. Mock the git clone for the update
+    const clone = vi.fn().mockImplementation(async (_, destination) => {
+      fs.mkdirSync(destination, { recursive: true });
+      // This is the "updated" version
+      fs.writeFileSync(
+        path.join(destination, EXTENSIONS_CONFIG_FILENAME),
+        JSON.stringify({ name: extensionName, version: '1.1.0' }),
+      );
+    });
+
+    const mockedSimpleGit = simpleGit as vi.MockedFunction<typeof simpleGit>;
+    mockedSimpleGit.mockReturnValue({
+      clone,
+    } as unknown as SimpleGit);
+
+    // 3. Call updateExtension
+    const updateInfo = await updateExtension(extensionName);
+
+    // 4. Assertions
+    expect(updateInfo).toEqual({
+      originalVersion: '1.0.0',
+      updatedVersion: '1.1.0',
+    });
+
+    // Check that the config file reflects the new version
+    const updatedConfig = JSON.parse(
+      fs.readFileSync(
+        path.join(targetExtDir, EXTENSIONS_CONFIG_FILENAME),
+        'utf-8',
+      ),
+    );
+    expect(updatedConfig.version).toBe('1.1.0');
+  });
+});
+
+describe('disableExtension', () => {
+  let tempWorkspaceDir: string;
+  let tempHomeDir: string;
+
+  beforeEach(() => {
+    tempWorkspaceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-workspace-'),
+    );
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
+  });
+
+  it('should disable an extension at the user scope', () => {
+    disableExtension('my-extension', SettingScope.User);
+    const settings = loadSettings(tempWorkspaceDir);
+    expect(
+      settings.forScope(SettingScope.User).settings.extensions?.disabled,
+    ).toEqual(['my-extension']);
+  });
+
+  it('should disable an extension at the workspace scope', () => {
+    disableExtension('my-extension', SettingScope.Workspace);
+    const settings = loadSettings(tempWorkspaceDir);
+    expect(
+      settings.forScope(SettingScope.Workspace).settings.extensions?.disabled,
+    ).toEqual(['my-extension']);
+  });
+
+  it('should handle disabling the same extension twice', () => {
+    disableExtension('my-extension', SettingScope.User);
+    disableExtension('my-extension', SettingScope.User);
+    const settings = loadSettings(tempWorkspaceDir);
+    expect(
+      settings.forScope(SettingScope.User).settings.extensions?.disabled,
+    ).toEqual(['my-extension']);
+  });
+
+  it('should throw an error if you request system scope', () => {
+    expect(() => disableExtension('my-extension', SettingScope.System)).toThrow(
+      'System and SystemDefaults scopes are not supported.',
+    );
+  });
+});
+
+describe('enableExtension', () => {
+  let tempWorkspaceDir: string;
+  let tempHomeDir: string;
+  let userExtensionsDir: string;
+
+  beforeEach(() => {
+    tempWorkspaceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-workspace-'),
+    );
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
+    userExtensionsDir = path.join(tempHomeDir, '.gemini', 'extensions');
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    fs.rmSync(userExtensionsDir, { recursive: true, force: true });
+  });
+
+  afterAll(() => {
+    vi.restoreAllMocks();
+  });
+
+  const getActiveExtensions = (): GeminiCLIExtension[] => {
+    const extensions = loadExtensions(tempWorkspaceDir);
+    const activeExtensions = annotateActiveExtensions(
+      extensions,
+      [],
+      tempWorkspaceDir,
+    );
+    return activeExtensions.filter((e) => e.isActive);
+  };
+
+  it('should enable an extension at the user scope', () => {
+    createExtension(userExtensionsDir, 'ext1', '1.0.0');
+    disableExtension('ext1', SettingScope.User);
+    let activeExtensions = getActiveExtensions();
+    expect(activeExtensions).toHaveLength(0);
+
+    enableExtension('ext1', [SettingScope.User]);
+    activeExtensions = getActiveExtensions();
+    expect(activeExtensions).toHaveLength(1);
+    expect(activeExtensions[0].name).toBe('ext1');
+  });
+
+  it('should enable an extension at the workspace scope', () => {
+    createExtension(userExtensionsDir, 'ext1', '1.0.0');
+    disableExtension('ext1', SettingScope.Workspace);
+    let activeExtensions = getActiveExtensions();
+    expect(activeExtensions).toHaveLength(0);
+
+    enableExtension('ext1', [SettingScope.Workspace]);
+    activeExtensions = getActiveExtensions();
+    expect(activeExtensions).toHaveLength(1);
+    expect(activeExtensions[0].name).toBe('ext1');
+  });
+});

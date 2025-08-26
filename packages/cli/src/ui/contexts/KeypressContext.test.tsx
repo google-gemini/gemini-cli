@@ -4,24 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { vi, Mock } from 'vitest';
-import {
-  KeypressProvider,
-  useKeypressContext,
-  Key,
-} from './KeypressContext.js';
+import type { Mock } from 'vitest';
+import { vi } from 'vitest';
+import type { Key } from './KeypressContext.js';
+import { KeypressProvider, useKeypressContext } from './KeypressContext.js';
 import { useStdin } from 'ink';
-import { EventEmitter } from 'events';
-import {
-  KITTY_KEYCODE_ENTER,
-  KITTY_KEYCODE_NUMPAD_ENTER,
-  CHAR_CODE_ESC,
-  CHAR_CODE_LEFT_BRACKET,
-  CHAR_CODE_1,
-  CHAR_CODE_2,
-} from '../utils/platformConstants.js';
+import { EventEmitter } from 'node:events';
 
 // Mock the 'ink' module to control stdin
 vi.mock('ink', async (importOriginal) => {
@@ -101,7 +91,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for regular enter: ESC[13u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_ENTER}u`);
+        stdin.sendKittySequence(`\x1b[13u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -129,7 +119,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter: ESC[57414u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER}u`);
+        stdin.sendKittySequence(`\x1b[57414u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -157,7 +147,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter with Shift (modifier 2): ESC[57414;2u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER};2u`);
+        stdin.sendKittySequence(`\x1b[57414;2u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -185,7 +175,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter with Ctrl (modifier 5): ESC[57414;5u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER};5u`);
+        stdin.sendKittySequence(`\x1b[57414;5u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -213,7 +203,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter with Alt (modifier 3): ESC[57414;3u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER};3u`);
+        stdin.sendKittySequence(`\x1b[57414;3u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -241,7 +231,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER}u`);
+        stdin.sendKittySequence(`\x1b[57414u`);
       });
 
       // When kitty protocol is disabled, the sequence should be passed through
@@ -282,10 +272,86 @@ describe('KeypressContext - Kitty Protocol', () => {
     });
   });
 
+  describe('Tab and Backspace handling', () => {
+    it('should recognize Tab key in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        stdin.sendKittySequence(`\x1b[9u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'tab',
+          kittyProtocol: true,
+          shift: false,
+        }),
+      );
+    });
+
+    it('should recognize Shift+Tab in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Modifier 2 is Shift
+      act(() => {
+        stdin.sendKittySequence(`\x1b[9;2u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'tab',
+          kittyProtocol: true,
+          shift: true,
+        }),
+      );
+    });
+
+    it('should recognize Backspace key in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        stdin.sendKittySequence(`\x1b[127u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          kittyProtocol: true,
+          meta: false,
+        }),
+      );
+    });
+
+    it('should recognize Option+Backspace in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Modifier 3 is Alt/Option
+      act(() => {
+        stdin.sendKittySequence(`\x1b[127;3u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          kittyProtocol: true,
+          meta: true,
+        }),
+      );
+    });
+  });
+
   describe('paste mode', () => {
     it('should handle multiline paste as a single event', async () => {
       const keyHandler = vi.fn();
-      const pastedText = 'This \nis \na \nmultiline \npaste.';
+      const pastedText = 'This \n is \n a \n multiline \n paste.';
 
       const { result } = renderHook(() => useKeypressContext(), {
         wrapper,
@@ -514,7 +580,7 @@ describe('KeypressContext - Kitty Protocol', () => {
       // Verify warning for char codes
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         'Kitty sequence buffer has char codes:',
-        [CHAR_CODE_ESC, CHAR_CODE_LEFT_BRACKET, CHAR_CODE_1, CHAR_CODE_2],
+        [27, 91, 49, 50],
       );
     });
   });
