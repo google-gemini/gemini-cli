@@ -4,14 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GlobTool, GlobToolParams, GlobPath, sortFileEntries } from './glob.js';
+import type { GlobToolParams, GlobPath } from './glob.js';
+import { GlobTool, sortFileEntries } from './glob.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { ToolErrorType } from './tool-error.js';
 import * as glob from 'glob';

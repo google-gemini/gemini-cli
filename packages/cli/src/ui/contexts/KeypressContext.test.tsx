@@ -4,26 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { vi, Mock } from 'vitest';
-import {
-  KeypressProvider,
-  useKeypressContext,
-  Key,
-} from './KeypressContext.js';
+import type { Mock } from 'vitest';
+import { vi } from 'vitest';
+import type { Key } from './KeypressContext.js';
+import { KeypressProvider, useKeypressContext } from './KeypressContext.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
-import {
-  KITTY_KEYCODE_ENTER,
-  KITTY_KEYCODE_NUMPAD_ENTER,
-  KITTY_KEYCODE_TAB,
-  KITTY_KEYCODE_BACKSPACE,
-  CHAR_CODE_ESC,
-  CHAR_CODE_LEFT_BRACKET,
-  CHAR_CODE_1,
-  CHAR_CODE_2,
-} from '../utils/platformConstants.js';
 
 // Mock the 'ink' module to control stdin
 vi.mock('ink', async (importOriginal) => {
@@ -103,7 +91,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for regular enter: ESC[13u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_ENTER}u`);
+        stdin.sendKittySequence(`\x1b[13u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -131,7 +119,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter: ESC[57414u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER}u`);
+        stdin.sendKittySequence(`\x1b[57414u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -159,7 +147,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter with Shift (modifier 2): ESC[57414;2u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER};2u`);
+        stdin.sendKittySequence(`\x1b[57414;2u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -187,7 +175,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter with Ctrl (modifier 5): ESC[57414;5u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER};5u`);
+        stdin.sendKittySequence(`\x1b[57414;5u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -215,7 +203,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter with Alt (modifier 3): ESC[57414;3u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER};3u`);
+        stdin.sendKittySequence(`\x1b[57414;3u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -243,7 +231,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER}u`);
+        stdin.sendKittySequence(`\x1b[57414u`);
       });
 
       // When kitty protocol is disabled, the sequence should be passed through
@@ -291,7 +279,7 @@ describe('KeypressContext - Kitty Protocol', () => {
       act(() => result.current.subscribe(keyHandler));
 
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_TAB}u`);
+        stdin.sendKittySequence(`\x1b[9u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -310,7 +298,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Modifier 2 is Shift
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_TAB};2u`);
+        stdin.sendKittySequence(`\x1b[9;2u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -328,7 +316,7 @@ describe('KeypressContext - Kitty Protocol', () => {
       act(() => result.current.subscribe(keyHandler));
 
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_BACKSPACE}u`);
+        stdin.sendKittySequence(`\x1b[127u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -347,7 +335,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Modifier 3 is Alt/Option
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_BACKSPACE};3u`);
+        stdin.sendKittySequence(`\x1b[127;3u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -592,7 +580,7 @@ describe('KeypressContext - Kitty Protocol', () => {
       // Verify warning for char codes
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         'Kitty sequence buffer has char codes:',
-        [CHAR_CODE_ESC, CHAR_CODE_LEFT_BRACKET, CHAR_CODE_1, CHAR_CODE_2],
+        [27, 91, 49, 50],
       );
     });
   });

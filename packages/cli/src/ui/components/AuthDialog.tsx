@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
+import { SettingScope } from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../../config/auth.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -62,13 +64,8 @@ export function AuthDialog({
   });
   const items = [
     {
-      label: 'Login with Google - Free Tier',
+      label: 'Login with Google',
       value: AuthType.LOGIN_WITH_GOOGLE,
-    },
-    {
-      label:
-        'Login with Google - Gemini Code Assist (Requires GOOGLE_CLOUD_PROJECT)',
-      value: AuthType.LOGIN_WITH_GOOGLE_GCA,
     },
     ...(process.env['CLOUD_SHELL'] === 'true'
       ? [
