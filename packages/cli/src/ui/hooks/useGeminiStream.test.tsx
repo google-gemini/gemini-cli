@@ -1089,6 +1089,42 @@ describe('useGeminiStream', () => {
         );
       });
     });
+
+    it('should not call handleSlashCommand for line comments', async () => {
+      const { result, mockSendMessageStream: localMockSendMessageStream } =
+        renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('// This is a line comment');
+      });
+
+      await waitFor(() => {
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        expect(localMockSendMessageStream).toHaveBeenCalledWith(
+          '// This is a line comment',
+          expect.any(AbortSignal),
+          expect.any(String),
+        );
+      });
+    });
+
+    it('should not call handleSlashCommand for block comments', async () => {
+      const { result, mockSendMessageStream: localMockSendMessageStream } =
+        renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('/* This is a block comment */');
+      });
+
+      await waitFor(() => {
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        expect(localMockSendMessageStream).toHaveBeenCalledWith(
+          '/* This is a block comment */',
+          expect.any(AbortSignal),
+          expect.any(String),
+        );
+      });
+    });
   });
 
   describe('Memory Refresh on save_memory', () => {
