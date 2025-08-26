@@ -517,6 +517,9 @@ export class GeminiClient {
         return turn;
       }
       yield event;
+      if (event.type === GeminiEventType.Error) {
+        return turn;
+      }
     }
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
       // Check if model was switched during the call (likely due to quota error)

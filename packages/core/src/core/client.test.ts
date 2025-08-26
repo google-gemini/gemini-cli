@@ -50,6 +50,8 @@ vi.mock('./turn', () => {
     GeminiEventType: {
       MaxSessionTurns: 'MaxSessionTurns',
       ChatCompressed: 'ChatCompressed',
+      Error: 'error',
+      Content: 'content',
     },
   };
 });
@@ -1862,6 +1864,89 @@ ${JSON.stringify(
         expect(JSON.stringify(finalCall)).toContain('activeFileChanged');
         expect(JSON.stringify(finalCall)).toContain('fileC.ts');
       });
+    });
+
+    it('should not call checkNextSpeaker when turn.run() yields an error', async () => {
+      // Arrange
+      const { checkNextSpeaker } = await import(
+        '../utils/nextSpeakerChecker.js'
+      );
+      const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
+
+      const mockStream = (async function* () {
+        yield {
+          type: GeminiEventType.Error,
+          value: { error: { message: 'test error' } },
+        };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        generateContent: mockGenerateContentFn,
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-error',
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      // Assert
+      expect(mockCheckNextSpeaker).not.toHaveBeenCalled();
+    });
+
+    it('should not call checkNextSpeaker when turn.run() yields a value then an error', async () => {
+      // Arrange
+      const { checkNextSpeaker } = await import(
+        '../utils/nextSpeakerChecker.js'
+      );
+      const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
+
+      const mockStream = (async function* () {
+        yield { type: GeminiEventType.Content, value: 'some content' };
+        yield {
+          type: GeminiEventType.Error,
+          value: { error: { message: 'test error' } },
+        };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        generateContent: mockGenerateContentFn,
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-error',
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      // Assert
+      expect(mockCheckNextSpeaker).not.toHaveBeenCalled();
     });
   });
 
