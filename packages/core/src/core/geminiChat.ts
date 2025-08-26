@@ -575,10 +575,7 @@ export class GeminiChat {
       } else {
         logInvalidChunk(
           this.config,
-          new InvalidChunkEvent(
-            safeJsonStringify(chunk).substring(0, 500), // Truncate to a reasonable length
-            'Invalid chunk received from stream.',
-          ),
+          new InvalidChunkEvent('Invalid chunk received from stream.'),
         );
         isStreamInvalid = true;
       }

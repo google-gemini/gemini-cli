@@ -452,13 +452,11 @@ export class FileOperationEvent implements BaseTelemetryEvent {
 export class InvalidChunkEvent implements BaseTelemetryEvent {
   'event.name': 'invalid_chunk';
   'event.timestamp': string;
-  chunk_data?: string; // Optional: truncated chunk data for debugging
   error_message?: string; // Optional: validation error details
 
-  constructor(chunk_data?: string, error_message?: string) {
+  constructor(error_message?: string) {
     this['event.name'] = 'invalid_chunk';
     this['event.timestamp'] = new Date().toISOString();
-    this.chunk_data = chunk_data;
     this.error_message = error_message;
   }
 }
