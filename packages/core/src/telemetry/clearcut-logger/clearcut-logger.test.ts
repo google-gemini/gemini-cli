@@ -14,18 +14,11 @@ import {
   beforeAll,
   afterAll,
 } from 'vitest';
-import {
-  ClearcutLogger,
-  LogEvent,
-  LogEventEntry,
-  EventNames,
-  TEST_ONLY,
-} from './clearcut-logger.js';
-import {
-  AuthType,
-  ContentGeneratorConfig,
-} from '../../core/contentGenerator.js';
-import { ConfigParameters } from '../../config/config.js';
+import type { LogEvent, LogEventEntry } from './clearcut-logger.js';
+import { ClearcutLogger, EventNames, TEST_ONLY } from './clearcut-logger.js';
+import type { ContentGeneratorConfig } from '../../core/contentGenerator.js';
+import { AuthType } from '../../core/contentGenerator.js';
+import type { ConfigParameters } from '../../config/config.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import { http, HttpResponse } from 'msw';

@@ -9,10 +9,17 @@ if (process.env.NO_COLOR !== undefined) {
   delete process.env.NO_COLOR;
 }
 
-import { mkdir, readdir, rm, readFile, writeFile, unlink } from 'fs/promises';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import * as os from 'os';
+import {
+  mkdir,
+  readdir,
+  rm,
+  readFile,
+  writeFile,
+  unlink,
+} from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import * as os from 'node:os';
 
 import {
   GEMINI_CONFIG_DIR,

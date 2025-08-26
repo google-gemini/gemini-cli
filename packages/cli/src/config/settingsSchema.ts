@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   MCPServerConfig,
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
-import { CustomTheme } from '../ui/themes/theme.js';
+import type { CustomTheme } from '../ui/themes/theme.js';
 
 export interface SettingDefinition {
   type: 'boolean' | 'string' | 'number' | 'array' | 'object';
@@ -543,6 +543,26 @@ export const SETTINGS_SCHEMA = {
     default: false,
     description: 'Enable extension management features.',
     showInDialog: false,
+  },
+  extensions: {
+    type: 'object',
+    label: 'Extensions',
+    category: 'Extensions',
+    requiresRestart: true,
+    default: {},
+    description: 'Settings for extensions.',
+    showInDialog: false,
+    properties: {
+      disabled: {
+        type: 'array',
+        label: 'Disabled Extensions',
+        category: 'Extensions',
+        requiresRestart: true,
+        default: [] as string[],
+        description: 'List of disabled extensions.',
+        showInDialog: false,
+      },
+    },
   },
   skipNextSpeakerCheck: {
     type: 'boolean',

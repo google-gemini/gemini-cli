@@ -4,28 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
-import os, { EOL } from 'os';
-import crypto from 'crypto';
-import { Config } from '../config/config.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import os, { EOL } from 'node:os';
+import crypto from 'node:crypto';
+import type { Config } from '../config/config.js';
 import { ToolErrorType } from './tool-error.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
+import type {
   ToolInvocation,
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
+} from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
 } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
-import {
-  ShellExecutionService,
-  ShellOutputEvent,
-} from '../services/shellExecutionService.js';
+import type { ShellOutputEvent } from '../services/shellExecutionService.js';
+import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import {
   getCommandRoots,

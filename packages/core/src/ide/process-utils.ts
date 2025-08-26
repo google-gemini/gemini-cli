@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import os from 'os';
-import path from 'path';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+import os from 'node:os';
+import path from 'node:path';
 
 const execAsync = promisify(exec);
 
@@ -99,9 +99,6 @@ async function getIdeProcessInfoForUnix(): Promise<{
     }
   }
 
-  console.error(
-    'Failed to find shell process in the process tree. Falling back to top-level process, which may be inaccurate. If you see this, please file a bug via /bug.',
-  );
   const { command } = await getProcessInfo(currentPid);
   return { pid: currentPid, command };
 }

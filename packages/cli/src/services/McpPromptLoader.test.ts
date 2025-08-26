@@ -5,8 +5,8 @@
  */
 
 import { McpPromptLoader } from './McpPromptLoader.js';
-import { Config } from '@google/gemini-cli-core';
-import { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
+import type { Config } from '@google/gemini-cli-core';
+import type { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
 import { describe, it, expect } from 'vitest';
 
 describe('McpPromptLoader', () => {
