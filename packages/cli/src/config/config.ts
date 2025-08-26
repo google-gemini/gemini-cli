@@ -220,6 +220,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description: 'Enable screen reader mode for accessibility.',
           default: false,
         })
+        .option('server-mode', {
+          type: 'boolean',
+          description: 'Run in persistent server mode for API usage.',
+          hidden: true, // Hide from help message
+        })
 
         .check((argv) => {
           if (argv.prompt && argv['promptInteractive']) {

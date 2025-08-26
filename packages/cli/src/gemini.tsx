@@ -106,6 +106,52 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   process.exit(0);
 }
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
+import { runServerMode } from './serverMode.js';
+
+export function setupUnhandledRejectionHandler() {
+  let unhandledRejectionOccurred = false;
+  process.on('unhandledRejection', (reason, _promise) => {
+    const errorMessage = `=========================================
+This is an unexpected error. Please file a bug report using the /bug tool.
+CRITICAL: Unhandled Promise Rejection!
+=========================================
+Reason: ${reason}${
+      reason instanceof Error && reason.stack
+        ? `
+Stack trace:
+${reason.stack}`
+        : ''
+    }`;
+    appEvents.emit(AppEvent.LogError, errorMessage);
+    if (!unhandledRejectionOccurred) {
+      unhandledRejectionOccurred = true;
+      appEvents.emit(AppEvent.OpenDebugConsole);
+    }
+  });
+}
+
+export async function startInteractiveUI(
+  config: Config,
+  settings: LoadedSettings,
+  startupWarnings: string[],
+  workspaceRoot: string,
+) {
+// ... (rest of the function is the same)
+}
+
+export async function main() {
+  // --- SERVER MODE ---
+  // Check for the server-mode flag before any other processing.
+  if (process.argv.includes('--server-mode')) {
+    await runServerMode();
+    return; // Exit after server mode is finished.
+  }
+
+  setupUnhandledRejectionHandler();
+  const workspaceRoot = process.cwd();
+  const settings = loadSettings(workspaceRoot);
+// ... (rest of the function is the same)
+
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
