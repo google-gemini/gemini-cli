@@ -528,6 +528,10 @@ export function logInvalidChunk(
     attributes['error.message'] = event.error_message;
   }
 
+  if (event.chunk_data) {
+    attributes['chunk_data'] = event.chunk_data;
+  }
+
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Invalid chunk received from stream.`,
