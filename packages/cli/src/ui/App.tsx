@@ -212,8 +212,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const { showMigrationDialog, workspaceExtensions, onMigrationDialogClose } =
-    useWorkspaceMigration(settings);
+  const {
+    showMigrationDialog,
+    workspaceExtensions,
+    onMigrationDialogOpen,
+    onMigrationDialogClose,
+  } = useWorkspaceMigration(settings);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
@@ -998,6 +1002,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           {showMigrationDialog ? (
             <MigrationDialog
               workspaceExtensions={workspaceExtensions}
+              onOpen={onMigrationDialogOpen}
               onClose={onMigrationDialogClose}
             />
           ) : shouldShowIdePrompt && currentIDE ? (

@@ -15,11 +15,13 @@ import { useState } from 'react';
 
 export function MigrationDialog(props: {
   workspaceExtensions: Extension[];
+  onOpen: () => void;
   onClose: () => void;
 }) {
-  const { workspaceExtensions, onClose } = props;
+  const { workspaceExtensions, onOpen, onClose } = props;
   const [migrationComplete, setMigrationComplete] = useState(false);
   const [failedExtensions, setFailedExtensions] = useState<string[]>([]);
+  onOpen();
   const onMigrate = async () => {
     const failed = await performWorkspaceExtensionMigration(
       process.cwd(),

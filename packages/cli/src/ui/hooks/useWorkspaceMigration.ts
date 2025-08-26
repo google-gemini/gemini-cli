@@ -27,14 +27,11 @@ export function useWorkspaceMigration(settings: LoadedSettings) {
     ) {
       setWorkspaceExtensions(extensions);
       setShowMigrationDialog(true);
+      console.log(settings.merged.extensions);
     }
-  }, [
-    settings.merged.extensions?.workspacesWithMigrationNudge,
-    settings.merged.extensionManagement,
-  ]);
+  }, [settings.merged.extensions, settings.merged.extensionManagement]);
 
-  const onMigrationDialogClose = () => {
-    setShowMigrationDialog(false);
+  const onMigrationDialogOpen = () => {
     const userSettings = settings.forScope(SettingScope.User);
     const extensionSettings = userSettings.settings.extensions || {
       disabled: [],
@@ -52,9 +49,14 @@ export function useWorkspaceMigration(settings: LoadedSettings) {
     settings.setValue(SettingScope.User, 'extensions', extensionSettings);
   };
 
+  const onMigrationDialogClose = () => {
+    setShowMigrationDialog(false);
+  };
+
   return {
     showMigrationDialog,
     workspaceExtensions,
+    onMigrationDialogOpen,
     onMigrationDialogClose,
   };
 }
