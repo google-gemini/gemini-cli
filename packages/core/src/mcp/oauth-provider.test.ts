@@ -95,6 +95,7 @@ describe('MCPOAuthProvider', () => {
     clientId: 'test-client-id',
     clientSecret: 'test-client-secret',
     authorizationUrl: 'https://auth.example.com/authorize',
+    registrationUrl: 'https://auth.example.com/register',
     tokenUrl: 'https://auth.example.com/token',
     scopes: ['read', 'write'],
     redirectUri: 'http://localhost:7777/oauth/callback',
@@ -317,6 +318,7 @@ describe('MCPOAuthProvider', () => {
     it('should perform dynamic client registration when no client ID provided', async () => {
       const configWithoutClient = { ...mockConfig };
       delete configWithoutClient.clientId;
+      delete configWithoutClient.registrationUrl; // to test auto-discover
 
       const mockRegistrationResponse: OAuthClientRegistrationResponse = {
         client_id: 'dynamic_client_id',
