@@ -6,7 +6,7 @@
 
 import { Box, Text, useInput } from 'ink';
 import {
-  Extension,
+  type Extension,
   performWorkspaceExtensionMigration,
 } from '../../config/extension.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
@@ -23,10 +23,8 @@ export function MigrationDialog(props: {
   const [failedExtensions, setFailedExtensions] = useState<string[]>([]);
   onOpen();
   const onMigrate = async () => {
-    const failed = await performWorkspaceExtensionMigration(
-      process.cwd(),
-      workspaceExtensions,
-    );
+    const failed =
+      await performWorkspaceExtensionMigration(workspaceExtensions);
     setFailedExtensions(failed);
     setMigrationComplete(true);
   };
@@ -79,10 +77,6 @@ export function MigrationDialog(props: {
       <Text>Would you like to install them at the user level?</Text>
       <Text>
         The extension definition will remain in your workspace directory.
-      </Text>
-      <Text>
-        If there are name conflicts, we will attempt to resolve by appending{' '}
-        {`'-workspace'`} to the extension name.{'\n'}
       </Text>
       <Text>
         If you opt to skip, you can install them manually using the extensions

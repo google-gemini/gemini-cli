@@ -91,35 +91,12 @@ async function copyExtension(
 }
 
 export async function performWorkspaceExtensionMigration(
-  workspaceDir: string,
   extensions: Extension[],
 ): Promise<string[]> {
-  const userExtensions = loadUserExtensions();
-  const userExtensionNames = new Set(
-    userExtensions.map((extension) => extension.config.name),
-  );
   const failedInstallNames: string[] = [];
 
   for (const extension of extensions) {
     try {
-      if (userExtensionNames.has(extension.config.name)) {
-        let newName = extension.config.name;
-        if (!newName.endsWith('-workspace')) {
-          newName = `${newName}-workspace`;
-        }
-        const configPath = path.join(
-          extension.path,
-          EXTENSIONS_CONFIG_FILENAME,
-        );
-        const configContent = await fs.promises.readFile(configPath, 'utf-8');
-        const config = JSON.parse(configContent) as ExtensionConfig;
-        config.name = newName;
-        await fs.promises.writeFile(
-          configPath,
-          JSON.stringify(config, null, 2),
-        );
-      }
-
       const installMetadata: ExtensionInstallMetadata = {
         source: extension.path,
         type: 'local',
@@ -131,6 +108,7 @@ export async function performWorkspaceExtensionMigration(
   }
   return failedInstallNames;
 }
+
 export function loadExtensions(workspaceDir: string): Extension[] {
   const settings = loadSettings(workspaceDir).merged;
   const disabledExtensions = settings.extensions?.disabled ?? [];
