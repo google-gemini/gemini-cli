@@ -40,7 +40,6 @@
     "highlight.js": "^11.11.1",
     "ink": "^6.1.1",
     "ink-gradient": "^3.0.0",
-    "ink-select-input": "^6.2.0",
     "ink-spinner": "^5.0.0",
     "lowlight": "^3.3.0",
     "mime-types": "^3.0.1",
