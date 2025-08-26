@@ -525,7 +525,6 @@ export function logInvalidChunk(
   };
 
   if (event.error_message) {
-    attributes.error_message = event.error_message;
     attributes['error.message'] = event.error_message;
   }
 
