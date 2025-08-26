@@ -92,7 +92,8 @@
   },
   "dependencies": {
     "node-fetch": "^3.3.2",
-    "strip-ansi": "^7.1.0"
+    "strip-ansi": "^7.1.0",
+    "typescript": "^5.9.2"
   },
   "optionalDependencies": {
     "@lydell/node-pty": "1.1.0",

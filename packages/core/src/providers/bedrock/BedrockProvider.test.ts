@@ -85,6 +85,7 @@ describe('BedrockProvider', () => {
     it('should initialize with proper AWS configuration', () => {
       expect(AnthropicBedrock).toHaveBeenCalledWith({
         awsRegion: 'us-east-1',
+        timeout: 3600000, // 60 minutes timeout as per AWS recommendations
       });
     });
 
@@ -597,9 +598,9 @@ describe('BedrockProvider', () => {
         ],
       });
 
-      // Rough estimation: ~3.5 chars per token
-      expect(response.totalTokens).toBeGreaterThan(10);
-      expect(response.totalTokens).toBeLessThan(20);
+      // Improved estimation: ~4.2 chars per token for natural language
+      expect(response.totalTokens).toBeGreaterThanOrEqual(10);
+      expect(response.totalTokens).toBeLessThan(15);
     });
 
     it('should estimate tokens for multi-turn conversation', async () => {

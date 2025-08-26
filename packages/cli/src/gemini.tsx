@@ -196,6 +196,19 @@ export async function main() {
     }
   }
 
+  // Override auth type with AUTH_TYPE environment variable if provided
+  const authTypeFromEnv = process.env['AUTH_TYPE'];
+  if (authTypeFromEnv && Object.values(AuthType).includes(authTypeFromEnv as AuthType)) {
+    settings.setValue(
+      SettingScope.User,
+      'selectedAuthType',
+      authTypeFromEnv as AuthType,
+    );
+    if (config.getDebugMode()) {
+      console.debug(`[Auth] Using AUTH_TYPE environment variable: ${authTypeFromEnv}`);
+    }
+  }
+
   setMaxSizedBoxDebugging(config.getDebugMode());
 
   await config.initialize();

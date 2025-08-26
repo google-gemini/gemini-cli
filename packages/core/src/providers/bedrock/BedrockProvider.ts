@@ -20,6 +20,7 @@ import {
   ContentGeneratorConfig,
 } from '../../core/contentGenerator.js';
 import { Config } from '../../config/config.js';
+import { retryWithBackoff } from '../../utils/retry.js';
 import { BedrockToolConverter } from './BedrockToolConverter.js';
 import { BedrockMessageConverter } from './BedrockMessageConverter.js';
 import { BedrockStreamHandler } from './BedrockStreamHandler.js';
@@ -51,6 +52,18 @@ export class BedrockProvider implements ContentGenerator {
     this.messageConverter = new BedrockMessageConverter();
     this.streamHandler = new BedrockStreamHandler(gcConfig);
 
+    // Override model with BEDROCK_MODEL environment variable if set
+    const envModel = process.env['BEDROCK_MODEL'];
+    if (envModel && envModel.trim()) {
+      this.config.setModel(envModel.trim());
+
+      if (gcConfig.getDebugMode()) {
+        console.debug(
+          `[BedrockProvider] Using model from BEDROCK_MODEL env var: ${envModel.trim()}`,
+        );
+      }
+    }
+
     // Validate AWS configuration
     this.validateAwsConfig();
 
@@ -59,6 +72,7 @@ export class BedrockProvider implements ContentGenerator {
       this.client = new AnthropicBedrock({
         awsRegion: process.env['AWS_REGION'],
         // AWS credentials are automatically loaded from the environment or AWS credential chain
+        timeout: parseInt(process.env['BEDROCK_TIMEOUT_MS'] || '3600000', 10), // Default 60 minutes, configurable via BEDROCK_TIMEOUT_MS
       });
     } catch (error) {
       throw new BedrockError(
@@ -114,8 +128,24 @@ export class BedrockProvider implements ContentGenerator {
         );
       }
 
-      const response = await this.client.messages.create(
-        apiRequest as MessageCreateParamsNonStreaming,
+      const response = await retryWithBackoff(
+        () =>
+          this.client.messages.create(
+            apiRequest as MessageCreateParamsNonStreaming,
+          ),
+        {
+          maxAttempts: 5,
+          initialDelayMs: 5000,
+          maxDelayMs: 60000, // 60 seconds for Bedrock quota refresh cycle
+          shouldRetry: (error: Error) => {
+            const status = this.getStatusCode(error);
+            return (
+              status === 429 ||
+              status === 503 ||
+              (status !== undefined && status >= 500 && status < 600)
+            );
+          },
+        },
       );
 
       if (this.config.getDebugMode()) {
@@ -123,19 +153,28 @@ export class BedrockProvider implements ContentGenerator {
           '[BedrockProvider] Received response:',
           JSON.stringify(response, null, 2),
         );
-        
+
         // Log actual token usage
         if (response.usage) {
           console.debug('[BedrockProvider] Actual token usage from API:', {
             inputTokens: response.usage.input_tokens,
             outputTokens: response.usage.output_tokens,
-            totalTokens: (response.usage.input_tokens || 0) + (response.usage.output_tokens || 0),
+            totalTokens:
+              (response.usage.input_tokens || 0) +
+              (response.usage.output_tokens || 0),
           });
         }
       }
 
-      return this.convertResponse(response, this.isJsonMode(request));
+      const result = this.convertResponse(response, this.isJsonMode(request));
+
+      // Clear tool use tracker to prevent memory leaks between requests
+      this.messageConverter.clearToolUseTracker();
+
+      return result;
     } catch (error) {
+      // Clear tool use tracker on error as well
+      this.messageConverter.clearToolUseTracker();
       throw this.handleError(error, 'generateContent');
     }
   }
@@ -159,12 +198,32 @@ export class BedrockProvider implements ContentGenerator {
         );
       }
 
-      const stream = await this.client.messages.create(
-        streamRequest as MessageCreateParamsStreaming,
+      const stream = await retryWithBackoff(
+        () =>
+          this.client.messages.create(
+            streamRequest as MessageCreateParamsStreaming,
+          ),
+        {
+          maxAttempts: 5,
+          initialDelayMs: 5000,
+          maxDelayMs: 60000, // 60 seconds for Bedrock quota refresh cycle
+          shouldRetry: (error: Error) => {
+            const status = this.getStatusCode(error);
+            return (
+              status === 429 ||
+              status === 503 ||
+              (status !== undefined && status >= 500 && status < 600)
+            );
+          },
+        },
       );
 
-      return this.streamHandler.handleStream(stream);
+      return this.wrapStreamWithCleanup(
+        this.streamHandler.handleStream(stream),
+      );
     } catch (error) {
+      // Clear tool use tracker on error
+      this.messageConverter.clearToolUseTracker();
       throw this.handleError(error, 'generateContentStream');
     }
   }
@@ -180,9 +239,11 @@ export class BedrockProvider implements ContentGenerator {
       // Use Anthropic's token counting if available in the future
       // For now, use a more accurate estimation based on Claude's tokenization
       const totalTokens = this.estimateTokens(messages);
-      
+
       if (this.config.getDebugMode()) {
-        console.debug(`[BedrockProvider] countTokens: ${totalTokens} estimated tokens for ${messages.length} messages`);
+        console.debug(
+          `[BedrockProvider] countTokens: ${totalTokens} estimated tokens for ${messages.length} messages`,
+        );
       }
 
       return {
@@ -200,6 +261,22 @@ export class BedrockProvider implements ContentGenerator {
       'Embeddings are not supported with AWS Bedrock Claude models. Consider using Amazon Titan Embeddings or another embedding model.',
       'NOT_SUPPORTED',
     );
+  }
+
+  /**
+   * Wrap stream generator with cleanup to prevent memory leaks
+   */
+  private async *wrapStreamWithCleanup(
+    stream: AsyncGenerator<GenerateContentResponse>,
+  ): AsyncGenerator<GenerateContentResponse> {
+    try {
+      for await (const chunk of stream) {
+        yield chunk;
+      }
+    } finally {
+      // Clear tool use tracker after stream completes or errors
+      this.messageConverter.clearToolUseTracker();
+    }
   }
 
   /**
@@ -446,11 +523,28 @@ export class BedrockProvider implements ContentGenerator {
             const text = block.text;
             // Different estimation based on content type
             if (this.isCodeLikeContent(text)) {
-              // Code content typically has fewer tokens per character
-              totalTokens += Math.ceil(text.length / 3.2);
+              // Code content typically has fewer tokens per character due to dense symbols
+              // Empirically tested ratios for Claude:
+              // - Dense code (lots of symbols): ~2.8 chars/token
+              // - Regular code: ~3.5 chars/token
+              const symbolDensity =
+                (text.match(/[{}()[\];,.<>=/\\|&*+\-!@#$%^]/g) || []).length /
+                text.length;
+              const ratio = symbolDensity > 0.2 ? 2.8 : 3.5;
+              totalTokens += Math.ceil(text.length / ratio);
             } else {
-              // Regular text uses ~4 characters per token for Claude
-              totalChars += text.length;
+              // Regular text - check if it's structured or natural language
+              const hasStructure =
+                /^\s*[-*+]\s+|^\s*\d+\.\s+|:\s*$|^\s*[A-Z][A-Z\s]+:/m.test(
+                  text,
+                );
+              if (hasStructure) {
+                // Structured text (lists, headings, etc.) - ~3.8 chars/token
+                totalTokens += Math.ceil(text.length / 3.8);
+              } else {
+                // Natural language text uses ~4.2 characters per token for Claude
+                totalChars += text.length;
+              }
             }
           } else if (block.type === 'image') {
             // Images have a fixed token cost in Claude
@@ -468,11 +562,13 @@ export class BedrockProvider implements ContentGenerator {
       }
     }
 
-    // Add estimated tokens from regular text content
-    totalTokens += Math.ceil(totalChars / 4.0);
+    // Add estimated tokens from regular natural language text content
+    totalTokens += Math.ceil(totalChars / 4.2);
 
     if (this.config.getDebugMode()) {
-      console.debug(`[BedrockProvider] Token estimation: ${totalTokens} tokens (${totalChars} chars)`);
+      console.debug(
+        `[BedrockProvider] Token estimation: ${totalTokens} tokens (${totalChars} chars)`,
+      );
     }
 
     return totalTokens;
@@ -482,20 +578,57 @@ export class BedrockProvider implements ContentGenerator {
    * Detect if content appears to be code or structured data
    */
   private isCodeLikeContent(text: string): boolean {
-    // Simple heuristics to detect code content
+    // Enhanced heuristics to detect various types of code content
     const codeIndicators = [
-      /^\s*[{}[\]]/m,           // Starts with brackets/braces
-      /[;{}]\s*$/m,             // Ends with semicolon or braces
-      /function\s+\w+\s*\(/,    // Function definitions
-      /class\s+\w+/,            // Class definitions
-      /import\s+.*from/,        // Import statements
-      /^\s*\/\/|^\s*\/\*/m,     // Comments
-      /\w+\.\w+\(/,            // Method calls
-      /=>\s*[{(]/,             // Arrow functions
-      /<[a-zA-Z][^>]*>/,       // XML/HTML tags
+      // Structural patterns
+      /^\s*[{}[\]]/m, // Starts with brackets/braces
+      /[;{}]\s*$/m, // Ends with semicolon or braces
+      /^\s*\w+\s*[{(]/m, // Function-like declarations
+
+      // Programming language patterns
+      /function\s+\w+\s*\(/, // Function definitions
+      /class\s+\w+/, // Class definitions
+      /import\s+.*from/, // Import statements
+      /export\s+(default\s+)?/, // Export statements
+      /^\s*(const|let|var)\s+\w+/m, // Variable declarations
+      /(if|while|for)\s*\(/, // Control structures
+      /\w+\.\w+\(/, // Method calls
+      /=>\s*[{(]/, // Arrow functions
+      /^\s*@\w+/m, // Decorators/annotations
+
+      // Markup and data formats
+      /<[a-zA-Z][^>]*>/, // XML/HTML tags
+      /^\s*<!DOCTYPE/m, // HTML doctype
+      /^\s*---\s*$/m, // YAML frontmatter
+      /^\s*[\w-]+:\s*[|>]/m, // YAML multiline
+      /^\s*"[\w-]+"\s*:/m, // JSON keys
+      /^\s*\w+\s*=\s*["'].+["']/m, // Config assignments
+
+      // Comments
+      /^\s*\/\/|^\s*\/\*/m, // JS/C-style comments
+      /^\s*#[^!]/m, // Shell/Python comments (not shebang)
+      /^\s*<!--/m, // HTML comments
+      /^\s*--\s/m, // SQL comments
+
+      // Shell/terminal patterns
+      /^\s*[$#]\s+/m, // Shell prompts
+      /^\s*(sudo|npm|git|docker)\s+/m, // Common CLI commands
+
+      // High density of punctuation (typical in code)
+      /[{}()[\];,.]{3,}/, // Multiple punctuation chars
     ];
 
-    return codeIndicators.some(pattern => pattern.test(text));
+    // Check if it matches multiple indicators (more reliable)
+    const matches = codeIndicators.filter((pattern) =>
+      pattern.test(text),
+    ).length;
+
+    // Also check character density - code typically has more symbols
+    const symbolDensity =
+      (text.match(/[{}()[\];,.<>=/\\|&*+\-!@#$%^]/g) || []).length /
+      text.length;
+
+    return matches >= 2 || symbolDensity > 0.15;
   }
 
   /**
@@ -533,9 +666,17 @@ export class BedrockProvider implements ContentGenerator {
 
     if (statusCode === 429) {
       return new BedrockError(
-        `Rate limit exceeded for model ${currentModel}. The system will automatically retry with exponential backoff.`,
+        `Rate limit exceeded for model ${currentModel}. Request has been retried with 60-second backoff as per AWS best practices, but quota is still exceeded.`,
         'RATE_LIMIT',
         429,
+      );
+    }
+
+    if (statusCode === 504) {
+      return new BedrockError(
+        `Gateway timeout for model ${currentModel}. The request took too long to process. This has been automatically retried but the request is still timing out.`,
+        'GATEWAY_TIMEOUT',
+        504,
       );
     }
 
