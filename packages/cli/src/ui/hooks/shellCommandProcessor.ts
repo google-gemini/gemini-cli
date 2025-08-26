@@ -4,27 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   HistoryItemWithoutId,
   IndividualToolCallDisplay,
-  ToolCallStatus,
 } from '../types.js';
+import { ToolCallStatus } from '../types.js';
 import { useCallback } from 'react';
-import {
+import type {
   Config,
   GeminiClient,
-  isBinary,
   ShellExecutionResult,
-  ShellExecutionService,
 } from '@google/gemini-cli-core';
+import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
-import crypto from 'crypto';
-import path from 'path';
-import os from 'os';
-import fs from 'fs';
+import crypto from 'node:crypto';
+import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const MAX_OUTPUT_LENGTH = 10000;
@@ -101,10 +100,11 @@ export const useShellCommandProcessor = (
         commandToExecute = `{ ${command} }; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
       }
 
-      const execPromise = new Promise<void>((resolve) => {
+      const executeCommand = async (
+        resolve: (value: void | PromiseLike<void>) => void,
+      ) => {
         let lastUpdateTime = Date.now();
         let cumulativeStdout = '';
-        let cumulativeStderr = '';
         let isBinaryStream = false;
         let binaryBytesReceived = 0;
 
@@ -134,7 +134,7 @@ export const useShellCommandProcessor = (
         onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
 
         try {
-          const { pid, result } = ShellExecutionService.execute(
+          const { pid, result } = await ShellExecutionService.execute(
             commandToExecute,
             targetDir,
             (event) => {
@@ -142,11 +142,7 @@ export const useShellCommandProcessor = (
                 case 'data':
                   // Do not process text data if we've already switched to binary mode.
                   if (isBinaryStream) break;
-                  if (event.stream === 'stdout') {
-                    cumulativeStdout += event.chunk;
-                  } else {
-                    cumulativeStderr += event.chunk;
-                  }
+                  cumulativeStdout += event.chunk;
                   break;
                 case 'binary_detected':
                   isBinaryStream = true;
@@ -172,9 +168,7 @@ export const useShellCommandProcessor = (
                     '[Binary output detected. Halting stream...]';
                 }
               } else {
-                currentDisplayOutput =
-                  cumulativeStdout +
-                  (cumulativeStderr ? `\n${cumulativeStderr}` : '');
+                currentDisplayOutput = cumulativeStdout;
               }
 
               // Throttle pending UI updates to avoid excessive re-renders.
@@ -192,6 +186,7 @@ export const useShellCommandProcessor = (
               }
             },
             abortSignal,
+            config.getShouldUseNodePtyShell(),
           );
 
           executionPid = pid;
@@ -295,6 +290,10 @@ export const useShellCommandProcessor = (
 
           resolve(); // Resolve the promise to unblock `onExec`
         }
+      };
+
+      const execPromise = new Promise<void>((resolve) => {
+        executeCommand(resolve);
       });
 
       onExec(execPromise);

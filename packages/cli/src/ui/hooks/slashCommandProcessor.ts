@@ -7,26 +7,27 @@
 import { useCallback, useMemo, useEffect, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
+import type { Config } from '@google/gemini-cli-core';
 import {
-  Config,
   GitService,
   Logger,
   logSlashCommand,
   makeSlashCommandEvent,
   SlashCommandStatus,
   ToolConfirmationOutcome,
+  Storage,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
-import {
+import type {
   Message,
-  MessageType,
   HistoryItemWithoutId,
   HistoryItem,
   SlashCommandProcessorResult,
 } from '../types.js';
-import { LoadedSettings } from '../../config/settings.js';
+import { MessageType } from '../types.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import { type CommandContext, type SlashCommand } from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
@@ -82,11 +83,14 @@ export const useSlashCommandProcessor = (
     if (!config?.getProjectRoot()) {
       return;
     }
-    return new GitService(config.getProjectRoot());
+    return new GitService(config.getProjectRoot(), config.storage);
   }, [config]);
 
   const logger = useMemo(() => {
-    const l = new Logger(config?.getSessionId() || '');
+    const l = new Logger(
+      config?.getSessionId() || '',
+      config?.storage ?? new Storage(process.cwd()),
+    );
     // The logger's initialize is async, but we can create the instance
     // synchronously. Commands that use it will await its initialization.
     return l;
@@ -206,7 +210,22 @@ export const useSlashCommandProcessor = (
     ],
   );
 
-  const ideMode = config?.getIdeMode();
+  useEffect(() => {
+    if (!config) {
+      return;
+    }
+
+    const ideClient = config.getIdeClient();
+    const listener = () => {
+      reloadCommands();
+    };
+
+    ideClient.addStatusChangeListener(listener);
+
+    return () => {
+      ideClient.removeStatusChangeListener(listener);
+    };
+  }, [config, reloadCommands]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -228,7 +247,7 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config, ideMode, reloadTrigger]);
+  }, [config, reloadTrigger]);
 
   const handleSlashCommand = useCallback(
     async (

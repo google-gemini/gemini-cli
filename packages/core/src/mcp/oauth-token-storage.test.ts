@@ -7,11 +7,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import {
-  MCPOAuthTokenStorage,
+import type {
   MCPOAuthToken,
   MCPOAuthCredentials,
 } from './oauth-token-storage.js';
+import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 
 // Mock file system operations
 vi.mock('node:fs', () => ({
@@ -21,6 +21,7 @@ vi.mock('node:fs', () => ({
     mkdir: vi.fn(),
     unlink: vi.fn(),
   },
+  mkdirSync: vi.fn(),
 }));
 
 vi.mock('node:os', () => ({

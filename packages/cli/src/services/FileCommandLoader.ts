@@ -4,26 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { promises as fs } from 'fs';
-import path from 'path';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 import toml from '@iarna/toml';
 import { glob } from 'glob';
 import { z } from 'zod';
-import {
-  Config,
-  getProjectCommandsDir,
-  getUserCommandsDir,
-} from '@google/gemini-cli-core';
-import { ICommandLoader } from './types.js';
-import {
+import type { Config } from '@google/gemini-cli-core';
+import { Storage } from '@google/gemini-cli-core';
+import type { ICommandLoader } from './types.js';
+import type {
   CommandContext,
-  CommandKind,
   SlashCommand,
   SlashCommandActionReturn,
 } from '../ui/commands/types.js';
+import { CommandKind } from '../ui/commands/types.js';
 import { DefaultArgumentProcessor } from './prompt-processors/argumentProcessor.js';
+import type { IPromptProcessor } from './prompt-processors/types.js';
 import {
-  IPromptProcessor,
   SHORTHAND_ARGS_PLACEHOLDER,
   SHELL_INJECTION_TRIGGER,
 } from './prompt-processors/types.js';
@@ -130,11 +127,13 @@ export class FileCommandLoader implements ICommandLoader {
   private getCommandDirectories(): CommandDirectory[] {
     const dirs: CommandDirectory[] = [];
 
+    const storage = this.config?.storage ?? new Storage(this.projectRoot);
+
     // 1. User commands
-    dirs.push({ path: getUserCommandsDir() });
+    dirs.push({ path: Storage.getUserCommandsDir() });
 
     // 2. Project commands (override user commands)
-    dirs.push({ path: getProjectCommandsDir(this.projectRoot) });
+    dirs.push({ path: storage.getProjectCommandsDir() });
 
     // 3. Extension commands (processed last to detect all conflicts)
     if (this.config) {

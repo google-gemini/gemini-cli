@@ -7,13 +7,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UiTelemetryService } from './uiTelemetry.js';
 import { ToolCallDecision } from './tool-call-decision.js';
-import { ApiErrorEvent, ApiResponseEvent, ToolCallEvent } from './types.js';
+import type { ApiErrorEvent, ApiResponseEvent } from './types.js';
+import { ToolCallEvent } from './types.js';
 import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
 } from './constants.js';
-import {
+import type {
   CompletedToolCall,
   ErroredToolCall,
   SuccessfulToolCall,
@@ -43,16 +44,18 @@ const createFakeCompletedToolCall = (
       status: 'success',
       request,
       tool,
-      invocation: tool.build({}),
+      invocation: tool.build({ param: 'test' }),
       response: {
         callId: request.callId,
-        responseParts: {
-          functionResponse: {
-            id: request.callId,
-            name,
-            response: { output: 'Success!' },
+        responseParts: [
+          {
+            functionResponse: {
+              id: request.callId,
+              name,
+              response: { output: 'Success!' },
+            },
           },
-        },
+        ],
         error: undefined,
         errorType: undefined,
         resultDisplay: 'Success!',
@@ -67,13 +70,15 @@ const createFakeCompletedToolCall = (
       tool,
       response: {
         callId: request.callId,
-        responseParts: {
-          functionResponse: {
-            id: request.callId,
-            name,
-            response: { error: 'Tool failed' },
+        responseParts: [
+          {
+            functionResponse: {
+              id: request.callId,
+              name,
+              response: { error: 'Tool failed' },
+            },
           },
-        },
+        ],
         error: error || new Error('Tool failed'),
         errorType: ToolErrorType.UNKNOWN,
         resultDisplay: 'Failure!',
@@ -107,6 +112,10 @@ describe('UiTelemetryService', () => {
           [ToolCallDecision.AUTO_ACCEPT]: 0,
         },
         byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     });
     expect(service.getLastPromptTokenCount()).toBe(0);
@@ -342,9 +351,9 @@ describe('UiTelemetryService', () => {
         ToolConfirmationOutcome.ProceedOnce,
       );
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
+        ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
 
       const metrics = service.getMetrics();
       const { tools } = metrics;
@@ -376,9 +385,9 @@ describe('UiTelemetryService', () => {
         ToolConfirmationOutcome.Cancel,
       );
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
+        ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
 
       const metrics = service.getMetrics();
       const { tools } = metrics;
@@ -410,9 +419,9 @@ describe('UiTelemetryService', () => {
         ToolConfirmationOutcome.ModifyWithEditor,
       );
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
+        ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
 
       const metrics = service.getMetrics();
       const { tools } = metrics;
@@ -426,9 +435,9 @@ describe('UiTelemetryService', () => {
     it('should process a ToolCallEvent without a decision', () => {
       const toolCall = createFakeCompletedToolCall('test_tool', true, 100);
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall))),
+        ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
 
       const metrics = service.getMetrics();
       const { tools } = metrics;
@@ -462,13 +471,13 @@ describe('UiTelemetryService', () => {
       );
 
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall1))),
+        ...structuredClone(new ToolCallEvent(toolCall1)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall2))),
+        ...structuredClone(new ToolCallEvent(toolCall2)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
 
       const metrics = service.getMetrics();
       const { tools } = metrics;
@@ -497,13 +506,13 @@ describe('UiTelemetryService', () => {
       const toolCall1 = createFakeCompletedToolCall('tool_A', true, 100);
       const toolCall2 = createFakeCompletedToolCall('tool_B', false, 200);
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall1))),
+        ...structuredClone(new ToolCallEvent(toolCall1)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
       service.addEvent({
-        ...JSON.parse(JSON.stringify(new ToolCallEvent(toolCall2))),
+        ...structuredClone(new ToolCallEvent(toolCall2)),
         'event.name': EVENT_TOOL_CALL,
-      });
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL });
 
       const metrics = service.getMetrics();
       const { tools } = metrics;
@@ -627,6 +636,44 @@ describe('UiTelemetryService', () => {
       service.resetLastPromptTokenCount();
       expect(service.getLastPromptTokenCount()).toBe(0);
       expect(spy).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('Tool Call Event with Line Count Metadata', () => {
+    it('should aggregate valid line count metadata', () => {
+      const toolCall = createFakeCompletedToolCall('test_tool', true, 100);
+      const event = {
+        ...structuredClone(new ToolCallEvent(toolCall)),
+        'event.name': EVENT_TOOL_CALL,
+        metadata: {
+          ai_added_lines: 10,
+          ai_removed_lines: 5,
+        },
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL };
+
+      service.addEvent(event);
+
+      const metrics = service.getMetrics();
+      expect(metrics.files.totalLinesAdded).toBe(10);
+      expect(metrics.files.totalLinesRemoved).toBe(5);
+    });
+
+    it('should ignore null/undefined values in line count metadata', () => {
+      const toolCall = createFakeCompletedToolCall('test_tool', true, 100);
+      const event = {
+        ...structuredClone(new ToolCallEvent(toolCall)),
+        'event.name': EVENT_TOOL_CALL,
+        metadata: {
+          ai_added_lines: null,
+          ai_removed_lines: undefined,
+        },
+      } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL };
+
+      service.addEvent(event);
+
+      const metrics = service.getMetrics();
+      expect(metrics.files.totalLinesAdded).toBe(0);
+      expect(metrics.files.totalLinesRemoved).toBe(0);
     });
   });
 });

@@ -5,7 +5,8 @@
  */
 
 import { getCliVersion } from '../../utils/version.js';
-import { CommandKind, SlashCommand } from './types.js';
+import type { SlashCommand } from './types.js';
+import { CommandKind } from './types.js';
 import process from 'node:process';
 import { MessageType, type HistoryItemAbout } from '../types.js';
 
@@ -29,7 +30,8 @@ export const aboutCommand: SlashCommand = {
       context.services.settings.merged.selectedAuthType || '';
     const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';
     const ideClient =
-      context.services.config?.getIdeClient()?.getDetectedIdeDisplayName() ||
+      (context.services.config?.getIdeMode() &&
+        context.services.config?.getIdeClient()?.getDetectedIdeDisplayName()) ||
       '';
 
     const aboutItem: Omit<HistoryItemAbout, 'id'> = {

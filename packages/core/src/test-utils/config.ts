@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Config, ConfigParameters } from '../config/config.js';
+import type { ConfigParameters } from '../config/config.js';
+import { Config } from '../config/config.js';
 
 /**
  * Default parameters used for {@link FAKE_CONFIG}

@@ -11,7 +11,7 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import * as versionUtils from '../../utils/version.js';
 import { MessageType } from '../types.js';
 
-import { IdeClient } from '../../../../core/src/ide/ide-client.js';
+import type { IdeClient } from '../../../../core/src/ide/ide-client.js';
 
 vi.mock('../../utils/version.js', () => ({
   getCliVersion: vi.fn(),
@@ -28,6 +28,7 @@ describe('aboutCommand', () => {
         config: {
           getModel: vi.fn(),
           getIdeClient: vi.fn(),
+          getIdeMode: vi.fn().mockReturnValue(true),
         },
         settings: {
           merged: {

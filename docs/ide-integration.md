@@ -44,7 +44,10 @@ You can also install the extension directly from a marketplace.
 - **For Visual Studio Code:** Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=google.gemini-cli-vscode-ide-companion).
 - **For VS Code Forks:** To support forks of VS Code, the extension is also published on the [Open VSX Registry](https://open-vsx.org/extension/google/gemini-cli-vscode-ide-companion). Follow your editor's instructions for installing extensions from this registry.
 
-After any installation method, it's recommended to open a new terminal window to ensure the integration is activated correctly. Once installed, you can use `/ide enable` to connect.
+> NOTE:
+> The "Gemini CLI Companion" extension may appear towards the bottom of search results. If you don't see it immediately, try scrolling down or sorting by "Newly Published".
+>
+> After manually installing the extension, you must run `/ide enable` in the CLI to activate the integration.
 
 ## Usage
 
@@ -110,7 +113,7 @@ If you encounter issues with IDE integration, here are some common error message
 
 ### Connection Errors
 
-- **Message:** `🔴 Disconnected: Failed to connect to IDE companion extension for [IDE Name]. Please ensure the extension is running and try restarting your terminal. To install the extension, run /ide install.`
+- **Message:** `🔴 Disconnected: Failed to connect to IDE companion extension in [IDE Name]. Please ensure the extension is running. To install the extension, run /ide install.`
   - **Cause:** Gemini CLI could not find the necessary environment variables (`GEMINI_CLI_IDE_WORKSPACE_PATH` or `GEMINI_CLI_IDE_SERVER_PORT`) to connect to the IDE. This usually means the IDE companion extension is not running or did not initialize correctly.
   - **Solution:**
     1.  Make sure you have installed the **Gemini CLI Companion** extension in your IDE and that it is enabled.
@@ -122,13 +125,13 @@ If you encounter issues with IDE integration, here are some common error message
 
 ### Configuration Errors
 
-- **Message:** `🔴 Disconnected: Directory mismatch. Gemini CLI is running in a different location than the open workspace in [IDE Name]. Please run the CLI from the same directory as your project's root folder.`
-  - **Cause:** The CLI's current working directory is outside the folder or workspace you have open in your IDE.
+- **Message:** `🔴 Disconnected: Directory mismatch. Gemini CLI is running in a different location than the open workspace in [IDE Name]. Please run the CLI from one of the following directories: [List of directories]`
+  - **Cause:** The CLI's current working directory is outside the workspace you have open in your IDE.
   - **Solution:** `cd` into the same directory that is open in your IDE and restart the CLI.
 
-- **Message:** `🔴 Disconnected: To use this feature, please open a single workspace folder in [IDE Name] and try again.`
-  - **Cause:** You have multiple workspace folders open in your IDE, or no folder is open at all. The IDE integration requires a single root workspace folder to operate correctly.
-  - **Solution:** Open a single project folder in your IDE and restart the CLI.
+- **Message:** `🔴 Disconnected: To use this feature, please open a workspace folder in [IDE Name] and try again.`
+  - **Cause:** You have no workspace open in your IDE.
+  - **Solution:** Open a workspace in your IDE and restart the CLI.
 
 ### General Errors
 
@@ -136,6 +139,6 @@ If you encounter issues with IDE integration, here are some common error message
   - **Cause:** You are running Gemini CLI in a terminal or environment that is not a supported IDE.
   - **Solution:** Run Gemini CLI from the integrated terminal of a supported IDE, like VS Code.
 
-- **Message:** `No installer is available for [IDE Name]. Please install the IDE companion manually from its marketplace.`
+- **Message:** `No installer is available for IDE. Please install the Gemini CLI Companion extension manually from the marketplace.`
   - **Cause:** You ran `/ide install`, but the CLI does not have an automated installer for your specific IDE.
-  - **Solution:** Open your IDE's extension marketplace, search for "Gemini CLI Companion", and install it manually.
+  - **Solution:** Open your IDE's extension marketplace, search for "Gemini CLI Companion", and [install it manually](#3-manual-installation-from-a-marketplace).

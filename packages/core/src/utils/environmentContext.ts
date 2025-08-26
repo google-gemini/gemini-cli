@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Part } from '@google/genai';
-import { Config } from '../config/config.js';
+import type { Part } from '@google/genai';
+import type { Config } from '../config/config.js';
 import { getFolderStructure } from './getFolderStructure.js';
 
 /**
@@ -62,13 +62,13 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
 
   const context = `
 This is the Gemini CLI. We are setting up the context for our chat.
-Today's date is ${today}.
+Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
 ${directoryContext}
         `.trim();
 
   const initialParts: Part[] = [{ text: context }];
-  const toolRegistry = await config.getToolRegistry();
+  const toolRegistry = config.getToolRegistry();
 
   // Add full file context if the flag is set
   if (config.getFullContext()) {

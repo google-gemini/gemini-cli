@@ -5,15 +5,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  Turn,
-  GeminiEventType,
+import type {
   ServerGeminiToolCallRequestEvent,
   ServerGeminiErrorEvent,
 } from './turn.js';
-import { GenerateContentResponse, Part, Content } from '@google/genai';
+import { Turn, GeminiEventType } from './turn.js';
+import type { GenerateContentResponse, Part, Content } from '@google/genai';
 import { reportError } from '../utils/errorReporting.js';
-import { GeminiChat } from './geminiChat.js';
+import type { GeminiChat } from './geminiChat.js';
 
 const mockSendMessageStream = vi.fn();
 const mockGetHistory = vi.fn();
@@ -444,6 +443,32 @@ describe('Turn', () => {
         { type: GeminiEventType.Content, value: 'Second part' },
         { type: GeminiEventType.Finished, value: 'OTHER' },
       ]);
+    });
+
+    it('should not crash when cancelled request has malformed error', async () => {
+      const abortController = new AbortController();
+
+      const errorToThrow = {
+        response: {
+          data: undefined, // Malformed error data
+        },
+      };
+
+      mockSendMessageStream.mockImplementation(async () => {
+        abortController.abort();
+        throw errorToThrow;
+      });
+
+      const events = [];
+      const reqParts: Part[] = [{ text: 'Test malformed error handling' }];
+
+      for await (const event of turn.run(reqParts, abortController.signal)) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([{ type: GeminiEventType.UserCancelled }]);
+
+      expect(reportError).not.toHaveBeenCalled();
     });
   });
 

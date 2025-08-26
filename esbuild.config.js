@@ -5,9 +5,9 @@
  */
 
 import esbuild from 'esbuild';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,7 +21,15 @@ esbuild
     outfile: 'bundle/gemini.js',
     platform: 'node',
     format: 'esm',
-    external: [],
+    external: [
+      '@lydell/node-pty',
+      'node-pty',
+      '@lydell/node-pty-darwin-arm64',
+      '@lydell/node-pty-darwin-x64',
+      '@lydell/node-pty-linux-x64',
+      '@lydell/node-pty-win32-arm64',
+      '@lydell/node-pty-win32-x64',
+    ],
     alias: {
       'is-in-ci': path.resolve(
         __dirname,
@@ -34,5 +42,6 @@ esbuild
     banner: {
       js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
     },
+    loader: { '.node': 'file' },
   })
   .catch(() => process.exit(1));
