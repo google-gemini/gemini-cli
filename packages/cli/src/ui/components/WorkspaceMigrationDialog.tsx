@@ -13,7 +13,7 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { Colors } from '../colors.js';
 import { useState } from 'react';
 
-export function MigrationDialog(props: {
+export function WorkspaceMigrationDialog(props: {
   workspaceExtensions: Extension[];
   onOpen: () => void;
   onClose: () => void;

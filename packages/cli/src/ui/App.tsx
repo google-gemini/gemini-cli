@@ -102,7 +102,7 @@ import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
 import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
-import { MigrationDialog } from './components/MigrationDialog.js';
+import { WorkspaceMigrationDialog } from './components/WorkspaceMigrationDialog.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 // Maximum number of queued messages to display in UI to prevent performance issues
@@ -213,10 +213,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const {
-    showMigrationDialog,
+    showWorkspaceMigrationDialog,
     workspaceExtensions,
-    onMigrationDialogOpen,
-    onMigrationDialogClose,
+    onWorkspaceMigrationDialogOpen,
+    onWorkspaceMigrationDialogClose,
   } = useWorkspaceMigration(settings);
 
   useEffect(() => {
@@ -999,11 +999,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               ))}
             </Box>
           )}
-          {showMigrationDialog ? (
-            <MigrationDialog
+          {showWorkspaceMigrationDialog ? (
+            <WorkspaceMigrationDialog
               workspaceExtensions={workspaceExtensions}
-              onOpen={onMigrationDialogOpen}
-              onClose={onMigrationDialogClose}
+              onOpen={onWorkspaceMigrationDialogOpen}
+              onClose={onWorkspaceMigrationDialogClose}
             />
           ) : shouldShowIdePrompt && currentIDE ? (
             <IdeIntegrationNudge

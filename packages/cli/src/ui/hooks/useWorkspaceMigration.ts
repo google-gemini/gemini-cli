@@ -10,7 +10,8 @@ import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import process from 'node:process';
 
 export function useWorkspaceMigration(settings: LoadedSettings) {
-  const [showMigrationDialog, setShowMigrationDialog] = useState(false);
+  const [showWorkspaceMigrationDialog, setShowWorkspaceMigrationDialog] =
+    useState(false);
   const [workspaceExtensions, setWorkspaceExtensions] = useState<Extension[]>(
     [],
   );
@@ -26,12 +27,12 @@ export function useWorkspaceMigration(settings: LoadedSettings) {
       !settings.merged.extensions?.workspacesWithMigrationNudge?.includes(cwd)
     ) {
       setWorkspaceExtensions(extensions);
-      setShowMigrationDialog(true);
+      setShowWorkspaceMigrationDialog(true);
       console.log(settings.merged.extensions);
     }
   }, [settings.merged.extensions, settings.merged.extensionManagement]);
 
-  const onMigrationDialogOpen = () => {
+  const onWorkspaceMigrationDialogOpen = () => {
     const userSettings = settings.forScope(SettingScope.User);
     const extensionSettings = userSettings.settings.extensions || {
       disabled: [],
@@ -49,14 +50,14 @@ export function useWorkspaceMigration(settings: LoadedSettings) {
     settings.setValue(SettingScope.User, 'extensions', extensionSettings);
   };
 
-  const onMigrationDialogClose = () => {
-    setShowMigrationDialog(false);
+  const onWorkspaceMigrationDialogClose = () => {
+    setShowWorkspaceMigrationDialog(false);
   };
 
   return {
-    showMigrationDialog,
+    showWorkspaceMigrationDialog,
     workspaceExtensions,
-    onMigrationDialogOpen,
-    onMigrationDialogClose,
+    onWorkspaceMigrationDialogOpen,
+    onWorkspaceMigrationDialogClose,
   };
 }
