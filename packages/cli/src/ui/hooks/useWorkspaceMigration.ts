@@ -5,8 +5,11 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Extension, getWorkspaceExtensions } from '../../config/extension.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import {
+  type Extension,
+  getWorkspaceExtensions,
+} from '../../config/extension.js';
+import { type LoadedSettings, SettingScope } from '../../config/settings.js';
 import process from 'node:process';
 
 export function useWorkspaceMigration(settings: LoadedSettings) {
