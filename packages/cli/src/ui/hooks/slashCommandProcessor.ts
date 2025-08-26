@@ -232,7 +232,7 @@ export const useSlashCommandProcessor = (
     const controller = new AbortController();
     const load = async () => {
       if (config) {
-        await initNotifications(config);
+        initNotifications(config);
       }
       const loaders = [
         new McpPromptLoader(config),

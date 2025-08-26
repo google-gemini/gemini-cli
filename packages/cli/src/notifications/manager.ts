@@ -117,17 +117,17 @@ export function getNotificationSettings(): NotificationSettings {
  * @param updates Partial settings to apply.
  * @param config The Config object to save settings to.
  */
-export async function updateNotificationEventSettings(
+export function updateNotificationEventSettings(
   eventType: NotificationEventType,
   updates: Partial<NotificationEventSettings>,
   config: Config,
-): Promise<void> {
+): void {
   if (currentSettings.events[eventType]) {
     currentSettings.events[eventType] = {
       ...currentSettings.events[eventType],
       ...updates,
     };
-    await saveNotificationSettings(config);
+    saveNotificationSettings(config);
   }
 }
 
@@ -136,12 +136,12 @@ export async function updateNotificationEventSettings(
  * @param enabled Whether to enable or disable notifications.
  * @param config The Config object to save settings to.
  */
-export async function setGlobalNotificationsEnabled(
+export function setGlobalNotificationsEnabled(
   enabled: boolean,
   config: Config,
-): Promise<void> {
+): void {
   currentSettings.enabled = enabled;
-  await saveNotificationSettings(config);
+  saveNotificationSettings(config);
 }
 
 /**
