@@ -134,7 +134,7 @@ export function useCommandCompletion(
       if (
         isPromptCompletionEnabled &&
         trimmedText.length >= PROMPT_COMPLETION_MIN_LENGTH &&
-        !trimmedText.startsWith('/') &&
+        !isSlashCommand(trimmedText) &&
         !trimmedText.includes('@')
       ) {
         return {

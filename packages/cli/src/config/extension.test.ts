@@ -18,6 +18,7 @@ import {
   uninstallExtension,
   updateExtension,
 } from './extension.js';
+import { type MCPServerConfig } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
 import { SettingScope, loadSettings } from './settings.js';
 import { type SimpleGit, simpleGit } from 'simple-git';
@@ -60,6 +61,7 @@ describe('loadExtensions', () => {
   afterEach(() => {
     fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
   });
 
   it('should include extension path in loaded extension', () => {
@@ -136,6 +138,7 @@ describe('loadExtensions', () => {
       EXTENSIONS_DIRECTORY_NAME,
     );
     fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+
     createExtension(workspaceExtensionsDir, 'ext1', '1.0.0');
     createExtension(workspaceExtensionsDir, 'ext2', '2.0.0');
 
@@ -154,6 +157,37 @@ describe('loadExtensions', () => {
     ).filter((e) => e.isActive);
     expect(activeExtensions).toHaveLength(1);
     expect(activeExtensions[0].name).toBe('ext2');
+  });
+
+  it('should hydrate variables', () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+
+    createExtension(
+      workspaceExtensionsDir,
+      'test-extension',
+      '1.0.0',
+      false,
+      undefined,
+      {
+        'test-server': {
+          cwd: '${extensionPath}${/}server',
+        },
+      },
+    );
+
+    const extensions = loadExtensions(tempWorkspaceDir);
+    expect(extensions).toHaveLength(1);
+    const loadedConfig = extensions[0].config;
+    const expectedCwd = path.join(
+      workspaceExtensionsDir,
+      'test-extension',
+      'server',
+    );
+    expect(loadedConfig.mcpServers?.['test-server'].cwd).toBe(expectedCwd);
   });
 });
 
@@ -318,9 +352,7 @@ describe('installExtension', () => {
     });
 
     const mockedSimpleGit = simpleGit as vi.MockedFunction<typeof simpleGit>;
-    mockedSimpleGit.mockReturnValue({
-      clone,
-    } as unknown as SimpleGit);
+    mockedSimpleGit.mockReturnValue({ clone } as unknown as SimpleGit);
 
     await installExtension({ source: gitUrl, type: 'git' });
 
@@ -400,12 +432,13 @@ function createExtension(
   version: string,
   addContextFile = false,
   contextFileName?: string,
+  mcpServers?: Record<string, MCPServerConfig>,
 ): string {
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(
     path.join(extDir, EXTENSIONS_CONFIG_FILENAME),
-    JSON.stringify({ name, version, contextFileName }),
+    JSON.stringify({ name, version, contextFileName, mcpServers }),
   );
 
   if (addContextFile) {
