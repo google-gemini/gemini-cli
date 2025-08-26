@@ -1092,27 +1092,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               currentModel={config.getModel()}
               fallbackModel={DEFAULT_GEMINI_FLASH_MODEL}
               onChoice={(choice) => {
+                setIsProQuotaDialogOpen(false);
+                if (!proQuotaDialogResolver) return;
+
+                const resolveValue = choice !== 'auth';
+                proQuotaDialogResolver(resolveValue);
+                setProQuotaDialogResolver(null);
+
                 if (choice === 'auth') {
-                  setIsProQuotaDialogOpen(false);
-                  if (proQuotaDialogResolver) {
-                    proQuotaDialogResolver(false);
-                    setProQuotaDialogResolver(null);
-                  }
                   openAuthDialog();
                 } else {
-                  setIsProQuotaDialogOpen(false);
-                  // For the 'continue' option, we want to:
-                  // 1. Resolve the promise to allow the current request to finish
-                  // 2. Switch to fallback mode
-                  // 3. Show a tip about using Ctrl+P to get the previous prompt
-                  if (proQuotaDialogResolver) {
-                    // Resolve with true to indicate we should continue with fallback
-                    proQuotaDialogResolver(true);
-                    setProQuotaDialogResolver(null);
-                  }
-                  // Switch to fallback model immediately
-                  config.setModel(DEFAULT_GEMINI_FLASH_MODEL);
-                  config.setFallbackMode(true);
                   addItem(
                     {
                       type: MessageType.INFO,
