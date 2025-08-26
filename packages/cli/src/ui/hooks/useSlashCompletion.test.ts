@@ -24,13 +24,34 @@ function createTestCommand(command: TestSlashCommand): SlashCommand {
   };
 }
 
-// Mock the fzf module to allow us to test error scenarios
+// Mock the fzf module to provide a working fuzzy search implementation for tests
 vi.mock('fzf', async () => {
   const actual = await vi.importActual<typeof import('fzf')>('fzf');
   return {
     ...actual,
-    AsyncFzf: vi.fn().mockImplementation((_items, _options) => ({
-      find: vi.fn().mockResolvedValue([])
+    AsyncFzf: vi.fn().mockImplementation((items, _options) => ({
+      find: vi.fn().mockImplementation((query: string) => {
+        // Simulate basic fuzzy matching behavior for tests
+        const results = [];
+        if (query) {
+          const lowerQuery = query.toLowerCase();
+          for (const item of items) {
+            const lowerItem = item.toLowerCase();
+            // Simple fuzzy matching: check if query chars appear in order
+            let queryIndex = 0;
+            for (let i = 0; i < lowerItem.length && queryIndex < lowerQuery.length; i++) {
+              if (lowerItem[i] === lowerQuery[queryIndex]) {
+                queryIndex++;
+              }
+            }
+            // If all query characters were found in order, include this item
+            if (queryIndex === lowerQuery.length) {
+              results.push({ item, positions: [] });
+            }
+          }
+        }
+        return Promise.resolve(results);
+      })
     }))
   };
 });
@@ -114,9 +135,11 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toEqual([
-        { label: 'memory', value: 'memory', description: 'Manage memory' },
-      ]);
+      await waitFor(() => {
+        expect(result.current.suggestions).toEqual([
+          { label: 'memory', value: 'memory', description: 'Manage memory' },
+        ]);
+      });
     });
 
     it('should suggest commands based on partial altNames', async () => {
@@ -136,13 +159,15 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toEqual([
-        {
-          label: 'stats',
-          value: 'stats',
-          description: 'check session stats. Usage: /stats [model|tools]',
-        },
-      ]);
+      await waitFor(() => {
+        expect(result.current.suggestions).toEqual([
+          {
+            label: 'stats',
+            value: 'stats',
+            description: 'check session stats. Usage: /stats [model|tools]',
+          },
+        ]);
+      });
     });
 
     it('should NOT provide suggestions for a perfectly typed command that is a leaf node', async () => {
@@ -305,9 +330,11 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toEqual([
-        { label: 'add', value: 'add', description: 'Add to memory' },
-      ]);
+      await waitFor(() => {
+        expect(result.current.suggestions).toEqual([
+          { label: 'add', value: 'add', description: 'Add to memory' },
+        ]);
+      });
     });
 
     it('should provide no suggestions for an invalid sub-command', async () => {
@@ -602,8 +629,9 @@ describe('useSlashCompletion', () => {
                   queryIndex++;
                 }
               }
+              // If all query characters were found in order, include this item
               if (queryIndex === lowerQuery.length) {
-                results.push({ item, score: 1 });
+                results.push({ item, positions: [] });
               }
             }
           }
@@ -668,15 +696,36 @@ describe('useSlashCompletion', () => {
       await waitFor(() => {
         expect(consoleWarnSpy).toHaveBeenCalledWith(
           'Fuzzy search failed, falling back to prefix matching:',
-          expect.any(Error)
+          'AsyncFzf error in find'
         );
       });
       
       consoleWarnSpy.mockRestore();
       
       // Reset AsyncFzf mock to default behavior for other tests
-      vi.mocked(AsyncFzf).mockImplementation((_items, _options) => ({
-        find: vi.fn().mockResolvedValue([])
+      vi.mocked(AsyncFzf).mockImplementation((items, _options) => ({
+        find: vi.fn().mockImplementation((query: string) => {
+          // Simulate basic fuzzy matching behavior for tests
+          const results = [];
+          if (query) {
+            const lowerQuery = query.toLowerCase();
+            for (const item of items) {
+              const lowerItem = item.toLowerCase();
+              // Simple fuzzy matching: check if query chars appear in order
+              let queryIndex = 0;
+              for (let i = 0; i < lowerItem.length && queryIndex < lowerQuery.length; i++) {
+                if (lowerItem[i] === lowerQuery[queryIndex]) {
+                  queryIndex++;
+                }
+              }
+              // If all query characters were found in order, include this item
+              if (queryIndex === lowerQuery.length) {
+                results.push({ item, positions: [] });
+              }
+            }
+          }
+          return Promise.resolve(results);
+        })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any));
     });
@@ -739,9 +788,6 @@ describe('useSlashCompletion', () => {
       expect(labels).toContain('config');
     });
   });
-
-<<<<<<< HEAD
-=======
   describe('Race Condition Handling', () => {
     it('should handle rapid input changes without race conditions', async () => {
       const mockDelayedCompletion = vi.fn().mockImplementation(
@@ -829,6 +875,4 @@ describe('useSlashCompletion', () => {
       expect(true).toBe(true); // Test passes if no errors are thrown
     });
   });
-
->>>>>>> 1a61bfe8 (test(useSlashCompletion): add test utility for creating slash commands)
 });
