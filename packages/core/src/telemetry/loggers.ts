@@ -573,7 +573,7 @@ export function logContentRetryFailure(
   };
 
   if (event.total_duration_ms) {
-    attributes.total_duration_ms = event.total_duration_ms;
+    attributes['total_duration_ms'] = event.total_duration_ms;
   }
 
   const logger = logs.getLogger(SERVICE_NAME);
