@@ -6,7 +6,10 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
-import { ToolCallConfirmationDetails, Config } from '@google/gemini-cli-core';
+import type {
+  ToolCallConfirmationDetails,
+  Config,
+} from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 
 describe('ToolConfirmationMessage', () => {

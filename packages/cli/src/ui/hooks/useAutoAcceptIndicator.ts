@@ -7,7 +7,8 @@
 import { useState, useEffect } from 'react';
 import { ApprovalMode, type Config } from '@google/gemini-cli-core';
 import { useKeypress } from './useKeypress.js';
-import { HistoryItemWithoutId, MessageType } from '../types.js';
+import type { HistoryItemWithoutId } from '../types.js';
+import { MessageType } from '../types.js';
 
 export interface UseAutoAcceptIndicatorArgs {
   config: Config;
