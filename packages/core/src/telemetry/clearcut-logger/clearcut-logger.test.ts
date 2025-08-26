@@ -277,6 +277,7 @@ describe('ClearcutLogger', () => {
         env: {
           CURSOR_TRACE_ID: 'abc123',
           GITHUB_SHA: undefined,
+          TERM_PROGRAM: 'vscode',
         },
         expectedValue: 'cursor',
       },
@@ -292,6 +293,7 @@ describe('ClearcutLogger', () => {
         env: {
           MONOSPACE_ENV: 'true',
           GITHUB_SHA: undefined,
+          TERM_PROGRAM: 'vscode',
         },
         expectedValue: 'firebasestudio',
       },
@@ -299,6 +301,7 @@ describe('ClearcutLogger', () => {
         env: {
           __COG_BASHRC_SOURCED: 'true',
           GITHUB_SHA: undefined,
+          TERM_PROGRAM: 'vscode',
         },
         expectedValue: 'devin',
       },
@@ -306,6 +309,7 @@ describe('ClearcutLogger', () => {
         env: {
           CLOUD_SHELL: 'true',
           GITHUB_SHA: undefined,
+          TERM_PROGRAM: 'vscode',
         },
         expectedValue: 'cloudshell',
       },
