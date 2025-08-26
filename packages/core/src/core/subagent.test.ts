@@ -4,11 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, Mock, afterEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 import {
   ContextState,
   SubAgentScope,
   SubagentTerminateMode,
+} from './subagent.js';
+import type {
   PromptConfig,
   ModelConfig,
   RunConfig,
@@ -16,19 +19,20 @@ import {
   ToolConfig,
   SubAgentOptions,
 } from './subagent.js';
-import { Config, ConfigParameters } from '../config/config.js';
+import { Config } from '../config/config.js';
+import type { ConfigParameters } from '../config/config.js';
 import { GeminiChat } from './geminiChat.js';
 import { createContentGenerator } from './contentGenerator.js';
 import { getEnvironmentContext } from '../utils/environmentContext.js';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
-import { ToolRegistry } from '../tools/tool-registry.js';
+import type { ToolRegistry } from '../tools/tool-registry.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
-import {
+import { Type } from '@google/genai';
+import type {
   Content,
   FunctionCall,
   FunctionDeclaration,
   GenerateContentConfig,
-  Type,
 } from '@google/genai';
 import { ToolErrorType } from '../tools/tool-error.js';
 

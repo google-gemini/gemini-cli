@@ -6,20 +6,20 @@
 
 import { reportError } from '../utils/errorReporting.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { AnyDeclarativeTool } from '../tools/tools.js';
-import { Config } from '../config/config.js';
-import { ToolCallRequestInfo } from './turn.js';
+import type { AnyDeclarativeTool } from '../tools/tools.js';
+import type { Config } from '../config/config.js';
+import type { ToolCallRequestInfo } from './turn.js';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
 import { createContentGenerator } from './contentGenerator.js';
 import { getEnvironmentContext } from '../utils/environmentContext.js';
-import {
+import type {
   Content,
   Part,
   FunctionCall,
   GenerateContentConfig,
   FunctionDeclaration,
-  Type,
 } from '@google/genai';
+import { Type } from '@google/genai';
 import { GeminiChat } from './geminiChat.js';
 
 /**
