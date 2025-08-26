@@ -1624,7 +1624,9 @@ describe('App UI', () => {
 
       // The prompt should now be empty as a result of the cancellation handler's logic.
       // We can't directly test the buffer's state, but we can see the rendered output.
-      expect(lastFrame()).not.toContain('some text');
+      await waitFor(() => {
+        expect(lastFrame()).not.toContain('some text');
+      });
     });
   });
 });
