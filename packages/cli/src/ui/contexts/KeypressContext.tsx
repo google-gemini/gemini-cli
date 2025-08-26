@@ -526,11 +526,27 @@ export function KeypressProvider({
           }
 
           // Try to peel off as many complete sequences as are available at the
-          // start of the buffer. This handles batched inputs cleanly.
+          // start of the buffer. This handles batched inputs cleanly. If the
+          // prefix is incomplete or invalid, skip to the next CSI introducer
+          // (ESC[) so that a following valid sequence can still be parsed.
           let parsedAny = false;
           while (kittySequenceBuffer) {
             const parsed = parseKittyPrefix(kittySequenceBuffer);
-            if (!parsed) break;
+            if (!parsed) {
+              // Look for the next potential CSI start beyond index 0
+              const nextStart = kittySequenceBuffer.indexOf(`${ESC}[`, 1);
+              if (nextStart > 0) {
+                if (debugKeystrokeLogging) {
+                  console.log(
+                    '[DEBUG] Skipping incomplete/invalid CSI prefix:',
+                    kittySequenceBuffer.slice(0, nextStart),
+                  );
+                }
+                kittySequenceBuffer = kittySequenceBuffer.slice(nextStart);
+                continue;
+              }
+              break;
+            }
             if (debugKeystrokeLogging) {
               console.log(
                 '[DEBUG] Kitty sequence parsed successfully (prefix):',

@@ -754,6 +754,34 @@ describe('KeypressContext - Kitty Protocol', () => {
     });
   });
 
+  describe('Legacy Home/End while Kitty enabled', () => {
+    it('should parse ESC[H/ESC[F as home/end without modifiers', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.sendKittySequence(`\x1b[H`));
+      act(() => stdin.sendKittySequence(`\x1b[F`));
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'home',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        }),
+      );
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'end',
+          ctrl: false,
+          meta: false,
+          shift: false,
+        }),
+      );
+    });
+  });
+
   describe('Double-tap and batching', () => {
     it('should emit two delete events for double-tap CSI[3~', async () => {
       const keyHandler = vi.fn();
