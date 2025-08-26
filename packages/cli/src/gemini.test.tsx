@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import stripAnsi from 'strip-ansi';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   main,
@@ -16,6 +15,7 @@ import type { SettingsFile } from './config/settings.js';
 import { LoadedSettings, loadSettings } from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import type { Config } from '@google/gemini-cli-core';
+import { FatalConfigError } from '@google/gemini-cli-core';
 
 // Custom error to identify mock process.exit calls
 class MockProcessExitError extends Error {
@@ -75,7 +75,6 @@ vi.mock('./utils/sandbox.js', () => ({
 }));
 
 describe('gemini.tsx main function', () => {
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   let loadSettingsMock: ReturnType<typeof vi.mocked<typeof loadSettings>>;
   let originalEnvGeminiSandbox: string | undefined;
   let originalEnvSandbox: string | undefined;
@@ -97,7 +96,6 @@ describe('gemini.tsx main function', () => {
     delete process.env['GEMINI_SANDBOX'];
     delete process.env['SANDBOX'];
 
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     initialUnhandledRejectionListeners =
       process.listeners('unhandledRejection');
   });
@@ -126,7 +124,7 @@ describe('gemini.tsx main function', () => {
     vi.restoreAllMocks();
   });
 
-  it('should call process.exit(1) if settings have errors', async () => {
+  it('should throw InvalidConfigurationError if settings have errors', async () => {
     const settingsError = {
       message: 'Test settings error',
       path: '/test/settings.json',
@@ -158,28 +156,7 @@ describe('gemini.tsx main function', () => {
 
     loadSettingsMock.mockReturnValue(mockLoadedSettings);
 
-    try {
-      await main();
-      // If main completes without throwing, the test should fail because process.exit was expected
-      expect.fail('main function did not exit as expected');
-    } catch (error) {
-      expect(error).toBeInstanceOf(MockProcessExitError);
-      if (error instanceof MockProcessExitError) {
-        expect(error.code).toBe(1);
-      }
-    }
-
-    // Verify console.error was called with the error message
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
-    expect(stripAnsi(String(consoleErrorSpy.mock.calls[0][0]))).toBe(
-      'Error in /test/settings.json: Test settings error',
-    );
-    expect(stripAnsi(String(consoleErrorSpy.mock.calls[1][0]))).toBe(
-      'Please fix /test/settings.json and try again.',
-    );
-
-    // Verify process.exit was called.
-    expect(processExitSpy).toHaveBeenCalledWith(1);
+    await expect(main()).rejects.toThrow(FatalConfigError);
   });
 
   it('should log unhandled promise rejections and open debug console on first error', async () => {
