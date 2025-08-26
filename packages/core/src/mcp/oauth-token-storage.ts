@@ -51,7 +51,7 @@ export class MCPOAuthTokenStorage {
       // File doesn't exist or is invalid, return empty map
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         console.error(
-          `Failed to load  OAuth tokens: ${getErrorMessage(error)}`,
+          `Failed to load MCP OAuth tokens: ${getErrorMessage(error)}`,
         );
       }
     }
