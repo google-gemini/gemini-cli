@@ -6,8 +6,6 @@
 
 import express from 'express';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import * as url from 'node:url';
-import * as path from 'node:path';
 
 import { Message, Task as SDKTask, AgentCard } from '@a2a-js/sdk';
 import {
@@ -649,7 +647,7 @@ export function updateCoderAgentCardUrl(port: number) {
   coderAgentCard.url = `http://localhost:${port}/`;
 }
 
-async function main() {
+export async function main() {
   try {
     const expressApp = await createApp();
     const port = process.env['CODER_AGENT_PORT'] || 0;
@@ -787,26 +785,4 @@ export async function createApp() {
     logger.error('[CoreAgent] Error during startup:', error);
     process.exit(1);
   }
-}
-
-process.on('uncaughtException', (error) => {
-  logger.error('Unhandled exception:', error);
-  process.exit(1);
-});
-
-// Check if the module is the main script being run. path.resolve() creates a
-// canonical, absolute path, which avoids cross-platform issues.
-const isMainModule =
-  path.resolve(process.argv[1]) ===
-  path.resolve(url.fileURLToPath(import.meta.url));
-
-if (
-  import.meta.url.startsWith('file:') &&
-  isMainModule &&
-  process.env['NODE_ENV'] !== 'test'
-) {
-  main().catch((error) => {
-    logger.error('[CoreAgent] Unhandled error in main:', error);
-    process.exit(1);
-  });
 }
