@@ -24,37 +24,86 @@ function createTestCommand(command: TestSlashCommand): SlashCommand {
   };
 }
 
+// Track AsyncFzf constructor calls for cache testing
+let asyncFzfConstructorCalls = 0;
+const resetConstructorCallCount = () => { asyncFzfConstructorCalls = 0; };
+const getConstructorCallCount = () => asyncFzfConstructorCalls;
+
+// Centralized fuzzy matching simulation logic
+// Note: This is a simplified reimplementation that may diverge from real fzf behavior.
+// Integration tests in useSlashCompletion.integration.test.ts use the real fzf library
+// to catch any behavioral differences and serve as our "canary in a coal mine."
+function simulateFuzzyMatching(items: readonly string[], query: string) {
+  const results = [];
+  if (query) {
+    const lowerQuery = query.toLowerCase();
+    for (const item of items) {
+      const lowerItem = item.toLowerCase();
+      
+      // Exact match gets highest score
+      if (lowerItem === lowerQuery) {
+        results.push({ item, positions: [], score: 100, start: 0, end: item.length });
+        continue;
+      }
+      
+      // Prefix match gets high score
+      if (lowerItem.startsWith(lowerQuery)) {
+        results.push({ item, positions: [], score: 80, start: 0, end: query.length });
+        continue;
+      }
+      
+      // Fuzzy matching: check if query chars appear in order
+      let queryIndex = 0;
+      let score = 0;
+      for (let i = 0; i < lowerItem.length && queryIndex < lowerQuery.length; i++) {
+        if (lowerItem[i] === lowerQuery[queryIndex]) {
+          queryIndex++;
+          score += (10 - i); // Earlier matches get higher scores
+        }
+      }
+      
+      // If all query characters were found in order, include this item
+      if (queryIndex === lowerQuery.length) {
+        results.push({ item, positions: [], score, start: 0, end: query.length });
+      }
+    }
+  }
+  
+  // Sort by score descending (better matches first)
+  results.sort((a, b) => b.score - a.score);
+  return Promise.resolve(results);
+}
+
 // Mock the fzf module to provide a working fuzzy search implementation for tests
 vi.mock('fzf', async () => {
   const actual = await vi.importActual<typeof import('fzf')>('fzf');
   return {
     ...actual,
-    AsyncFzf: vi.fn().mockImplementation((items, _options) => ({
-      find: vi.fn().mockImplementation((query: string) => {
-        // Simulate basic fuzzy matching behavior for tests
-        const results = [];
-        if (query) {
-          const lowerQuery = query.toLowerCase();
-          for (const item of items) {
-            const lowerItem = item.toLowerCase();
-            // Simple fuzzy matching: check if query chars appear in order
-            let queryIndex = 0;
-            for (let i = 0; i < lowerItem.length && queryIndex < lowerQuery.length; i++) {
-              if (lowerItem[i] === lowerQuery[queryIndex]) {
-                queryIndex++;
-              }
-            }
-            // If all query characters were found in order, include this item
-            if (queryIndex === lowerQuery.length) {
-              results.push({ item, positions: [] });
-            }
-          }
-        }
-        return Promise.resolve(results);
-      })
-    }))
+    AsyncFzf: vi.fn().mockImplementation((items, _options) => {
+      asyncFzfConstructorCalls++;
+      return {
+        find: vi.fn().mockImplementation((query: string) => 
+          simulateFuzzyMatching(items, query)
+        )
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any;
+    })
   };
 });
+
+// Default mock behavior helper - now uses centralized logic
+const createDefaultAsyncFzfMock = () => (items: readonly string[], _options: unknown) => {
+  asyncFzfConstructorCalls++;
+  return {
+    find: vi.fn().mockImplementation((query: string) => 
+      simulateFuzzyMatching(items, query)
+    )
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any;
+};
+
+// Export test utilities
+export { resetConstructorCallCount, getConstructorCallCount, createDefaultAsyncFzfMock };
 
 // Test harness to capture the state from the hook's callbacks.
 function useTestHarnessForSlashCompletion(
@@ -563,8 +612,8 @@ describe('useSlashCompletion', () => {
     });
 
     it('should fallback to prefix matching when AsyncFzf find fails', async () => {
-      // Mock console.warn to avoid noise in test output
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      // Mock console.error to avoid noise in test output
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       
       // Import the mocked AsyncFzf
       const { AsyncFzf } = await import('fzf');
@@ -574,6 +623,7 @@ describe('useSlashCompletion', () => {
       
       // Mock AsyncFzf to return an instance with failing find
       vi.mocked(AsyncFzf).mockImplementation((_items, _options) => ({
+        finder: vi.fn(),
         find: mockFind
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any));
@@ -603,42 +653,18 @@ describe('useSlashCompletion', () => {
       expect(labels).not.toContain('config'); // Doesn't start with 'cle'
       expect(labels).not.toContain('chat'); // Doesn't start with 'cle'
       
-      // Verify the warning was logged
+      // Verify the error was logged
       await waitFor(() => {
-        expect(consoleWarnSpy).toHaveBeenCalledWith(
-          'Fuzzy search failed, falling back to prefix matching:',
-          'AsyncFzf find failed'
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          '[Fuzzy search - falling back to prefix matching]',
+          expect.any(Error)
         );
       });
       
-      consoleWarnSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
       
       // Reset AsyncFzf mock to default behavior for other tests
-      vi.mocked(AsyncFzf).mockImplementation((items, _options) => ({
-        find: vi.fn().mockImplementation((query: string) => {
-          // Simulate basic fuzzy matching behavior for tests
-          const results = [];
-          if (query) {
-            const lowerQuery = query.toLowerCase();
-            for (const item of items) {
-              const lowerItem = item.toLowerCase();
-              // Simple fuzzy matching: check if query chars appear in order
-              let queryIndex = 0;
-              for (let i = 0; i < lowerItem.length && queryIndex < lowerQuery.length; i++) {
-                if (lowerItem[i] === lowerQuery[queryIndex]) {
-                  queryIndex++;
-                }
-              }
-              // If all query characters were found in order, include this item
-              if (queryIndex === lowerQuery.length) {
-                results.push({ item, positions: [] });
-              }
-            }
-          }
-          return Promise.resolve(results);
-        })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any));
+      vi.mocked(AsyncFzf).mockImplementation(createDefaultAsyncFzfMock());
     });
 
     it('should show all commands for empty partial query', async () => {
@@ -655,8 +681,8 @@ describe('useSlashCompletion', () => {
     });
 
     it('should handle AsyncFzf errors gracefully and fallback to prefix matching', async () => {
-      // Mock console.warn to avoid noise in test output
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      // Mock console.error to avoid noise in test output
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       
       // Import the mocked AsyncFzf
       const { AsyncFzf } = await import('fzf');
@@ -666,6 +692,7 @@ describe('useSlashCompletion', () => {
       
       // Mock AsyncFzf to return an instance with failing find
       vi.mocked(AsyncFzf).mockImplementation((_items, _options) => ({
+        finder: vi.fn(),
         find: mockFind
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any));
@@ -692,47 +719,28 @@ describe('useSlashCompletion', () => {
       const labels = result.current.suggestions.map((s) => s.label);
       expect(labels).toEqual(expect.arrayContaining(['test', 'temp']));
       
-      // Verify the warning was logged
+      // Verify the error was logged
       await waitFor(() => {
-        expect(consoleWarnSpy).toHaveBeenCalledWith(
-          'Fuzzy search failed, falling back to prefix matching:',
-          'AsyncFzf error in find'
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          '[Fuzzy search - falling back to prefix matching]',
+          expect.any(Error)
         );
       });
       
-      consoleWarnSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
       
       // Reset AsyncFzf mock to default behavior for other tests
-      vi.mocked(AsyncFzf).mockImplementation((items, _options) => ({
-        find: vi.fn().mockImplementation((query: string) => {
-          // Simulate basic fuzzy matching behavior for tests
-          const results = [];
-          if (query) {
-            const lowerQuery = query.toLowerCase();
-            for (const item of items) {
-              const lowerItem = item.toLowerCase();
-              // Simple fuzzy matching: check if query chars appear in order
-              let queryIndex = 0;
-              for (let i = 0; i < lowerItem.length && queryIndex < lowerQuery.length; i++) {
-                if (lowerItem[i] === lowerQuery[queryIndex]) {
-                  queryIndex++;
-                }
-              }
-              // If all query characters were found in order, include this item
-              if (queryIndex === lowerQuery.length) {
-                results.push({ item, positions: [] });
-              }
-            }
-          }
-          return Promise.resolve(results);
-        })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any));
+      vi.mocked(AsyncFzf).mockImplementation(createDefaultAsyncFzfMock());
     });
 
     it('should cache AsyncFzf instances for performance', async () => {
-      // This test verifies that the same command set reuses cached instances
-      // We test this indirectly by ensuring consistent behavior across multiple renders
+      // Reset constructor call count and ensure mock is set up correctly
+      resetConstructorCallCount();
+      
+      // Import the mocked AsyncFzf
+      const { AsyncFzf } = await import('fzf');
+      vi.mocked(AsyncFzf).mockImplementation(createDefaultAsyncFzfMock());
+      
       const { result, rerender } = renderHook(
         ({ query }) =>
           useTestHarnessForSlashCompletion(
@@ -749,8 +757,10 @@ describe('useSlashCompletion', () => {
       });
 
       const firstResults = result.current.suggestions.map((s) => s.label);
+      const callCountAfterFirst = getConstructorCallCount();
+      expect(callCountAfterFirst).toBeGreaterThan(0);
 
-      // Rerender with same query - should use cached instance and return same results
+      // Rerender with same query - should use cached instance
       rerender({ query: '/he' });
 
       await waitFor(() => {
@@ -758,7 +768,21 @@ describe('useSlashCompletion', () => {
       });
 
       const secondResults = result.current.suggestions.map((s) => s.label);
+      const callCountAfterSecond = getConstructorCallCount();
+      
+      // Should have same number of constructor calls (reused cached instance)
+      expect(callCountAfterSecond).toBe(callCountAfterFirst);
       expect(secondResults).toEqual(firstResults);
+
+      // Different query should still use same cached instance for same command set
+      rerender({ query: '/hel' });
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const thirdCallCount = getConstructorCallCount();
+      expect(thirdCallCount).toBe(callCountAfterFirst); // Same constructor call count
     });
 
     it('should not return duplicate suggestions when query matches both name and altNames', async () => {
@@ -873,6 +897,60 @@ describe('useSlashCompletion', () => {
       // Since the component is unmounted, suggestions should remain empty
       // and no state update errors should occur
       expect(true).toBe(true); // Test passes if no errors are thrown
+    });
+  });
+
+  describe('Error Logging', () => {
+    it('should log errors to the console', async () => {
+      // Mock console.error to capture log calls
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      // Import the mocked AsyncFzf
+      const { AsyncFzf } = await import('fzf');
+      
+      // Create a failing find method with error containing sensitive-looking data
+      const sensitiveError = new Error('Database connection failed: user=admin, pass=secret123');
+      const mockFind = vi.fn().mockRejectedValue(sensitiveError);
+      
+      // Mock AsyncFzf to return an instance with failing find
+      vi.mocked(AsyncFzf).mockImplementation((_items, _options) => ({
+        find: mockFind
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any));
+      
+      const testCommands = [
+        createTestCommand({ name: 'test', description: 'Test command' })
+      ];
+      
+      const { result } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/test',
+          testCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      // Should get fallback suggestions
+      const labels = result.current.suggestions.map((s) => s.label);
+      expect(labels).toContain('test');
+      
+      // Verify error logging occurred
+      await waitFor(() => {
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          '[Fuzzy search - falling back to prefix matching]',
+          sensitiveError
+        );
+      });
+      
+      consoleErrorSpy.mockRestore();
+      
+      // Reset AsyncFzf mock to default behavior
+      vi.mocked(AsyncFzf).mockImplementation(createDefaultAsyncFzfMock());
     });
   });
 });

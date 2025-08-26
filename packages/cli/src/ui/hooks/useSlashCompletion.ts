@@ -15,29 +15,31 @@ type FzfCommandResult = {
   start: number;
   end: number;
   score: number;
-  positions: Record<string, unknown>;
+  positions?: number[]; // Optional - fzf doesn't always provide match positions depending on algorithm/options used
 };
 
-// Interface for FZF command cache entry
+// Interface for FZF command cache entry (simplified)
 interface FzfCommandCacheEntry {
   fzf: AsyncFzf<string[]>;
   commandMap: Map<string, SlashCommand>;
-  createdAt: number;
-  lastUsed: number;
 }
 
-// Cache management constants
-const MAX_CACHE_SIZE = 50; // Maximum number of cached instances
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes TTL
-
-// Utility function to safely extract error messages without information disclosure
-function getSafeErrorMessage(error: unknown, fallback = 'Unknown error'): string {
+// Utility function to safely handle errors without information disclosure
+function logErrorSafely(error: unknown, context: string): void {
   if (error instanceof Error) {
-    // Only include safe error messages, avoid stack traces or sensitive data
-    return error.message.replace(/[^\w\s\-.,!?()]/g, '').slice(0, 200);
+    // Log full error details securely for debugging
+    console.error(`[${context}]`, error);
+  } else {
+    console.error(`[${context}] Non-error thrown:`, error);
   }
-  return fallback;
 }
+
+// Shared utility function for command matching logic
+function matchesCommand(cmd: SlashCommand, query: string): boolean {
+  return cmd.name.toLowerCase() === query.toLowerCase() ||
+    cmd.altNames?.some(alt => alt.toLowerCase() === query.toLowerCase()) || false;
+}
+
 
 interface CommandParserResult {
   hasTrailingSpace: boolean;
@@ -51,8 +53,7 @@ interface CommandParserResult {
 
 function useCommandParser(
   query: string | null,
-  slashCommands: readonly SlashCommand[],
-  matchesCommand: (cmd: SlashCommand, query: string) => boolean
+  slashCommands: readonly SlashCommand[]
 ): CommandParserResult {
   return useMemo(() => {
     if (!query) {
@@ -128,7 +129,7 @@ function useCommandParser(
       exactMatchAsParent,
       isArgumentCompletion,
     };
-  }, [query, slashCommands, matchesCommand]);
+  }, [query, slashCommands]);
 }
 
 interface SuggestionsResult {
@@ -191,7 +192,7 @@ function useCommandSuggestions(
           }
         } catch (error) {
           if (!signal.aborted) {
-            console.warn('Argument completion failed:', getSafeErrorMessage(error));
+            logErrorSafely(error, 'Argument completion');
             setSuggestions([]);
             setIsLoading(false);
           }
@@ -226,7 +227,7 @@ function useCommandSuggestions(
               });
               potentialSuggestions = Array.from(uniqueCommands);
             } catch (error) {
-              console.warn('Fuzzy search failed, falling back to prefix matching:', getSafeErrorMessage(error));
+              logErrorSafely(error, 'Fuzzy search - falling back to prefix matching');
               // Fallback to prefix-based filtering
               potentialSuggestions = getPrefixSuggestions(commandsToSearch, partial);
             }
@@ -248,17 +249,11 @@ function useCommandSuggestions(
       };
 
       performFuzzySearch().catch((error) => {
-        console.warn('Unexpected error in fuzzy search:', getSafeErrorMessage(error));
+        logErrorSafely(error, 'Unexpected fuzzy search error');
         if (!signal.aborted) {
-          // Ultimate fallback: show all commands with descriptions
-          const fallbackSuggestions = commandsToSearch
-            .filter((cmd) => cmd.description)
-            .map((cmd) => ({
-              label: cmd.name,
-              value: cmd.name,
-              description: cmd.description,
-            }));
-          setSuggestions(fallbackSuggestions);
+          // Ultimate fallback: show no suggestions rather than confusing the user
+          // with all available commands when their query clearly doesn't match anything
+          setSuggestions([]);
         }
       });
       return () => abortController.abort();
@@ -301,8 +296,7 @@ function useCompletionPositions(
 }
 
 function usePerfectMatch(
-  parserResult: CommandParserResult,
-  matchesCommand: (cmd: SlashCommand, query: string) => boolean
+  parserResult: CommandParserResult
 ): PerfectMatchResult {
   return useMemo(() => {
     const { hasTrailingSpace, partial, leafCommand, currentLevel } = parserResult;
@@ -325,7 +319,7 @@ function usePerfectMatch(
     }
 
     return { isPerfectMatch: false };
-  }, [parserResult, matchesCommand]);
+  }, [parserResult]);
 }
 
 export interface UseSlashCompletionProps {
@@ -354,11 +348,8 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
   const [completionStart, setCompletionStart] = useState(-1);
   const [completionEnd, setCompletionEnd] = useState(-1);
 
-  // Memoized cache for AsyncFzf instances per command level
+  // Simplified cache for AsyncFzf instances - WeakMap handles automatic cleanup
   const fzfInstanceCache = useMemo(() => new WeakMap<readonly SlashCommand[], FzfCommandCacheEntry>(), []);
-  
-  // Cache metadata for monitoring and cleanup (using WeakRef to avoid memory leaks)
-  const cacheMetadata = useMemo(() => new Map<string, WeakRef<readonly SlashCommand[]>>(), []);
 
   // Helper function to create or retrieve cached AsyncFzf instance for a command level
   const getFzfForCommands = useMemo(() => (commands: readonly SlashCommand[]) => {
@@ -368,36 +359,11 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
     
     // Check if we already have a cached instance
     const cached = fzfInstanceCache.get(commands);
-    const now = Date.now();
-    
     if (cached) {
-      // Check if cache entry is still valid
-      if (now - cached.createdAt < CACHE_TTL_MS) {
-        cached.lastUsed = now;
-        return cached;
-      } else {
-        // Cache expired, remove it
-        fzfInstanceCache.delete(commands);
-      }
+      return cached;
     }
     
-    // Perform cache cleanup if we're approaching the limit
-    if (cacheMetadata.size >= MAX_CACHE_SIZE) {
-      const keysToRemove: string[] = [];
-      cacheMetadata.forEach((commandsRef, key) => {
-        const commandsArray = commandsRef.deref();
-        if (!commandsArray || !fzfInstanceCache.has(commandsArray)) {
-          keysToRemove.push(key);
-        }
-      });
-      keysToRemove.forEach(key => cacheMetadata.delete(key));
-      
-      // If still at limit, we'll just proceed - WeakMap will eventually clean up
-      if (cacheMetadata.size >= MAX_CACHE_SIZE) {
-        console.warn(`FZF cache approaching limit (${cacheMetadata.size}/${MAX_CACHE_SIZE})`);
-      }
-    }
-    
+    // Create new fzf instance
     const commandItems: string[] = [];
     const commandMap = new Map<string, SlashCommand>();
     
@@ -421,30 +387,23 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
     
     try {
       const instance: FzfCommandCacheEntry = {
-        fzf: new AsyncFzf(commandItems, { fuzzy: 'v2' }),
-        commandMap,
-        createdAt: now,
-        lastUsed: now
+        fzf: new AsyncFzf(commandItems, { 
+          fuzzy: 'v2',
+          casing: 'case-insensitive' // Explicitly enforce case-insensitivity
+        }),
+        commandMap
       };
       
-      // Cache the instance for future use
+      // Cache the instance - WeakMap will handle automatic cleanup
       fzfInstanceCache.set(commands, instance);
-      
-      // Track in metadata for cleanup purposes
-      const cacheKey = `cache_${now}_${Math.random()}`;
-      cacheMetadata.set(cacheKey, new WeakRef(commands));
       
       return instance;
     } catch (error) {
-      console.warn('Failed to create FZF instance:', getSafeErrorMessage(error));
+      logErrorSafely(error, 'FZF instance creation');
       return null;
     }
-  }, [fzfInstanceCache, cacheMetadata]);
+  }, [fzfInstanceCache]);
 
-  // Helper function for command matching to reduce code duplication
-  const matchesCommand = useMemo(() => (cmd: SlashCommand, query: string): boolean => 
-    cmd.name.toLowerCase() === query.toLowerCase() ||
-    cmd.altNames?.some(alt => alt.toLowerCase() === query.toLowerCase()) || false, []);
 
   // Memoized helper function for prefix-based filtering to improve performance
   const getPrefixSuggestions = useMemo(() => (commands: readonly SlashCommand[], partial: string) => 
@@ -456,7 +415,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
     ), []);
 
   // Use extracted hooks for better separation of concerns
-  const parserResult = useCommandParser(query, slashCommands, matchesCommand);
+  const parserResult = useCommandParser(query, slashCommands);
   const { suggestions: hookSuggestions, isLoading } = useCommandSuggestions(
     parserResult,
     commandContext,
@@ -464,7 +423,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
     getPrefixSuggestions
   );
   const { start: calculatedStart, end: calculatedEnd } = useCompletionPositions(query, parserResult);
-  const { isPerfectMatch } = usePerfectMatch(parserResult, matchesCommand);
+  const { isPerfectMatch } = usePerfectMatch(parserResult);
 
   // Update external state - this is now much simpler and focused
   useEffect(() => {
