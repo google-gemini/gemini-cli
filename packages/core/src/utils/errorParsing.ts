@@ -16,7 +16,7 @@ import {
 } from '../config/models.js';
 import { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
-import { PartListUnion } from '@google/genai';
+import { PartListUnion, PartUnion } from '@google/genai';
 
 // Free Tier message functions
 const getRateLimitErrorMessageGoogleFree = (
@@ -184,29 +184,16 @@ function wasCausedByInvalidImageUpload(err: string, request?: PartListUnion) {
   return (
     err.includes('Provided image is not valid.') &&
     request &&
-    requestContainedImage(request)
+    requestContainedImage(Array.isArray(request) ? request : [request])
   );
 }
 
-function requestContainedImage(parts: PartListUnion): boolean {
-  if (!parts) {
-    return false;
-  }
-  if (typeof parts === 'string') {
-    return false;
-  }
-  if (Array.isArray(parts)) {
-    for (const part of parts) {
-      if (
-        typeof part !== 'string' &&
-        part.inlineData?.mimeType?.startsWith('image/')
-      ) {
-        return true;
-      }
-    }
-  } else {
-    // It's a single Part
-    if (parts.inlineData?.mimeType?.startsWith('image/')) {
+function requestContainedImage(parts: PartUnion[]): boolean {
+  for (const part of parts) {
+    if (
+      typeof part !== 'string' &&
+      part.inlineData?.mimeType?.startsWith('image/')
+    ) {
       return true;
     }
   }
