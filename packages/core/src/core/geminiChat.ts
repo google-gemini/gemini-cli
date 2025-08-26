@@ -384,7 +384,14 @@ export class GeminiChat {
             if (isContentError) {
               // Check if we have more attempts left.
               if (attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts - 1) {
-                logContentRetry(self.config, new ContentRetryEvent());
+                logContentRetry(
+                  self.config,
+                  new ContentRetryEvent(
+                    attempt,
+                    'EmptyStreamError',
+                    INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs,
+                  ),
+                );
                 await new Promise((res) =>
                   setTimeout(
                     res,
