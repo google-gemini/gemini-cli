@@ -149,7 +149,7 @@ export function loadExtension(extensionDir: string): Extension | null {
       extensionPath: extensionDir,
       '/': path.sep,
       pathSeparator: path.sep,
-    }) as ExtensionConfig;
+    }) as unknown as ExtensionConfig;
     if (!config.name || !config.version) {
       console.error(
         `Invalid extension config in ${configFilePath}: missing name or version.`,

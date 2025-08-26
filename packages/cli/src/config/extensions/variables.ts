@@ -6,6 +6,16 @@
 
 import { type VariableSchema, VARIABLE_SCHEMA } from './variableSchema.js';
 
+export type JsonObject = { [key: string]: JsonValue };
+export type JsonArray = JsonValue[];
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonObject
+  | JsonArray;
+
 export type VariableContext = {
   [key in keyof typeof VARIABLE_SCHEMA]?: string;
 };
@@ -33,11 +43,9 @@ export function hydrateString(str: string, context: VariableContext): string {
 }
 
 export function recursivelyHydrateStrings(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  obj: any,
+  obj: JsonValue,
   values: VariableContext,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): any {
+): JsonValue {
   if (typeof obj === 'string') {
     return hydrateString(obj, values);
   }
@@ -45,7 +53,7 @@ export function recursivelyHydrateStrings(
     return obj.map((item) => recursivelyHydrateStrings(item, values));
   }
   if (typeof obj === 'object' && obj !== null) {
-    const newObj: { [key: string]: unknown } = {};
+    const newObj: JsonObject = {};
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
         newObj[key] = recursivelyHydrateStrings(obj[key], values);
