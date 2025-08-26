@@ -5,12 +5,18 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { AsyncFzf, FzfResultItem } from 'fzf';
+import { AsyncFzf } from 'fzf';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 
-// Type alias for improved type safety
-type FzfCommandResult = FzfResultItem<string>;
+// Type alias for improved type safety based on actual fzf result structure
+type FzfCommandResult = {
+  item: string;
+  start: number;
+  end: number;
+  score: number;
+  positions: Record<string, unknown>;
+};
 
 // Interface for FZF command cache entry
 interface FzfCommandCacheEntry {
