@@ -5,7 +5,12 @@
  */
 
 import { playSound } from './player.js';
-import { NotificationSettings, NotificationEventType, DEFAULT_NOTIFICATION_SETTINGS } from './types.js';
+import {
+  NotificationSettings,
+  NotificationEventType,
+  DEFAULT_NOTIFICATION_SETTINGS,
+  NotificationEventSettings,
+} from './types.js';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { Config } from '@google/gemini-cli-core';
 import * as os from 'os';
@@ -20,7 +25,8 @@ export function initNotifications(config: Config): void {
   try {
     const loadedSettings = loadSettings(config.getProjectRoot());
     if (loadedSettings.merged.notifications) {
-      currentSettings = loadedSettings.merged.notifications as NotificationSettings;
+      currentSettings = loadedSettings.merged
+        .notifications as NotificationSettings;
     }
   } catch (error) {
     console.error('Failed to load notification settings:', error);
@@ -33,11 +39,14 @@ export function initNotifications(config: Config): void {
  * Saves the current notification settings.
  * @param config The Config object to save settings to.
  */
-export async function saveNotificationSettings(config: Config): Promise<void> {
+export function saveNotificationSettings(config: Config): void {
   try {
-    const loadedSettings = await loadSettings(config, SettingScope.USER);
-    loadedSettings.user.notifications = currentSettings;
-    await loadedSettings.save();
+    const loadedSettings = loadSettings(config.getProjectRoot());
+    loadedSettings.setValue(
+      SettingScope.USER,
+      'notifications',
+      currentSettings,
+    );
   } catch (error) {
     console.error('Failed to save notification settings:', error);
   }
@@ -65,7 +74,10 @@ export function triggerNotification(eventType: NotificationEventType): void {
     let systemSoundPath: string | undefined;
     switch (os.platform()) {
       case 'darwin':
-        systemSoundPath = eventType === 'inputRequired' ? '/System/Library/Sounds/Glass.aiff' : '/System/Library/Sounds/Pop.aiff';
+        systemSoundPath =
+          eventType === 'inputRequired'
+            ? '/System/Library/Sounds/Glass.aiff'
+            : '/System/Library/Sounds/Pop.aiff';
         break;
       case 'linux':
         // For Linux, we'll use a simple beep command as a placeholder for system sound.
@@ -73,8 +85,14 @@ export function triggerNotification(eventType: NotificationEventType): void {
         playSound('echo -e "\a"', true); // ASCII bell character
         return;
       case 'win32':
-        systemSoundPath = eventType === 'inputRequired' ? 'SystemAsterisk' : 'SystemExclamation';
-        playSound(`(New-Object Media.SystemSounds).${systemSoundPath}.Play()`, true);
+        systemSoundPath =
+          eventType === 'inputRequired'
+            ? 'SystemAsterisk'
+            : 'SystemExclamation';
+        playSound(
+          `(New-Object Media.SystemSounds).${systemSoundPath}.Play()`,
+          true,
+        );
         return;
       default:
         console.warn(`Audio notifications not supported on ${os.platform()}`);
@@ -99,9 +117,16 @@ export function getNotificationSettings(): NotificationSettings {
  * @param updates Partial settings to apply.
  * @param config The Config object to save settings to.
  */
-export async function updateNotificationEventSettings(eventType: NotificationEventType, updates: Partial<NotificationEventSettings>, config: Config): Promise<void> {
+export async function updateNotificationEventSettings(
+  eventType: NotificationEventType,
+  updates: Partial<NotificationEventSettings>,
+  config: Config,
+): Promise<void> {
   if (currentSettings.events[eventType]) {
-    currentSettings.events[eventType] = { ...currentSettings.events[eventType], ...updates };
+    currentSettings.events[eventType] = {
+      ...currentSettings.events[eventType],
+      ...updates,
+    };
     await saveNotificationSettings(config);
   }
 }
@@ -111,7 +136,10 @@ export async function updateNotificationEventSettings(eventType: NotificationEve
  * @param enabled Whether to enable or disable notifications.
  * @param config The Config object to save settings to.
  */
-export async function setGlobalNotificationsEnabled(enabled: boolean, config: Config): Promise<void> {
+export async function setGlobalNotificationsEnabled(
+  enabled: boolean,
+  config: Config,
+): Promise<void> {
   currentSettings.enabled = enabled;
   await saveNotificationSettings(config);
 }
