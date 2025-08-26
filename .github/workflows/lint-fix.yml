@@ -1,31 +1,32 @@
-name: 'Fix Lint Issues'
+name: 'Suggest Lint Fixes'
 
-on:
-  pull_request_review:
-    types: [submitted]
+on: ['pull_request']
 
 jobs:
   fix_lint:
-    if: github.event.review.state == 'approved'
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
     permissions:
-      contents: write
+      contents: 'write'
     steps:
-      - uses: actions/checkout@v4
+      - uses: 'actions/checkout@v4'
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+          repository: '${{ github.event.pull_request.head.repo.full_name }}'
+          ref: '${{ github.event.pull_request.head.ref }}'
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@v4'
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-      - name: Fix lint issues
-        run: npm run lint:fix
-      - name: Commit changes
-        uses: stefanzweifel/git-auto-commit-action@v6
+      - name: 'Install dependencies'
+        run: 'npm ci'
+      - name: 'Fix lint issues'
+        run: 'npm run lint:fix'
+      - name: 'Suggest changes'
+        uses: 'reviewdog/action-suggester@4747dbc9f9e37adba0943e681cc20db466642158' # v1.21.0
         with:
-          commit_message: 'chore: apply linting fixes'
-          branch: ${{ github.event.pull_request.head.ref }}
+          tool_name: 'eslint'
+          level: 'warning'
+          fail_on_error: 'true'
+          filter_mode: 'nofilter'
+          reporter: 'github-pr-review'
+          git_diff: 'git diff'
