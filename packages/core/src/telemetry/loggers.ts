@@ -23,6 +23,9 @@ import {
   EVENT_CONVERSATION_FINISHED,
   EVENT_CHAT_COMPRESSION,
   EVENT_MALFORMED_JSON_RESPONSE,
+  EVENT_INVALID_CHUNK,
+  EVENT_CONTENT_RETRY,
+  EVENT_CONTENT_RETRY_FAILURE,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -41,6 +44,9 @@ import type {
   KittySequenceOverflowEvent,
   ChatCompressionEvent,
   MalformedJsonResponseEvent,
+  InvalidChunkEvent,
+  ContentRetryEvent,
+  ContentRetryFailureEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
