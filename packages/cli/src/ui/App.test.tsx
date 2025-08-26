@@ -4,28 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../test-utils/render.js';
 import { AppWrapper as App } from './App.js';
-import {
-  Config as ServerConfig,
-  MCPServerConfig,
-  ApprovalMode,
-  ToolRegistry,
+import type {
   AccessibilitySettings,
+  MCPServerConfig,
+  ToolRegistry,
   SandboxConfig,
   GeminiClient,
-  ideContext,
-  type AuthType,
+  AuthType,
 } from '@google/gemini-cli-core';
-import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
+import {
+  ApprovalMode,
+  ideContext,
+  Config as ServerConfig,
+} from '@google/gemini-cli-core';
+import type { SettingsFile, Settings } from '../config/settings.js';
+import { LoadedSettings } from '../config/settings.js';
 import process from 'node:process';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
-import { StreamingState, ConsoleMessageItem } from './types.js';
+import type { ConsoleMessageItem } from './types.js';
+import { StreamingState } from './types.js';
 import { Tips } from './components/Tips.js';
-import { checkForUpdates, UpdateObject } from './utils/updateCheck.js';
-import { EventEmitter } from 'events';
+import type { UpdateObject } from './utils/updateCheck.js';
+import { checkForUpdates } from './utils/updateCheck.js';
+import { EventEmitter } from 'node:events';
 import { updateEventEmitter } from '../utils/updateEventEmitter.js';
 import * as auth from '../config/auth.js';
 import * as useTerminalSize from './hooks/useTerminalSize.js';
@@ -287,6 +294,10 @@ describe('App UI', () => {
       path: '/system/settings.json',
       settings: settings.system || {},
     };
+    const systemDefaultsFile: SettingsFile = {
+      path: '/system/system-defaults.json',
+      settings: {},
+    };
     const userSettingsFile: SettingsFile = {
       path: '/user/settings.json',
       settings: settings.user || {},
@@ -297,6 +308,7 @@ describe('App UI', () => {
     };
     return new LoadedSettings(
       systemSettingsFile,
+      systemDefaultsFile,
       userSettingsFile,
       workspaceSettingsFile,
       [],
@@ -388,9 +400,10 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(spawn).not.toHaveBeenCalled();
+      // Wait for any potential async operations to complete
+      await waitFor(() => {
+        expect(spawn).not.toHaveBeenCalled();
+      });
     });
 
     it('should show a success message when update succeeds', async () => {
@@ -416,11 +429,12 @@ describe('App UI', () => {
 
       updateEventEmitter.emit('update-success', info);
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(lastFrame()).toContain(
-        'Update successful! The new version will be used on your next run.',
-      );
+      // Wait for the success message to appear
+      await waitFor(() => {
+        expect(lastFrame()).toContain(
+          'Update successful! The new version will be used on your next run.',
+        );
+      });
     });
 
     it('should show an error message when update fails', async () => {
@@ -446,11 +460,12 @@ describe('App UI', () => {
 
       updateEventEmitter.emit('update-failed', info);
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(lastFrame()).toContain(
-        'Automatic update failed. Please try updating manually',
-      );
+      // Wait for the error message to appear
+      await waitFor(() => {
+        expect(lastFrame()).toContain(
+          'Automatic update failed. Please try updating manually',
+        );
+      });
     });
 
     it('should show an error message when spawn fails', async () => {
@@ -478,11 +493,12 @@ describe('App UI', () => {
       // which is what should be emitted when a spawn error occurs elsewhere.
       updateEventEmitter.emit('update-failed', info);
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(lastFrame()).toContain(
-        'Automatic update failed. Please try updating manually',
-      );
+      // Wait for the error message to appear
+      await waitFor(() => {
+        expect(lastFrame()).toContain(
+          'Automatic update failed. Please try updating manually',
+        );
+      });
     });
 
     it('should not auto-update if GEMINI_CLI_DISABLE_AUTOUPDATER is true', async () => {
@@ -508,9 +524,10 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(spawn).not.toHaveBeenCalled();
+      // Wait for any potential async operations to complete
+      await waitFor(() => {
+        expect(spawn).not.toHaveBeenCalled();
+      });
     });
   });
 

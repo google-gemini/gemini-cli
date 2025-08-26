@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MarkdownDisplay } from './MarkdownDisplay.js';
 import { LoadedSettings } from '../../config/settings.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
-import { EOL } from 'os';
+import { EOL } from 'node:os';
 
 describe('<MarkdownDisplay />', () => {
   const baseProps = {
@@ -19,6 +19,7 @@ describe('<MarkdownDisplay />', () => {
   };
 
   const mockSettings = new LoadedSettings(
+    { path: '', settings: {} },
     { path: '', settings: {} },
     { path: '', settings: {} },
     { path: '', settings: {} },
@@ -221,6 +222,7 @@ Another paragraph.
   it('hides line numbers in code blocks when showLineNumbers is false', () => {
     const text = '```javascript\nconst x = 1;\n```'.replace(/\n/g, EOL);
     const settings = new LoadedSettings(
+      { path: '', settings: {} },
       { path: '', settings: {} },
       { path: '', settings: { showLineNumbers: false } },
       { path: '', settings: {} },

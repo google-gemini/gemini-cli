@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useCompletion } from './useCompletion.js';
-import { TextBuffer } from '../components/shared/text-buffer.js';
+import type { TextBuffer } from '../components/shared/text-buffer.js';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 
 function useDebouncedValue<T>(value: T, delay = 200): T {

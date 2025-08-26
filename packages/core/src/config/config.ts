@@ -6,9 +6,9 @@
 
 import * as path from 'node:path';
 import process from 'node:process';
+import type { ContentGeneratorConfig } from '../core/contentGenerator.js';
 import {
   AuthType,
-  ContentGeneratorConfig,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
@@ -28,25 +28,23 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
+import type { TelemetryTarget } from '../telemetry/index.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
-  TelemetryTarget,
-  StartSessionEvent,
 } from '../telemetry/index.js';
+import { StartSessionEvent } from '../telemetry/index.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
-import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
+import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
 import type { Content } from '@google/genai';
-import {
-  FileSystemService,
-  StandardFileSystemService,
-} from '../services/fileSystemService.js';
+import type { FileSystemService } from '../services/fileSystemService.js';
+import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { logCliConfiguration, logIdeConnection } from '../telemetry/loggers.js';
 import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 
@@ -205,6 +203,7 @@ export interface ConfigParameters {
   useRipgrep?: boolean;
   shouldUseNodePtyShell?: boolean;
   skipNextSpeakerCheck?: boolean;
+  extensionManagement?: boolean;
   enablePromptCompletion?: boolean;
 }
 
@@ -253,7 +252,7 @@ export class Config {
   private readonly folderTrustFeature: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
-  private ideClient: IdeClient;
+  private ideClient!: IdeClient;
   private inFallbackMode = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
@@ -275,6 +274,7 @@ export class Config {
   private readonly useRipgrep: boolean;
   private readonly shouldUseNodePtyShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
+  private readonly extensionManagement: boolean;
   private readonly enablePromptCompletion: boolean = false;
   private initialized: boolean = false;
   readonly storage: Storage;
@@ -340,7 +340,6 @@ export class Config {
     this.folderTrustFeature = params.folderTrustFeature ?? false;
     this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
-    this.ideClient = IdeClient.getInstance();
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
     this.chatCompression = params.chatCompression;
@@ -349,6 +348,7 @@ export class Config {
     this.useRipgrep = params.useRipgrep ?? false;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
+    this.extensionManagement = params.extensionManagement ?? false;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
@@ -370,6 +370,7 @@ export class Config {
       throw Error('Config was already initialized');
     }
     this.initialized = true;
+    this.ideClient = await IdeClient.getInstance();
     // Initialize centralized FileDiscoveryService
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
@@ -563,6 +564,11 @@ export class Config {
   }
 
   setApprovalMode(mode: ApprovalMode): void {
+    if (this.isTrustedFolder() === false && mode !== ApprovalMode.DEFAULT) {
+      throw new Error(
+        'Cannot enable privileged approval modes in an untrusted folder.',
+      );
+    }
     this.approvalMode = mode;
   }
 
@@ -676,6 +682,10 @@ export class Config {
 
   getListExtensions(): boolean {
     return this.listExtensions;
+  }
+
+  getExtensionManagement(): boolean {
+    return this.extensionManagement;
   }
 
   getExtensions(): GeminiCLIExtension[] {

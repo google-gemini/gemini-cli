@@ -15,12 +15,8 @@ import os from 'node:os';
 import dns from 'node:dns';
 import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
-import {
-  DnsResolutionOrder,
-  LoadedSettings,
-  loadSettings,
-  SettingScope,
-} from './config/settings.js';
+import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
+import { loadSettings, SettingScope } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
@@ -29,8 +25,8 @@ import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions } from './config/extension.js';
 import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
+import type { Config } from '@google/gemini-cli-core';
 import {
-  Config,
   sessionId,
   logUserPrompt,
   AuthType,
@@ -38,6 +34,7 @@ import {
   logIdeConnection,
   IdeConnectionEvent,
   IdeConnectionType,
+  FatalConfigError,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -177,18 +174,15 @@ export async function main() {
 
   await cleanupCheckpoints();
   if (settings.errors.length > 0) {
-    for (const error of settings.errors) {
-      let errorMessage = `Error in ${error.path}: ${error.message}`;
-      if (!process.env['NO_COLOR']) {
-        errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
-      }
-      console.error(errorMessage);
-      console.error(`Please fix ${error.path} and try again.`);
-    }
-    process.exit(1);
+    const errorMessages = settings.errors.map(
+      (error) => `Error in ${error.path}: ${error.message}`,
+    );
+    throw new FatalConfigError(
+      `${errorMessages.join('\n')}\nPlease fix the configuration file(s) and try again.`,
+    );
   }
 
-  const argv = await parseArguments();
+  const argv = await parseArguments(settings.merged);
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(
     settings.merged,
@@ -372,6 +366,10 @@ export async function main() {
     settings.merged.useExternalAuth,
     config,
   );
+
+  if (config.getDebugMode()) {
+    console.log('Session ID: %s', sessionId);
+  }
 
   await runNonInteractive(nonInteractiveConfig, input, prompt_id);
   process.exit(0);

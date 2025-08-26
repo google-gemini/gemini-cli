@@ -7,9 +7,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GitService } from './gitService.js';
 import { Storage } from '../config/storage.js';
-import * as path from 'path';
-import * as fs from 'fs/promises';
-import * as os from 'os';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import type { ChildProcess } from 'node:child_process';
 import { getProjectHash, GEMINI_DIR } from '../utils/paths.js';
 
