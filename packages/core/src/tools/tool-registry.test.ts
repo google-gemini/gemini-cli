@@ -174,6 +174,24 @@ describe('ToolRegistry', () => {
     });
   });
 
+  describe('getAllToolNames', () => {
+    it('should return all registered tool names', () => {
+      // Register tools with displayNames in non-alphabetical order
+      const toolC = new MockTool('c-tool', 'Tool C');
+      const toolA = new MockTool('a-tool', 'Tool A');
+      const toolB = new MockTool('b-tool', 'Tool B');
+
+      toolRegistry.registerTool(toolC);
+      toolRegistry.registerTool(toolA);
+      toolRegistry.registerTool(toolB);
+
+      const toolNames = toolRegistry.getAllToolNames();
+
+      // Assert that the returned array contains all tool names
+      expect(toolNames).toEqual(['c-tool', 'a-tool', 'b-tool']);
+    });
+  });
+
   describe('getToolsByServer', () => {
     it('should return an empty array if no tools match the server name', () => {
       toolRegistry.registerTool(new MockTool());
