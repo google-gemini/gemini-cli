@@ -36,11 +36,7 @@ export function ProQuotaDialog({
   };
 
   return (
-    <Box
-      borderStyle="round"
-      flexDirection="column"
-      paddingX={1}
-    >
+    <Box borderStyle="round" flexDirection="column" paddingX={1}>
       <Text bold color={Colors.AccentYellow}>
         Pro quota limit reached for {currentModel}.
       </Text>
