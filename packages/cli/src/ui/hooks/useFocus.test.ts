@@ -5,7 +5,7 @@
  */
 
 import { renderHook, act } from '@testing-library/react';
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 import { useFocus } from './useFocus.js';
 import { vi } from 'vitest';
 import { useStdin, useStdout } from 'ink';

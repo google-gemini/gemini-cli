@@ -4,15 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useContext } from 'react';
-import { SettingScope } from '../../config/settings.js';
+import { useState, useCallback } from 'react';
+import type { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { type HistoryItem, MessageType } from '../types.js';
+import type { EditorType } from '@google/gemini-cli-core';
 import {
   allowEditorTypeInSandbox,
   checkHasEditorType,
-  EditorType,
 } from '@google/gemini-cli-core';
-import { SettingsContext } from '../contexts/SettingsContext.js';
 
 interface UseEditorSettingsReturn {
   isEditorDialogOpen: boolean;
@@ -25,11 +24,11 @@ interface UseEditorSettingsReturn {
 }
 
 export const useEditorSettings = (
+  loadedSettings: LoadedSettings,
   setEditorError: (error: string | null) => void,
   addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
 ): UseEditorSettingsReturn => {
   const [isEditorDialogOpen, setIsEditorDialogOpen] = useState(false);
-  const settingsContext = useContext(SettingsContext);
 
   const openEditorDialog = useCallback(() => {
     setIsEditorDialogOpen(true);
@@ -46,11 +45,7 @@ export const useEditorSettings = (
       }
 
       try {
-        settingsContext?.settings.setValue(
-          scope,
-          'preferredEditor',
-          editorType,
-        );
+        loadedSettings.setValue(scope, 'preferredEditor', editorType);
         addItem(
           {
             type: MessageType.INFO,
@@ -64,7 +59,7 @@ export const useEditorSettings = (
         setEditorError(`Failed to set editor preference: ${error}`);
       }
     },
-    [settingsContext, setEditorError, addItem],
+    [loadedSettings, setEditorError, addItem],
   );
 
   const exitEditorDialog = useCallback(() => {

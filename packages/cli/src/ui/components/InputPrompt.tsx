@@ -4,28 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import type React from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import { TextBuffer, logicalPosToOffset } from './shared/text-buffer.js';
-import { cpSlice, cpLen } from '../utils/textUtils.js';
+import type { TextBuffer } from './shared/text-buffer.js';
+import { logicalPosToOffset } from './shared/text-buffer.js';
+import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
-import { useKeypress, Key } from '../hooks/useKeypress.js';
+import type { Key } from '../hooks/useKeypress.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
-import { CommandContext, SlashCommand } from '../commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
 import {
   clipboardHasImage,
   saveClipboardImage,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
-import * as path from 'path';
+import * as path from 'node:path';
+import { SCREEN_READER_USER_PREFIX } from '../constants.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -403,6 +407,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
+      // Handle Tab key for ghost text acceptance
+      if (
+        key.name === 'tab' &&
+        !completion.showSuggestions &&
+        completion.promptCompletion.text
+      ) {
+        completion.promptCompletion.accept();
+        return;
+      }
+
       if (!shellModeActive) {
         if (keyMatchers[Command.HISTORY_UP](key)) {
           inputHistory.navigateUp();
@@ -471,7 +485,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       if (keyMatchers[Command.END](key)) {
         buffer.move('end');
-        buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
       // Ctrl+C (Clear input)
@@ -507,6 +520,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
+
+      // Clear ghost text when user types regular characters (not navigation/control keys)
+      if (
+        completion.promptCompletion.text &&
+        key.sequence &&
+        key.sequence.length === 1 &&
+        !key.ctrl &&
+        !key.meta
+      ) {
+        completion.promptCompletion.clear();
+      }
     },
     [
       focus,
@@ -540,6 +564,119 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     buffer.visualCursor;
   const scrollVisualRow = buffer.visualScrollRow;
 
+  const getGhostTextLines = useCallback(() => {
+    if (
+      !completion.promptCompletion.text ||
+      !buffer.text ||
+      !completion.promptCompletion.text.startsWith(buffer.text)
+    ) {
+      return { inlineGhost: '', additionalLines: [] };
+    }
+
+    const ghostSuffix = completion.promptCompletion.text.slice(
+      buffer.text.length,
+    );
+    if (!ghostSuffix) {
+      return { inlineGhost: '', additionalLines: [] };
+    }
+
+    const currentLogicalLine = buffer.lines[buffer.cursor[0]] || '';
+    const cursorCol = buffer.cursor[1];
+
+    const textBeforeCursor = cpSlice(currentLogicalLine, 0, cursorCol);
+    const usedWidth = stringWidth(textBeforeCursor);
+    const remainingWidth = Math.max(0, inputWidth - usedWidth);
+
+    const ghostTextLinesRaw = ghostSuffix.split('\n');
+    const firstLineRaw = ghostTextLinesRaw.shift() || '';
+
+    let inlineGhost = '';
+    let remainingFirstLine = '';
+
+    if (stringWidth(firstLineRaw) <= remainingWidth) {
+      inlineGhost = firstLineRaw;
+    } else {
+      const words = firstLineRaw.split(' ');
+      let currentLine = '';
+      let wordIdx = 0;
+      for (const word of words) {
+        const prospectiveLine = currentLine ? `${currentLine} ${word}` : word;
+        if (stringWidth(prospectiveLine) > remainingWidth) {
+          break;
+        }
+        currentLine = prospectiveLine;
+        wordIdx++;
+      }
+      inlineGhost = currentLine;
+      if (words.length > wordIdx) {
+        remainingFirstLine = words.slice(wordIdx).join(' ');
+      }
+    }
+
+    const linesToWrap = [];
+    if (remainingFirstLine) {
+      linesToWrap.push(remainingFirstLine);
+    }
+    linesToWrap.push(...ghostTextLinesRaw);
+    const remainingGhostText = linesToWrap.join('\n');
+
+    const additionalLines: string[] = [];
+    if (remainingGhostText) {
+      const textLines = remainingGhostText.split('\n');
+      for (const textLine of textLines) {
+        const words = textLine.split(' ');
+        let currentLine = '';
+
+        for (const word of words) {
+          const prospectiveLine = currentLine ? `${currentLine} ${word}` : word;
+          const prospectiveWidth = stringWidth(prospectiveLine);
+
+          if (prospectiveWidth > inputWidth) {
+            if (currentLine) {
+              additionalLines.push(currentLine);
+            }
+
+            let wordToProcess = word;
+            while (stringWidth(wordToProcess) > inputWidth) {
+              let part = '';
+              const wordCP = toCodePoints(wordToProcess);
+              let partWidth = 0;
+              let splitIndex = 0;
+              for (let i = 0; i < wordCP.length; i++) {
+                const char = wordCP[i];
+                const charWidth = stringWidth(char);
+                if (partWidth + charWidth > inputWidth) {
+                  break;
+                }
+                part += char;
+                partWidth += charWidth;
+                splitIndex = i + 1;
+              }
+              additionalLines.push(part);
+              wordToProcess = cpSlice(wordToProcess, splitIndex);
+            }
+            currentLine = wordToProcess;
+          } else {
+            currentLine = prospectiveLine;
+          }
+        }
+        if (currentLine) {
+          additionalLines.push(currentLine);
+        }
+      }
+    }
+
+    return { inlineGhost, additionalLines };
+  }, [
+    completion.promptCompletion.text,
+    buffer.text,
+    buffer.lines,
+    buffer.cursor,
+    inputWidth,
+  ]);
+
+  const { inlineGhost, additionalLines } = getGhostTextLines();
+
   return (
     <>
       <Box
@@ -554,7 +691,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         >
           {shellModeActive ? (
             reverseSearchActive ? (
-              <Text color={theme.text.link}>(r:) </Text>
+              <Text
+                color={theme.text.link}
+                aria-label={SCREEN_READER_USER_PREFIX}
+              >
+                (r:){' '}
+              </Text>
             ) : (
               '! '
             )
@@ -573,42 +715,91 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               <Text color={theme.text.secondary}>{placeholder}</Text>
             )
           ) : (
-            linesToRender.map((lineText, visualIdxInRenderedSet) => {
-              const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
-              let display = cpSlice(lineText, 0, inputWidth);
-              const currentVisualWidth = stringWidth(display);
-              if (currentVisualWidth < inputWidth) {
-                display = display + ' '.repeat(inputWidth - currentVisualWidth);
-              }
+            linesToRender
+              .map((lineText, visualIdxInRenderedSet) => {
+                const cursorVisualRow =
+                  cursorVisualRowAbsolute - scrollVisualRow;
+                let display = cpSlice(lineText, 0, inputWidth);
 
-              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
-                const relativeVisualColForHighlight = cursorVisualColAbsolute;
+                const isOnCursorLine =
+                  focus && visualIdxInRenderedSet === cursorVisualRow;
+                const currentLineGhost = isOnCursorLine ? inlineGhost : '';
 
-                if (relativeVisualColForHighlight >= 0) {
-                  if (relativeVisualColForHighlight < cpLen(display)) {
-                    const charToHighlight =
-                      cpSlice(
-                        display,
-                        relativeVisualColForHighlight,
-                        relativeVisualColForHighlight + 1,
-                      ) || ' ';
-                    const highlighted = chalk.inverse(charToHighlight);
-                    display =
-                      cpSlice(display, 0, relativeVisualColForHighlight) +
-                      highlighted +
-                      cpSlice(display, relativeVisualColForHighlight + 1);
-                  } else if (
-                    relativeVisualColForHighlight === cpLen(display) &&
-                    cpLen(display) === inputWidth
-                  ) {
-                    display = display + chalk.inverse(' ');
+                const ghostWidth = stringWidth(currentLineGhost);
+
+                if (focus && visualIdxInRenderedSet === cursorVisualRow) {
+                  const relativeVisualColForHighlight = cursorVisualColAbsolute;
+
+                  if (relativeVisualColForHighlight >= 0) {
+                    if (relativeVisualColForHighlight < cpLen(display)) {
+                      const charToHighlight =
+                        cpSlice(
+                          display,
+                          relativeVisualColForHighlight,
+                          relativeVisualColForHighlight + 1,
+                        ) || ' ';
+                      const highlighted = chalk.inverse(charToHighlight);
+                      display =
+                        cpSlice(display, 0, relativeVisualColForHighlight) +
+                        highlighted +
+                        cpSlice(display, relativeVisualColForHighlight + 1);
+                    } else if (
+                      relativeVisualColForHighlight === cpLen(display)
+                    ) {
+                      if (!currentLineGhost) {
+                        display = display + chalk.inverse(' ');
+                      }
+                    }
                   }
                 }
-              }
-              return (
-                <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
-              );
-            })
+
+                const showCursorBeforeGhost =
+                  focus &&
+                  visualIdxInRenderedSet === cursorVisualRow &&
+                  cursorVisualColAbsolute ===
+                    // eslint-disable-next-line no-control-regex
+                    cpLen(display.replace(/\x1b\[[0-9;]*m/g, '')) &&
+                  currentLineGhost;
+
+                const actualDisplayWidth = stringWidth(display);
+                const cursorWidth = showCursorBeforeGhost ? 1 : 0;
+                const totalContentWidth =
+                  actualDisplayWidth + cursorWidth + ghostWidth;
+                const trailingPadding = Math.max(
+                  0,
+                  inputWidth - totalContentWidth,
+                );
+
+                return (
+                  <Text key={`line-${visualIdxInRenderedSet}`}>
+                    {display}
+                    {showCursorBeforeGhost && chalk.inverse(' ')}
+                    {currentLineGhost && (
+                      <Text color={theme.text.secondary}>
+                        {currentLineGhost}
+                      </Text>
+                    )}
+                    {trailingPadding > 0 && ' '.repeat(trailingPadding)}
+                  </Text>
+                );
+              })
+              .concat(
+                additionalLines.map((ghostLine, index) => {
+                  const padding = Math.max(
+                    0,
+                    inputWidth - stringWidth(ghostLine),
+                  );
+                  return (
+                    <Text
+                      key={`ghost-line-${index}`}
+                      color={theme.text.secondary}
+                    >
+                      {ghostLine}
+                      {' '.repeat(padding)}
+                    </Text>
+                  );
+                }),
+              )
           )}
         </Box>
       </Box>

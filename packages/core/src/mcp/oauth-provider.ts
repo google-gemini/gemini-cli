@@ -8,7 +8,8 @@ import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import { URL } from 'node:url';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
-import { MCPOAuthToken, MCPOAuthTokenStorage } from './oauth-token-storage.js';
+import type { OAuthToken } from './token-storage/types.js';
+import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { OAuthUtils } from './oauth-utils.js';
 
@@ -582,7 +583,7 @@ export class MCPOAuthProvider {
     serverName: string,
     config: MCPOAuthConfig,
     mcpServerUrl?: string,
-  ): Promise<MCPOAuthToken> {
+  ): Promise<OAuthToken> {
     // If no authorization URL is provided, try to discover OAuth configuration
     if (!config.authorizationUrl && mcpServerUrl) {
       console.log(
@@ -776,7 +777,7 @@ export class MCPOAuthProvider {
       throw new Error('No access token received from token endpoint');
     }
 
-    const token: MCPOAuthToken = {
+    const token: OAuthToken = {
       accessToken: tokenResponse.access_token,
       tokenType: tokenResponse.token_type || 'Bearer',
       refreshToken: tokenResponse.refresh_token,
@@ -862,7 +863,7 @@ export class MCPOAuthProvider {
         );
 
         // Update stored token
-        const newToken: MCPOAuthToken = {
+        const newToken: OAuthToken = {
           accessToken: newTokenResponse.access_token,
           tokenType: newTokenResponse.token_type,
           refreshToken: newTokenResponse.refresh_token || token.refreshToken,

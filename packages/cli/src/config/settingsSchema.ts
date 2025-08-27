@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   MCPServerConfig,
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
-import { CustomTheme } from '../ui/themes/theme.js';
+import type { CustomTheme } from '../ui/themes/theme.js';
 
 export interface SettingDefinition {
   type: 'boolean' | 'string' | 'number' | 'array' | 'object';
@@ -206,6 +206,16 @@ export const SETTINGS_SCHEMA = {
         description: 'Disable loading phrases for accessibility',
         showInDialog: true,
       },
+      screenReader: {
+        type: 'boolean',
+        label: 'Screen Reader Mode',
+        category: 'Accessibility',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Render output in plain-text to be more screen reader accessible',
+        showInDialog: true,
+      },
     },
   },
   checkpointing: {
@@ -262,6 +272,15 @@ export const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: true,
         description: 'Enable recursive file search functionality',
+        showInDialog: true,
+      },
+      disableFuzzySearch: {
+        type: 'boolean',
+        label: 'Disable Fuzzy Search',
+        category: 'File Filtering',
+        requiresRestart: true,
+        default: false,
+        description: 'Disable fuzzy search when searching for files.',
         showInDialog: true,
       },
     },
@@ -323,6 +342,16 @@ export const SETTINGS_SCHEMA = {
     requiresRestart: true,
     default: undefined as string[] | undefined,
     description: 'Paths to core tool definitions.',
+    showInDialog: false,
+  },
+  allowedTools: {
+    type: 'array',
+    label: 'Allowed Tools',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: undefined as string[] | undefined,
+    description:
+      'A list of tool names that will bypass the confirmation dialog.',
     showInDialog: false,
   },
   excludeTools: {
@@ -449,7 +478,8 @@ export const SETTINGS_SCHEMA = {
     category: 'General',
     requiresRestart: false,
     default: [] as string[],
-    description: 'Additional directories to include in the workspace context.',
+    description:
+      'Additional directories to include in the workspace context. Missing directories will be skipped with a warning.',
     showInDialog: false,
   },
   loadMemoryFromIncludeDirectories: {
@@ -515,6 +545,45 @@ export const SETTINGS_SCHEMA = {
     description: 'Show line numbers in the chat.',
     showInDialog: true,
   },
+  extensionManagement: {
+    type: 'boolean',
+    label: 'Extension Management',
+    category: 'Feature Flag',
+    requiresRestart: true,
+    default: false,
+    description: 'Enable extension management features.',
+    showInDialog: false,
+  },
+  extensions: {
+    type: 'object',
+    label: 'Extensions',
+    category: 'Extensions',
+    requiresRestart: true,
+    default: {},
+    description: 'Settings for extensions.',
+    showInDialog: false,
+    properties: {
+      disabled: {
+        type: 'array',
+        label: 'Disabled Extensions',
+        category: 'Extensions',
+        requiresRestart: true,
+        default: [] as string[],
+        description: 'List of disabled extensions.',
+        showInDialog: false,
+      },
+      workspacesWithMigrationNudge: {
+        type: 'array',
+        label: 'Workspaces with Migration Nudge',
+        category: 'Extensions',
+        requiresRestart: false,
+        default: [] as string[],
+        description:
+          'List of workspaces for which the migration nudge has been shown.',
+        showInDialog: false,
+      },
+    },
+  },
   skipNextSpeakerCheck: {
     type: 'boolean',
     label: 'Skip Next Speaker Check',
@@ -522,6 +591,35 @@ export const SETTINGS_SCHEMA = {
     requiresRestart: false,
     default: false,
     description: 'Skip the next speaker check.',
+    showInDialog: true,
+  },
+  useRipgrep: {
+    type: 'boolean',
+    label: 'Use Ripgrep',
+    category: 'Tools',
+    requiresRestart: false,
+    default: false,
+    description:
+      'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
+    showInDialog: true,
+  },
+  enablePromptCompletion: {
+    type: 'boolean',
+    label: 'Enable Prompt Completion',
+    category: 'General',
+    requiresRestart: true,
+    default: false,
+    description:
+      'Enable AI-powered prompt completion suggestions while typing.',
+    showInDialog: true,
+  },
+  debugKeystrokeLogging: {
+    type: 'boolean',
+    label: 'Debug Keystroke Logging',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Enable debug logging of keystrokes to the console.',
     showInDialog: true,
   },
 } as const;

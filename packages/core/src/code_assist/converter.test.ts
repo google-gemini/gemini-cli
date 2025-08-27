@@ -5,18 +5,21 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import type { CaGenerateContentResponse } from './converter.js';
 import {
   toGenerateContentRequest,
   fromGenerateContentResponse,
-  CaGenerateContentResponse,
   toContents,
 } from './converter.js';
-import {
+import type {
   ContentListUnion,
   GenerateContentParameters,
+} from '@google/genai';
+import {
   GenerateContentResponse,
   FinishReason,
   BlockedReason,
+  type Part,
 } from '@google/genai';
 
 describe('converter', () => {
@@ -347,6 +350,95 @@ describe('converter', () => {
       expect(toContents(strings)).toEqual([
         { role: 'user', parts: [{ text: 'string 1' }] },
         { role: 'user', parts: [{ text: 'string 2' }] },
+      ]);
+    });
+
+    it('should convert thought parts to text parts for API compatibility', () => {
+      const contentWithThought: ContentListUnion = {
+        role: 'model',
+        parts: [
+          { text: 'regular text' },
+          { thought: 'thinking about the problem' } as Part & {
+            thought: string;
+          },
+          { text: 'more text' },
+        ],
+      };
+      expect(toContents(contentWithThought)).toEqual([
+        {
+          role: 'model',
+          parts: [
+            { text: 'regular text' },
+            { text: '[Thought: thinking about the problem]' },
+            { text: 'more text' },
+          ],
+        },
+      ]);
+    });
+
+    it('should combine text and thought for text parts with thoughts', () => {
+      const contentWithTextAndThought: ContentListUnion = {
+        role: 'model',
+        parts: [
+          {
+            text: 'Here is my response',
+            thought: 'I need to be careful here',
+          } as Part & { thought: string },
+        ],
+      };
+      expect(toContents(contentWithTextAndThought)).toEqual([
+        {
+          role: 'model',
+          parts: [
+            {
+              text: 'Here is my response\n[Thought: I need to be careful here]',
+            },
+          ],
+        },
+      ]);
+    });
+
+    it('should preserve non-thought properties while removing thought', () => {
+      const contentWithComplexPart: ContentListUnion = {
+        role: 'model',
+        parts: [
+          {
+            functionCall: { name: 'calculate', args: { x: 5, y: 10 } },
+            thought: 'Performing calculation',
+          } as Part & { thought: string },
+        ],
+      };
+      expect(toContents(contentWithComplexPart)).toEqual([
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: { name: 'calculate', args: { x: 5, y: 10 } },
+            },
+          ],
+        },
+      ]);
+    });
+
+    it('should convert invalid text content to valid text part with thought', () => {
+      const contentWithInvalidText: ContentListUnion = {
+        role: 'model',
+        parts: [
+          {
+            text: 123, // Invalid - should be string
+            thought: 'Processing number',
+          } as Part & { thought: string; text: number },
+        ],
+      };
+      expect(toContents(contentWithInvalidText)).toEqual([
+        {
+          role: 'model',
+          parts: [
+            {
+              text: '123\n[Thought: Processing number]',
+            },
+          ],
+        },
       ]);
     });
   });

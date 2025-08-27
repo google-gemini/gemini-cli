@@ -35,6 +35,10 @@ describe('AuthDialog', () => {
         path: '',
       },
       {
+        settings: {},
+        path: '',
+      },
+      {
         settings: {
           selectedAuthType: AuthType.USE_GEMINI,
         },
@@ -45,6 +49,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       [],
+      true,
     );
 
     const { lastFrame } = renderWithProviders(
@@ -74,6 +79,10 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
+          settings: {},
+          path: '',
+        },
+        {
           settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
@@ -82,6 +91,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -107,6 +117,10 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
+          settings: {},
+          path: '',
+        },
+        {
           settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
@@ -115,6 +129,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -140,6 +155,10 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
+          settings: {},
+          path: '',
+        },
+        {
           settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
@@ -148,6 +167,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -174,6 +194,10 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
+          settings: {},
+          path: '',
+        },
+        {
           settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
@@ -182,6 +206,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -203,6 +228,10 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
+          settings: {},
+          path: '',
+        },
+        {
           settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
@@ -211,6 +240,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -234,6 +264,10 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
+          settings: {},
+          path: '',
+        },
+        {
           settings: { customThemes: {}, mcpServers: {} },
           path: '',
         },
@@ -242,6 +276,7 @@ describe('AuthDialog', () => {
           path: '',
         },
         [],
+        true,
       );
 
       const { lastFrame } = renderWithProviders(
@@ -265,6 +300,10 @@ describe('AuthDialog', () => {
         path: '',
       },
       {
+        settings: {},
+        path: '',
+      },
+      {
         settings: {
           selectedAuthType: undefined,
           customThemes: {},
@@ -277,6 +316,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       [],
+      true,
     );
 
     const { lastFrame, stdin, unmount } = renderWithProviders(
@@ -304,6 +344,10 @@ describe('AuthDialog', () => {
         path: '',
       },
       {
+        settings: {},
+        path: '',
+      },
+      {
         settings: {
           selectedAuthType: undefined,
           customThemes: {},
@@ -316,6 +360,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       [],
+      true,
     );
 
     const { lastFrame, stdin, unmount } = renderWithProviders(
@@ -346,6 +391,10 @@ describe('AuthDialog', () => {
         path: '',
       },
       {
+        settings: {},
+        path: '',
+      },
+      {
         settings: {
           selectedAuthType: AuthType.USE_GEMINI,
           customThemes: {},
@@ -358,6 +407,7 @@ describe('AuthDialog', () => {
         path: '',
       },
       [],
+      true,
     );
 
     const { stdin, unmount } = renderWithProviders(

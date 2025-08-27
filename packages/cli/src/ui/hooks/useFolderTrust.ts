@@ -4,16 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useEffect, useContext } from 'react';
-import { Settings, LoadedSettings } from '../../config/settings.js';
+import { useState, useCallback, useEffect } from 'react';
+import type { Settings, LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import {
   loadTrustedFolders,
   TrustLevel,
   isWorkspaceTrusted,
 } from '../../config/trustedFolders.js';
-import * as process from 'process';
-import { SettingsContext } from '../contexts/SettingsContext.js';
+import * as process from 'node:process';
 
 export const useFolderTrust = (
   settings: LoadedSettings,
@@ -21,7 +20,7 @@ export const useFolderTrust = (
 ) => {
   const [isTrusted, setIsTrusted] = useState<boolean | undefined>(undefined);
   const [isFolderTrustDialogOpen, setIsFolderTrustDialogOpen] = useState(false);
-  const settingsContext = useContext(SettingsContext);
+  const [isRestarting, setIsRestarting] = useState(false);
 
   const { folderTrust, folderTrustFeature } = settings.merged;
   useEffect(() => {
@@ -40,6 +39,8 @@ export const useFolderTrust = (
       const cwd = process.cwd();
       let trustLevel: TrustLevel;
 
+      const wasTrusted = isTrusted ?? true;
+
       switch (choice) {
         case FolderTrustChoice.TRUST_FOLDER:
           trustLevel = TrustLevel.TRUST_FOLDER;
@@ -55,21 +56,27 @@ export const useFolderTrust = (
       }
 
       trustedFolders.setValue(cwd, trustLevel);
-      const trusted = isWorkspaceTrusted({
-        folderTrust,
-        folderTrustFeature,
-      } as Settings);
-      setIsTrusted(trusted);
-      setIsFolderTrustDialogOpen(false);
-      onTrustChange(trusted);
-      settingsContext?.recomputeSettings();
+      const newIsTrusted =
+        trustLevel === TrustLevel.TRUST_FOLDER ||
+        trustLevel === TrustLevel.TRUST_PARENT;
+      setIsTrusted(newIsTrusted);
+      onTrustChange(newIsTrusted);
+
+      const needsRestart = wasTrusted !== newIsTrusted;
+      if (needsRestart) {
+        setIsRestarting(true);
+        setIsFolderTrustDialogOpen(true);
+      } else {
+        setIsFolderTrustDialogOpen(false);
+      }
     },
-    [onTrustChange, folderTrust, folderTrustFeature, settingsContext],
+    [onTrustChange, isTrusted],
   );
 
   return {
     isTrusted,
     isFolderTrustDialogOpen,
     handleFolderTrustSelect,
+    isRestarting,
   };
 };

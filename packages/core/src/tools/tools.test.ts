@@ -5,13 +5,8 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import {
-  DeclarativeTool,
-  hasCycleInSchema,
-  Kind,
-  ToolInvocation,
-  ToolResult,
-} from './tools.js';
+import type { ToolInvocation, ToolResult } from './tools.js';
+import { DeclarativeTool, hasCycleInSchema, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
 class TestToolInvocation implements ToolInvocation<object, ToolResult> {
@@ -101,7 +96,6 @@ describe('DeclarativeTool', () => {
       const successResult: ToolResult = {
         llmContent: 'Success!',
         returnDisplay: 'Success!',
-        summary: 'Tool executed successfully',
       };
       const executeFn = vi.fn().mockResolvedValue(successResult);
       const invocation = new TestToolInvocation({}, executeFn);

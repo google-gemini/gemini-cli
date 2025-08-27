@@ -4,16 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useEffect, useContext } from 'react';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import { useState, useCallback, useEffect } from 'react';
+import type { LoadedSettings, SettingScope } from '../../config/settings.js';
+import { AuthType, type Config } from '@google/gemini-cli-core';
 import {
-  AuthType,
-  Config,
   clearCachedCredentialFile,
   getErrorMessage,
 } from '@google/gemini-cli-core';
 import { runExitCleanup } from '../../utils/cleanup.js';
-import { SettingsContext } from '../contexts/SettingsContext.js';
 
 export const useAuthCommand = (
   settings: LoadedSettings,
@@ -23,7 +21,6 @@ export const useAuthCommand = (
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(
     settings.merged.selectedAuthType === undefined,
   );
-  const settingsContext = useContext(SettingsContext);
 
   const openAuthDialog = useCallback(() => {
     setIsAuthDialogOpen(true);
@@ -58,7 +55,7 @@ export const useAuthCommand = (
       if (authType) {
         await clearCachedCredentialFile();
 
-        settingsContext?.settings.setValue(scope, 'selectedAuthType', authType);
+        settings.setValue(scope, 'selectedAuthType', authType);
         if (
           authType === AuthType.LOGIN_WITH_GOOGLE &&
           config.isBrowserLaunchSuppressed()
@@ -77,7 +74,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setIsAuthDialogOpen(false);
       setAuthError(null);
     },
-    [settingsContext, setAuthError, config],
+    [settings, setAuthError, config],
   );
 
   const cancelAuthentication = useCallback(() => {

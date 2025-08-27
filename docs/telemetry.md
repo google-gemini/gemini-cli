@@ -220,6 +220,10 @@ Logs are timestamped records of specific events. The following events are logged
     - `response_text` (if applicable)
     - `auth_type`
 
+- `gemini_cli.malformed_json_response`: This event occurs when a `generateJson` response from Gemini API cannot be parsed as a json.
+  - **Attributes**:
+    - `model`
+
 - `gemini_cli.flash_fallback`: This event occurs when Gemini CLI switches to flash as fallback.
   - **Attributes**:
     - `auth_type`
@@ -272,6 +276,7 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `ai_removed_lines` (Int, if applicable): Number of lines removed/changed by AI.
     - `user_added_lines` (Int, if applicable): Number of lines added/changed by user in AI proposed changes.
     - `user_removed_lines` (Int, if applicable): Number of lines removed/changed by user in AI proposed changes.
+    - `programming_language` (string, if applicable): The programming language of the file.
 
 - `gemini_cli.chat_compression` (Counter, Int): Counts chat compression operations
   - **Attributes**:

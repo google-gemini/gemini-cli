@@ -6,9 +6,11 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { PartUnion } from '@google/genai';
+import type { PartUnion } from '@google/genai';
 import mime from 'mime-types';
-import { FileSystemService } from '../services/fileSystemService.js';
+import type { FileSystemService } from '../services/fileSystemService.js';
+import { ToolErrorType } from '../tools/tool-error.js';
+import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 
 // Constants for text file processing
 const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
@@ -152,38 +154,7 @@ export async function detectFileType(
 
   // Stricter binary check for common non-text extensions before content check
   // These are often not well-covered by mime-types or might be misidentified.
-  if (
-    [
-      '.zip',
-      '.tar',
-      '.gz',
-      '.exe',
-      '.dll',
-      '.so',
-      '.class',
-      '.jar',
-      '.war',
-      '.7z',
-      '.doc',
-      '.docx',
-      '.xls',
-      '.xlsx',
-      '.ppt',
-      '.pptx',
-      '.odt',
-      '.ods',
-      '.odp',
-      '.bin',
-      '.dat',
-      '.obj',
-      '.o',
-      '.a',
-      '.lib',
-      '.wasm',
-      '.pyc',
-      '.pyo',
-    ].includes(ext)
-  ) {
+  if (BINARY_EXTENSIONS.includes(ext)) {
     return 'binary';
   }
 
@@ -196,18 +167,11 @@ export async function detectFileType(
   return 'text';
 }
 
-export enum FileErrorType {
-  FILE_NOT_FOUND = 'FILE_NOT_FOUND',
-  IS_DIRECTORY = 'IS_DIRECTORY',
-  FILE_TOO_LARGE = 'FILE_TOO_LARGE',
-  READ_ERROR = 'READ_ERROR',
-}
-
 export interface ProcessedFileReadResult {
   llmContent: PartUnion; // string for text, Part for image/pdf/unreadable binary
   returnDisplay: string;
   error?: string; // Optional error message for the LLM if file processing failed
-  errorType?: FileErrorType; // Structured error type using enum
+  errorType?: ToolErrorType; // Structured error type
   isTruncated?: boolean; // For text files, indicates if content was truncated
   originalLineCount?: number; // For text files
   linesShown?: [number, number]; // For text files [startLine, endLine] (1-based for display)
@@ -232,33 +196,32 @@ export async function processSingleFileContent(
     if (!fs.existsSync(filePath)) {
       // Sync check is acceptable before async read
       return {
-        llmContent: '',
+        llmContent:
+          'Could not read file because no file was found at the specified path.',
         returnDisplay: 'File not found.',
         error: `File not found: ${filePath}`,
-        errorType: FileErrorType.FILE_NOT_FOUND,
+        errorType: ToolErrorType.FILE_NOT_FOUND,
       };
     }
     const stats = await fs.promises.stat(filePath);
     if (stats.isDirectory()) {
       return {
-        llmContent: '',
+        llmContent:
+          'Could not read file because the provided path is a directory, not a file.',
         returnDisplay: 'Path is a directory.',
         error: `Path is a directory, not a file: ${filePath}`,
-        errorType: FileErrorType.IS_DIRECTORY,
+        errorType: ToolErrorType.TARGET_IS_DIRECTORY,
       };
     }
 
-    const fileSizeInBytes = stats.size;
-    // 20MB limit
-    const maxFileSize = 20 * 1024 * 1024;
-
-    if (fileSizeInBytes > maxFileSize) {
-      throw new Error(
-        `File size exceeds the 20MB limit: ${filePath} (${(
-          fileSizeInBytes /
-          (1024 * 1024)
-        ).toFixed(2)}MB)`,
-      );
+    const fileSizeInMB = stats.size / (1024 * 1024);
+    if (fileSizeInMB > 20) {
+      return {
+        llmContent: 'File size exceeds the 20MB limit.',
+        returnDisplay: 'File size exceeds the 20MB limit.',
+        error: `File size exceeds the 20MB limit: ${filePath} (${fileSizeInMB.toFixed(2)}MB)`,
+        errorType: ToolErrorType.FILE_TOO_LARGE,
+      };
     }
 
     const fileType = await detectFileType(filePath);
@@ -373,6 +336,7 @@ export async function processSingleFileContent(
       llmContent: `Error reading file ${displayPath}: ${errorMessage}`,
       returnDisplay: `Error reading file ${displayPath}: ${errorMessage}`,
       error: `Error reading file ${filePath}: ${errorMessage}`,
+      errorType: ToolErrorType.READ_CONTENT_FAILURE,
     };
   }
 }

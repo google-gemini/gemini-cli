@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { render } from 'ink';
-import { MainComponent } from './ui/MainComponent.js';
+import { AppWrapper } from './ui/App.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
@@ -14,12 +15,8 @@ import os from 'node:os';
 import dns from 'node:dns';
 import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
-import {
-  DnsResolutionOrder,
-  LoadedSettings,
-  loadSettings,
-  SettingScope,
-} from './config/settings.js';
+import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
+import { loadSettings, SettingScope } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
@@ -28,8 +25,8 @@ import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions } from './config/extension.js';
 import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
+import type { Config } from '@google/gemini-cli-core';
 import {
-  Config,
   sessionId,
   logUserPrompt,
   AuthType,
@@ -37,6 +34,7 @@ import {
   logIdeConnection,
   IdeConnectionEvent,
   IdeConnectionType,
+  FatalConfigError,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -45,6 +43,7 @@ import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.j
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { SettingsContext } from './ui/contexts/SettingsContext.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -130,6 +129,44 @@ ${reason.stack}`
   });
 }
 
+export async function startInteractiveUI(
+  config: Config,
+  settings: LoadedSettings,
+  startupWarnings: string[],
+  workspaceRoot: string,
+) {
+  const version = await getCliVersion();
+  // Detect and enable Kitty keyboard protocol once at startup
+  await detectAndEnableKittyProtocol();
+  setWindowTitle(basename(workspaceRoot), settings);
+  const instance = render(
+    <React.StrictMode>
+      <SettingsContext.Provider value={settings}>
+        <AppWrapper
+          config={config}
+          settings={settings}
+          startupWarnings={startupWarnings}
+          version={version}
+        />
+      </SettingsContext.Provider>
+    </React.StrictMode>,
+    { exitOnCtrlC: false, isScreenReaderEnabled: config.getScreenReader() },
+  );
+
+  checkForUpdates()
+    .then((info) => {
+      handleAutoUpdate(info, settings, config.getProjectRoot());
+    })
+    .catch((err) => {
+      // Silently ignore update check errors.
+      if (config.getDebugMode()) {
+        console.error('Update check failed:', err);
+      }
+    });
+
+  registerCleanup(() => instance.unmount());
+}
+
 export async function main() {
   setupUnhandledRejectionHandler();
   const workspaceRoot = process.cwd();
@@ -137,18 +174,15 @@ export async function main() {
 
   await cleanupCheckpoints();
   if (settings.errors.length > 0) {
-    for (const error of settings.errors) {
-      let errorMessage = `Error in ${error.path}: ${error.message}`;
-      if (!process.env['NO_COLOR']) {
-        errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
-      }
-      console.error(errorMessage);
-      console.error(`Please fix ${error.path} and try again.`);
-    }
-    process.exit(1);
+    const errorMessages = settings.errors.map(
+      (error) => `Error in ${error.path}: ${error.message}`,
+    );
+    throw new FatalConfigError(
+      `${errorMessages.join('\n')}\nPlease fix the configuration file(s) and try again.`,
+    );
   }
 
-  const argv = await parseArguments();
+  const argv = await parseArguments(settings.merged);
   const extensions = loadExtensions(workspaceRoot);
   const config = await loadCliConfig(
     settings.merged,
@@ -192,6 +226,14 @@ export async function main() {
         AuthType.CLOUD_SHELL,
       );
     }
+  }
+  // Empty key causes issues with the GoogleGenAI package.
+  if (process.env['GEMINI_API_KEY']?.trim() === '') {
+    delete process.env['GEMINI_API_KEY'];
+  }
+
+  if (process.env['GOOGLE_API_KEY']?.trim() === '') {
+    delete process.env['GOOGLE_API_KEY'];
   }
 
   setMaxSizedBoxDebugging(config.getDebugMode());
@@ -237,7 +279,37 @@ export async function main() {
           process.exit(1);
         }
       }
-      await start_sandbox(sandboxConfig, memoryArgs, config);
+      let stdinData = '';
+      if (!process.stdin.isTTY) {
+        stdinData = await readStdin();
+      }
+
+      // This function is a copy of the one from sandbox.ts
+      // It is moved here to decouple sandbox.ts from the CLI's argument structure.
+      const injectStdinIntoArgs = (
+        args: string[],
+        stdinData?: string,
+      ): string[] => {
+        const finalArgs = [...args];
+        if (stdinData) {
+          const promptIndex = finalArgs.findIndex(
+            (arg) => arg === '--prompt' || arg === '-p',
+          );
+          if (promptIndex > -1 && finalArgs.length > promptIndex + 1) {
+            // If there's a prompt argument, prepend stdin to it
+            finalArgs[promptIndex + 1] =
+              `${stdinData}\n\n${finalArgs[promptIndex + 1]}`;
+          } else {
+            // If there's no prompt argument, add stdin as the prompt
+            finalArgs.push('--prompt', stdinData);
+          }
+        }
+        return finalArgs;
+      };
+
+      const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
+
+      await start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs);
       process.exit(0);
     } else {
       // Not in a sandbox and not entering one, so relaunch with additional
@@ -269,38 +341,7 @@ export async function main() {
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {
-    const version = await getCliVersion();
-    // Detect and enable Kitty keyboard protocol once at startup
-    await detectAndEnableKittyProtocol();
-    setWindowTitle(basename(workspaceRoot), settings);
-
-    const instance = render(
-      <MainComponent
-        initialConfig={config}
-        settings={settings}
-        startupWarnings={startupWarnings}
-        version={version}
-        workspaceRoot={workspaceRoot}
-        extensions={extensions}
-        argv={argv}
-      />,
-      {
-        exitOnCtrlC: false,
-      },
-    );
-
-    checkForUpdates()
-      .then((info) => {
-        handleAutoUpdate(info, settings, config.getProjectRoot());
-      })
-      .catch((err) => {
-        // Silently ignore update check errors.
-        if (config.getDebugMode()) {
-          console.error('Update check failed:', err);
-        }
-      });
-
-    registerCleanup(() => instance.unmount());
+    await startInteractiveUI(config, settings, startupWarnings, workspaceRoot);
     return;
   }
   // If not a TTY, read from stdin
@@ -312,7 +353,9 @@ export async function main() {
     }
   }
   if (!input) {
-    console.error('No input provided via stdin.');
+    console.error(
+      `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
+    );
     process.exit(1);
   }
 
@@ -331,6 +374,10 @@ export async function main() {
     settings.merged.useExternalAuth,
     config,
   );
+
+  if (config.getDebugMode()) {
+    console.log('Session ID: %s', sessionId);
+  }
 
   await runNonInteractive(nonInteractiveConfig, input, prompt_id);
   process.exit(0);

@@ -5,8 +5,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { isNodeError, Storage } from '@google/gemini-cli-core';
 
 const MAX_HISTORY_LENGTH = 100;
