@@ -36,26 +36,28 @@ You will be given:
 
 const EDIT_USER_PROMPT = `
 # Goal of the Original Edit
+<instruction>
 {instruction}
+</instruction>
 
 # Failed Attempt Details
 - **Original \`search\` parameter (failed):**
-\`\`\
+<search>
 {old_string}
-\`\`\
+</search>
 - **Original \`replace\` parameter:**
-\`\`\
+<replace>
 {new_string}
-\`\`\
+</replace>
 - **Error Encountered:**
-\`\`\
+<error>
 {error}
-\`\`\
+</error>
 
 # Full File Content
-\`\`\
+<file_content>
 {current_content}
-\`\`\
+</file_content>
 
 # Your Task
 Based on the error and the file content, provide a corrected \`search\` string that will succeed. Remember to keep your correction minimal and explain the precise reason for the failure in your \`explanation\`.
