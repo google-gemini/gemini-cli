@@ -10,6 +10,8 @@ import {
   type ExtensionInstallMetadata,
 } from '../../config/extension.js';
 
+import { getErrorMessage } from '../../utils/errors.js';
+
 interface InstallArgs {
   source?: string;
   path?: string;
@@ -26,7 +28,7 @@ export async function handleInstall(args: InstallArgs) {
       `Extension "${extensionName}" installed successfully and enabled.`,
     );
   } catch (error) {
-    console.error((error as Error).message);
+    console.error(getErrorMessage(error));
     process.exit(1);
   }
 }

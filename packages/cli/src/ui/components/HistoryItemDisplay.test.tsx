@@ -10,6 +10,7 @@ import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import type { HistoryItem } from '../types.js';
 import { MessageType } from '../types.js';
 import { SessionStatsProvider } from '../contexts/SessionContext.js';
+import type { Config } from '@google/gemini-cli-core';
 
 // Mock child components
 vi.mock('./messages/ToolGroupMessage.js', () => ({
@@ -17,11 +18,13 @@ vi.mock('./messages/ToolGroupMessage.js', () => ({
 }));
 
 describe('<HistoryItemDisplay />', () => {
+  const mockConfig = {} as unknown as Config;
   const baseItem = {
     id: 1,
     timestamp: 12345,
     isPending: false,
     terminalWidth: 80,
+    config: mockConfig,
   };
 
   it('renders UserMessage for "user" type', () => {

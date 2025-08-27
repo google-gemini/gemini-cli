@@ -1,0 +1,29 @@
+name: 'Eval'
+
+on:
+  workflow_dispatch:
+
+jobs:
+  eval:
+    name: 'Eval'
+    runs-on: 'ubuntu-latest'
+    strategy:
+      matrix:
+        node-version:
+          - '20.x'
+          - '22.x'
+          - '24.x'
+    steps:
+      - name: 'Set up Node.js ${{ matrix.node-version }}'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version: '${{ matrix.node-version }}'
+          cache: 'npm'
+
+      - name: 'Set up Python'
+        uses: 'actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065' # ratchet:actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 'Install and configure Poetry'
+        uses: 'snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a' # ratchet:snok/install-poetry@v1

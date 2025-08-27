@@ -36,6 +36,7 @@ import { EOL } from 'node:os';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import * as summarizer from '../utils/summarizer.js';
+import { ToolErrorType } from './tool-error.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
@@ -205,6 +206,22 @@ describe('ShellTool', () => {
       const result = await promise;
       expect(result.llmContent).toContain('Error: wrapped command failed');
       expect(result.llmContent).not.toContain('pgrep');
+    });
+
+    it('should return a SHELL_EXECUTE_ERROR for a command failure', async () => {
+      const error = new Error('command failed');
+      const invocation = shellTool.build({ command: 'user-command' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({
+        error,
+        exitCode: 1,
+      });
+
+      const result = await promise;
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.SHELL_EXECUTE_ERROR);
+      expect(result.error?.message).toBe('command failed');
     });
 
     it('should throw an error for invalid parameters', () => {

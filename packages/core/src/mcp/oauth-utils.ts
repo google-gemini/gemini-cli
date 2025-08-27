@@ -141,6 +141,76 @@ export class OAuthUtils {
   }
 
   /**
+   * Discover Oauth Authorization server metadata given an Auth server URL, by
+   * trying the standard well-known endpoints.
+   *
+   * @param authServerUrl The authorization server URL
+   * @returns The authorization server metadata or null if not found
+   */
+  static async discoverAuthorizationServerMetadata(
+    authServerUrl: string,
+  ): Promise<OAuthAuthorizationServerMetadata | null> {
+    const authServerUrlObj = new URL(authServerUrl);
+    const base = `${authServerUrlObj.protocol}//${authServerUrlObj.host}`;
+
+    const endpointsToTry: string[] = [];
+
+    // With issuer URLs with path components, try the following well-known
+    // endpoints in order:
+    if (authServerUrlObj.pathname !== '/') {
+      // 1. OAuth 2.0 Authorization Server Metadata with path insertion
+      endpointsToTry.push(
+        new URL(
+          `/.well-known/oauth-authorization-server${authServerUrlObj.pathname}`,
+          base,
+        ).toString(),
+      );
+
+      // 2. OpenID Connect Discovery 1.0 with path insertion
+      endpointsToTry.push(
+        new URL(
+          `/.well-known/openid-configuration${authServerUrlObj.pathname}`,
+          base,
+        ).toString(),
+      );
+
+      // 3. OpenID Connect Discovery 1.0 with path appending
+      endpointsToTry.push(
+        new URL(
+          `${authServerUrlObj.pathname}/.well-known/openid-configuration`,
+          base,
+        ).toString(),
+      );
+    }
+
+    // With issuer URLs without path components, and those that failed previous
+    // discoveries, try the following well-known endpoints in order:
+
+    // 1. OAuth 2.0 Authorization Server Metadata
+    endpointsToTry.push(
+      new URL('/.well-known/oauth-authorization-server', base).toString(),
+    );
+
+    // 2. OpenID Connect Discovery 1.0
+    endpointsToTry.push(
+      new URL('/.well-known/openid-configuration', base).toString(),
+    );
+
+    for (const endpoint of endpointsToTry) {
+      const authServerMetadata =
+        await this.fetchAuthorizationServerMetadata(endpoint);
+      if (authServerMetadata) {
+        return authServerMetadata;
+      }
+    }
+
+    console.debug(
+      `Metadata discovery failed for authorization server ${authServerUrl}`,
+    );
+    return null;
+  }
+
+  /**
    * Discover OAuth configuration using the standard well-known endpoints.
    *
    * @param serverUrl The base URL of the server
@@ -172,33 +242,8 @@ export class OAuthUtils {
       if (resourceMetadata?.authorization_servers?.length) {
         // Use the first authorization server
         const authServerUrl = resourceMetadata.authorization_servers[0];
-
-        // The authorization server URL may include a path (e.g., https://github.com/login/oauth)
-        // We need to preserve this path when constructing the metadata URL
-        const authServerUrlObj = new URL(authServerUrl);
-        const authServerPath =
-          authServerUrlObj.pathname === '/' ? '' : authServerUrlObj.pathname;
-
-        // Try with the authorization server's path first
-        let authServerMetadataUrl = new URL(
-          `/.well-known/oauth-authorization-server${authServerPath}`,
-          `${authServerUrlObj.protocol}//${authServerUrlObj.host}`,
-        ).toString();
-
-        let authServerMetadata = await this.fetchAuthorizationServerMetadata(
-          authServerMetadataUrl,
-        );
-
-        // If that fails, try root as fallback
-        if (!authServerMetadata && authServerPath) {
-          authServerMetadataUrl = new URL(
-            '/.well-known/oauth-authorization-server',
-            `${authServerUrlObj.protocol}//${authServerUrlObj.host}`,
-          ).toString();
-          authServerMetadata = await this.fetchAuthorizationServerMetadata(
-            authServerMetadataUrl,
-          );
-        }
+        const authServerMetadata =
+          await this.discoverAuthorizationServerMetadata(authServerUrl);
 
         if (authServerMetadata) {
           const config = this.metadataToOAuthConfig(authServerMetadata);
@@ -212,13 +257,10 @@ export class OAuthUtils {
         }
       }
 
-      // Fallback: try /.well-known/oauth-authorization-server at the base URL
-      console.debug(
-        `Trying OAuth discovery fallback at ${wellKnownUrls.authorizationServer}`,
-      );
-      const authServerMetadata = await this.fetchAuthorizationServerMetadata(
-        wellKnownUrls.authorizationServer,
-      );
+      // Fallback: try well-known endpoints at the base URL
+      console.debug(`Trying OAuth discovery fallback at ${serverUrl}`);
+      const authServerMetadata =
+        await this.discoverAuthorizationServerMetadata(serverUrl);
 
       if (authServerMetadata) {
         const config = this.metadataToOAuthConfig(authServerMetadata);
@@ -277,34 +319,8 @@ export class OAuthUtils {
     }
 
     const authServerUrl = resourceMetadata.authorization_servers[0];
-
-    // The authorization server URL may include a path (e.g., https://github.com/login/oauth)
-    // We need to preserve this path when constructing the metadata URL
-    const authServerUrlObj = new URL(authServerUrl);
-    const authServerPath =
-      authServerUrlObj.pathname === '/' ? '' : authServerUrlObj.pathname;
-
-    // Build auth server metadata URL with the authorization server's path
-    const authServerMetadataUrl = new URL(
-      `/.well-known/oauth-authorization-server${authServerPath}`,
-      `${authServerUrlObj.protocol}//${authServerUrlObj.host}`,
-    ).toString();
-
-    let authServerMetadata = await this.fetchAuthorizationServerMetadata(
-      authServerMetadataUrl,
-    );
-
-    // If that fails and we have a path, also try the root path as a fallback
-    if (!authServerMetadata && authServerPath) {
-      const rootAuthServerMetadataUrl = new URL(
-        '/.well-known/oauth-authorization-server',
-        `${authServerUrlObj.protocol}//${authServerUrlObj.host}`,
-      ).toString();
-
-      authServerMetadata = await this.fetchAuthorizationServerMetadata(
-        rootAuthServerMetadataUrl,
-      );
-    }
+    const authServerMetadata =
+      await this.discoverAuthorizationServerMetadata(authServerUrl);
 
     if (authServerMetadata) {
       return this.metadataToOAuthConfig(authServerMetadata);
