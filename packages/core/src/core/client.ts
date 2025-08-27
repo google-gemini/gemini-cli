@@ -868,7 +868,7 @@ export class GeminiClient {
       await this.getContentGenerator().countTokens({
         // model might change after calling `sendMessage`, so we get the newest value from config
         model: this.config.getModel(),
-        contents: this.getChat().getHistory(),
+        contents: chat.getHistory(),
       });
     if (newTokenCount === undefined) {
       console.warn('Could not determine compressed history token count.');

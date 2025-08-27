@@ -37,6 +37,7 @@ import { setSimulate429 } from '../utils/testUtils.js';
 import { tokenLimit } from './tokenLimits.js';
 import { ideContext } from '../ide/ideContext.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { truncateSync } from 'node:fs';
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
@@ -387,7 +388,9 @@ describe('Gemini Client (client.ts)', () => {
     });
 
     it('should allow overriding model and config', async () => {
-      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const contents: Content[] = [
+        { role: 'user', parts: [{ text: 'hello' }] },
+      ];
       const schema = { type: 'string' };
       const abortSignal = new AbortController().signal;
       const customModel = 'custom-json-model';
@@ -428,10 +431,10 @@ describe('Gemini Client (client.ts)', () => {
 
   describe('addHistory', () => {
     it('should call chat.addHistory with the provided content', async () => {
-      const mockChat = {
+      const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
       };
-      client['chat'] = mockChat as unknown as GeminiChat;
+      client['chat'] = mockChat as GeminiChat;
 
       const newContent = {
         role: 'user',
@@ -493,34 +496,35 @@ describe('Gemini Client (client.ts)', () => {
       } as unknown as GeminiChat;
     });
 
+    function setup({
+      chatHistory = [
+        { role: 'user', parts: [{ text: 'Long conversation' }] },
+        { role: 'model', parts: [{ text: 'Long response' }] },
+      ] as Content[],
+    } = {}) {
+      const mockChat: Partial<GeminiChat> = {
+        getHistory: vi.fn().mockReturnValue(chatHistory),
+        setHistory: vi.fn(),
+        sendMessage: vi.fn().mockResolvedValue({ text: 'Summary' }),
+      };
+      const mockCountTokens = vi
+        .fn()
+        .mockResolvedValueOnce({ totalTokens: 1000 })
+        .mockResolvedValueOnce({ totalTokens: 5000 });
+
+      const mockGenerator: Partial<Mocked<ContentGenerator>> = {
+        countTokens: mockCountTokens,
+      };
+
+      client['chat'] = mockChat as GeminiChat;
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+      client['startChat'] = vi.fn().mockResolvedValue({ ...mockChat });
+
+      return { client, mockChat, mockGenerator };
+    }
+
     describe('when compression inflates the token count', () => {
-      function setup({
-        chatHistory = [
-          { role: 'user', parts: [{ text: 'Long conversation' }] },
-          { role: 'model', parts: [{ text: 'Long response' }] },
-        ] as Content[],
-      } = {}) {
-        const mockChat: Partial<GeminiChat> = {
-          getHistory: vi.fn().mockReturnValue(chatHistory),
-          setHistory: vi.fn(),
-          sendMessage: vi.fn().mockResolvedValue({ text: 'Summary' }),
-        };
-        const mockCountTokens = vi
-          .fn()
-          .mockResolvedValueOnce({ totalTokens: 1000 })
-          .mockResolvedValueOnce({ totalTokens: 5000 });
-
-        const mockGenerator: Partial<Mocked<ContentGenerator>> = {
-          countTokens: mockCountTokens,
-        };
-
-        client['chat'] = mockChat as GeminiChat;
-        client['contentGenerator'] = mockGenerator as ContentGenerator;
-        client['startChat'] = vi.fn().mockResolvedValue({ ...mockChat });
-
-        return { client, mockChat, mockGenerator };
-      }
-
+      it('uses the truncated history for compression');
       it('allows compression to be forced/manual after a failure', async () => {
         const { client, mockGenerator } = setup();
         mockGenerator.countTokens?.mockResolvedValue({
