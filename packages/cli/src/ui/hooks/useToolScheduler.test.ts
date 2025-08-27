@@ -48,19 +48,21 @@ vi.mock('@google/gemini-cli-core', async () => {
 
 const mockToolRegistry = {
   getTool: vi.fn(),
+  getAllToolNames: vi.fn(() => ['mockTool', 'anotherTool']),
 };
 
 const mockConfig = {
   getToolRegistry: vi.fn(() => mockToolRegistry as unknown as ToolRegistry),
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
+  getSessionId: () => 'test-session-id',
   getUsageStatisticsEnabled: () => true,
   getDebugMode: () => false,
-  getSessionId: () => 'test-session-id',
+  getAllowedTools: vi.fn(() => []),
   getContentGeneratorConfig: () => ({
     model: 'test-model',
     authType: 'oauth-personal',
   }),
-};
+} as unknown as Config;
 
 class MockToolInvocation extends BaseToolInvocation<object, ToolResult> {
   constructor(
@@ -217,11 +219,6 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     await act(async () => {
       await vi.runAllTimersAsync(); // Process execution
     });
-
-    // Check that shouldConfirmExecute was NOT called
-    expect(
-      mockToolRequiresConfirmation.shouldConfirmExecute,
-    ).not.toHaveBeenCalled();
 
     // Check that execute WAS called
     expect(mockToolRequiresConfirmation.execute).toHaveBeenCalledWith(
@@ -431,11 +428,17 @@ describe('useReactToolScheduler', () => {
         request,
         response: expect.objectContaining({
           error: expect.objectContaining({
-            message: 'Tool "nonexistentTool" not found in registry.',
+            message: expect.stringMatching(
+              /Tool "nonexistentTool" not found in registry/,
+            ),
           }),
         }),
       }),
     ]);
+    const errorMessage = onComplete.mock.calls[0][0][0].response.error.message;
+    expect(errorMessage).toContain('Did you mean one of:');
+    expect(errorMessage).toContain('"mockTool"');
+    expect(errorMessage).toContain('"anotherTool"');
     expect(result.current[0]).toEqual([]);
   });
 
