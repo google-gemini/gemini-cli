@@ -39,16 +39,15 @@ describe('<Help/>', () => {
     const customCommands: readonly SlashCommand[] = [
       {
         name: 'custom1',
-        description:
-          '[extension-foo] This is a custom command from an extension.',
+        description: 'This is a custom command from an extension.',
         kind: CommandKind.FILE, // or any other non-BUILT_IN kind
         extensionName: 'extension-foo',
       },
       {
         name: 'custom2',
-        description:
-          '[fooMcpServer] This is a custom command from an MCP server.',
+        description: 'This is a custom command from an MCP server.',
         kind: CommandKind.MCP_PROMPT,
+        mcpServerName: 'mcp-server-bar',
       },
     ];
 
@@ -60,14 +59,11 @@ describe('<Help/>', () => {
     expect(output).toContain('Show this help message.');
     expect(output).toContain('/exit');
     expect(output).toContain('Exit the application.');
-    expect(output).toContain('Custom Commands:');
+    expect(output).toContain('Commands from extension extension-foo:');
     expect(output).toContain('/custom1');
-    expect(output).toContain(
-      '[extension-foo] This is a custom command from an extension.',
-    );
+    expect(output).toContain('This is a custom command from an extension.');
+    expect(output).toContain('Commands from MCP server mcp-server-bar:');
     expect(output).toContain('/custom2');
-    expect(output).toContain(
-      '[fooMcpServer] This is a custom command from an MCP server.',
-    );
+    expect(output).toContain('This is a custom command from an MCP server.');
   });
 });

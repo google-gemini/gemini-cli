@@ -388,6 +388,29 @@ describe('FileCommandLoader', () => {
     expect(command.description).toBe('My test command');
   });
 
+  it('sets the originName metadata for commands outside extensions', async () => {
+    const userCommandsDir = Storage.getUserCommandsDir();
+    const projectCommandsDir = new Storage(
+      process.cwd(),
+    ).getProjectCommandsDir();
+
+    mock({
+      [userCommandsDir]: {
+        'user.toml': 'prompt = "User command"',
+      },
+      [projectCommandsDir]: {
+        'project.toml': 'prompt = "Project command"',
+      },
+    });
+
+    const loader = new FileCommandLoader(null);
+    const commands = await loader.loadCommands(signal);
+    expect(commands[0]).toBeDefined();
+    expect(commands[0].originName).toBe('user .gemini directory');
+    expect(commands[1]).toBeDefined();
+    expect(commands[1].originName).toBe('project .gemini directory');
+  });
+
   it('should sanitize colons in filenames to prevent namespace conflicts', async () => {
     const userCommandsDir = Storage.getUserCommandsDir();
     mock({
@@ -566,7 +589,6 @@ describe('FileCommandLoader', () => {
 
       const extCommand = commands.find((cmd) => cmd.name === 'ext');
       expect(extCommand?.extensionName).toBe('test-ext');
-      expect(extCommand?.description).toMatch(/^\[test-ext\]/);
     });
 
     it('extension commands have extensionName metadata for conflict resolution', async () => {
@@ -650,7 +672,6 @@ describe('FileCommandLoader', () => {
 
       expect(commands[2].name).toBe('deploy');
       expect(commands[2].extensionName).toBe('test-ext');
-      expect(commands[2].description).toMatch(/^\[test-ext\]/);
       const result2 = await commands[2].action?.(
         createMockCommandContext({
           invocation: {
@@ -721,7 +742,6 @@ describe('FileCommandLoader', () => {
       expect(commands).toHaveLength(1);
       expect(commands[0].name).toBe('active');
       expect(commands[0].extensionName).toBe('active-ext');
-      expect(commands[0].description).toMatch(/^\[active-ext\]/);
     });
 
     it('handles missing extension commands directory gracefully', async () => {
@@ -793,7 +813,6 @@ describe('FileCommandLoader', () => {
 
       const nestedCmd = commands.find((cmd) => cmd.name === 'b:c');
       expect(nestedCmd?.extensionName).toBe('a');
-      expect(nestedCmd?.description).toMatch(/^\[a\]/);
       expect(nestedCmd).toBeDefined();
       const result = await nestedCmd!.action?.(
         createMockCommandContext({

@@ -36,7 +36,10 @@ import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 
 interface CommandDirectory {
   path: string;
+  // Set only if the directory is part of an extension
   extensionName?: string;
+  // Set only if the command is not part of an extension
+  displayName?: string;
 }
 
 /**
@@ -98,11 +101,7 @@ export class FileCommandLoader implements ICommandLoader {
         });
 
         const commandPromises = files.map((file) =>
-          this.parseAndAdaptFile(
-            path.join(dirInfo.path, file),
-            dirInfo.path,
-            dirInfo.extensionName,
-          ),
+          this.parseAndAdaptFile(path.join(dirInfo.path, file), dirInfo),
         );
 
         const commands = (await Promise.all(commandPromises)).filter(
@@ -135,10 +134,16 @@ export class FileCommandLoader implements ICommandLoader {
     const storage = this.config?.storage ?? new Storage(this.projectRoot);
 
     // 1. User commands
-    dirs.push({ path: Storage.getUserCommandsDir() });
+    dirs.push({
+      path: Storage.getUserCommandsDir(),
+      displayName: 'user .gemini directory',
+    });
 
     // 2. Project commands (override user commands)
-    dirs.push({ path: storage.getProjectCommandsDir() });
+    dirs.push({
+      path: storage.getProjectCommandsDir(),
+      displayName: 'project .gemini directory',
+    });
 
     // 3. Extension commands (processed last to detect all conflicts)
     if (this.config) {
@@ -167,8 +172,7 @@ export class FileCommandLoader implements ICommandLoader {
    */
   private async parseAndAdaptFile(
     filePath: string,
-    baseDir: string,
-    extensionName?: string,
+    commandDir: CommandDirectory,
   ): Promise<SlashCommand | null> {
     let fileContent: string;
     try {
@@ -204,7 +208,7 @@ export class FileCommandLoader implements ICommandLoader {
 
     const validDef = validationResult.data;
 
-    const relativePathWithExt = path.relative(baseDir, filePath);
+    const relativePathWithExt = path.relative(commandDir.path, filePath);
     const relativePath = relativePathWithExt.substring(
       0,
       relativePathWithExt.length - 5, // length of '.toml'
@@ -217,11 +221,12 @@ export class FileCommandLoader implements ICommandLoader {
       .map((segment) => segment.replaceAll(':', '_'))
       .join(':');
 
-    // Add extension name tag for extension commands
+    let originName = undefined; // only used if there is no extension
     const defaultDescription = `Custom command from ${path.basename(filePath)}`;
-    let description = validDef.description || defaultDescription;
-    if (extensionName) {
-      description = `[${extensionName}] ${description}`;
+    const description = validDef.description || defaultDescription;
+    if (!commandDir.extensionName) {
+      // If this command isn't from an extension, set the origin name for it
+      originName = commandDir.displayName || 'unknown location';
     }
 
     const processors: IPromptProcessor[] = [];
@@ -256,7 +261,8 @@ export class FileCommandLoader implements ICommandLoader {
       name: baseCommandName,
       description,
       kind: CommandKind.FILE,
-      extensionName,
+      extensionName: commandDir.extensionName,
+      originName,
       action: async (
         context: CommandContext,
         _args: string,

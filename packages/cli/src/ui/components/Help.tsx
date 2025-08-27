@@ -119,11 +119,39 @@ export const Help: React.FC<Help> = ({ commands }) => {
         </Box>
       </Box>
 
-      {customCommands.length > 0 && (
-        <Box flexDirection="column" paddingTop={1}>
-          <CommandList title={'Custom Commands:'} commands={customCommands} />
-        </Box>
-      )}
+      {/* Custom commands, grouped by origin */}
+      {customCommands.length > 0 &&
+        Object.entries(
+          customCommands.reduce(
+            (acc, command) => {
+              const key =
+                command.mcpServerName ||
+                command.extensionName ||
+                command.originName ||
+                'Unknown Origin';
+              if (!acc[key]) {
+                acc[key] = [];
+              }
+              acc[key].push(command);
+              return acc;
+            },
+            {} as Record<string, SlashCommand[]>,
+          ),
+        ).map(([origin, commands]) => {
+          let title = 'Commands from unknown location:';
+          if (commands[0].mcpServerName !== undefined) {
+            title = `Commands from MCP server ${origin}:`;
+          } else if (commands[0].extensionName !== undefined) {
+            title = `Commands from extension ${origin}:`;
+          } else if (commands[0].originName !== undefined) {
+            title = `Commands from ${origin}:`;
+          }
+          return (
+            <Box key={origin} flexDirection="column" paddingTop={1}>
+              <CommandList title={title} commands={commands} />
+            </Box>
+          );
+        })}
 
       {/* Shortcuts */}
       <Box key={'shortcuts'} flexDirection="column" paddingTop={1}>

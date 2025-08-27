@@ -173,6 +173,12 @@ export interface SlashCommand {
 
   kind: CommandKind;
 
+  // Optional name of the MCP server this command came from
+  mcpServerName?: string;
+
+  // Optional path to the directory the file command came from
+  originName?: string;
+
   // Optional metadata for extension commands
   extensionName?: string;
 
