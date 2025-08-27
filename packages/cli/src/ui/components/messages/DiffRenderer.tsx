@@ -6,7 +6,6 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { EOL } from 'node:os';
 import { Colors } from '../../colors.js';
 import crypto from 'node:crypto';
 import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
@@ -21,7 +20,7 @@ interface DiffLine {
 }
 
 function parseDiffWithLineNumbers(diffContent: string): DiffLine[] {
-  const lines = diffContent.split(EOL);
+  const lines = diffContent.split('\n');
   const result: DiffLine[] = [];
   let currentOldLine = 0;
   let currentNewLine = 0;
