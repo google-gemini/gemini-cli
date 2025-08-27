@@ -14,8 +14,12 @@ import {
 } from '../../config/trustedFolders.js';
 import * as process from 'node:process';
 
+import type { Config } from '@google/gemini-cli-core';
+import { useIdeTrustListener } from './useIdeTrustListener.js';
+
 export const useFolderTrust = (
   settings: LoadedSettings,
+  config: Config,
   onTrustChange: (isTrusted: boolean | undefined) => void,
 ) => {
   const [isTrusted, setIsTrusted] = useState<boolean | undefined>(undefined);
@@ -23,6 +27,26 @@ export const useFolderTrust = (
   const [isRestarting, setIsRestarting] = useState(false);
 
   const folderTrust = settings.merged.security?.folderTrust?.enabled;
+
+
+  const updateTrust = useCallback(
+    (newIsTrusted: boolean) => {
+      const wasTrusted = isTrusted ?? true;
+      setIsTrusted(newIsTrusted);
+      onTrustChange(newIsTrusted);
+
+      const needsRestart = wasTrusted !== newIsTrusted;
+      if (needsRestart) {
+        setIsRestarting(true);
+        setIsFolderTrustDialogOpen(true);
+      } else {
+        setIsFolderTrustDialogOpen(false);
+      }
+    },
+    [isTrusted, onTrustChange],
+  );
+
+  useIdeTrustListener(config, updateTrust);
 
   useEffect(() => {
     const trusted = isWorkspaceTrusted({
@@ -43,8 +67,6 @@ export const useFolderTrust = (
       const cwd = process.cwd();
       let trustLevel: TrustLevel;
 
-      const wasTrusted = isTrusted ?? true;
-
       switch (choice) {
         case FolderTrustChoice.TRUST_FOLDER:
           trustLevel = TrustLevel.TRUST_FOLDER;
@@ -63,18 +85,9 @@ export const useFolderTrust = (
       const newIsTrusted =
         trustLevel === TrustLevel.TRUST_FOLDER ||
         trustLevel === TrustLevel.TRUST_PARENT;
-      setIsTrusted(newIsTrusted);
-      onTrustChange(newIsTrusted);
-
-      const needsRestart = wasTrusted !== newIsTrusted;
-      if (needsRestart) {
-        setIsRestarting(true);
-        setIsFolderTrustDialogOpen(true);
-      } else {
-        setIsFolderTrustDialogOpen(false);
-      }
+      updateTrust(newIsTrusted);
     },
-    [onTrustChange, isTrusted],
+    [updateTrust],
   );
 
   return {

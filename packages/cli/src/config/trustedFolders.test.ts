@@ -255,3 +255,68 @@ describe('isWorkspaceTrusted', () => {
     expect(isWorkspaceTrusted(mockSettings)).toBe(true);
   });
 });
+
+describe('isWorkspaceTrusted with IDE override', () => {
+  const mockSettings: Settings = {
+    folderTrustFeature: true,
+    folderTrust: true,
+  };
+
+  afterEach(() => {
+    delete process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'];
+  });
+
+  it('should return true when env var is "true", ignoring config', () => {
+    process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'] = 'true';
+    // Even if config says don't trust, env var should win.
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({ [process.cwd()]: TrustLevel.DO_NOT_TRUST }),
+    );
+    expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+  });
+
+  it('should return false when env var is "false", ignoring config', () => {
+    process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'] = 'false';
+    // Even if config says trust, env var should win.
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({ [process.cwd()]: TrustLevel.TRUST_FOLDER }),
+    );
+    expect(isWorkspaceTrusted(mockSettings)).toBe(false);
+  });
+
+  it('should fall back to config when env var is undefined', () => {
+    delete process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'];
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({ [process.cwd()]: TrustLevel.TRUST_FOLDER }),
+    );
+    expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+  });
+
+  it('should fall back to config when env var is an empty string', () => {
+    process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'] = '';
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({ [process.cwd()]: TrustLevel.TRUST_FOLDER }),
+    );
+    expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+  });
+
+  it('should always return true if folderTrustFeature is disabled', () => {
+    const settings: Settings = {
+      folderTrustFeature: false,
+      folderTrust: true,
+    };
+    process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'] = 'false';
+    expect(isWorkspaceTrusted(settings)).toBe(true);
+  });
+
+  it('should always return true if folderTrust setting is disabled', () => {
+    const settings: Settings = {
+      folderTrustFeature: true,
+      folderTrust: false,
+    };
+    process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'] = 'false';
+    expect(isWorkspaceTrusted(settings)).toBe(true);
+  });
+});

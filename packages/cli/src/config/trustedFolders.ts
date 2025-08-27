@@ -7,7 +7,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { homedir } from 'node:os';
-import { getErrorMessage, isWithinRoot } from '@google/gemini-cli-core';
+import {
+  getErrorMessage,
+  isWithinRoot,
+  getIdeWorkspaceTrustOverride,
+} from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
 
@@ -159,20 +163,63 @@ export function isFolderTrustEnabled(settings: Settings): boolean {
   return folderTrustSetting;
 }
 
-export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
-  if (!isFolderTrustEnabled(settings)) {
-    return true;
-  }
+function getWorkspaceTrustFromLocalConfig(): boolean | undefined {
+  const { rules, errors } = loadTrustedFolders();
 
-  const folders = loadTrustedFolders();
-
-  if (folders.errors.length > 0) {
-    for (const error of folders.errors) {
+  if (errors.length > 0) {
+    for (const error of errors) {
       console.error(
         `Error loading trusted folders config from ${error.path}: ${error.message}`,
       );
     }
   }
 
-  return folders.isPathTrusted(process.cwd());
+  const trustedPaths: string[] = [];
+  const untrustedPaths: string[] = [];
+
+  for (const rule of rules) {
+    switch (rule.trustLevel) {
+      case TrustLevel.TRUST_FOLDER:
+        trustedPaths.push(rule.path);
+        break;
+      case TrustLevel.TRUST_PARENT:
+        trustedPaths.push(path.dirname(rule.path));
+        break;
+      case TrustLevel.DO_NOT_TRUST:
+        untrustedPaths.push(rule.path);
+        break;
+      default:
+        // Do nothing for unknown trust levels.
+        break;
+    }
+  }
+
+  const cwd = process.cwd();
+
+  for (const trustedPath of trustedPaths) {
+    if (isWithinRoot(cwd, trustedPath)) {
+      return true;
+    }
+  }
+
+  for (const untrustedPath of untrustedPaths) {
+    if (path.normalize(cwd) === path.normalize(untrustedPath)) {
+      return false;
+    }
+  }
+
+  return undefined;
+}
+
+export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
+  if (!isFolderTrustEnabled(settings)) {
+    return true;
+  }
+
+  const trustOverride = getIdeWorkspaceTrustOverride();
+  if (trustOverride !== undefined) {
+    console.error('Overriding trust status using ide trust');
+    return trustOverride;
+  }
+  return getWorkspaceTrustFromLocalConfig();
 }

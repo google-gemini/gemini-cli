@@ -45,6 +45,7 @@ const vscodeMock = vi.hoisted(() => ({
         },
       },
     ],
+    isTrusted: true,
   },
 }));
 
@@ -101,7 +102,7 @@ describe('IDEServer', () => {
     await ideServer.start(mockContext);
 
     const replaceMock = mockContext.environmentVariableCollection.replace;
-    expect(replaceMock).toHaveBeenCalledTimes(2);
+    expect(replaceMock).toHaveBeenCalledTimes(3);
 
     expect(replaceMock).toHaveBeenNthCalledWith(
       1,
@@ -118,6 +119,12 @@ describe('IDEServer', () => {
       2,
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
       expectedWorkspacePaths,
+    );
+
+    expect(replaceMock).toHaveBeenNthCalledWith(
+      3,
+      'GEMINI_CLI_IDE_WORKSPACE_TRUST',
+      'true',
     );
 
     const port = getPortFromMock(replaceMock);
@@ -229,7 +236,7 @@ describe('IDEServer', () => {
       { uri: { fsPath: '/foo/bar' } },
       { uri: { fsPath: '/baz/qux' } },
     ];
-    await ideServer.updateWorkspacePath();
+    await ideServer.syncEnvVars();
 
     const expectedWorkspacePaths = ['/foo/bar', '/baz/qux'].join(
       path.delimiter,
@@ -264,7 +271,7 @@ describe('IDEServer', () => {
 
     // Simulate removing a folder
     vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: '/baz/qux' } }];
-    await ideServer.updateWorkspacePath();
+    await ideServer.syncEnvVars();
 
     expect(replaceMock).toHaveBeenCalledWith(
       'GEMINI_CLI_IDE_WORKSPACE_PATH',

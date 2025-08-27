@@ -302,7 +302,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     useSettingsCommand();
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
-    useFolderTrust(settings, setIsTrustedFolder);
+    useFolderTrust(settings, config, setIsTrustedFolder);
 
   const {
     isAuthDialogOpen,
