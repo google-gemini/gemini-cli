@@ -10,7 +10,11 @@ import type {
   ToolInvocation,
   ToolResult,
 } from '../tools/tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from '../tools/tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+} from '../tools/tools.js';
 
 type MockToolOptions = {
   name: string;
@@ -81,7 +85,9 @@ export class MockTool extends BaseDeclarativeTool<
     );
 
     if (options.shouldConfirmExecute) {
-      this.shouldConfirmExecute.mockImplementation(options.shouldConfirmExecute);
+      this.shouldConfirmExecute.mockImplementation(
+        options.shouldConfirmExecute,
+      );
     } else {
       this.shouldConfirmExecute.mockResolvedValue(false);
     }

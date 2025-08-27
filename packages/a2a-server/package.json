@@ -40,8 +40,7 @@
     "dotenv": "^16.4.5",
     "supertest": "^7.1.4",
     "typescript": "^5.3.3",
-    "vitest": "^3.1.1",
-    "@google/gemini-cli-test-utils": "file:../test-utils"
+    "vitest": "^3.1.1"
   },
   "engines": {
     "node": ">=20"

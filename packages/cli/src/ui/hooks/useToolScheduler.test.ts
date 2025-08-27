@@ -28,10 +28,10 @@ import type {
 import {
   ToolConfirmationOutcome,
   ApprovalMode,
+  MockTool,
 } from '@google/gemini-cli-core';
 import type { HistoryItemWithoutId, HistoryItemToolGroup } from '../types.js';
 import { ToolCallStatus } from '../types.js';
-import { MockTool } from '@google/gemini-cli-core';
 
 // Mocks
 vi.mock('@google/gemini-cli-core', async () => {
@@ -955,7 +955,6 @@ describe('mapToDisplay', () => {
       status: 'error',
       extraProps: {
         tool: baseTool,
-        // invocation: baseInvocation,
         response: {
           ...baseResponse,
           error: new Error('Tool execution failed'),
