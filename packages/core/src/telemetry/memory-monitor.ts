@@ -6,7 +6,7 @@
 
 import v8 from 'node:v8';
 import process from 'node:process';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import {
   recordMemoryUsage,
   MemoryMetricType,
