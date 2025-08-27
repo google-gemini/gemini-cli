@@ -91,6 +91,19 @@ vi.mock('../telemetry/index.js', () => ({
 }));
 vi.mock('../ide/ideContext.js');
 
+/**
+ * Array.fromAsync ponyfill, which will be available in es 2024.
+ *
+ * Buffers an async generator into an array and returns the result.
+ */
+async function fromAsync<T>(promise: AsyncGenerator<T>): Promise<readonly T[]> {
+  const results: T[] = [];
+  for await (const result of promise) {
+    results.push(result);
+  }
+  return results;
+}
+
 describe('findIndexAfterFraction', () => {
   const history: Content[] = [
     { role: 'user', parts: [{ text: 'This is the first message.' }] }, // JSON length: 66
@@ -926,7 +939,7 @@ describe('Gemini Client (client.ts)', () => {
         'prompt-id-1',
       );
 
-      const events = await Array.fromAsync(stream);
+      const events = await fromAsync(stream);
 
       // Assert
       expect(events).toContainEqual({
@@ -983,7 +996,7 @@ describe('Gemini Client (client.ts)', () => {
           'prompt-id-1',
         );
 
-        const events = await Array.fromAsync(stream);
+        const events = await fromAsync(stream);
 
         // Assert
         expect(events).not.toContainEqual({
