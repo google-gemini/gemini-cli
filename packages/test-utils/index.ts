@@ -4,4 +4,4 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export * from './src/file-system-test-helpers.js';
+export * from './src/index.js';
