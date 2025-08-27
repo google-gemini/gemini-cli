@@ -34,6 +34,7 @@ import {
   logIdeConnection,
   IdeConnectionEvent,
   IdeConnectionType,
+  FatalConfigError,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -173,15 +174,12 @@ export async function main() {
 
   await cleanupCheckpoints();
   if (settings.errors.length > 0) {
-    for (const error of settings.errors) {
-      let errorMessage = `Error in ${error.path}: ${error.message}`;
-      if (!process.env['NO_COLOR']) {
-        errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
-      }
-      console.error(errorMessage);
-      console.error(`Please fix ${error.path} and try again.`);
-    }
-    process.exit(1);
+    const errorMessages = settings.errors.map(
+      (error) => `Error in ${error.path}: ${error.message}`,
+    );
+    throw new FatalConfigError(
+      `${errorMessages.join('\n')}\nPlease fix the configuration file(s) and try again.`,
+    );
   }
 
   const argv = await parseArguments(settings.merged);
@@ -228,6 +226,14 @@ export async function main() {
         AuthType.CLOUD_SHELL,
       );
     }
+  }
+  // Empty key causes issues with the GoogleGenAI package.
+  if (process.env['GEMINI_API_KEY']?.trim() === '') {
+    delete process.env['GEMINI_API_KEY'];
+  }
+
+  if (process.env['GOOGLE_API_KEY']?.trim() === '') {
+    delete process.env['GOOGLE_API_KEY'];
   }
 
   setMaxSizedBoxDebugging(config.getDebugMode());
