@@ -16,7 +16,7 @@ import {
 } from '../config/models.js';
 import { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
-import { PartListUnion, PartUnion } from '@google/genai';
+import type { PartListUnion, PartUnion } from '@google/genai';
 
 // Free Tier message functions
 const getRateLimitErrorMessageGoogleFree = (
