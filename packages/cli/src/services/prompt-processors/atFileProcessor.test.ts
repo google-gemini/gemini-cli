@@ -190,6 +190,27 @@ describe('AtFileProcessor', () => {
       );
     });
 
+    it('should call ui.addItem with a WARNING if the file was ignored', async () => {
+      const processor = new AtFileProcessor();
+      const prompt: PartUnion[] = [{ text: 'Analyze @{ignored.txt}' }];
+      // Simulate an ignored file by returning an empty array.
+      mockReadPathFromWorkspace.mockResolvedValue([]);
+
+      const result = await processor.process(prompt, context);
+
+      // The placeholder should be removed, resulting in only the prefix.
+      expect(result).toEqual([{ text: 'Analyze ' }]);
+
+      expect(context.ui.addItem).toHaveBeenCalledTimes(1);
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: "File '@{ignored.txt}' was ignored by .gitignore or .geminiignore and was not included in the prompt.",
+        },
+        expect.any(Number),
+      );
+    });
+
     it('should NOT call ui.addItem on success', async () => {
       const processor = new AtFileProcessor();
       const prompt: PartUnion[] = [{ text: 'Analyze @{good-file.txt}' }];

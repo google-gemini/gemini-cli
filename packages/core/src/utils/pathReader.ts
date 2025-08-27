@@ -25,6 +25,7 @@ export async function readPathFromWorkspace(
   config: Config,
 ): Promise<PartUnion[]> {
   const workspace = config.getWorkspaceContext();
+  const fileService = config.getFileService();
   let absolutePath: string | null = null;
 
   if (path.isAbsolute(pathStr)) {
@@ -68,7 +69,18 @@ export async function readPathFromWorkspace(
       absolute: true,
     });
 
-    for (const filePath of files) {
+    const relativeFiles = files.map((p) =>
+      path.relative(config.getTargetDir(), p),
+    );
+    const filteredFiles = fileService.filterFiles(relativeFiles, {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    });
+    const finalFiles = filteredFiles.map((p) =>
+      path.resolve(config.getTargetDir(), p),
+    );
+
+    for (const filePath of finalFiles) {
       const relativePathForDisplay = path.relative(absolutePath, filePath);
       allParts.push({ text: `--- ${relativePathForDisplay} ---\n` });
       const result = await processSingleFileContent(
@@ -83,6 +95,18 @@ export async function readPathFromWorkspace(
     allParts.push({ text: `--- End of content for directory: ${pathStr} ---` });
     return allParts;
   } else {
+    // It's a single file, check if it's ignored.
+    const relativePath = path.relative(config.getTargetDir(), absolutePath);
+    const filtered = fileService.filterFiles([relativePath], {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    });
+
+    if (filtered.length === 0) {
+      // File is ignored, return empty array to silently skip.
+      return [];
+    }
+
     // It's a single file, process it directly.
     const result = await processSingleFileContent(
       absolutePath,

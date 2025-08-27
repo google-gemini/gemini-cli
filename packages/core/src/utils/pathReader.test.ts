@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import mock from 'mock-fs';
 import * as path from 'node:path';
 import { WorkspaceContext } from './workspaceContext.js';
 import { readPathFromWorkspace } from './pathReader.js';
 import type { Config } from '../config/config.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
+import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 // Helper to conditionally run tests (useful for OS-specific behaviors like permissions)
 const itif = (condition: boolean) => (condition ? it : it.skip);
@@ -18,7 +19,11 @@ const itif = (condition: boolean) => (condition ? it : it.skip);
 // --- Helper for creating a mock Config object ---
 // We use the actual implementations of WorkspaceContext and FileSystemService
 // to test the integration against mock-fs.
-const createMockConfig = (cwd: string, otherDirs: string[] = []): Config => {
+const createMockConfig = (
+  cwd: string,
+  otherDirs: string[] = [],
+  mockFileService?: FileDiscoveryService,
+): Config => {
   const workspace = new WorkspaceContext(cwd, otherDirs);
   const fileSystemService = new StandardFileSystemService();
   return {
@@ -26,6 +31,7 @@ const createMockConfig = (cwd: string, otherDirs: string[] = []): Config => {
     // TargetDir is used by processSingleFileContent to generate relative paths in errors/output
     getTargetDir: () => cwd,
     getFileSystemService: () => fileSystemService,
+    getFileService: () => mockFileService,
   } as unknown as Config;
 };
 
@@ -36,6 +42,7 @@ describe('readPathFromWorkspace', () => {
 
   afterEach(() => {
     mock.restore();
+    vi.resetAllMocks();
   });
 
   it('should read a text file from the CWD', async () => {
@@ -44,10 +51,14 @@ describe('readPathFromWorkspace', () => {
         'file.txt': 'hello from cwd',
       },
     });
-    const config = createMockConfig(CWD);
+    const mockFileService = {
+      filterFiles: vi.fn((files) => files),
+    } as unknown as FileDiscoveryService;
+    const config = createMockConfig(CWD, [], mockFileService);
     const result = await readPathFromWorkspace('file.txt', config);
     // Expect [string] for text content
     expect(result).toEqual(['hello from cwd']);
+    expect(mockFileService.filterFiles).toHaveBeenCalled();
   });
 
   it('should read a file from a secondary workspace directory', async () => {
@@ -57,7 +68,10 @@ describe('readPathFromWorkspace', () => {
         'file.txt': 'hello from other dir',
       },
     });
-    const config = createMockConfig(CWD, [OTHER_DIR]);
+    const mockFileService = {
+      filterFiles: vi.fn((files) => files),
+    } as unknown as FileDiscoveryService;
+    const config = createMockConfig(CWD, [OTHER_DIR], mockFileService);
     const result = await readPathFromWorkspace('file.txt', config);
     expect(result).toEqual(['hello from other dir']);
   });
@@ -71,7 +85,10 @@ describe('readPathFromWorkspace', () => {
         'file.txt': 'hello from other dir',
       },
     });
-    const config = createMockConfig(CWD, [OTHER_DIR]);
+    const mockFileService = {
+      filterFiles: vi.fn((files) => files),
+    } as unknown as FileDiscoveryService;
+    const config = createMockConfig(CWD, [OTHER_DIR], mockFileService);
     const result = await readPathFromWorkspace('file.txt', config);
     expect(result).toEqual(['hello from cwd']);
   });
@@ -86,7 +103,10 @@ describe('readPathFromWorkspace', () => {
         'image.png': imageData,
       },
     });
-    const config = createMockConfig(CWD);
+    const mockFileService = {
+      filterFiles: vi.fn((files) => files),
+    } as unknown as FileDiscoveryService;
+    const config = createMockConfig(CWD, [], mockFileService);
     const result = await readPathFromWorkspace('image.png', config);
     // Expect [Part] for image content
     expect(result).toEqual([
@@ -107,7 +127,10 @@ describe('readPathFromWorkspace', () => {
         'data.bin': binaryData,
       },
     });
-    const config = createMockConfig(CWD);
+    const mockFileService = {
+      filterFiles: vi.fn((files) => files),
+    } as unknown as FileDiscoveryService;
+    const config = createMockConfig(CWD, [], mockFileService);
     const result = await readPathFromWorkspace('data.bin', config);
     // Expect [string] containing the skip message from fileUtils
     expect(result).toEqual(['Cannot display content of binary file: data.bin']);
@@ -121,7 +144,10 @@ describe('readPathFromWorkspace', () => {
         'abs.txt': 'absolute content',
       },
     });
-    const config = createMockConfig(CWD, [OTHER_DIR]);
+    const mockFileService = {
+      filterFiles: vi.fn((files) => files),
+    } as unknown as FileDiscoveryService;
+    const config = createMockConfig(CWD, [OTHER_DIR], mockFileService);
     const result = await readPathFromWorkspace(absPath, config);
     expect(result).toEqual(['absolute content']);
   });
@@ -136,7 +162,10 @@ describe('readPathFromWorkspace', () => {
           },
         },
       });
-      const config = createMockConfig(CWD);
+      const mockFileService = {
+        filterFiles: vi.fn((files) => files),
+      } as unknown as FileDiscoveryService;
+      const config = createMockConfig(CWD, [], mockFileService);
       const result = await readPathFromWorkspace('my-dir', config);
 
       // Convert to a single string for easier, order-independent checking
@@ -144,7 +173,9 @@ describe('readPathFromWorkspace', () => {
         .map((p) => {
           if (typeof p === 'string') return p;
           if (typeof p === 'object' && p && 'text' in p) return p.text;
-          return ''; // Ignore non-text parts for this assertion
+          // This part is important for handling binary/image data which isn't just text
+          if (typeof p === 'object' && p && 'inlineData' in p) return '';
+          return p;
         })
         .join('');
 
@@ -171,7 +202,10 @@ describe('readPathFromWorkspace', () => {
           },
         },
       });
-      const config = createMockConfig(CWD);
+      const mockFileService = {
+        filterFiles: vi.fn((files) => files),
+      } as unknown as FileDiscoveryService;
+      const config = createMockConfig(CWD, [], mockFileService);
       const result = await readPathFromWorkspace('my-dir', config);
 
       const resultText = result
@@ -205,7 +239,10 @@ describe('readPathFromWorkspace', () => {
           },
         },
       });
-      const config = createMockConfig(CWD);
+      const mockFileService = {
+        filterFiles: vi.fn((files) => files),
+      } as unknown as FileDiscoveryService;
+      const config = createMockConfig(CWD, [], mockFileService);
       const result = await readPathFromWorkspace('mixed-dir', config);
 
       // Check for the text part
@@ -237,12 +274,67 @@ describe('readPathFromWorkspace', () => {
           'empty-dir': {},
         },
       });
-      const config = createMockConfig(CWD);
+      const mockFileService = {
+        filterFiles: vi.fn((files) => files),
+      } as unknown as FileDiscoveryService;
+      const config = createMockConfig(CWD, [], mockFileService);
       const result = await readPathFromWorkspace('empty-dir', config);
       expect(result).toEqual([
         { text: '--- Start of content for directory: empty-dir ---\n' },
         { text: '--- End of content for directory: empty-dir ---' },
       ]);
+    });
+  });
+
+  describe('File Ignoring', () => {
+    it('should return an empty array for an ignored file', async () => {
+      mock({
+        [CWD]: {
+          'ignored.txt': 'ignored content',
+        },
+      });
+      const mockFileService = {
+        filterFiles: vi.fn(() => []), // Simulate the file being filtered out
+      } as unknown as FileDiscoveryService;
+      const config = createMockConfig(CWD, [], mockFileService);
+      const result = await readPathFromWorkspace('ignored.txt', config);
+      expect(result).toEqual([]);
+      expect(mockFileService.filterFiles).toHaveBeenCalledWith(
+        ['ignored.txt'],
+        {
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        },
+      );
+    });
+
+    it('should not read ignored files when expanding a directory', async () => {
+      mock({
+        [CWD]: {
+          'my-dir': {
+            'not-ignored.txt': 'visible',
+            'ignored.log': 'invisible',
+          },
+        },
+      });
+      const mockFileService = {
+        filterFiles: vi.fn((files: string[]) =>
+          files.filter((f) => !f.endsWith('ignored.log')),
+        ),
+      } as unknown as FileDiscoveryService;
+      const config = createMockConfig(CWD, [], mockFileService);
+      const result = await readPathFromWorkspace('my-dir', config);
+      const resultText = result
+        .map((p) => {
+          if (typeof p === 'string') return p;
+          if (typeof p === 'object' && p && 'text' in p) return p.text;
+          return '';
+        })
+        .join('');
+
+      expect(resultText).toContain('visible');
+      expect(resultText).not.toContain('invisible');
+      expect(mockFileService.filterFiles).toHaveBeenCalled();
     });
   });
 
@@ -284,7 +376,10 @@ describe('readPathFromWorkspace', () => {
           }),
         },
       });
-      const config = createMockConfig(CWD);
+      const mockFileService = {
+        filterFiles: vi.fn((files) => files),
+      } as unknown as FileDiscoveryService;
+      const config = createMockConfig(CWD, [], mockFileService);
       // processSingleFileContent catches the error and returns an error string.
       const result = await readPathFromWorkspace('unreadable.txt', config);
       const textResult = result[0] as string;
@@ -303,7 +398,10 @@ describe('readPathFromWorkspace', () => {
         'large.txt': largeContent,
       },
     });
-    const config = createMockConfig(CWD);
+    const mockFileService = {
+      filterFiles: vi.fn((files) => files),
+    } as unknown as FileDiscoveryService;
+    const config = createMockConfig(CWD, [], mockFileService);
     const result = await readPathFromWorkspace('large.txt', config);
     const textResult = result[0] as string;
     // The error message comes directly from processSingleFileContent
