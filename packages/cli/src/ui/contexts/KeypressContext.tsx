@@ -136,7 +136,38 @@ export function KeypressProvider({
         [KITTY_KEYCODE_NUMPAD_ENTER]: 'return',
       };
 
+<<<<<<< HEAD
       if (keyCode in keyNameMap) {
+=======
+      if (keyCode === KITTY_KEYCODE_TAB) {
+        return {
+          name: 'tab',
+          ctrl,
+          meta: alt,
+          shift,
+          paste: false,
+          sequence,
+          kittyProtocol: true,
+        };
+      }
+
+      if (keyCode === KITTY_KEYCODE_BACKSPACE) {
+        return {
+          name: 'backspace',
+          ctrl,
+          meta: alt,
+          shift,
+          paste: false,
+          sequence,
+          kittyProtocol: true,
+        };
+      }
+
+      if (
+        keyCode === KITTY_KEYCODE_ENTER ||
+        keyCode === KITTY_KEYCODE_NUMPAD_ENTER
+      ) {
+>>>>>>> v0.2.0
         return {
           name: keyNameMap[keyCode],
           ctrl,
