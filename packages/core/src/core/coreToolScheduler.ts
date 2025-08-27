@@ -33,6 +33,7 @@ import {
 } from '../tools/modifiable-tool.js';
 import * as Diff from 'diff';
 import { doesToolInvocationMatch } from '../utils/tool-utils.js';
+import levenshtein from 'fast-levenshtein';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -504,6 +505,40 @@ export class CoreToolScheduler {
     }
   }
 
+  /**
+   * Generates a suggestion string for a tool name that was not found in the registry.
+   * It finds the closest matches based on Levenshtein distance.
+   * @param unknownToolName The tool name that was not found.
+   * @param topN The number of suggestions to return. Defaults to 3.
+   * @returns A suggestion string like " Did you mean 'tool'?" or " Did you mean one of: 'tool1', 'tool2'?", or an empty string if no suggestions are found.
+   */
+  private getToolSuggestion(unknownToolName: string, topN = 3): string {
+    const allToolNames = this.toolRegistry.getAllToolNames();
+
+    const matches = allToolNames.map((toolName) => ({
+      name: toolName,
+      distance: levenshtein.get(unknownToolName, toolName),
+    }));
+
+    matches.sort((a, b) => a.distance - b.distance);
+
+    const topNResults = matches.slice(0, topN);
+
+    if (topNResults.length === 0) {
+      return '';
+    }
+
+    const suggestedNames = topNResults
+      .map((match) => `"${match.name}"`)
+      .join(', ');
+
+    if (topNResults.length > 1) {
+      return ` Did you mean one of: ${suggestedNames}?`;
+    } else {
+      return ` Did you mean ${suggestedNames}?`;
+    }
+  }
+
   schedule(
     request: ToolCallRequestInfo | ToolCallRequestInfo[],
     signal: AbortSignal,
@@ -557,12 +592,14 @@ export class CoreToolScheduler {
         (reqInfo): ToolCall => {
           const toolInstance = this.toolRegistry.getTool(reqInfo.name);
           if (!toolInstance) {
+            const suggestion = this.getToolSuggestion(reqInfo.name);
+            const errorMessage = `Tool "${reqInfo.name}" not found in registry. Tools must use the exact names that are registered.${suggestion}`;
             return {
               status: 'error',
               request: reqInfo,
               response: createErrorResponse(
                 reqInfo,
-                new Error(`Tool "${reqInfo.name}" not found in registry.`),
+                new Error(errorMessage),
                 ToolErrorType.TOOL_NOT_REGISTERED,
               ),
               durationMs: 0,

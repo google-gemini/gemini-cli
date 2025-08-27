@@ -532,6 +532,7 @@ export async function loadCliConfig(
       respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
       enableRecursiveFileSearch:
         settings.fileFiltering?.enableRecursiveFileSearch,
+      disableFuzzySearch: settings.fileFiltering?.disableFuzzySearch,
     },
     checkpointing: argv.checkpointing || settings.checkpointing?.enabled,
     proxy:
