@@ -39,7 +39,7 @@ body:
         Run `gemini` to enter the interactive CLI, then run the `/about` command.
 
         ```console
-        /about
+        > /about
         # paste output here
         ```
 
