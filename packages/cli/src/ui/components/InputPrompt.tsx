@@ -508,7 +508,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) {
-        buffer.deleteWordBackward();
+        buffer.deleteWordLeft();
         return;
       }
 
