@@ -163,6 +163,9 @@ export enum EventMetadataKey {
   // Logs the Gemini CLI Git commit hash
   GEMINI_CLI_GIT_COMMIT_HASH = 55,
 
+  // Logs the Gemini CLI OS
+  GEMINI_CLI_OS = 82,
+
   // ==========================================================================
   // Loop Detected Event Keys
   // ===========================================================================
