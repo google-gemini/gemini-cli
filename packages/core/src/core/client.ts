@@ -475,7 +475,7 @@ export class GeminiClient {
 
     const compressed = await this.tryCompressChat(prompt_id);
 
-    if (compressed) {
+    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
 

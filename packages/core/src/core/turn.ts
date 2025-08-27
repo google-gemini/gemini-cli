@@ -128,6 +128,7 @@ export type ServerGeminiErrorEvent = {
 export enum CompressionStatus {
   /** The compression was successful */
   COMPRESSED = 1,
+
   /** The compression failed due to the compression inflating the token count */
   COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
 
