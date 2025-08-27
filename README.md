@@ -188,6 +188,12 @@ gemini --include-directories ../lib,../docs
 gemini -m gemini-2.5-flash
 ```
 
+Use your own fine tuned gemini model:
+```bash
+gemini --model-endpoint projects/<project_id>/locations/<region>/endpoints/<model_id>
+```
+
+
 #### Non-interactive mode for scripts
 
 ```bash

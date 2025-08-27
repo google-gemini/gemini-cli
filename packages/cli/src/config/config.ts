@@ -53,6 +53,7 @@ const logger = {
 
 export interface CliArgs {
   model: string | undefined;
+  modelEndpoint: string | undefined;
   sandbox: boolean | string | undefined;
   sandboxImage: string | undefined;
   debug: boolean | undefined;
@@ -93,6 +94,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: `Model`,
           default: process.env['GEMINI_MODEL'],
+        })
+        .option('model-endpoint', {
+          type: 'string',
+          description: `Endpoint of a fine-tuned model deployed on VertexAI.`,
+          default: process.env['GEMINI_MODEL_ENDPOINT'],
         })
         .option('prompt', {
           alias: 'p',
@@ -545,6 +551,7 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
     model: argv.model || settings.model || DEFAULT_GEMINI_MODEL,
+    modelEndpoint: argv.modelEndpoint,
     extensionContextFilePaths,
     maxSessionTurns: settings.maxSessionTurns ?? -1,
     experimentalZedIntegration: argv.experimentalAcp || false,
