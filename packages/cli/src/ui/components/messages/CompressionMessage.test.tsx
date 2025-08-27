@@ -5,11 +5,12 @@
  */
 
 import { render } from 'ink-testing-library';
+import type {
+  CompressionDisplayProps} from './CompressionMessage.js';
 import {
-  CompressionMessage,
-  CompressionDisplayProps,
+  CompressionMessage
 } from './CompressionMessage.js';
-import { CompressionProps } from '../../types.js';
+import type { CompressionProps } from '../../types.js';
 import { describe, it, expect } from 'vitest';
 
 describe('<CompressionMessage />', () => {
