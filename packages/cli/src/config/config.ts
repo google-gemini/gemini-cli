@@ -497,6 +497,7 @@ export async function loadCliConfig(
     coreTools: settings.coreTools || undefined,
     allowedTools: argv.allowedTools || settings.allowedTools || undefined,
     excludeTools,
+    preapprovedShellCommandRegexes: settings.preapprovedShellCommandRegexes,
     toolDiscoveryCommand: settings.toolDiscoveryCommand,
     toolCallCommand: settings.toolCallCommand,
     mcpServerCommand: settings.mcpServerCommand,

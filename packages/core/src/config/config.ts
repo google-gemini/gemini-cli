@@ -162,6 +162,7 @@ export interface ConfigParameters {
   coreTools?: string[];
   allowedTools?: string[];
   excludeTools?: string[];
+  preapprovedShellCommandRegexes?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
   mcpServerCommand?: string;
@@ -225,6 +226,7 @@ export class Config {
   private readonly coreTools: string[] | undefined;
   private readonly allowedTools: string[] | undefined;
   private readonly excludeTools: string[] | undefined;
+  private readonly preapprovedShellCommandRegexes: RegExp[];
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
@@ -300,6 +302,15 @@ export class Config {
     this.coreTools = params.coreTools;
     this.allowedTools = params.allowedTools;
     this.excludeTools = params.excludeTools;
+    this.preapprovedShellCommandRegexes = (params.preapprovedShellCommandRegexes ?? [])
+      .map((regex) => {
+        try {
+          return new RegExp(`^(?:${regex})$`);
+        } catch (e: unknown) {
+          console.warn(`Skipping invalid preapproved shell command regex: "${regex}".`);
+          console.warn(`Error: ${(e as Error)?.message}`);
+        }
+      }).filter((r) => r is RegExp => r != null);
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
@@ -533,6 +544,10 @@ export class Config {
 
   getExcludeTools(): string[] | undefined {
     return this.excludeTools;
+  }
+
+  getPreapprovedShellCommandRegexes(): RegExp[] {
+    return this.preapprovedShellCommandRegexes;
   }
 
   getToolDiscoveryCommand(): string | undefined {
