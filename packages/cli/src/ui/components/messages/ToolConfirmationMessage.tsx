@@ -23,7 +23,7 @@ import { useKeypress } from '../../hooks/useKeypress.js';
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
-  config?: Config;
+  config: Config;
   isFocused?: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
@@ -43,8 +43,8 @@ export const ToolConfirmationMessage: React.FC<
 
   const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
     if (confirmationDetails.type === 'edit') {
-      const ideClient = config?.getIdeClient();
-      if (config?.getIdeMode()) {
+      const ideClient = config.getIdeClient();
+      if (config.getIdeMode()) {
         const cliOutcome =
           outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
         await ideClient?.resolveDiffFromCli(
@@ -55,6 +55,8 @@ export const ToolConfirmationMessage: React.FC<
     }
     onConfirm(outcome);
   };
+
+  const isTrustedFolder = config.isTrustedFolder() !== false;
 
   useKeypress(
     (key) => {
@@ -129,13 +131,13 @@ export const ToolConfirmationMessage: React.FC<
       label: 'Yes, allow once',
       value: ToolConfirmationOutcome.ProceedOnce,
     });
-    if (config?.isTrustedFolder()) {
+    if (isTrustedFolder) {
       options.push({
         label: 'Yes, allow always',
         value: ToolConfirmationOutcome.ProceedAlways,
       });
     }
-    if (config?.getIdeMode()) {
+    if (config.getIdeMode()) {
       options.push({
         label: 'No (esc)',
         value: ToolConfirmationOutcome.Cancel,
@@ -168,7 +170,7 @@ export const ToolConfirmationMessage: React.FC<
       label: 'Yes, allow once',
       value: ToolConfirmationOutcome.ProceedOnce,
     });
-    if (config?.isTrustedFolder()) {
+    if (isTrustedFolder) {
       options.push({
         label: `Yes, allow always ...`,
         value: ToolConfirmationOutcome.ProceedAlways,
@@ -208,7 +210,7 @@ export const ToolConfirmationMessage: React.FC<
       label: 'Yes, allow once',
       value: ToolConfirmationOutcome.ProceedOnce,
     });
-    if (config?.isTrustedFolder()) {
+    if (isTrustedFolder) {
       options.push({
         label: 'Yes, allow always',
         value: ToolConfirmationOutcome.ProceedAlways,
@@ -253,7 +255,7 @@ export const ToolConfirmationMessage: React.FC<
       label: 'Yes, allow once',
       value: ToolConfirmationOutcome.ProceedOnce,
     });
-    if (config?.isTrustedFolder()) {
+    if (isTrustedFolder) {
       options.push({
         label: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
         value: ToolConfirmationOutcome.ProceedAlwaysTool, // Cast until types are updated

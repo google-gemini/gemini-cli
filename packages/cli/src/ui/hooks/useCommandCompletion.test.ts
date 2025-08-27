@@ -516,4 +516,81 @@ describe('useCommandCompletion', () => {
       );
     });
   });
+
+  describe('prompt completion filtering', () => {
+    it('should not trigger prompt completion for line comments', async () => {
+      const mockConfig = {
+        getEnablePromptCompletion: () => true,
+      } as Config;
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('// This is a line comment');
+        const completion = useCommandCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      // Should not trigger prompt completion for comments
+      expect(result.current.suggestions.length).toBe(0);
+    });
+
+    it('should not trigger prompt completion for block comments', async () => {
+      const mockConfig = {
+        getEnablePromptCompletion: () => true,
+      } as Config;
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest(
+          '/* This is a block comment */',
+        );
+        const completion = useCommandCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      // Should not trigger prompt completion for comments
+      expect(result.current.suggestions.length).toBe(0);
+    });
+
+    it('should trigger prompt completion for regular text when enabled', async () => {
+      const mockConfig = {
+        getEnablePromptCompletion: () => true,
+      } as Config;
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest(
+          'This is regular text that should trigger completion',
+        );
+        const completion = useCommandCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      // This test verifies that comments are filtered out while regular text is not
+      expect(result.current.textBuffer.text).toBe(
+        'This is regular text that should trigger completion',
+      );
+    });
+  });
 });
