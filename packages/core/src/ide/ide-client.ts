@@ -386,7 +386,7 @@ export class IdeClient {
       const portFileContents = await fs.promises.readFile(portFile, 'utf8');
       return JSON.parse(portFileContents);
     } catch (_) {
-      return {};
+      return undefined;
     }
   }
 

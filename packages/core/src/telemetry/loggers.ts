@@ -489,7 +489,6 @@ export function logKittySequenceOverflow(
   };
   logger.emit(logRecord);
 }
-<<<<<<< HEAD
 
 export function logMalformedJsonResponse(
   config: Config,
@@ -512,8 +511,6 @@ export function logMalformedJsonResponse(
   logger.emit(logRecord);
 }
 
-=======
->>>>>>> v0.2.0
 export function logInvalidChunk(
   config: Config,
   event: InvalidChunkEvent,

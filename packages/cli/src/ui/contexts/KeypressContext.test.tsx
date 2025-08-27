@@ -12,12 +12,6 @@ import type { Key } from './KeypressContext.js';
 import { KeypressProvider, useKeypressContext } from './KeypressContext.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
-import {
-  KITTY_KEYCODE_ENTER,
-  KITTY_KEYCODE_NUMPAD_ENTER,
-  KITTY_KEYCODE_TAB,
-  KITTY_KEYCODE_BACKSPACE,
-} from '../utils/platformConstants.js';
 
 // Mock the 'ink' module to control stdin
 vi.mock('ink', async (importOriginal) => {
@@ -285,7 +279,7 @@ describe('KeypressContext - Kitty Protocol', () => {
       act(() => result.current.subscribe(keyHandler));
 
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_TAB}u`);
+        stdin.sendKittySequence(`\x1b[9u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -304,7 +298,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Modifier 2 is Shift
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_TAB};2u`);
+        stdin.sendKittySequence(`\x1b[9;2u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -322,7 +316,7 @@ describe('KeypressContext - Kitty Protocol', () => {
       act(() => result.current.subscribe(keyHandler));
 
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_BACKSPACE}u`);
+        stdin.sendKittySequence(`\x1b[127u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -341,7 +335,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Modifier 3 is Alt/Option
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_BACKSPACE};3u`);
+        stdin.sendKittySequence(`\x1b[127;3u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(

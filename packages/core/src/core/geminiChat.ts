@@ -22,11 +22,7 @@ import { AuthType } from './contentGenerator.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
-<<<<<<< HEAD
 import type { StructuredError } from './turn.js';
-=======
-import { StructuredError } from './turn.js';
->>>>>>> v0.2.0
 import {
   logContentRetry,
   logContentRetryFailure,
@@ -37,7 +33,6 @@ import {
   ContentRetryFailureEvent,
   InvalidChunkEvent,
 } from '../telemetry/types.js';
-<<<<<<< HEAD
 
 /**
  * Options for retrying due to invalid content from the model.
@@ -53,23 +48,7 @@ const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
   maxAttempts: 3, // 1 initial call + 2 retries
   initialDelayMs: 500,
 };
-=======
->>>>>>> v0.2.0
 
-/**
- * Options for retrying due to invalid content from the model.
- */
-interface ContentRetryOptions {
-  /** Total number of attempts to make (1 initial + N retries). */
-  maxAttempts: number;
-  /** The base delay in milliseconds for linear backoff. */
-  initialDelayMs: number;
-}
-
-const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
-  maxAttempts: 3, // 1 initial call + 2 retries
-  initialDelayMs: 500,
-};
 /**
  * Returns true if the response is valid, false otherwise.
  */
@@ -590,16 +569,8 @@ export class GeminiChat {
       hasReceivedAnyChunk = true;
       if (isValidResponse(chunk)) {
         const content = chunk.candidates?.[0]?.content;
-<<<<<<< HEAD
         if (content?.parts) {
           modelResponseParts.push(...content.parts);
-=======
-        if (content) {
-          // Filter out thought parts from being added to history.
-          if (!this.isThoughtContent(content) && content.parts) {
-            modelResponseParts.push(...content.parts);
-          }
->>>>>>> v0.2.0
         }
       } else {
         logInvalidChunk(
@@ -608,24 +579,15 @@ export class GeminiChat {
         );
         isStreamInvalid = true;
       }
-<<<<<<< HEAD
       yield chunk;
     }
 
-=======
-      yield chunk; // Yield every chunk to the UI immediately.
-    }
-
-    // Now that the stream is finished, make a decision.
-    // Throw an error if the stream was invalid OR if it was completely empty.
->>>>>>> v0.2.0
     if (isStreamInvalid || !hasReceivedAnyChunk) {
       throw new EmptyStreamError(
         'Model stream was invalid or completed without valid content.',
       );
     }
 
-<<<<<<< HEAD
     // Bundle all streamed parts into a single Content object
     const modelOutput: Content[] =
       modelResponseParts.length > 0
@@ -633,12 +595,6 @@ export class GeminiChat {
         : [];
 
     // Pass the raw, bundled data to the new, robust recordHistory
-=======
-    // Use recordHistory to correctly save the conversation turn.
-    const modelOutput: Content[] = [
-      { role: 'model', parts: modelResponseParts },
-    ];
->>>>>>> v0.2.0
     this.recordHistory(userInput, modelOutput);
   }
 
@@ -647,7 +603,6 @@ export class GeminiChat {
     modelOutput: Content[],
     automaticFunctionCallingHistory?: Content[],
   ) {
-<<<<<<< HEAD
     // Part 1: Handle the user's turn.
     if (
       automaticFunctionCallingHistory &&
@@ -741,92 +696,9 @@ export class GeminiChat {
       // If, after all processing, there's NO model output, add the placeholder.
       this.history.push({ role: 'model', parts: [] });
     }
-=======
-    const newHistoryEntries: Content[] = [];
-
-    // Part 1: Handle the user's part of the turn.
-    if (
-      automaticFunctionCallingHistory &&
-      automaticFunctionCallingHistory.length > 0
-    ) {
-      newHistoryEntries.push(
-        ...extractCuratedHistory(automaticFunctionCallingHistory),
-      );
-    } else {
-      // Guard for streaming calls where the user input might already be in the history.
-      if (
-        this.history.length === 0 ||
-        this.history[this.history.length - 1] !== userInput
-      ) {
-        newHistoryEntries.push(userInput);
-      }
-    }
-
-    // Part 2: Handle the model's part of the turn, filtering out thoughts.
-    const nonThoughtModelOutput = modelOutput.filter(
-      (content) => !this.isThoughtContent(content),
-    );
-
-    let outputContents: Content[] = [];
-    if (nonThoughtModelOutput.length > 0) {
-      outputContents = nonThoughtModelOutput;
-    } else if (
-      modelOutput.length === 0 &&
-      !isFunctionResponse(userInput) &&
-      !automaticFunctionCallingHistory
-    ) {
-      // Add an empty model response if the model truly returned nothing.
-      outputContents.push({ role: 'model', parts: [] } as Content);
-    }
-
-    // Part 3: Consolidate the parts of this turn's model response.
-    const consolidatedOutputContents: Content[] = [];
-    if (outputContents.length > 0) {
-      for (const content of outputContents) {
-        const lastContent =
-          consolidatedOutputContents[consolidatedOutputContents.length - 1];
-        if (this.hasTextContent(lastContent) && this.hasTextContent(content)) {
-          lastContent.parts[0].text += content.parts[0].text || '';
-          if (content.parts.length > 1) {
-            lastContent.parts.push(...content.parts.slice(1));
-          }
-        } else {
-          consolidatedOutputContents.push(content);
-        }
-      }
-    }
-
-    // Part 4: Add the new turn (user and model parts) to the main history.
-    this.history.push(...newHistoryEntries, ...consolidatedOutputContents);
-  }
-
-  private hasTextContent(
-    content: Content | undefined,
-  ): content is Content & { parts: [{ text: string }, ...Part[]] } {
-    return !!(
-      content &&
-      content.role === 'model' &&
-      content.parts &&
-      content.parts.length > 0 &&
-      typeof content.parts[0].text === 'string' &&
-      content.parts[0].text !== ''
-    );
-  }
-
-  private isThoughtContent(
-    content: Content | undefined,
-  ): content is Content & { parts: [{ thought: boolean }, ...Part[]] } {
-    return !!(
-      content &&
-      content.role === 'model' &&
-      content.parts &&
-      content.parts.length > 0 &&
-      typeof content.parts[0].thought === 'boolean' &&
-      content.parts[0].thought === true
-    );
->>>>>>> v0.2.0
   }
 }
+
 /** Visible for Testing */
 export function isSchemaDepthError(errorMessage: string): boolean {
   return errorMessage.includes('maximum schema depth exceeded');
