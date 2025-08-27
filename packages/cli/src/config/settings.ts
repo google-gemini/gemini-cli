@@ -133,6 +133,28 @@ function mergeSettings(
       ...(safeWorkspace.chatCompression || {}),
       ...(system.chatCompression || {}),
     },
+    extensions: {
+      ...(systemDefaults.extensions || {}),
+      ...(user.extensions || {}),
+      ...(safeWorkspace.extensions || {}),
+      ...(system.extensions || {}),
+      disabled: [
+        ...new Set([
+          ...(systemDefaults.extensions?.disabled || []),
+          ...(user.extensions?.disabled || []),
+          ...(safeWorkspace.extensions?.disabled || []),
+          ...(system.extensions?.disabled || []),
+        ]),
+      ],
+      workspacesWithMigrationNudge: [
+        ...new Set([
+          ...(systemDefaults.extensions?.workspacesWithMigrationNudge || []),
+          ...(user.extensions?.workspacesWithMigrationNudge || []),
+          ...(safeWorkspace.extensions?.workspacesWithMigrationNudge || []),
+          ...(system.extensions?.workspacesWithMigrationNudge || []),
+        ]),
+      ],
+    },
   };
 }
 
