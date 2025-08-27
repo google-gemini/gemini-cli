@@ -49,10 +49,7 @@ export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';
 export type { TelemetryEvent } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
-export {
-  uiTelemetryService,
-  UiTelemetryService,
-} from './uiTelemetry.js';
+export { uiTelemetryService, UiTelemetryService } from './uiTelemetry.js';
 export type {
   SessionMetrics,
   ModelMetrics,
@@ -93,10 +90,7 @@ export {
   startGlobalMemoryMonitoring,
   stopGlobalMemoryMonitoring,
 } from './memory-monitor.js';
-export type {
-  MemorySnapshot,
-  ProcessMetrics,
-} from './memory-monitor.js';
+export type { MemorySnapshot, ProcessMetrics } from './memory-monitor.js';
 export {
   ActivityDetector,
   initializeActivityDetector,

@@ -10,7 +10,7 @@ import {
   useActivityMonitoring,
   useActivityRecorder,
 } from './useActivityMonitoring.js';
-import { Config } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
 
 // Mock the core package
 const mockRecordActivity = vi.fn();

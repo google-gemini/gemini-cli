@@ -5,8 +5,8 @@
  */
 
 import { useCallback } from 'react';
+import type { Config } from '@google/gemini-cli-core';
 import {
-  Config,
   getActivityMonitor,
   startGlobalActivityMonitoring,
   stopGlobalActivityMonitoring,

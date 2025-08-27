@@ -253,7 +253,7 @@ export async function main() {
   const cleanupDuration = cleanupEnd - cleanupStart;
 
   const argv = await parseArguments(settings.merged);
-  
+
   // Extensions loading phase
   const extensionsStart = performance.now();
   const extensions = loadExtensions(workspaceRoot);

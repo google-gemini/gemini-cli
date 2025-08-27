@@ -14,9 +14,9 @@ import {
   recordUserActivity,
   startGlobalActivityMonitoring,
   stopGlobalActivityMonitoring,
-  type ActivityEvent,
 } from './activity-monitor.js';
-import { Config } from '../config/config.js';
+import type { ActivityEvent } from './activity-monitor.js';
+import type { Config } from '../config/config.js';
 
 // Mock the dependencies
 vi.mock('./metrics.js', () => ({
