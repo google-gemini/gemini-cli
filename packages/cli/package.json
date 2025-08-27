@@ -46,6 +46,7 @@
     "open": "^10.1.2",
     "react": "^19.1.0",
     "read-package-up": "^11.0.0",
+    "simple-git": "^3.28.0",
     "shell-quote": "^1.8.3",
     "string-width": "^7.1.0",
     "strip-ansi": "^7.1.0",
