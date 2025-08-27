@@ -15,18 +15,21 @@ import { useState } from 'react';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 
 // Test utility type and helper function for creating test SlashCommands
-type TestSlashCommand = Omit<SlashCommand, 'kind'> & Partial<Pick<SlashCommand, 'kind'>>;
+type TestSlashCommand = Omit<SlashCommand, 'kind'> &
+  Partial<Pick<SlashCommand, 'kind'>>;
 
 function createTestCommand(command: TestSlashCommand): SlashCommand {
   return {
     kind: CommandKind.BUILT_IN, // default for tests
-    ...command
+    ...command,
   };
 }
 
 // Track AsyncFzf constructor calls for cache testing
 let asyncFzfConstructorCalls = 0;
-const resetConstructorCallCount = () => { asyncFzfConstructorCalls = 0; };
+const resetConstructorCallCount = () => {
+  asyncFzfConstructorCalls = 0;
+};
 const getConstructorCallCount = () => asyncFzfConstructorCalls;
 
 // Centralized fuzzy matching simulation logic
@@ -39,36 +42,58 @@ function simulateFuzzyMatching(items: readonly string[], query: string) {
     const lowerQuery = query.toLowerCase();
     for (const item of items) {
       const lowerItem = item.toLowerCase();
-      
+
       // Exact match gets highest score
       if (lowerItem === lowerQuery) {
-        results.push({ item, positions: [], score: 100, start: 0, end: item.length });
+        results.push({
+          item,
+          positions: [],
+          score: 100,
+          start: 0,
+          end: item.length,
+        });
         continue;
       }
-      
+
       // Prefix match gets high score
       if (lowerItem.startsWith(lowerQuery)) {
-        results.push({ item, positions: [], score: 80, start: 0, end: query.length });
+        results.push({
+          item,
+          positions: [],
+          score: 80,
+          start: 0,
+          end: query.length,
+        });
         continue;
       }
-      
+
       // Fuzzy matching: check if query chars appear in order
       let queryIndex = 0;
       let score = 0;
-      for (let i = 0; i < lowerItem.length && queryIndex < lowerQuery.length; i++) {
+      for (
+        let i = 0;
+        i < lowerItem.length && queryIndex < lowerQuery.length;
+        i++
+      ) {
         if (lowerItem[i] === lowerQuery[queryIndex]) {
           queryIndex++;
-          score += (10 - i); // Earlier matches get higher scores
+          score += 10 - i; // Earlier matches get higher scores
         }
       }
-      
+
       // If all query characters were found in order, include this item
       if (queryIndex === lowerQuery.length) {
-        results.push({ item, positions: [], score, start: 0, end: query.length });
+        results.push({
+          item,
+          positions: [],
+          score,
+          start: 0,
+          end: query.length,
+        });
       }
     }
   }
-  
+
   // Sort by score descending (better matches first)
   results.sort((a, b) => b.score - a.score);
   return Promise.resolve(results);
@@ -82,28 +107,37 @@ vi.mock('fzf', async () => {
     AsyncFzf: vi.fn().mockImplementation((items, _options) => {
       asyncFzfConstructorCalls++;
       return {
-        find: vi.fn().mockImplementation((query: string) => 
-          simulateFuzzyMatching(items, query)
-        )
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        find: vi
+          .fn()
+          .mockImplementation((query: string) =>
+            simulateFuzzyMatching(items, query),
+          ),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any;
-    })
+    }),
   };
 });
 
 // Default mock behavior helper - now uses centralized logic
-const createDefaultAsyncFzfMock = () => (items: readonly string[], _options: unknown) => {
-  asyncFzfConstructorCalls++;
-  return {
-    find: vi.fn().mockImplementation((query: string) => 
-      simulateFuzzyMatching(items, query)
-    )
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any;
-};
+const createDefaultAsyncFzfMock =
+  () => (items: readonly string[], _options: unknown) => {
+    asyncFzfConstructorCalls++;
+    return {
+      find: vi
+        .fn()
+        .mockImplementation((query: string) =>
+          simulateFuzzyMatching(items, query),
+        ),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+  };
 
 // Export test utilities
-export { resetConstructorCallCount, getConstructorCallCount, createDefaultAsyncFzfMock };
+export {
+  resetConstructorCallCount,
+  getConstructorCallCount,
+  createDefaultAsyncFzfMock,
+};
 
 // Test harness to capture the state from the hook's callbacks.
 function useTestHarnessForSlashCompletion(
@@ -142,7 +176,11 @@ describe('useSlashCompletion', () => {
   describe('Top-Level Commands', () => {
     it('should suggest all top-level commands for the root slash', async () => {
       const slashCommands = [
-        createTestCommand({ name: 'help', altNames: ['?'], description: 'Show help' }),
+        createTestCommand({
+          name: 'help',
+          altNames: ['?'],
+          description: 'Show help',
+        }),
         createTestCommand({
           name: 'stats',
           altNames: ['usage'],
@@ -152,7 +190,9 @@ describe('useSlashCompletion', () => {
         createTestCommand({
           name: 'memory',
           description: 'Manage memory',
-          subCommands: [createTestCommand({ name: 'show', description: 'Show memory' })],
+          subCommands: [
+            createTestCommand({ name: 'show', description: 'Show memory' }),
+          ],
         }),
         createTestCommand({ name: 'chat', description: 'Manage chat history' }),
       ];
@@ -221,7 +261,11 @@ describe('useSlashCompletion', () => {
 
     it('should NOT provide suggestions for a perfectly typed command that is a leaf node', async () => {
       const slashCommands = [
-        createTestCommand({ name: 'clear', description: 'Clear the screen', action: vi.fn() }),
+        createTestCommand({
+          name: 'clear',
+          description: 'Clear the screen',
+          action: vi.fn(),
+        }),
       ];
       const { result } = renderHook(() =>
         useTestHarnessForSlashCompletion(
@@ -532,10 +576,21 @@ describe('useSlashCompletion', () => {
 
   describe('Fuzzy Matching', () => {
     const fuzzyTestCommands = [
-      createTestCommand({ name: 'help', altNames: ['?'], description: 'Show help' }),
-      createTestCommand({ name: 'history', description: 'Show command history' }),
+      createTestCommand({
+        name: 'help',
+        altNames: ['?'],
+        description: 'Show help',
+      }),
+      createTestCommand({
+        name: 'history',
+        description: 'Show command history',
+      }),
       createTestCommand({ name: 'hello', description: 'Hello world command' }),
-      createTestCommand({ name: 'config', altNames: ['configure'], description: 'Configure settings' }),
+      createTestCommand({
+        name: 'config',
+        altNames: ['configure'],
+        description: 'Configure settings',
+      }),
       createTestCommand({ name: 'clear', description: 'Clear the screen' }),
     ];
 
@@ -613,31 +668,41 @@ describe('useSlashCompletion', () => {
 
     it('should fallback to prefix matching when AsyncFzf find fails', async () => {
       // Mock console.error to avoid noise in test output
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
       // Import the mocked AsyncFzf
       const { AsyncFzf } = await import('fzf');
-      
+
       // Create a failing find method for this specific test
-      const mockFind = vi.fn().mockRejectedValue(new Error('AsyncFzf find failed'));
-      
+      const mockFind = vi
+        .fn()
+        .mockRejectedValue(new Error('AsyncFzf find failed'));
+
       // Mock AsyncFzf to return an instance with failing find
-      vi.mocked(AsyncFzf).mockImplementation((_items, _options) => ({
-        finder: vi.fn(),
-        find: mockFind
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any));
-      
+      vi.mocked(AsyncFzf).mockImplementation(
+        (_items, _options) =>
+          ({
+            finder: vi.fn(),
+            find: mockFind,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          }) as any,
+      );
+
       const testCommands = [
         createTestCommand({ name: 'clear', description: 'Clear the screen' }),
-        createTestCommand({ name: 'config', description: 'Configure settings' }),
-        createTestCommand({ name: 'chat', description: 'Start chat' })
+        createTestCommand({
+          name: 'config',
+          description: 'Configure settings',
+        }),
+        createTestCommand({ name: 'chat', description: 'Start chat' }),
       ];
-      
+
       const { result } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
-          '/cle', 
+          '/cle',
           testCommands,
           mockCommandContext,
         ),
@@ -652,17 +717,17 @@ describe('useSlashCompletion', () => {
       expect(labels).toContain('clear');
       expect(labels).not.toContain('config'); // Doesn't start with 'cle'
       expect(labels).not.toContain('chat'); // Doesn't start with 'cle'
-      
+
       // Verify the error was logged
       await waitFor(() => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           '[Fuzzy search - falling back to prefix matching]',
-          expect.any(Error)
+          expect.any(Error),
         );
       });
-      
+
       consoleErrorSpy.mockRestore();
-      
+
       // Reset AsyncFzf mock to default behavior for other tests
       vi.mocked(AsyncFzf).mockImplementation(createDefaultAsyncFzfMock());
     });
@@ -682,21 +747,28 @@ describe('useSlashCompletion', () => {
 
     it('should handle AsyncFzf errors gracefully and fallback to prefix matching', async () => {
       // Mock console.error to avoid noise in test output
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
       // Import the mocked AsyncFzf
       const { AsyncFzf } = await import('fzf');
-      
+
       // Create a failing find method for this specific test
-      const mockFind = vi.fn().mockRejectedValue(new Error('AsyncFzf error in find'));
-      
+      const mockFind = vi
+        .fn()
+        .mockRejectedValue(new Error('AsyncFzf error in find'));
+
       // Mock AsyncFzf to return an instance with failing find
-      vi.mocked(AsyncFzf).mockImplementation((_items, _options) => ({
-        finder: vi.fn(),
-        find: mockFind
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any));
-      
+      vi.mocked(AsyncFzf).mockImplementation(
+        (_items, _options) =>
+          ({
+            finder: vi.fn(),
+            find: mockFind,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          }) as any,
+      );
+
       const testCommands = [
         { name: 'test', description: 'Test command' },
         { name: 'temp', description: 'Temporary command' },
@@ -718,17 +790,17 @@ describe('useSlashCompletion', () => {
       // Should get suggestions via prefix matching fallback
       const labels = result.current.suggestions.map((s) => s.label);
       expect(labels).toEqual(expect.arrayContaining(['test', 'temp']));
-      
+
       // Verify the error was logged
       await waitFor(() => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           '[Fuzzy search - falling back to prefix matching]',
-          expect.any(Error)
+          expect.any(Error),
         );
       });
-      
+
       consoleErrorSpy.mockRestore();
-      
+
       // Reset AsyncFzf mock to default behavior for other tests
       vi.mocked(AsyncFzf).mockImplementation(createDefaultAsyncFzfMock());
     });
@@ -736,11 +808,11 @@ describe('useSlashCompletion', () => {
     it('should cache AsyncFzf instances for performance', async () => {
       // Reset constructor call count and ensure mock is set up correctly
       resetConstructorCallCount();
-      
+
       // Import the mocked AsyncFzf
       const { AsyncFzf } = await import('fzf');
       vi.mocked(AsyncFzf).mockImplementation(createDefaultAsyncFzfMock());
-      
+
       const { result, rerender } = renderHook(
         ({ query }) =>
           useTestHarnessForSlashCompletion(
@@ -749,7 +821,7 @@ describe('useSlashCompletion', () => {
             fuzzyTestCommands,
             mockCommandContext,
           ),
-        { initialProps: { query: '/he' } }
+        { initialProps: { query: '/he' } },
       );
 
       await waitFor(() => {
@@ -769,7 +841,7 @@ describe('useSlashCompletion', () => {
 
       const secondResults = result.current.suggestions.map((s) => s.label);
       const callCountAfterSecond = getConstructorCallCount();
-      
+
       // Should have same number of constructor calls (reused cached instance)
       expect(callCountAfterSecond).toBe(callCountAfterFirst);
       expect(secondResults).toEqual(firstResults);
@@ -787,8 +859,16 @@ describe('useSlashCompletion', () => {
 
     it('should not return duplicate suggestions when query matches both name and altNames', async () => {
       const commandsWithAltNames = [
-        createTestCommand({ name: 'config', altNames: ['configure', 'conf'], description: 'Configure settings' }),
-        createTestCommand({ name: 'help', altNames: ['?'], description: 'Show help' }),
+        createTestCommand({
+          name: 'config',
+          altNames: ['configure', 'conf'],
+          description: 'Configure settings',
+        }),
+        createTestCommand({
+          name: 'help',
+          altNames: ['?'],
+          description: 'Show help',
+        }),
       ];
 
       const { result } = renderHook(() =>
@@ -806,7 +886,7 @@ describe('useSlashCompletion', () => {
 
       const labels = result.current.suggestions.map((s) => s.label);
       const uniqueLabels = new Set(labels);
-      
+
       // Should not have duplicates
       expect(labels.length).toBe(uniqueLabels.size);
       expect(labels).toContain('config');
@@ -814,14 +894,16 @@ describe('useSlashCompletion', () => {
   });
   describe('Race Condition Handling', () => {
     it('should handle rapid input changes without race conditions', async () => {
-      const mockDelayedCompletion = vi.fn().mockImplementation(
-        async (_context: CommandContext, partialArg: string) => {
-          // Simulate network delay with different delays for different inputs
-          const delay = partialArg.includes('slow') ? 200 : 50;
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return [`suggestion-for-${partialArg}`];
-        }
-      );
+      const mockDelayedCompletion = vi
+        .fn()
+        .mockImplementation(
+          async (_context: CommandContext, partialArg: string) => {
+            // Simulate network delay with different delays for different inputs
+            const delay = partialArg.includes('slow') ? 200 : 50;
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            return [`suggestion-for-${partialArg}`];
+          },
+        );
 
       const slashCommands = [
         createTestCommand({
@@ -839,7 +921,7 @@ describe('useSlashCompletion', () => {
             slashCommands,
             mockCommandContext,
           ),
-        { initialProps: { query: '/test slowquery' } }
+        { initialProps: { query: '/test slowquery' } },
       );
 
       // Quickly change to a faster query
@@ -858,9 +940,10 @@ describe('useSlashCompletion', () => {
     it('should not update suggestions if component unmounts during async operation', async () => {
       let resolveCompletion: (value: string[]) => void;
       const mockCompletion = vi.fn().mockImplementation(
-        async () => new Promise<string[]>((resolve) => {
-          resolveCompletion = resolve;
-        })
+        async () =>
+          new Promise<string[]>((resolve) => {
+            resolveCompletion = resolve;
+          }),
       );
 
       const slashCommands = [
@@ -877,7 +960,7 @@ describe('useSlashCompletion', () => {
           '/test query',
           slashCommands,
           mockCommandContext,
-        )
+        ),
       );
 
       // Start the async operation
@@ -892,7 +975,7 @@ describe('useSlashCompletion', () => {
       resolveCompletion!(['late-suggestion']);
 
       // Wait a bit to ensure any pending updates would have been processed
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Since the component is unmounted, suggestions should remain empty
       // and no state update errors should occur
@@ -903,25 +986,32 @@ describe('useSlashCompletion', () => {
   describe('Error Logging', () => {
     it('should log errors to the console', async () => {
       // Mock console.error to capture log calls
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
       // Import the mocked AsyncFzf
       const { AsyncFzf } = await import('fzf');
-      
+
       // Create a failing find method with error containing sensitive-looking data
-      const sensitiveError = new Error('Database connection failed: user=admin, pass=secret123');
+      const sensitiveError = new Error(
+        'Database connection failed: user=admin, pass=secret123',
+      );
       const mockFind = vi.fn().mockRejectedValue(sensitiveError);
-      
+
       // Mock AsyncFzf to return an instance with failing find
-      vi.mocked(AsyncFzf).mockImplementation((_items, _options) => ({
-        find: mockFind
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any));
-      
+      vi.mocked(AsyncFzf).mockImplementation(
+        (_items, _options) =>
+          ({
+            find: mockFind,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          }) as any,
+      );
+
       const testCommands = [
-        createTestCommand({ name: 'test', description: 'Test command' })
+        createTestCommand({ name: 'test', description: 'Test command' }),
       ];
-      
+
       const { result } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
@@ -938,17 +1028,17 @@ describe('useSlashCompletion', () => {
       // Should get fallback suggestions
       const labels = result.current.suggestions.map((s) => s.label);
       expect(labels).toContain('test');
-      
+
       // Verify error logging occurred
       await waitFor(() => {
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           '[Fuzzy search - falling back to prefix matching]',
-          sensitiveError
+          sensitiveError,
         );
       });
-      
+
       consoleErrorSpy.mockRestore();
-      
+
       // Reset AsyncFzf mock to default behavior
       vi.mocked(AsyncFzf).mockImplementation(createDefaultAsyncFzfMock());
     });
