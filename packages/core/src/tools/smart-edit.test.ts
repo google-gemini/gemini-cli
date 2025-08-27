@@ -26,20 +26,28 @@ vi.mock('../utils/editor.js', () => ({
   openDiff: mockOpenDiff,
 }));
 
-import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  vi,
+  type Mock,
+} from 'vitest';
 import {
   applyReplacement,
   SmartEditTool,
-  EditToolParams,
+  type EditToolParams,
   calculateReplacement,
 } from './smart-edit.js';
-import { FileDiff, ToolConfirmationOutcome } from './tools.js';
+import { type FileDiff, ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
-import { ApprovalMode, Config } from '../config/config.js';
-import { Content, Part, SchemaUnion } from '@google/genai';
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
+import { ApprovalMode, type Config } from '../config/config.js';
+import { type Content, type Part, type SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 

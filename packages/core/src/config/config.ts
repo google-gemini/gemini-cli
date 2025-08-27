@@ -211,7 +211,6 @@ export interface ConfigParameters {
   enablePromptCompletion?: boolean;
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
-  enablePromptCompletion?: boolean;
 }
 
 export class Config {
@@ -288,6 +287,7 @@ export class Config {
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
+  private readonly useSmartEdit: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;

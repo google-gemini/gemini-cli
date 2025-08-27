@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Content, Type } from '@google/genai';
-import { GeminiClient } from '../core/client.js';
+import { type Content, Type } from '@google/genai';
+import { type GeminiClient } from '../core/client.js';
 import { LruCache } from './LruCache.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
