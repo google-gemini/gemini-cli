@@ -1617,14 +1617,18 @@ describe('App UI', () => {
 
       // Simulate Ctrl+C.
       stdin.write('\x03');
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // The main cancellation handler SHOULD be called.
-      expect(mockCancel).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(mockCancel).toHaveBeenCalled();
+      });
 
       // The prompt should now be empty as a result of the cancellation handler's logic.
       // We can't directly test the buffer's state, but we can see the rendered output.
-      expect(lastFrame()).not.toContain('some text');
+      // Wait for the UI to update after cancellation.
+      await waitFor(() => {
+        expect(lastFrame()).not.toContain('some text');
+      });
     });
   });
 });
