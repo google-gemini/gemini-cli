@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   MCPServerConfig,
   BugCommandSettings,
   TelemetrySettings,
   AuthType,
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
-import { CustomTheme } from '../ui/themes/theme.js';
+import type { CustomTheme } from '../ui/themes/theme.js';
 
 export interface SettingDefinition {
   type: 'boolean' | 'string' | 'number' | 'array' | 'object';
@@ -464,6 +464,15 @@ export const SETTINGS_SCHEMA = {
             description: 'Enable recursive file search functionality',
             showInDialog: true,
           },
+          disableFuzzySearch: {
+            type: 'boolean',
+            label: 'Disable Fuzzy Search',
+            category: 'Context',
+            requiresRestart: true,
+            default: false,
+            description: 'Disable fuzzy search when searching for files.',
+            showInDialog: true,
+          },
         },
       },
     },
@@ -505,6 +514,16 @@ export const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: undefined as string[] | undefined,
         description: 'Paths to core tool definitions.',
+        showInDialog: false,
+      },
+      allowed: {
+        type: 'array',
+        label: 'Allowed Tools',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: undefined as string[] | undefined,
+        description:
+          'A list of tool names that will bypass the confirmation dialog.',
         showInDialog: false,
       },
       exclude: {
@@ -699,6 +718,58 @@ export const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: undefined as BugCommandSettings | undefined,
         description: 'Configuration for the bug report command.',
+        showInDialog: false,
+      },
+    },
+  },
+
+  feature: {
+    type: 'object',
+    label: 'Feature Flag',
+    category: 'Feature Flag',
+    requiresRestart: true,
+    default: {},
+    description: 'Feature flag settings to enable early features',
+    showInDialog: false,
+    properties: {
+      extensionManagement: {
+        type: 'boolean',
+        label: 'Extension Management',
+        category: 'Feature Flag',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable extension management features.',
+        showInDialog: false,
+      },
+    },
+  },
+
+  extensions: {
+    type: 'object',
+    label: 'Extensions',
+    category: 'Extensions',
+    requiresRestart: true,
+    default: {},
+    description: 'Settings for extensions.',
+    showInDialog: false,
+    properties: {
+      disabled: {
+        type: 'array',
+        label: 'Disabled Extensions',
+        category: 'Extensions',
+        requiresRestart: true,
+        default: [] as string[],
+        description: 'List of disabled extensions.',
+        showInDialog: false,
+      },
+      workspacesWithMigrationNudge: {
+        type: 'array',
+        label: 'Workspaces with Migration Nudge',
+        category: 'Extensions',
+        requiresRestart: false,
+        default: [] as string[],
+        description:
+          'List of workspaces for which the migration nudge has been shown.',
         showInDialog: false,
       },
     },

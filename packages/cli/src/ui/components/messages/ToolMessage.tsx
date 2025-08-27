@@ -6,12 +6,14 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
-import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
+import type { IndividualToolCallDisplay } from '../../types.js';
+import { ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
+import { TOOL_STATUS } from '../../constants.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -118,28 +120,28 @@ const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
 }) => (
   <Box minWidth={STATUS_INDICATOR_WIDTH}>
     {status === ToolCallStatus.Pending && (
-      <Text color={Colors.AccentGreen}>o</Text>
+      <Text color={Colors.AccentGreen}>{TOOL_STATUS.PENDING}</Text>
     )}
     {status === ToolCallStatus.Executing && (
       <GeminiRespondingSpinner
         spinnerType="toggle"
-        nonRespondingDisplay={'⊷'}
+        nonRespondingDisplay={TOOL_STATUS.EXECUTING}
       />
     )}
     {status === ToolCallStatus.Success && (
-      <Text color={Colors.AccentGreen}>✔</Text>
+      <Text color={Colors.AccentGreen}>{TOOL_STATUS.SUCCESS}</Text>
     )}
     {status === ToolCallStatus.Confirming && (
-      <Text color={Colors.AccentYellow}>?</Text>
+      <Text color={Colors.AccentYellow}>{TOOL_STATUS.CONFIRMING}</Text>
     )}
     {status === ToolCallStatus.Canceled && (
       <Text color={Colors.AccentYellow} bold>
-        -
+        {TOOL_STATUS.CANCELED}
       </Text>
     )}
     {status === ToolCallStatus.Error && (
       <Text color={Colors.AccentRed} bold>
-        x
+        {TOOL_STATUS.ERROR}
       </Text>
     )}
   </Box>

@@ -7,9 +7,10 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { ConfirmationRequiredError, ShellProcessor } from './shellProcessor.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { CommandContext } from '../../ui/commands/types.js';
-import { ApprovalMode, Config } from '@google/gemini-cli-core';
-import os from 'os';
+import type { CommandContext } from '../../ui/commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
+import { ApprovalMode } from '@google/gemini-cli-core';
+import os from 'node:os';
 import { quote } from 'shell-quote';
 
 // Helper function to determine the expected escaped string based on the current OS,

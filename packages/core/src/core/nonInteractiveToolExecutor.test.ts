@@ -6,15 +6,14 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
-import {
+import type {
   ToolRegistry,
   ToolCallRequestInfo,
   ToolResult,
   Config,
-  ToolErrorType,
-  ApprovalMode,
 } from '../index.js';
-import { Part } from '@google/genai';
+import { ToolErrorType, ApprovalMode } from '../index.js';
+import type { Part } from '@google/genai';
 import { MockTool } from '../test-utils/tools.js';
 
 describe('executeToolCall', () => {
@@ -28,11 +27,13 @@ describe('executeToolCall', () => {
 
     mockToolRegistry = {
       getTool: vi.fn(),
+      getAllToolNames: vi.fn(),
     } as unknown as ToolRegistry;
 
     mockConfig = {
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getAllowedTools: () => [],
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
@@ -94,6 +95,10 @@ describe('executeToolCall', () => {
       prompt_id: 'prompt-id-2',
     };
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(undefined);
+    vi.mocked(mockToolRegistry.getAllToolNames).mockReturnValue([
+      'testTool',
+      'anotherTool',
+    ]);
 
     const response = await executeToolCall(
       mockConfig,
@@ -101,18 +106,20 @@ describe('executeToolCall', () => {
       abortController.signal,
     );
 
+    const expectedErrorMessage =
+      'Tool "nonexistentTool" not found in registry. Tools must use the exact names that are registered. Did you mean one of: "testTool", "anotherTool"?';
     expect(response).toStrictEqual({
       callId: 'call2',
-      error: new Error('Tool "nonexistentTool" not found in registry.'),
+      error: new Error(expectedErrorMessage),
       errorType: ToolErrorType.TOOL_NOT_REGISTERED,
-      resultDisplay: 'Tool "nonexistentTool" not found in registry.',
+      resultDisplay: expectedErrorMessage,
       responseParts: [
         {
           functionResponse: {
             name: 'nonexistentTool',
             id: 'call2',
             response: {
-              error: 'Tool "nonexistentTool" not found in registry.',
+              error: expectedErrorMessage,
             },
           },
         },

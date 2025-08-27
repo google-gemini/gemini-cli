@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import { homedir, platform } from 'os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { homedir, platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,
@@ -17,7 +17,7 @@ import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { Settings, MemoryImportFormat } from './settingsSchema.js';
+import type { Settings, MemoryImportFormat } from './settingsSchema.js';
 import { mergeWith } from 'lodash-es';
 
 export type { Settings, MemoryImportFormat };
@@ -203,43 +203,118 @@ function mergeSettings(
   const safeWorkspace = isTrusted ? workspace : ({} as Settings);
 
   // folderTrust is not supported at workspace level.
-  const workspaceWithouFolderTrust = {
-    ...safeWorkspace,
-    security: { ...safeWorkspace.security, folderTrust: undefined },
+  const { security, ...restOfWorkspace } = safeWorkspace;
+  const safeWorkspaceWithoutFolderTrust = security
+    ? {
+        ...restOfWorkspace,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        security: (({ folderTrust, ...rest }) => rest)(security),
+      }
+    : {
+        ...restOfWorkspace,
+        security: {},
+      };
+
+  // Settings are merged with the following precedence (last one wins for
+  // single values):
+  // 1. System Defaults
+  // 2. User Settings
+  // 3. Workspace Settings
+  // 4. System Settings (as overrides)
+  //
+  // For properties that are arrays (e.g., includeDirectories), the arrays
+  // are concatenated. For objects (e.g., customThemes), they are merged.
+  return {
+    ...systemDefaults,
+    ...user,
+    ...safeWorkspaceWithoutFolderTrust,
+    ...system,
+    ui: {
+      ...(systemDefaults.ui || {}),
+      ...(user.ui || {}),
+      ...(safeWorkspaceWithoutFolderTrust.ui || {}),
+      ...(system.ui || {}),
+      customThemes: {
+        ...(systemDefaults.ui?.customThemes || {}),
+        ...(user.ui?.customThemes || {}),
+        ...(safeWorkspaceWithoutFolderTrust.ui?.customThemes || {}),
+        ...(system.ui?.customThemes || {}),
+      },
+    },
+    security: {
+      ...(systemDefaults.security || {}),
+      ...(user.security || {}),
+      ...(safeWorkspaceWithoutFolderTrust.security || {}),
+      ...(system.security || {}),
+    },
+    mcpServers: {
+      ...(systemDefaults.mcpServers || {}),
+      ...(user.mcpServers || {}),
+      ...(safeWorkspaceWithoutFolderTrust.mcpServers || {}),
+      ...(system.mcpServers || {}),
+    },
+    context: {
+      ...(systemDefaults.context || {}),
+      ...(user.context || {}),
+      ...(safeWorkspaceWithoutFolderTrust.context || {}),
+      ...(system.context || {}),
+      includeDirectories: [
+        ...(systemDefaults.context?.includeDirectories || []),
+        ...(user.context?.includeDirectories || []),
+        ...(safeWorkspaceWithoutFolderTrust.context?.includeDirectories || []),
+        ...(system.context?.includeDirectories || []),
+      ],
+    },
+    model: {
+      ...(systemDefaults.model || {}),
+      ...(user.model || {}),
+      ...(safeWorkspaceWithoutFolderTrust.model || {}),
+      ...(system.model || {}),
+      chatCompression: {
+        ...(systemDefaults.model?.chatCompression || {}),
+        ...(user.model?.chatCompression || {}),
+        ...(safeWorkspaceWithoutFolderTrust.model?.chatCompression || {}),
+        ...(system.model?.chatCompression || {}),
+      },
+    },
+    advanced: {
+      ...(systemDefaults.advanced || {}),
+      ...(user.advanced || {}),
+      ...(safeWorkspaceWithoutFolderTrust.advanced || {}),
+      ...(system.advanced || {}),
+      excludedEnvVars: [
+        ...new Set([
+          ...(systemDefaults.advanced?.excludedEnvVars || []),
+          ...(user.advanced?.excludedEnvVars || []),
+          ...(safeWorkspaceWithoutFolderTrust.advanced?.excludedEnvVars || []),
+          ...(system.advanced?.excludedEnvVars || []),
+        ]),
+      ],
+    },
+    extensions: {
+      ...(systemDefaults.extensions || {}),
+      ...(user.extensions || {}),
+      ...(safeWorkspaceWithoutFolderTrust.extensions || {}),
+      ...(system.extensions || {}),
+      disabled: [
+        ...new Set([
+          ...(systemDefaults.extensions?.disabled || []),
+          ...(user.extensions?.disabled || []),
+          ...(safeWorkspaceWithoutFolderTrust.extensions?.disabled || []),
+          ...(system.extensions?.disabled || []),
+        ]),
+      ],
+      workspacesWithMigrationNudge: [
+        ...new Set([
+          ...(systemDefaults.extensions?.workspacesWithMigrationNudge || []),
+          ...(user.extensions?.workspacesWithMigrationNudge || []),
+          ...(safeWorkspaceWithoutFolderTrust.extensions
+            ?.workspacesWithMigrationNudge || []),
+          ...(system.extensions?.workspacesWithMigrationNudge || []),
+        ]),
+      ],
+    },
   };
-
-  const customizer = (objValue: unknown, srcValue: unknown) => {
-    if (Array.isArray(objValue) && Array.isArray(srcValue)) {
-      return objValue.concat(srcValue);
-    }
-    return undefined;
-  };
-
-  const merged = mergeWith(
-    {},
-    systemDefaults,
-    user,
-    workspaceWithouFolderTrust,
-    system,
-    customizer,
-  );
-
-  // Validate chatCompression settings
-  const chatCompression = merged.model?.chatCompression;
-  const threshold = chatCompression?.contextPercentageThreshold;
-  if (
-    threshold != null &&
-    (typeof threshold !== 'number' || threshold < 0 || threshold > 1)
-  ) {
-    console.warn(
-      `Invalid value for chatCompression.contextPercentageThreshold: "${threshold}". Please use a value between 0 and 1. Using default compression settings.`,
-    );
-    if (merged.model) {
-      merged.model.chatCompression = undefined;
-    }
-  }
-
-  return merged;
 }
 
 export class LoadedSettings {

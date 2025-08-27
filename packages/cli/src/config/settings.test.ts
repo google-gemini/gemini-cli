@@ -7,7 +7,7 @@
 /// <reference types="vitest/globals" />
 
 // Mock 'os' first.
-import * as osActual from 'os'; // Import for type info for the mock factory
+import * as osActual from 'node:os'; // Import for type info for the mock factory
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof osActual>();
   return {
@@ -33,7 +33,7 @@ vi.mock('./trustedFolders.js', () => ({
 }));
 
 // NOW import everything else, including the (now effectively re-exported) settings.js
-import * as pathActual from 'path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
+import * as pathActual from 'node:path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
 import {
   describe,
   it,
@@ -44,7 +44,7 @@ import {
   type Mocked,
   type Mock,
 } from 'vitest';
-import * as fs from 'fs'; // fs will be mocked separately
+import * as fs from 'node:fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
@@ -118,9 +118,24 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
-        security: {
-          folderTrust: undefined,
+        ui: {
+          customThemes: {},
         },
+        mcpServers: {},
+        context: {
+          includeDirectories: [],
+        },
+        model: {
+          chatCompression: {},
+        },
+        advanced: {
+          excludedEnvVars: [],
+        },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        security: {},
       });
       expect(settings.errors.length).toBe(0);
     });
@@ -156,9 +171,25 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...systemSettingsContent,
-        security: {
-          folderTrust: undefined,
+        ui: {
+          ...systemSettingsContent.ui,
+          customThemes: {},
         },
+        mcpServers: {},
+        context: {
+          includeDirectories: [],
+        },
+        model: {
+          chatCompression: {},
+        },
+        advanced: {
+          excludedEnvVars: [],
+        },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        security: {},
       });
     });
 
@@ -194,9 +225,26 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...userSettingsContent,
-        security: {
-          folderTrust: undefined,
+        ui: {
+          ...userSettingsContent.ui,
+          customThemes: {},
         },
+        mcpServers: {},
+        context: {
+          ...userSettingsContent.context,
+          includeDirectories: [],
+        },
+        model: {
+          chatCompression: {},
+        },
+        advanced: {
+          excludedEnvVars: [],
+        },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        security: {},
       });
     });
 
@@ -229,10 +277,28 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
-        ...workspaceSettingsContent,
-        security: {
-          folderTrust: undefined,
+        tools: {
+          sandbox: true,
         },
+        context: {
+          fileName: 'WORKSPACE_CONTEXT.md',
+          includeDirectories: [],
+        },
+        ui: {
+          customThemes: {},
+        },
+        mcpServers: {},
+        model: {
+          chatCompression: {},
+        },
+        advanced: {
+          excludedEnvVars: [],
+        },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        security: {},
       });
     });
 
@@ -276,6 +342,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged).toEqual({
         ui: {
           theme: 'dark',
+          customThemes: {},
         },
         tools: {
           sandbox: true,
@@ -283,10 +350,20 @@ describe('Settings Loading and Merging', () => {
         },
         context: {
           fileName: 'WORKSPACE_CONTEXT.md',
+          includeDirectories: [],
         },
-        security: {
-          folderTrust: undefined,
+        advanced: {
+          excludedEnvVars: [],
         },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        mcpServers: {},
+        model: {
+          chatCompression: {},
+        },
+        security: {},
       });
     });
 
@@ -348,21 +425,31 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged).toEqual({
         ui: {
           theme: 'system-theme',
+          customThemes: {},
         },
         tools: {
           sandbox: false,
-          core: ['tool1'],
         },
         telemetry: { enabled: false },
         context: {
           fileName: 'WORKSPACE_CONTEXT.md',
+          includeDirectories: [],
         },
         mcp: {
-          allowed: ['server1', 'server2', 'server3', 'server1', 'server2'],
+          allowed: ['server1', 'server2'],
         },
-        security: {
-          folderTrust: undefined,
+        advanced: {
+          excludedEnvVars: [],
         },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        mcpServers: {},
+        model: {
+          chatCompression: {},
+        },
+        security: {},
       });
     });
 
@@ -429,13 +516,9 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
-        ui: {
-          theme: 'system-theme',
+        advanced: {
+          excludedEnvVars: [],
         },
-        tools: {
-          sandbox: false,
-        },
-        telemetry: false,
         context: {
           fileName: 'WORKSPACE_CONTEXT.md',
           includeDirectories: [
@@ -446,8 +529,22 @@ describe('Settings Loading and Merging', () => {
             '/system/dir',
           ],
         },
-        security: {
-          folderTrust: undefined,
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        mcpServers: {},
+        model: {
+          chatCompression: {},
+        },
+        security: {},
+        telemetry: false,
+        tools: {
+          sandbox: false,
+        },
+        ui: {
+          customThemes: {},
+          theme: 'system-theme',
         },
       });
     });
@@ -724,8 +821,8 @@ describe('Settings Loading and Merging', () => {
       (fs.readFileSync as Mock).mockReturnValue('{}');
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.merged.telemetry).toBeUndefined();
-      expect(settings.merged.ui?.customThemes).toBeUndefined();
-      expect(settings.merged.mcpServers).toBeUndefined();
+      expect(settings.merged.ui?.customThemes).toEqual({});
+      expect(settings.merged.mcpServers).toEqual({});
     });
 
     it('should merge MCP servers correctly, with workspace taking precedence', () => {
@@ -851,7 +948,7 @@ describe('Settings Loading and Merging', () => {
       (mockFsExistsSync as Mock).mockReturnValue(false); // No settings files exist
       (fs.readFileSync as Mock).mockReturnValue('{}');
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.mcpServers).toBeUndefined();
+      expect(settings.merged.mcpServers).toEqual({});
     });
 
     it('should merge chatCompression settings, with workspace taking precedence', () => {
@@ -916,7 +1013,7 @@ describe('Settings Loading and Merging', () => {
       (mockFsExistsSync as Mock).mockReturnValue(false); // No settings files exist
       (fs.readFileSync as Mock).mockReturnValue('{}');
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.model?.chatCompression).toBeUndefined();
+      expect(settings.merged.model?.chatCompression).toEqual({});
     });
 
     it('should ignore chatCompression if contextPercentageThreshold is invalid', () => {
@@ -937,7 +1034,9 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.model?.chatCompression).toBeUndefined();
+      expect(settings.merged.model?.chatCompression).toEqual({
+        contextPercentageThreshold: 1.5,
+      });
       warnSpy.mockRestore();
     });
 
@@ -1045,9 +1144,24 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
-        security: {
-          folderTrust: undefined,
+        ui: {
+          customThemes: {},
         },
+        mcpServers: {},
+        context: {
+          includeDirectories: [],
+        },
+        model: {
+          chatCompression: {},
+        },
+        advanced: {
+          excludedEnvVars: [],
+        },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        security: {},
       });
 
       // Check that error objects are populated in settings.errors
@@ -1436,9 +1550,25 @@ describe('Settings Loading and Merging', () => {
         expect(settings.system.settings).toEqual(systemSettingsContent);
         expect(settings.merged).toEqual({
           ...systemSettingsContent,
-          security: {
-            folderTrust: undefined,
+          ui: {
+            ...systemSettingsContent.ui,
+            customThemes: {},
           },
+          mcpServers: {},
+          context: {
+            includeDirectories: [],
+          },
+          model: {
+            chatCompression: {},
+          },
+          advanced: {
+            excludedEnvVars: [],
+          },
+          extensions: {
+            disabled: [],
+            workspacesWithMigrationNudge: [],
+          },
+          security: {},
         });
       });
     });

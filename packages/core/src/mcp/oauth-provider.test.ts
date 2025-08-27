@@ -17,13 +17,14 @@ vi.mock('./oauth-token-storage.js');
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
-import {
-  MCPOAuthProvider,
+import type {
   MCPOAuthConfig,
   OAuthTokenResponse,
   OAuthClientRegistrationResponse,
 } from './oauth-provider.js';
-import { MCPOAuthTokenStorage, MCPOAuthToken } from './oauth-token-storage.js';
+import { MCPOAuthProvider } from './oauth-provider.js';
+import type { OAuthToken } from './token-storage/types.js';
+import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -100,7 +101,7 @@ describe('MCPOAuthProvider', () => {
     audiences: ['https://api.example.com'],
   };
 
-  const mockToken: MCPOAuthToken = {
+  const mockToken: OAuthToken = {
     accessToken: 'access_token_123',
     refreshToken: 'refresh_token_456',
     tokenType: 'Bearer',

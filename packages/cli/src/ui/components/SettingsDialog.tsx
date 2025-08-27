@@ -7,11 +7,8 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import {
-  LoadedSettings,
-  SettingScope,
-  Settings,
-} from '../../config/settings.js';
+import type { LoadedSettings, Settings } from '../../config/settings.js';
+import { SettingScope } from '../../config/settings.js';
 import {
   getScopeItems,
   getScopeMessageForSetting,

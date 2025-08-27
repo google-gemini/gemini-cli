@@ -4,16 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { FunctionDeclaration } from '@google/genai';
-import {
+import type { FunctionDeclaration } from '@google/genai';
+import type {
   AnyDeclarativeTool,
-  Kind,
   ToolResult,
-  BaseDeclarativeTool,
-  BaseToolInvocation,
   ToolInvocation,
 } from './tools.js';
-import { Config } from '../config/config.js';
+import { Kind, BaseDeclarativeTool, BaseToolInvocation } from './tools.js';
+import type { Config } from '../config/config.js';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 import { connectAndDiscover } from './mcp-client.js';
@@ -437,6 +435,13 @@ export class ToolRegistry {
       }
     }
     return declarations;
+  }
+
+  /**
+   * Returns an array of all registered and discovered tool names.
+   */
+  getAllToolNames(): string[] {
+    return Array.from(this.tools.keys());
   }
 
   /**

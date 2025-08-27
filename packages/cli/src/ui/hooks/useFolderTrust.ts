@@ -5,14 +5,14 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { Settings, LoadedSettings } from '../../config/settings.js';
+import type { Settings, LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import {
   loadTrustedFolders,
   TrustLevel,
   isWorkspaceTrusted,
 } from '../../config/trustedFolders.js';
-import * as process from 'process';
+import * as process from 'node:process';
 
 export const useFolderTrust = (
   settings: LoadedSettings,
