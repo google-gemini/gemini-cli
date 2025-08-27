@@ -15,7 +15,9 @@ import {
   disableExtension,
   enableExtension,
   installExtension,
+  loadExtension,
   loadExtensions,
+  performWorkspaceExtensionMigration,
   uninstallExtension,
   updateExtension,
 } from './extension.js';
@@ -46,6 +48,7 @@ vi.mock('child_process', async (importOriginal) => {
     execSync: vi.fn(),
   };
 });
+
 const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
 
 describe('loadExtensions', () => {
@@ -427,6 +430,80 @@ describe('uninstallExtension', () => {
     await expect(uninstallExtension('nonexistent-extension')).rejects.toThrow(
       'Extension "nonexistent-extension" not found.',
     );
+  });
+});
+
+describe('performWorkspaceExtensionMigration', () => {
+  let tempWorkspaceDir: string;
+  let tempHomeDir: string;
+
+  beforeEach(() => {
+    tempWorkspaceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-workspace-'),
+    );
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('should install the extensions in the user directory', async () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+    const ext1Path = createExtension(workspaceExtensionsDir, 'ext1', '1.0.0');
+    const ext2Path = createExtension(workspaceExtensionsDir, 'ext2', '1.0.0');
+    const extensionsToMigrate = [
+      loadExtension(ext1Path)!,
+      loadExtension(ext2Path)!,
+    ];
+    const failed =
+      await performWorkspaceExtensionMigration(extensionsToMigrate);
+
+    expect(failed).toEqual([]);
+
+    const userExtensionsDir = path.join(tempHomeDir, '.gemini', 'extensions');
+    const userExt1Path = path.join(userExtensionsDir, 'ext1');
+    const extensions = loadExtensions(tempWorkspaceDir);
+
+    expect(extensions).toHaveLength(2);
+    const metadataPath = path.join(userExt1Path, INSTALL_METADATA_FILENAME);
+    expect(fs.existsSync(metadataPath)).toBe(true);
+    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+    expect(metadata).toEqual({
+      source: ext1Path,
+      type: 'local',
+    });
+  });
+
+  it('should return the names of failed installations', async () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+
+    const ext1Path = createExtension(workspaceExtensionsDir, 'ext1', '1.0.0');
+
+    const extensions = [
+      loadExtension(ext1Path)!,
+      {
+        path: '/ext/path/1',
+        config: { name: 'ext2', version: '1.0.0' },
+        contextFiles: [],
+      },
+    ];
+
+    const failed = await performWorkspaceExtensionMigration(extensions);
+    expect(failed).toEqual(['ext2']);
   });
 });
 
