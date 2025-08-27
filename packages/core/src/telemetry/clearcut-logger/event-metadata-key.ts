@@ -262,23 +262,6 @@ export enum EventMetadataKey {
   // ===========================================================================
 
   // Logs the research opt-in status (true/false)
-  GEMINI_CLI_RESEARCH_OPT_IN_STATUS = 72,
-
-  // Logs the contact email for research participation
-  GEMINI_CLI_RESEARCH_CONTACT_EMAIL = 73,
-
-  // Logs the user ID for research events
-  GEMINI_CLI_RESEARCH_USER_ID = 74,
-
-  // Logs the type of research feedback
-  GEMINI_CLI_RESEARCH_FEEDBACK_TYPE = 75,
-
-  // Logs the content of research feedback
-  GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT = 76,
-
-  // Logs survey responses for research feedback (JSON stringified)
-  GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 77,
-
   GEMINI_CLI_RESEARCH_OPT_IN_STATUS = 66,
 
   // Logs the contact email for research participation
@@ -307,26 +290,26 @@ export enum EventMetadataKey {
   GEMINI_CLI_FILE_OPERATION_TYPE = 57,
 
   // Logs the number of lines in the file operation.
-  GEMINI_CLI_FILE_OPERATION_LINES = 82,
+  GEMINI_CLI_FILE_OPERATION_LINES = 72,
 
   // Logs the mimetype of the file in the file operation.
-  GEMINI_CLI_FILE_OPERATION_MIMETYPE = 83,
+  GEMINI_CLI_FILE_OPERATION_MIMETYPE = 73,
 
   // Logs the extension of the file in the file operation.
-  GEMINI_CLI_FILE_OPERATION_EXTENSION = 84,
+  GEMINI_CLI_FILE_OPERATION_EXTENSION = 74,
 
   // ==========================================================================
   // Content Streaming Event Keys
   // ===========================================================================
 
   // Logs the error message for an invalid chunk.
-  GEMINI_CLI_INVALID_CHUNK_ERROR_MESSAGE = 85,
+  GEMINI_CLI_INVALID_CHUNK_ERROR_MESSAGE = 75,
 
   // Logs the attempt number for a content retry.
-  GEMINI_CLI_CONTENT_RETRY_ATTEMPT_NUMBER = 86,
+  GEMINI_CLI_CONTENT_RETRY_ATTEMPT_NUMBER = 76,
 
   // Logs the error type for a content retry.
-  GEMINI_CLI_CONTENT_RETRY_ERROR_TYPE = 87,
+  GEMINI_CLI_CONTENT_RETRY_ERROR_TYPE = 77,
 
   // Logs the delay in milliseconds for a content retry.
   GEMINI_CLI_CONTENT_RETRY_DELAY_MS = 78,
