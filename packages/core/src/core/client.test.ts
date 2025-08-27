@@ -37,7 +37,6 @@ import { setSimulate429 } from '../utils/testUtils.js';
 import { tokenLimit } from './tokenLimits.js';
 import { ideContext } from '../ide/ideContext.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
-import { truncateSync } from 'node:fs';
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
