@@ -160,6 +160,17 @@ async function calculateFlexibleReplacement(
   return null;
 }
 
+/**
+ * Detects the line ending style of a string.
+ * @param content The string content to analyze.
+ * @returns '\r\n' for Windows-style, '\n' for Unix-style.
+ */
+function detectLineEnding(content: string): '\r\n' | '\n' {
+  // If a Carriage Return is found, assume Windows-style endings.
+  // This is a simple but effective heuristic.
+  return content.includes('\r\n') ? '\r\n' : '\n';
+}
+
 export async function calculateReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult> {
@@ -270,6 +281,7 @@ interface CalculatedEdit {
   occurrences: number;
   error?: { display: string; raw: string; type: ToolErrorType };
   isNewFile: boolean;
+  originalLineEnding: '\r\n' | '\n';
 }
 
 class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
@@ -287,6 +299,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     currentContent: string,
     initialError: { display: string; raw: string; type: ToolErrorType },
     abortSignal: AbortSignal,
+    originalLineEnding: '\r\n' | '\n',
   ): Promise<CalculatedEdit> {
     const fixedEdit = await FixLLMEditWithInstruction(
       params.instruction,
@@ -309,6 +322,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           raw: `A secondary check determined that no changes were necessary to fulfill the instruction. Explanation: ${fixedEdit.explanation}. Original error with the parameters given: ${initialError.raw}`,
           type: ToolErrorType.EDIT_NO_CHANGE,
         },
+        originalLineEnding,
       };
     }
 
@@ -338,6 +352,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         occurrences: 0,
         isNewFile: false,
         error: initialError,
+        originalLineEnding,
       };
     }
 
@@ -347,6 +362,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       occurrences: secondAttemptResult.occurrences,
       isNewFile: false,
       error: undefined,
+      originalLineEnding,
     };
   }
 
@@ -363,11 +379,13 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     const expectedReplacements = 1;
     let currentContent: string | null = null;
     let fileExists = false;
+    let originalLineEnding: '\r\n' | '\n' = '\n'; // Default for new files
 
     try {
       currentContent = await this.config
         .getFileSystemService()
         .readTextFile(params.file_path);
+      originalLineEnding = detectLineEnding(currentContent);
       currentContent = currentContent.replace(/\r\n/g, '\n');
       fileExists = true;
     } catch (err: unknown) {
@@ -386,6 +404,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         occurrences: 1,
         isNewFile: true,
         error: undefined,
+        originalLineEnding,
       };
     }
 
@@ -401,6 +420,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           raw: `File not found: ${params.file_path}`,
           type: ToolErrorType.FILE_NOT_FOUND,
         },
+        originalLineEnding,
       };
     }
 
@@ -415,6 +435,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           raw: `Failed to read content of existing file: ${params.file_path}`,
           type: ToolErrorType.READ_CONTENT_FAILURE,
         },
+        originalLineEnding,
       };
     }
 
@@ -429,6 +450,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           raw: `File already exists, cannot create: ${params.file_path}`,
           type: ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
         },
+        originalLineEnding,
       };
     }
 
@@ -453,6 +475,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         occurrences: replacementResult.occurrences,
         isNewFile: false,
         error: undefined,
+        originalLineEnding,
       };
     }
 
@@ -462,6 +485,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       currentContent,
       initialError,
       abortSignal,
+      originalLineEnding,
     );
   }
 
@@ -590,9 +614,15 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
 
     try {
       this.ensureParentDirectoriesExist(this.params.file_path);
+      let finalContent = editData.newContent;
+
+      // Restore original line endings if they were CRLF
+      if (!editData.isNewFile && editData.originalLineEnding === '\r\n') {
+        finalContent = finalContent.replace(/\n/g, '\r\n');
+      }
       await this.config
         .getFileSystemService()
-        .writeTextFile(this.params.file_path, editData.newContent);
+        .writeTextFile(this.params.file_path, finalContent);
 
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {
@@ -677,7 +707,7 @@ export class SmartEditTool
   constructor(private readonly config: Config) {
     super(
       SmartEditTool.Name,
-      'Smart Edit',
+      'Edit',
       `Replaces text within a file. Replaces a single occurrence. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${ReadFileTool.Name} tool to examine the file's current content before attempting a text replacement.
       
       The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
@@ -686,7 +716,7 @@ export class SmartEditTool
       1. \`file_path\` MUST be an absolute path; otherwise an error will be thrown.
       2. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
       3. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
-      4.  \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
+      4. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
       5. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
       **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
       6. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.

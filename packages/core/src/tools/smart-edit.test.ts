@@ -328,6 +328,40 @@ describe('SmartEditTool', () => {
       expect(result.llmContent).toMatch(/A secondary check determined/);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent); // File is unchanged
     });
+
+    it('should preserve CRLF line endings when editing a file', async () => {
+      const initialContent = 'line one\r\nline two\r\n';
+      const newContent = 'line one\r\nline three\r\n';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace two with three',
+        old_string: 'line two',
+        new_string: 'line three',
+      };
+
+      const invocation = tool.build(params);
+      await invocation.execute(new AbortController().signal);
+
+      const finalContent = fs.readFileSync(filePath, 'utf8');
+      expect(finalContent).toBe(newContent);
+    });
+
+    it('should create a new file with CRLF line endings if new_string has them', async () => {
+      const newContentWithCRLF = 'new line one\r\nnew line two\r\n';
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Create a new file',
+        old_string: '',
+        new_string: newContentWithCRLF,
+      };
+
+      const invocation = tool.build(params);
+      await invocation.execute(new AbortController().signal);
+
+      const finalContent = fs.readFileSync(filePath, 'utf8');
+      expect(finalContent).toBe(newContentWithCRLF);
+    });
   });
 
   describe('Error Scenarios', () => {
