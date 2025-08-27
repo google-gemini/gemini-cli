@@ -35,3 +35,9 @@ export interface TokenStorage {
   getAllCredentials(): Promise<Map<string, OAuthCredentials>>;
   clearAll(): Promise<void>;
 }
+
+export enum TokenStorageType {
+  KEYCHAIN = 'keychain',
+  FILE = 'file',
+  ENCRYPTED_FILE = 'encrypted_file',
+}
