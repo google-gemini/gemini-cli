@@ -4,24 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Config, IdeClient, File } from '@google/gemini-cli-core';
 import {
-  Config,
-  DetectedIde,
-  GEMINI_CLI_COMPANION_EXTENSION_NAME,
-  IDEConnectionStatus,
-  getIdeInfo,
   getIdeInstaller,
-  IdeClient,
-  type File,
+  IDEConnectionStatus,
   ideContext,
+  GEMINI_CLI_COMPANION_EXTENSION_NAME,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
-import {
+import type {
   CommandContext,
   SlashCommand,
   SlashCommandActionReturn,
-  CommandKind,
 } from './types.js';
+import { CommandKind } from './types.js';
 import { SettingScope } from '../../config/settings.js';
 
 function getIdeStatusMessage(ideClient: IdeClient): {
@@ -130,11 +126,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         ({
           type: 'message',
           messageType: 'error',
-          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: ${Object.values(
-            DetectedIde,
-          )
-            .map((ide) => getIdeInfo(ide).displayName)
-            .join(', ')}`,
+          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks.`,
         }) as const,
     };
   }

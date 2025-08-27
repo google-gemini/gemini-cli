@@ -4,28 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { vi, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { vi } from 'vitest';
+import type { Key } from './KeypressContext.js';
 import {
-  KeypressProvider,
-  useKeypressContext,
-  Key,
+  KeypressProvider, useKeypressContext,
   DRAG_COMPLETION_TIMEOUT_MS,
   DRAG_START_TIMEOUT_MS,
   MAC_DRAG_MODE_PREFIX,
   MAC_FOCUS_EVENT_OUT_OF_EDITOR,
 } from './KeypressContext.js';
 import { useStdin } from 'ink';
-import { EventEmitter } from 'events';
-import {
-  KITTY_KEYCODE_ENTER,
-  KITTY_KEYCODE_NUMPAD_ENTER,
-  CHAR_CODE_ESC,
-  CHAR_CODE_LEFT_BRACKET,
-  CHAR_CODE_1,
-  CHAR_CODE_2,
-} from '../utils/platformConstants.js';
+import { EventEmitter } from 'node:events';
 
 // Mock the 'ink' module to control stdin
 vi.mock('ink', async (importOriginal) => {
@@ -105,7 +97,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for regular enter: ESC[13u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_ENTER}u`);
+        stdin.sendKittySequence(`\x1b[13u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -133,7 +125,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter: ESC[57414u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER}u`);
+        stdin.sendKittySequence(`\x1b[57414u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -161,7 +153,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter with Shift (modifier 2): ESC[57414;2u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER};2u`);
+        stdin.sendKittySequence(`\x1b[57414;2u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -189,7 +181,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter with Ctrl (modifier 5): ESC[57414;5u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER};5u`);
+        stdin.sendKittySequence(`\x1b[57414;5u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -217,7 +209,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter with Alt (modifier 3): ESC[57414;3u
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER};3u`);
+        stdin.sendKittySequence(`\x1b[57414;3u`);
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
@@ -245,7 +237,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       // Send kitty protocol sequence for numpad enter
       act(() => {
-        stdin.sendKittySequence(`\x1b[${KITTY_KEYCODE_NUMPAD_ENTER}u`);
+        stdin.sendKittySequence(`\x1b[57414u`);
       });
 
       // When kitty protocol is disabled, the sequence should be passed through
@@ -286,10 +278,86 @@ describe('KeypressContext - Kitty Protocol', () => {
     });
   });
 
+  describe('Tab and Backspace handling', () => {
+    it('should recognize Tab key in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        stdin.sendKittySequence(`\x1b[9u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'tab',
+          kittyProtocol: true,
+          shift: false,
+        }),
+      );
+    });
+
+    it('should recognize Shift+Tab in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Modifier 2 is Shift
+      act(() => {
+        stdin.sendKittySequence(`\x1b[9;2u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'tab',
+          kittyProtocol: true,
+          shift: true,
+        }),
+      );
+    });
+
+    it('should recognize Backspace key in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        stdin.sendKittySequence(`\x1b[127u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          kittyProtocol: true,
+          meta: false,
+        }),
+      );
+    });
+
+    it('should recognize Option+Backspace in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Modifier 3 is Alt/Option
+      act(() => {
+        stdin.sendKittySequence(`\x1b[127;3u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          kittyProtocol: true,
+          meta: true,
+        }),
+      );
+    });
+  });
+
   describe('paste mode', () => {
     it('should handle multiline paste as a single event', async () => {
       const keyHandler = vi.fn();
-      const pastedText = 'This \nis \na \nmultiline \npaste.';
+      const pastedText = 'This \n is \n a \n multiline \n paste.';
 
       const { result } = renderHook(() => useKeypressContext(), {
         wrapper,
@@ -324,8 +392,8 @@ describe('KeypressContext - Kitty Protocol', () => {
     let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
+      consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
     });
 
     afterEach(() => {
@@ -518,7 +586,266 @@ describe('KeypressContext - Kitty Protocol', () => {
       // Verify warning for char codes
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         'Kitty sequence buffer has char codes:',
-        [CHAR_CODE_ESC, CHAR_CODE_LEFT_BRACKET, CHAR_CODE_1, CHAR_CODE_2],
+        [27, 91, 49, 50],
+      );
+    });
+  });
+});
+
+describe('Drag and Drop Handling', () => {
+  let stdin: MockStdin;
+  const mockSetRawMode = vi.fn();
+
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <KeypressProvider kittyProtocolEnabled={true}>{children}</KeypressProvider>
+  );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    stdin = new MockStdin();
+    (useStdin as Mock).mockReturnValue({
+      stdin,
+      setRawMode: mockSetRawMode,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe('isDragFocusEvent detection', () => {
+    it('should detect MAC_DRAG_MODE_PREFIX as drag focus event', async () => {
+      const keyHandler = vi.fn();
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Send MAC_DRAG_MODE_PREFIX
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: MAC_DRAG_MODE_PREFIX,
+        });
+      });
+
+      // Should not broadcast the drag focus event itself
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
+
+    it('should detect MAC_FOCUS_EVENT_OUT_OF_EDITOR as drag focus event', async () => {
+      const keyHandler = vi.fn();
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Send MAC_FOCUS_EVENT_OUT_OF_EDITOR
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: MAC_FOCUS_EVENT_OUT_OF_EDITOR,
+        });
+      });
+
+      // Should not broadcast the drag focus event itself
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('drag collection and completion', () => {
+    it('should collect single character inputs during drag mode', async () => {
+      const keyHandler = vi.fn();
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Start drag mode
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: MAC_DRAG_MODE_PREFIX,
+        });
+      });
+
+      // Send single character
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'a',
+        });
+      });
+
+      // Character should not be immediately broadcast
+      expect(keyHandler).not.toHaveBeenCalled();
+
+      // Fast-forward to completion timeout
+      act(() => {
+        vi.advanceTimersByTime(DRAG_COMPLETION_TIMEOUT_MS);
+      });
+
+      // Should broadcast the collected path as paste
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paste: true,
+          sequence: 'a',
+        }),
+      );
+    });
+
+    it('should collect multiple characters and complete on timeout', async () => {
+      const keyHandler = vi.fn();
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Start drag mode
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: MAC_DRAG_MODE_PREFIX,
+        });
+      });
+
+      // Send multiple characters
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'p',
+        });
+      });
+
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'a',
+        });
+      });
+
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 't',
+        });
+      });
+
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'h',
+        });
+      });
+
+      // Characters should not be immediately broadcast
+      expect(keyHandler).not.toHaveBeenCalled();
+
+      // Fast-forward to completion timeout
+      act(() => {
+        vi.advanceTimersByTime(DRAG_COMPLETION_TIMEOUT_MS);
+      });
+
+      // Should broadcast the collected path as paste
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paste: true,
+          sequence: 'path',
+        }),
+      );
+    });
+
+    it('should timeout and reset if no characters received after drag start', async () => {
+      const keyHandler = vi.fn();
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Start drag mode
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: MAC_DRAG_MODE_PREFIX,
+        });
+      });
+
+      // No characters sent, just timeout
+      act(() => {
+        vi.advanceTimersByTime(DRAG_START_TIMEOUT_MS);
+      });
+
+      // Should not broadcast anything
+      expect(keyHandler).not.toHaveBeenCalled();
+
+      // Subsequent normal keys should work normally
+      act(() => {
+        stdin.pressKey({
+          name: 'a',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'a',
+        });
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'a',
+          sequence: 'a',
+        }),
       );
     });
   });

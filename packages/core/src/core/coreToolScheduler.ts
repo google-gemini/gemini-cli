@@ -4,32 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   ToolCallRequestInfo,
   ToolCallResponseInfo,
-  ToolConfirmationOutcome,
   ToolCallConfirmationDetails,
   ToolResult,
   ToolResultDisplay,
   ToolRegistry,
-  ApprovalMode,
   EditorType,
   Config,
-  logToolCall,
-  ToolCallEvent,
   ToolConfirmationPayload,
-  ToolErrorType,
   AnyDeclarativeTool,
   AnyToolInvocation,
 } from '../index.js';
-import { Part, PartListUnion } from '@google/genai';
+import {
+  ToolConfirmationOutcome,
+  ApprovalMode,
+  logToolCall,
+  ToolErrorType,
+  ToolCallEvent,
+} from '../index.js';
+import type { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
+import type { ModifyContext } from '../tools/modifiable-tool.js';
 import {
   isModifiableDeclarativeTool,
-  ModifyContext,
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
 import * as Diff from 'diff';
+import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -613,68 +616,74 @@ export class CoreToolScheduler {
             );
             continue;
           }
-          if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
+
+          const confirmationDetails =
+            await invocation.shouldConfirmExecute(signal);
+
+          if (!confirmationDetails) {
+            this.setToolCallOutcome(
+              reqInfo.callId,
+              ToolConfirmationOutcome.ProceedAlways,
+            );
+            this.setStatusInternal(reqInfo.callId, 'scheduled');
+            continue;
+          }
+
+          const allowedTools = this.config.getAllowedTools() || [];
+          if (
+            this.config.getApprovalMode() === ApprovalMode.YOLO ||
+            doesToolInvocationMatch(toolCall.tool, invocation, allowedTools)
+          ) {
             this.setToolCallOutcome(
               reqInfo.callId,
               ToolConfirmationOutcome.ProceedAlways,
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled');
           } else {
-            const confirmationDetails =
-              await invocation.shouldConfirmExecute(signal);
-
-            if (confirmationDetails) {
-              // Allow IDE to resolve confirmation
-              if (
-                confirmationDetails.type === 'edit' &&
-                confirmationDetails.ideConfirmation
-              ) {
-                confirmationDetails.ideConfirmation.then((resolution) => {
-                  if (resolution.status === 'accepted') {
-                    this.handleConfirmationResponse(
-                      reqInfo.callId,
-                      confirmationDetails.onConfirm,
-                      ToolConfirmationOutcome.ProceedOnce,
-                      signal,
-                    );
-                  } else {
-                    this.handleConfirmationResponse(
-                      reqInfo.callId,
-                      confirmationDetails.onConfirm,
-                      ToolConfirmationOutcome.Cancel,
-                      signal,
-                    );
-                  }
-                });
-              }
-
-              const originalOnConfirm = confirmationDetails.onConfirm;
-              const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
-                ...confirmationDetails,
-                onConfirm: (
-                  outcome: ToolConfirmationOutcome,
-                  payload?: ToolConfirmationPayload,
-                ) =>
+            // Allow IDE to resolve confirmation
+            if (
+              confirmationDetails.type === 'edit' &&
+              confirmationDetails.ideConfirmation
+            ) {
+              confirmationDetails.ideConfirmation.then((resolution) => {
+                if (resolution.status === 'accepted') {
                   this.handleConfirmationResponse(
                     reqInfo.callId,
-                    originalOnConfirm,
-                    outcome,
+                    confirmationDetails.onConfirm,
+                    ToolConfirmationOutcome.ProceedOnce,
                     signal,
-                    payload,
-                  ),
-              };
-              this.setStatusInternal(
-                reqInfo.callId,
-                'awaiting_approval',
-                wrappedConfirmationDetails,
-              );
-            } else {
-              this.setToolCallOutcome(
-                reqInfo.callId,
-                ToolConfirmationOutcome.ProceedAlways,
-              );
-              this.setStatusInternal(reqInfo.callId, 'scheduled');
+                  );
+                } else {
+                  this.handleConfirmationResponse(
+                    reqInfo.callId,
+                    confirmationDetails.onConfirm,
+                    ToolConfirmationOutcome.Cancel,
+                    signal,
+                  );
+                }
+              });
             }
+
+            const originalOnConfirm = confirmationDetails.onConfirm;
+            const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
+              ...confirmationDetails,
+              onConfirm: (
+                outcome: ToolConfirmationOutcome,
+                payload?: ToolConfirmationPayload,
+              ) =>
+                this.handleConfirmationResponse(
+                  reqInfo.callId,
+                  originalOnConfirm,
+                  outcome,
+                  signal,
+                  payload,
+                ),
+            };
+            this.setStatusInternal(
+              reqInfo.callId,
+              'awaiting_approval',
+              wrappedConfirmationDetails,
+            );
           }
         } catch (error) {
           this.setStatusInternal(

@@ -4,13 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { homedir } from 'node:os';
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
+import type {
+  TelemetryTarget,
+  FileFilteringOptions,
+  MCPServerConfig,
+} from '@google/gemini-cli-core';
+import { extensionsCommand } from '../commands/extensions.js';
 import {
   Config,
   loadServerHierarchicalMemory,
@@ -21,16 +27,14 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
-  TelemetryTarget,
-  FileFilteringOptions,
   ShellTool,
   EditTool,
   WriteFileTool,
-  MCPServerConfig,
 } from '@google/gemini-cli-core';
-import { Settings } from './settings.js';
+import type { Settings } from './settings.js';
 
-import { Extension, annotateActiveExtensions } from './extension.js';
+import type { Extension } from './extension.js';
+import { annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
@@ -55,9 +59,7 @@ export interface CliArgs {
   prompt: string | undefined;
   promptInteractive: string | undefined;
   allFiles: boolean | undefined;
-  all_files: boolean | undefined;
   showMemoryUsage: boolean | undefined;
-  show_memory_usage: boolean | undefined;
   yolo: boolean | undefined;
   approvalMode: string | undefined;
   telemetry: boolean | undefined;
@@ -68,6 +70,7 @@ export interface CliArgs {
   telemetryLogPrompts: boolean | undefined;
   telemetryOutfile: string | undefined;
   allowedMcpServerNames: string[] | undefined;
+  allowedTools: string[] | undefined;
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
@@ -76,7 +79,7 @@ export interface CliArgs {
   screenReader: boolean | undefined;
 }
 
-export async function parseArguments(): Promise<CliArgs> {
+export async function parseArguments(settings: Settings): Promise<CliArgs> {
   const yargsInstance = yargs(hideBin(process.argv))
     .locale('en')
     .scriptName('gemini')
@@ -123,29 +126,11 @@ export async function parseArguments(): Promise<CliArgs> {
           description: 'Include ALL files in context?',
           default: false,
         })
-        .option('all_files', {
-          type: 'boolean',
-          description: 'Include ALL files in context?',
-          default: false,
-        })
-        .deprecateOption(
-          'all_files',
-          'Use --all-files instead. We will be removing --all_files in the coming weeks.',
-        )
         .option('show-memory-usage', {
           type: 'boolean',
           description: 'Show memory usage in status bar',
           default: false,
         })
-        .option('show_memory_usage', {
-          type: 'boolean',
-          description: 'Show memory usage in status bar',
-          default: false,
-        })
-        .deprecateOption(
-          'show_memory_usage',
-          'Use --show-memory-usage instead. We will be removing --show_memory_usage in the coming weeks.',
-        )
         .option('yolo', {
           alias: 'y',
           type: 'boolean',
@@ -205,6 +190,11 @@ export async function parseArguments(): Promise<CliArgs> {
           string: true,
           description: 'Allowed MCP server names',
         })
+        .option('allowed-tools', {
+          type: 'array',
+          string: true,
+          description: 'Tools that are allowed to run without confirmation',
+        })
         .option('extensions', {
           alias: 'e',
           type: 'array',
@@ -252,7 +242,13 @@ export async function parseArguments(): Promise<CliArgs> {
         }),
     )
     // Register MCP subcommands
-    .command(mcpCommand)
+    .command(mcpCommand);
+
+  if (settings?.extensionManagement ?? false) {
+    yargsInstance.command(extensionsCommand);
+  }
+
+  yargsInstance
     .version(await getCliVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
     .help()
@@ -265,7 +261,10 @@ export async function parseArguments(): Promise<CliArgs> {
 
   // Handle case where MCP subcommands are executed - they should exit the process
   // and not return to main CLI logic
-  if (result._.length > 0 && result._[0] === 'mcp') {
+  if (
+    result._.length > 0 &&
+    (result._[0] === 'mcp' || result._[0] === 'extensions')
+  ) {
     // MCP commands handle their own execution and process exit
     process.exit(0);
   }
@@ -341,6 +340,7 @@ export async function loadCliConfig(
   const allExtensions = annotateActiveExtensions(
     extensions,
     argv.extensions || [],
+    cwd,
   );
 
   const activeExtensions = extensions.filter(
@@ -411,6 +411,14 @@ export async function loadCliConfig(
     // Fallback to legacy --yolo flag behavior
     approvalMode =
       argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
+  }
+
+  // Force approval mode to default if the folder is not trusted.
+  if (!trustedFolder && approvalMode !== ApprovalMode.DEFAULT) {
+    logger.warn(
+      `Approval mode overridden to "default" because the current folder is not trusted.`,
+    );
+    approvalMode = ApprovalMode.DEFAULT;
   }
 
   const interactive =
@@ -485,8 +493,9 @@ export async function loadCliConfig(
       settings.loadMemoryFromIncludeDirectories || false,
     debugMode,
     question,
-    fullContext: argv.allFiles || argv.all_files || false,
+    fullContext: argv.allFiles || false,
     coreTools: settings.coreTools || undefined,
+    allowedTools: argv.allowedTools || settings.allowedTools || undefined,
     excludeTools,
     toolDiscoveryCommand: settings.toolDiscoveryCommand,
     toolCallCommand: settings.toolCallCommand,
@@ -495,11 +504,7 @@ export async function loadCliConfig(
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     approvalMode,
-    showMemoryUsage:
-      argv.showMemoryUsage ||
-      argv.show_memory_usage ||
-      settings.showMemoryUsage ||
-      false,
+    showMemoryUsage: argv.showMemoryUsage || settings.showMemoryUsage || false,
     accessibility: {
       ...settings.accessibility,
       screenReader,

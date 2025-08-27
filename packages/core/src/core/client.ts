@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   EmbedContentParameters,
   GenerateContentConfig,
   PartListUnion,
@@ -16,14 +16,10 @@ import {
   getDirectoryContextString,
   getEnvironmentContext,
 } from '../utils/environmentContext.js';
-import {
-  Turn,
-  ServerGeminiStreamEvent,
-  GeminiEventType,
-  ChatCompressionInfo,
-} from './turn.js';
-import { Config } from '../config/config.js';
-import { UserTierId } from '../code_assist/types.js';
+import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
+import { Turn, GeminiEventType } from './turn.js';
+import type { Config } from '../config/config.js';
+import type { UserTierId } from '../code_assist/types.js';
 import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
@@ -33,12 +29,11 @@ import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { tokenLimit } from './tokenLimits.js';
-import {
-  AuthType,
+import type {
   ContentGenerator,
   ContentGeneratorConfig,
-  createContentGenerator,
 } from './contentGenerator.js';
+import { AuthType, createContentGenerator } from './contentGenerator.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
@@ -46,14 +41,14 @@ import { ideContext } from '../ide/ideContext.js';
 import {
   logChatCompression,
   logNextSpeakerCheck,
+  logMalformedJsonResponse,
 } from '../telemetry/loggers.js';
 import {
   makeChatCompressionEvent,
   MalformedJsonResponseEvent,
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
-import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
-import { IdeContext, File } from '../ide/ideContext.js';
+import type { IdeContext, File } from '../ide/ideContext.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -248,6 +243,7 @@ export class GeminiClient {
         ? {
             ...this.generateContentConfig,
             thinkingConfig: {
+              thinkingBudget: -1,
               includeThoughts: true,
             },
           }
@@ -517,6 +513,9 @@ export class GeminiClient {
         return turn;
       }
       yield event;
+      if (event.type === GeminiEventType.Error) {
+        return turn;
+      }
     }
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
       // Check if model was switched during the call (likely due to quota error)
@@ -617,7 +616,8 @@ export class GeminiClient {
       const prefix = '```json';
       const suffix = '```';
       if (text.startsWith(prefix) && text.endsWith(suffix)) {
-        ClearcutLogger.getInstance(this.config)?.logMalformedJsonResponseEvent(
+        logMalformedJsonResponse(
+          this.config,
           new MalformedJsonResponseEvent(modelToUse),
         );
         text = text
