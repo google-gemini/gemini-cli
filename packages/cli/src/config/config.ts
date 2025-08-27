@@ -527,13 +527,7 @@ export async function loadCliConfig(
     },
     usageStatisticsEnabled: settings.usageStatisticsEnabled ?? true,
     // Git-aware file filtering settings
-    fileFiltering: {
-      respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
-      respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
-      enableRecursiveFileSearch:
-        settings.fileFiltering?.enableRecursiveFileSearch,
-      disableFuzzySearch: settings.fileFiltering?.disableFuzzySearch,
-    },
+    fileFiltering: settings.fileFiltering,
     checkpointing: argv.checkpointing || settings.checkpointing?.enabled,
     proxy:
       argv.proxy ||

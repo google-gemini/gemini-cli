@@ -2016,3 +2016,92 @@ describe('loadCliConfig trustedFolder', () => {
     });
   }
 });
+
+describe('loadCliConfig fileFiltering', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    process.argv = ['node', 'script.js']; // Reset argv for each test
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should pass disableFuzzySearch from settings to config when true', async () => {
+    const settings: Settings = {
+      fileFiltering: { disableFuzzySearch: true },
+    };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFileFilteringDisableFuzzySearch()).toBe(true);
+  });
+
+  it('should pass disableFuzzySearch from settings to config when false', async () => {
+    const settings: Settings = {
+      fileFiltering: { disableFuzzySearch: false },
+    };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFileFilteringDisableFuzzySearch()).toBe(false);
+  });
+
+  it('should pass respectGitIgnore from settings to config when true', async () => {
+    const settings: Settings = {
+      fileFiltering: { respectGitIgnore: true },
+    };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFileFilteringRespectGitIgnore()).toBe(true);
+  });
+
+  it('should pass respectGitIgnore from settings to config when false', async () => {
+    const settings: Settings = {
+      fileFiltering: { respectGitIgnore: false },
+    };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
+  });
+
+  it('should pass respectGeminiIgnore from settings to config when true', async () => {
+    const settings: Settings = {
+      fileFiltering: { respectGeminiIgnore: true },
+    };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFileFilteringRespectGeminiIgnore()).toBe(true);
+  });
+
+  it('should pass respectGeminiIgnore from settings to config when false', async () => {
+    const settings: Settings = {
+      fileFiltering: { respectGeminiIgnore: false },
+    };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFileFilteringRespectGeminiIgnore()).toBe(false);
+  });
+
+  it('should pass enableRecursiveFileSearch from settings to config when true', async () => {
+    const settings: Settings = {
+      fileFiltering: { enableRecursiveFileSearch: true },
+    };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getEnableRecursiveFileSearch()).toBe(true);
+  });
+
+  it('should pass enableRecursiveFileSearch from settings to config when false', async () => {
+    const settings: Settings = {
+      fileFiltering: { enableRecursiveFileSearch: false },
+    };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getEnableRecursiveFileSearch()).toBe(false);
+  });
+});
