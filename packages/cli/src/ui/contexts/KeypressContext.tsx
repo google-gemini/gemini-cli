@@ -41,6 +41,7 @@ export const MAC_FOCUS_EVENT_OUT_OF_EDITOR = "'"; // When editor does NOT have f
 
 export const DRAG_START_TIMEOUT_MS = 200;
 export const DRAG_COMPLETION_TIMEOUT_MS = 200;
+export const DRAG_COMPLETION_REVERSE_DELAY_BUDGET_MS = 100;
 
 export interface Key {
   name: string;
@@ -89,7 +90,9 @@ export function KeypressProvider({
 
   const dragBufferRef = useRef('');
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const dragCompletionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isDragCollectingRef = useRef(false);
+  const dragBroadcastedRef = useRef(false);
 
   const subscribe = useCallback(
     (handler: KeypressHandler) => {
@@ -106,9 +109,26 @@ export function KeypressProvider({
   );
 
   useEffect(() => {
-    if (dragTimeoutRef.current) {
-      clearTimeout(dragTimeoutRef.current);
-    }
+    const clearDragStartTimeout = () => {
+      if (dragTimeoutRef.current) {
+        clearTimeout(dragTimeoutRef.current);
+        dragTimeoutRef.current = null;
+      }
+    };
+
+    const clearDragCompletionTimeout = () => {
+      if (dragCompletionTimeoutRef.current) {
+        clearTimeout(dragCompletionTimeoutRef.current);
+        dragCompletionTimeoutRef.current = null;
+      }
+    };
+
+    clearDragStartTimeout();
+    clearDragCompletionTimeout();
+    isDragCollectingRef.current = false;
+    dragBufferRef.current = '';
+    dragBroadcastedRef.current = false;
+
     setRawMode(true);
 
     const keypressStream = new PassThrough();
@@ -207,25 +227,27 @@ export function KeypressProvider({
       }
 
       const resetDragState = () => {
-        if (dragTimeoutRef.current) {
-          clearTimeout(dragTimeoutRef.current);
-          dragTimeoutRef.current = null;
-        }
+        clearDragStartTimeout();
+        clearDragCompletionTimeout();
         isDragCollectingRef.current = false;
         dragBufferRef.current = '';
+        dragBroadcastedRef.current = false;
       };
 
-      const isDragFocusEvent = (sequence: string) =>
+      const isDragStartEvent = (sequence: string) =>
         sequence === MAC_DRAG_MODE_PREFIX ||
         sequence === MAC_FOCUS_EVENT_OUT_OF_EDITOR;
 
-      if (isDragFocusEvent(key.sequence) && !key.paste) {
+      if (
+        !isDragCollectingRef.current &&
+        isDragStartEvent(key.sequence) &&
+        !key.paste
+      ) {
         isDragCollectingRef.current = true;
         dragBufferRef.current = '';
+        dragBroadcastedRef.current = false;
 
-        if (dragTimeoutRef.current) {
-          clearTimeout(dragTimeoutRef.current);
-        }
+        clearDragStartTimeout();
         dragTimeoutRef.current = setTimeout(() => {
           resetDragState();
         }, DRAG_START_TIMEOUT_MS);
@@ -239,27 +261,36 @@ export function KeypressProvider({
         key.sequence.length === 1 &&
         !key.paste
       ) {
+        clearDragStartTimeout();
+        clearDragCompletionTimeout();
+
         dragBufferRef.current += key.sequence;
-        const newBuffer = dragBufferRef.current;
 
-        if (dragTimeoutRef.current) {
-          clearTimeout(dragTimeoutRef.current);
-        }
+        const pathSnapshot = dragBufferRef.current;
+        const currentBufferLength = pathSnapshot.length;
+        const delayMs =
+          DRAG_COMPLETION_TIMEOUT_MS +
+          Math.max(
+            0,
+            DRAG_COMPLETION_REVERSE_DELAY_BUDGET_MS - currentBufferLength,
+          );
 
-        dragTimeoutRef.current = setTimeout(() => {
-          const trimmedPath = newBuffer.trim();
-          if (trimmedPath) {
+        dragCompletionTimeoutRef.current = setTimeout(() => {
+          if (pathSnapshot && !dragBroadcastedRef.current) {
+            dragBroadcastedRef.current = true;
             broadcast({
               name: '',
               ctrl: false,
               meta: false,
               shift: false,
               paste: true,
-              sequence: trimmedPath,
+              sequence: pathSnapshot,
             });
           }
-          resetDragState();
-        }, DRAG_COMPLETION_TIMEOUT_MS);
+          if (isDragCollectingRef.current) {
+            resetDragState();
+          }
+        }, delayMs);
 
         return;
       }

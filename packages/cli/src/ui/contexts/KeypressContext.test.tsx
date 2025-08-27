@@ -16,6 +16,7 @@ import {
   DRAG_START_TIMEOUT_MS,
   MAC_DRAG_MODE_PREFIX,
   MAC_FOCUS_EVENT_OUT_OF_EDITOR,
+  DRAG_COMPLETION_REVERSE_DELAY_BUDGET_MS,
 } from './KeypressContext.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
@@ -706,7 +707,9 @@ describe('Drag and Drop Handling', () => {
 
       // Fast-forward to completion timeout
       act(() => {
-        vi.advanceTimersByTime(DRAG_COMPLETION_TIMEOUT_MS);
+        vi.advanceTimersByTime(
+          DRAG_COMPLETION_TIMEOUT_MS + DRAG_COMPLETION_REVERSE_DELAY_BUDGET_MS,
+        );
       });
 
       // Should broadcast the collected path as paste
@@ -789,7 +792,9 @@ describe('Drag and Drop Handling', () => {
 
       // Fast-forward to completion timeout
       act(() => {
-        vi.advanceTimersByTime(DRAG_COMPLETION_TIMEOUT_MS);
+        vi.advanceTimersByTime(
+          DRAG_COMPLETION_TIMEOUT_MS + DRAG_COMPLETION_REVERSE_DELAY_BUDGET_MS,
+        );
       });
 
       // Should broadcast the collected path as paste
