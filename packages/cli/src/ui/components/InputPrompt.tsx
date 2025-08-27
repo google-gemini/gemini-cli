@@ -138,10 +138,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (shellModeActive) {
         shellHistory.addCommandToHistory(submittedValue);
       }
-      onSubmit(submittedValue);
-      // Clear the buffer *after* calling onSubmit to prevent potential re-submission
+      // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
+      onSubmit(submittedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
     },
