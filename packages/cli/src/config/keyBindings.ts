@@ -55,6 +55,7 @@ export enum Command {
   REVERSE_SEARCH = 'reverseSearch',
   SUBMIT_REVERSE_SEARCH = 'submitReverseSearch',
   ACCEPT_SUGGESTION_REVERSE_SEARCH = 'acceptSuggestionReverseSearch',
+  TOGGLE_SHELL_INPUT_FOCUS = 'toggleShellInputFocus',
 }
 
 /**
@@ -180,5 +181,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Note: original logic ONLY checked ctrl=false, ignored meta/shift/paste
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   // Original: key.name === 'tab'
+  // Original: key.name === 'tab'
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
+  [Command.TOGGLE_SHELL_INPUT_FOCUS]: [{ key: 'f', ctrl: true }],
 };

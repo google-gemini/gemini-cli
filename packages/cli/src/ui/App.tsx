@@ -70,6 +70,7 @@ import {
   isProQuotaExceededError,
   isGenericQuotaExceededError,
   UserTierId,
+  ShellExecutionService,
 } from '@google/gemini-cli-core';
 import type { IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { IdeIntegrationNudge } from './IdeIntegrationNudge.js';
@@ -225,6 +226,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [shellInputFocused, setShellInputFocused] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const {
     showWorkspaceMigrationDialog,
     workspaceExtensions,
@@ -489,6 +495,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   // Terminal and UI setup
   const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
+
   const isNarrow = isNarrowWidth(terminalWidth);
   const { stdin, setRawMode } = useStdin();
   const isInitialMount = useRef(true);
@@ -579,6 +586,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
     cancelOngoingRequest,
+    activeShellPtyId,
   } = useGeminiStream(
     config.getGeminiClient(),
     history,
@@ -594,6 +602,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setModelSwitchedFromQuotaError,
     refreshStatic,
     () => cancelHandlerRef.current(),
+    setShellInputFocused,
+    terminalWidth,
+    terminalHeight,
+    shellInputFocused,
+    setCursorPosition,
   );
 
   const pendingHistoryItems = useMemo(
@@ -747,6 +760,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
+      } else if (keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS](key)) {
+        if (activeShellPtyId || shellInputFocused) {
+          setShellInputFocused((prev) => !prev);
+        }
       }
     },
     [
@@ -768,6 +785,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       handleSlashCommand,
       isAuthenticating,
       cancelOngoingRequest,
+      activeShellPtyId,
+      shellInputFocused,
       settings.merged.debugKeystrokeLogging,
     ],
   );
@@ -862,10 +881,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       refreshStatic();
     }, 300);
 
+    config.setTerminalHeight(terminalHeight * 0.5);
+    config.setTerminalWidth(terminalWidth * 0.5);
+
     return () => {
       clearTimeout(handler);
     };
-  }, [terminalWidth, terminalHeight, refreshStatic]);
+  }, [terminalWidth, terminalHeight, refreshStatic, config]);
 
   useEffect(() => {
     if (streamingState === StreamingState.Idle && staticNeedsRefresh) {
@@ -893,6 +915,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const initialPrompt = useMemo(() => config.getQuestion(), [config]);
   const geminiClient = config.getGeminiClient();
+
+  useEffect(() => {
+    if (activeShellPtyId) {
+      ShellExecutionService.resizePty(
+        activeShellPtyId,
+        Math.floor(terminalWidth * 0.5),
+        Math.floor(terminalHeight * 0.5),
+      );
+    }
+  }, [terminalHeight, terminalWidth, activeShellPtyId, geminiClient]);
 
   useEffect(() => {
     if (
@@ -1002,6 +1034,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 isPending={true}
                 config={config}
                 isFocused={!isEditorDialogOpen}
+                activeShellPtyId={activeShellPtyId}
+                shellInputFocused={shellInputFocused}
+                cursorPosition={cursorPosition}
               />
             ))}
             <ShowMoreLines constrainHeight={constrainHeight} />
@@ -1139,23 +1174,24 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             />
           ) : (
             <>
-              <LoadingIndicator
-                thought={
-                  streamingState === StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.disableLoadingPhrases ||
-                  config.getScreenReader()
-                    ? undefined
-                    : thought
-                }
-                currentLoadingPhrase={
-                  config.getAccessibility()?.disableLoadingPhrases ||
-                  config.getScreenReader()
-                    ? undefined
-                    : currentLoadingPhrase
-                }
-                elapsedTime={elapsedTime}
-              />
-
+              {!shellInputFocused && (
+                <LoadingIndicator
+                  thought={
+                    streamingState === StreamingState.WaitingForConfirmation ||
+                    config.getAccessibility()?.disableLoadingPhrases ||
+                    config.getScreenReader()
+                      ? undefined
+                      : thought
+                  }
+                  currentLoadingPhrase={
+                    config.getAccessibility()?.disableLoadingPhrases ||
+                    config.getScreenReader()
+                      ? undefined
+                      : currentLoadingPhrase
+                  }
+                  elapsedTime={elapsedTime}
+                />
+              )}
               {/* Display queued messages below loading indicator */}
               {messageQueue.length > 0 && (
                 <Box flexDirection="column" marginTop={1}>
@@ -1263,6 +1299,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   focus={isFocused}
                   vimHandleInput={vimHandleInput}
                   placeholder={placeholder}
+                  isShellInputFocused={shellInputFocused}
                 />
               )}
             </>

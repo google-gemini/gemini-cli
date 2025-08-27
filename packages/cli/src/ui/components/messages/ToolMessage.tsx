@@ -13,6 +13,11 @@ import { Colors } from '../../colors.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
+import { ShellInputPrompt } from '../ShellInputPrompt.js';
+import { TerminalOutput } from '../TerminalOutput.js';
+import { SHELL_COMMAND_NAME } from '../../constants.js';
+import { theme } from '../../semantic-colors.js';
+import type { Config } from '@google/gemini-cli-core';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -29,6 +34,10 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   terminalWidth: number;
   emphasis?: TextEmphasis;
   renderOutputAsMarkdown?: boolean;
+  activeShellPtyId?: number | null;
+  shellInputFocused?: boolean;
+  config?: Config;
+  cursorPosition?: { x: number; y: number } | null;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -40,7 +49,18 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   terminalWidth,
   emphasis = 'medium',
   renderOutputAsMarkdown = true,
+  activeShellPtyId,
+  shellInputFocused,
+  ptyId,
+  config,
+  cursorPosition,
 }) => {
+  const isThisShellFocused =
+    (name === SHELL_COMMAND_NAME || name === 'Shell') &&
+    status === ToolCallStatus.Executing &&
+    ptyId === activeShellPtyId &&
+    shellInputFocused;
+
   const availableHeight = availableTerminalHeight
     ? Math.max(
         availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
@@ -73,12 +93,21 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           description={description}
           emphasis={emphasis}
         />
+        {isThisShellFocused && (
+          <Box marginLeft={1}>
+            <Text color={theme.text.accent}>[Focused]</Text>
+          </Box>
+        )}
         {emphasis === 'high' && <TrailingIndicator />}
       </Box>
       {resultDisplay && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
           <Box flexDirection="column">
-            {typeof resultDisplay === 'string' && renderOutputAsMarkdown && (
+            {isThisShellFocused &&
+            typeof resultDisplay === 'string' &&
+            cursorPosition ? (
+              <TerminalOutput output={resultDisplay} cursor={cursorPosition} />
+            ) : typeof resultDisplay === 'string' && renderOutputAsMarkdown ? (
               <Box flexDirection="column">
                 <MarkdownDisplay
                   text={resultDisplay}
@@ -87,23 +116,31 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                   terminalWidth={childWidth}
                 />
               </Box>
-            )}
-            {typeof resultDisplay === 'string' && !renderOutputAsMarkdown && (
+            ) : typeof resultDisplay === 'string' && !renderOutputAsMarkdown ? (
               <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
                 <Box>
                   <Text wrap="wrap">{resultDisplay}</Text>
                 </Box>
               </MaxSizedBox>
-            )}
-            {typeof resultDisplay !== 'string' && (
-              <DiffRenderer
-                diffContent={resultDisplay.fileDiff}
-                filename={resultDisplay.fileName}
-                availableTerminalHeight={availableHeight}
-                terminalWidth={childWidth}
-              />
+            ) : (
+              typeof resultDisplay !== 'string' && (
+                <DiffRenderer
+                  diffContent={resultDisplay.fileDiff}
+                  filename={resultDisplay.fileName}
+                  availableTerminalHeight={availableHeight}
+                  terminalWidth={childWidth}
+                />
+              )
             )}
           </Box>
+        </Box>
+      )}
+      {isThisShellFocused && config && (
+        <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
+          <ShellInputPrompt
+            activeShellPtyId={activeShellPtyId ?? null}
+            focus={shellInputFocused}
+          />
         </Box>
       )}
     </Box>

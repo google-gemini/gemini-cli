@@ -9,7 +9,7 @@ import type {
   IndividualToolCallDisplay,
 } from '../types.js';
 import { ToolCallStatus } from '../types.js';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import type {
   Config,
   GeminiClient,
@@ -69,7 +69,12 @@ export const useShellCommandProcessor = (
   onDebugMessage: (message: string) => void,
   config: Config,
   geminiClient: GeminiClient,
+  setShellInputFocused: (value: boolean) => void,
+  terminalWidth?: number,
+  terminalHeight?: number,
+  setCursorPosition?: (position: { x: number; y: number } | null) => void,
 ) => {
+  const [activeShellPtyId, setActiveShellPtyId] = useState<number | null>(null);
   const handleShellCommand = useCallback(
     (rawQuery: PartListUnion, abortSignal: AbortSignal): boolean => {
       if (typeof rawQuery !== 'string' || rawQuery.trim() === '') {
@@ -138,11 +143,17 @@ export const useShellCommandProcessor = (
             commandToExecute,
             targetDir,
             (event) => {
+              let shouldUpdate = false;
               switch (event.type) {
                 case 'data':
                   // Do not process text data if we've already switched to binary mode.
                   if (isBinaryStream) break;
-                  cumulativeStdout += event.chunk;
+                  cumulativeStdout = event.chunk;
+                  if (setCursorPosition) {
+                    setCursorPosition(event.cursor ?? null);
+                  }
+                  // Force an immediate UI update to show the binary detection message.
+                  shouldUpdate = true;
                   break;
                 case 'binary_detected':
                   isBinaryStream = true;
@@ -171,25 +182,48 @@ export const useShellCommandProcessor = (
                 currentDisplayOutput = cumulativeStdout;
               }
 
-              // Throttle pending UI updates to avoid excessive re-renders.
-              if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                setPendingHistoryItem({
-                  type: 'tool_group',
-                  tools: [
-                    {
-                      ...initialToolDisplay,
-                      resultDisplay: currentDisplayOutput,
-                    },
-                  ],
+              // Throttle pending UI updates, but allow forced updates.
+              if (
+                shouldUpdate ||
+                Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS
+              ) {
+                setPendingHistoryItem((prevItem) => {
+                  if (prevItem?.type === 'tool_group') {
+                    return {
+                      ...prevItem,
+                      tools: prevItem.tools.map((tool) =>
+                        tool.callId === callId
+                          ? { ...tool, resultDisplay: currentDisplayOutput }
+                          : tool,
+                      ),
+                    };
+                  }
+                  return prevItem;
                 });
                 lastUpdateTime = Date.now();
               }
             },
             abortSignal,
             config.getShouldUseNodePtyShell(),
+            terminalWidth,
+            terminalHeight,
           );
 
           executionPid = pid;
+          if (pid) {
+            setActiveShellPtyId(pid);
+            setPendingHistoryItem((prevItem) => {
+              if (prevItem?.type === 'tool_group') {
+                return {
+                  ...prevItem,
+                  tools: prevItem.tools.map((tool) =>
+                    tool.callId === callId ? { ...tool, ptyId: pid } : tool,
+                  ),
+                };
+              }
+              return prevItem;
+            });
+          }
 
           result
             .then((result: ShellExecutionResult) => {
@@ -269,6 +303,8 @@ export const useShellCommandProcessor = (
               if (pwdFilePath && fs.existsSync(pwdFilePath)) {
                 fs.unlinkSync(pwdFilePath);
               }
+              setActiveShellPtyId(null);
+              setShellInputFocused(false);
               resolve();
             });
         } catch (err) {
@@ -287,7 +323,8 @@ export const useShellCommandProcessor = (
           if (pwdFilePath && fs.existsSync(pwdFilePath)) {
             fs.unlinkSync(pwdFilePath);
           }
-
+          setActiveShellPtyId(null);
+          setShellInputFocused(false);
           resolve(); // Resolve the promise to unblock `onExec`
         }
       };
@@ -306,8 +343,12 @@ export const useShellCommandProcessor = (
       setPendingHistoryItem,
       onExec,
       geminiClient,
+      setShellInputFocused,
+      terminalHeight,
+      terminalWidth,
+      setCursorPosition,
     ],
   );
 
-  return { handleShellCommand };
+  return { handleShellCommand, activeShellPtyId };
 };
