@@ -344,6 +344,16 @@ export const SETTINGS_SCHEMA = {
     description: 'Paths to core tool definitions.',
     showInDialog: false,
   },
+  allowedTools: {
+    type: 'array',
+    label: 'Allowed Tools',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: undefined as string[] | undefined,
+    description:
+      'A list of tool names that will bypass the confirmation dialog.',
+    showInDialog: false,
+  },
   excludeTools: {
     type: 'array',
     label: 'Exclude Tools',
@@ -560,6 +570,16 @@ export const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: [] as string[],
         description: 'List of disabled extensions.',
+        showInDialog: false,
+      },
+      workspacesWithMigrationNudge: {
+        type: 'array',
+        label: 'Workspaces with Migration Nudge',
+        category: 'Extensions',
+        requiresRestart: false,
+        default: [] as string[],
+        description:
+          'List of workspaces for which the migration nudge has been shown.',
         showInDialog: false,
       },
     },
