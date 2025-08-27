@@ -710,7 +710,7 @@ export class SmartEditTool
   constructor(private readonly config: Config) {
     super(
       SmartEditTool.Name,
-      'Smart Edit',
+      'Edit',
       `Replaces text within a file. Replaces a single occurrence. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${ReadFileTool.Name} tool to examine the file's current content before attempting a text replacement.
       
       The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
