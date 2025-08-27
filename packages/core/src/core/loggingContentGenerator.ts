@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   Content,
   CountTokensParameters,
   CountTokensResponse,
@@ -19,13 +19,13 @@ import {
   ApiResponseEvent,
   ApiErrorEvent,
 } from '../telemetry/types.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import {
   logApiError,
   logApiRequest,
   logApiResponse,
 } from '../telemetry/loggers.js';
-import { ContentGenerator } from './contentGenerator.js';
+import type { ContentGenerator } from './contentGenerator.js';
 import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
 
@@ -149,9 +149,12 @@ export class LoggingContentGenerator implements ContentGenerator {
     userPromptId: string,
   ): AsyncGenerator<GenerateContentResponse> {
     let lastResponse: GenerateContentResponse | undefined;
+    const responses: GenerateContentResponse[] = [];
+
     let lastUsageMetadata: GenerateContentResponseUsageMetadata | undefined;
     try {
       for await (const response of stream) {
+        responses.push(response);
         lastResponse = response;
         if (response.usageMetadata) {
           lastUsageMetadata = response.usageMetadata;
@@ -169,7 +172,7 @@ export class LoggingContentGenerator implements ContentGenerator {
         durationMs,
         userPromptId,
         lastUsageMetadata,
-        JSON.stringify(lastResponse),
+        JSON.stringify(responses),
       );
     }
   }

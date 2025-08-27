@@ -7,13 +7,11 @@
 import { vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useFolderTrust } from './useFolderTrust.js';
-import { LoadedSettings } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
-import {
-  LoadedTrustedFolders,
-  TrustLevel,
-} from '../../config/trustedFolders.js';
-import * as process from 'process';
+import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
+import { TrustLevel } from '../../config/trustedFolders.js';
+import * as process from 'node:process';
 
 import * as trustedFolders from '../../config/trustedFolders.js';
 

@@ -4,28 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import type React from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import { TextBuffer, logicalPosToOffset } from './shared/text-buffer.js';
+import type { TextBuffer } from './shared/text-buffer.js';
+import { logicalPosToOffset } from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
-import { useKeypress, Key } from '../hooks/useKeypress.js';
+import type { Key } from '../hooks/useKeypress.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
-import { CommandContext, SlashCommand } from '../commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
 import {
   clipboardHasImage,
   saveClipboardImage,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
-import * as path from 'path';
+import * as path from 'node:path';
+import { SCREEN_READER_USER_PREFIX } from '../constants.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -481,7 +485,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       if (keyMatchers[Command.END](key)) {
         buffer.move('end');
-        buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
       // Ctrl+C (Clear input)
@@ -688,7 +691,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         >
           {shellModeActive ? (
             reverseSearchActive ? (
-              <Text color={theme.text.link}>(r:) </Text>
+              <Text
+                color={theme.text.link}
+                aria-label={SCREEN_READER_USER_PREFIX}
+              >
+                (r:){' '}
+              </Text>
             ) : (
               '! '
             )

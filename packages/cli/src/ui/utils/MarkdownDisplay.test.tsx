@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MarkdownDisplay } from './MarkdownDisplay.js';
 import { LoadedSettings } from '../../config/settings.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
+import { EOL } from 'node:os';
 
 describe('<MarkdownDisplay />', () => {
   const baseProps = {
@@ -18,6 +19,7 @@ describe('<MarkdownDisplay />', () => {
   };
 
   const mockSettings = new LoadedSettings(
+    { path: '', settings: {} },
     { path: '', settings: {} },
     { path: '', settings: {} },
     { path: '', settings: {} },
@@ -54,7 +56,7 @@ describe('<MarkdownDisplay />', () => {
 ## Header 2
 ### Header 3
 #### Header 4
-`;
+`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay {...baseProps} text={text} />
@@ -64,7 +66,10 @@ describe('<MarkdownDisplay />', () => {
   });
 
   it('renders a fenced code block with a language', () => {
-    const text = '```javascript\nconst x = 1;\nconsole.log(x);\n```';
+    const text = '```javascript\nconst x = 1;\nconsole.log(x);\n```'.replace(
+      /\n/g,
+      EOL,
+    );
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay {...baseProps} text={text} />
@@ -74,7 +79,7 @@ describe('<MarkdownDisplay />', () => {
   });
 
   it('renders a fenced code block without a language', () => {
-    const text = '```\nplain text\n```';
+    const text = '```\nplain text\n```'.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay {...baseProps} text={text} />
@@ -84,7 +89,7 @@ describe('<MarkdownDisplay />', () => {
   });
 
   it('handles unclosed (pending) code blocks', () => {
-    const text = '```typescript\nlet y = 2;';
+    const text = '```typescript\nlet y = 2;'.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay {...baseProps} text={text} isPending={true} />
@@ -98,7 +103,7 @@ describe('<MarkdownDisplay />', () => {
 - item A
 * item B
 + item C
-`;
+`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay {...baseProps} text={text} />
@@ -112,7 +117,7 @@ describe('<MarkdownDisplay />', () => {
 * Level 1
   * Level 2
     * Level 3
-`;
+`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay {...baseProps} text={text} />
@@ -125,7 +130,7 @@ describe('<MarkdownDisplay />', () => {
     const text = `
 1. First item
 2. Second item
-`;
+`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay {...baseProps} text={text} />
@@ -141,7 +146,7 @@ Hello
 World
 ***
 Test
-`;
+`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay {...baseProps} text={text} />
@@ -156,7 +161,7 @@ Test
 |----------|:--------:|
 | Cell 1   | Cell 2   |
 | Cell 3   | Cell 4   |
-`;
+`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay {...baseProps} text={text} />
@@ -170,7 +175,7 @@ Test
 Some text before.
 | A | B |
 |---|
-| 1 | 2 |`;
+| 1 | 2 |`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay {...baseProps} text={text} />
@@ -182,7 +187,7 @@ Some text before.
   it('inserts a single space between paragraphs', () => {
     const text = `Paragraph 1.
 
-Paragraph 2.`;
+Paragraph 2.`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay {...baseProps} text={text} />
@@ -205,7 +210,7 @@ some code
 \`\`\`
 
 Another paragraph.
-`;
+`.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay {...baseProps} text={text} />
@@ -215,8 +220,9 @@ Another paragraph.
   });
 
   it('hides line numbers in code blocks when showLineNumbers is false', () => {
-    const text = '```javascript\nconst x = 1;\n```';
+    const text = '```javascript\nconst x = 1;\n```'.replace(/\n/g, EOL);
     const settings = new LoadedSettings(
+      { path: '', settings: {} },
       { path: '', settings: {} },
       { path: '', settings: { showLineNumbers: false } },
       { path: '', settings: {} },
@@ -234,7 +240,7 @@ Another paragraph.
   });
 
   it('shows line numbers in code blocks by default', () => {
-    const text = '```javascript\nconst x = 1;\n```';
+    const text = '```javascript\nconst x = 1;\n```'.replace(/\n/g, EOL);
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay {...baseProps} text={text} />

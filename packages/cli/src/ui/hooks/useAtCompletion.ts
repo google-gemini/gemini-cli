@@ -5,16 +5,10 @@
  */
 
 import { useEffect, useReducer, useRef } from 'react';
-import {
-  Config,
-  FileSearch,
-  FileSearchFactory,
-  escapePath,
-} from '@google/gemini-cli-core';
-import {
-  Suggestion,
-  MAX_SUGGESTIONS_TO_SHOW,
-} from '../components/SuggestionsDisplay.js';
+import type { Config, FileSearch } from '@google/gemini-cli-core';
+import { FileSearchFactory, escapePath } from '@google/gemini-cli-core';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
+import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
 
 export enum AtCompletionStatus {
   IDLE = 'idle',
@@ -172,6 +166,8 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
           cacheTtl: 30, // 30 seconds
           enableRecursiveFileSearch:
             config?.getEnableRecursiveFileSearch() ?? true,
+          disableFuzzySearch:
+            config?.getFileFilteringDisableFuzzySearch() ?? false,
         });
         await searcher.initialize();
         fileSearch.current = searcher;

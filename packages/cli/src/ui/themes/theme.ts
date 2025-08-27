@@ -5,7 +5,7 @@
  */
 
 import type { CSSProperties } from 'react';
-import { SemanticColors } from './semantic-tokens.js';
+import type { SemanticColors } from './semantic-tokens.js';
 import { resolveColor } from './color-utils.js';
 
 export type ThemeType = 'light' | 'dark' | 'ansi' | 'custom';
@@ -141,6 +141,7 @@ export class Theme {
    * to Ink-compatible color strings (hex or name).
    */
   protected readonly _colorMap: Readonly<Record<string, string>>;
+  readonly semanticColors: SemanticColors;
 
   /**
    * Creates a new Theme instance.
@@ -152,8 +153,37 @@ export class Theme {
     readonly type: ThemeType,
     rawMappings: Record<string, CSSProperties>,
     readonly colors: ColorsTheme,
-    readonly semanticColors: SemanticColors,
+    semanticColors?: SemanticColors,
   ) {
+    this.semanticColors = semanticColors ?? {
+      text: {
+        primary: this.colors.Foreground,
+        secondary: this.colors.Gray,
+        link: this.colors.AccentBlue,
+        accent: this.colors.AccentPurple,
+      },
+      background: {
+        primary: this.colors.Background,
+        diff: {
+          added: this.colors.DiffAdded,
+          removed: this.colors.DiffRemoved,
+        },
+      },
+      border: {
+        default: this.colors.Gray,
+        focused: this.colors.AccentBlue,
+      },
+      ui: {
+        comment: this.colors.Comment,
+        symbol: this.colors.Gray,
+        gradient: this.colors.GradientColors,
+      },
+      status: {
+        error: this.colors.AccentRed,
+        success: this.colors.AccentGreen,
+        warning: this.colors.AccentYellow,
+      },
+    };
     this._colorMap = Object.freeze(this._buildColorMap(rawMappings)); // Build and freeze the map
 
     // Determine the default foreground color

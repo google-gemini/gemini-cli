@@ -6,10 +6,12 @@
 
 import path from 'node:path';
 import picomatch from 'picomatch';
-import { Ignore, loadIgnoreRules } from './ignore.js';
+import type { Ignore } from './ignore.js';
+import { loadIgnoreRules } from './ignore.js';
 import { ResultCache } from './result-cache.js';
 import { crawl } from './crawler.js';
-import { AsyncFzf, FzfResultItem } from 'fzf';
+import type { FzfResultItem } from 'fzf';
+import { AsyncFzf } from 'fzf';
 import { unescapePath } from '../paths.js';
 
 export interface FileSearchOptions {
@@ -20,6 +22,7 @@ export interface FileSearchOptions {
   cache: boolean;
   cacheTtl: number;
   enableRecursiveFileSearch: boolean;
+  disableFuzzySearch: boolean;
   maxDepth?: number;
 }
 
@@ -128,7 +131,7 @@ class RecursiveFileSearch implements FileSearch {
       filteredCandidates = candidates;
     } else {
       let shouldCache = true;
-      if (pattern.includes('*')) {
+      if (pattern.includes('*') || this.options.disableFuzzySearch) {
         filteredCandidates = await filter(candidates, pattern, options.signal);
       } else {
         filteredCandidates = await this.fzf

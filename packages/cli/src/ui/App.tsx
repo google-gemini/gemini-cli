@@ -7,14 +7,20 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   Box,
-  DOMElement,
+  type DOMElement,
   measureElement,
   Static,
   Text,
   useStdin,
   useStdout,
 } from 'ink';
-import { StreamingState, type HistoryItem, MessageType } from './types.js';
+import {
+  StreamingState,
+  type HistoryItem,
+  MessageType,
+  ToolCallStatus,
+  type HistoryItemWithoutId,
+} from './types.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
@@ -41,7 +47,8 @@ import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js
 import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
 import { Colors } from './colors.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
-import { LoadedSettings, SettingScope } from '../config/settings.js';
+import type { LoadedSettings } from '../config/settings.js';
+import { SettingScope } from '../config/settings.js';
 import { Tips } from './components/Tips.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup } from '../utils/cleanup.js';
@@ -50,23 +57,22 @@ import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import process from 'node:process';
+import type { EditorType, Config, IdeContext } from '@google/gemini-cli-core';
 import {
-  getErrorMessage,
-  type Config,
-  getAllGeminiMdFilenames,
   ApprovalMode,
+  getAllGeminiMdFilenames,
   isEditorAvailable,
-  EditorType,
-  FlashFallbackEvent,
-  logFlashFallback,
+  getErrorMessage,
   AuthType,
-  type IdeContext,
+  logFlashFallback,
+  FlashFallbackEvent,
   ideContext,
+  isProQuotaExceededError,
+  isGenericQuotaExceededError,
+  UserTierId,
 } from '@google/gemini-cli-core';
-import {
-  IdeIntegrationNudge,
-  IdeIntegrationNudgeResult,
-} from './IdeIntegrationNudge.js';
+import type { IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
+import { IdeIntegrationNudge } from './IdeIntegrationNudge.js';
 import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
@@ -80,18 +86,14 @@ import { useBracketedPaste } from './hooks/useBracketedPaste.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useVimMode, VimModeProvider } from './contexts/VimModeContext.js';
 import { useVim } from './hooks/vim.js';
-import { useKeypress, Key } from './hooks/useKeypress.js';
+import type { Key } from './hooks/useKeypress.js';
+import { useKeypress } from './hooks/useKeypress.js';
 import { KeypressProvider } from './contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './hooks/useKittyKeyboardProtocol.js';
 import { keyMatchers, Command } from './keyMatchers.js';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { UpdateNotification } from './components/UpdateNotification.js';
-import {
-  isProQuotaExceededError,
-  isGenericQuotaExceededError,
-  UserTierId,
-} from '@google/gemini-cli-core';
-import { UpdateObject } from './utils/updateCheck.js';
+import type { UpdateObject } from './utils/updateCheck.js';
 import ansiEscapes from 'ansi-escapes';
 import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
@@ -101,6 +103,8 @@ import { SettingsDialog } from './components/SettingsDialog.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
+import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
+import { WorkspaceMigrationDialog } from './components/WorkspaceMigrationDialog.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 // Maximum number of queued messages to display in UI to prevent performance issues
@@ -113,12 +117,24 @@ interface AppProps {
   version: string;
 }
 
+function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
+  return pendingHistoryItems.some((item) => {
+    if (item && item.type === 'tool_group') {
+      return item.tools.some(
+        (tool) => ToolCallStatus.Executing === tool.status,
+      );
+    }
+    return false;
+  });
+}
+
 export const AppWrapper = (props: AppProps) => {
   const kittyProtocolStatus = useKittyKeyboardProtocol();
   return (
     <KeypressProvider
       kittyProtocolEnabled={kittyProtocolStatus.enabled}
       config={props.config}
+      debugKeystrokeLogging={props.settings.merged.debugKeystrokeLogging}
     >
       <SessionStatsProvider>
         <VimModeProvider settings={props.settings}>
@@ -209,6 +225,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const {
+    showWorkspaceMigrationDialog,
+    workspaceExtensions,
+    onWorkspaceMigrationDialogOpen,
+    onWorkspaceMigrationDialogClose,
+  } = useWorkspaceMigration(settings);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
@@ -574,6 +596,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     () => cancelHandlerRef.current(),
   );
 
+  const pendingHistoryItems = useMemo(
+    () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
+    [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
+  );
+
   // Message queue for handling input during streaming
   const { messageQueue, addMessage, clearQueue, getQueuedMessagesText } =
     useMessageQueue({
@@ -583,6 +610,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   // Update the cancel handler with message queue support
   cancelHandlerRef.current = useCallback(() => {
+    if (isToolExecuting(pendingHistoryItems)) {
+      buffer.setText(''); // Just clear the prompt
+      return;
+    }
+
     const lastUserMessage = userMessages.at(-1);
     let textToSet = lastUserMessage || '';
 
@@ -596,7 +628,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     if (textToSet) {
       buffer.setText(textToSet);
     }
-  }, [buffer, userMessages, getQueuedMessagesText, clearQueue]);
+  }, [
+    buffer,
+    userMessages,
+    getQueuedMessagesText,
+    clearQueue,
+    pendingHistoryItems,
+  ]);
 
   // Input handling - queue messages for processing
   const handleFinalSubmit = useCallback(
@@ -632,12 +670,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   );
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
-  const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
-  pendingHistoryItems.push(...pendingGeminiHistoryItems);
 
   const { elapsedTime, currentLoadingPhrase } =
     useLoadingIndicator(streamingState);
-  const showAutoAcceptIndicator = useAutoAcceptIndicator({ config });
+  const showAutoAcceptIndicator = useAutoAcceptIndicator({ config, addItem });
 
   const handleExit = useCallback(
     (
@@ -664,6 +700,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const handleGlobalKeypress = useCallback(
     (key: Key) => {
+      // Debug log keystrokes if enabled
+      if (settings.merged.debugKeystrokeLogging) {
+        console.log('[DEBUG] Keystroke:', JSON.stringify(key));
+      }
+
       let enteringConstrainHeightMode = false;
       if (!constrainHeight) {
         enteringConstrainHeightMode = true;
@@ -727,6 +768,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       handleSlashCommand,
       isAuthenticating,
       cancelOngoingRequest,
+      settings.merged.debugKeystrokeLogging,
     ],
   );
 
@@ -923,10 +965,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           key={staticKey}
           items={[
             <Box flexDirection="column" key="header">
-              {!settings.merged.hideBanner && (
+              {!(settings.merged.hideBanner || config.getScreenReader()) && (
                 <Header version={version} nightly={nightly} />
               )}
-              {!settings.merged.hideTips && <Tips config={config} />}
+              {!(settings.merged.hideTips || config.getScreenReader()) && (
+                <Tips config={config} />
+              )}
             </Box>,
             ...history.map((h) => (
               <HistoryItemDisplay
@@ -982,8 +1026,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               ))}
             </Box>
           )}
-
-          {shouldShowIdePrompt && currentIDE ? (
+          {showWorkspaceMigrationDialog ? (
+            <WorkspaceMigrationDialog
+              workspaceExtensions={workspaceExtensions}
+              onOpen={onWorkspaceMigrationDialogOpen}
+              onClose={onWorkspaceMigrationDialogClose}
+            />
+          ) : shouldShowIdePrompt && currentIDE ? (
             <IdeIntegrationNudge
               ide={currentIDE}
               onComplete={handleIdePromptComplete}
@@ -1093,12 +1142,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               <LoadingIndicator
                 thought={
                   streamingState === StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.disableLoadingPhrases
+                  config.getAccessibility()?.disableLoadingPhrases ||
+                  config.getScreenReader()
                     ? undefined
                     : thought
                 }
                 currentLoadingPhrase={
-                  config.getAccessibility()?.disableLoadingPhrases
+                  config.getAccessibility()?.disableLoadingPhrases ||
+                  config.getScreenReader()
                     ? undefined
                     : currentLoadingPhrase
                 }
@@ -1129,8 +1180,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     <Box paddingLeft={2}>
                       <Text dimColor>
                         ... (+
-                        {messageQueue.length -
-                          MAX_DISPLAYED_QUEUED_MESSAGES}{' '}
+                        {messageQueue.length - MAX_DISPLAYED_QUEUED_MESSAGES}
                         more)
                       </Text>
                     </Box>
