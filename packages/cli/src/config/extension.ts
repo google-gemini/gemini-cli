@@ -77,15 +77,51 @@ export class ExtensionStorage {
   }
 }
 
+export function getWorkspaceExtensions(workspaceDir: string): Extension[] {
+  return loadExtensionsFromDir(workspaceDir);
+}
+
+async function copyExtension(
+  source: string,
+  destination: string,
+): Promise<void> {
+  await fs.promises.cp(source, destination, { recursive: true });
+}
+
+export async function performWorkspaceExtensionMigration(
+  extensions: Extension[],
+): Promise<string[]> {
+  const failedInstallNames: string[] = [];
+
+  for (const extension of extensions) {
+    try {
+      const installMetadata: ExtensionInstallMetadata = {
+        source: extension.path,
+        type: 'local',
+      };
+      await installExtension(installMetadata);
+    } catch (_) {
+      failedInstallNames.push(extension.config.name);
+    }
+  }
+  return failedInstallNames;
+}
+
 export function loadExtensions(workspaceDir: string): Extension[] {
-  const allExtensions = [
-    ...loadExtensionsFromDir(workspaceDir),
-    ...loadExtensionsFromDir(os.homedir()),
-  ];
+  const settings = loadSettings(workspaceDir).merged;
+  const disabledExtensions = settings.extensions?.disabled ?? [];
+  const allExtensions = [...loadUserExtensions()];
+
+  if (!settings.extensionManagement) {
+    allExtensions.push(...getWorkspaceExtensions(workspaceDir));
+  }
 
   const uniqueExtensions = new Map<string, Extension>();
   for (const extension of allExtensions) {
-    if (!uniqueExtensions.has(extension.config.name)) {
+    if (
+      !uniqueExtensions.has(extension.config.name) &&
+      !disabledExtensions.includes(extension.config.name)
+    ) {
       uniqueExtensions.set(extension.config.name, extension);
     }
   }
@@ -281,18 +317,6 @@ async function cloneFromGit(
       cause: error,
     });
   }
-}
-
-/**
- * Copies an extension from a source to a destination path.
- * @param source The source path of the extension.
- * @param destination The destination path to copy the extension to.
- */
-async function copyExtension(
-  source: string,
-  destination: string,
-): Promise<void> {
-  await fs.promises.cp(source, destination, { recursive: true });
 }
 
 export async function installExtension(
