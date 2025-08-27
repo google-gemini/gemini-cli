@@ -2033,75 +2033,62 @@ describe('loadCliConfig fileFiltering', () => {
     vi.restoreAllMocks();
   });
 
-  it('should pass disableFuzzySearch from settings to config when true', async () => {
-    const settings: Settings = {
-      fileFiltering: { disableFuzzySearch: true },
-    };
-    const argv = await parseArguments(settings);
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFileFilteringDisableFuzzySearch()).toBe(true);
-  });
+  const testCases: Array<{
+    property: keyof NonNullable<Settings['fileFiltering']>;
+    getter: (config: ServerConfig.Config) => boolean;
+    value: boolean;
+  }> = [
+    {
+      property: 'disableFuzzySearch',
+      getter: (c) => c.getFileFilteringDisableFuzzySearch(),
+      value: true,
+    },
+    {
+      property: 'disableFuzzySearch',
+      getter: (c) => c.getFileFilteringDisableFuzzySearch(),
+      value: false,
+    },
+    {
+      property: 'respectGitIgnore',
+      getter: (c) => c.getFileFilteringRespectGitIgnore(),
+      value: true,
+    },
+    {
+      property: 'respectGitIgnore',
+      getter: (c) => c.getFileFilteringRespectGitIgnore(),
+      value: false,
+    },
+    {
+      property: 'respectGeminiIgnore',
+      getter: (c) => c.getFileFilteringRespectGeminiIgnore(),
+      value: true,
+    },
+    {
+      property: 'respectGeminiIgnore',
+      getter: (c) => c.getFileFilteringRespectGeminiIgnore(),
+      value: false,
+    },
+    {
+      property: 'enableRecursiveFileSearch',
+      getter: (c) => c.getEnableRecursiveFileSearch(),
+      value: true,
+    },
+    {
+      property: 'enableRecursiveFileSearch',
+      getter: (c) => c.getEnableRecursiveFileSearch(),
+      value: false,
+    },
+  ];
 
-  it('should pass disableFuzzySearch from settings to config when false', async () => {
-    const settings: Settings = {
-      fileFiltering: { disableFuzzySearch: false },
-    };
-    const argv = await parseArguments(settings);
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFileFilteringDisableFuzzySearch()).toBe(false);
-  });
-
-  it('should pass respectGitIgnore from settings to config when true', async () => {
-    const settings: Settings = {
-      fileFiltering: { respectGitIgnore: true },
-    };
-    const argv = await parseArguments(settings);
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFileFilteringRespectGitIgnore()).toBe(true);
-  });
-
-  it('should pass respectGitIgnore from settings to config when false', async () => {
-    const settings: Settings = {
-      fileFiltering: { respectGitIgnore: false },
-    };
-    const argv = await parseArguments(settings);
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
-  });
-
-  it('should pass respectGeminiIgnore from settings to config when true', async () => {
-    const settings: Settings = {
-      fileFiltering: { respectGeminiIgnore: true },
-    };
-    const argv = await parseArguments(settings);
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFileFilteringRespectGeminiIgnore()).toBe(true);
-  });
-
-  it('should pass respectGeminiIgnore from settings to config when false', async () => {
-    const settings: Settings = {
-      fileFiltering: { respectGeminiIgnore: false },
-    };
-    const argv = await parseArguments(settings);
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFileFilteringRespectGeminiIgnore()).toBe(false);
-  });
-
-  it('should pass enableRecursiveFileSearch from settings to config when true', async () => {
-    const settings: Settings = {
-      fileFiltering: { enableRecursiveFileSearch: true },
-    };
-    const argv = await parseArguments(settings);
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getEnableRecursiveFileSearch()).toBe(true);
-  });
-
-  it('should pass enableRecursiveFileSearch from settings to config when false', async () => {
-    const settings: Settings = {
-      fileFiltering: { enableRecursiveFileSearch: false },
-    };
-    const argv = await parseArguments(settings);
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getEnableRecursiveFileSearch()).toBe(false);
-  });
+  it.each(testCases)(
+    'should pass $property from settings to config when $value',
+    async ({ property, getter, value }) => {
+      const settings: Settings = {
+        fileFiltering: { [property]: value },
+      };
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(getter(config)).toBe(value);
+    },
+  );
 });
