@@ -15,7 +15,7 @@ import {
   startGlobalMemoryMonitoring,
   stopGlobalMemoryMonitoring,
 } from './memory-monitor.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { recordMemoryUsage, isPerformanceMonitoringActive } from './metrics.js';
 
 // Mock dependencies

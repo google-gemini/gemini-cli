@@ -5,8 +5,8 @@
  */
 
 import { useState, useRef, useCallback } from 'react';
-import { HistoryItem } from '../types.js';
-import { Config } from '@google/gemini-cli-core';
+import type { HistoryItem } from '../types.js';
+import type { Config } from '@google/gemini-cli-core';
 import { useActivityRecorder } from './useActivityMonitoring.js';
 
 // Type for the updater function passed to updateHistoryItem
