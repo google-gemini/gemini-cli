@@ -1576,28 +1576,52 @@ describe('App UI', () => {
   describe('Ctrl+C behavior', () => {
     it('should call cancel but only clear the prompt when a tool is executing', async () => {
       const mockCancel = vi.fn();
+      let onCancelSubmitCallback = () => {};
 
       // Simulate a tool in the "Executing" state.
-      vi.mocked(useGeminiStream).mockReturnValue({
-        streamingState: StreamingState.Responding,
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [
-          {
-            type: 'tool_group',
-            tools: [
+      vi.mocked(useGeminiStream).mockImplementation(
+        (
+          _client,
+          _history,
+          _addItem,
+          _config,
+          _onDebugMessage,
+          _handleSlashCommand,
+          _shellModeActive,
+          _getPreferredEditor,
+          _onAuthError,
+          _performMemoryRefresh,
+          _modelSwitchedFromQuotaError,
+          _setModelSwitchedFromQuotaError,
+          _onEditorClose,
+          onCancelSubmit, // Capture the cancel callback from App.tsx
+        ) => {
+          onCancelSubmitCallback = onCancelSubmit;
+          return {
+            streamingState: StreamingState.Responding,
+            submitQuery: vi.fn(),
+            initError: null,
+            pendingHistoryItems: [
               {
-                name: 'test_tool',
-                status: 'Executing',
-                result: '',
-                args: {},
+                type: 'tool_group',
+                tools: [
+                  {
+                    name: 'test_tool',
+                    status: 'Executing',
+                    result: '',
+                    args: {},
+                  },
+                ],
               },
             ],
-          },
-        ],
-        thought: null,
-        cancelOngoingRequest: mockCancel,
-      });
+            thought: null,
+            cancelOngoingRequest: () => {
+              mockCancel();
+              onCancelSubmitCallback(); // <--- This is the key change
+            },
+          };
+        },
+      );
 
       const { stdin, lastFrame, unmount } = renderWithProviders(
         <App
@@ -1624,7 +1648,9 @@ describe('App UI', () => {
 
       // The prompt should now be empty as a result of the cancellation handler's logic.
       // We can't directly test the buffer's state, but we can see the rendered output.
-      expect(lastFrame()).not.toContain('some text');
+      await waitFor(() => {
+        expect(lastFrame()).not.toContain('some text');
+      });
     });
   });
 });

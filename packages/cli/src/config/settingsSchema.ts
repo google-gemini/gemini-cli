@@ -572,6 +572,16 @@ export const SETTINGS_SCHEMA = {
         description: 'List of disabled extensions.',
         showInDialog: false,
       },
+      workspacesWithMigrationNudge: {
+        type: 'array',
+        label: 'Workspaces with Migration Nudge',
+        category: 'Extensions',
+        requiresRestart: false,
+        default: [] as string[],
+        description:
+          'List of workspaces for which the migration nudge has been shown.',
+        showInDialog: false,
+      },
     },
   },
   skipNextSpeakerCheck: {
