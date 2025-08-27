@@ -84,6 +84,7 @@ import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import {
   SlashCommandStatus,
+  ToolConfirmationOutcome,
   makeFakeConfig,
   ToolConfirmationOutcome,
   type IdeClient,

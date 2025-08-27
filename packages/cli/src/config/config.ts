@@ -70,6 +70,7 @@ export interface CliArgs {
   telemetryLogPrompts: boolean | undefined;
   telemetryOutfile: string | undefined;
   allowedMcpServerNames: string[] | undefined;
+  allowedTools: string[] | undefined;
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
@@ -188,6 +189,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'array',
           string: true,
           description: 'Allowed MCP server names',
+        })
+        .option('allowed-tools', {
+          type: 'array',
+          string: true,
+          description: 'Tools that are allowed to run without confirmation',
         })
         .option('extensions', {
           alias: 'e',
@@ -489,6 +495,7 @@ export async function loadCliConfig(
     question,
     fullContext: argv.allFiles || false,
     coreTools: settings.coreTools || undefined,
+    allowedTools: argv.allowedTools || settings.allowedTools || undefined,
     excludeTools,
     toolDiscoveryCommand: settings.toolDiscoveryCommand,
     toolCallCommand: settings.toolCallCommand,
