@@ -955,7 +955,7 @@ describe('mapToDisplay', () => {
       status: 'error',
       extraProps: {
         tool: baseTool,
-        invocation: baseInvocation,
+        // invocation: baseInvocation,
         response: {
           ...baseResponse,
           error: new Error('Tool execution failed'),
@@ -965,7 +965,7 @@ describe('mapToDisplay', () => {
       expectedStatus: ToolCallStatus.Error,
       expectedResultDisplay: 'Execution failed display',
       expectedName: baseTool.displayName, // Changed from baseTool.name
-      expectedDescription: baseInvocation.getDescription(),
+      expectedDescription: JSON.stringify(baseRequest.args),
     },
     {
       name: 'cancelled',
