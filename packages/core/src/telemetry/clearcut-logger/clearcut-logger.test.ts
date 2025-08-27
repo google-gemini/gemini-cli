@@ -256,7 +256,7 @@ describe('ClearcutLogger', () => {
           },
           {
             gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
-            value: expect.any(String),
+            value: process.platform,
           },
         ]),
       );
