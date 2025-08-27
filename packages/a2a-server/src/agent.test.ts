@@ -191,7 +191,7 @@ describe('E2E Tests', () => {
 
     const mockTool = new MockTool({
       name: 'test-tool',
-      shouldConfirmExecute: mockToolConfirmationFn,
+      shouldConfirmExecute: vi.fn(mockToolConfirmationFn),
     });
 
     getToolRegistrySpy.mockReturnValue({
@@ -284,12 +284,12 @@ describe('E2E Tests', () => {
     const mockTool1 = new MockTool({
       name: 'test-tool-1',
       displayName: 'Test Tool 1',
-      shouldConfirmExecute: mockToolConfirmationFn,
+      shouldConfirmExecute: vi.fn(mockToolConfirmationFn),
     });
     const mockTool2 = new MockTool({
       name: 'test-tool-2',
       displayName: 'Test Tool 2',
-      shouldConfirmExecute: mockToolConfirmationFn,
+      shouldConfirmExecute: vi.fn(mockToolConfirmationFn),
     });
 
     getToolRegistrySpy.mockReturnValue({
@@ -400,10 +400,10 @@ describe('E2E Tests', () => {
     const mockTool = new MockTool({
       name: 'test-tool-no-approval',
       displayName: 'Test Tool No Approval',
-    });
-    mockTool.execute.mockResolvedValue({
-      llmContent: 'Tool executed successfully.',
-      returnDisplay: 'Tool executed successfully.',
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'Tool executed successfully.',
+        returnDisplay: 'Tool executed successfully.',
+      }),
     });
 
     getToolRegistrySpy.mockReturnValue({
@@ -531,10 +531,10 @@ describe('E2E Tests', () => {
     const mockTool = new MockTool({
       name: 'test-tool-yolo',
       displayName: 'Test Tool YOLO',
-    });
-    mockTool.execute.mockResolvedValue({
-      llmContent: 'Tool executed successfully.',
-      returnDisplay: 'Tool executed successfully.',
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'Tool executed successfully.',
+        returnDisplay: 'Tool executed successfully.',
+      }),
     });
 
     getToolRegistrySpy.mockReturnValue({

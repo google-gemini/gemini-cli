@@ -22,7 +22,10 @@ type MockToolOptions = {
   description?: string;
   canUpdateOutput?: boolean;
   isOutputMarkdown?: boolean;
-  shouldConfirmExecute?: () => Promise<ToolCallConfirmationDetails | false>;
+  shouldConfirmExecute?: (
+    ...args: unknown[]
+  ) => Promise<ToolCallConfirmationDetails | false>;
+  execute?: (...args: unknown[]) => Promise<ToolResult>;
   params?: object;
 };
 
@@ -70,8 +73,10 @@ export class MockTool extends BaseDeclarativeTool<
   { [key: string]: unknown },
   ToolResult
 > {
-  execute = vi.fn();
-  shouldConfirmExecute = vi.fn();
+  execute: (...args: unknown[]) => Promise<ToolResult>;
+  shouldConfirmExecute: (
+    ...args: unknown[]
+  ) => Promise<ToolCallConfirmationDetails | false>;
 
   constructor(options: MockToolOptions) {
     super(
@@ -85,11 +90,15 @@ export class MockTool extends BaseDeclarativeTool<
     );
 
     if (options.shouldConfirmExecute) {
-      this.shouldConfirmExecute.mockImplementation(
-        options.shouldConfirmExecute,
-      );
+      this.shouldConfirmExecute = options.shouldConfirmExecute;
     } else {
-      this.shouldConfirmExecute.mockResolvedValue(false);
+      this.shouldConfirmExecute = vi.fn().mockResolvedValue(false);
+    }
+
+    if (options.execute) {
+      this.execute = options.execute;
+    } else {
+      this.execute = vi.fn();
     }
   }
 

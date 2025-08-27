@@ -75,18 +75,6 @@ const mockToolRequiresConfirmation = new MockTool({
   name: 'mockToolRequiresConfirmation',
   displayName: 'Mock Tool Requires Confirmation',
 });
-mockToolRequiresConfirmation.shouldConfirmExecute.mockImplementation(
-  async (): Promise<ToolCallConfirmationDetails | false> => ({
-    type: 'edit',
-    title: 'Mock Tool Requires Confirmation',
-    onConfirm: mockOnUserConfirmForToolConfirmation,
-    filePath: 'mock',
-    fileName: 'mockToolRequiresConfirmation.ts',
-    fileDiff: 'Mock tool requires confirmation',
-    originalContent: 'Original content',
-    newContent: 'New content',
-  }),
-);
 
 describe('useReactToolScheduler in YOLO Mode', () => {
   let onComplete: Mock;
@@ -650,19 +638,23 @@ describe('useReactToolScheduler', () => {
   });
 
   it('should schedule and execute multiple tool calls', async () => {
-    const tool1 = new MockTool({ name: 'tool1', displayName: 'Tool 1' });
-    tool1.execute.mockResolvedValue({
-      llmContent: 'Output 1',
-      returnDisplay: 'Display 1',
-    } as ToolResult);
-    tool1.shouldConfirmExecute.mockResolvedValue(null);
+    const tool1 = new MockTool({
+      name: 'tool1',
+      displayName: 'Tool 1',
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'Output 1',
+        returnDisplay: 'Display 1',
+      } as ToolResult),
+    });
 
-    const tool2 = new MockTool({ name: 'tool2', displayName: 'Tool 2' });
-    tool2.execute.mockResolvedValue({
-      llmContent: 'Output 2',
-      returnDisplay: 'Display 2',
-    } as ToolResult);
-    tool2.shouldConfirmExecute.mockResolvedValue(null);
+    const tool2 = new MockTool({
+      name: 'tool2',
+      displayName: 'Tool 2',
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'Output 2',
+        returnDisplay: 'Display 2',
+      } as ToolResult),
+    });
 
     mockToolRegistry.getTool.mockImplementation((name) => {
       if (name === 'tool1') return tool1;
@@ -806,6 +798,8 @@ describe('mapToDisplay', () => {
   const baseTool = new MockTool({
     name: 'testTool',
     displayName: 'Test Tool Display',
+    execute: vi.fn(),
+    shouldConfirmExecute: vi.fn(),
   });
 
   const baseResponse: ToolCallResponseInfo = {
@@ -1039,6 +1033,8 @@ describe('mapToDisplay', () => {
       name: baseTool.name,
       displayName: baseTool.displayName,
       isOutputMarkdown: true,
+      execute: vi.fn(),
+      shouldConfirmExecute: vi.fn(),
     });
     const toolCall2: ToolCall = {
       request: { ...baseRequest, callId: 'call2' },
