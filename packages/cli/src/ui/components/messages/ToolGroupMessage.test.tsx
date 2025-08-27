@@ -13,6 +13,7 @@ import type {
   Config,
   ToolCallConfirmationDetails,
 } from '@google/gemini-cli-core';
+import { TOOL_STATUS } from '../../constants.js';
 
 // Mock child components to isolate ToolGroupMessage behavior
 vi.mock('./ToolMessage.js', () => ({
@@ -29,14 +30,16 @@ vi.mock('./ToolMessage.js', () => ({
     status: ToolCallStatus;
     emphasis: string;
   }) {
-    const statusSymbol = {
-      [ToolCallStatus.Success]: '✓',
-      [ToolCallStatus.Pending]: 'o',
-      [ToolCallStatus.Executing]: '⊷',
-      [ToolCallStatus.Confirming]: '?',
-      [ToolCallStatus.Canceled]: '-',
-      [ToolCallStatus.Error]: 'x',
-    }[status];
+    // Use the same constants as the real component
+    const statusSymbolMap: Record<ToolCallStatus, string> = {
+      [ToolCallStatus.Success]: TOOL_STATUS.SUCCESS,
+      [ToolCallStatus.Pending]: TOOL_STATUS.PENDING,
+      [ToolCallStatus.Executing]: TOOL_STATUS.EXECUTING,
+      [ToolCallStatus.Confirming]: TOOL_STATUS.CONFIRMING,
+      [ToolCallStatus.Canceled]: TOOL_STATUS.CANCELED,
+      [ToolCallStatus.Error]: TOOL_STATUS.ERROR,
+    };
+    const statusSymbol = statusSymbolMap[status] || '?';
     return (
       <Text>
         MockTool[{callId}]: {statusSymbol} {name} - {description} ({emphasis})
