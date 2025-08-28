@@ -47,7 +47,9 @@ The following code can be added to your workspace (`.gemini/settings.json`) or u
     "enabled": true,
     "target": "gcp"
   },
-  "sandbox": false
+  "tools": {
+    "sandbox": false
+  }
 }
 ```
 

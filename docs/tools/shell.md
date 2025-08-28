@@ -66,16 +66,16 @@ When `run_shell_command` executes a command, it sets the `GEMINI_CLI=1` environm
 
 ## Command Restrictions
 
-You can restrict the commands that can be executed by the `run_shell_command` tool by using the `coreTools` and `excludeTools` settings in your configuration file.
+You can restrict the commands that can be executed by the `run_shell_command` tool by using the `tools.core` and `tools.exclude` settings in your configuration file.
 
-- `coreTools`: To restrict `run_shell_command` to a specific set of commands, add entries to the `coreTools` list in the format `run_shell_command(<command>)`. For example, `"coreTools": ["run_shell_command(git)"]` will only allow `git` commands. Including the generic `run_shell_command` acts as a wildcard, allowing any command not explicitly blocked.
-- `excludeTools`: To block specific commands, add entries to the `excludeTools` list in the format `run_shell_command(<command>)`. For example, `"excludeTools": ["run_shell_command(rm)"]` will block `rm` commands.
+- `tools.core`: To restrict `run_shell_command` to a specific set of commands, add entries to the `core` list under the `tools` category in the format `run_shell_command(<command>)`. For example, `"tools": {"core": ["run_shell_command(git)"]}` will only allow `git` commands. Including the generic `run_shell_command` acts as a wildcard, allowing any command not explicitly blocked.
+- `tools.exclude`: To block specific commands, add entries to the `exclude` list under the `tools` category in the format `run_shell_command(<command>)`. For example, `"tools": {"exclude": ["run_shell_command(rm)"]}` will block `rm` commands.
 
 The validation logic is designed to be secure and flexible:
 
 1.  **Command Chaining Disabled**: The tool automatically splits commands chained with `&&`, `||`, or `;` and validates each part separately. If any part of the chain is disallowed, the entire command is blocked.
 2.  **Prefix Matching**: The tool uses prefix matching. For example, if you allow `git`, you can run `git status` or `git log`.
-3.  **Blocklist Precedence**: The `excludeTools` list is always checked first. If a command matches a blocked prefix, it will be denied, even if it also matches an allowed prefix in `coreTools`.
+3.  **Blocklist Precedence**: The `tools.exclude` list is always checked first. If a command matches a blocked prefix, it will be denied, even if it also matches an allowed prefix in `tools.core`.
 
 ### Command Restriction Examples
 
@@ -85,7 +85,9 @@ To allow only `git` and `npm` commands, and block all others:
 
 ```json
 {
-  "coreTools": ["run_shell_command(git)", "run_shell_command(npm)"]
+  "tools": {
+    "core": ["run_shell_command(git)", "run_shell_command(npm)"]
+  }
 }
 ```
 
@@ -99,8 +101,10 @@ To block `rm` and allow all other commands:
 
 ```json
 {
-  "coreTools": ["run_shell_command"],
-  "excludeTools": ["run_shell_command(rm)"]
+  "tools": {
+    "core": ["run_shell_command"],
+    "exclude": ["run_shell_command(rm)"]
+  }
 }
 ```
 
@@ -110,12 +114,14 @@ To block `rm` and allow all other commands:
 
 **Blocklist takes precedence**
 
-If a command prefix is in both `coreTools` and `excludeTools`, it will be blocked.
+If a command prefix is in both `tools.core` and `tools.exclude`, it will be blocked.
 
 ```json
 {
-  "coreTools": ["run_shell_command(git)"],
-  "excludeTools": ["run_shell_command(git push)"]
+  "tools": {
+    "core": ["run_shell_command(git)"],
+    "exclude": ["run_shell_command(git push)"]
+  }
 }
 ```
 
@@ -124,11 +130,13 @@ If a command prefix is in both `coreTools` and `excludeTools`, it will be blocke
 
 **Block all shell commands**
 
-To block all shell commands, add the `run_shell_command` wildcard to `excludeTools`:
+To block all shell commands, add the `run_shell_command` wildcard to `tools.exclude`:
 
 ```json
 {
-  "excludeTools": ["run_shell_command"]
+  "tools": {
+    "exclude": ["run_shell_command"]
+  }
 }
 ```
 
