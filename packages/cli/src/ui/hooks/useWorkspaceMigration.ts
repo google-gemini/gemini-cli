@@ -20,7 +20,7 @@ export function useWorkspaceMigration(settings: LoadedSettings) {
   );
 
   useEffect(() => {
-    if (!settings.merged.feature?.extensionManagement) {
+    if (!settings.merged.experimental?.extensionManagement) {
       return;
     }
     const cwd = process.cwd();
@@ -35,7 +35,7 @@ export function useWorkspaceMigration(settings: LoadedSettings) {
     }
   }, [
     settings.merged.extensions,
-    settings.merged.feature?.extensionManagement,
+    settings.merged.experimental?.extensionManagement,
   ]);
 
   const onWorkspaceMigrationDialogOpen = () => {

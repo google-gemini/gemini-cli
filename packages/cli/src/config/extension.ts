@@ -112,7 +112,7 @@ export function loadExtensions(workspaceDir: string): Extension[] {
   const disabledExtensions = settings.extensions?.disabled ?? [];
   const allExtensions = [...loadUserExtensions()];
 
-  if (!settings.feature?.extensionManagement) {
+  if (!settings.experimental?.extensionManagement) {
     allExtensions.push(...getWorkspaceExtensions(workspaceDir));
   }
 

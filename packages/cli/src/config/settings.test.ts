@@ -1834,56 +1834,6 @@ describe('Settings Loading and Merging', () => {
     });
   });
 
-  describe('LoadedSettings class', () => {
-    it('setValue should update the correct scope and recompute merged settings', () => {
-      (mockFsExistsSync as Mock).mockReturnValue(false);
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-
-      vi.mocked(fs.writeFileSync).mockImplementation(() => {});
-      // mkdirSync is mocked in beforeEach to return undefined, which is fine for void usage
-
-      loadedSettings.setValue(SettingScope.User, 'ui.theme', 'matrix');
-      expect(loadedSettings.user.settings.ui?.theme).toBe('matrix');
-      expect(loadedSettings.merged.ui?.theme).toBe('matrix');
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
-        USER_SETTINGS_PATH,
-        JSON.stringify({ ui: { theme: 'matrix' } }, null, 2),
-        'utf-8',
-      );
-
-      loadedSettings.setValue(
-        SettingScope.Workspace,
-        'context.fileName',
-        'MY_AGENTS.md',
-      );
-      expect(loadedSettings.workspace.settings.context?.fileName).toBe(
-        'MY_AGENTS.md',
-      );
-      expect(loadedSettings.merged.context?.fileName).toBe('MY_AGENTS.md');
-      expect(loadedSettings.merged.ui?.theme).toBe('matrix'); // User setting should still be there
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
-        MOCK_WORKSPACE_SETTINGS_PATH,
-        JSON.stringify({ context: { fileName: 'MY_AGENTS.md' } }, null, 2),
-        'utf-8',
-      );
-
-      // System theme overrides user and workspace themes
-      loadedSettings.setValue(SettingScope.System, 'ui.theme', 'ocean');
-
-      expect(loadedSettings.system.settings.ui?.theme).toBe('ocean');
-      expect(loadedSettings.merged.ui?.theme).toBe('ocean');
-
-      // SystemDefaults theme is overridden by user, workspace, and system themes
-      loadedSettings.setValue(
-        SettingScope.SystemDefaults,
-        'ui.theme',
-        'default',
-      );
-      expect(loadedSettings.systemDefaults.settings.ui?.theme).toBe('default');
-      expect(loadedSettings.merged.ui?.theme).toBe('ocean');
-    });
-  });
-
   describe('excludedProjectEnvVars integration', () => {
     const originalEnv = { ...process.env };
 

@@ -28,6 +28,8 @@ export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
+const MIGRATE_V2_OVERWRITE = false;
+
 // As defined in spec.md
 const MIGRATION_MAP: Record<string, string> = {
   preferredEditor: 'general.preferredEditor',
@@ -132,8 +134,6 @@ export interface SettingsFile {
   settings: Settings;
   path: string;
 }
-
-const MIGRATE_V2_OVERWRITE = true;
 
 function setNestedProperty(
   obj: Record<string, unknown>,
@@ -456,7 +456,7 @@ export class LoadedSettings {
     const settingsFile = this.forScope(scope);
     setNestedProperty(settingsFile.settings, key, value);
     this._merged = this.computeMergedSettings();
-    saveSettings(settingsFile, this.migratedInMemorScopes.has(scope));
+    saveSettings(settingsFile);
   }
 }
 
@@ -783,10 +783,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   return loadedSettings;
 }
 
-export function saveSettings(
-  settingsFile: SettingsFile,
-  wasMigratedInMem?: boolean,
-): void {
+export function saveSettings(settingsFile: SettingsFile): void {
   try {
     // Ensure the directory exists
     const dirPath = path.dirname(settingsFile.path);
@@ -795,7 +792,7 @@ export function saveSettings(
     }
 
     let settingsToSave = settingsFile.settings;
-    if (wasMigratedInMem && !MIGRATE_V2_OVERWRITE) {
+    if (!MIGRATE_V2_OVERWRITE) {
       settingsToSave = migrateSettingsToV1(
         settingsToSave as Record<string, unknown>,
       ) as Settings;

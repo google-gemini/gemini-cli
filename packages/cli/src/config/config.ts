@@ -244,7 +244,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     // Register MCP subcommands
     .command(mcpCommand);
 
-  if (settings?.feature?.extensionManagement ?? false) {
+  if (settings?.experimental?.extensionManagement ?? false) {
     yargsInstance.command(extensionsCommand);
   }
 

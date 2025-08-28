@@ -723,19 +723,19 @@ export const SETTINGS_SCHEMA = {
     },
   },
 
-  feature: {
+  experimental: {
     type: 'object',
-    label: 'Feature Flag',
-    category: 'Feature Flag',
+    label: 'Experimental',
+    category: 'Experimental',
     requiresRestart: true,
     default: {},
-    description: 'Feature flag settings to enable early features',
+    description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
       extensionManagement: {
         type: 'boolean',
         label: 'Extension Management',
-        category: 'Feature Flag',
+        category: 'Experimental',
         requiresRestart: true,
         default: false,
         description: 'Enable extension management features.',
