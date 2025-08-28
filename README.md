@@ -108,7 +108,7 @@ Choose the authentication method that best fits your needs:
 
 ### Option 1: OAuth login (Using your Google Account)
 
-**✨ Best for:** Individual developers as well as anyone who has a Gemini Code Assist License. (see [quota limits and terms of service](https://cloud.google.com/gemini/docs/quotas) for details)
+**✨ Best for:** Individual developers as well as anyone who has a Gemini Cloud Assist API License. (see [quota limits and terms of service](https://cloud.google.com/gemini/docs/quotas) for details)
 
 **Benefits:**
 
