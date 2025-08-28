@@ -17,8 +17,11 @@ const mockPrompt = {
   description: 'A test prompt.',
   serverName: 'test-server',
   arguments: [
-    { name: 'name', required: true, description: 'The user\'s name.' },
-    { name: 'age', required: false, description: 'The user\'s age.' },
+    { name: 'name', required: true, description: 'The animal\'s name.' },
+    { name: 'age', required: true, description: 'The animal\'s age.' },
+    { name: 'species', required: true, description: 'The animal\'s species.' },
+    { name: 'enclosure', required: false, description: 'The animal\'s enclosure.' },
+    { name: 'trail', required: false, description: 'The animal\'s trail.' },
   ],
   invoke: vi.fn().mockResolvedValue({
     messages: [{ content: { text: 'Hello, world!' } }],
@@ -240,7 +243,13 @@ describe('McpPromptLoader', () => {
         const completion = commands[0].completion!;
         const context = {} as any;
         const suggestions = await completion(context, '');
-        expect(suggestions).toEqual(['--name=""', '--age=""']);
+        expect(suggestions).toEqual([
+          '--name=""',
+          '--age=""',
+          '--species=""',
+          '--enclosure=""',
+          '--trail=""'
+        ]);
       });
 
       it('should suggest remaining arguments when some are present', async () => {
@@ -248,8 +257,12 @@ describe('McpPromptLoader', () => {
         const commands = await loader.loadCommands(new AbortController().signal);
         const completion = commands[0].completion!;
         const context = {} as any;
-        const suggestions = await completion(context, '--name="test"');
-        expect(suggestions).toEqual(['--age=""']);
+        const suggestions = await completion(context, '--name="test-name" --age="6"');
+        expect(suggestions).toEqual([
+          '--species=""',
+          '--enclosure=""',
+          '--trail=""'
+        ]);
       });
 
       it('should suggest no arguments when all are present', async () => {
@@ -259,7 +272,7 @@ describe('McpPromptLoader', () => {
         const context = {} as any;
         const suggestions = await completion(
           context,
-          '--name="test" --age="123"',
+          '--name="test-name" --age="6" --species="tiger", --enclosure="Tiger Den" --trail="Jungle"',
         );
         expect(suggestions).toEqual([]);
       });
