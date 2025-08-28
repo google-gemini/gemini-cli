@@ -223,5 +223,59 @@ describe('McpPromptLoader', () => {
       const commands = await loader.loadCommands(new AbortController().signal);
       expect(commands).toEqual([]);
     });
+
+    describe('completion', () => {
+      it('should suggest no arguments when using positional arguments', async () => {
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(new AbortController().signal);
+        const completion = commands[0].completion!;
+        const context = {} as any;
+        const suggestions = await completion(context, 'test-name');
+        expect(suggestions).toEqual([]);
+      });
+
+      it('should suggest all arguments when none are present', async () => {
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(new AbortController().signal);
+        const completion = commands[0].completion!;
+        const context = {} as any;
+        const suggestions = await completion(context, '');
+        expect(suggestions).toEqual(['--name=""', '--age=""']);
+      });
+
+      it('should suggest remaining arguments when some are present', async () => {
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(new AbortController().signal);
+        const completion = commands[0].completion!;
+        const context = {} as any;
+        const suggestions = await completion(context, '--name="test"');
+        expect(suggestions).toEqual(['--age=""']);
+      });
+
+      it('should suggest no arguments when all are present', async () => {
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(new AbortController().signal);
+        const completion = commands[0].completion!;
+        const context = {} as any;
+        const suggestions = await completion(
+          context,
+          '--name="test" --age="123"',
+        );
+        expect(suggestions).toEqual([]);
+      });
+
+      it('should suggest nothing for prompts with no arguments', async () => {
+        // Temporarily override the mock to return a prompt with no args
+        vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([
+          { ...mockPrompt, arguments: [] },
+        ]);
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(new AbortController().signal);
+        const completion = commands[0].completion!;
+        const context = {} as any;
+        const suggestions = await completion(context, '');
+        expect(suggestions).toEqual([]);
+      });
+    });
   });
 });

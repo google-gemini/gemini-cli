@@ -146,15 +146,28 @@ export class McpPromptLoader implements ICommandLoader {
               return [];
             }
 
-            const suggestions: string[] = [];
             const usedArgNames = new Set(
               (partialArg.match(/--([^=]+)/g) || []).map((s) => s.substring(2)),
             );
 
-            for (const arg of prompt.arguments) {
-              if (!usedArgNames.has(arg.name)) {
-                suggestions.push(`--${arg.name}=""`);
-              }
+            const namedArgRegex = /--([^=]+)=(?:"((?:\\.|[^"\\])*)"|([^ ]+))/g;
+            const positionalArgsString = partialArg
+              .replace(namedArgRegex, '')
+              .trim();
+
+            const positionalArgRegex = /(?:"((?:\\.|[^"\\])*)"|([^ ]+))/g;
+            const positionalArgCount =
+              (positionalArgsString.match(positionalArgRegex) || []).length;
+
+            const availableArgs = prompt.arguments.filter(
+              (arg) => !usedArgNames.has(arg.name),
+            );
+
+            const remainingArgs = availableArgs.slice(positionalArgCount);
+
+            const suggestions: string[] = [];
+            for (const arg of remainingArgs) {
+              suggestions.push(`--${arg.name}=""`);
             }
 
             return suggestions;
