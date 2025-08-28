@@ -19,6 +19,9 @@ describe('useReverseSearchCompletion', () => {
       viewport: { width: 80, height: 20 },
       isValidPath: () => false,
       onChange: () => {},
+      onLargePaste: () => {},
+      largePasteThresholdChars: 1000,
+      largePasteThresholdLines: 50,
     });
   }
 

@@ -111,6 +111,8 @@ import { WorkspaceMigrationDialog } from './components/WorkspaceMigrationDialog.
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 // Maximum number of queued messages to display in UI to prevent performance issues
 const MAX_DISPLAYED_QUEUED_MESSAGES = 3;
+const LARGE_PASTE_THRESHOLD_CHARS = 1000;
+const LARGE_PASTE_THRESHOLD_LINES = 50;
 
 interface AppProps {
   config: Config;
@@ -152,6 +154,10 @@ export const AppWrapper = (props: AppProps) => {
 const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const isFocused = useFocus();
   useBracketedPaste();
+  const [pastes, setPastes] = useState<string[]>([]);
+  const handleLargePaste = (pastedText: string) => {
+    setPastes((prevPastes) => [...prevPastes, pastedText]);
+  };
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
   const { stdout } = useStdout();
   const nightly = version.includes('nightly');
@@ -620,6 +626,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setRawMode,
     isValidPath,
     shellModeActive,
+    onLargePaste: handleLargePaste,
+    largePasteThresholdChars: LARGE_PASTE_THRESHOLD_CHARS,
+    largePasteThresholdLines: LARGE_PASTE_THRESHOLD_LINES,
   });
 
   const [userMessages, setUserMessages] = useState<string[]>([]);
@@ -1344,6 +1353,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   focus={isFocused}
                   vimHandleInput={vimHandleInput}
                   placeholder={placeholder}
+                  pastes={pastes}
+                  setPastes={setPastes}
                 />
               )}
             </>

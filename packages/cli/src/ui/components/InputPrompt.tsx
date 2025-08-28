@@ -31,6 +31,21 @@ import {
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 
+const PASTED_CONTENT_REGEX = /\[Pasted Content (\d+) chars\]/g;
+
+const reconstructInput = (text: string, storedPastes: string[]): string => {
+  if (storedPastes.length === 0) {
+    return text;
+  }
+
+  let pasteIndex = 0;
+  return text.replace(PASTED_CONTENT_REGEX, () => {
+    const fullText = storedPastes[pasteIndex] || '';
+    pasteIndex++;
+    return fullText;
+  });
+};
+
 export interface InputPromptProps {
   buffer: TextBuffer;
   onSubmit: (value: string) => void;
@@ -47,6 +62,8 @@ export interface InputPromptProps {
   setShellModeActive: (value: boolean) => void;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
+  pastes: string[];
+  setPastes: (pastes: string[]) => void;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -65,6 +82,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setShellModeActive,
   onEscapePromptChange,
   vimHandleInput,
+  pastes,
+  setPastes,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [escPressCount, setEscPressCount] = useState(0);
@@ -135,13 +154,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
+      const fullText = reconstructInput(submittedValue, pastes);
       if (shellModeActive) {
-        shellHistory.addCommandToHistory(submittedValue);
+        shellHistory.addCommandToHistory(fullText);
       }
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
-      onSubmit(submittedValue);
+      onSubmit(fullText);
+      setPastes([]); // clear pastes
       resetCompletionState();
       resetReverseSearchCompletionState();
     },
@@ -152,6 +173,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shellModeActive,
       shellHistory,
       resetReverseSearchCompletionState,
+      pastes,
+      setPastes,
     ],
   );
 

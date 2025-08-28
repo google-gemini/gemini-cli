@@ -187,6 +187,8 @@ describe('InputPrompt', () => {
       inputWidth: 80,
       suggestionsWidth: 80,
       focus: true,
+      pastes: [],
+      setPastes: vi.fn(),
     };
   });
 

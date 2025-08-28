@@ -20,6 +20,19 @@ import {
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 
+function isLargePaste(
+  pastedText: string,
+  thresholdChars: number,
+  thresholdLines: number,
+): boolean {
+  if (!pastedText) {
+    return false;
+  }
+  const charCount = pastedText.length;
+  const lineCount = pastedText.split('\n').length;
+  return charCount > thresholdChars || lineCount > thresholdLines;
+}
+
 export type Direction =
   | 'left'
   | 'right'
@@ -518,6 +531,9 @@ interface UseTextBufferProps {
   onChange?: (text: string) => void; // Callback for when text changes
   isValidPath: (path: string) => boolean;
   shellModeActive?: boolean; // Whether the text buffer is in shell mode
+  onLargePaste: (pastedText: string) => void;
+  largePasteThresholdChars: number;
+  largePasteThresholdLines: number;
 }
 
 interface UndoHistoryEntry {
@@ -1455,6 +1471,9 @@ export function useTextBuffer({
   onChange,
   isValidPath,
   shellModeActive = false,
+  onLargePaste,
+  largePasteThresholdChars,
+  largePasteThresholdLines,
 }: UseTextBufferProps): TextBuffer {
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
@@ -1517,6 +1536,15 @@ export function useTextBuffer({
 
   const insert = useCallback(
     (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
+      if (
+        paste &&
+        isLargePaste(ch, largePasteThresholdChars, largePasteThresholdLines)
+      ) {
+        onLargePaste(ch);
+        const summary = `[Pasted Content ${ch.length} chars]`;
+        dispatch({ type: 'insert', payload: summary });
+        return;
+      }
       if (/[\n\r]/.test(ch)) {
         dispatch({ type: 'insert', payload: ch });
         return;
