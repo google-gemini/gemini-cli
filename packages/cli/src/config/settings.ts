@@ -565,7 +565,40 @@ export function loadEnvironment(settings: Settings): void {
     setUpCloudShellEnvironment(envFilePath);
   }
 
-  if (envFilePath) {
+<<<<<<< HEAD
+  // If no settings provided, try to load workspace settings for exclusions
+  let resolvedSettings = settings;
+  if (!resolvedSettings) {
+    const workspaceSettingsPath = new Storage(
+      process.cwd(),
+    ).getWorkspaceSettingsPath();
+    try {
+      if (fs.existsSync(workspaceSettingsPath)) {
+        const workspaceContent = fs.readFileSync(
+          workspaceSettingsPath,
+          'utf-8',
+        );
+        const parsedWorkspaceSettings = JSON.parse(
+          stripJsonComments(workspaceContent),
+        ) as Settings;
+        resolvedSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
+      }
+    } catch (_e) {
+      // Ignore errors loading workspace settings
+    }
+  }
+
+  // Only load project-level env when the workspace is trusted. This avoids
+  // untrusted repos injecting environment variables by dropping a .env file.
+  // Determine trust based on settings or hardened default via GEMINI_SAFE_TRUST_DEFAULT.
+  const workspaceTrustEnabled =
+    resolvedSettings?.security?.folderTrust?.featureEnabled ?? false;
+  const workspaceTrusted = workspaceTrustEnabled
+    ? resolvedSettings?.security?.folderTrust?.enabled ?? true
+    : process.env['GEMINI_SAFE_TRUST_DEFAULT'] === '1'
+      ? false
+      : true;
+  if (envFilePath && workspaceTrusted) {
     // Manually parse and load environment variables to handle exclusions correctly.
     // This avoids modifying environment variables that were already set from the shell.
     try {
@@ -711,7 +744,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   // For the initial trust check, we can only use user and system settings.
   const initialTrustCheckSettings = mergeWith({}, systemSettings, userSettings);
   const isTrusted =
-    isWorkspaceTrusted(initialTrustCheckSettings as Settings) ?? true;
+    isWorkspaceTrusted(initialTrustCheckSettings as Settings) ?? false;
 
   // Create a temporary merged settings object to pass to loadEnvironment.
   const tempMergedSettings = mergeSettings(
