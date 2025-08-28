@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
+import { spawn } from 'node:child_process';
 import type { Config } from '../config/config.js';
 import { ToolErrorType } from './tool-error.js';
 import type {
@@ -38,6 +39,31 @@ import {
 } from '../utils/shell-utils.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+
+// Global tracker for background processes that need to be killed on cancellation
+const globalBackgroundPIDs = new Set<number>();
+
+export function killAllBackgroundProcesses(): void {
+  for (const pid of globalBackgroundPIDs) {
+    try {
+      if (os.platform() === 'win32') {
+        spawn('taskkill', ['/pid', pid.toString(), '/f'], { stdio: 'ignore' });
+      } else {
+        process.kill(-pid, 'SIGTERM');
+        setTimeout(() => {
+          try {
+            process.kill(-pid, 'SIGKILL');
+          } catch {
+            // Process may already be dead
+          }
+        }, 200);
+      }
+    } catch {
+      // Process may already be dead
+    }
+  }
+  globalBackgroundPIDs.clear();
+}
 
 export interface ShellToolParams {
   command: string;
@@ -211,6 +237,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
           }
         }
       }
+
+      // Track background processes globally for cancellation
+      backgroundPIDs.forEach((pid) => globalBackgroundPIDs.add(pid));
 
       let llmContent = '';
       if (result.aborted) {
