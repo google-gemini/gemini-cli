@@ -13,7 +13,7 @@ describe('Argument Processors', () => {
     const processor = new DefaultArgumentProcessor();
 
     it('should append the full command if args are provided', async () => {
-      const prompt = 'Parse the command.';
+      const prompt = [{ text: 'Parse the command.' }];
       const context = createMockCommandContext({
         invocation: {
           raw: '/mycommand arg1 "arg two"',
@@ -22,11 +22,13 @@ describe('Argument Processors', () => {
         },
       });
       const result = await processor.process(prompt, context);
-      expect(result).toBe('Parse the command.\n\n/mycommand arg1 "arg two"');
+      expect(result).toEqual([
+        { text: 'Parse the command.\n\n/mycommand arg1 "arg two"' },
+      ]);
     });
 
     it('should NOT append the full command if no args are provided', async () => {
-      const prompt = 'Parse the command.';
+      const prompt = [{ text: 'Parse the command.' }];
       const context = createMockCommandContext({
         invocation: {
           raw: '/mycommand',
@@ -35,7 +37,7 @@ describe('Argument Processors', () => {
         },
       });
       const result = await processor.process(prompt, context);
-      expect(result).toBe('Parse the command.');
+      expect(result).toEqual([{ text: 'Parse the command.' }]);
     });
   });
 });
