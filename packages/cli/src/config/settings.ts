@@ -648,7 +648,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
 
         let settingsObject = rawSettings as Record<string, unknown>;
         if (needsMigration(settingsObject)) {
-          console.error(`Legacy settings file detected at: ${filePath}`);
           const migratedSettings = migrateSettingsToV2(settingsObject);
           if (migratedSettings) {
             if (MIGRATE_V2_OVERWRITE) {
@@ -659,9 +658,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
                   JSON.stringify(migratedSettings, null, 2),
                   'utf-8',
                 );
-                console.log(
-                  `Successfully migrated and saved settings file: ${filePath}`,
-                );
               } catch (e) {
                 console.error(
                   `Error migrating settings file on disk: ${getErrorMessage(
@@ -670,9 +666,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
                 );
               }
             } else {
-              console.log(
-                `Successfully migrated settings for ${filePath} in-memory for the current session.`,
-              );
               migratedInMemorScopes.add(scope);
             }
             settingsObject = migratedSettings;
