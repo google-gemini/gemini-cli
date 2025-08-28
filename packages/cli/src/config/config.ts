@@ -482,9 +482,10 @@ export async function loadCliConfig(
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
-
+  const screenReaderFlag =
+    argv.screenReader === undefined ? true : argv.screenReader;
   const screenReader =
-    (settings.ui?.accessibility?.screenReader || argv.screenReader) ?? false;
+    screenReaderFlag ?? settings.ui?.accessibility?.screenReader ?? false;
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
