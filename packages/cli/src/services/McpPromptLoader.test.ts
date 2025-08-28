@@ -197,9 +197,11 @@ describe('McpPromptLoader', () => {
       const commands = await loader.loadCommands(new AbortController().signal);
       const action = commands[0].action!;
       const context = {} as any;
-      const result = await action(context, 'test-name 123');
+      const result = await action(context, 'test-name 123 tiger');
       expect(mockPrompt.invoke).toHaveBeenCalledWith({
-        name: 'test-name 123',
+        name: 'test-name',
+        age: '123',
+        species: 'tiger',
       });
       expect(result).toEqual({
         type: 'submit_prompt',
@@ -217,7 +219,7 @@ describe('McpPromptLoader', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Error: Invocation failed!',
+        content: 'Missing required argument(s): --age, --species',
       });
     });
 
@@ -233,7 +235,7 @@ describe('McpPromptLoader', () => {
         const commands = await loader.loadCommands(new AbortController().signal);
         const completion = commands[0].completion!;
         const context = {} as any;
-        const suggestions = await completion(context, 'test-name');
+        const suggestions = await completion(context, 'test-name 6 tiger');
         expect(suggestions).toEqual([]);
       });
 
