@@ -8,7 +8,7 @@ import type {
   MCPServerConfig,
   GeminiCLIExtension,
 } from '@google/gemini-cli-core';
-import { Storage } from '@google/gemini-cli-core';
+import { GEMINI_DIR, Storage } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -18,7 +18,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
-export const EXTENSIONS_DIRECTORY_NAME = '.gemini/extensions';
+export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';

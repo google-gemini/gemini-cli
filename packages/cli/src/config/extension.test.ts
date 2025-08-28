@@ -21,9 +21,9 @@ import {
   uninstallExtension,
   updateExtension,
   type Extension,
-  type ExtensionConfig,
 } from './extension.js';
 import {
+  GEMINI_DIR,
   type GeminiCLIExtension,
   type MCPServerConfig,
 } from '@google/gemini-cli-core';
@@ -60,7 +60,7 @@ vi.mock('child_process', async (importOriginal) => {
   };
 });
 
-const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
+const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
 describe('loadExtensions', () => {
   let tempWorkspaceDir: string;
@@ -175,7 +175,7 @@ describe('loadExtensions', () => {
       version: '2.0.0',
     });
 
-    const settingsDir = path.join(tempWorkspaceDir, '.gemini');
+    const settingsDir = path.join(tempWorkspaceDir, GEMINI_DIR);
     fs.mkdirSync(settingsDir, { recursive: true });
     fs.writeFileSync(
       path.join(settingsDir, 'settings.json'),
@@ -303,7 +303,7 @@ describe('installExtension', () => {
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
-    userExtensionsDir = path.join(tempHomeDir, '.gemini', 'extensions');
+    userExtensionsDir = path.join(tempHomeDir, GEMINI_DIR, 'extensions');
     // Clean up before each test
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
     fs.mkdirSync(userExtensionsDir, { recursive: true });
@@ -403,7 +403,7 @@ describe('uninstallExtension', () => {
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
-    userExtensionsDir = path.join(tempHomeDir, '.gemini', 'extensions');
+    userExtensionsDir = path.join(tempHomeDir, GEMINI_DIR, 'extensions');
     // Clean up before each test
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
     fs.mkdirSync(userExtensionsDir, { recursive: true });
@@ -498,7 +498,7 @@ describe('performWorkspaceExtensionMigration', () => {
 
     expect(failed).toEqual([]);
 
-    const userExtensionsDir = path.join(tempHomeDir, '.gemini', 'extensions');
+    const userExtensionsDir = path.join(tempHomeDir, GEMINI_DIR, 'extensions');
     const userExt1Path = path.join(userExtensionsDir, 'ext1');
     const extensions = loadExtensions(tempWorkspaceDir);
 
@@ -573,7 +573,7 @@ describe('updateExtension', () => {
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
-    userExtensionsDir = path.join(tempHomeDir, '.gemini', 'extensions');
+    userExtensionsDir = path.join(tempHomeDir, GEMINI_DIR, 'extensions');
     // Clean up before each test
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
     fs.mkdirSync(userExtensionsDir, { recursive: true });
@@ -702,7 +702,7 @@ describe('enableExtension', () => {
     tempHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
-    userExtensionsDir = path.join(tempHomeDir, '.gemini', 'extensions');
+    userExtensionsDir = path.join(tempHomeDir, GEMINI_DIR, 'extensions');
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
   });
