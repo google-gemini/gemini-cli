@@ -70,6 +70,7 @@ import {
   isProQuotaExceededError,
   isGenericQuotaExceededError,
   UserTierId,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import type { IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { IdeIntegrationNudge } from './IdeIntegrationNudge.js';
@@ -100,6 +101,7 @@ import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { SettingsDialog } from './components/SettingsDialog.js';
+import { ProQuotaDialog } from './components/ProQuotaDialog.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
@@ -227,12 +229,18 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+
   const {
     showWorkspaceMigrationDialog,
     workspaceExtensions,
     onWorkspaceMigrationDialogOpen,
     onWorkspaceMigrationDialogClose,
   } = useWorkspaceMigration(settings);
+
+  const [isProQuotaDialogOpen, setIsProQuotaDialogOpen] = useState(false);
+  const [proQuotaDialogResolver, setProQuotaDialogResolver] = useState<
+    ((value: boolean) => void) | null
+  >(null);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
@@ -415,6 +423,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       fallbackModel: string,
       error?: unknown,
     ): Promise<boolean> => {
+      // Check if we've already switched to the fallback model
+      if (config.isInFallbackMode()) {
+        // If we're already in fallback mode, don't show the dialog again
+        return false;
+      }
+
       let message: string;
 
       if (
@@ -429,11 +443,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         if (error && isProQuotaExceededError(error)) {
           if (isPaidTier) {
             message = `⚡ You have reached your daily ${currentModel} quota limit.
-⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
+⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
 ⚡ To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
           } else {
             message = `⚡ You have reached your daily ${currentModel} quota limit.
-⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
+⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
 ⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
 ⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
 ⚡ You can switch authentication methods by typing /auth`;
@@ -475,6 +489,40 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           Date.now(),
         );
 
+        // For Pro quota errors, show the dialog and wait for user's choice
+        if (error && isProQuotaExceededError(error)) {
+          // Set the flag to prevent tool continuation
+          setModelSwitchedFromQuotaError(true);
+          // Set global quota error flag to prevent Flash model calls
+          config.setQuotaErrorOccurred(true);
+
+          // Show the ProQuotaDialog and wait for user's choice
+          const shouldContinueWithFallback = await new Promise<boolean>(
+            (resolve) => {
+              setIsProQuotaDialogOpen(true);
+              setProQuotaDialogResolver(() => resolve);
+            },
+          );
+
+          // If user chose to continue with fallback, we don't need to stop the current prompt
+          if (shouldContinueWithFallback) {
+            // Switch to fallback model for future use
+            config.setModel(fallbackModel);
+            config.setFallbackMode(true);
+            logFlashFallback(
+              config,
+              new FlashFallbackEvent(
+                config.getContentGeneratorConfig().authType!,
+              ),
+            );
+            return true; // Continue with current prompt using fallback model
+          }
+
+          // If user chose to authenticate, stop current prompt
+          return false;
+        }
+
+        // For other quota errors, automatically switch to fallback model
         // Set the flag to prevent tool continuation
         setModelSwitchedFromQuotaError(true);
         // Set global quota error flag to prevent Flash model calls
@@ -831,7 +879,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     (streamingState === StreamingState.Idle ||
       streamingState === StreamingState.Responding) &&
     !initError &&
-    !isProcessing;
+    !isProcessing &&
+    !isProQuotaDialogOpen;
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -1043,6 +1092,31 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             <IdeIntegrationNudge
               ide={currentIDE}
               onComplete={handleIdePromptComplete}
+            />
+          ) : isProQuotaDialogOpen ? (
+            <ProQuotaDialog
+              currentModel={config.getModel()}
+              fallbackModel={DEFAULT_GEMINI_FLASH_MODEL}
+              onChoice={(choice) => {
+                setIsProQuotaDialogOpen(false);
+                if (!proQuotaDialogResolver) return;
+
+                const resolveValue = choice !== 'auth';
+                proQuotaDialogResolver(resolveValue);
+                setProQuotaDialogResolver(null);
+
+                if (choice === 'auth') {
+                  openAuthDialog();
+                } else {
+                  addItem(
+                    {
+                      type: MessageType.INFO,
+                      text: 'Switched to fallback model. Tip: Press Ctrl+P to recall your previous prompt and submit it again if you wish.',
+                    },
+                    Date.now(),
+                  );
+                }
+              }}
             />
           ) : isFolderTrustDialogOpen ? (
             <FolderTrustDialog
