@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import {
@@ -13,8 +14,10 @@ import {
   type EditorDisplay,
 } from '../editors/editorSettingsManager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
-import { EditorType, isEditorAvailable } from '@google/gemini-cli-core';
+import type { LoadedSettings } from '../../config/settings.js';
+import { SettingScope } from '../../config/settings.js';
+import type { EditorType } from '@google/gemini-cli-core';
+import { isEditorAvailable } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 
 interface EditorDialogProps {
@@ -50,7 +53,7 @@ export function EditorSettingsDialog({
     editorSettingsManager.getAvailableEditorDisplays();
 
   const currentPreference =
-    settings.forScope(selectedScope).settings.preferredEditor;
+    settings.forScope(selectedScope).settings.general?.preferredEditor;
   let editorIndex = currentPreference
     ? editorItems.findIndex(
         (item: EditorDisplay) => item.type === currentPreference,
@@ -84,20 +87,26 @@ export function EditorSettingsDialog({
     selectedScope === SettingScope.User
       ? SettingScope.Workspace
       : SettingScope.User;
-  if (settings.forScope(otherScope).settings.preferredEditor !== undefined) {
+  if (
+    settings.forScope(otherScope).settings.general?.preferredEditor !==
+    undefined
+  ) {
     otherScopeModifiedMessage =
-      settings.forScope(selectedScope).settings.preferredEditor !== undefined
+      settings.forScope(selectedScope).settings.general?.preferredEditor !==
+      undefined
         ? `(Also modified in ${otherScope})`
         : `(Modified in ${otherScope})`;
   }
 
   let mergedEditorName = 'None';
   if (
-    settings.merged.preferredEditor &&
-    isEditorAvailable(settings.merged.preferredEditor)
+    settings.merged.general?.preferredEditor &&
+    isEditorAvailable(settings.merged.general?.preferredEditor)
   ) {
     mergedEditorName =
-      EDITOR_DISPLAY_NAMES[settings.merged.preferredEditor as EditorType];
+      EDITOR_DISPLAY_NAMES[
+        settings.merged.general?.preferredEditor as EditorType
+      ];
   }
 
   return (

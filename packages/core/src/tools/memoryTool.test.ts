@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   MemoryTool,
   setGeminiMdFilename,
@@ -12,13 +13,26 @@ import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
 } from './memoryTool.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as os from 'os';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import { ToolConfirmationOutcome } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 
 // Mock dependencies
-vi.mock('fs/promises');
+vi.mock(import('node:fs/promises'), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    mkdir: vi.fn(),
+    readFile: vi.fn(),
+  };
+});
+
+vi.mock('fs', () => ({
+  mkdirSync: vi.fn(),
+}));
+
 vi.mock('os');
 
 const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
@@ -274,6 +288,9 @@ describe('MemoryTool', () => {
       );
       expect(result.returnDisplay).toBe(
         `Error saving memory: ${underlyingError.message}`,
+      );
+      expect(result.error?.type).toBe(
+        ToolErrorType.MEMORY_TOOL_EXECUTION_ERROR,
       );
     });
   });

@@ -6,12 +6,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'path';
-import fs from 'fs';
-import net from 'net';
-import os from 'os';
-import { execSync } from 'child_process';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import fs from 'node:fs';
+import net from 'node:net';
+import os from 'node:os';
+import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 
 const __filename = fileURLToPath(import.meta.url);

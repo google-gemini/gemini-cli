@@ -4,10 +4,48 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
 import ignore from 'ignore';
 import picomatch from 'picomatch';
 
 const hasFileExtension = picomatch('**/*[*.]*');
+
+export interface LoadIgnoreRulesOptions {
+  projectRoot: string;
+  useGitignore: boolean;
+  useGeminiignore: boolean;
+  ignoreDirs: string[];
+}
+
+export function loadIgnoreRules(options: LoadIgnoreRulesOptions): Ignore {
+  const ignorer = new Ignore();
+  if (options.useGitignore) {
+    const gitignorePath = path.join(options.projectRoot, '.gitignore');
+    if (fs.existsSync(gitignorePath)) {
+      ignorer.add(fs.readFileSync(gitignorePath, 'utf8'));
+    }
+  }
+
+  if (options.useGeminiignore) {
+    const geminiignorePath = path.join(options.projectRoot, '.geminiignore');
+    if (fs.existsSync(geminiignorePath)) {
+      ignorer.add(fs.readFileSync(geminiignorePath, 'utf8'));
+    }
+  }
+
+  const ignoreDirs = ['.git', ...options.ignoreDirs];
+  ignorer.add(
+    ignoreDirs.map((dir) => {
+      if (dir.endsWith('/')) {
+        return dir;
+      }
+      return `${dir}/`;
+    }),
+  );
+
+  return ignorer;
+}
 
 export class Ignore {
   private readonly allPatterns: string[] = [];

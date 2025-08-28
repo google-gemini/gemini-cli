@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   Content,
   CountTokensParameters,
   CountTokensResponse,
@@ -19,26 +19,18 @@ import {
   ApiResponseEvent,
   ApiErrorEvent,
 } from '../telemetry/types.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import {
   logApiError,
   logApiRequest,
   logApiResponse,
 } from '../telemetry/loggers.js';
-import { ContentGenerator } from './contentGenerator.js';
+import type { ContentGenerator } from './contentGenerator.js';
 import { toContents } from '../code_assist/converter.js';
+import { isStructuredError } from '../utils/quotaErrorDetection.js';
 
 interface StructuredError {
   status: number;
-}
-
-export function isStructuredError(error: unknown): error is StructuredError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'status' in error &&
-    typeof (error as StructuredError).status === 'number'
-  );
 }
 
 /**
@@ -49,6 +41,10 @@ export class LoggingContentGenerator implements ContentGenerator {
     private readonly wrapped: ContentGenerator,
     private readonly config: Config,
   ) {}
+
+  getWrapped(): ContentGenerator {
+    return this.wrapped;
+  }
 
   private logApiRequest(
     contents: Content[],
@@ -153,9 +149,12 @@ export class LoggingContentGenerator implements ContentGenerator {
     userPromptId: string,
   ): AsyncGenerator<GenerateContentResponse> {
     let lastResponse: GenerateContentResponse | undefined;
+    const responses: GenerateContentResponse[] = [];
+
     let lastUsageMetadata: GenerateContentResponseUsageMetadata | undefined;
     try {
       for await (const response of stream) {
+        responses.push(response);
         lastResponse = response;
         if (response.usageMetadata) {
           lastUsageMetadata = response.usageMetadata;
@@ -173,7 +172,7 @@ export class LoggingContentGenerator implements ContentGenerator {
         durationMs,
         userPromptId,
         lastUsageMetadata,
-        JSON.stringify(lastResponse),
+        JSON.stringify(responses),
       );
     }
   }

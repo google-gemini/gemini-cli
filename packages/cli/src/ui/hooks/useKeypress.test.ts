@@ -6,11 +6,12 @@
 
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
-import { useKeypress, Key } from './useKeypress.js';
+import type { Key } from './useKeypress.js';
+import { useKeypress } from './useKeypress.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { useStdin } from 'ink';
-import { EventEmitter } from 'events';
-import { PassThrough } from 'stream';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 
 // Mock the 'ink' module to control stdin
 vi.mock('ink', async (importOriginal) => {
@@ -116,7 +117,7 @@ describe('useKeypress', () => {
     });
 
     originalNodeVersion = process.versions.node;
-    delete process.env['PASTE_WORKAROUND'];
+    vi.unstubAllEnvs();
   });
 
   afterEach(() => {
@@ -197,7 +198,7 @@ describe('useKeypress', () => {
       description: 'Workaround Env Var',
       setup: () => {
         setNodeVersion('20.0.0');
-        process.env['PASTE_WORKAROUND'] = 'true';
+        vi.stubEnv('PASTE_WORKAROUND', 'true');
       },
       isLegacy: true,
     },

@@ -7,10 +7,11 @@
 /* ACP defines a schema for a simple (experimental) JSON-RPC protocol that allows GUI applications to interact with agents. */
 
 import { z } from 'zod';
+import { EOL } from 'node:os';
 import * as schema from './schema.js';
 export * from './schema.js';
 
-import { WritableStream, ReadableStream } from 'node:stream/web';
+import type { WritableStream, ReadableStream } from 'node:stream/web';
 
 export class AgentSideConnection implements Client {
   #connection: Connection;
@@ -172,7 +173,7 @@ class Connection {
     const decoder = new TextDecoder();
     for await (const chunk of output) {
       content += decoder.decode(chunk, { stream: true });
-      const lines = content.split('\n');
+      const lines = content.split(EOL);
       content = lines.pop() || '';
 
       for (const line of lines) {

@@ -11,7 +11,7 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import * as versionUtils from '../../utils/version.js';
 import { MessageType } from '../types.js';
 
-import { IdeClient } from '../../../../core/src/ide/ide-client.js';
+import type { IdeClient } from '../../../../core/src/ide/ide-client.js';
 
 vi.mock('../../utils/version.js', () => ({
   getCliVersion: vi.fn(),
@@ -28,10 +28,15 @@ describe('aboutCommand', () => {
         config: {
           getModel: vi.fn(),
           getIdeClient: vi.fn(),
+          getIdeMode: vi.fn().mockReturnValue(true),
         },
         settings: {
           merged: {
-            selectedAuthType: 'test-auth',
+            security: {
+              auth: {
+                selectedType: 'test-auth',
+              },
+            },
           },
         },
       },
@@ -44,7 +49,7 @@ describe('aboutCommand', () => {
     vi.spyOn(mockContext.services.config!, 'getModel').mockReturnValue(
       'test-model',
     );
-    process.env.GOOGLE_CLOUD_PROJECT = 'test-gcp-project';
+    process.env['GOOGLE_CLOUD_PROJECT'] = 'test-gcp-project';
     Object.defineProperty(process, 'platform', {
       value: 'test-os',
     });
@@ -68,7 +73,7 @@ describe('aboutCommand', () => {
   });
 
   it('should call addItem with all version info', async () => {
-    process.env.SANDBOX = '';
+    process.env['SANDBOX'] = '';
     if (!aboutCommand.action) {
       throw new Error('The about command must have an action.');
     }
@@ -91,7 +96,7 @@ describe('aboutCommand', () => {
   });
 
   it('should show the correct sandbox environment variable', async () => {
-    process.env.SANDBOX = 'gemini-sandbox';
+    process.env['SANDBOX'] = 'gemini-sandbox';
     if (!aboutCommand.action) {
       throw new Error('The about command must have an action.');
     }
@@ -107,8 +112,8 @@ describe('aboutCommand', () => {
   });
 
   it('should show sandbox-exec profile when applicable', async () => {
-    process.env.SANDBOX = 'sandbox-exec';
-    process.env.SEATBELT_PROFILE = 'test-profile';
+    process.env['SANDBOX'] = 'sandbox-exec';
+    process.env['SEATBELT_PROFILE'] = 'test-profile';
     if (!aboutCommand.action) {
       throw new Error('The about command must have an action.');
     }

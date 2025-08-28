@@ -4,16 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as cache from './crawlCache.js';
-import { FileSearch, AbortError, filter } from './fileSearch.js';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { FileSearchFactory, AbortError, filter } from './fileSearch.js';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
-
-type FileSearchWithPrivateMethods = FileSearch & {
-  performCrawl: () => Promise<void>;
-};
 
 describe('FileSearch', () => {
   let tmpDir: string;
@@ -31,13 +24,15 @@ describe('FileSearch', () => {
       src: ['not-ignored.js'],
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: false,
       useGeminiignore: true,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -55,13 +50,15 @@ describe('FileSearch', () => {
       src: ['not-ignored.js'],
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: true,
       useGeminiignore: true,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -81,13 +78,15 @@ describe('FileSearch', () => {
       src: ['main.js'],
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: false,
       useGeminiignore: false,
       ignoreDirs: ['logs'],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -108,13 +107,15 @@ describe('FileSearch', () => {
       src: ['main.js'],
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: true,
       useGeminiignore: false,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -139,13 +140,15 @@ describe('FileSearch', () => {
       },
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: false,
       useGeminiignore: false,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -161,13 +164,15 @@ describe('FileSearch', () => {
       'Foo.mk': '',
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: true,
       useGeminiignore: false,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -194,13 +199,15 @@ describe('FileSearch', () => {
       },
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: true,
       useGeminiignore: false,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -222,13 +229,15 @@ describe('FileSearch', () => {
       src: ['main.js'],
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: true,
       useGeminiignore: false,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -250,13 +259,15 @@ describe('FileSearch', () => {
       src: ['file1.js'],
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: true,
       useGeminiignore: true,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     // Expect no errors to be thrown during initialization
@@ -275,13 +286,15 @@ describe('FileSearch', () => {
       },
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: false,
       useGeminiignore: false,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -299,13 +312,15 @@ describe('FileSearch', () => {
       },
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: false,
       useGeminiignore: false,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -314,18 +329,74 @@ describe('FileSearch', () => {
     expect(results).toEqual(['src/style.css']);
   });
 
-  it('should return empty array when no matches are found', async () => {
+  it('should not use fzf for fuzzy matching when disableFuzzySearch is true', async () => {
     tmpDir = await createTmpDir({
-      src: ['file1.js'],
+      src: {
+        'file1.js': '',
+        'flexible.js': '',
+        'other.ts': '',
+      },
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: false,
       useGeminiignore: false,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: true,
+    });
+
+    await fileSearch.initialize();
+    const results = await fileSearch.search('fle');
+
+    expect(results).toEqual(['src/flexible.js']);
+  });
+
+  it('should use fzf for fuzzy matching when disableFuzzySearch is false', async () => {
+    tmpDir = await createTmpDir({
+      src: {
+        'file1.js': '',
+        'flexible.js': '',
+        'other.ts': '',
+      },
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: false,
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
+    });
+
+    await fileSearch.initialize();
+    const results = await fileSearch.search('fle');
+
+    expect(results).toEqual(
+      expect.arrayContaining(['src/file1.js', 'src/flexible.js']),
+    );
+  });
+
+  it('should return empty array when no matches are found', async () => {
+    tmpDir = await createTmpDir({
+      src: ['file1.js'],
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: false,
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -346,170 +417,22 @@ describe('FileSearch', () => {
     await expect(filterPromise).rejects.toThrow(AbortError);
   });
 
-  describe('with in-memory cache', () => {
-    beforeEach(() => {
-      cache.clear();
+  it('should throw an error if search is called before initialization', async () => {
+    tmpDir = await createTmpDir({});
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: false,
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    it('should throw an error if search is called before initialization', async () => {
-      tmpDir = await createTmpDir({});
-      const fileSearch = new FileSearch({
-        projectRoot: tmpDir,
-        useGitignore: false,
-        useGeminiignore: false,
-        ignoreDirs: [],
-        cache: false,
-        cacheTtl: 0,
-      });
-
-      await expect(fileSearch.search('')).rejects.toThrow(
-        'Engine not initialized. Call initialize() first.',
-      );
-    });
-
-    it('should hit the cache for subsequent searches', async () => {
-      tmpDir = await createTmpDir({ 'file1.js': '' });
-      const getOptions = () => ({
-        projectRoot: tmpDir,
-        useGitignore: false,
-        useGeminiignore: false,
-        ignoreDirs: [],
-        cache: true,
-        cacheTtl: 10,
-      });
-
-      const fs1 = new FileSearch(getOptions());
-      const crawlSpy1 = vi.spyOn(
-        fs1 as FileSearchWithPrivateMethods,
-        'performCrawl',
-      );
-      await fs1.initialize();
-      expect(crawlSpy1).toHaveBeenCalledTimes(1);
-
-      // Second search should hit the cache because the options are identical
-      const fs2 = new FileSearch(getOptions());
-      const crawlSpy2 = vi.spyOn(
-        fs2 as FileSearchWithPrivateMethods,
-        'performCrawl',
-      );
-      await fs2.initialize();
-      expect(crawlSpy2).not.toHaveBeenCalled();
-    });
-
-    it('should miss the cache when ignore rules change', async () => {
-      tmpDir = await createTmpDir({
-        '.gitignore': 'a.txt',
-        'a.txt': '',
-        'b.txt': '',
-      });
-      const options = {
-        projectRoot: tmpDir,
-        useGitignore: true,
-        useGeminiignore: false,
-        ignoreDirs: [],
-        cache: true,
-        cacheTtl: 10000,
-      };
-
-      // Initial search to populate the cache
-      const fs1 = new FileSearch(options);
-      const crawlSpy1 = vi.spyOn(
-        fs1 as FileSearchWithPrivateMethods,
-        'performCrawl',
-      );
-      await fs1.initialize();
-      const results1 = await fs1.search('');
-      expect(crawlSpy1).toHaveBeenCalledTimes(1);
-      expect(results1).toEqual(['.gitignore', 'b.txt']);
-
-      // Modify the ignore file
-      await fs.writeFile(path.join(tmpDir, '.gitignore'), 'b.txt');
-
-      // Second search should miss the cache and trigger a recrawl
-      const fs2 = new FileSearch(options);
-      const crawlSpy2 = vi.spyOn(
-        fs2 as FileSearchWithPrivateMethods,
-        'performCrawl',
-      );
-      await fs2.initialize();
-      const results2 = await fs2.search('');
-      expect(crawlSpy2).toHaveBeenCalledTimes(1);
-      expect(results2).toEqual(['.gitignore', 'a.txt']);
-    });
-
-    it('should miss the cache after TTL expires', async () => {
-      vi.useFakeTimers();
-      tmpDir = await createTmpDir({ 'file1.js': '' });
-      const options = {
-        projectRoot: tmpDir,
-        useGitignore: false,
-        useGeminiignore: false,
-        ignoreDirs: [],
-        cache: true,
-        cacheTtl: 10, // 10 seconds
-      };
-
-      // Initial search to populate the cache
-      const fs1 = new FileSearch(options);
-      await fs1.initialize();
-
-      // Advance time past the TTL
-      await vi.advanceTimersByTimeAsync(11000);
-
-      // Second search should miss the cache and trigger a recrawl
-      const fs2 = new FileSearch(options);
-      const crawlSpy = vi.spyOn(
-        fs2 as FileSearchWithPrivateMethods,
-        'performCrawl',
-      );
-      await fs2.initialize();
-
-      expect(crawlSpy).toHaveBeenCalledTimes(1);
-    });
-
-    it('should miss the cache when maxDepth changes', async () => {
-      tmpDir = await createTmpDir({ 'file1.js': '' });
-      const getOptions = (maxDepth?: number) => ({
-        projectRoot: tmpDir,
-        useGitignore: false,
-        useGeminiignore: false,
-        ignoreDirs: [],
-        cache: true,
-        cacheTtl: 10000,
-        maxDepth,
-      });
-
-      // 1. First search with maxDepth: 1, should trigger a crawl.
-      const fs1 = new FileSearch(getOptions(1));
-      const crawlSpy1 = vi.spyOn(
-        fs1 as FileSearchWithPrivateMethods,
-        'performCrawl',
-      );
-      await fs1.initialize();
-      expect(crawlSpy1).toHaveBeenCalledTimes(1);
-
-      // 2. Second search with maxDepth: 2, should be a cache miss and trigger a crawl.
-      const fs2 = new FileSearch(getOptions(2));
-      const crawlSpy2 = vi.spyOn(
-        fs2 as FileSearchWithPrivateMethods,
-        'performCrawl',
-      );
-      await fs2.initialize();
-      expect(crawlSpy2).toHaveBeenCalledTimes(1);
-
-      // 3. Third search with maxDepth: 1 again, should be a cache hit.
-      const fs3 = new FileSearch(getOptions(1));
-      const crawlSpy3 = vi.spyOn(
-        fs3 as FileSearchWithPrivateMethods,
-        'performCrawl',
-      );
-      await fs3.initialize();
-      expect(crawlSpy3).not.toHaveBeenCalled();
-    });
+    await expect(fileSearch.search('')).rejects.toThrow(
+      'Engine not initialized. Call initialize() first.',
+    );
   });
 
   it('should handle empty or commented-only ignore files', async () => {
@@ -518,13 +441,15 @@ describe('FileSearch', () => {
       src: ['main.js'],
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: true,
       useGeminiignore: false,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -539,13 +464,15 @@ describe('FileSearch', () => {
       src: ['main.js'],
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: false, // Explicitly disable .gitignore to isolate this rule
       useGeminiignore: false,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -561,13 +488,15 @@ describe('FileSearch', () => {
     }
     tmpDir = await createTmpDir(largeDir);
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: false,
       useGeminiignore: false,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -596,13 +525,15 @@ describe('FileSearch', () => {
       },
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: false,
       useGeminiignore: false,
       ignoreDirs: [],
       cache: true, // Enable caching for this test
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -634,13 +565,15 @@ describe('FileSearch', () => {
       'other.txt': '',
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: false,
       useGeminiignore: false,
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -676,13 +609,15 @@ describe('FileSearch', () => {
       'file5.js': '',
     });
 
-    const fileSearch = new FileSearch({
+    const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
       useGitignore: false,
       useGeminiignore: false,
       ignoreDirs: [],
       cache: true, // Ensure caching is enabled
       cacheTtl: 10000,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -704,108 +639,131 @@ describe('FileSearch', () => {
     expect(limitedResults).toEqual(['file1.js', 'file2.js']);
   });
 
-  describe('with maxDepth', () => {
-    beforeEach(async () => {
+  it('should handle file paths with special characters that need escaping', async () => {
+    tmpDir = await createTmpDir({
+      src: {
+        'file with (special) chars.txt': '',
+        'another-file.txt': '',
+      },
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: false,
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
+    });
+
+    await fileSearch.initialize();
+
+    // Search for the file using a pattern that contains special characters.
+    // The `unescapePath` function should handle the escaped path correctly.
+    const results = await fileSearch.search(
+      'src/file with \\(special\\) chars.txt',
+    );
+
+    expect(results).toEqual(['src/file with (special) chars.txt']);
+  });
+
+  describe('DirectoryFileSearch', () => {
+    it('should search for files in the current directory', async () => {
       tmpDir = await createTmpDir({
-        'file-root.txt': '',
-        level1: {
-          'file-level1.txt': '',
-          level2: {
-            'file-level2.txt': '',
-            level3: {
-              'file-level3.txt': '',
-            },
-          },
+        'file1.js': '',
+        'file2.ts': '',
+        'file3.js': '',
+      });
+
+      const fileSearch = FileSearchFactory.create({
+        projectRoot: tmpDir,
+        useGitignore: false,
+        useGeminiignore: false,
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        enableRecursiveFileSearch: false,
+        disableFuzzySearch: false,
+      });
+
+      await fileSearch.initialize();
+      const results = await fileSearch.search('*.js');
+      expect(results).toEqual(['file1.js', 'file3.js']);
+    });
+
+    it('should search for files in a subdirectory', async () => {
+      tmpDir = await createTmpDir({
+        'file1.js': '',
+        src: {
+          'file2.js': '',
+          'file3.ts': '',
         },
       });
-    });
 
-    it('should only search top-level files when maxDepth is 0', async () => {
-      const fileSearch = new FileSearch({
+      const fileSearch = FileSearchFactory.create({
         projectRoot: tmpDir,
         useGitignore: false,
         useGeminiignore: false,
         ignoreDirs: [],
         cache: false,
         cacheTtl: 0,
-        maxDepth: 0,
+        enableRecursiveFileSearch: false,
+        disableFuzzySearch: false,
       });
 
       await fileSearch.initialize();
-      const results = await fileSearch.search('');
-
-      expect(results).toEqual(['level1/', 'file-root.txt']);
+      const results = await fileSearch.search('src/*.js');
+      expect(results).toEqual(['src/file2.js']);
     });
 
-    it('should search one level deep when maxDepth is 1', async () => {
-      const fileSearch = new FileSearch({
+    it('should list all files in a directory', async () => {
+      tmpDir = await createTmpDir({
+        'file1.js': '',
+        src: {
+          'file2.js': '',
+          'file3.ts': '',
+        },
+      });
+
+      const fileSearch = FileSearchFactory.create({
         projectRoot: tmpDir,
         useGitignore: false,
         useGeminiignore: false,
         ignoreDirs: [],
         cache: false,
         cacheTtl: 0,
-        maxDepth: 1,
+        enableRecursiveFileSearch: false,
+        disableFuzzySearch: false,
       });
 
       await fileSearch.initialize();
-      const results = await fileSearch.search('');
-
-      expect(results).toEqual([
-        'level1/',
-        'level1/level2/',
-        'file-root.txt',
-        'level1/file-level1.txt',
-      ]);
+      const results = await fileSearch.search('src/');
+      expect(results).toEqual(['src/file2.js', 'src/file3.ts']);
     });
 
-    it('should search two levels deep when maxDepth is 2', async () => {
-      const fileSearch = new FileSearch({
+    it('should respect ignore rules', async () => {
+      tmpDir = await createTmpDir({
+        '.gitignore': '*.js',
+        'file1.js': '',
+        'file2.ts': '',
+      });
+
+      const fileSearch = FileSearchFactory.create({
         projectRoot: tmpDir,
-        useGitignore: false,
+        useGitignore: true,
         useGeminiignore: false,
         ignoreDirs: [],
         cache: false,
         cacheTtl: 0,
-        maxDepth: 2,
+        enableRecursiveFileSearch: false,
+        disableFuzzySearch: false,
       });
 
       await fileSearch.initialize();
-      const results = await fileSearch.search('');
-
-      expect(results).toEqual([
-        'level1/',
-        'level1/level2/',
-        'level1/level2/level3/',
-        'file-root.txt',
-        'level1/file-level1.txt',
-        'level1/level2/file-level2.txt',
-      ]);
-    });
-
-    it('should perform a full recursive search when maxDepth is undefined', async () => {
-      const fileSearch = new FileSearch({
-        projectRoot: tmpDir,
-        useGitignore: false,
-        useGeminiignore: false,
-        ignoreDirs: [],
-        cache: false,
-        cacheTtl: 0,
-        maxDepth: undefined, // Explicitly undefined
-      });
-
-      await fileSearch.initialize();
-      const results = await fileSearch.search('');
-
-      expect(results).toEqual([
-        'level1/',
-        'level1/level2/',
-        'level1/level2/level3/',
-        'file-root.txt',
-        'level1/file-level1.txt',
-        'level1/level2/file-level2.txt',
-        'level1/level2/level3/file-level3.txt',
-      ]);
+      const results = await fileSearch.search('*');
+      expect(results).toEqual(['.gitignore', 'file2.ts']);
     });
   });
 });

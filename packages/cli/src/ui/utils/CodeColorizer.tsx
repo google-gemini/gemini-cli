@@ -15,12 +15,12 @@ import type {
   RootContent,
 } from 'hast';
 import { themeManager } from '../themes/theme-manager.js';
-import { Theme } from '../themes/theme.js';
+import type { Theme } from '../themes/theme.js';
 import {
   MaxSizedBox,
   MINIMUM_MAX_HEIGHT,
 } from '../components/shared/MaxSizedBox.js';
-import { LoadedSettings } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
 
 // Configure theming and parsing utilities.
 const lowlight = createLowlight(common);
@@ -38,7 +38,7 @@ function renderHastNode(
   // Handle Element Nodes: Determine color and pass it down, don't wrap
   if (node.type === 'element') {
     const nodeClasses: string[] =
-      (node.properties?.className as string[]) || [];
+      (node.properties?.['className'] as string[]) || [];
     let elementColor: string | undefined = undefined;
 
     // Find color defined specifically for this element's class
@@ -134,7 +134,7 @@ export function colorizeCode(
 ): React.ReactNode {
   const codeToHighlight = code.replace(/\n$/, '');
   const activeTheme = theme || themeManager.getActiveTheme();
-  const showLineNumbers = settings?.merged.showLineNumbers ?? true;
+  const showLineNumbers = settings?.merged.ui?.showLineNumbers ?? true;
 
   try {
     // Render the HAST tree using the adapted theme

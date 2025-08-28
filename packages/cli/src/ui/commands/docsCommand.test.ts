@@ -56,7 +56,7 @@ describe('docsCommand', () => {
     }
 
     // Simulate a sandbox environment
-    process.env.SANDBOX = 'gemini-sandbox';
+    vi.stubEnv('SANDBOX', 'gemini-sandbox');
     const docsUrl = 'https://goo.gle/gemini-cli-docs';
 
     await docsCommand.action(mockContext, '');
@@ -79,7 +79,7 @@ describe('docsCommand', () => {
     }
 
     // Simulate the specific 'sandbox-exec' environment
-    process.env.SANDBOX = 'sandbox-exec';
+    vi.stubEnv('SANDBOX', 'sandbox-exec');
     const docsUrl = 'https://goo.gle/gemini-cli-docs';
 
     await docsCommand.action(mockContext, '');

@@ -11,8 +11,8 @@
 
 import { describe, it, beforeAll, expect } from 'vitest';
 import { TestRig } from './test-helper.js';
-import { join } from 'path';
-import { writeFileSync } from 'fs';
+import { join } from 'node:path';
+import { writeFileSync } from 'node:fs';
 
 // Create a minimal MCP server that doesn't require external dependencies
 // This implements the MCP protocol directly using Node.js built-ins
@@ -27,7 +27,7 @@ const readline = require('readline');
 const fs = require('fs');
 
 // Debug logging to stderr (only when MCP_DEBUG or VERBOSE is set)
-const debugEnabled = process.env.MCP_DEBUG === 'true' || process.env.VERBOSE === 'true';
+const debugEnabled = process.env['MCP_DEBUG'] === 'true' || process.env['VERBOSE'] === 'true';
 function debug(msg) {
   if (debugEnabled) {
     fs.writeSync(2, \`[MCP-DEBUG] \${msg}\\n\`);
@@ -175,7 +175,7 @@ describe('mcp server with cyclic tool schema is detected', () => {
 
     // Make the script executable (though running with 'node' should work anyway)
     if (process.platform !== 'win32') {
-      const { chmodSync } = await import('fs');
+      const { chmodSync } = await import('node:fs');
       chmodSync(testServerPath, 0o755);
     }
   });

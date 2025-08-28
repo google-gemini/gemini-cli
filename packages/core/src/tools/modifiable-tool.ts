@@ -4,14 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { EditorType, openDiff } from '../utils/editor.js';
-import os from 'os';
-import path from 'path';
-import fs from 'fs';
+import type { EditorType } from '../utils/editor.js';
+import { openDiff } from '../utils/editor.js';
+import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs';
 import * as Diff from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { isNodeError } from '../utils/errors.js';
-import { AnyDeclarativeTool, DeclarativeTool, ToolResult } from './tools.js';
+import type {
+  AnyDeclarativeTool,
+  DeclarativeTool,
+  ToolResult,
+} from './tools.js';
 
 /**
  * A declarative tool that supports a modify operation.

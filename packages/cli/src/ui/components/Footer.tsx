@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { shortenPath, tildeifyPath } from '@google/gemini-cli-core';
@@ -103,15 +103,16 @@ export const Footer: React.FC<FooterProps> = ({
       >
         {isTrustedFolder === false ? (
           <Text color={theme.status.warning}>untrusted</Text>
-        ) : process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec' ? (
+        ) : process.env['SANDBOX'] &&
+          process.env['SANDBOX'] !== 'sandbox-exec' ? (
           <Text color="green">
-            {process.env.SANDBOX.replace(/^gemini-(?:cli-)?/, '')}
+            {process.env['SANDBOX'].replace(/^gemini-(?:cli-)?/, '')}
           </Text>
-        ) : process.env.SANDBOX === 'sandbox-exec' ? (
+        ) : process.env['SANDBOX'] === 'sandbox-exec' ? (
           <Text color={theme.status.warning}>
             macOS Seatbelt{' '}
             <Text color={theme.text.secondary}>
-              ({process.env.SEATBELT_PROFILE})
+              ({process.env['SEATBELT_PROFILE']})
             </Text>
           </Text>
         ) : (

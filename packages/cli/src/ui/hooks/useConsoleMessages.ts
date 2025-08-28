@@ -11,7 +11,7 @@ import {
   useRef,
   useTransition,
 } from 'react';
-import { ConsoleMessageItem } from '../types.js';
+import type { ConsoleMessageItem } from '../types.js';
 
 export interface UseConsoleMessagesReturn {
   consoleMessages: ConsoleMessageItem[];

@@ -29,6 +29,7 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 | `Ctrl+A` / `Home`                                  | Move the cursor to the beginning of the line.                                                                                       |
 | `Ctrl+B` / `Left Arrow`                            | Move the cursor one character to the left.                                                                                          |
 | `Ctrl+C`                                           | Clear the input prompt                                                                                                              |
+| `Esc` (double press)                               | Clear the input prompt.                                                                                                             |
 | `Ctrl+D` / `Delete`                                | Delete the character to the right of the cursor.                                                                                    |
 | `Ctrl+E` / `End`                                   | Move the cursor to the end of the line.                                                                                             |
 | `Ctrl+F` / `Right Arrow`                           | Move the cursor one character to the right.                                                                                         |

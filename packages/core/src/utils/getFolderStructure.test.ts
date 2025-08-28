@@ -5,12 +5,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import fsPromises from 'fs/promises';
-import * as nodePath from 'path';
-import * as os from 'os';
+import fsPromises from 'node:fs/promises';
+import * as nodePath from 'node:path';
+import * as os from 'node:os';
 import { getFolderStructure } from './getFolderStructure.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import * as path from 'path';
+import * as path from 'node:path';
 
 describe('getFolderStructure', () => {
   let testRootDir: string;

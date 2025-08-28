@@ -7,15 +7,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import { renderHook, act } from '@testing-library/react';
-import {
-  useTextBuffer,
+import type {
   Viewport,
   TextBuffer,
+  TextBufferState,
+  TextBufferAction,
+} from './text-buffer.js';
+import {
+  useTextBuffer,
   offsetToLogicalPos,
   logicalPosToOffset,
   textBufferReducer,
-  TextBufferState,
-  TextBufferAction,
   findWordEndInLine,
   findNextWordStartInLine,
   isWordCharStrict,
@@ -893,7 +895,7 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
-    it('should handle inserts that contain delete characters ', () => {
+    it('should handle inserts that contain delete characters', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: 'abcde',
@@ -911,7 +913,7 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
-    it('should handle inserts with a mix of regular and delete characters ', () => {
+    it('should handle inserts with a mix of regular and delete characters', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: 'abcde',

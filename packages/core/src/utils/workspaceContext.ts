@@ -5,8 +5,11 @@
  */
 
 import { isNodeError } from '../utils/errors.js';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as process from 'node:process';
+
+export type Unsubscribe = () => void;
 
 /**
  * WorkspaceContext manages multiple workspace directories and validates paths
@@ -16,6 +19,7 @@ import * as path from 'path';
 export class WorkspaceContext {
   private directories = new Set<string>();
   private initialDirectories: Set<string>;
+  private onDirectoriesChangedListeners = new Set<() => void>();
 
   /**
    * Creates a new WorkspaceContext with the given initial directory and optional additional directories.
@@ -27,8 +31,31 @@ export class WorkspaceContext {
     for (const additionalDirectory of additionalDirectories) {
       this.addDirectory(additionalDirectory);
     }
-
     this.initialDirectories = new Set(this.directories);
+  }
+
+  /**
+   * Registers a listener that is called when the workspace directories change.
+   * @param listener The listener to call.
+   * @returns A function to unsubscribe the listener.
+   */
+  onDirectoriesChanged(listener: () => void): Unsubscribe {
+    this.onDirectoriesChangedListeners.add(listener);
+    return () => {
+      this.onDirectoriesChangedListeners.delete(listener);
+    };
+  }
+
+  private notifyDirectoriesChanged() {
+    // Iterate over a copy of the set in case a listener unsubscribes itself or others.
+    for (const listener of [...this.onDirectoriesChangedListeners]) {
+      try {
+        listener();
+      } catch (e) {
+        // Don't let one listener break others.
+        console.error('Error in WorkspaceContext listener:', e);
+      }
+    }
   }
 
   /**
@@ -37,7 +64,18 @@ export class WorkspaceContext {
    * @param basePath Optional base path for resolving relative paths (defaults to cwd)
    */
   addDirectory(directory: string, basePath: string = process.cwd()): void {
-    this.directories.add(this.resolveAndValidateDir(directory, basePath));
+    try {
+      const resolved = this.resolveAndValidateDir(directory, basePath);
+      if (this.directories.has(resolved)) {
+        return;
+      }
+      this.directories.add(resolved);
+      this.notifyDirectoriesChanged();
+    } catch (err) {
+      console.warn(
+        `[WARN] Skipping unreadable directory: ${directory} (${err instanceof Error ? err.message : String(err)})`,
+      );
+    }
   }
 
   private resolveAndValidateDir(
@@ -72,9 +110,17 @@ export class WorkspaceContext {
   }
 
   setDirectories(directories: readonly string[]): void {
-    this.directories.clear();
+    const newDirectories = new Set<string>();
     for (const dir of directories) {
-      this.addDirectory(dir);
+      newDirectories.add(this.resolveAndValidateDir(dir));
+    }
+
+    if (
+      newDirectories.size !== this.directories.size ||
+      ![...newDirectories].every((d) => this.directories.has(d))
+    ) {
+      this.directories = newDirectories;
+      this.notifyDirectoriesChanged();
     }
   }
 

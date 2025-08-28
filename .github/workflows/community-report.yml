@@ -30,6 +30,10 @@ jobs:
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
+          permission-pull-requests: 'read'
+          permission-discussions: 'read'
+          permission-contents: 'read'
 
       - name: 'Generate Report 📜'
         id: 'report'
@@ -164,7 +168,7 @@ jobs:
       - name: '🤖 Get Insights from Report'
         if: |-
           ${{ steps.report.outputs.report_body != '' }}
-        uses: 'google-github-actions/run-gemini-cli@06123c6a203eb7a964ce3be7c48479cc66059f23' # ratchet:google-github-actions/run-gemini-cli@v0
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
         env:
           GITHUB_TOKEN: '${{ steps.generate_token.outputs.token }}'
           REPOSITORY: '${{ github.repository }}'

@@ -1,0 +1,48 @@
+{
+  "name": "@google/gemini-cli-a2a-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gemini CLI A2A Server",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/google-gemini/gemini-cli.git",
+    "directory": "packages/a2a-server"
+  },
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "start": "node dist/src/server.js",
+    "build": "node ../../scripts/build_package.js",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:ci": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@a2a-js/sdk": "^0.3.2",
+    "@google-cloud/storage": "^7.16.0",
+    "@google/gemini-cli-core": "file:../core",
+    "express": "^5.1.0",
+    "fs-extra": "^11.3.0",
+    "tar": "^7.4.3",
+    "uuid": "^11.1.0",
+    "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/fs-extra": "^11.0.4",
+    "@types/supertest": "^6.0.3",
+    "@types/tar": "^6.1.13",
+    "dotenv": "^16.4.5",
+    "supertest": "^7.1.4",
+    "typescript": "^5.3.3",
+    "vitest": "^3.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

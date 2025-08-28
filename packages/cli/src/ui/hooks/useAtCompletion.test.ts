@@ -9,14 +9,12 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { useAtCompletion } from './useAtCompletion.js';
-import { Config, FileSearch } from '@google/gemini-cli-core';
-import {
-  createTmpDir,
-  cleanupTmpDir,
-  FileSystemStructure,
-} from '@google/gemini-cli-test-utils';
+import type { Config, FileSearch } from '@google/gemini-cli-core';
+import { FileSearchFactory } from '@google/gemini-cli-core';
+import type { FileSystemStructure } from '@google/gemini-cli-test-utils';
+import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import { useState } from 'react';
-import { Suggestion } from '../components/SuggestionsDisplay.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
 
 // Test harness to capture the state from the hook's callbacks.
 function useTestHarnessForAtCompletion(
@@ -51,6 +49,7 @@ describe('useAtCompletion', () => {
         respectGeminiIgnore: true,
       })),
       getEnableRecursiveFileSearch: () => true,
+      getFileFilteringDisableFuzzySearch: () => false,
     } as unknown as Config;
     vi.clearAllMocks();
   });
@@ -190,14 +189,28 @@ describe('useAtCompletion', () => {
       const structure: FileSystemStructure = { 'a.txt': '', 'b.txt': '' };
       testRootDir = await createTmpDir(structure);
 
-      // Spy on the search method to introduce an artificial delay
-      const originalSearch = FileSearch.prototype.search;
-      vi.spyOn(FileSearch.prototype, 'search').mockImplementation(
-        async function (...args) {
-          await new Promise((resolve) => setTimeout(resolve, 300));
-          return originalSearch.apply(this, args);
-        },
-      );
+      const realFileSearch = FileSearchFactory.create({
+        projectRoot: testRootDir,
+        ignoreDirs: [],
+        useGitignore: true,
+        useGeminiignore: true,
+        cache: false,
+        cacheTtl: 0,
+        enableRecursiveFileSearch: true,
+        disableFuzzySearch: false,
+      });
+      await realFileSearch.initialize();
+
+      // Mock that returns results immediately but we'll control timing with fake timers
+      const mockFileSearch: FileSearch = {
+        initialize: vi.fn().mockResolvedValue(undefined),
+        search: vi
+          .fn()
+          .mockImplementation(async (...args) =>
+            realFileSearch.search(...args),
+          ),
+      };
+      vi.spyOn(FileSearchFactory, 'create').mockReturnValue(mockFileSearch);
 
       const { result, rerender } = renderHook(
         ({ pattern }) =>
@@ -205,33 +218,42 @@ describe('useAtCompletion', () => {
         { initialProps: { pattern: 'a' } },
       );
 
-      // Wait for the initial (slow) search to complete
+      // Wait for the initial search to complete (using real timers)
       await waitFor(() => {
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
           'a.txt',
         ]);
       });
 
-      // Now, rerender to trigger the second search
-      rerender({ pattern: 'b' });
+      // Now switch to fake timers for precise control of the loading behavior
+      vi.useFakeTimers();
 
-      // Wait for the loading indicator to appear
-      await waitFor(() => {
-        expect(result.current.isLoadingSuggestions).toBe(true);
+      // Trigger the second search
+      act(() => {
+        rerender({ pattern: 'b' });
       });
 
-      // Suggestions should be cleared while loading
+      // Initially, loading should be false (before 200ms timer)
+      expect(result.current.isLoadingSuggestions).toBe(false);
+
+      // Advance time by exactly 200ms to trigger the loading state
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+
+      // Now loading should be true and suggestions should be cleared
+      expect(result.current.isLoadingSuggestions).toBe(true);
       expect(result.current.suggestions).toEqual([]);
 
-      // Wait for the final (slow) search to complete
-      await waitFor(
-        () => {
-          expect(result.current.suggestions.map((s) => s.value)).toEqual([
-            'b.txt',
-          ]);
-        },
-        { timeout: 1000 },
-      ); // Increase timeout for the slow search
+      // Switch back to real timers for the final waitFor
+      vi.useRealTimers();
+
+      // Wait for the search results to be processed
+      await waitFor(() => {
+        expect(result.current.suggestions.map((s) => s.value)).toEqual([
+          'b.txt',
+        ]);
+      });
 
       expect(result.current.isLoadingSuggestions).toBe(false);
     });
@@ -241,14 +263,15 @@ describe('useAtCompletion', () => {
       testRootDir = await createTmpDir(structure);
 
       const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
-      const searchSpy = vi
-        .spyOn(FileSearch.prototype, 'search')
-        .mockImplementation(async (...args) => {
-          const delay = args[0] === 'a' ? 500 : 50;
+      const mockFileSearch: FileSearch = {
+        initialize: vi.fn().mockResolvedValue(undefined),
+        search: vi.fn().mockImplementation(async (pattern: string) => {
+          const delay = pattern === 'a' ? 500 : 50;
           await new Promise((resolve) => setTimeout(resolve, delay));
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          return [args[0] as any];
-        });
+          return [pattern];
+        }),
+      };
+      vi.spyOn(FileSearchFactory, 'create').mockReturnValue(mockFileSearch);
 
       const { result, rerender } = renderHook(
         ({ pattern }) =>
@@ -258,7 +281,10 @@ describe('useAtCompletion', () => {
 
       // Wait for the hook to be ready (initialization is complete)
       await waitFor(() => {
-        expect(searchSpy).toHaveBeenCalledWith('a', expect.any(Object));
+        expect(mockFileSearch.search).toHaveBeenCalledWith(
+          'a',
+          expect.any(Object),
+        );
       });
 
       // Now that the first search is in-flight, trigger the second one.
@@ -278,9 +304,10 @@ describe('useAtCompletion', () => {
       );
 
       // The search spy should have been called for both patterns.
-      expect(searchSpy).toHaveBeenCalledWith('b', expect.any(Object));
-
-      vi.restoreAllMocks();
+      expect(mockFileSearch.search).toHaveBeenCalledWith(
+        'b',
+        expect.any(Object),
+      );
     });
   });
 
@@ -313,9 +340,13 @@ describe('useAtCompletion', () => {
       testRootDir = await createTmpDir({});
 
       // Force an error during initialization
-      vi.spyOn(FileSearch.prototype, 'initialize').mockRejectedValueOnce(
-        new Error('Initialization failed'),
-      );
+      const mockFileSearch: FileSearch = {
+        initialize: vi
+          .fn()
+          .mockRejectedValue(new Error('Initialization failed')),
+        search: vi.fn(),
+      };
+      vi.spyOn(FileSearchFactory, 'create').mockReturnValue(mockFileSearch);
 
       const { result, rerender } = renderHook(
         ({ enabled }) =>
@@ -448,6 +479,7 @@ describe('useAtCompletion', () => {
           respectGitIgnore: true,
           respectGeminiIgnore: true,
         })),
+        getFileFilteringDisableFuzzySearch: () => false,
       } as unknown as Config;
 
       const { result } = renderHook(() =>

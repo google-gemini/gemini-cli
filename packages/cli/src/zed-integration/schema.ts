@@ -84,6 +84,8 @@ export type AgentCapabilities = z.infer<typeof agentCapabilitiesSchema>;
 
 export type AuthMethod = z.infer<typeof authMethodSchema>;
 
+export type PromptCapabilities = z.infer<typeof promptCapabilitiesSchema>;
+
 export type ClientResponse = z.infer<typeof clientResponseSchema>;
 
 export type ClientNotification = z.infer<typeof clientNotificationSchema>;
@@ -270,8 +272,15 @@ export const mcpServerSchema = z.object({
   name: z.string(),
 });
 
+export const promptCapabilitiesSchema = z.object({
+  audio: z.boolean().optional(),
+  embeddedContext: z.boolean().optional(),
+  image: z.boolean().optional(),
+});
+
 export const agentCapabilitiesSchema = z.object({
-  loadSession: z.boolean(),
+  loadSession: z.boolean().optional(),
+  promptCapabilities: promptCapabilitiesSchema.optional(),
 });
 
 export const authMethodSchema = z.object({

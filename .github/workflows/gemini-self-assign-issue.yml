@@ -1,0 +1,98 @@
+name: 'Assign Issue on Comment'
+
+on:
+  issue_comment:
+    types:
+      - 'created'
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.event.issue.number }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
+
+permissions:
+  contents: 'read'
+  id-token: 'write'
+  issues: 'write'
+  statuses: 'write'
+  packages: 'read'
+
+jobs:
+  self-assign-issue:
+    if: |-
+      github.repository == 'google-gemini/gemini-cli' &&
+      github.event_name == 'issue_comment' &&
+      contains(github.event.comment.body, '/assign')
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          # Add 'assignments' write permission
+          permission-issues: 'write'
+
+      - name: 'Assign issue to user'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |
+            const issueNumber = context.issue.number;
+            const commenter = context.actor;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const MAX_ISSUES_ASSIGNED = 3;
+
+            // Search for open issues already assigned to the commenter in this repo
+            const { data: assignedIssues } = await github.rest.search.issuesAndPullRequests({
+              q: `is:issue repo:${owner}/${repo} assignee:${commenter} is:open`
+            });
+
+            if (assignedIssues.total_count >= MAX_ISSUES_ASSIGNED) {
+              await github.rest.issues.createComment({
+                owner: owner,
+                repo: repo,
+                issue_number: issueNumber,
+                body: `👋 @${commenter}! You currently have ${assignedIssues.total_count} issues assigned to you. We have a ${MAX_ISSUES_ASSIGNED} max issues assigned at once policy. Once you close out an existing issue it will open up space to take another. You can also unassign yourself from an existing issue but please work on a hand-off if someone is expecting work on that issue.`
+              });
+              return; // exit
+            }
+
+            // Check if the issue is already assigned
+            const issue = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+            });
+
+            if (issue.data.assignees.length > 0) {
+              // Comment that it's already assigned
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: `@${commenter} Thanks for taking interest but this issue is already assigned. We'd still love to have you contribute. Check out our [Help Wanted](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22help%20wanted%22) list for issues where we need some extra attention.`
+              });
+              return;
+            }
+
+            // If not taken, assign the user who commented
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              assignees: [commenter]
+            });
+
+            // Post a comment to confirm assignment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: `👋 @${commenter}, you've been assigned to this issue! Thank you for taking the time to contribute. Make sure to check out our [contributing guidelines](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md).`
+            });

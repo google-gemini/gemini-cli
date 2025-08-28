@@ -4,27 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
+  Part,
   PartListUnion,
   GenerateContentResponse,
   FunctionCall,
   FunctionDeclaration,
   FinishReason,
 } from '@google/genai';
-import {
+import type {
   ToolCallConfirmationDetails,
   ToolResult,
   ToolResultDisplay,
 } from '../tools/tools.js';
-import { ToolErrorType } from '../tools/tool-error.js';
-import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import type { ToolErrorType } from '../tools/tool-error.js';
+import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import {
   getErrorMessage,
   UnauthorizedError,
   toFriendlyError,
 } from '../utils/errors.js';
-import { GeminiChat } from './geminiChat.js';
+import type { GeminiChat } from './geminiChat.js';
 
 // Define a structure for tools passed to the server
 export interface ServerTool {
@@ -74,7 +75,7 @@ export interface ToolCallRequestInfo {
 
 export interface ToolCallResponseInfo {
   callId: string;
-  responseParts: PartListUnion;
+  responseParts: Part[];
   resultDisplay: ToolResultDisplay | undefined;
   error: Error | undefined;
   errorType: ToolErrorType | undefined;
@@ -124,9 +125,24 @@ export type ServerGeminiErrorEvent = {
   value: GeminiErrorEventValue;
 };
 
+export enum CompressionStatus {
+  /** The compression was successful */
+  COMPRESSED = 1,
+
+  /** The compression failed due to the compression inflating the token count */
+  COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+
+  /** The compression failed due to an error counting tokens */
+  COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
+
+  /** The compression was not necessary and no action was taken */
+  NOOP,
+}
+
 export interface ChatCompressionInfo {
   originalTokenCount: number;
   newTokenCount: number;
+  compressionStatus: CompressionStatus;
 }
 
 export type ServerGeminiChatCompressedEvent = {
@@ -247,14 +263,15 @@ export class Turn {
         }
       }
     } catch (e) {
-      const error = toFriendlyError(e);
-      if (error instanceof UnauthorizedError) {
-        throw error;
-      }
       if (signal.aborted) {
         yield { type: GeminiEventType.UserCancelled };
         // Regular cancellation error, fail gracefully.
         return;
+      }
+
+      const error = toFriendlyError(e);
+      if (error instanceof UnauthorizedError) {
+        throw error;
       }
 
       const contextForReport = [...this.chat.getHistory(/*curated*/ true), req];

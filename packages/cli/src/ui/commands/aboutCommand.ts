@@ -5,7 +5,8 @@
  */
 
 import { getCliVersion } from '../../utils/version.js';
-import { CommandKind, SlashCommand } from './types.js';
+import type { SlashCommand } from './types.js';
+import { CommandKind } from './types.js';
 import process from 'node:process';
 import { MessageType, type HistoryItemAbout } from '../types.js';
 
@@ -16,20 +17,21 @@ export const aboutCommand: SlashCommand = {
   action: async (context) => {
     const osVersion = process.platform;
     let sandboxEnv = 'no sandbox';
-    if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-      sandboxEnv = process.env.SANDBOX;
-    } else if (process.env.SANDBOX === 'sandbox-exec') {
+    if (process.env['SANDBOX'] && process.env['SANDBOX'] !== 'sandbox-exec') {
+      sandboxEnv = process.env['SANDBOX'];
+    } else if (process.env['SANDBOX'] === 'sandbox-exec') {
       sandboxEnv = `sandbox-exec (${
-        process.env.SEATBELT_PROFILE || 'unknown'
+        process.env['SEATBELT_PROFILE'] || 'unknown'
       })`;
     }
     const modelVersion = context.services.config?.getModel() || 'Unknown';
     const cliVersion = await getCliVersion();
     const selectedAuthType =
-      context.services.settings.merged.selectedAuthType || '';
-    const gcpProject = process.env.GOOGLE_CLOUD_PROJECT || '';
+      context.services.settings.merged.security?.auth?.selectedType || '';
+    const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';
     const ideClient =
-      context.services.config?.getIdeClient()?.getDetectedIdeDisplayName() ||
+      (context.services.config?.getIdeMode() &&
+        context.services.config?.getIdeClient()?.getDetectedIdeDisplayName()) ||
       '';
 
     const aboutItem: Omit<HistoryItemAbout, 'id'> = {

@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { WorkspaceContext } from './workspaceContext.js';
 
 describe('WorkspaceContext with real filesystem', () => {
@@ -48,13 +48,6 @@ describe('WorkspaceContext with real filesystem', () => {
       expect(directories).toEqual([cwd, otherDir]);
     });
 
-    it('should reject non-existent directories', () => {
-      const nonExistentDir = path.join(tempDir, 'does-not-exist');
-      expect(() => {
-        new WorkspaceContext(cwd, [nonExistentDir]);
-      }).toThrow('Directory does not exist');
-    });
-
     it('should handle empty initialization', () => {
       const workspaceContext = new WorkspaceContext(cwd, []);
       const directories = workspaceContext.getDirectories();
@@ -79,15 +72,6 @@ describe('WorkspaceContext with real filesystem', () => {
       const directories = workspaceContext.getDirectories();
 
       expect(directories).toEqual([cwd, otherDir]);
-    });
-
-    it('should reject non-existent directories', () => {
-      const nonExistentDir = path.join(tempDir, 'does-not-exist');
-      const workspaceContext = new WorkspaceContext(cwd);
-
-      expect(() => {
-        workspaceContext.addDirectory(nonExistentDir);
-      }).toThrow('Directory does not exist');
     });
 
     it('should prevent duplicate directories', () => {
@@ -294,6 +278,88 @@ describe('WorkspaceContext with real filesystem', () => {
     });
   });
 
+  describe('onDirectoriesChanged', () => {
+    it('should call listener when adding a directory', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      workspaceContext.addDirectory(otherDir);
+
+      expect(listener).toHaveBeenCalledOnce();
+    });
+
+    it('should not call listener when adding a duplicate directory', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      workspaceContext.addDirectory(otherDir);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      workspaceContext.addDirectory(otherDir);
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('should call listener when setting different directories', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      workspaceContext.setDirectories([otherDir]);
+
+      expect(listener).toHaveBeenCalledOnce();
+    });
+
+    it('should not call listener when setting same directories', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      workspaceContext.setDirectories([cwd]);
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('should support multiple listeners', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener1 = vi.fn();
+      const listener2 = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener1);
+      workspaceContext.onDirectoriesChanged(listener2);
+
+      workspaceContext.addDirectory(otherDir);
+
+      expect(listener1).toHaveBeenCalledOnce();
+      expect(listener2).toHaveBeenCalledOnce();
+    });
+
+    it('should allow unsubscribing a listener', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      const unsubscribe = workspaceContext.onDirectoriesChanged(listener);
+
+      unsubscribe();
+      workspaceContext.addDirectory(otherDir);
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('should not fail if a listener throws an error', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const errorListener = () => {
+        throw new Error('test error');
+      };
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(errorListener);
+      workspaceContext.onDirectoriesChanged(listener);
+
+      expect(() => {
+        workspaceContext.addDirectory(otherDir);
+      }).not.toThrow();
+      expect(listener).toHaveBeenCalledOnce();
+    });
+  });
+
   describe('getDirectories', () => {
     it('should return a copy of directories array', () => {
       const workspaceContext = new WorkspaceContext(cwd);
@@ -303,5 +369,54 @@ describe('WorkspaceContext with real filesystem', () => {
       expect(dirs1).not.toBe(dirs2);
       expect(dirs1).toEqual(dirs2);
     });
+  });
+});
+
+describe('WorkspaceContext with optional directories', () => {
+  let tempDir: string;
+  let cwd: string;
+  let existingDir1: string;
+  let existingDir2: string;
+  let nonExistentDir: string;
+
+  beforeEach(() => {
+    tempDir = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-context-optional-')),
+    );
+    cwd = path.join(tempDir, 'project');
+    existingDir1 = path.join(tempDir, 'existing-dir-1');
+    existingDir2 = path.join(tempDir, 'existing-dir-2');
+    nonExistentDir = path.join(tempDir, 'non-existent-dir');
+
+    fs.mkdirSync(cwd, { recursive: true });
+    fs.mkdirSync(existingDir1, { recursive: true });
+    fs.mkdirSync(existingDir2, { recursive: true });
+
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('should skip a missing optional directory and log a warning', () => {
+    const workspaceContext = new WorkspaceContext(cwd, [
+      nonExistentDir,
+      existingDir1,
+    ]);
+    const directories = workspaceContext.getDirectories();
+    expect(directories).toEqual([cwd, existingDir1]);
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    expect(console.warn).toHaveBeenCalledWith(
+      `[WARN] Skipping unreadable directory: ${nonExistentDir} (Directory does not exist: ${nonExistentDir})`,
+    );
+  });
+
+  it('should include an existing optional directory', () => {
+    const workspaceContext = new WorkspaceContext(cwd, [existingDir1]);
+    const directories = workspaceContext.getDirectories();
+    expect(directories).toEqual([cwd, existingDir1]);
+    expect(console.warn).not.toHaveBeenCalled();
   });
 });

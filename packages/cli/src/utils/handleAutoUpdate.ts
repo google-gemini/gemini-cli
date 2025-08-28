@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { UpdateObject } from '../ui/utils/updateCheck.js';
-import { LoadedSettings } from '../config/settings.js';
+import type { UpdateObject } from '../ui/utils/updateCheck.js';
+import type { LoadedSettings } from '../config/settings.js';
 import { getInstallationInfo } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
-import { HistoryItem, MessageType } from '../ui/types.js';
+import type { HistoryItem } from '../ui/types.js';
+import { MessageType } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
-import { spawn } from 'child_process';
+import type { spawn } from 'node:child_process';
 
 export function handleAutoUpdate(
   info: UpdateObject | null,
@@ -22,13 +23,13 @@ export function handleAutoUpdate(
     return;
   }
 
-  if (settings.merged.disableUpdateNag) {
+  if (settings.merged.general?.disableUpdateNag) {
     return;
   }
 
   const installationInfo = getInstallationInfo(
     projectRoot,
-    settings.merged.disableAutoUpdate ?? false,
+    settings.merged.general?.disableAutoUpdate ?? false,
   );
 
   let combinedMessage = info.message;
@@ -40,7 +41,10 @@ export function handleAutoUpdate(
     message: combinedMessage,
   });
 
-  if (!installationInfo.updateCommand || settings.merged.disableAutoUpdate) {
+  if (
+    !installationInfo.updateCommand ||
+    settings.merged.general?.disableAutoUpdate
+  ) {
     return;
   }
   const isNightly = info.update.latest.includes('nightly');

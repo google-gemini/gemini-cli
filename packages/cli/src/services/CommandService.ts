@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SlashCommand } from '../ui/commands/types.js';
-import { ICommandLoader } from './types.js';
+import type { SlashCommand } from '../ui/commands/types.js';
+import type { ICommandLoader } from './types.js';
 
 /**
  * Orchestrates the discovery and loading of all slash commands for the CLI.
