@@ -635,7 +635,7 @@ export async function discoverTools(
 ): Promise<DiscoveredMCPTool[]> {
   try {
     const config: CallableToolConfig = {
-      timeout: mcpServerConfig.timeout
+      timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC
     }
     const mcpCallableTool = mcpToTool(mcpClient, config);
     const tool = await mcpCallableTool.tool();
