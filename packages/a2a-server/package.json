@@ -23,7 +23,7 @@
     "dist"
   ],
   "dependencies": {
-    "@a2a-js/sdk": "^0.3.2",
+    "@a2a-js/sdk": "^0.3.3",
     "@google-cloud/storage": "^7.16.0",
     "@google/gemini-cli-core": "file:../core",
     "express": "^5.1.0",
@@ -39,7 +39,7 @@
     "@types/tar": "^6.1.13",
     "dotenv": "^16.4.5",
     "supertest": "^7.1.4",
-    "typescript": "^5.3.3",
+    "typescript": "^5.9.2",
     "vitest": "^3.1.1"
   },
   "engines": {
