@@ -7,7 +7,7 @@
 import type React from 'react';
 import { Text, Box } from 'ink';
 import { Colors } from '../../colors.js';
-import { SCREEN_READER_USER_PREFIX } from '../../constants.js';
+import { SCREEN_READER_USER_PREFIX } from '../../textConstants.js';
 import { isSlashCommand as checkIsSlashCommand } from '../../utils/commandUtils.js';
 
 interface UserMessageProps {
