@@ -44,7 +44,9 @@ export * from './utils/formatters.js';
 export * from './utils/generateContentResponseUtilities.js';
 export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
+export * from './utils/workspaceContext.js';
 export * from './utils/ignorePatterns.js';
+export * from './utils/partUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -90,9 +92,9 @@ export * from './tools/mcp-tool.js';
 // MCP OAuth
 export { MCPOAuthProvider } from './mcp/oauth-provider.js';
 export type {
-  MCPOAuthToken,
-  MCPOAuthCredentials,
-} from './mcp/oauth-token-storage.js';
+  OAuthToken,
+  OAuthCredentials,
+} from './mcp/token-storage/types.js';
 export { MCPOAuthTokenStorage } from './mcp/oauth-token-storage.js';
 export type { MCPOAuthConfig } from './mcp/oauth-provider.js';
 export type {

@@ -84,6 +84,7 @@ import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import {
   SlashCommandStatus,
+  ToolConfirmationOutcome,
   makeFakeConfig,
   ToolConfirmationOutcome,
   type IdeClient,
@@ -490,7 +491,7 @@ describe('useSlashCommandProcessor', () => {
           description: 'A command from a file',
           action: async () => ({
             type: 'submit_prompt',
-            content: 'The actual prompt from the TOML file.',
+            content: [{ text: 'The actual prompt from the TOML file.' }],
           }),
         },
         CommandKind.FILE,
@@ -506,7 +507,7 @@ describe('useSlashCommandProcessor', () => {
 
       expect(actionResult).toEqual({
         type: 'submit_prompt',
-        content: 'The actual prompt from the TOML file.',
+        content: [{ text: 'The actual prompt from the TOML file.' }],
       });
 
       expect(mockAddItem).toHaveBeenCalledWith(
@@ -522,7 +523,7 @@ describe('useSlashCommandProcessor', () => {
           description: 'A command from mcp',
           action: async () => ({
             type: 'submit_prompt',
-            content: 'The actual prompt from the mcp command.',
+            content: [{ text: 'The actual prompt from the mcp command.' }],
           }),
         },
         CommandKind.MCP_PROMPT,
@@ -538,7 +539,7 @@ describe('useSlashCommandProcessor', () => {
 
       expect(actionResult).toEqual({
         type: 'submit_prompt',
-        content: 'The actual prompt from the mcp command.',
+        content: [{ text: 'The actual prompt from the mcp command.' }],
       });
 
       expect(mockAddItem).toHaveBeenCalledWith(
