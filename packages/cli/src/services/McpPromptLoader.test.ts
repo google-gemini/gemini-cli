@@ -17,11 +17,15 @@ const mockPrompt = {
   description: 'A test prompt.',
   serverName: 'test-server',
   arguments: [
-    { name: 'name', required: true, description: 'The animal\'s name.' },
-    { name: 'age', required: true, description: 'The animal\'s age.' },
-    { name: 'species', required: true, description: 'The animal\'s species.' },
-    { name: 'enclosure', required: false, description: 'The animal\'s enclosure.' },
-    { name: 'trail', required: false, description: 'The animal\'s trail.' },
+    { name: 'name', required: true, description: "The animal's name." },
+    { name: 'age', required: true, description: "The animal's age." },
+    { name: 'species', required: true, description: "The animal's species." },
+    {
+      name: 'enclosure',
+      required: false,
+      description: "The animal's enclosure.",
+    },
+    { name: 'trail', required: false, description: "The animal's trail." },
   ],
   invoke: vi.fn().mockResolvedValue({
     messages: [{ content: { text: 'Hello, world!' } }],
@@ -210,7 +214,9 @@ describe('McpPromptLoader', () => {
     });
 
     it('should return an error message if prompt invocation fails', async () => {
-      vi.spyOn(mockPrompt, 'invoke').mockRejectedValue(new Error('Invocation failed!'));
+      vi.spyOn(mockPrompt, 'invoke').mockRejectedValue(
+        new Error('Invocation failed!'),
+      );
       const loader = new McpPromptLoader(mockConfigWithPrompts);
       const commands = await loader.loadCommands(new AbortController().signal);
       const action = commands[0].action!;
@@ -232,7 +238,9 @@ describe('McpPromptLoader', () => {
     describe('completion', () => {
       it('should suggest no arguments when using positional arguments', async () => {
         const loader = new McpPromptLoader(mockConfigWithPrompts);
-        const commands = await loader.loadCommands(new AbortController().signal);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
         const completion = commands[0].completion!;
         const context = {} as any;
         const suggestions = await completion(context, 'test-name 6 tiger');
@@ -241,7 +249,9 @@ describe('McpPromptLoader', () => {
 
       it('should suggest all arguments when none are present', async () => {
         const loader = new McpPromptLoader(mockConfigWithPrompts);
-        const commands = await loader.loadCommands(new AbortController().signal);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
         const completion = commands[0].completion!;
         const context = {} as any;
         const suggestions = await completion(context, '');
@@ -250,26 +260,33 @@ describe('McpPromptLoader', () => {
           '--age=""',
           '--species=""',
           '--enclosure=""',
-          '--trail=""'
+          '--trail=""',
         ]);
       });
 
       it('should suggest remaining arguments when some are present', async () => {
         const loader = new McpPromptLoader(mockConfigWithPrompts);
-        const commands = await loader.loadCommands(new AbortController().signal);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
         const completion = commands[0].completion!;
         const context = {} as any;
-        const suggestions = await completion(context, '--name="test-name" --age="6"');
+        const suggestions = await completion(
+          context,
+          '--name="test-name" --age="6"',
+        );
         expect(suggestions).toEqual([
           '--species=""',
           '--enclosure=""',
-          '--trail=""'
+          '--trail=""',
         ]);
       });
 
       it('should suggest no arguments when all are present', async () => {
         const loader = new McpPromptLoader(mockConfigWithPrompts);
-        const commands = await loader.loadCommands(new AbortController().signal);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
         const completion = commands[0].completion!;
         const context = {} as any;
         const suggestions = await completion(
@@ -285,7 +302,9 @@ describe('McpPromptLoader', () => {
           { ...mockPrompt, arguments: [] },
         ]);
         const loader = new McpPromptLoader(mockConfigWithPrompts);
-        const commands = await loader.loadCommands(new AbortController().signal);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
         const completion = commands[0].completion!;
         const context = {} as any;
         const suggestions = await completion(context, '');

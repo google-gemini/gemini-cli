@@ -156,8 +156,9 @@ export class McpPromptLoader implements ICommandLoader {
               .trim();
 
             const positionalArgRegex = /(?:"((?:\\.|[^"\\])*)"|([^ ]+))/g;
-            const positionalArgCount =
-              (positionalArgsString.match(positionalArgRegex) || []).length;
+            const positionalArgCount = (
+              positionalArgsString.match(positionalArgRegex) || []
+            ).length;
 
             if (positionalArgCount > 0 && usedArgNames.size === 0) {
               return [];
