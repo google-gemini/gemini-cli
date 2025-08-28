@@ -393,9 +393,9 @@ export const useSlashCommandProcessor = (
                     }
                   }
                 case 'load_history': {
-                  await config
+                  config
                     ?.getGeminiClient()
-                    ?.setHistory(result.clientHistory);
+                    ?.setHistory(result.clientHistory, { stripThoughts: true });
                   fullCommandContext.ui.clear();
                   result.history.forEach((item, index) => {
                     fullCommandContext.ui.addItem(item, index);
