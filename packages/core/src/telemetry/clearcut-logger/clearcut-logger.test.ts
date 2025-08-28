@@ -262,6 +262,17 @@ describe('ClearcutLogger', () => {
       );
     });
 
+    it('logs the current nodejs version', () => {
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_NODE_VERSION,
+        value: process.versions.node,
+      });
+    });
+
     it('logs the current surface', () => {
       const { logger } = setup({});
 
