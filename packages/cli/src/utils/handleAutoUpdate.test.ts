@@ -64,7 +64,9 @@ describe('handleAutoUpdate', () => {
 
     mockSettings = {
       merged: {
-        disableAutoUpdate: false,
+        general: {
+          disableAutoUpdate: false,
+        },
       },
     } as LoadedSettings;
 
@@ -93,7 +95,7 @@ describe('handleAutoUpdate', () => {
   });
 
   it('should do nothing if update nag is disabled', () => {
-    mockSettings.merged.disableUpdateNag = true;
+    mockSettings.merged.general!.disableUpdateNag = true;
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
     expect(mockGetInstallationInfo).not.toHaveBeenCalled();
     expect(mockUpdateEventEmitter.emit).not.toHaveBeenCalled();
@@ -101,7 +103,7 @@ describe('handleAutoUpdate', () => {
   });
 
   it('should emit "update-received" but not update if auto-updates are disabled', () => {
-    mockSettings.merged.disableAutoUpdate = true;
+    mockSettings.merged.general!.disableAutoUpdate = true;
     mockGetInstallationInfo.mockReturnValue({
       updateCommand: 'npm i -g @google/gemini-cli@latest',
       updateMessage: 'Please update manually.',

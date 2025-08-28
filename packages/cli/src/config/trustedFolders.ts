@@ -111,8 +111,9 @@ export function saveTrustedFolders(
 }
 
 export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
-  const folderTrustFeature = settings.folderTrustFeature ?? false;
-  const folderTrustSetting = settings.folderTrust ?? true;
+  const folderTrustFeature =
+    settings.security?.folderTrust?.featureEnabled ?? false;
+  const folderTrustSetting = settings.security?.folderTrust?.enabled ?? true;
   const folderTrustEnabled = folderTrustFeature && folderTrustSetting;
 
   if (!folderTrustEnabled) {

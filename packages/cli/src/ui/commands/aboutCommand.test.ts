@@ -32,7 +32,11 @@ describe('aboutCommand', () => {
         },
         settings: {
           merged: {
-            selectedAuthType: 'test-auth',
+            security: {
+              auth: {
+                selectedType: 'test-auth',
+              },
+            },
           },
         },
       },

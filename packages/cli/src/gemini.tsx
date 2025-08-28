@@ -199,7 +199,7 @@ export async function main() {
   registerCleanup(consolePatcher.cleanup);
 
   dns.setDefaultResultOrder(
-    validateDnsResolutionOrder(settings.merged.dnsResolutionOrder),
+    validateDnsResolutionOrder(settings.merged.advanced?.dnsResolutionOrder),
   );
 
   if (argv.promptInteractive && !process.stdin.isTTY) {
@@ -218,7 +218,7 @@ export async function main() {
   }
 
   // Set a default auth type if one isn't set.
-  if (!settings.merged.selectedAuthType) {
+  if (!settings.merged.security?.auth?.selectedType) {
     if (process.env['CLOUD_SHELL'] === 'true') {
       settings.setValue(
         SettingScope.User,
@@ -246,34 +246,36 @@ export async function main() {
   }
 
   // Load custom themes from settings
-  themeManager.loadCustomThemes(settings.merged.customThemes);
+  themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
 
-  if (settings.merged.theme) {
-    if (!themeManager.setActiveTheme(settings.merged.theme)) {
+  if (settings.merged.ui?.theme) {
+    if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
       // The useThemeCommand hook in App.tsx will handle opening the dialog.
-      console.warn(`Warning: Theme "${settings.merged.theme}" not found.`);
+      console.warn(`Warning: Theme "${settings.merged.ui?.theme}" not found.`);
     }
   }
 
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
-    const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
+    const memoryArgs = settings.merged.advanced?.autoConfigureMemory
       ? getNodeMemoryArgs(config)
       : [];
     const sandboxConfig = config.getSandbox();
     if (sandboxConfig) {
       if (
-        settings.merged.selectedAuthType &&
-        !settings.merged.useExternalAuth
+        settings.merged.security?.auth?.selectedType &&
+        !settings.merged.security?.auth?.useExternal
       ) {
         // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
         try {
-          const err = validateAuthMethod(settings.merged.selectedAuthType);
+          const err = validateAuthMethod(
+            settings.merged.security.auth.selectedType,
+          );
           if (err) {
             throw new Error(err);
           }
-          await config.refreshAuth(settings.merged.selectedAuthType);
+          await config.refreshAuth(settings.merged.security.auth.selectedType);
         } catch (err) {
           console.error('Error authenticating:', err);
           process.exit(1);
@@ -322,11 +324,12 @@ export async function main() {
   }
 
   if (
-    settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
+    settings.merged.security?.auth?.selectedType ===
+      AuthType.LOGIN_WITH_GOOGLE &&
     config.isBrowserLaunchSuppressed()
   ) {
     // Do oauth before app renders to make copying the link possible.
-    await getOauthClient(settings.merged.selectedAuthType, config);
+    await getOauthClient(settings.merged.security.auth.selectedType, config);
   }
 
   if (config.getExperimentalZedIntegration()) {
@@ -370,8 +373,8 @@ export async function main() {
   });
 
   const nonInteractiveConfig = await validateNonInteractiveAuth(
-    settings.merged.selectedAuthType,
-    settings.merged.useExternalAuth,
+    settings.merged.security?.auth?.selectedType,
+    settings.merged.security?.auth?.useExternal,
     config,
   );
 
@@ -384,7 +387,7 @@ export async function main() {
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
-  if (!settings.merged.hideWindowTitle) {
+  if (!settings.merged.ui?.hideWindowTitle) {
     const windowTitle = (
       process.env['CLI_TITLE'] || `Gemini - ${title}`
     ).replace(

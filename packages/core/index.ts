@@ -5,6 +5,7 @@
  */
 
 export * from './src/index.js';
+export { Storage } from './src/config/storage.js';
 export {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,

@@ -32,7 +32,7 @@ export function createShowMemoryAction(
 
     const currentMemory = config.getUserMemory();
     const fileCount = config.getGeminiMdFileCount();
-    const contextFileName = settings.merged.contextFileName;
+    const contextFileName = settings.merged.context?.fileName;
     const contextFileNames = Array.isArray(contextFileName)
       ? contextFileName
       : [contextFileName];

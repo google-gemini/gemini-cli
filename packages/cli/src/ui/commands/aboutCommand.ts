@@ -27,7 +27,7 @@ export const aboutCommand: SlashCommand = {
     const modelVersion = context.services.config?.getModel() || 'Unknown';
     const cliVersion = await getCliVersion();
     const selectedAuthType =
-      context.services.settings.merged.selectedAuthType || '';
+      context.services.settings.merged.security?.auth?.selectedType || '';
     const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';
     const ideClient =
       (context.services.config?.getIdeMode() &&
