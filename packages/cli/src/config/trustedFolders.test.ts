@@ -231,7 +231,6 @@ describe('isWorkspaceTrusted', () => {
     expect(isWorkspaceTrusted(mockSettings)).toBe(false);
   });
 
-  // RICHIE THINKS THAT RETURNING UNDEFINED IS ACTUALLY A PROBLEM. `true | false | undefined` is very strange.
   it('should return undefined for a child of an untrusted folder', () => {
     mockCwd = '/home/user/untrusted/src';
     mockRules['/home/user/untrusted'] = TrustLevel.DO_NOT_TRUST;
