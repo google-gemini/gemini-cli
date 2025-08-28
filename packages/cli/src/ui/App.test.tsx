@@ -1609,6 +1609,7 @@ describe('App UI', () => {
           _history,
           _addItem,
           _config,
+          _settings,
           _onDebugMessage,
           _handleSlashCommand,
           _shellModeActive,

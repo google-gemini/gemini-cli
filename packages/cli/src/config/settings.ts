@@ -45,6 +45,7 @@ const MIGRATION_MAP: Record<string, string> = {
   hideFooter: 'ui.hideFooter',
   showMemoryUsage: 'ui.showMemoryUsage',
   showLineNumbers: 'ui.showLineNumbers',
+  showCitations: 'ui.showCitations',
   accessibility: 'ui.accessibility',
   ideMode: 'ide.enabled',
   hasSeenIdeIntegrationNudge: 'ide.hasSeenNudge',
