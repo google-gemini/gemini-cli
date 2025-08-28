@@ -35,6 +35,7 @@ import {
   promptIdContext,
   WRITE_FILE_TOOL_NAME,
   tokenLimit,
+  killAllBackgroundProcesses,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -94,6 +95,7 @@ export const useGeminiStream = (
   onDebugMessage: (message: string) => void,
   handleSlashCommand: (
     cmd: PartListUnion,
+    signal: AbortSignal,
   ) => Promise<SlashCommandProcessorResult | false>,
   shellModeActive: boolean,
   getPreferredEditor: () => EditorType | undefined,
@@ -271,6 +273,7 @@ export const useGeminiStream = (
     }
     turnCancelledRef.current = true;
     abortControllerRef.current?.abort();
+    killAllBackgroundProcesses(); // Kill any background processes
     if (pendingHistoryItemRef.current) {
       addItem(pendingHistoryItemRef.current, Date.now());
     }
@@ -329,7 +332,7 @@ export const useGeminiStream = (
 
         // Handle UI-only commands first
         const slashCommandResult = isSlashCommand(trimmedQuery)
-          ? await handleSlashCommand(trimmedQuery)
+          ? await handleSlashCommand(trimmedQuery, abortSignal)
           : false;
 
         if (slashCommandResult) {
