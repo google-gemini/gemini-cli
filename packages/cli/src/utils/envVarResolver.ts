@@ -53,12 +53,15 @@ export function resolveEnvVarsInObject<T>(obj: T): T {
 
 /**
  * Internal implementation of resolveEnvVarsInObject with circular reference protection.
- * 
+ *
  * @param obj - The object to process
  * @param visited - WeakSet to track visited objects and prevent circular references
  * @returns A new object with environment variables resolved
  */
-function resolveEnvVarsInObjectInternal<T>(obj: T, visited: WeakSet<object>): T {
+function resolveEnvVarsInObjectInternal<T>(
+  obj: T,
+  visited: WeakSet<object>,
+): T {
   if (
     obj === null ||
     obj === undefined ||
@@ -78,9 +81,11 @@ function resolveEnvVarsInObjectInternal<T>(obj: T, visited: WeakSet<object>): T 
       // Return a shallow copy to break the cycle
       return [...obj] as unknown as T;
     }
-    
+
     visited.add(obj);
-    const result = obj.map((item) => resolveEnvVarsInObjectInternal(item, visited)) as unknown as T;
+    const result = obj.map((item) =>
+      resolveEnvVarsInObjectInternal(item, visited),
+    ) as unknown as T;
     visited.delete(obj);
     return result;
   }
@@ -91,7 +96,7 @@ function resolveEnvVarsInObjectInternal<T>(obj: T, visited: WeakSet<object>): T 
       // Return a shallow copy to break the cycle
       return { ...obj } as T;
     }
-    
+
     visited.add(obj as object);
     const newObj = { ...obj } as T;
     for (const key in newObj) {

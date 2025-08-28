@@ -249,11 +249,11 @@ describe('resolveEnvVarsInObject', () => {
 
     const obj1: any = { name: '$NESTED_VAR', id: 1 };
     const obj2: any = { name: 'static', id: 2 };
-    
+
     // Create cross-references
     obj1.ref = obj2;
     obj2.ref = obj1;
-    
+
     const config = {
       primary: obj1,
       secondary: obj2,
@@ -267,13 +267,13 @@ describe('resolveEnvVarsInObject', () => {
     expect(result.primary.id).toBe(1);
     expect(result.secondary.name).toBe('static');
     expect(result.secondary.id).toBe(2);
-    
+
     // Check that circular references are handled (shallow copied)
     expect(result.primary.ref).toBeDefined();
     expect(result.secondary.ref).toBeDefined();
     expect(result.primary.ref.name).toBe('static'); // Should be shallow copy
     expect(result.secondary.ref.name).toBe('nested-resolved'); // The shallow copy still gets processed
-    
+
     // Most importantly: verify no infinite recursion by checking objects are different
     expect(result.primary.ref).not.toBe(result.secondary);
     expect(result.secondary.ref).not.toBe(result.primary);
