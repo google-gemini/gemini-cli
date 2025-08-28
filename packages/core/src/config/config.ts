@@ -25,6 +25,7 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
+import { getPlanningTool } from '../tools/planning-tool.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
@@ -207,6 +208,7 @@ export interface ConfigParameters {
   skipNextSpeakerCheck?: boolean;
   extensionManagement?: boolean;
   enablePromptCompletion?: boolean;
+  usePlanningTool?: boolean;
 }
 
 export class Config {
@@ -282,6 +284,7 @@ export class Config {
   private initialized: boolean = false;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
+  private readonly usePlanningTool: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -356,6 +359,7 @@ export class Config {
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
+    this.usePlanningTool = params.usePlanningTool ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -794,6 +798,10 @@ export class Config {
     return this.enablePromptCompletion;
   }
 
+  getUsePlanningTool(): boolean {
+    return this.usePlanningTool;
+  }
+
   async getGitService(): Promise<GitService> {
     if (!this.gitService) {
       this.gitService = new GitService(this.targetDir, this.storage);
@@ -858,6 +866,14 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
+
+    // Manually register the planning tool as it has a different structure
+    if (
+      this.getUsePlanningTool() &&
+      !this.getExcludeTools()?.includes('planning_tool')
+    ) {
+      registry.registerTool(getPlanningTool(this));
+    }
 
     await registry.discoverAllTools();
     return registry;

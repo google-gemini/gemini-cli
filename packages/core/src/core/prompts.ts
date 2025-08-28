@@ -18,8 +18,14 @@ import { WriteFileTool } from '../tools/write-file.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
+import { getPlanningTool } from '../tools/planning-tool.js';
+import type { Config } from '../config/config.js';
 
-export function getCoreSystemPrompt(userMemory?: string): string {
+export function getCoreSystemPrompt(
+  config: Config,
+  userMemory?: string,
+  usePlanningTool?: boolean,
+): string {
   // if GEMINI_SYSTEM_MD is set (and not 0|false), override system prompt from file
   // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD
   let systemMdEnabled = false;
@@ -113,7 +119,38 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 - **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`. If unsure, ask the user.
 - **Interactive Commands:** Try to avoid shell commands that are likely to require user interaction (e.g. \`git rebase -i\`). Use non-interactive versions of commands (e.g. \`npm init -y\` instead of \`npm init\`) when available, and otherwise remind the user that interactive shell commands are not supported and may cause hangs until canceled by the user.
 - **Remembering Facts:** Use the '${MemoryTool.Name}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
-- **Respect User Confirmations:** Most tool calls (also denoted as 'function calls') will first require confirmation from the user, where they will either approve or cancel the function call. If a user cancels a function call, respect their choice and do _not_ try to make the function call again. It is okay to request the tool call again _only_ if the user requests that same tool call on a subsequent prompt. When a user cancels a function call, assume best intentions from the user and consider inquiring if they prefer any alternative paths forward.
+- **Respect User Confirmations:** Most tool calls (also denoted as 'function calls') will first require confirmation from the user, where they will either approve or cancel the function call. If a user cancels a function call, respect their choice and do _not_ try to make the function call again. It is okay to request the tool call again _only_ if the user requests that same tool call on a subsequent prompt. When a user cancels a function call, assume best intentions from the user and consider inquiring if they prefer any alternative paths forward.${
+        usePlanningTool
+          ? `
+
+## Planning Tool Usage
+**🚨 MANDATORY FIRST STEP:** Before ANY file reads or edits, you MUST use 'planning_tool' when the user asks you to:
+- Add, modify, or deprecate command-line arguments/flags
+- Implement a new feature (even small ones)
+- Refactor existing functionality
+- Fix bugs that might touch multiple files
+- Make changes that affect both code and tests
+
+**Specific triggers that REQUIRE planning_tool:**
+- "deprecate the --X flag" → Use planning_tool FIRST
+- "add a new positional argument" → Use planning_tool FIRST
+- "refactor X to Y" → Use planning_tool FIRST
+- "implement X feature" → Use planning_tool FIRST
+- Any request mentioning multiple files or components → Use planning_tool FIRST
+
+**Planning First Approach:**
+- Always use the planning tool BEFORE any file reads or modifications for complex tasks
+- The planning tool will generate a detailed JSON execution plan that ensures nothing is missed
+- Follow the generated plan systematically to complete the task
+- This approach prevents errors and ensures all requirements are addressed
+
+**Examples of tasks that REQUIRE the planning tool:**
+- "Add a new command line argument and update the related functionality"
+- "Refactor this component to use a different pattern"
+- "Implement a new feature that touches multiple files"
+- "Fix this bug that might affect multiple parts of the codebase"`
+          : ''
+      }
 
 ## Interaction Details
 - **Help Command:** The user can use '/help' to display help information.
@@ -188,7 +225,12 @@ model: [tool_call: ${ShellTool.Name} for 'node server.js &' because it must run 
 <example>
 user: Refactor the auth logic in src/auth.py to use the requests library instead of urllib.
 model: Okay, I can refactor 'src/auth.py'.
-First, I'll analyze the code and check for a test safety net before planning any changes.
+${function () {
+  if (usePlanningTool) {
+    return `I'll start by using the Planning Tool since this is a significant change that requires careful planning.`;
+  }
+  return `I'll start by analyzing the code and checking for a test safety net before planning any changes.`;
+}}
 [tool_call: ${GlobTool.Name} for path 'tests/test_auth.py']
 [tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/tests/test_auth.py']
 (After analysis)
@@ -259,7 +301,34 @@ I found the following 'app.config' files:
 - /path/to/moduleA/app.config
 - /path/to/moduleB/app.config
 To help you check their settings, I can read their contents. Which one would you like to start with, or should I read all of them?
+</example>${
+        usePlanningTool
+          ? (() => {
+              const planningTool = getPlanningTool(config);
+              return `
+
+<example>
+user: Add a new command line argument '--verbose' to the main script to enable detailed logging.
+model:
+Okay, I will add a new '--verbose' argument. Since this involves modifying command-line argument handling, I must use the planning tool first to ensure all necessary files are updated correctly.
+[tool_call: ${planningTool.name} for task "Add a new command line argument '--verbose' to the main script to enable detailed logging."]
+(After receiving the plan from the planning_tool)
+The plan is ready. I will now execute the steps, starting with reading the main script to identify where to add the new argument.
+[tool_call: ${ReadFileTool.Name} for absolute_path '/path/to/main_script.py']
 </example>
+
+<example>
+user: Implement a new feature to cache remote API responses in-memory to improve performance.
+model:
+I will implement an in-memory cache for API responses. This is a new feature that will likely touch multiple files (e.g., API client, cache module, configuration). Therefore, I will start by using the planning tool.
+[tool_call: ${planningTool.name} for task "Implement a new feature to cache remote API responses in-memory."]
+(After receiving the plan from the planning_tool)
+The plan is generated. I will start by creating a new file for the cache implementation.
+[tool_call: ${WriteFileTool.Name} to create /path/to/src/cache.js with initial content]
+</example>`;
+            })()
+          : ''
+      }
 
 # Final Reminder
 Your core function is efficient and safe assistance. Balance extreme conciseness with the crucial need for clarity, especially regarding safety and potential system modifications. Always prioritize user control and project conventions. Never make assumptions about the contents of files; instead use '${ReadFileTool.Name}' or '${ReadManyFilesTool.Name}' to ensure you aren't making broad assumptions. Finally, you are an agent - please keep going until the user's query is completely resolved.
@@ -324,7 +393,7 @@ The structure MUST be as follows:
          - Build Command: \`npm run build\`
          - Testing: Tests are run with \`npm test\`. Test files must end in \`.test.ts\`.
          - API Endpoint: The primary API endpoint is \`https://api.example.com/v2\`.
-         
+
         -->
     </key_knowledge>
 

@@ -622,6 +622,15 @@ export const SETTINGS_SCHEMA = {
     description: 'Enable debug logging of keystrokes to the console.',
     showInDialog: true,
   },
+  usePlanningTool: {
+    type: 'boolean',
+    label: 'Use Planning Tool',
+    category: 'Experimental',
+    requiresRestart: true,
+    default: false,
+    description: 'Enable the experimental planning tool.',
+    showInDialog: true,
+  },
 } as const;
 
 type InferSettings<T extends SettingsSchema> = {

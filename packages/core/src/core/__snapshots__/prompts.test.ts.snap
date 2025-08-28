@@ -104,7 +104,12 @@ model: [tool_call: run_shell_command for 'node server.js &' because it must run 
 <example>
 user: Refactor the auth logic in src/auth.py to use the requests library instead of urllib.
 model: Okay, I can refactor 'src/auth.py'.
-First, I'll analyze the code and check for a test safety net before planning any changes.
+function() {
+    if (usePlanningTool) {
+      return \`I'll start by using the Planning Tool since this is a significant change that requires careful planning.\`;
+    };
+    return \`I'll start by analyzing the code and checking for a test safety net before planning any changes.\`;
+  }
 [tool_call: glob for path 'tests/test_auth.py']
 [tool_call: read_file for absolute_path '/path/to/tests/test_auth.py']
 (After analysis)
@@ -300,7 +305,12 @@ model: [tool_call: run_shell_command for 'node server.js &' because it must run 
 <example>
 user: Refactor the auth logic in src/auth.py to use the requests library instead of urllib.
 model: Okay, I can refactor 'src/auth.py'.
-First, I'll analyze the code and check for a test safety net before planning any changes.
+function() {
+    if (usePlanningTool) {
+      return \`I'll start by using the Planning Tool since this is a significant change that requires careful planning.\`;
+    };
+    return \`I'll start by analyzing the code and checking for a test safety net before planning any changes.\`;
+  }
 [tool_call: glob for path 'tests/test_auth.py']
 [tool_call: read_file for absolute_path '/path/to/tests/test_auth.py']
 (After analysis)
@@ -476,7 +486,12 @@ model: [tool_call: run_shell_command for 'node server.js &' because it must run 
 <example>
 user: Refactor the auth logic in src/auth.py to use the requests library instead of urllib.
 model: Okay, I can refactor 'src/auth.py'.
-First, I'll analyze the code and check for a test safety net before planning any changes.
+function() {
+    if (usePlanningTool) {
+      return \`I'll start by using the Planning Tool since this is a significant change that requires careful planning.\`;
+    };
+    return \`I'll start by analyzing the code and checking for a test safety net before planning any changes.\`;
+  }
 [tool_call: glob for path 'tests/test_auth.py']
 [tool_call: read_file for absolute_path '/path/to/tests/test_auth.py']
 (After analysis)
@@ -652,7 +667,12 @@ model: [tool_call: run_shell_command for 'node server.js &' because it must run 
 <example>
 user: Refactor the auth logic in src/auth.py to use the requests library instead of urllib.
 model: Okay, I can refactor 'src/auth.py'.
-First, I'll analyze the code and check for a test safety net before planning any changes.
+function() {
+    if (usePlanningTool) {
+      return \`I'll start by using the Planning Tool since this is a significant change that requires careful planning.\`;
+    };
+    return \`I'll start by analyzing the code and checking for a test safety net before planning any changes.\`;
+  }
 [tool_call: glob for path 'tests/test_auth.py']
 [tool_call: read_file for absolute_path '/path/to/tests/test_auth.py']
 (After analysis)
@@ -828,7 +848,12 @@ model: [tool_call: run_shell_command for 'node server.js &' because it must run 
 <example>
 user: Refactor the auth logic in src/auth.py to use the requests library instead of urllib.
 model: Okay, I can refactor 'src/auth.py'.
-First, I'll analyze the code and check for a test safety net before planning any changes.
+function() {
+    if (usePlanningTool) {
+      return \`I'll start by using the Planning Tool since this is a significant change that requires careful planning.\`;
+    };
+    return \`I'll start by analyzing the code and checking for a test safety net before planning any changes.\`;
+  }
 [tool_call: glob for path 'tests/test_auth.py']
 [tool_call: read_file for absolute_path '/path/to/tests/test_auth.py']
 (After analysis)
@@ -1004,7 +1029,12 @@ model: [tool_call: run_shell_command for 'node server.js &' because it must run 
 <example>
 user: Refactor the auth logic in src/auth.py to use the requests library instead of urllib.
 model: Okay, I can refactor 'src/auth.py'.
-First, I'll analyze the code and check for a test safety net before planning any changes.
+function() {
+    if (usePlanningTool) {
+      return \`I'll start by using the Planning Tool since this is a significant change that requires careful planning.\`;
+    };
+    return \`I'll start by analyzing the code and checking for a test safety net before planning any changes.\`;
+  }
 [tool_call: glob for path 'tests/test_auth.py']
 [tool_call: read_file for absolute_path '/path/to/tests/test_auth.py']
 (After analysis)
@@ -1180,7 +1210,12 @@ model: [tool_call: run_shell_command for 'node server.js &' because it must run 
 <example>
 user: Refactor the auth logic in src/auth.py to use the requests library instead of urllib.
 model: Okay, I can refactor 'src/auth.py'.
-First, I'll analyze the code and check for a test safety net before planning any changes.
+function() {
+    if (usePlanningTool) {
+      return \`I'll start by using the Planning Tool since this is a significant change that requires careful planning.\`;
+    };
+    return \`I'll start by analyzing the code and checking for a test safety net before planning any changes.\`;
+  }
 [tool_call: glob for path 'tests/test_auth.py']
 [tool_call: read_file for absolute_path '/path/to/tests/test_auth.py']
 (After analysis)
@@ -1356,7 +1391,12 @@ model: [tool_call: run_shell_command for 'node server.js &' because it must run 
 <example>
 user: Refactor the auth logic in src/auth.py to use the requests library instead of urllib.
 model: Okay, I can refactor 'src/auth.py'.
-First, I'll analyze the code and check for a test safety net before planning any changes.
+function() {
+    if (usePlanningTool) {
+      return \`I'll start by using the Planning Tool since this is a significant change that requires careful planning.\`;
+    };
+    return \`I'll start by analyzing the code and checking for a test safety net before planning any changes.\`;
+  }
 [tool_call: glob for path 'tests/test_auth.py']
 [tool_call: read_file for absolute_path '/path/to/tests/test_auth.py']
 (After analysis)
@@ -1532,7 +1572,12 @@ model: [tool_call: run_shell_command for 'node server.js &' because it must run 
 <example>
 user: Refactor the auth logic in src/auth.py to use the requests library instead of urllib.
 model: Okay, I can refactor 'src/auth.py'.
-First, I'll analyze the code and check for a test safety net before planning any changes.
+function() {
+    if (usePlanningTool) {
+      return \`I'll start by using the Planning Tool since this is a significant change that requires careful planning.\`;
+    };
+    return \`I'll start by analyzing the code and checking for a test safety net before planning any changes.\`;
+  }
 [tool_call: glob for path 'tests/test_auth.py']
 [tool_call: read_file for absolute_path '/path/to/tests/test_auth.py']
 (After analysis)
