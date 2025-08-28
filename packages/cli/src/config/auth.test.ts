@@ -10,18 +10,18 @@ import { validateAuthMethod } from './auth.js';
 
 vi.mock('./settings.js', () => ({
   loadEnvironment: vi.fn(),
+  loadSettings: vi.fn().mockReturnValue({
+    merged: vi.fn().mockReturnValue({}),
+  }),
 }));
 
 describe('validateAuthMethod', () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
     vi.resetModules();
-    process.env = {};
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   it('should return null for LOGIN_WITH_GOOGLE', () => {
@@ -34,7 +34,7 @@ describe('validateAuthMethod', () => {
 
   describe('USE_GEMINI', () => {
     it('should return null if GEMINI_API_KEY is set', () => {
-      process.env['GEMINI_API_KEY'] = 'test-key';
+      vi.stubEnv('GEMINI_API_KEY', 'test-key');
       expect(validateAuthMethod(AuthType.USE_GEMINI)).toBeNull();
     });
 
@@ -47,13 +47,13 @@ describe('validateAuthMethod', () => {
 
   describe('USE_VERTEX_AI', () => {
     it('should return null if GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION are set', () => {
-      process.env['GOOGLE_CLOUD_PROJECT'] = 'test-project';
-      process.env['GOOGLE_CLOUD_LOCATION'] = 'test-location';
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
+      vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'test-location');
       expect(validateAuthMethod(AuthType.USE_VERTEX_AI)).toBeNull();
     });
 
     it('should return null if GOOGLE_API_KEY is set', () => {
-      process.env['GOOGLE_API_KEY'] = 'test-api-key';
+      vi.stubEnv('GOOGLE_API_KEY', 'test-api-key');
       expect(validateAuthMethod(AuthType.USE_VERTEX_AI)).toBeNull();
     });
 
