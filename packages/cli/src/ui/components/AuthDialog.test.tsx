@@ -31,7 +31,7 @@ describe('AuthDialog', () => {
 
     const settings: LoadedSettings = new LoadedSettings(
       {
-        settings: { customThemes: {}, mcpServers: {} },
+        settings: { ui: { customThemes: {} }, mcpServers: {} },
         path: '',
       },
       {
@@ -40,16 +40,21 @@ describe('AuthDialog', () => {
       },
       {
         settings: {
-          selectedAuthType: AuthType.USE_GEMINI,
+          security: {
+            auth: {
+              selectedType: AuthType.USE_GEMINI,
+            },
+          },
         },
         path: '',
       },
       {
-        settings: { customThemes: {}, mcpServers: {} },
+        settings: { ui: { customThemes: {} }, mcpServers: {} },
         path: '',
       },
       [],
       true,
+      new Set(),
     );
 
     const { lastFrame } = renderWithProviders(
@@ -72,8 +77,8 @@ describe('AuthDialog', () => {
       const settings: LoadedSettings = new LoadedSettings(
         {
           settings: {
-            selectedAuthType: undefined,
-            customThemes: {},
+            security: { auth: { selectedType: undefined } },
+            ui: { customThemes: {} },
             mcpServers: {},
           },
           path: '',
@@ -83,15 +88,16 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
-          settings: { customThemes: {}, mcpServers: {} },
+          settings: { ui: { customThemes: {} }, mcpServers: {} },
           path: '',
         },
         {
-          settings: { customThemes: {}, mcpServers: {} },
+          settings: { ui: { customThemes: {} }, mcpServers: {} },
           path: '',
         },
         [],
         true,
+        new Set(),
       );
 
       const { lastFrame } = renderWithProviders(
@@ -110,8 +116,8 @@ describe('AuthDialog', () => {
       const settings: LoadedSettings = new LoadedSettings(
         {
           settings: {
-            selectedAuthType: undefined,
-            customThemes: {},
+            security: { auth: { selectedType: undefined } },
+            ui: { customThemes: {} },
             mcpServers: {},
           },
           path: '',
@@ -121,15 +127,16 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
-          settings: { customThemes: {}, mcpServers: {} },
+          settings: { ui: { customThemes: {} }, mcpServers: {} },
           path: '',
         },
         {
-          settings: { customThemes: {}, mcpServers: {} },
+          settings: { ui: { customThemes: {} }, mcpServers: {} },
           path: '',
         },
         [],
         true,
+        new Set(),
       );
 
       const { lastFrame } = renderWithProviders(
@@ -148,8 +155,8 @@ describe('AuthDialog', () => {
       const settings: LoadedSettings = new LoadedSettings(
         {
           settings: {
-            selectedAuthType: undefined,
-            customThemes: {},
+            security: { auth: { selectedType: undefined } },
+            ui: { customThemes: {} },
             mcpServers: {},
           },
           path: '',
@@ -159,15 +166,16 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
-          settings: { customThemes: {}, mcpServers: {} },
+          settings: { ui: { customThemes: {} }, mcpServers: {} },
           path: '',
         },
         {
-          settings: { customThemes: {}, mcpServers: {} },
+          settings: { ui: { customThemes: {} }, mcpServers: {} },
           path: '',
         },
         [],
         true,
+        new Set(),
       );
 
       const { lastFrame } = renderWithProviders(
@@ -187,8 +195,8 @@ describe('AuthDialog', () => {
       const settings: LoadedSettings = new LoadedSettings(
         {
           settings: {
-            selectedAuthType: undefined,
-            customThemes: {},
+            security: { auth: { selectedType: undefined } },
+            ui: { customThemes: {} },
             mcpServers: {},
           },
           path: '',
@@ -198,15 +206,16 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
-          settings: { customThemes: {}, mcpServers: {} },
+          settings: { ui: { customThemes: {} }, mcpServers: {} },
           path: '',
         },
         {
-          settings: { customThemes: {}, mcpServers: {} },
+          settings: { ui: { customThemes: {} }, mcpServers: {} },
           path: '',
         },
         [],
         true,
+        new Set(),
       );
 
       const { lastFrame } = renderWithProviders(
@@ -221,8 +230,8 @@ describe('AuthDialog', () => {
       const settings: LoadedSettings = new LoadedSettings(
         {
           settings: {
-            selectedAuthType: undefined,
-            customThemes: {},
+            security: { auth: { selectedType: undefined } },
+            ui: { customThemes: {} },
             mcpServers: {},
           },
           path: '',
@@ -232,15 +241,16 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
-          settings: { customThemes: {}, mcpServers: {} },
+          settings: { ui: { customThemes: {} }, mcpServers: {} },
           path: '',
         },
         {
-          settings: { customThemes: {}, mcpServers: {} },
+          settings: { ui: { customThemes: {} }, mcpServers: {} },
           path: '',
         },
         [],
         true,
+        new Set(),
       );
 
       const { lastFrame } = renderWithProviders(
@@ -257,8 +267,8 @@ describe('AuthDialog', () => {
       const settings: LoadedSettings = new LoadedSettings(
         {
           settings: {
-            selectedAuthType: undefined,
-            customThemes: {},
+            security: { auth: { selectedType: undefined } },
+            ui: { customThemes: {} },
             mcpServers: {},
           },
           path: '',
@@ -268,15 +278,16 @@ describe('AuthDialog', () => {
           path: '',
         },
         {
-          settings: { customThemes: {}, mcpServers: {} },
+          settings: { ui: { customThemes: {} }, mcpServers: {} },
           path: '',
         },
         {
-          settings: { customThemes: {}, mcpServers: {} },
+          settings: { ui: { customThemes: {} }, mcpServers: {} },
           path: '',
         },
         [],
         true,
+        new Set(),
       );
 
       const { lastFrame } = renderWithProviders(
@@ -296,7 +307,7 @@ describe('AuthDialog', () => {
     const onSelect = vi.fn();
     const settings: LoadedSettings = new LoadedSettings(
       {
-        settings: { customThemes: {}, mcpServers: {} },
+        settings: { ui: { customThemes: {} }, mcpServers: {} },
         path: '',
       },
       {
@@ -305,18 +316,19 @@ describe('AuthDialog', () => {
       },
       {
         settings: {
-          selectedAuthType: undefined,
-          customThemes: {},
+          security: { auth: { selectedType: undefined } },
+          ui: { customThemes: {} },
           mcpServers: {},
         },
         path: '',
       },
       {
-        settings: { customThemes: {}, mcpServers: {} },
+        settings: { ui: { customThemes: {} }, mcpServers: {} },
         path: '',
       },
       [],
       true,
+      new Set(),
     );
 
     const { lastFrame, stdin, unmount } = renderWithProviders(
@@ -340,7 +352,7 @@ describe('AuthDialog', () => {
     const onSelect = vi.fn();
     const settings: LoadedSettings = new LoadedSettings(
       {
-        settings: { customThemes: {}, mcpServers: {} },
+        settings: { ui: { customThemes: {} }, mcpServers: {} },
         path: '',
       },
       {
@@ -349,18 +361,19 @@ describe('AuthDialog', () => {
       },
       {
         settings: {
-          selectedAuthType: undefined,
-          customThemes: {},
+          security: { auth: { selectedType: undefined } },
+          ui: { customThemes: {} },
           mcpServers: {},
         },
         path: '',
       },
       {
-        settings: { customThemes: {}, mcpServers: {} },
+        settings: { ui: { customThemes: {} }, mcpServers: {} },
         path: '',
       },
       [],
       true,
+      new Set(),
     );
 
     const { lastFrame, stdin, unmount } = renderWithProviders(
@@ -387,7 +400,7 @@ describe('AuthDialog', () => {
     const onSelect = vi.fn();
     const settings: LoadedSettings = new LoadedSettings(
       {
-        settings: { customThemes: {}, mcpServers: {} },
+        settings: { ui: { customThemes: {} }, mcpServers: {} },
         path: '',
       },
       {
@@ -396,18 +409,19 @@ describe('AuthDialog', () => {
       },
       {
         settings: {
-          selectedAuthType: AuthType.USE_GEMINI,
-          customThemes: {},
+          security: { auth: { selectedType: AuthType.LOGIN_WITH_GOOGLE } },
+          ui: { customThemes: {} },
           mcpServers: {},
         },
         path: '',
       },
       {
-        settings: { customThemes: {}, mcpServers: {} },
+        settings: { ui: { customThemes: {} }, mcpServers: {} },
         path: '',
       },
       [],
       true,
+      new Set(),
     );
 
     const { stdin, unmount } = renderWithProviders(
