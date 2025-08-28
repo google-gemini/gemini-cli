@@ -20,6 +20,9 @@ import {
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 
+let pasteIdCounter = 0;
+const generatePasteId = () => `paste-${pasteIdCounter++}`;
+
 function isLargePaste(
   pastedText: string,
   thresholdChars: number,
@@ -28,9 +31,19 @@ function isLargePaste(
   if (!pastedText) {
     return false;
   }
-  const charCount = pastedText.length;
-  const lineCount = pastedText.split('\n').length;
-  return charCount > thresholdChars || lineCount > thresholdLines;
+  if (pastedText.length > thresholdChars) {
+    return true;
+  }
+  let lineCount = 1;
+  for (let i = 0; i < pastedText.length; i++) {
+    if (pastedText[i] === '\n') {
+      lineCount++;
+      if (lineCount > thresholdLines) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 export type Direction =
@@ -531,7 +544,6 @@ interface UseTextBufferProps {
   onChange?: (text: string) => void; // Callback for when text changes
   isValidPath: (path: string) => boolean;
   shellModeActive?: boolean; // Whether the text buffer is in shell mode
-  onLargePaste: (pastedText: string) => void;
   largePasteThresholdChars: number;
   largePasteThresholdLines: number;
 }
@@ -540,6 +552,7 @@ interface UndoHistoryEntry {
   lines: string[];
   cursorRow: number;
   cursorCol: number;
+  pastes: Map<string, string>;
 }
 
 function calculateInitialCursorPosition(
@@ -873,6 +886,7 @@ export interface TextBufferState {
   clipboard: string | null;
   selectionAnchor: [number, number] | null;
   viewportWidth: number;
+  pastes: Map<string, string>;
 }
 
 const historyLimit = 100;
@@ -882,6 +896,7 @@ export const pushUndo = (currentState: TextBufferState): TextBufferState => {
     lines: [...currentState.lines],
     cursorRow: currentState.cursorRow,
     cursorCol: currentState.cursorCol,
+    pastes: new Map(currentState.pastes),
   };
   const newStack = [...currentState.undoStack, snapshot];
   if (newStack.length > historyLimit) {
@@ -893,6 +908,7 @@ export const pushUndo = (currentState: TextBufferState): TextBufferState => {
 export type TextBufferAction =
   | { type: 'set_text'; payload: string; pushToUndo?: boolean }
   | { type: 'insert'; payload: string }
+  | { type: 'add_paste'; payload: { id: string; content: string } }
   | { type: 'backspace' }
   | {
       type: 'move';
@@ -967,6 +983,13 @@ export function textBufferReducer(
   const currentLineLen = (r: number): number => cpLen(currentLine(r));
 
   switch (action.type) {
+    case 'add_paste': {
+      const nextState = pushUndoLocal(state);
+      const newPastes = new Map(nextState.pastes);
+      newPastes.set(action.payload.id, action.payload.content);
+      return { ...nextState, pastes: newPastes };
+    }
+
     case 'set_text': {
       let nextState = state;
       if (action.pushToUndo !== false) {
@@ -1356,10 +1379,11 @@ export function textBufferReducer(
       const stateToRestore = state.undoStack[state.undoStack.length - 1];
       if (!stateToRestore) return state;
 
-      const currentSnapshot = {
+      const currentSnapshot: UndoHistoryEntry = {
         lines: [...state.lines],
         cursorRow: state.cursorRow,
         cursorCol: state.cursorCol,
+        pastes: new Map(state.pastes),
       };
       return {
         ...state,
@@ -1373,10 +1397,11 @@ export function textBufferReducer(
       const stateToRestore = state.redoStack[state.redoStack.length - 1];
       if (!stateToRestore) return state;
 
-      const currentSnapshot = {
+      const currentSnapshot: UndoHistoryEntry = {
         lines: [...state.lines],
         cursorRow: state.cursorRow,
         cursorCol: state.cursorCol,
+        pastes: new Map(state.pastes),
       };
       return {
         ...state,
@@ -1471,7 +1496,6 @@ export function useTextBuffer({
   onChange,
   isValidPath,
   shellModeActive = false,
-  onLargePaste,
   largePasteThresholdChars,
   largePasteThresholdLines,
 }: UseTextBufferProps): TextBuffer {
@@ -1491,11 +1515,13 @@ export function useTextBuffer({
       clipboard: null,
       selectionAnchor: null,
       viewportWidth: viewport.width,
+      pastes: new Map(),
     };
   }, [initialText, initialCursorOffset, viewport.width]);
 
   const [state, dispatch] = useReducer(textBufferReducer, initialState);
-  const { lines, cursorRow, cursorCol, preferredCol, selectionAnchor } = state;
+  const { lines, cursorRow, cursorCol, preferredCol, selectionAnchor, pastes } =
+    state;
 
   const text = useMemo(() => lines.join('\n'), [lines]);
 
@@ -1540,8 +1566,9 @@ export function useTextBuffer({
         paste &&
         isLargePaste(ch, largePasteThresholdChars, largePasteThresholdLines)
       ) {
-        onLargePaste(ch);
-        const summary = `[Pasted Content ${ch.length} chars]`;
+        const pasteId = generatePasteId();
+        dispatch({ type: 'add_paste', payload: { id: pasteId, content: ch } });
+        const summary = `[Pasted Content ID: ${pasteId}]`;
         dispatch({ type: 'insert', payload: summary });
         return;
       }
@@ -1589,7 +1616,6 @@ export function useTextBuffer({
       shellModeActive,
       largePasteThresholdChars,
       largePasteThresholdLines,
-      onLargePaste,
     ],
   );
 
@@ -1914,6 +1940,7 @@ export function useTextBuffer({
   const returnValue: TextBuffer = {
     lines,
     text,
+    pastes,
     cursor: [cursorRow, cursorCol],
     preferredCol,
     selectionAnchor,
@@ -1981,6 +2008,7 @@ export interface TextBuffer {
   // State
   lines: string[]; // Logical lines
   text: string;
+  pastes: Map<string, string>;
   cursor: [number, number]; // Logical cursor [row, col]
   /**
    * When the user moves the caret vertically we try to keep their original
