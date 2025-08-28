@@ -22,7 +22,7 @@ import { Turn, GeminiEventType } from './turn.js';
 import type { Config } from '../config/config.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
-import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import { getResponseText } from '../utils/partUtils.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';

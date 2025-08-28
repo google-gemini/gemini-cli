@@ -18,7 +18,7 @@ import type {
   ToolResultDisplay,
 } from '../tools/tools.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
-import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import {
   getErrorMessage,

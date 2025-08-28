@@ -10,14 +10,16 @@ import {
   escapeShellArg,
   getShellConfiguration,
   ShellExecutionService,
+  flatMapTextParts,
 } from '@google/gemini-cli-core';
 
 import type { CommandContext } from '../../ui/commands/types.js';
-import type { IPromptProcessor } from './types.js';
+import type { IPromptProcessor, PromptPipelineContent } from './types.js';
 import {
   SHELL_INJECTION_TRIGGER,
   SHORTHAND_ARGS_PLACEHOLDER,
 } from './types.js';
+import { extractInjections, type Injection } from './injectionParser.js';
 
 export class ConfirmationRequiredError extends Error {
   constructor(
@@ -30,15 +32,10 @@ export class ConfirmationRequiredError extends Error {
 }
 
 /**
- * Represents a single detected shell injection site in the prompt.
+ * Represents a single detected shell injection site in the prompt,
+ * after resolution of arguments. Extends the base Injection interface.
  */
-interface ShellInjection {
-  /** The shell command extracted from within !{...}, trimmed. */
-  command: string;
-  /** The starting index of the injection (inclusive, points to '!'). */
-  startIndex: number;
-  /** The ending index of the injection (exclusive, points after '}'). */
-  endIndex: number;
+interface ResolvedShellInjection extends Injection {
   /** The command after {{args}} has been escaped and substituted. */
   resolvedCommand?: string;
 }
@@ -56,11 +53,25 @@ interface ShellInjection {
 export class ShellProcessor implements IPromptProcessor {
   constructor(private readonly commandName: string) {}
 
-  async process(prompt: string, context: CommandContext): Promise<string> {
+  async process(
+    prompt: PromptPipelineContent,
+    context: CommandContext,
+  ): Promise<PromptPipelineContent> {
+    return flatMapTextParts(prompt, (text) =>
+      this.processString(text, context),
+    );
+  }
+
+  private async processString(
+    prompt: string,
+    context: CommandContext,
+  ): Promise<PromptPipelineContent> {
     const userArgsRaw = context.invocation?.args || '';
 
     if (!prompt.includes(SHELL_INJECTION_TRIGGER)) {
-      return prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, userArgsRaw);
+      return [
+        { text: prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, userArgsRaw) },
+      ];
     }
 
     const config = context.services.config;
@@ -71,26 +82,37 @@ export class ShellProcessor implements IPromptProcessor {
     }
     const { sessionShellAllowlist } = context.session;
 
-    const injections = this.extractInjections(prompt);
+    const injections = extractInjections(
+      prompt,
+      SHELL_INJECTION_TRIGGER,
+      this.commandName,
+    );
+
     // If extractInjections found no closed blocks (and didn't throw), treat as raw.
     if (injections.length === 0) {
-      return prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, userArgsRaw);
+      return [
+        { text: prompt.replaceAll(SHORTHAND_ARGS_PLACEHOLDER, userArgsRaw) },
+      ];
     }
 
     const { shell } = getShellConfiguration();
     const userArgsEscaped = escapeShellArg(userArgsRaw, shell);
 
-    const resolvedInjections = injections.map((injection) => {
-      if (injection.command === '') {
-        return injection;
-      }
-      // Replace {{args}} inside the command string with the escaped version.
-      const resolvedCommand = injection.command.replaceAll(
-        SHORTHAND_ARGS_PLACEHOLDER,
-        userArgsEscaped,
-      );
-      return { ...injection, resolvedCommand };
-    });
+    const resolvedInjections: ResolvedShellInjection[] = injections.map(
+      (injection) => {
+        const command = injection.content;
+
+        if (command === '') {
+          return { ...injection, resolvedCommand: undefined };
+        }
+
+        const resolvedCommand = command.replaceAll(
+          SHORTHAND_ARGS_PLACEHOLDER,
+          userArgsEscaped,
+        );
+        return { ...injection, resolvedCommand };
+      },
+    );
 
     const commandsToConfirm = new Set<string>();
     for (const injection of resolvedInjections) {
@@ -180,69 +202,6 @@ export class ShellProcessor implements IPromptProcessor {
       userArgsRaw,
     );
 
-    return processedPrompt;
-  }
-
-  /**
-   * Iteratively parses the prompt string to extract shell injections (!{...}),
-   * correctly handling nested braces within the command.
-   *
-   * @param prompt The prompt string to parse.
-   * @returns An array of extracted ShellInjection objects.
-   * @throws Error if an unclosed injection (`!{`) is found.
-   */
-  private extractInjections(prompt: string): ShellInjection[] {
-    const injections: ShellInjection[] = [];
-    let index = 0;
-
-    while (index < prompt.length) {
-      const startIndex = prompt.indexOf(SHELL_INJECTION_TRIGGER, index);
-
-      if (startIndex === -1) {
-        break;
-      }
-
-      let currentIndex = startIndex + SHELL_INJECTION_TRIGGER.length;
-      let braceCount = 1;
-      let foundEnd = false;
-
-      while (currentIndex < prompt.length) {
-        const char = prompt[currentIndex];
-
-        // We count literal braces. This parser does not interpret shell quoting/escaping.
-        if (char === '{') {
-          braceCount++;
-        } else if (char === '}') {
-          braceCount--;
-          if (braceCount === 0) {
-            const commandContent = prompt.substring(
-              startIndex + SHELL_INJECTION_TRIGGER.length,
-              currentIndex,
-            );
-            const endIndex = currentIndex + 1;
-
-            injections.push({
-              command: commandContent.trim(),
-              startIndex,
-              endIndex,
-            });
-
-            index = endIndex;
-            foundEnd = true;
-            break;
-          }
-        }
-        currentIndex++;
-      }
-
-      // Check if the inner loop finished without finding the closing brace.
-      if (!foundEnd) {
-        throw new Error(
-          `Invalid syntax in command '${this.commandName}': Unclosed shell injection starting at index ${startIndex} ('!{'). Ensure braces are balanced.`,
-        );
-      }
-    }
-
-    return injections;
+    return [{ text: processedPrompt }];
   }
 }

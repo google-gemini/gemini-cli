@@ -6,7 +6,6 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  getResponseText,
   getResponseTextFromParts,
   getFunctionCalls,
   getFunctionCallsFromParts,
@@ -69,45 +68,6 @@ const minimalMockResponse = (
 });
 
 describe('generateContentResponseUtilities', () => {
-  describe('getResponseText', () => {
-    it('should return undefined for no candidates', () => {
-      expect(getResponseText(minimalMockResponse(undefined))).toBeUndefined();
-    });
-    it('should return undefined for empty candidates array', () => {
-      expect(getResponseText(minimalMockResponse([]))).toBeUndefined();
-    });
-    it('should return undefined for no parts', () => {
-      const response = mockResponse([]);
-      expect(getResponseText(response)).toBeUndefined();
-    });
-    it('should extract text from a single text part', () => {
-      const response = mockResponse([mockTextPart('Hello')]);
-      expect(getResponseText(response)).toBe('Hello');
-    });
-    it('should concatenate text from multiple text parts', () => {
-      const response = mockResponse([
-        mockTextPart('Hello '),
-        mockTextPart('World'),
-      ]);
-      expect(getResponseText(response)).toBe('Hello World');
-    });
-    it('should ignore function call parts', () => {
-      const response = mockResponse([
-        mockTextPart('Hello '),
-        mockFunctionCallPart('testFunc'),
-        mockTextPart('World'),
-      ]);
-      expect(getResponseText(response)).toBe('Hello World');
-    });
-    it('should return undefined if only function call parts exist', () => {
-      const response = mockResponse([
-        mockFunctionCallPart('testFunc'),
-        mockFunctionCallPart('anotherFunc'),
-      ]);
-      expect(getResponseText(response)).toBeUndefined();
-    });
-  });
-
   describe('getResponseTextFromParts', () => {
     it('should return undefined for no parts', () => {
       expect(getResponseTextFromParts([])).toBeUndefined();
