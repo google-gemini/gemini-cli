@@ -132,8 +132,12 @@ describe('isWorkspaceTrusted', () => {
   let mockCwd: string;
   const mockRules: Record<string, TrustLevel> = {};
   const mockSettings: Settings = {
-    folderTrustFeature: true,
-    folderTrust: true,
+    security: {
+      folderTrust: {
+        featureEnabled: true,
+        enabled: true,
+      },
+    },
   };
 
   beforeEach(() => {
