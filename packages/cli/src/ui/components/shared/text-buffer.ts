@@ -1584,7 +1584,13 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText });
       }
     },
-    [isValidPath, shellModeActive],
+    [
+      isValidPath,
+      shellModeActive,
+      largePasteThresholdChars,
+      largePasteThresholdLines,
+      onLargePaste,
+    ],
   );
 
   const newline = useCallback((): void => {
