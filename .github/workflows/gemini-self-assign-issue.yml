@@ -36,7 +36,6 @@ jobs:
           private-key: '${{ secrets.PRIVATE_KEY }}'
           # Add 'assignments' write permission
           permission-issues: 'write'
-          permission-assignements: 'write'
 
       - name: 'Assign issue to user'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
