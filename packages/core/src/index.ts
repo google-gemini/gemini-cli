@@ -45,7 +45,9 @@ export * from './utils/generateContentResponseUtilities.js';
 export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
 export * from './utils/installationManager.js';
+export * from './utils/workspaceContext.js';
 export * from './utils/ignorePatterns.js';
+export * from './utils/partUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -107,3 +109,6 @@ export * from './telemetry/index.js';
 export { sessionId } from './utils/session.js';
 export * from './utils/browser.js';
 export { Storage } from './config/storage.js';
+
+// Export test utils
+export * from './test-utils/index.js';
