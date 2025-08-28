@@ -34,7 +34,6 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
-    "@google/gemini-cli-test-utils": "file:../test-utils",
     "@types/fs-extra": "^11.0.4",
     "@types/supertest": "^6.0.3",
     "@types/tar": "^6.1.13",
