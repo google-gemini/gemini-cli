@@ -124,33 +124,11 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   if (screenReaderEnabled) {
     return (
       <Box flexDirection="column">
-        {parsedLines.map((line, index) => {
-          let prefix = '';
-          switch (line.type) {
-            case 'add':
-              prefix = 'add';
-              break;
-            case 'del':
-              prefix = 'del';
-              break;
-            case 'context':
-              prefix = 'context';
-              break;
-            case 'hunk':
-              prefix = 'hunk';
-              break;
-            case 'other':
-              prefix = 'other';
-              break;
-            default:
-              break;
-          }
-          return (
-            <Text key={index}>
-              {prefix}: {line.content}
-            </Text>
-          );
-        })}
+        {parsedLines.map((line, index) => (
+          <Text key={index}>
+            {line.type}: {line.content}
+          </Text>
+        ))}
       </Box>
     );
   }
