@@ -100,6 +100,16 @@ vi.mock('../services/gitService.js', () => {
   return { GitService: GitServiceMock };
 });
 
+vi.mock('../ide/ide-client.js', () => ({
+  IdeClient: {
+    getInstance: vi.fn().mockResolvedValue({
+      getConnectionStatus: vi.fn(),
+      initialize: vi.fn(),
+      shutdown: vi.fn(),
+    }),
+  },
+}));
+
 describe('Server Config (config.ts)', () => {
   const MODEL = 'gemini-pro';
   const SANDBOX: SandboxConfig = {

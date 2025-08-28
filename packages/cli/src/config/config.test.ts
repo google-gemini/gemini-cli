@@ -83,7 +83,7 @@ vi.mock('@google/gemini-cli-core', async () => {
   return {
     ...actualServer,
     IdeClient: {
-      getInstance: vi.fn().mockReturnValue({
+      getInstance: vi.fn().mockResolvedValue({
         getConnectionStatus: vi.fn(),
         initialize: vi.fn(),
         shutdown: vi.fn(),
