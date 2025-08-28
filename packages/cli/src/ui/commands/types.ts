@@ -14,6 +14,8 @@ import type { SessionStatsState } from '../contexts/SessionContext.js';
 
 // Grouped dependencies for clarity and easier mocking
 export interface CommandContext {
+  /** AbortSignal for cancelling the command execution. */
+  signal: AbortSignal;
   // Invocation properties for when commands are called.
   invocation?: {
     /** The raw, untrimmed input string from the user. */

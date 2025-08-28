@@ -122,6 +122,20 @@ vi.mock('./useLogger.js', () => ({
   }),
 }));
 
+const mockKillAllBackgroundProcesses = vi.hoisted(() => vi.fn());
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actualCoreModule = (await importOriginal()) as any;
+  return {
+    ...actualCoreModule,
+    GitService: vi.fn(),
+    GeminiClient: MockedGeminiClientClass,
+    UserPromptEvent: MockedUserPromptEvent,
+    parseAndFormatApiError: mockParseAndFormatApiError,
+    killAllBackgroundProcesses: mockKillAllBackgroundProcesses,
+  };
+});
+
 const mockStartNewPrompt = vi.fn();
 const mockAddUsage = vi.fn();
 vi.mock('../contexts/SessionContext.js', () => ({
@@ -1040,7 +1054,10 @@ describe('useGeminiStream', () => {
       });
 
       await waitFor(() => {
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith('/help');
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/help',
+          expect.any(AbortSignal),
+        );
         expect(mockScheduleToolCalls).not.toHaveBeenCalled();
         expect(mockSendMessageStream).not.toHaveBeenCalled(); // No LLM call made
       });
@@ -1063,6 +1080,7 @@ describe('useGeminiStream', () => {
       await waitFor(() => {
         expect(mockHandleSlashCommand).toHaveBeenCalledWith(
           '/my-custom-command',
+          expect.any(AbortSignal),
         );
 
         expect(localMockSendMessageStream).not.toHaveBeenCalledWith(
@@ -1096,7 +1114,10 @@ describe('useGeminiStream', () => {
       });
 
       await waitFor(() => {
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith('/emptycmd');
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/emptycmd',
+          expect.any(AbortSignal),
+        );
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           '',
           expect.any(AbortSignal),
@@ -1787,6 +1808,103 @@ describe('useGeminiStream', () => {
         'gemini-2.5-pro',
         'gemini-2.5-flash',
       );
+    });
+  });
+
+  describe('Background Process Cancellation', () => {
+    let keypressCallback: (key: any) => void;
+    const mockUseKeypress = useKeypress as Mock;
+
+    beforeEach(() => {
+      // Capture the callback passed to useKeypress
+      mockUseKeypress.mockImplementation((callback, options) => {
+        if (options.isActive) {
+          keypressCallback = callback;
+        } else {
+          keypressCallback = () => {};
+        }
+      });
+
+      // Clear the background process mock
+      mockKillAllBackgroundProcesses.mockClear();
+    });
+
+    const simulateEscapeKeyPress = () => {
+      act(() => {
+        keypressCallback({ name: 'escape' });
+      });
+    };
+
+    it('should call killAllBackgroundProcesses when user cancels a request', async () => {
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        // Keep the stream open
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderTestHook();
+
+      // Start a query
+      await act(async () => {
+        result.current.submitQuery('test query with background processes');
+      });
+
+      // Wait for the response to start
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // Simulate escape key press to cancel
+      simulateEscapeKeyPress();
+
+      // Verify killAllBackgroundProcesses was called
+      await waitFor(() => {
+        expect(mockKillAllBackgroundProcesses).toHaveBeenCalledTimes(1);
+      });
+
+      // Verify cancellation message is added
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Request cancelled.',
+          },
+          expect.any(Number),
+        );
+      });
+
+      // Verify state is reset
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    it('should call killAllBackgroundProcesses when AbortController is aborted', async () => {
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        // Keep the stream open
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderTestHook();
+
+      // Start a query to enter responding state
+      await act(async () => {
+        result.current.submitQuery('test query');
+      });
+
+      // Wait for the response to start
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // Trigger cancelOngoingRequest directly (simulates other cancellation scenarios)
+      act(() => {
+        result.current.cancelOngoingRequest();
+      });
+
+      // Verify killAllBackgroundProcesses was called
+      expect(mockKillAllBackgroundProcesses).toHaveBeenCalledTimes(1);
     });
   });
 });
