@@ -10,6 +10,7 @@ import { McpClient } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import type { WorkspaceContext } from '../utils/workspaceContext.js';
+import type { Config } from '../config/config.js';
 
 vi.mock('./mcp-client.js', async () => {
   const originalModule = await vi.importActual('./mcp-client.js');
@@ -47,7 +48,7 @@ describe('McpClientManager', () => {
       false,
       {} as WorkspaceContext,
     );
-    await manager.discoverAllMcpTools();
+    await manager.discoverAllMcpTools({} as Config);
     expect(mockedMcpClient.connect).toHaveBeenCalledOnce();
     expect(mockedMcpClient.discover).toHaveBeenCalledOnce();
   });
