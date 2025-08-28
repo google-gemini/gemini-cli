@@ -4,14 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useState } from 'react';
+import type React from 'react';
+import { useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
+import { SettingScope } from '../../config/settings.js';
 import {
   getScopeItems,
   getScopeMessageForSetting,
@@ -44,13 +46,13 @@ export function ThemeDialog({
   // Track the currently highlighted theme name
   const [highlightedThemeName, setHighlightedThemeName] = useState<
     string | undefined
-  >(settings.merged.theme || DEFAULT_THEME.name);
+  >(settings.merged.ui?.theme || DEFAULT_THEME.name);
 
   // Generate theme items filtered by selected scope
   const customThemes =
     selectedScope === SettingScope.User
-      ? settings.user.settings.customThemes || {}
-      : settings.merged.customThemes || {};
+      ? settings.user.settings.ui?.customThemes || {}
+      : settings.merged.ui?.customThemes || {};
   const builtInThemes = themeManager
     .getAvailableThemes()
     .filter((theme) => theme.type !== 'custom');
@@ -74,7 +76,7 @@ export function ThemeDialog({
   const [selectInputKey, setSelectInputKey] = useState(Date.now());
 
   // Find the index of the selected theme, but only if it exists in the list
-  const selectedThemeName = settings.merged.theme || DEFAULT_THEME.name;
+  const selectedThemeName = settings.merged.ui?.theme || DEFAULT_THEME.name;
   const initialThemeIndex = themeItems.findIndex(
     (item) => item.value === selectedThemeName,
   );
@@ -126,7 +128,7 @@ export function ThemeDialog({
 
   // Generate scope message for theme setting
   const otherScopeModifiedMessage = getScopeMessageForSetting(
-    'theme',
+    'ui.theme',
     selectedScope,
     settings,
   );

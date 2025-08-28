@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn } from 'node:child_process';
 import { parse } from 'shell-quote';
-import { mkdirSync, writeFileSync, readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { env } from 'process';
-import fs from 'fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { env } from 'node:process';
+import fs from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -177,7 +177,9 @@ export class TestRig {
   }
 
   run(
-    promptOrOptions: string | { prompt?: string; stdin?: string },
+    promptOrOptions:
+      | string
+      | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
     ...args: string[]
   ): Promise<string> {
     let command = `node ${this.bundlePath} --yolo`;
@@ -221,7 +223,13 @@ export class TestRig {
     if (execOptions.input) {
       child.stdin!.write(execOptions.input);
     }
-    child.stdin!.end();
+
+    if (
+      typeof promptOrOptions === 'object' &&
+      !promptOrOptions.stdinDoesNotEnd
+    ) {
+      child.stdin!.end();
+    }
 
     child.stdout!.on('data', (data: Buffer) => {
       stdout += data;
@@ -249,7 +257,7 @@ export class TestRig {
           if (env.GEMINI_SANDBOX === 'podman') {
             // Remove telemetry JSON objects from output
             // They are multi-line JSON objects that start with { and contain telemetry fields
-            const lines = result.split('\n');
+            const lines = result.split(EOL);
             const filteredLines = [];
             let inTelemetryObject = false;
             let braceDepth = 0;
@@ -510,7 +518,7 @@ export class TestRig {
     // If no matches found with the simple pattern, try the JSON parsing approach
     // in case the format changes
     if (logs.length === 0) {
-      const lines = stdout.split('\n');
+      const lines = stdout.split(EOL);
       let currentObject = '';
       let inObject = false;
       let braceDepth = 0;

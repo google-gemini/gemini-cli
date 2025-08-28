@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
@@ -12,7 +12,11 @@ import {
 } from './constants.js';
 
 import { ToolCallDecision } from './tool-call-decision.js';
-import { ApiErrorEvent, ApiResponseEvent, ToolCallEvent } from './types.js';
+import type {
+  ApiErrorEvent,
+  ApiResponseEvent,
+  ToolCallEvent,
+} from './types.js';
 
 export type UiEvent =
   | (ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE })

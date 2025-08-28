@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { DiscoveredMCPPrompt } from '../tools/mcp-client.js';
+import type { DiscoveredMCPPrompt } from '../tools/mcp-client.js';
 
 export class PromptRegistry {
   private prompts: Map<string, DiscoveredMCPPrompt> = new Map();

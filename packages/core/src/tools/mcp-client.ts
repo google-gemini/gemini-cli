@@ -5,38 +5,41 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import {
-  SSEClientTransport,
-  SSEClientTransportOptions,
-} from '@modelcontextprotocol/sdk/client/sse.js';
-import {
-  StreamableHTTPClientTransport,
-  StreamableHTTPClientTransportOptions,
-} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import {
+import type { SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import type { StreamableHTTPClientTransportOptions } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type {
   Prompt,
-  ListPromptsResultSchema,
   GetPromptResult,
+} from '@modelcontextprotocol/sdk/types.js';
+import {
+  ListPromptsResultSchema,
   GetPromptResultSchema,
   ListRootsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
-import { AuthProviderType, MCPServerConfig } from '../config/config.js';
+import type { MCPServerConfig } from '../config/config.js';
+import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 
-import { FunctionDeclaration, mcpToTool } from '@google/genai';
-import { ToolRegistry } from './tool-registry.js';
-import { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { FunctionDeclaration } from '@google/genai';
+import { mcpToTool } from '@google/genai';
+import type { ToolRegistry } from './tool-registry.js';
+import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { Unsubscribe, WorkspaceContext } from '../utils/workspaceContext.js';
+import type {
+  Unsubscribe,
+  WorkspaceContext,
+} from '../utils/workspaceContext.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -325,15 +328,12 @@ async function handleAutomaticOAuth(
       OAuthUtils.parseWWWAuthenticateHeader(wwwAuthenticate);
     if (resourceMetadataUri) {
       oauthConfig = await OAuthUtils.discoverOAuthConfig(resourceMetadataUri);
-    } else if (mcpServerConfig.url) {
-      // Fallback: try to discover OAuth config from the base URL for SSE
-      const sseUrl = new URL(mcpServerConfig.url);
-      const baseUrl = `${sseUrl.protocol}//${sseUrl.host}`;
-      oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
-    } else if (mcpServerConfig.httpUrl) {
-      // Fallback: try to discover OAuth config from the base URL for HTTP
-      const httpUrl = new URL(mcpServerConfig.httpUrl);
-      const baseUrl = `${httpUrl.protocol}//${httpUrl.host}`;
+    } else if (hasNetworkTransport(mcpServerConfig)) {
+      // Fallback: try to discover OAuth config from the base URL
+      const serverUrl = new URL(
+        mcpServerConfig.httpUrl || mcpServerConfig.url!,
+      );
+      const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
       oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
     }
 
@@ -784,6 +784,16 @@ export async function invokeMcpPrompt(
 }
 
 /**
+ * @visiblefortesting
+ * Checks if the MCP server configuration has a network transport URL (SSE or HTTP).
+ * @param config The MCP server configuration.
+ * @returns True if a `url` or `httpUrl` is present, false otherwise.
+ */
+export function hasNetworkTransport(config: MCPServerConfig): boolean {
+  return !!(config.url || config.httpUrl);
+}
+
+/**
  * Creates and connects an MCP client to a server based on the provided configuration.
  * It determines the appropriate transport (Stdio, SSE, or Streamable HTTP) and
  * establishes a connection. It also applies a patch to handle request timeouts.
@@ -879,10 +889,7 @@ export async function connectToMcpServer(
   } catch (error) {
     // Check if this is a 401 error that might indicate OAuth is required
     const errorString = String(error);
-    if (
-      errorString.includes('401') &&
-      (mcpServerConfig.httpUrl || mcpServerConfig.url)
-    ) {
+    if (errorString.includes('401') && hasNetworkTransport(mcpServerConfig)) {
       mcpServerRequiresOAuth.set(mcpServerName, true);
       // Only trigger automatic OAuth discovery for HTTP servers or when OAuth is explicitly configured
       // For SSE servers, we should not trigger new OAuth flows automatically
@@ -922,15 +929,18 @@ export async function connectToMcpServer(
       let wwwAuthenticate = extractWWWAuthenticateHeader(errorString);
 
       // If we didn't get the header from the error string, try to get it from the server
-      if (!wwwAuthenticate && mcpServerConfig.url) {
+      if (!wwwAuthenticate && hasNetworkTransport(mcpServerConfig)) {
         console.log(
           `No www-authenticate header in error, trying to fetch it from server...`,
         );
         try {
-          const response = await fetch(mcpServerConfig.url, {
+          const urlToFetch = mcpServerConfig.httpUrl || mcpServerConfig.url!;
+          const response = await fetch(urlToFetch, {
             method: 'HEAD',
             headers: {
-              Accept: 'text/event-stream',
+              Accept: mcpServerConfig.httpUrl
+                ? 'application/json'
+                : 'text/event-stream',
             },
             signal: AbortSignal.timeout(5000),
           });
@@ -945,7 +955,9 @@ export async function connectToMcpServer(
           }
         } catch (fetchError) {
           console.debug(
-            `Failed to fetch www-authenticate header: ${getErrorMessage(fetchError)}`,
+            `Failed to fetch www-authenticate header: ${getErrorMessage(
+              fetchError,
+            )}`,
           );
         }
       }
@@ -1071,12 +1083,14 @@ export async function connectToMcpServer(
           );
         }
 
-        // For SSE servers, try to discover OAuth configuration from the base URL
+        // For SSE/HTTP servers, try to discover OAuth configuration from the base URL
         console.log(`🔍 Attempting OAuth discovery for '${mcpServerName}'...`);
 
-        if (mcpServerConfig.url) {
-          const sseUrl = new URL(mcpServerConfig.url);
-          const baseUrl = `${sseUrl.protocol}//${sseUrl.host}`;
+        if (hasNetworkTransport(mcpServerConfig)) {
+          const serverUrl = new URL(
+            mcpServerConfig.httpUrl || mcpServerConfig.url!,
+          );
+          const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
 
           try {
             // Try to discover OAuth configuration from the base URL
@@ -1096,14 +1110,15 @@ export async function connectToMcpServer(
 
               // Perform OAuth authentication
               // Pass the server URL for proper discovery
-              const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
+              const authServerUrl =
+                mcpServerConfig.httpUrl || mcpServerConfig.url;
               console.log(
                 `Starting OAuth authentication for server '${mcpServerName}'...`,
               );
               await MCPOAuthProvider.authenticate(
                 mcpServerName,
                 oauthAuthConfig,
-                serverUrl,
+                authServerUrl,
               );
 
               // Retry connection with OAuth token

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { StructuredError } from '../core/turn.js';
+import type { StructuredError } from '../core/turn.js';
 
 export interface ApiError {
   error: {

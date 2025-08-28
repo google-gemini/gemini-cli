@@ -5,14 +5,14 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { Settings, LoadedSettings } from '../../config/settings.js';
+import type { Settings, LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import {
   loadTrustedFolders,
   TrustLevel,
   isWorkspaceTrusted,
 } from '../../config/trustedFolders.js';
-import * as process from 'process';
+import * as process from 'node:process';
 
 export const useFolderTrust = (
   settings: LoadedSettings,
@@ -20,8 +20,12 @@ export const useFolderTrust = (
 ) => {
   const [isTrusted, setIsTrusted] = useState<boolean | undefined>(undefined);
   const [isFolderTrustDialogOpen, setIsFolderTrustDialogOpen] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
 
-  const { folderTrust, folderTrustFeature } = settings.merged;
+  const folderTrust = settings.merged.security?.folderTrust?.enabled;
+  const folderTrustFeature =
+    settings.merged.security?.folderTrust?.featureEnabled;
+
   useEffect(() => {
     const trusted = isWorkspaceTrusted({
       folderTrust,
@@ -38,6 +42,8 @@ export const useFolderTrust = (
       const cwd = process.cwd();
       let trustLevel: TrustLevel;
 
+      const wasTrusted = isTrusted ?? true;
+
       switch (choice) {
         case FolderTrustChoice.TRUST_FOLDER:
           trustLevel = TrustLevel.TRUST_FOLDER;
@@ -53,20 +59,27 @@ export const useFolderTrust = (
       }
 
       trustedFolders.setValue(cwd, trustLevel);
-      const trusted = isWorkspaceTrusted({
-        folderTrust,
-        folderTrustFeature,
-      } as Settings);
-      setIsTrusted(trusted);
-      setIsFolderTrustDialogOpen(false);
-      onTrustChange(trusted);
+      const newIsTrusted =
+        trustLevel === TrustLevel.TRUST_FOLDER ||
+        trustLevel === TrustLevel.TRUST_PARENT;
+      setIsTrusted(newIsTrusted);
+      onTrustChange(newIsTrusted);
+
+      const needsRestart = wasTrusted !== newIsTrusted;
+      if (needsRestart) {
+        setIsRestarting(true);
+        setIsFolderTrustDialogOpen(true);
+      } else {
+        setIsFolderTrustDialogOpen(false);
+      }
     },
-    [onTrustChange, folderTrust, folderTrustFeature],
+    [onTrustChange, isTrusted],
   );
 
   return {
     isTrusted,
     isFolderTrustDialogOpen,
     handleFolderTrustSelect,
+    isRestarting,
   };
 };
