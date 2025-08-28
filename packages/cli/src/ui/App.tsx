@@ -13,9 +13,7 @@ import { Composer } from './components/Composer.js';
 import { useUIState } from './contexts/UIStateContext.js';
 import { QuittingDisplay } from './components/QuittingDisplay.js';
 
-interface AppProps {}
-
-export const App = (props: AppProps) => {
+export const App = () => {
   const uiState = useUIState();
 
   if (uiState.quittingMessages) {

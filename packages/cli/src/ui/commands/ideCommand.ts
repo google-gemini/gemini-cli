@@ -9,6 +9,7 @@ import {
   getIdeInstaller,
   IDEConnectionStatus,
   ideContext,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
 import type {
@@ -218,22 +219,44 @@ export const ideCommand: SlashCommand = {
           content: 'IDE installer not available for this IDE.',
         };
       }
-      const result = await installer.install();
-      
+      // Try to connect directly first
+      try {
+        if (ideClient.connect) {
+          await ideClient.connect();
+        }
+        await context.services.config?.setIdeModeAndSyncConnection(true);
+        const { messageType, content } = getIdeStatusMessage(ideClient);
+        return {
+          type: 'message',
+          messageType,
+          content,
+        };
+      } catch (error) {
+        // If connection fails directly, return the error
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `Failed to connect: ${getErrorMessage(error)}`,
+        };
+      }
+
+      // Not installed, proceed with installation
+      const result = await installer!.install();
+
       if (result.success) {
         context.services.settings.setValue(
           SettingScope.User,
           'ide.enabled',
           true,
         );
-        
+
         // Poll for up to 5 seconds for the extension to activate.
-        const ideClient = context.services.config?.getIdeClient();
-        if (ideClient) {
+        const ideClient2 = context.services.config?.getIdeClient();
+        if (ideClient2) {
           for (let i = 0; i < 10; i++) {
             await context.services.config?.setIdeModeAndSyncConnection(true);
             if (
-              ideClient.getConnectionStatus().status ===
+              ideClient2!.getConnectionStatus().status ===
               IDEConnectionStatus.Connected
             ) {
               break;
@@ -241,23 +264,24 @@ export const ideCommand: SlashCommand = {
             await new Promise((resolve) => setTimeout(resolve, 500));
           }
 
-          const { messageType, content } = getIdeStatusMessage(ideClient);
+          const { messageType, content } = getIdeStatusMessage(ideClient2!);
           if (messageType === 'error') {
             return {
               type: 'message',
               messageType: 'error',
-              content: 'Failed to automatically enable IDE integration. To fix this, run the CLI in a new terminal window.',
+              content:
+                'Failed to automatically enable IDE integration. To fix this, run the CLI in a new terminal window.',
             };
           } else {
             return {
               type: 'message',
-              messageType: messageType,
-              content: content,
+              messageType,
+              content,
             };
           }
         }
       }
-      
+
       return {
         type: 'message',
         messageType: result.success ? 'info' : 'error',
@@ -277,8 +301,8 @@ export const ideCommand: SlashCommand = {
         const { messageType, content } = getIdeStatusMessage(ideClient);
         return {
           type: 'message',
-          messageType: messageType,
-          content: content,
+          messageType,
+          content,
         };
       }
       return {
@@ -300,8 +324,8 @@ export const ideCommand: SlashCommand = {
         const { messageType, content } = getIdeStatusMessage(ideClient);
         return {
           type: 'message',
-          messageType: messageType,
-          content: content,
+          messageType,
+          content,
         };
       }
       return {

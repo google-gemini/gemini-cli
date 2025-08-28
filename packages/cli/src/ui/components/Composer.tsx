@@ -26,9 +26,7 @@ import { StreamingState } from '../types.js';
 
 const MAX_DISPLAYED_QUEUED_MESSAGES = 3;
 
-interface ComposerProps {}
-
-export const Composer = (props: ComposerProps) => {
+export const Composer = () => {
   const config = useConfig();
   const settings = useSettings();
   const uiState = useUIState();
@@ -37,9 +35,9 @@ export const Composer = (props: ComposerProps) => {
   const terminalWidth = process.stdout.columns;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
-  
+
   const { contextFileNames, showAutoAcceptIndicator } = uiState;
-  
+
   // Build footer props from context values
   const footerProps: Omit<FooterProps, 'vimMode'> = {
     model: config.getModel(),
@@ -50,7 +48,8 @@ export const Composer = (props: ComposerProps) => {
     corgiMode: uiState.corgiMode,
     errorCount: uiState.errorCount,
     showErrorDetails: uiState.showErrorDetails,
-    showMemoryUsage: config.getDebugMode() || settings.merged.ui?.showMemoryUsage || false,
+    showMemoryUsage:
+      config.getDebugMode() || settings.merged.ui?.showMemoryUsage || false,
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
     nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,

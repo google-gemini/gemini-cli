@@ -5,20 +5,20 @@
  */
 
 import { createContext, useContext } from 'react';
-import {
-  type HistoryItem,
+import type {
+  HistoryItem,
+  ThoughtSummary,
+  ConsoleMessageItem,
+  ShellConfirmationRequest,
+  ConfirmationRequest,
+  HistoryItemWithoutId,
   StreamingState,
-  type ThoughtSummary,
-  type ConsoleMessageItem,
-  type ShellConfirmationRequest,
-  type ConfirmationRequest,
-  type HistoryItemWithoutId,
 } from '../types.js';
-import { type CommandContext, type SlashCommand } from '../commands/types.js';
-import { type TextBuffer } from '../components/shared/text-buffer.js';
-import { type IdeContext, ApprovalMode } from '@google/gemini-cli-core';
-import { type DOMElement } from 'ink';
-import { type SessionStatsState } from '../contexts/SessionContext.js';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import type { TextBuffer } from '../components/shared/text-buffer.js';
+import type { IdeContext, ApprovalMode } from '@google/gemini-cli-core';
+import type { DOMElement } from 'ink';
+import type { SessionStatsState } from '../contexts/SessionContext.js';
 
 export interface UIState {
   history: HistoryItem[];
@@ -68,6 +68,7 @@ export interface UIState {
   messageQueue: string[];
   showAutoAcceptIndicator: ApprovalMode;
   showWorkspaceMigrationDialog: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   workspaceExtensions: any[]; // Extension[]
   // New fields for complete state management
   contextFileNames: string[];

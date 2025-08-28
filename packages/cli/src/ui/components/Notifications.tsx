@@ -10,9 +10,7 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { Colors } from '../colors.js';
 import { StreamingState } from '../types.js';
 
-interface NotificationsProps {}
-
-export const Notifications = (props: NotificationsProps) => {
+export const Notifications = () => {
   const { startupWarnings } = useAppContext();
   const { initError, streamingState } = useUIState();
 

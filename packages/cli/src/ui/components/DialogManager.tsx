@@ -24,9 +24,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 
 // Props for DialogManager
-interface DialogManagerProps {}
-
-export const DialogManager = (props: DialogManagerProps) => {
+export const DialogManager = () => {
   const config = useConfig();
   const settings = useSettings();
 

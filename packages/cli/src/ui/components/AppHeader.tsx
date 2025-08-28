@@ -12,9 +12,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 
-interface AppHeaderProps {}
-
-export const AppHeader = (props: AppHeaderProps) => {
+export const AppHeader = () => {
   const { version } = useAppContext();
   const settings = useSettings();
   const config = useConfig();

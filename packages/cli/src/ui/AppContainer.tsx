@@ -41,7 +41,7 @@ import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useStdin, useStdout } from 'ink';
 import ansiEscapes from 'ansi-escapes';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
@@ -59,7 +59,7 @@ import { appEvents, AppEvent } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
-import { registerCleanup } from '../utils/cleanup.js';
+import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
@@ -128,11 +128,11 @@ export const AppContainer = (props: AppContainerProps) => {
   const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
   const { stdin, setRawMode } = useStdin();
   const { stdout } = useStdout();
-  
+
   // Additional hooks moved from App.tsx
   const { stats: sessionStats } = useSessionStats();
   const branchName = useGitBranchName(config.getTargetDir());
-  
+
   // Layout measurements
   const mainControlsRef = useRef<DOMElement>(null);
   const staticExtraHeight = 3;
@@ -275,7 +275,8 @@ export const AppContainer = (props: AppContainerProps) => {
       openSettingsDialog,
       quit: (messages: HistoryItem[]) => {
         setQuittingMessages(messages);
-        setTimeout(() => {
+        setTimeout(async () => {
+          await runExitCleanup();
           process.exit(0);
         }, 100);
       },
@@ -407,7 +408,10 @@ export const AppContainer = (props: AppContainerProps) => {
     });
 
   cancelHandlerRef.current = useCallback(() => {
-    const pendingHistoryItems = [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems];
+    const pendingHistoryItems = [
+      ...pendingSlashCommandHistoryItems,
+      ...pendingGeminiHistoryItems,
+    ];
     if (isToolExecuting(pendingHistoryItems)) {
       buffer.setText(''); // Just clear the prompt
       return;
@@ -451,7 +455,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
   const isInputActive = !initError && !isProcessing;
-  
+
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = useMemo(() => {
     if (mainControlsRef.current) {
@@ -459,11 +463,11 @@ export const AppContainer = (props: AppContainerProps) => {
       return terminalHeight - fullFooterMeasurement.height - staticExtraHeight;
     }
     return terminalHeight - staticExtraHeight;
-  }, [terminalHeight, isInputActive]);
+  }, [terminalHeight]);
 
   const isFocused = useFocus();
   useBracketedPaste();
-  
+
   // Context file names computation
   const contextFileNames = useMemo(() => {
     const fromSettings = settings.merged.context?.fileName;
@@ -473,12 +477,11 @@ export const AppContainer = (props: AppContainerProps) => {
         : [fromSettings]
       : getAllGeminiMdFilenames();
   }, [settings.merged.context?.fileName]);
-  
   // Initial prompt handling
   const initialPrompt = useMemo(() => config.getQuestion(), [config]);
   const initialPromptSubmitted = useRef(false);
   const geminiClient = config.getGeminiClient();
-  
+
   useEffect(() => {
     if (
       initialPrompt &&
@@ -725,7 +728,7 @@ export const AppContainer = (props: AppContainerProps) => {
     }
     return consoleMessages.filter((msg) => msg.type !== 'debug');
   }, [consoleMessages, config]);
-  
+
   // Computed values
   const errorCount = useMemo(
     () =>
@@ -734,9 +737,9 @@ export const AppContainer = (props: AppContainerProps) => {
         .reduce((total, msg) => total + msg.count, 0),
     [filteredConsoleMessages],
   );
-  
+
   const nightly = props.version.includes('nightly');
-  
+
   const dialogsVisible = useMemo(
     () =>
       showWorkspaceMigrationDialog ||
@@ -764,7 +767,7 @@ export const AppContainer = (props: AppContainerProps) => {
       showPrivacyNotice,
     ],
   );
-  
+
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],

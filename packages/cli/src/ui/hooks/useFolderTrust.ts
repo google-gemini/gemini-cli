@@ -61,7 +61,7 @@ export const useFolderTrust = (
       setIsFolderTrustDialogOpen(false);
       onTrustChange(trusted);
     },
-    [folderTrust, folderTrustFeature, settings.merged, onTrustChange],
+    [settings.merged, onTrustChange],
   );
 
   return {

@@ -11,9 +11,7 @@ import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { AppHeader } from './AppHeader.js';
 
-interface MainContentProps {}
-
-export const MainContent = (props: MainContentProps) => {
+export const MainContent = () => {
   const uiState = useUIState();
   const {
     pendingHistoryItems,

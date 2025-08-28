@@ -121,41 +121,26 @@ Action: Systematically update all import paths in the modified files to reflect 
 
 Rule 7: Verification Protocol
 
-During Merge Resolution (Compilation Only):
-1.  npm run typecheck - Must pass with zero errors
-2.  npm run build - Must complete successfully
+This protocol is applied in two stages, corresponding to the two commits being rebased.
 
-IMPORTANT: Do NOT run tests during merge resolution. Tests may fail due to incomplete refactor state - this is expected and will be addressed after the complete refactor is finished.
+**Stage 1: Architectural Refactor Commit**
 
-User Smoke Test (Interactive CLI):
-After a successful npm run build, the AI agent will provide a set of commands based on the functionality modified in the last commit. The user should then perform the following steps:
+During the merge resolution for the first commit (the main architectural refactor):
 
-1.  Start the CLI: Run npm run start.
-2.  Execute Provided Commands: Run the commands provided by the AI agent within the interactive Gemini CLI.
-3.  Verify Behavior: Check if the application behaves as expected.
-4.  Provide Feedback: Inform the AI agent if the tests passed or failed.
+1.  **Compilation Only:**
+    *   `npm run typecheck` - Must pass with zero errors.
+    *   `npm run build` - Must complete successfully.
+2.  **No Testing:** Do NOT run tests (`npm test` or `npm run preflight`). Tests are expected to fail at this stage and will be addressed by the next commit.
+3.  **User Smoke Test:** After a successful build, provide a smoke test plan for the user to manually verify core functionality.
 
-Example Test Scenarios (to be provided by AI):
+**Stage 2: Test Fixes Commit**
 
-* Authentication Flow:
-    * Run /auth
-    * Expected: Auth dialog opens and works correctly.
-* Theme Switching:
-    * Run /theme
-    * Expected: Theme dialog opens and theme changes apply.
-* Core Chat Functionality:
-    * Enter "Hello, test message"
-    * Expected: Message sends and response streams correctly.
+During the merge resolution for the second commit (which contains the test fixes):
 
-Note: Focus testing on the specific features and components that were modified in the current commit. Skip tests for unchanged functionality to save time.
-
-Expected Behavior: All dialogs should open/close properly, state should persist between commands, and core chat functionality should work identically to pre-refactor behavior.
-
-Architectural Checklist (Secondary):
--   App.tsx contains no state management logic.
--   No props are passed more than one level deep from App.tsx or AppContainer.tsx.
--   All dialog visibility is controlled by state in UIStateContext.
--   All stateful logic resides in AppContainer.tsx.
+1.  **Full Preflight Check:**
+    *   `npm run preflight` - Must pass completely. This includes building, linting, type-checking, and running all tests.
+2.  **Fix Failures:** If any part of `preflight` fails, fix the issues as part of the conflict resolution.
+3.  **User Smoke Test:** Provide a smoke test plan focused on the areas covered by the new tests.
 
 ---
 
