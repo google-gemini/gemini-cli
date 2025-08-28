@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
+  CompressionStatus,
   ToolCallConfirmationDetails,
   ToolResultDisplay,
-  UserTierId,
 } from '@google/gemini-cli-core';
+import type { PartListUnion } from '@google/genai';
 
 // Only defining the state enum needed by the UI
 export enum StreamingState {
@@ -57,6 +58,7 @@ export interface CompressionProps {
   isPending: boolean;
   originalTokenCount: number | null;
   newTokenCount: number | null;
+  compressionStatus: CompressionStatus | null;
 }
 
 export interface HistoryItemBase {
@@ -97,7 +99,6 @@ export type HistoryItemAbout = HistoryItemBase & {
   selectedAuthType: string;
   gcpProject: string;
   ideClient: string;
-  userTier?: UserTierId;
 };
 
 export type HistoryItemHelp = HistoryItemBase & {
@@ -239,7 +240,7 @@ export interface ConsoleMessageItem {
  */
 export interface SubmitPromptResult {
   type: 'submit_prompt';
-  content: string;
+  content: PartListUnion;
 }
 
 /**

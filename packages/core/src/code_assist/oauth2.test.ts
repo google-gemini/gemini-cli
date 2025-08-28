@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   getOauthClient,
   resetOauthClientForTesting,
@@ -20,7 +21,7 @@ import open from 'open';
 import crypto from 'node:crypto';
 import * as os from 'node:os';
 import { AuthType } from '../core/contentGenerator.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import readline from 'node:readline';
 
 vi.mock('os', async (importOriginal) => {

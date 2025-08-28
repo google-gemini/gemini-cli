@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { CommandModule } from 'yargs';
+import type { CommandModule } from 'yargs';
 import { loadUserExtensions, toOutputString } from '../../config/extension.js';
+import { getErrorMessage } from '../../utils/errors.js';
 
 export async function handleList() {
   try {
@@ -20,7 +21,7 @@ export async function handleList() {
         .join('\n\n'),
     );
   } catch (error) {
-    console.error((error as Error).message);
+    console.error(getErrorMessage(error));
     process.exit(1);
   }
 }

@@ -8,16 +8,17 @@ import * as fsPromises from 'node:fs/promises';
 import React from 'react';
 import { Text } from 'ink';
 import { Colors } from '../colors.js';
-import {
+import type {
   CommandContext,
   SlashCommand,
   MessageActionReturn,
-  CommandKind,
   SlashCommandActionReturn,
 } from './types.js';
+import { CommandKind } from './types.js';
 import { decodeTagName } from '@google/gemini-cli-core';
 import path from 'node:path';
-import { HistoryItemWithoutId, MessageType } from '../types.js';
+import type { HistoryItemWithoutId } from '../types.js';
+import { MessageType } from '../types.js';
 
 interface ChatDetail {
   name: string;

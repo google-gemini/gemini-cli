@@ -31,11 +31,7 @@ export default tseslint.config(
       'node_modules/*',
       '.integration-tests/**',
       'eslint.config.js',
-      'packages/cli/dist/**',
-      'packages/core/dist/**',
-      'packages/server/dist/**',
-      'packages/test-utils/dist/**',
-      'packages/vscode-ide-companion/dist/**',
+      'packages/**/dist/**',
       'bundle/**',
       'package/bundle/**',
       '.integration-tests/**',
@@ -107,6 +103,10 @@ export default tseslint.config(
       '@typescript-eslint/no-inferrable-types': [
         'error',
         { ignoreParameters: true, ignoreProperties: true },
+      ],
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { disallowTypeAnnotations: false },
       ],
       '@typescript-eslint/no-namespace': ['error', { allowDeclarations: true }],
       '@typescript-eslint/no-unused-vars': [

@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
+import { SettingScope } from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../../config/auth.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -62,13 +64,8 @@ export function AuthDialog({
   });
   const items = [
     {
-      label: 'Login with Google - Free Tier',
+      label: 'Login with Google',
       value: AuthType.LOGIN_WITH_GOOGLE,
-    },
-    {
-      label:
-        'Login with Google - Gemini Code Assist (Requires GOOGLE_CLOUD_PROJECT)',
-      value: AuthType.LOGIN_WITH_GOOGLE_GCA,
     },
     ...(process.env['CLOUD_SHELL'] === 'true'
       ? [
@@ -86,8 +83,8 @@ export function AuthDialog({
   ];
 
   const initialAuthIndex = items.findIndex((item) => {
-    if (settings.merged.selectedAuthType) {
-      return item.value === settings.merged.selectedAuthType;
+    if (settings.merged.security?.auth?.selectedType) {
+      return item.value === settings.merged.security.auth.selectedType;
     }
 
     const defaultAuthType = parseDefaultAuthType(
@@ -122,7 +119,7 @@ export function AuthDialog({
         if (errorMessage) {
           return;
         }
-        if (settings.merged.selectedAuthType === undefined) {
+        if (settings.merged.security?.auth?.selectedType === undefined) {
           // Prevent exiting if no auth method is set
           setErrorMessage(
             'You must select an auth method to proceed. Press Ctrl+C twice to exit.',

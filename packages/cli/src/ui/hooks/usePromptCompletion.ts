@@ -5,13 +5,14 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import type { Config } from '@google/gemini-cli-core';
 import {
-  Config,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   getResponseText,
 } from '@google/gemini-cli-core';
-import { Content, GenerateContentConfig } from '@google/genai';
-import { TextBuffer } from '../components/shared/text-buffer.js';
+import type { Content, GenerateContentConfig } from '@google/genai';
+import type { TextBuffer } from '../components/shared/text-buffer.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
 
 export const PROMPT_COMPLETION_MIN_LENGTH = 5;
 export const PROMPT_COMPLETION_DEBOUNCE_MS = 250;
@@ -81,7 +82,7 @@ export function usePromptCompletion({
     if (
       trimmedText.length < PROMPT_COMPLETION_MIN_LENGTH ||
       !geminiClient ||
-      trimmedText.startsWith('/') ||
+      isSlashCommand(trimmedText) ||
       trimmedText.includes('@') ||
       !isPromptCompletionEnabled
     ) {
@@ -237,7 +238,7 @@ export function usePromptCompletion({
     const trimmedText = buffer.text.trim();
     return (
       trimmedText.length >= PROMPT_COMPLETION_MIN_LENGTH &&
-      !trimmedText.startsWith('/') &&
+      !isSlashCommand(trimmedText) &&
       !trimmedText.includes('@')
     );
   }, [buffer.text, isPromptCompletionEnabled, isCursorAtEnd]);

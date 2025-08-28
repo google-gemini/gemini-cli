@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType, ContentGenerator } from '../core/contentGenerator.js';
+import type { ContentGenerator } from '../core/contentGenerator.js';
+import { AuthType } from '../core/contentGenerator.js';
 import { getOauthClient } from './oauth2.js';
 import { setupUser } from './setup.js';
-import { CodeAssistServer, HttpOptions } from './server.js';
-import { Config } from '../config/config.js';
+import type { HttpOptions } from './server.js';
+import { CodeAssistServer } from './server.js';
+import type { Config } from '../config/config.js';
 
 export async function createCodeAssistContentGenerator(
   httpOptions: HttpOptions,
@@ -18,11 +20,10 @@ export async function createCodeAssistContentGenerator(
 ): Promise<ContentGenerator> {
   if (
     authType === AuthType.LOGIN_WITH_GOOGLE ||
-    authType === AuthType.LOGIN_WITH_GOOGLE_GCA ||
     authType === AuthType.CLOUD_SHELL
   ) {
     const authClient = await getOauthClient(authType, config);
-    const userData = await setupUser(authClient, authType);
+    const userData = await setupUser(authClient);
     return new CodeAssistServer(
       authClient,
       userData.projectId,

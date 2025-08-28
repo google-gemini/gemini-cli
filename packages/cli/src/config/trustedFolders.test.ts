@@ -35,7 +35,7 @@ import {
   TrustLevel,
   isWorkspaceTrusted,
 } from './trustedFolders.js';
-import { Settings } from './settings.js';
+import type { Settings } from './settings.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof fs>();
@@ -132,8 +132,12 @@ describe('isWorkspaceTrusted', () => {
   let mockCwd: string;
   const mockRules: Record<string, TrustLevel> = {};
   const mockSettings: Settings = {
-    folderTrustFeature: true,
-    folderTrust: true,
+    security: {
+      folderTrust: {
+        featureEnabled: true,
+        enabled: true,
+      },
+    },
   };
 
   beforeEach(() => {
