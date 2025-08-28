@@ -182,6 +182,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     override readonly parameterSchema: unknown,
     readonly timeout?: number,
     readonly trust?: boolean,
+    readonly strictSchemeValidation?: boolean,
     nameOverride?: string,
   ) {
     super(
@@ -204,6 +205,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.parameterSchema,
       this.timeout,
       this.trust,
+      this.strictSchemeValidation,
       `${this.serverName}__${this.serverToolName}`,
     );
   }

@@ -567,13 +567,14 @@ export async function connectAndDiscover(
  *
  * @visiblefortesting
  */
-export function hasValidTypes(schema: unknown): boolean {
+export function hasValidTypes(schema: unknown, mcpServerConfig?: MCPServerConfig): boolean {
   if (typeof schema !== 'object' || schema === null) {
     // Not a schema object we can validate, or not a schema at all.
     // Treat as valid as it has no properties to be invalid.
     return true;
   }
-
+  //
+  const useStrictValidation = mcpServerConfig?.strictSchemeValidation ?? false;
   const s = schema as Record<string, unknown>;
 
   if (!s['type']) {
@@ -587,7 +588,7 @@ export function hasValidTypes(schema: unknown): boolean {
       if (Array.isArray(subSchemas)) {
         hasSubSchema = true;
         for (const subSchema of subSchemas) {
-          if (!hasValidTypes(subSchema)) {
+          if (!hasValidTypes(subSchema,mcpServerConfig )) {
             return false;
           }
         }
@@ -595,13 +596,14 @@ export function hasValidTypes(schema: unknown): boolean {
     }
 
     // If the node itself is missing a type and had no subschemas, then it isn't valid.
-    if (!hasSubSchema) return false;
+    // It won't skip a tool because there's no "type" in a subschema.
+    if (!hasSubSchema && useStrictValidation) return false;
   }
 
   if (s['type'] === 'object' && s['properties']) {
     if (typeof s['properties'] === 'object' && s['properties'] !== null) {
       for (const prop of Object.values(s['properties'])) {
-        if (!hasValidTypes(prop)) {
+        if (!hasValidTypes(prop,mcpServerConfig)) {
           return false;
         }
       }
@@ -609,7 +611,7 @@ export function hasValidTypes(schema: unknown): boolean {
   }
 
   if (s['type'] === 'array' && s['items']) {
-    if (!hasValidTypes(s['items'])) {
+    if (!hasValidTypes(s['items'], mcpServerConfig)) {
       return false;
     }
   }
@@ -649,7 +651,7 @@ export async function discoverTools(
           continue;
         }
 
-        if (!hasValidTypes(funcDecl.parametersJsonSchema)) {
+        if (!hasValidTypes(funcDecl.parametersJsonSchema,mcpServerConfig )) {
           console.warn(
             `Skipping tool '${funcDecl.name}' from MCP server '${mcpServerName}' ` +
               `because it has missing types in its parameter schema. Please file an ` +
@@ -667,6 +669,7 @@ export async function discoverTools(
             funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
             mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
             mcpServerConfig.trust,
+            mcpServerConfig.strictSchemeValidation,
           ),
         );
       } catch (error) {
