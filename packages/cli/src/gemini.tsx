@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { render } from 'ink';
+import React, { useState, useEffect } from 'react';
+import { render, Box, Text } from 'ink';
+import Spinner from 'ink-spinner';
 import { AppWrapper } from './ui/App.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
@@ -105,6 +106,39 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   await new Promise((resolve) => child.on('close', resolve));
   process.exit(0);
 }
+
+const InitializingComponent = ({ initialTotal }: { initialTotal: number }) => {
+  const [total, setTotal] = useState(initialTotal);
+  const [connected, setConnected] = useState(0);
+
+  useEffect(() => {
+    const onStart = ({ count }: { count: number }) => setTotal(count);
+    const onChange = () => {
+      setConnected((val) => val + 1);
+    };
+
+    appEvents.on('mcp-servers-discovery-start', onStart);
+    appEvents.on('mcp-server-connected', onChange);
+    appEvents.on('mcp-server-error', onChange);
+
+    return () => {
+      appEvents.off('mcp-servers-discovery-start', onStart);
+      appEvents.off('mcp-server-connected', onChange);
+      appEvents.off('mcp-server-error', onChange);
+    };
+  }, []);
+
+  const message = `Connecting to MCP servers... (${connected}/${total})`;
+
+  return (
+    <Box>
+      <Text>
+        <Spinner /> {message}
+      </Text>
+    </Box>
+  );
+};
+
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
 
 export function setupUnhandledRejectionHandler() {
@@ -238,7 +272,24 @@ export async function main() {
 
   setMaxSizedBoxDebugging(config.getDebugMode());
 
+  const mcpServers = config.getMcpServers();
+  const mcpServersCount = mcpServers ? Object.keys(mcpServers).length : 0;
+
+  let spinnerInstance;
+  if (config.isInteractive() && mcpServersCount > 0) {
+    spinnerInstance = render(
+      <InitializingComponent initialTotal={mcpServersCount} />,
+    );
+  }
+
   await config.initialize();
+
+  if (spinnerInstance) {
+    // Small UX detail to show the completion message for a bit before unmounting.
+    await new Promise((f) => setTimeout(f, 100));
+    spinnerInstance.clear();
+    spinnerInstance.unmount();
+  }
 
   if (config.getIdeMode()) {
     await config.getIdeClient().connect();
