@@ -26,9 +26,16 @@ async function getProcessInfo(pid: number): Promise<{
 }> {
   const platform = os.platform();
   if (platform === 'win32') {
-    const { stdout } = await execAsync(
-      `powershell "$p = Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}' -ErrorAction SilentlyContinue; if ($p) { @{Name=$p.Name;ParentProcessId=$p.ParentProcessId;CommandLine=$p.CommandLine} | ConvertTo-Json }"`,
-    );
+    const powershellCommand = [
+      '$p = Get-CimInstance Win32_Process',
+      `-Filter 'ProcessId=${pid}'`,
+      '-ErrorAction SilentlyContinue;',
+      'if ($p) {',
+      '@{Name=$p.Name;ParentProcessId=$p.ParentProcessId;CommandLine=$p.CommandLine}',
+      '| ConvertTo-Json',
+      '}',
+    ].join(' ');
+    const { stdout } = await execAsync(`powershell "${powershellCommand}"`);
     const output = stdout.trim();
     if (!output) return { parentPid: 0, name: '', command: '' };
     const {
