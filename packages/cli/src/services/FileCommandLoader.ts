@@ -96,12 +96,12 @@ export class FileCommandLoader implements ICommandLoader {
     const commandDirs = this.getCommandDirectories();
     for (const dirInfo of commandDirs) {
       try {
-        let files = await glob('**/*.toml', {
+        const files = await glob('**/*.toml', {
           ...globOptions,
           cwd: dirInfo.path,
         });
 
-        if(this.folderTrustEnabled && !this.folderTrust) {
+        if (this.folderTrustEnabled && !this.folderTrust) {
           return [];
         }
 
