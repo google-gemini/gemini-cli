@@ -56,6 +56,9 @@ export class McpClientManager {
    * them with the `ToolRegistry`.
    */
   async discoverAllMcpTools(cliConfig: Config): Promise<void> {
+    if (cliConfig.isTrustedFolder() === false) {
+      return;
+    }
     await this.stop();
 
     const servers = populateMcpServerCommand(
