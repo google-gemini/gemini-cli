@@ -99,7 +99,6 @@ describe('Trusted Folders Loading', () => {
       const { folders } = setup({
         config: {
           './myfolder': TrustLevel.TRUST_FOLDER,
-          '../myfolder': TrustLevel.TRUST_FOLDER,
           '/trustedparent/trustme': TrustLevel.TRUST_PARENT,
           '/user/folder': TrustLevel.TRUST_FOLDER,
           '/secret': TrustLevel.DO_NOT_TRUST,
@@ -111,7 +110,6 @@ describe('Trusted Folders Loading', () => {
       expect(folders.isPathTrusted('/secret/publickeys/public.pem')).toBe(true);
       expect(folders.isPathTrusted('/user/folder/harhar')).toBe(true);
       expect(folders.isPathTrusted('myfolder/somefile.jpg')).toBe(true);
-      expect(folders.isPathTrusted('../myfolder/somestuff')).toBe(true);
       expect(folders.isPathTrusted('/trustedparent/someotherfolder')).toBe(
         true,
       );

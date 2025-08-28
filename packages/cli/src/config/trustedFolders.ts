@@ -64,8 +64,6 @@ export class LoadedTrustedFolders {
     const trustedPaths: string[] = [];
     const untrustedPaths: string[] = [];
 
-    location = path.resolve(location);
-
     for (const rule of this.rules) {
       switch (rule.trustLevel) {
         case TrustLevel.TRUST_FOLDER:
