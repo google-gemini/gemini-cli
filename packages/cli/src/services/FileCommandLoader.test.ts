@@ -1183,4 +1183,48 @@ describe('FileCommandLoader', () => {
       }
     });
   });
+
+  describe('with folder trust enabled', () => {
+    it('loads multiple commands', async () => {
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => '/path/to/project'),
+        getExtensions: vi.fn(() => []),
+        getFolderTrustFeature: vi.fn(() => true),
+        getFolderTrust: vi.fn(() => true),
+      } as unknown as Config;
+      const userCommandsDir = Storage.getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'test1.toml': 'prompt = "Prompt 1"',
+          'test2.toml': 'prompt = "Prompt 2"',
+        },
+      });
+
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(2);
+    });
+
+    it('does not load when folder is not trusted', async () => {
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => '/path/to/project'),
+        getExtensions: vi.fn(() => []),
+        getFolderTrustFeature: vi.fn(() => true),
+        getFolderTrust: vi.fn(() => false),
+      } as unknown as Config;
+      const userCommandsDir = Storage.getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'test1.toml': 'prompt = "Prompt 1"',
+          'test2.toml': 'prompt = "Prompt 2"',
+        },
+      });
+
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(0);
+    });
+  });
 });
