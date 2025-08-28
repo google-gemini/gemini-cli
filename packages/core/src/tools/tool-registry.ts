@@ -20,7 +20,7 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import { EventEmitter } from 'node:events';
+import type { EventEmitter } from 'node:events';
 
 type ToolParams = Record<string, unknown>;
 

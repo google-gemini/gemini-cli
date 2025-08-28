@@ -54,7 +54,7 @@ import type { AnyToolInvocation } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
-import { EventEmitter } from 'node:events';
+import type { EventEmitter } from 'node:events';
 
 export enum ApprovalMode {
   DEFAULT = 'default',

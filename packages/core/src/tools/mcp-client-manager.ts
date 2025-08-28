@@ -13,7 +13,7 @@ import {
   populateMcpServerCommand,
 } from './mcp-client.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { EventEmitter } from 'node:events';
+import type { EventEmitter } from 'node:events';
 import type { WorkspaceContext } from '../utils/workspaceContext.js';
 
 /**
