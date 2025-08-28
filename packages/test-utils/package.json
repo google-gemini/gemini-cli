@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "@google/gemini-cli-core": "file:../core",
+    "vitest": "^3.1.1"
   },
   "engines": {
     "node": ">=20"
