@@ -63,8 +63,10 @@ const TomlCommandDefSchema = z.object({
  */
 export class FileCommandLoader implements ICommandLoader {
   private readonly projectRoot: string;
+  private readonly folderTrustEnabled: boolean;
 
   constructor(private readonly config: Config | null) {
+    this.folderTrustEnabled = !!config?.getFolderTrustFeature();
     this.projectRoot = config?.getProjectRoot() || process.cwd();
   }
 
@@ -96,6 +98,10 @@ export class FileCommandLoader implements ICommandLoader {
           ...globOptions,
           cwd: dirInfo.path,
         });
+
+        if(this.folderTrustEnabled) {
+          return [];
+        }
 
         const commandPromises = files.map((file) =>
           this.parseAndAdaptFile(
