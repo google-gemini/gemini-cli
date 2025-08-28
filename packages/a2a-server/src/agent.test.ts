@@ -33,7 +33,7 @@ import {
   assertTaskCreationAndWorkingStatus,
   createStreamMessageRequest,
 } from './testing_utils.js';
-import { MockTool } from '@google/gemini-cli-test-utils';
+import { MockTool } from '@google/gemini-cli-core';
 
 const mockToolConfirmationFn = async () =>
   ({}) as unknown as ToolCallConfirmationDetails;

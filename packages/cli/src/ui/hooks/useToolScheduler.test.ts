@@ -25,10 +25,13 @@ import type {
   AnyDeclarativeTool,
   AnyToolInvocation,
 } from '@google/gemini-cli-core';
-import { ToolConfirmationOutcome, ApprovalMode } from '@google/gemini-cli-core';
+import {
+  ToolConfirmationOutcome,
+  ApprovalMode,
+  MockTool,
+} from '@google/gemini-cli-core';
 import type { HistoryItemWithoutId, HistoryItemToolGroup } from '../types.js';
 import { ToolCallStatus } from '../types.js';
-import { MockTool } from '@google/gemini-cli-test-utils';
 
 // Mocks
 vi.mock('@google/gemini-cli-core', async () => {
