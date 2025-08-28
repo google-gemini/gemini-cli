@@ -22,13 +22,16 @@ import type {
   ToolCallResponseInfo,
   ToolCall, // Import from core
   Status as ToolCallStatusType,
+  ToolInvocation,
   AnyDeclarativeTool,
   AnyToolInvocation,
 } from '@google/gemini-cli-core';
 import {
   ToolConfirmationOutcome,
   ApprovalMode,
-  MockTool,
+  Kind,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
 } from '@google/gemini-cli-core';
 import type { HistoryItemWithoutId, HistoryItemToolGroup } from '../types.js';
 import { ToolCallStatus } from '../types.js';
@@ -61,20 +64,96 @@ const mockConfig = {
   }),
 } as unknown as Config;
 
-const mockTool = new MockTool({ name: 'mockTool', displayName: 'Mock Tool' });
-const mockToolWithLiveOutput = new MockTool({
-  name: 'mockToolWithLiveOutput',
-  displayName: 'Mock Tool With Live Output',
-  description: 'A mock tool for testing',
-  params: {},
-  isOutputMarkdown: true,
-  canUpdateOutput: true,
-});
+class MockToolInvocation extends BaseToolInvocation<object, ToolResult> {
+  constructor(
+    private readonly tool: MockTool,
+    params: object,
+  ) {
+    super(params);
+  }
+
+  getDescription(): string {
+    return JSON.stringify(this.params);
+  }
+
+  override shouldConfirmExecute(
+    abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    return this.tool.shouldConfirmExecute(this.params, abortSignal);
+  }
+
+  execute(
+    signal: AbortSignal,
+    updateOutput?: (output: string) => void,
+    terminalColumns?: number,
+    terminalRows?: number,
+  ): Promise<ToolResult> {
+    return this.tool.execute(
+      this.params,
+      signal,
+      updateOutput,
+      terminalColumns,
+      terminalRows,
+    );
+  }
+}
+
+class MockTool extends BaseDeclarativeTool<object, ToolResult> {
+  constructor(
+    name: string,
+    displayName: string,
+    canUpdateOutput = false,
+    shouldConfirm = false,
+    isOutputMarkdown = false,
+  ) {
+    super(
+      name,
+      displayName,
+      'A mock tool for testing',
+      Kind.Other,
+      {},
+      isOutputMarkdown,
+      canUpdateOutput,
+    );
+    if (shouldConfirm) {
+      this.shouldConfirmExecute.mockImplementation(
+        async (): Promise<ToolCallConfirmationDetails | false> => ({
+          type: 'edit',
+          title: 'Mock Tool Requires Confirmation',
+          onConfirm: mockOnUserConfirmForToolConfirmation,
+          filePath: 'mock',
+          fileName: 'mockToolRequiresConfirmation.ts',
+          fileDiff: 'Mock tool requires confirmation',
+          originalContent: 'Original content',
+          newContent: 'New content',
+        }),
+      );
+    }
+  }
+
+  execute = vi.fn();
+  shouldConfirmExecute = vi.fn();
+
+  protected createInvocation(
+    params: object,
+  ): ToolInvocation<object, ToolResult> {
+    return new MockToolInvocation(this, params);
+  }
+}
+
+const mockTool = new MockTool('mockTool', 'Mock Tool');
+const mockToolWithLiveOutput = new MockTool(
+  'mockToolWithLiveOutput',
+  'Mock Tool With Live Output',
+  true,
+);
 let mockOnUserConfirmForToolConfirmation: Mock;
-const mockToolRequiresConfirmation = new MockTool({
-  name: 'mockToolRequiresConfirmation',
-  displayName: 'Mock Tool Requires Confirmation',
-});
+const mockToolRequiresConfirmation = new MockTool(
+  'mockToolRequiresConfirmation',
+  'Mock Tool Requires Confirmation',
+  false,
+  true,
+);
 
 describe('useReactToolScheduler in YOLO Mode', () => {
   let onComplete: Mock;
@@ -638,23 +717,19 @@ describe('useReactToolScheduler', () => {
   });
 
   it('should schedule and execute multiple tool calls', async () => {
-    const tool1 = new MockTool({
-      name: 'tool1',
-      displayName: 'Tool 1',
-      execute: vi.fn().mockResolvedValue({
-        llmContent: 'Output 1',
-        returnDisplay: 'Display 1',
-      } as ToolResult),
-    });
+    const tool1 = new MockTool('tool1', 'Tool 1');
+    tool1.execute.mockResolvedValue({
+      llmContent: 'Output 1',
+      returnDisplay: 'Display 1',
+    } as ToolResult);
+    tool1.shouldConfirmExecute.mockResolvedValue(null);
 
-    const tool2 = new MockTool({
-      name: 'tool2',
-      displayName: 'Tool 2',
-      execute: vi.fn().mockResolvedValue({
-        llmContent: 'Output 2',
-        returnDisplay: 'Display 2',
-      } as ToolResult),
-    });
+    const tool2 = new MockTool('tool2', 'Tool 2');
+    tool2.execute.mockResolvedValue({
+      llmContent: 'Output 2',
+      returnDisplay: 'Display 2',
+    } as ToolResult);
+    tool2.shouldConfirmExecute.mockResolvedValue(null);
 
     mockToolRegistry.getTool.mockImplementation((name) => {
       if (name === 'tool1') return tool1;
@@ -795,12 +870,7 @@ describe('mapToDisplay', () => {
     args: { foo: 'bar' },
   } as any;
 
-  const baseTool = new MockTool({
-    name: 'testTool',
-    displayName: 'Test Tool Display',
-    execute: vi.fn(),
-    shouldConfirmExecute: vi.fn(),
-  });
+  const baseTool = new MockTool('testTool', 'Test Tool Display');
 
   const baseResponse: ToolCallResponseInfo = {
     callId: 'testCallId',
@@ -958,7 +1028,7 @@ describe('mapToDisplay', () => {
       expectedStatus: ToolCallStatus.Error,
       expectedResultDisplay: 'Execution failed display',
       expectedName: baseTool.displayName, // Changed from baseTool.name
-      expectedDescription: JSON.stringify(baseRequest.args),
+      expectedDescription: baseInvocation.getDescription(),
     },
     {
       name: 'cancelled',
@@ -1029,13 +1099,13 @@ describe('mapToDisplay', () => {
       invocation: baseTool.build(baseRequest.args),
       response: { ...baseResponse, callId: 'call1' },
     } as ToolCall;
-    const toolForCall2 = new MockTool({
-      name: baseTool.name,
-      displayName: baseTool.displayName,
-      isOutputMarkdown: true,
-      execute: vi.fn(),
-      shouldConfirmExecute: vi.fn(),
-    });
+    const toolForCall2 = new MockTool(
+      baseTool.name,
+      baseTool.displayName,
+      false,
+      false,
+      true,
+    );
     const toolCall2: ToolCall = {
       request: { ...baseRequest, callId: 'call2' },
       status: 'executing',
