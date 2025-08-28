@@ -16,6 +16,7 @@ import { simpleGit } from 'simple-git';
 import { SettingScope, loadSettings } from '../config/settings.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
+import { isWorkspaceTrusted } from './trustedFolders.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = '.gemini/extensions';
 
@@ -112,7 +113,10 @@ export function loadExtensions(workspaceDir: string): Extension[] {
   const disabledExtensions = settings.extensions?.disabled ?? [];
   const allExtensions = [...loadUserExtensions()];
 
-  if (!settings.experimental?.extensionManagement) {
+  if (
+    isWorkspaceTrusted(settings) &&
+    !settings.experimental?.extensionManagement
+  ) {
     allExtensions.push(...getWorkspaceExtensions(workspaceDir));
   }
 
