@@ -114,7 +114,7 @@ export function loadExtensions(workspaceDir: string): Extension[] {
   const allExtensions = [...loadUserExtensions()];
 
   if (
-    isWorkspaceTrusted(settings) &&
+    (isWorkspaceTrusted(settings) ?? true) &&
     !settings.experimental?.extensionManagement
   ) {
     allExtensions.push(...getWorkspaceExtensions(workspaceDir));
