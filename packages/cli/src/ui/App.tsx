@@ -591,6 +591,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     history,
     addItem,
     config,
+    settings,
     setDebugMessage,
     handleSlashCommand,
     shellModeActive,
