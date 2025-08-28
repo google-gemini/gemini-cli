@@ -27,9 +27,10 @@ import { defaultConfig, getCompatiblePaths } from '../config.js';
 import { GuardrailStore } from '../tools/shared-guardrail-store.js';
 import { Neo4jStore } from '../tools/shared-neo4j-store.js';
 import * as dotenv from 'dotenv';
-import { githubTools } from '../mcp/github-mcp-client.js';
+import { githubTools, githubWorkflowTools } from '../mcp/github-mcp-client.js';
 import { productionReadinessPrompt } from '../prompts/production_readiness_prompt.js';
 import { guardrailAgentPrompt } from '../prompts/guardrail_agent_prompt.js';
+import { githubWorkflowDebuggerPrompt } from '../prompts/github_workflow_debugger_prompt.js';
 import { Memory } from '@mastra/memory';
 import { LibSQLStore } from '@mastra/libsql';
 import { createStreamingSSEHandler } from '../api/streaming-sse.js';
@@ -442,6 +443,22 @@ const guardrailAgent = new Agent({
   memory,
 });
 
+// Create GitHub Workflow Debugger Agent for Mastra
+const githubWorkflowDebuggerAgent = new Agent({
+  name: 'github-workflow-debugger',
+  instructions: githubWorkflowDebuggerPrompt,
+  model: anthropic('claude-3-5-sonnet-20241022'),
+  defaultGenerateOptions: {
+    maxSteps: 100,
+  },
+  tools: {
+    claudeCode: claudeCodeTool,
+    ekg: ekgCrudTool,
+    ...githubWorkflowTools,
+  },
+  memory,
+});
+
 export const mastra = new Mastra({
   agents: {
     'accelos-google': accelosGoogleAgent,
@@ -449,6 +466,7 @@ export const mastra = new Mastra({
     'accelos-anthropic': accelosAnthropicAgent,
     'guardrail-agent': guardrailAgent,
     'production-readiness-agent': productionReadinessAgent,
+    'github-workflow-debugger': githubWorkflowDebuggerAgent,
   },
   workflows: {
     'code-review-workflow': codeReviewWorkflow,
