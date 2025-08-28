@@ -22,4 +22,11 @@ describe('extensions install command', () => {
       validationParser.parse('install --source some-url --path /some/path'),
     ).toThrow('Arguments source and path are mutually exclusive');
   });
+
+  it('should fail on invalid location', () => {
+    const validationParser = yargs([]).command(installCommand).fail(false);
+    expect(() =>
+      validationParser.parse('install --path /some/path --location invalid'),
+    ).toThrow('Invalid values');
+  });
 });

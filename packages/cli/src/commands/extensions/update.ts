@@ -5,32 +5,36 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { updateExtension } from '../../config/extension.js';
+import { InstallLocation, updateExtension } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import { locationOption } from './options.js';
 
 interface UpdateArgs {
   name: string;
+  location: string;
 }
 
 export async function handleUpdate(args: UpdateArgs) {
   try {
-    // TODO(chrstnb): we should list extensions if the requested extension is not installed.
-    const updatedExtensionInfo = await updateExtension(args.name);
+    const location =
+      args.location === 'system'
+        ? InstallLocation.System
+        : InstallLocation.User;
+    const updatedExtensionInfo = await updateExtension(args.name, location);
     if (!updatedExtensionInfo) {
       console.log(`Extension "${args.name}" failed to update.`);
       return;
     }
     console.log(
-      `Extension "${args.name}" successfully updated: ${updatedExtensionInfo.originalVersion} → ${updatedExtensionInfo.updatedVersion}.`,
+      `Extension "${args.name}" updated: ${updatedExtensionInfo.originalVersion} → ${updatedExtensionInfo.updatedVersion}.`,
     );
   } catch (error) {
     console.error(getErrorMessage(error));
-    process.exit(1);
   }
 }
 
 export const updateCommand: CommandModule = {
-  command: 'update <name>',
+  command: 'update [--location] <name>',
   describe: 'Updates an extension.',
   builder: (yargs) =>
     yargs
@@ -38,10 +42,12 @@ export const updateCommand: CommandModule = {
         describe: 'The name of the extension to update.',
         type: 'string',
       })
+      .option('location', locationOption)
       .check((_argv) => true),
   handler: async (argv) => {
     await handleUpdate({
       name: argv['name'] as string,
+      location: argv['location'] as string,
     });
   },
 };

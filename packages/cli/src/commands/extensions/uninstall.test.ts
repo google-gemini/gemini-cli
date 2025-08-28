@@ -15,4 +15,11 @@ describe('extensions uninstall command', () => {
       'Not enough non-option arguments: got 0, need at least 1',
     );
   });
+
+  it('should fail on invalid location', () => {
+    const validationParser = yargs([]).command(uninstallCommand).fail(false);
+    expect(() =>
+      validationParser.parse('uninstall my-extension --location invalid'),
+    ).toThrow('Invalid values');
+  });
 });

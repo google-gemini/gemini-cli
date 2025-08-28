@@ -84,12 +84,16 @@ export function getSystemSettingsPath(): string {
   if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
     return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
   }
+  return path.join(getSystemSettingsBasePath(), 'settings.json');
+}
+
+export function getSystemSettingsBasePath(): string {
   if (platform() === 'darwin') {
-    return '/Library/Application Support/GeminiCli/settings.json';
+    return '/Library/Application Support/GeminiCli';
   } else if (platform() === 'win32') {
-    return 'C:\\ProgramData\\gemini-cli\\settings.json';
+    return 'C:\\ProgramData\\gemini-cli';
   } else {
-    return '/etc/gemini-cli/settings.json';
+    return '/etc/gemini-cli';
   }
 }
 

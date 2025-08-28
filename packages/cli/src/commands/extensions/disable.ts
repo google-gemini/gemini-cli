@@ -22,7 +22,6 @@ export async function handleDisable(args: DisableArgs) {
     );
   } catch (error) {
     console.error(getErrorMessage(error));
-    process.exit(1);
   }
 }
 
@@ -39,7 +38,7 @@ export const disableCommand: CommandModule = {
         describe: 'The scope to disable the extenison in.',
         type: 'string',
         default: SettingScope.User,
-        choices: [SettingScope.User, SettingScope.Workspace],
+        choices: Object.values(SettingScope),
       })
       .check((_argv) => true),
   handler: async (argv) => {

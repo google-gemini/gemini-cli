@@ -8,13 +8,16 @@ import type { CommandModule } from 'yargs';
 import {
   installExtension,
   type ExtensionInstallMetadata,
+  InstallLocation,
 } from '../../config/extension.js';
 
 import { getErrorMessage } from '../../utils/errors.js';
+import { locationOption } from './options.js';
 
 interface InstallArgs {
   source?: string;
   path?: string;
+  location: string;
 }
 
 export async function handleInstall(args: InstallArgs) {
@@ -23,18 +26,22 @@ export async function handleInstall(args: InstallArgs) {
       source: (args.source || args.path) as string,
       type: args.source ? 'git' : 'local',
     };
-    const extensionName = await installExtension(installMetadata);
+    const location =
+      args.location === 'system'
+        ? InstallLocation.System
+        : InstallLocation.User;
+    const extensionName = await installExtension(installMetadata, location);
     console.log(
       `Extension "${extensionName}" installed successfully and enabled.`,
     );
   } catch (error) {
     console.error(getErrorMessage(error));
-    process.exit(1);
+    throw error;
   }
 }
 
 export const installCommand: CommandModule = {
-  command: 'install [--source | --path ]',
+  command: 'install [--source | --path] [--location]',
   describe: 'Installs an extension from a git repository or a local path.',
   builder: (yargs) =>
     yargs
@@ -46,6 +53,7 @@ export const installCommand: CommandModule = {
         describe: 'Path to a local extension directory.',
         type: 'string',
       })
+      .option('location', locationOption)
       .conflicts('source', 'path')
       .check((argv) => {
         if (!argv.source && !argv.path) {
@@ -59,6 +67,7 @@ export const installCommand: CommandModule = {
     await handleInstall({
       source: argv['source'] as string | undefined,
       path: argv['path'] as string | undefined,
+      location: argv['location'] as string,
     });
   },
 };

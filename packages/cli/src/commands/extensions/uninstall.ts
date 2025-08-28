@@ -5,25 +5,30 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { uninstallExtension } from '../../config/extension.js';
+import { InstallLocation, uninstallExtension } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import { locationOption } from './options.js';
 
 interface UninstallArgs {
   name: string;
+  location: string;
 }
 
 export async function handleUninstall(args: UninstallArgs) {
   try {
-    await uninstallExtension(args.name);
+    const location =
+      args.location === 'system'
+        ? InstallLocation.System
+        : InstallLocation.User;
+    await uninstallExtension(args.name, location);
     console.log(`Extension "${args.name}" successfully uninstalled.`);
   } catch (error) {
     console.error(getErrorMessage(error));
-    process.exit(1);
   }
 }
 
 export const uninstallCommand: CommandModule = {
-  command: 'uninstall <name>',
+  command: 'uninstall [--location] <name>',
   describe: 'Uninstalls an extension.',
   builder: (yargs) =>
     yargs
@@ -31,6 +36,7 @@ export const uninstallCommand: CommandModule = {
         describe: 'The name of the extension to uninstall.',
         type: 'string',
       })
+      .option('location', locationOption)
       .check((argv) => {
         if (!argv.name) {
           throw new Error(
@@ -42,6 +48,7 @@ export const uninstallCommand: CommandModule = {
   handler: async (argv) => {
     await handleUninstall({
       name: argv['name'] as string,
+      location: argv['location'] as string,
     });
   },
 };

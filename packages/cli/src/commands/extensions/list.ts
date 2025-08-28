@@ -5,24 +5,45 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { loadUserExtensions, toOutputString } from '../../config/extension.js';
+import {
+  InstallLocation,
+  loadExtensionsForLocation,
+  toOutputString,
+} from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
 export async function handleList() {
   try {
-    const extensions = loadUserExtensions();
-    if (extensions.length === 0) {
+    const userExtensions = loadExtensionsForLocation(InstallLocation.User);
+    const systemExtensions = loadExtensionsForLocation(InstallLocation.System);
+
+    if (userExtensions.length === 0 && systemExtensions.length === 0) {
       console.log('No extensions installed.');
       return;
     }
-    console.log(
-      extensions
-        .map((extension, _): string => toOutputString(extension))
-        .join('\n\n'),
-    );
+
+    if (userExtensions.length > 0) {
+      console.log('User Extensions:');
+      console.log(
+        userExtensions
+          .map((extension) => toOutputString(extension))
+          .join('\n\n'),
+      );
+    }
+
+    if (systemExtensions.length > 0) {
+      if (userExtensions.length > 0) {
+        console.log('\n');
+      }
+      console.log('System Extensions:');
+      console.log(
+        systemExtensions
+          .map((extension) => toOutputString(extension))
+          .join('\n\n'),
+      );
+    }
   } catch (error) {
     console.error(getErrorMessage(error));
-    process.exit(1);
   }
 }
 
