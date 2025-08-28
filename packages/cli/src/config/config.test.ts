@@ -2091,4 +2091,188 @@ describe('loadCliConfig trustedFolder', () => {
       expect(config.isTrustedFolder()).toBe(expectedIsTrustedFolder);
     });
   }
+
+  describe('GEMINI_SAFE_TRUST_DEFAULT MCP server security tests', () => {
+    let originalEnv: string | undefined;
+    let mockIsWorkspaceTrusted: Mock;
+
+    beforeEach(() => {
+      originalEnv = process.env['GEMINI_SAFE_TRUST_DEFAULT'];
+      mockIsWorkspaceTrusted = vi.mocked(isWorkspaceTrusted);
+    });
+
+    afterEach(() => {
+      if (originalEnv !== undefined) {
+        process.env['GEMINI_SAFE_TRUST_DEFAULT'] = originalEnv;
+      } else {
+        delete process.env['GEMINI_SAFE_TRUST_DEFAULT'];
+      }
+      mockIsWorkspaceTrusted.mockRestore();
+    });
+
+    it('should include MCP servers when workspace is trusted and GEMINI_SAFE_TRUST_DEFAULT is not set', async () => {
+      delete process.env['GEMINI_SAFE_TRUST_DEFAULT'];
+      mockIsWorkspaceTrusted.mockReturnValue(true);
+
+      const settings: Settings = {
+        security: {
+          folderTrust: {
+            featureEnabled: true,
+            enabled: true,
+          },
+        },
+        mcpServers: {
+          'test-server': {
+            command: 'test-command',
+            args: ['arg1'],
+          },
+        },
+      };
+
+      const argv = await parseArguments({} as Settings);
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      expect(config.getMcpServers()).toHaveProperty('test-server');
+    });
+
+    it('should exclude MCP servers when GEMINI_SAFE_TRUST_DEFAULT=1 and folder trust is disabled', async () => {
+      process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
+      mockIsWorkspaceTrusted.mockReturnValue(true);
+
+      const settings: Settings = {
+        security: {
+          folderTrust: {
+            featureEnabled: false, // Trust feature disabled
+            enabled: true,
+          },
+        },
+        mcpServers: {
+          'test-server': {
+            command: 'test-command',
+            args: ['arg1'],
+          },
+        },
+      };
+
+      const argv = await parseArguments({} as Settings);
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      expect(config.getMcpServers()).not.toHaveProperty('test-server');
+    });
+
+    it('should include MCP servers when GEMINI_SAFE_TRUST_DEFAULT=1 but explicit trust rules allow it', async () => {
+      process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
+      mockIsWorkspaceTrusted.mockReturnValue(true);
+
+      const settings: Settings = {
+        security: {
+          folderTrust: {
+            featureEnabled: true, // Trust feature enabled
+            enabled: true,
+          },
+        },
+        mcpServers: {
+          'test-server': {
+            command: 'test-command',
+            args: ['arg1'],
+          },
+        },
+      };
+
+      const argv = await parseArguments({} as Settings);
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      expect(config.getMcpServers()).toHaveProperty('test-server');
+    });
+
+    it('should handle different GEMINI_SAFE_TRUST_DEFAULT values for MCP servers', async () => {
+      const testCases = [
+        { value: '1', shouldInclude: false },
+        { value: '0', shouldInclude: true },
+        { value: 'true', shouldInclude: true },
+        { value: 'false', shouldInclude: true },
+        { value: '', shouldInclude: true },
+      ];
+
+      for (const testCase of testCases) {
+        process.env['GEMINI_SAFE_TRUST_DEFAULT'] = testCase.value;
+        mockIsWorkspaceTrusted.mockReturnValue(true);
+
+        const settings: Settings = {
+          security: {
+            folderTrust: {
+              featureEnabled: testCase.value === '1' ? false : true,
+              enabled: true,
+            },
+          },
+          mcpServers: {
+            'test-server': {
+              command: 'test-command',
+              args: ['arg1'],
+            },
+          },
+        };
+
+        const argv = await parseArguments({} as Settings);
+        const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+        if (testCase.shouldInclude) {
+          expect(config.getMcpServers()).toHaveProperty('test-server');
+        } else {
+          expect(config.getMcpServers()).not.toHaveProperty('test-server');
+        }
+      }
+    });
+
+    it('should prioritize explicit trust settings over GEMINI_SAFE_TRUST_DEFAULT for MCP servers', async () => {
+      process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
+      mockIsWorkspaceTrusted.mockReturnValue(true);
+
+      const settings: Settings = {
+        security: {
+          folderTrust: {
+            featureEnabled: true, // Explicit trust enabled
+            enabled: true,
+          },
+        },
+        mcpServers: {
+          'test-server': {
+            command: 'test-command',
+            args: ['arg1'],
+          },
+        },
+      };
+
+      const argv = await parseArguments({} as Settings);
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      // Even with GEMINI_SAFE_TRUST_DEFAULT=1, explicit trust should work
+      expect(config.getMcpServers()).toHaveProperty('test-server');
+    });
+
+    it('should maintain MCP server security when both conditions are untrusted', async () => {
+      process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
+      mockIsWorkspaceTrusted.mockReturnValue(false);
+
+      const settings: Settings = {
+        security: {
+          folderTrust: {
+            featureEnabled: false,
+            enabled: false,
+          },
+        },
+        mcpServers: {
+          'test-server': {
+            command: 'test-command',
+            args: ['arg1'],
+          },
+        },
+      };
+
+      const argv = await parseArguments({} as Settings);
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+
+      expect(config.getMcpServers()).not.toHaveProperty('test-server');
+    });
+  });
 });
