@@ -93,7 +93,6 @@
   },
   "dependencies": {
     "@lvce-editor/ripgrep": "^1.6.0",
-    "ink": "^6.2.3",
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0"
   },
