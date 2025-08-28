@@ -553,34 +553,12 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   }
 }
 
-export function loadEnvironment(settings?: Settings): void {
+export function loadEnvironment(settings: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
     setUpCloudShellEnvironment(envFilePath);
-  }
-
-  // If no settings provided, try to load workspace settings for exclusions
-  let resolvedSettings = settings;
-  if (!resolvedSettings) {
-    const workspaceSettingsPath = new Storage(
-      process.cwd(),
-    ).getWorkspaceSettingsPath();
-    try {
-      if (fs.existsSync(workspaceSettingsPath)) {
-        const workspaceContent = fs.readFileSync(
-          workspaceSettingsPath,
-          'utf-8',
-        );
-        const parsedWorkspaceSettings = JSON.parse(
-          stripJsonComments(workspaceContent),
-        ) as Settings;
-        resolvedSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
-      }
-    } catch (_e) {
-      // Ignore errors loading workspace settings
-    }
   }
 
   if (envFilePath) {
@@ -591,8 +569,7 @@ export function loadEnvironment(settings?: Settings): void {
       const parsedEnv = dotenv.parse(envFileContent);
 
       const excludedVars =
-        resolvedSettings?.advanced?.excludedEnvVars ||
-        DEFAULT_EXCLUDED_ENV_VARS;
+        settings?.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
       const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
 
       for (const key in parsedEnv) {
