@@ -133,6 +133,8 @@ export interface SettingsFile {
   path: string;
 }
 
+const MIGRATE_V2_OVERWRITE = true;
+
 function setNestedProperty(
   obj: Record<string, unknown>,
   path: string,
@@ -193,6 +195,74 @@ function migrateSettingsToV2(
   return v2Settings;
 }
 
+function getNestedProperty(
+  obj: Record<string, unknown>,
+  path: string,
+): unknown {
+  const keys = path.split('.');
+  let current: unknown = obj;
+  for (const key of keys) {
+    if (typeof current !== 'object' || current === null || !(key in current)) {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[key];
+  }
+  return current;
+}
+
+const REVERSE_MIGRATION_MAP: Record<string, string> = Object.fromEntries(
+  Object.entries(MIGRATION_MAP).map(([key, value]) => [value, key]),
+);
+
+// Dynamically determine the top-level keys from the V2 settings structure.
+const KNOWN_V2_CONTAINERS = new Set(
+  Object.values(MIGRATION_MAP).map((path) => path.split('.')[0]),
+);
+
+export function migrateSettingsToV1(
+  v2Settings: Record<string, unknown>,
+): Record<string, unknown> {
+  const v1Settings: Record<string, unknown> = {};
+  const v2Keys = new Set(Object.keys(v2Settings));
+
+  for (const [newPath, oldKey] of Object.entries(REVERSE_MIGRATION_MAP)) {
+    const value = getNestedProperty(v2Settings, newPath);
+    if (value !== undefined) {
+      v1Settings[oldKey] = value;
+      v2Keys.delete(newPath.split('.')[0]);
+    }
+  }
+
+  // Preserve mcpServers at the top level
+  if (v2Settings['mcpServers']) {
+    v1Settings['mcpServers'] = v2Settings['mcpServers'];
+    v2Keys.delete('mcpServers');
+  }
+
+  // Carry over any unrecognized keys
+  for (const remainingKey of v2Keys) {
+    const value = v2Settings[remainingKey];
+    if (value === undefined) {
+      continue;
+    }
+
+    // Don't carry over empty objects that were just containers for migrated settings.
+    if (
+      KNOWN_V2_CONTAINERS.has(remainingKey) &&
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value) &&
+      Object.keys(value).length === 0
+    ) {
+      continue;
+    }
+
+    v1Settings[remainingKey] = value;
+  }
+
+  return v1Settings;
+}
+
 function mergeSettings(
   system: Settings,
   systemDefaults: Settings,
@@ -246,6 +316,12 @@ function mergeSettings(
       ...(user.security || {}),
       ...(safeWorkspaceWithoutFolderTrust.security || {}),
       ...(system.security || {}),
+    },
+    mcp: {
+      ...(systemDefaults.mcp || {}),
+      ...(user.mcp || {}),
+      ...(safeWorkspaceWithoutFolderTrust.mcp || {}),
+      ...(system.mcp || {}),
     },
     mcpServers: {
       ...(systemDefaults.mcpServers || {}),
@@ -380,17 +456,7 @@ export class LoadedSettings {
     const settingsFile = this.forScope(scope);
     setNestedProperty(settingsFile.settings, key, value);
     this._merged = this.computeMergedSettings();
-
-    // If the scope was previously migrated only in-memory, this explicit change
-    // triggers a full migration and write to disk.
-    if (this.migratedInMemorScopes.has(scope)) {
-      // TODO: Replace with a proper logger
-      console.log(
-        `User modified a setting in scope ${scope}, which was previously migrated in-memory. Migrating ${settingsFile.path} to the new format on disk.`,
-      );
-      this.migratedInMemorScopes.delete(scope); // No longer just in-memory
-    }
-    saveSettings(settingsFile);
+    saveSettings(settingsFile, this.migratedInMemorScopes.has(scope));
   }
 }
 
@@ -553,7 +619,6 @@ export function loadEnvironment(settings?: Settings): void {
  * Project settings override user settings.
  */
 export function loadSettings(workspaceDir: string): LoadedSettings {
-  const MIGRATE_V2_OVERWRITE = false;
   let systemSettings: Settings = {};
   let systemDefaultSettings: Settings = {};
   let userSettings: Settings = {};
@@ -607,7 +672,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
           if (migratedSettings) {
             if (MIGRATE_V2_OVERWRITE) {
               try {
-                fs.renameSync(filePath, `${filePath}.bak`);
+                fs.renameSync(filePath, `${filePath}.orig`);
                 fs.writeFileSync(
                   filePath,
                   JSON.stringify(migratedSettings, null, 2),
@@ -718,7 +783,10 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   return loadedSettings;
 }
 
-export function saveSettings(settingsFile: SettingsFile): void {
+export function saveSettings(
+  settingsFile: SettingsFile,
+  wasMigratedInMem?: boolean,
+): void {
   try {
     // Ensure the directory exists
     const dirPath = path.dirname(settingsFile.path);
@@ -726,9 +794,16 @@ export function saveSettings(settingsFile: SettingsFile): void {
       fs.mkdirSync(dirPath, { recursive: true });
     }
 
+    let settingsToSave = settingsFile.settings;
+    if (wasMigratedInMem && !MIGRATE_V2_OVERWRITE) {
+      settingsToSave = migrateSettingsToV1(
+        settingsToSave as Record<string, unknown>,
+      ) as Settings;
+    }
+
     fs.writeFileSync(
       settingsFile.path,
-      JSON.stringify(settingsFile.settings, null, 2),
+      JSON.stringify(settingsToSave, null, 2),
       'utf-8',
     );
   } catch (error) {

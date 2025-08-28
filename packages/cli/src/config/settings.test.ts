@@ -8,6 +8,7 @@
 
 // Mock 'os' first.
 import * as osActual from 'node:os'; // Import for type info for the mock factory
+
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof osActual>();
   return {
@@ -56,6 +57,8 @@ import {
   getSystemDefaultsPath,
   SETTINGS_DIRECTORY_NAME, // This is from the original module, but used by the mock.
   SettingScope,
+  migrateSettingsToV1,
+  type Settings,
 } from './settings.js';
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
@@ -65,6 +68,9 @@ const MOCK_WORKSPACE_SETTINGS_PATH = pathActual.join(
   SETTINGS_DIRECTORY_NAME,
   'settings.json',
 );
+
+// A more flexible type for test data that allows arbitrary properties.
+type TestSettings = Settings & { [key: string]: unknown };
 
 vi.mock('fs', async (importOriginal) => {
   // Get all the functions from the real 'fs' module
@@ -121,6 +127,7 @@ describe('Settings Loading and Merging', () => {
         ui: {
           customThemes: {},
         },
+        mcp: {},
         mcpServers: {},
         context: {
           includeDirectories: [],
@@ -175,6 +182,7 @@ describe('Settings Loading and Merging', () => {
           ...systemSettingsContent.ui,
           customThemes: {},
         },
+        mcp: {},
         mcpServers: {},
         context: {
           includeDirectories: [],
@@ -229,6 +237,7 @@ describe('Settings Loading and Merging', () => {
           ...userSettingsContent.ui,
           customThemes: {},
         },
+        mcp: {},
         mcpServers: {},
         context: {
           ...userSettingsContent.context,
@@ -287,6 +296,7 @@ describe('Settings Loading and Merging', () => {
         ui: {
           customThemes: {},
         },
+        mcp: {},
         mcpServers: {},
         model: {
           chatCompression: {},
@@ -359,6 +369,7 @@ describe('Settings Loading and Merging', () => {
           disabled: [],
           workspacesWithMigrationNudge: [],
         },
+        mcp: {},
         mcpServers: {},
         model: {
           chatCompression: {},
@@ -453,6 +464,125 @@ describe('Settings Loading and Merging', () => {
       });
     });
 
+    it('should correctly migrate a complex legacy (v1) settings file', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const legacySettingsContent = {
+        theme: 'legacy-dark',
+        vimMode: true,
+        contextFileName: 'LEGACY_CONTEXT.md',
+        model: 'gemini-pro',
+        mcpServers: {
+          'legacy-server-1': {
+            command: 'npm',
+            args: ['run', 'start:server1'],
+            description: 'Legacy Server 1',
+          },
+          'legacy-server-2': {
+            command: 'node',
+            args: ['server2.js'],
+            description: 'Legacy Server 2',
+          },
+        },
+        allowMCPServers: ['legacy-server-1'],
+        someUnrecognizedSetting: 'should-be-preserved',
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(legacySettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged).toEqual({
+        ui: {
+          theme: 'legacy-dark',
+          customThemes: {},
+        },
+        general: {
+          vimMode: true,
+        },
+        context: {
+          fileName: 'LEGACY_CONTEXT.md',
+          includeDirectories: [],
+        },
+        model: {
+          name: 'gemini-pro',
+          chatCompression: {},
+        },
+        mcpServers: {
+          'legacy-server-1': {
+            command: 'npm',
+            args: ['run', 'start:server1'],
+            description: 'Legacy Server 1',
+          },
+          'legacy-server-2': {
+            command: 'node',
+            args: ['server2.js'],
+            description: 'Legacy Server 2',
+          },
+        },
+        mcp: {
+          allowed: ['legacy-server-1'],
+        },
+        someUnrecognizedSetting: 'should-be-preserved',
+        advanced: {
+          excludedEnvVars: [],
+        },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        security: {},
+      });
+    });
+
+    it('should correctly merge and migrate legacy array properties from multiple scopes', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const legacyUserSettings = {
+        includeDirectories: ['/user/dir'],
+        excludeTools: ['user-tool'],
+        excludedProjectEnvVars: ['USER_VAR'],
+      };
+      const legacyWorkspaceSettings = {
+        includeDirectories: ['/workspace/dir'],
+        excludeTools: ['workspace-tool'],
+        excludedProjectEnvVars: ['WORKSPACE_VAR', 'USER_VAR'],
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(legacyUserSettings);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(legacyWorkspaceSettings);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Verify includeDirectories are concatenated
+      expect(settings.merged.context?.includeDirectories).toEqual([
+        '/user/dir',
+        '/workspace/dir',
+      ]);
+
+      // Verify excludeTools are overwritten by workspace
+      expect(settings.merged.tools?.exclude).toEqual(['workspace-tool']);
+
+      // Verify excludedProjectEnvVars are concatenated and de-duped
+      expect(settings.merged.advanced?.excludedEnvVars).toEqual(
+        expect.arrayContaining(['USER_VAR', 'WORKSPACE_VAR']),
+      );
+      expect(settings.merged.advanced?.excludedEnvVars).toHaveLength(2);
+    });
+
     it('should merge all settings files with the correct precedence', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const systemDefaultsContent = {
@@ -533,6 +663,7 @@ describe('Settings Loading and Merging', () => {
           disabled: [],
           workspacesWithMigrationNudge: [],
         },
+        mcp: {},
         mcpServers: {},
         model: {
           chatCompression: {},
@@ -951,6 +1082,113 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.mcpServers).toEqual({});
     });
 
+    it('should merge MCP servers from system, user, and workspace with system taking precedence', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const systemSettingsContent = {
+        mcpServers: {
+          'shared-server': {
+            command: 'system-command',
+            args: ['--system-arg'],
+          },
+          'system-only-server': {
+            command: 'system-only-command',
+          },
+        },
+      };
+      const userSettingsContent = {
+        mcpServers: {
+          'user-server': {
+            command: 'user-command',
+          },
+          'shared-server': {
+            command: 'user-command',
+            description: 'from user',
+          },
+        },
+      };
+      const workspaceSettingsContent = {
+        mcpServers: {
+          'workspace-server': {
+            command: 'workspace-command',
+          },
+          'shared-server': {
+            command: 'workspace-command',
+            args: ['--workspace-arg'],
+          },
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.mcpServers).toEqual({
+        'user-server': {
+          command: 'user-command',
+        },
+        'workspace-server': {
+          command: 'workspace-command',
+        },
+        'system-only-server': {
+          command: 'system-only-command',
+        },
+        'shared-server': {
+          command: 'system-command',
+          args: ['--system-arg'],
+        },
+      });
+    });
+
+    it('should merge mcp allowed/excluded lists with system taking precedence over workspace', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const systemSettingsContent = {
+        mcp: {
+          allowed: ['system-allowed'],
+        },
+      };
+      const userSettingsContent = {
+        mcp: {
+          allowed: ['user-allowed'],
+          excluded: ['user-excluded'],
+        },
+      };
+      const workspaceSettingsContent = {
+        mcp: {
+          allowed: ['workspace-allowed'],
+          excluded: ['workspace-excluded'],
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath())
+            return JSON.stringify(systemSettingsContent);
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.mcp).toEqual({
+        allowed: ['system-allowed'],
+        excluded: ['workspace-excluded'],
+      });
+    });
+
     it('should merge chatCompression settings, with workspace taking precedence', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
@@ -1147,6 +1385,7 @@ describe('Settings Loading and Merging', () => {
         ui: {
           customThemes: {},
         },
+        mcp: {},
         mcpServers: {},
         context: {
           includeDirectories: [],
@@ -1187,7 +1426,7 @@ describe('Settings Loading and Merging', () => {
 
     it('should resolve environment variables in user settings', () => {
       process.env['TEST_API_KEY'] = 'user_api_key_from_env';
-      const userSettingsContent = {
+      const userSettingsContent: TestSettings = {
         apiKey: '$TEST_API_KEY',
         someUrl: 'https://test.com/${TEST_API_KEY}',
       };
@@ -1203,20 +1442,21 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.apiKey).toBe('user_api_key_from_env');
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.someUrl).toBe(
+      expect((settings.user.settings as TestSettings)['apiKey']).toBe(
+        'user_api_key_from_env',
+      );
+      expect((settings.user.settings as TestSettings)['someUrl']).toBe(
         'https://test.com/user_api_key_from_env',
       );
-      // @ts-expect-error: dynamic property for test
-      expect(settings.merged.apiKey).toBe('user_api_key_from_env');
+      expect((settings.merged as TestSettings)['apiKey']).toBe(
+        'user_api_key_from_env',
+      );
       delete process.env['TEST_API_KEY'];
     });
 
     it('should resolve environment variables in workspace settings', () => {
       process.env['WORKSPACE_ENDPOINT'] = 'workspace_endpoint_from_env';
-      const workspaceSettingsContent = {
+      const workspaceSettingsContent: TestSettings = {
         endpoint: '${WORKSPACE_ENDPOINT}/api',
         nested: { value: '$WORKSPACE_ENDPOINT' },
       };
@@ -1232,14 +1472,15 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.workspace.settings.endpoint).toBe(
+      expect((settings.workspace.settings as TestSettings)['endpoint']).toBe(
         'workspace_endpoint_from_env/api',
       );
-      expect(settings.workspace.settings.nested.value).toBe(
-        'workspace_endpoint_from_env',
+      expect(
+        (settings.workspace.settings as TestSettings)['nested']['value'],
+      ).toBe('workspace_endpoint_from_env');
+      expect((settings.merged as TestSettings)['endpoint']).toBe(
+        'workspace_endpoint_from_env/api',
       );
-      // @ts-expect-error: dynamic property for test
-      expect(settings.merged.endpoint).toBe('workspace_endpoint_from_env/api');
       delete process.env['WORKSPACE_ENDPOINT'];
     });
 
@@ -1249,18 +1490,18 @@ describe('Settings Loading and Merging', () => {
       process.env['WORKSPACE_VAR'] = 'workspace_value';
       process.env['SHARED_VAR'] = 'final_value';
 
-      const systemSettingsContent = {
+      const systemSettingsContent: TestSettings = {
         configValue: '$SHARED_VAR',
         systemOnly: '$SYSTEM_VAR',
       };
-      const userSettingsContent = {
+      const userSettingsContent: TestSettings = {
         configValue: '$SHARED_VAR',
         userOnly: '$USER_VAR',
         ui: {
           theme: 'dark',
         },
       };
-      const workspaceSettingsContent = {
+      const workspaceSettingsContent: TestSettings = {
         configValue: '$SHARED_VAR',
         workspaceOnly: '$WORKSPACE_VAR',
         ui: {
@@ -1287,28 +1528,36 @@ describe('Settings Loading and Merging', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
       // Check resolved values in individual scopes
-      // @ts-expect-error: dynamic property for test
-      expect(settings.system.settings.configValue).toBe('final_value');
-      // @ts-expect-error: dynamic property for test
-      expect(settings.system.settings.systemOnly).toBe('system_value');
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.configValue).toBe('final_value');
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.userOnly).toBe('user_value');
-      // @ts-expect-error: dynamic property for test
-      expect(settings.workspace.settings.configValue).toBe('final_value');
-      // @ts-expect-error: dynamic property for test
-      expect(settings.workspace.settings.workspaceOnly).toBe('workspace_value');
+      expect((settings.system.settings as TestSettings)['configValue']).toBe(
+        'final_value',
+      );
+      expect((settings.system.settings as TestSettings)['systemOnly']).toBe(
+        'system_value',
+      );
+      expect((settings.user.settings as TestSettings)['configValue']).toBe(
+        'final_value',
+      );
+      expect((settings.user.settings as TestSettings)['userOnly']).toBe(
+        'user_value',
+      );
+      expect((settings.workspace.settings as TestSettings)['configValue']).toBe(
+        'final_value',
+      );
+      expect(
+        (settings.workspace.settings as TestSettings)['workspaceOnly'],
+      ).toBe('workspace_value');
 
       // Check merged values (system > workspace > user)
-      // @ts-expect-error: dynamic property for test
-      expect(settings.merged.configValue).toBe('final_value');
-      // @ts-expect-error: dynamic property for test
-      expect(settings.merged.systemOnly).toBe('system_value');
-      // @ts-expect-error: dynamic property for test
-      expect(settings.merged.userOnly).toBe('user_value');
-      // @ts-expect-error: dynamic property for test
-      expect(settings.merged.workspaceOnly).toBe('workspace_value');
+      expect((settings.merged as TestSettings)['configValue']).toBe(
+        'final_value',
+      );
+      expect((settings.merged as TestSettings)['systemOnly']).toBe(
+        'system_value',
+      );
+      expect((settings.merged as TestSettings)['userOnly']).toBe('user_value');
+      expect((settings.merged as TestSettings)['workspaceOnly']).toBe(
+        'workspace_value',
+      );
       expect(settings.merged.ui?.theme).toBe('light'); // workspace overrides user
 
       delete process.env['SYSTEM_VAR'];
@@ -1360,7 +1609,7 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should leave unresolved environment variables as is', () => {
-      const userSettingsContent = { apiKey: '$UNDEFINED_VAR' };
+      const userSettingsContent: TestSettings = { apiKey: '$UNDEFINED_VAR' };
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
       );
@@ -1373,16 +1622,20 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.apiKey).toBe('$UNDEFINED_VAR');
-      // @ts-expect-error: dynamic property for test
-      expect(settings.merged.apiKey).toBe('$UNDEFINED_VAR');
+      expect((settings.user.settings as TestSettings)['apiKey']).toBe(
+        '$UNDEFINED_VAR',
+      );
+      expect((settings.merged as TestSettings)['apiKey']).toBe(
+        '$UNDEFINED_VAR',
+      );
     });
 
     it('should resolve multiple environment variables in a single string', () => {
       process.env['VAR_A'] = 'valueA';
       process.env['VAR_B'] = 'valueB';
-      const userSettingsContent = { path: '/path/$VAR_A/${VAR_B}/end' };
+      const userSettingsContent: TestSettings = {
+        path: '/path/$VAR_A/${VAR_B}/end',
+      };
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
       );
@@ -1394,8 +1647,9 @@ describe('Settings Loading and Merging', () => {
         },
       );
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.path).toBe('/path/valueA/valueB/end');
+      expect((settings.user.settings as TestSettings)['path']).toBe(
+        '/path/valueA/valueB/end',
+      );
       delete process.env['VAR_A'];
       delete process.env['VAR_B'];
     });
@@ -1403,7 +1657,9 @@ describe('Settings Loading and Merging', () => {
     it('should resolve environment variables in arrays', () => {
       process.env['ITEM_1'] = 'item1_env';
       process.env['ITEM_2'] = 'item2_env';
-      const userSettingsContent = { list: ['$ITEM_1', '${ITEM_2}', 'literal'] };
+      const userSettingsContent: TestSettings = {
+        list: ['$ITEM_1', '${ITEM_2}', 'literal'],
+      };
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
       );
@@ -1415,8 +1671,7 @@ describe('Settings Loading and Merging', () => {
         },
       );
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.list).toEqual([
+      expect((settings.user.settings as TestSettings)['list']).toEqual([
         'item1_env',
         'item2_env',
         'literal',
@@ -1429,7 +1684,7 @@ describe('Settings Loading and Merging', () => {
       process.env['MY_ENV_STRING'] = 'env_string_value';
       process.env['MY_ENV_STRING_NESTED'] = 'env_string_nested_value';
 
-      const userSettingsContent = {
+      const userSettingsContent: TestSettings = {
         nullVal: null,
         trueVal: true,
         falseVal: false,
@@ -1457,31 +1712,34 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.nullVal).toBeNull();
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.trueVal).toBe(true);
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.falseVal).toBe(false);
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.numberVal).toBe(123.45);
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.stringVal).toBe('env_string_value');
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.undefinedVal).toBeUndefined();
-
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.nestedObj.nestedNull).toBeNull();
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.nestedObj.nestedBool).toBe(true);
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.nestedObj.nestedNum).toBe(0);
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.nestedObj.nestedString).toBe('literal');
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.nestedObj.anotherEnv).toBe(
-        'env_string_nested_value',
+      expect((settings.user.settings as TestSettings)['nullVal']).toBeNull();
+      expect((settings.user.settings as TestSettings)['trueVal']).toBe(true);
+      expect((settings.user.settings as TestSettings)['falseVal']).toBe(false);
+      expect((settings.user.settings as TestSettings)['numberVal']).toBe(
+        123.45,
       );
+      expect((settings.user.settings as TestSettings)['stringVal']).toBe(
+        'env_string_value',
+      );
+      expect(
+        (settings.user.settings as TestSettings)['undefinedVal'],
+      ).toBeUndefined();
+
+      expect(
+        (settings.user.settings as TestSettings)['nestedObj']['nestedNull'],
+      ).toBeNull();
+      expect(
+        (settings.user.settings as TestSettings)['nestedObj']['nestedBool'],
+      ).toBe(true);
+      expect(
+        (settings.user.settings as TestSettings)['nestedObj']['nestedNum'],
+      ).toBe(0);
+      expect(
+        (settings.user.settings as TestSettings)['nestedObj']['nestedString'],
+      ).toBe('literal');
+      expect(
+        (settings.user.settings as TestSettings)['nestedObj']['anotherEnv'],
+      ).toBe('env_string_nested_value');
 
       delete process.env['MY_ENV_STRING'];
       delete process.env['MY_ENV_STRING_NESTED'];
@@ -1490,7 +1748,7 @@ describe('Settings Loading and Merging', () => {
     it('should resolve multiple concatenated environment variables in a single string value', () => {
       process.env['TEST_HOST'] = 'myhost';
       process.env['TEST_PORT'] = '9090';
-      const userSettingsContent = {
+      const userSettingsContent: TestSettings = {
         serverAddress: '${TEST_HOST}:${TEST_PORT}/api',
       };
       (mockFsExistsSync as Mock).mockImplementation(
@@ -1505,8 +1763,9 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      // @ts-expect-error: dynamic property for test
-      expect(settings.user.settings.serverAddress).toBe('myhost:9090/api');
+      expect((settings.user.settings as TestSettings)['serverAddress']).toBe(
+        'myhost:9090/api',
+      );
 
       delete process.env['TEST_HOST'];
       delete process.env['TEST_PORT'];
@@ -1554,6 +1813,7 @@ describe('Settings Loading and Merging', () => {
             ...systemSettingsContent.ui,
             customThemes: {},
           },
+          mcp: {},
           mcpServers: {},
           context: {
             includeDirectories: [],
@@ -1823,6 +2083,335 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.tools?.sandbox).toBe(false); // User setting
       expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
       expect(settings.merged.ui?.theme).toBe('dark'); // User setting
+    });
+  });
+
+  describe('migrateSettingsToV1', () => {
+    it('should handle an empty object', () => {
+      const v2Settings = {};
+      const v1Settings = migrateSettingsToV1(v2Settings);
+      expect(v1Settings).toEqual({});
+    });
+
+    it('should migrate a simple v2 settings object to v1', () => {
+      const v2Settings = {
+        general: {
+          preferredEditor: 'vscode',
+          vimMode: true,
+        },
+        ui: {
+          theme: 'dark',
+        },
+      };
+      const v1Settings = migrateSettingsToV1(v2Settings);
+      expect(v1Settings).toEqual({
+        preferredEditor: 'vscode',
+        vimMode: true,
+        theme: 'dark',
+      });
+    });
+
+    it('should handle nested properties correctly', () => {
+      const v2Settings = {
+        security: {
+          folderTrust: {
+            enabled: true,
+          },
+          auth: {
+            selectedType: 'oauth',
+          },
+        },
+        advanced: {
+          autoConfigureMemory: true,
+        },
+      };
+      const v1Settings = migrateSettingsToV1(v2Settings);
+      expect(v1Settings).toEqual({
+        folderTrust: true,
+        selectedAuthType: 'oauth',
+        autoConfigureMaxOldSpaceSize: true,
+      });
+    });
+
+    it('should preserve mcpServers at the top level', () => {
+      const v2Settings = {
+        general: {
+          preferredEditor: 'vscode',
+        },
+        mcpServers: {
+          'my-server': {
+            command: 'npm start',
+          },
+        },
+      };
+      const v1Settings = migrateSettingsToV1(v2Settings);
+      expect(v1Settings).toEqual({
+        preferredEditor: 'vscode',
+        mcpServers: {
+          'my-server': {
+            command: 'npm start',
+          },
+        },
+      });
+    });
+
+    it('should carry over unrecognized top-level properties', () => {
+      const v2Settings = {
+        general: {
+          vimMode: false,
+        },
+        unrecognized: 'value',
+        another: {
+          nested: true,
+        },
+      };
+      const v1Settings = migrateSettingsToV1(v2Settings);
+      expect(v1Settings).toEqual({
+        vimMode: false,
+        unrecognized: 'value',
+        another: {
+          nested: true,
+        },
+      });
+    });
+
+    it('should handle a complex object with mixed properties', () => {
+      const v2Settings = {
+        general: {
+          disableAutoUpdate: true,
+        },
+        ui: {
+          hideBanner: true,
+          customThemes: {
+            myTheme: {},
+          },
+        },
+        model: {
+          name: 'gemini-pro',
+          chatCompression: {
+            contextPercentageThreshold: 0.5,
+          },
+        },
+        mcpServers: {
+          'server-1': {
+            command: 'node server.js',
+          },
+        },
+        unrecognized: {
+          should: 'be-preserved',
+        },
+      };
+      const v1Settings = migrateSettingsToV1(v2Settings);
+      expect(v1Settings).toEqual({
+        disableAutoUpdate: true,
+        hideBanner: true,
+        customThemes: {
+          myTheme: {},
+        },
+        model: 'gemini-pro',
+        chatCompression: {
+          contextPercentageThreshold: 0.5,
+        },
+        mcpServers: {
+          'server-1': {
+            command: 'node server.js',
+          },
+        },
+        unrecognized: {
+          should: 'be-preserved',
+        },
+      });
+    });
+
+    it('should not migrate a v1 settings object', () => {
+      const v1Settings = {
+        preferredEditor: 'vscode',
+        vimMode: true,
+        theme: 'dark',
+      };
+      const migratedSettings = migrateSettingsToV1(v1Settings);
+      expect(migratedSettings).toEqual({
+        preferredEditor: 'vscode',
+        vimMode: true,
+        theme: 'dark',
+      });
+    });
+
+    it('should migrate a full v2 settings object to v1', () => {
+      const v2Settings: TestSettings = {
+        general: {
+          preferredEditor: 'code',
+          vimMode: true,
+        },
+        ui: {
+          theme: 'dark',
+        },
+        privacy: {
+          usageStatisticsEnabled: false,
+        },
+        model: {
+          name: 'gemini-pro',
+          chatCompression: {
+            contextPercentageThreshold: 0.8,
+          },
+        },
+        context: {
+          fileName: 'CONTEXT.md',
+          includeDirectories: ['/src'],
+        },
+        tools: {
+          sandbox: true,
+          exclude: ['toolA'],
+        },
+        mcp: {
+          allowed: ['server1'],
+        },
+        security: {
+          folderTrust: {
+            enabled: true,
+          },
+        },
+        advanced: {
+          dnsResolutionOrder: 'ipv4first',
+          excludedEnvVars: ['SECRET'],
+        },
+        mcpServers: {
+          'my-server': {
+            command: 'npm start',
+          },
+        },
+        unrecognizedTopLevel: {
+          value: 'should be preserved',
+        },
+      };
+
+      const v1Settings = migrateSettingsToV1(v2Settings);
+
+      expect(v1Settings).toEqual({
+        preferredEditor: 'code',
+        vimMode: true,
+        theme: 'dark',
+        usageStatisticsEnabled: false,
+        model: 'gemini-pro',
+        chatCompression: {
+          contextPercentageThreshold: 0.8,
+        },
+        contextFileName: 'CONTEXT.md',
+        includeDirectories: ['/src'],
+        sandbox: true,
+        excludeTools: ['toolA'],
+        allowMCPServers: ['server1'],
+        folderTrust: true,
+        dnsResolutionOrder: 'ipv4first',
+        excludedProjectEnvVars: ['SECRET'],
+        mcpServers: {
+          'my-server': {
+            command: 'npm start',
+          },
+        },
+        unrecognizedTopLevel: {
+          value: 'should be preserved',
+        },
+      });
+    });
+
+    it('should handle partial v2 settings', () => {
+      const v2Settings: TestSettings = {
+        general: {
+          vimMode: false,
+        },
+        ui: {},
+        model: {
+          name: 'gemini-1.5-pro',
+        },
+        unrecognized: 'value',
+      };
+
+      const v1Settings = migrateSettingsToV1(v2Settings);
+
+      expect(v1Settings).toEqual({
+        vimMode: false,
+        model: 'gemini-1.5-pro',
+        unrecognized: 'value',
+      });
+    });
+
+    it('should handle settings with different data types', () => {
+      const v2Settings: TestSettings = {
+        general: {
+          vimMode: false,
+        },
+        model: {
+          maxSessionTurns: 0,
+        },
+        context: {
+          includeDirectories: [],
+        },
+        security: {
+          folderTrust: {
+            enabled: null,
+          },
+        },
+      };
+
+      const v1Settings = migrateSettingsToV1(v2Settings);
+
+      expect(v1Settings).toEqual({
+        vimMode: false,
+        maxSessionTurns: 0,
+        includeDirectories: [],
+        folderTrust: null,
+      });
+    });
+
+    it('should preserve unrecognized top-level keys', () => {
+      const v2Settings: TestSettings = {
+        general: {
+          vimMode: true,
+        },
+        customTopLevel: {
+          a: 1,
+          b: [2],
+        },
+        anotherOne: 'hello',
+      };
+
+      const v1Settings = migrateSettingsToV1(v2Settings);
+
+      expect(v1Settings).toEqual({
+        vimMode: true,
+        customTopLevel: {
+          a: 1,
+          b: [2],
+        },
+        anotherOne: 'hello',
+      });
+    });
+
+    it('should handle an empty v2 settings object', () => {
+      const v2Settings = {};
+      const v1Settings = migrateSettingsToV1(v2Settings);
+      expect(v1Settings).toEqual({});
+    });
+
+    it('should correctly handle mcpServers at the top level', () => {
+      const v2Settings: TestSettings = {
+        mcpServers: {
+          serverA: { command: 'a' },
+        },
+        mcp: {
+          allowed: ['serverA'],
+        },
+      };
+
+      const v1Settings = migrateSettingsToV1(v2Settings);
+
+      expect(v1Settings).toEqual({
+        mcpServers: {
+          serverA: { command: 'a' },
+        },
+        allowMCPServers: ['serverA'],
+      });
     });
   });
 });

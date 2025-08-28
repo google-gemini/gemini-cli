@@ -1355,6 +1355,30 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
       server1: { url: 'http://localhost:8080' },
     });
   });
+
+  it('should prioritize CLI flag over both allowed and excluded settings', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed-mcp-server-names',
+      'server2',
+      '--allowed-mcp-server-names',
+      'server3',
+    ];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ...baseSettings,
+      mcp: {
+        allowed: ['server1', 'server2'], // Should be ignored
+        excluded: ['server3'], // Should be ignored
+      },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getMcpServers()).toEqual({
+      server2: { url: 'http://localhost:8081' },
+      server3: { url: 'http://localhost:8082' },
+    });
+  });
 });
 
 describe('loadCliConfig extensions', () => {
