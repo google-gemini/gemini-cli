@@ -491,7 +491,8 @@ export async function loadCliConfig(
   // mcpServers and only keep user/system entries already merged above.
   // Harden only when explicitly requested to avoid breaking existing behavior.
   if (!trustedFolder && process.env['GEMINI_SAFE_TRUST_DEFAULT'] === '1') {
-    mcpServers = {};
+    // Revert to only settings-based servers, dropping extension-provided ones.
+    mcpServers = settings.mcpServers ?? {};
   }
 
   return new Config({
