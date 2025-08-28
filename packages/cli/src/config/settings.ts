@@ -513,34 +513,16 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   }
 }
 
-export function loadEnvironment(settings?: Settings): void {
+export function loadEnvironment(settings: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
+
+  if (!isWorkspaceTrusted(settings)) {
+    return;
+  }
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
     setUpCloudShellEnvironment(envFilePath);
-  }
-
-  // If no settings provided, try to load workspace settings for exclusions
-  let resolvedSettings = settings;
-  if (!resolvedSettings) {
-    const workspaceSettingsPath = new Storage(
-      process.cwd(),
-    ).getWorkspaceSettingsPath();
-    try {
-      if (fs.existsSync(workspaceSettingsPath)) {
-        const workspaceContent = fs.readFileSync(
-          workspaceSettingsPath,
-          'utf-8',
-        );
-        const parsedWorkspaceSettings = JSON.parse(
-          stripJsonComments(workspaceContent),
-        ) as Settings;
-        resolvedSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
-      }
-    } catch (_e) {
-      // Ignore errors loading workspace settings
-    }
   }
 
   if (envFilePath) {
@@ -551,8 +533,7 @@ export function loadEnvironment(settings?: Settings): void {
       const parsedEnv = dotenv.parse(envFileContent);
 
       const excludedVars =
-        resolvedSettings?.advanced?.excludedEnvVars ||
-        DEFAULT_EXCLUDED_ENV_VARS;
+        settings?.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
       const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
 
       for (const key in parsedEnv) {
@@ -627,7 +608,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
 
         let settingsObject = rawSettings as Record<string, unknown>;
         if (needsMigration(settingsObject)) {
-          console.error(`Legacy settings file detected at: ${filePath}`);
           const migratedSettings = migrateSettingsToV2(settingsObject);
           if (migratedSettings) {
             if (MIGRATE_V2_OVERWRITE) {
@@ -638,9 +618,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
                   JSON.stringify(migratedSettings, null, 2),
                   'utf-8',
                 );
-                console.log(
-                  `Successfully migrated and saved settings file: ${filePath}`,
-                );
               } catch (e) {
                 console.error(
                   `Error migrating settings file on disk: ${getErrorMessage(
@@ -649,9 +626,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
                 );
               }
             } else {
-              console.log(
-                `Successfully migrated settings for ${filePath} in-memory for the current session.`,
-              );
               migratedInMemorScopes.add(scope);
             }
             settingsObject = migratedSettings;
