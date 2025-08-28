@@ -16,14 +16,9 @@ import {
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
-import {
-  isFolderTrustEnabled,
-  isWorkspaceTrusted,
-  loadTrustedFolders,
-} from './trustedFolders.js';
+import { isWorkspaceTrusted } from './trustedFolders.js';
 import type { Settings, MemoryImportFormat } from './settingsSchema.js';
 import { mergeWith } from 'lodash-es';
-import { env } from 'yargs';
 
 export type { Settings, MemoryImportFormat };
 
@@ -562,11 +557,8 @@ export function loadEnvironment(settings: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
   if (!isWorkspaceTrusted(settings)) {
-    console.log('workspace is not trusted');
     return;
   }
-
-  console.log('workspace is trusted!');
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
