@@ -327,6 +327,13 @@ export async function installExtension(
   installMetadata: ExtensionInstallMetadata,
   cwd: string = process.cwd(),
 ): Promise<string> {
+  const settings = loadSettings(cwd).merged;
+  if (!isWorkspaceTrusted(settings)) {
+    throw new Error(
+      `Could not install extension from untrusted folder at ${installMetadata.source}`,
+    );
+  }
+
   const extensionsDir = ExtensionStorage.getUserExtensionsDir();
   await fs.promises.mkdir(extensionsDir, { recursive: true });
 

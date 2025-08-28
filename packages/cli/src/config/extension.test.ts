@@ -307,6 +307,7 @@ describe('installExtension', () => {
     // Clean up before each test
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
     fs.mkdirSync(userExtensionsDir, { recursive: true });
+    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
 
     vi.mocked(execSync).mockClear();
   });
@@ -456,6 +457,7 @@ describe('uninstallExtension', () => {
 describe('performWorkspaceExtensionMigration', () => {
   let tempWorkspaceDir: string;
   let tempHomeDir: string;
+  let workspaceExtensionsDir: string;
 
   beforeEach(() => {
     tempWorkspaceDir = fs.mkdtempSync(
@@ -465,6 +467,13 @@ describe('performWorkspaceExtensionMigration', () => {
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+
+    workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
   });
 
   afterEach(() => {
@@ -473,12 +482,57 @@ describe('performWorkspaceExtensionMigration', () => {
     vi.restoreAllMocks();
   });
 
+  describe('folder trust', () => {
+    it('refuses to install extensions from untrusted folders', async () => {
+      vi.mocked(isWorkspaceTrusted).mockReturnValue(false);
+      const ext1Path = createExtension({
+        extensionsDir: workspaceExtensionsDir,
+        name: 'ext1',
+        version: '1.0.0',
+      });
+
+      const failed = await performWorkspaceExtensionMigration([
+        loadExtension(ext1Path)!,
+      ]);
+
+      expect(failed).toEqual(['ext1']);
+    });
+
+    it('does not copy extensions to the user dir', async () => {
+      vi.mocked(isWorkspaceTrusted).mockReturnValue(false);
+      const ext1Path = createExtension({
+        extensionsDir: workspaceExtensionsDir,
+        name: 'ext1',
+        version: '1.0.0',
+      });
+
+      await performWorkspaceExtensionMigration([loadExtension(ext1Path)!]);
+
+      const userExtensionsDir = path.join(
+        tempHomeDir,
+        GEMINI_DIR,
+        'extensions',
+      );
+
+      expect(() => fs.readdirSync(userExtensionsDir)).toThrow();
+    });
+
+    it('does not load any extensions in the workspace config', async () => {
+      vi.mocked(isWorkspaceTrusted).mockReturnValue(false);
+      const ext1Path = createExtension({
+        extensionsDir: workspaceExtensionsDir,
+        name: 'ext1',
+        version: '1.0.0',
+      });
+
+      await performWorkspaceExtensionMigration([loadExtension(ext1Path)!]);
+      const extensions = loadExtensions(tempWorkspaceDir);
+
+      expect(extensions).toEqual([]);
+    });
+  });
+
   it('should install the extensions in the user directory', async () => {
-    const workspaceExtensionsDir = path.join(
-      tempWorkspaceDir,
-      EXTENSIONS_DIRECTORY_NAME,
-    );
-    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
     const ext1Path = createExtension({
       extensionsDir: workspaceExtensionsDir,
       name: 'ext1',
@@ -513,12 +567,6 @@ describe('performWorkspaceExtensionMigration', () => {
   });
 
   it('should return the names of failed installations', async () => {
-    const workspaceExtensionsDir = path.join(
-      tempWorkspaceDir,
-      EXTENSIONS_DIRECTORY_NAME,
-    );
-    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
-
     const ext1Path = createExtension({
       extensionsDir: workspaceExtensionsDir,
       name: 'ext1',
@@ -577,6 +625,7 @@ describe('updateExtension', () => {
     // Clean up before each test
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
     fs.mkdirSync(userExtensionsDir, { recursive: true });
+    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
 
     vi.mocked(execSync).mockClear();
   });
