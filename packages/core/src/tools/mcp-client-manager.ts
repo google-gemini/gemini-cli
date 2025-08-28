@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { MCPServerConfig } from '../config/config.js';
+import type { Config, MCPServerConfig } from '../config/config.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import {
@@ -55,7 +55,10 @@ export class McpClientManager {
    * It connects to each server, discovers its available tools, and registers
    * them with the `ToolRegistry`.
    */
-  async discoverAllMcpTools(): Promise<void> {
+  async discoverAllMcpTools(cliConfig: Config): Promise<void> {
+    if (cliConfig.isTrustedFolder() === false) {
+      return;
+    }
     await this.stop();
 
     const servers = populateMcpServerCommand(
@@ -91,7 +94,7 @@ export class McpClientManager {
 
         try {
           await client.connect();
-          await client.discover();
+          await client.discover(cliConfig);
           this.eventEmitter?.emit('mcp-server-connected', {
             name,
             current,
