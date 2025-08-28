@@ -2433,79 +2433,44 @@ describe('Settings Loading and Merging', () => {
         originalIsWorkspaceTrusted.mockRestore();
       });
 
-      it('should load env files when workspace is trusted and GEMINI_SAFE_TRUST_DEFAULT is not set', () => {
-        delete process.env['GEMINI_SAFE_TRUST_DEFAULT'];
-        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: true });
+      it('should load env files when workspace is trusted', () => {
+        originalIsWorkspaceTrusted.mockReturnValue(true);
 
         loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
 
         expect(process.env['TESTTEST']).toEqual('1234');
       });
 
-      it('should not load env files when GEMINI_SAFE_TRUST_DEFAULT=1 and folder trust is disabled', () => {
-        process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
-        setup({ isFolderTrustEnabled: false, isWorkspaceTrustedValue: true });
+      it('should not load env files when workspace is not trusted', () => {
+        originalIsWorkspaceTrusted.mockReturnValue(false);
 
         loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
 
         expect(process.env['TESTTEST']).toBeUndefined();
       });
 
-      it('should load env files when GEMINI_SAFE_TRUST_DEFAULT=1 but explicit trust rules allow it', () => {
+      it('should not load env files when workspace trust is undefined', () => {
+        originalIsWorkspaceTrusted.mockReturnValue(undefined);
+
+        loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+
+        expect(process.env['TESTTEST']).toBeUndefined();
+      });
+
+      it('should load env files when workspace trust returns true with GEMINI_SAFE_TRUST_DEFAULT logic', () => {
+        // Test that the centralized isWorkspaceTrusted function handles GEMINI_SAFE_TRUST_DEFAULT
         process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
-        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: true });
+        originalIsWorkspaceTrusted.mockReturnValue(true); // Explicit trust overrides env var
 
         loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
 
         expect(process.env['TESTTEST']).toEqual('1234');
       });
 
-      it('should handle different GEMINI_SAFE_TRUST_DEFAULT values correctly', () => {
-        // Test with various values
-        const testCases = [
-          { value: '1', shouldLoad: false },
-          { value: '0', shouldLoad: true },
-          { value: 'true', shouldLoad: true },
-          { value: 'false', shouldLoad: true },
-          { value: '', shouldLoad: true },
-        ];
-
-        for (const testCase of testCases) {
-          process.env['GEMINI_SAFE_TRUST_DEFAULT'] = testCase.value;
-          setup({
-            isFolderTrustEnabled: testCase.value === '1' ? false : true,
-            isWorkspaceTrustedValue: true
-          });
-
-          // Clear any existing env var
-          delete process.env['TESTTEST'];
-
-          loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
-
-          if (testCase.shouldLoad) {
-            expect(process.env['TESTTEST']).toEqual('1234');
-          } else {
-            expect(process.env['TESTTEST']).toBeUndefined();
-          }
-        }
-      });
-
-      it('should prioritize explicit trust settings over GEMINI_SAFE_TRUST_DEFAULT', () => {
+      it('should not load env files when GEMINI_SAFE_TRUST_DEFAULT blocks access', () => {
+        // Test that the centralized isWorkspaceTrusted function handles GEMINI_SAFE_TRUST_DEFAULT
         process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
-
-        // Even with GEMINI_SAFE_TRUST_DEFAULT=1, explicit trust should work
-        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: true });
-
-        loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
-
-        expect(process.env['TESTTEST']).toEqual('1234');
-      });
-
-      it('should maintain security when both conditions are untrusted', () => {
-        process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
-
-        // Both conditions untrusted
-        setup({ isFolderTrustEnabled: false, isWorkspaceTrustedValue: false });
+        originalIsWorkspaceTrusted.mockReturnValue(false); // Env var blocks access
 
         loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
 

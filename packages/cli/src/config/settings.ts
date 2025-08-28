@@ -558,15 +558,7 @@ export function loadEnvironment(settings: Settings): void {
 
   // Only load project-level env when the workspace is trusted. This avoids
   // untrusted repos injecting environment variables by dropping a .env file.
-  // Determine trust based on settings or hardened default via GEMINI_SAFE_TRUST_DEFAULT.
-  const workspaceTrustEnabled =
-    settings?.security?.folderTrust?.featureEnabled ?? false;
-  const workspaceTrusted = workspaceTrustEnabled
-    ? isWorkspaceTrusted(settings) ?? true
-    : process.env['GEMINI_SAFE_TRUST_DEFAULT'] === '1'
-      ? false
-      : true;
-  if (!workspaceTrusted) {
+  if (isWorkspaceTrusted(settings) !== true) {
     return;
   }
 
