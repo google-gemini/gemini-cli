@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { GeminiClient } from '@google/gemini-cli-core';
+import {
+  CompressionStatus,
+  type ChatCompressionInfo,
+  type GeminiClient,
+} from '@google/gemini-cli-core';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { compressCommand } from './compressCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -35,6 +39,7 @@ describe('compressCommand', () => {
         isPending: true,
         originalTokenCount: null,
         newTokenCount: null,
+        compressionStatus: null,
       },
     };
     await compressCommand.action!(context, '');
@@ -50,25 +55,24 @@ describe('compressCommand', () => {
   });
 
   it('should set pending item, call tryCompressChat, and add result on success', async () => {
-    const compressedResult = {
+    const compressedResult: ChatCompressionInfo = {
       originalTokenCount: 200,
+      compressionStatus: CompressionStatus.COMPRESSED,
       newTokenCount: 100,
     };
     mockTryCompressChat.mockResolvedValue(compressedResult);
 
     await compressCommand.action!(context, '');
 
-    expect(context.ui.setPendingItem).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        type: MessageType.COMPRESSION,
-        compression: {
-          isPending: true,
-          originalTokenCount: null,
-          newTokenCount: null,
-        },
-      }),
-    );
+    expect(context.ui.setPendingItem).toHaveBeenNthCalledWith(1, {
+      type: MessageType.COMPRESSION,
+      compression: {
+        isPending: true,
+        compressionStatus: null,
+        originalTokenCount: null,
+        newTokenCount: null,
+      },
+    });
 
     expect(mockTryCompressChat).toHaveBeenCalledWith(
       expect.stringMatching(/^compress-\d+$/),
@@ -76,14 +80,15 @@ describe('compressCommand', () => {
     );
 
     expect(context.ui.addItem).toHaveBeenCalledWith(
-      expect.objectContaining({
+      {
         type: MessageType.COMPRESSION,
         compression: {
           isPending: false,
+          compressionStatus: CompressionStatus.COMPRESSED,
           originalTokenCount: 200,
           newTokenCount: 100,
         },
-      }),
+      },
       expect.any(Number),
     );
 

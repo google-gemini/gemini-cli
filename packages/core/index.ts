@@ -5,6 +5,7 @@
  */
 
 export * from './src/index.js';
+export { Storage } from './src/config/storage.js';
 export {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -17,3 +18,4 @@ export {
   IdeConnectionType,
 } from './src/telemetry/types.js';
 export { makeFakeConfig } from './src/test-utils/config.js';
+export * from './src/utils/pathReader.js';
