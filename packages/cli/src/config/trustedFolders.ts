@@ -164,16 +164,11 @@ export function isFolderTrustEnabled(settings: Settings): boolean {
 }
 
 export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
-  console.log('ass');
   if (!isFolderTrustEnabled(settings)) {
-    console.log('trust is disabled');
     return true;
   }
-  console.log('zzzzp');
 
   const folders = loadTrustedFolders();
-
-  console.log('zoom');
 
   if (folders.errors.length > 0) {
     for (const error of folders.errors) {
@@ -182,8 +177,6 @@ export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
       );
     }
   }
-
-  console.log('is path');
 
   return folders.isPathTrusted(process.cwd());
 }
