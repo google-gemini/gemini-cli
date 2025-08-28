@@ -7,10 +7,34 @@
 import { McpPromptLoader } from './McpPromptLoader.js';
 import type { Config } from '@google/gemini-cli-core';
 import type { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { CommandKind } from '../ui/commands/types.js';
+import * as cliCore from '@google/gemini-cli-core';
+
+// Define the mock prompt data at a higher scope
+const mockPrompt = {
+  name: 'test-prompt',
+  description: 'A test prompt.',
+  serverName: 'test-server',
+  arguments: [
+    { name: 'name', required: true, description: 'The user\'s name.' },
+    { name: 'age', required: false, description: 'The user\'s age.' },
+  ],
+  invoke: vi.fn().mockResolvedValue({
+    messages: [{ content: { text: 'Hello, world!' } }],
+  }),
+};
 
 describe('McpPromptLoader', () => {
   const mockConfig = {} as Config;
+
+  // Use a beforeEach to set up and clean a spy for each test
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(cliCore, 'getMCPServerPrompts').mockReturnValue([mockPrompt]);
+  });
+
+  // --- `parseArgs` tests remain the same ---
 
   describe('parseArgs', () => {
     it('should handle multi-word positional arguments', () => {
@@ -123,6 +147,81 @@ describe('McpPromptLoader', () => {
         named2: 'value2',
         pos3: 'p3 "with quotes"',
       });
+    });
+  });
+
+  describe('loadCommands', () => {
+    const mockConfigWithPrompts = {
+      getMcpServers: () => ({
+        'test-server': { httpUrl: 'https://test-server.com' },
+      }),
+    } as unknown as Config;
+
+    it('should load prompts as slash commands', async () => {
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+      expect(commands).toHaveLength(1);
+      expect(commands[0].name).toBe('test-prompt');
+      expect(commands[0].description).toBe('A test prompt.');
+      expect(commands[0].kind).toBe(CommandKind.MCP_PROMPT);
+    });
+
+    it('should generate a help subcommand with correct format', async () => {
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+      const helpSubcommand = commands[0].subCommands?.find(
+        (cmd) => cmd.name === 'help',
+      );
+      expect(helpSubcommand).toBeDefined();
+
+      let result;
+      if (helpSubcommand?.action) {
+        result = await helpSubcommand.action({} as any, '');
+      }
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: expect.stringContaining('Arguments for "test-prompt":'),
+      });
+      expect((result as any).content).toContain('--name\n');
+      expect((result as any).content).toContain('--age\n');
+      expect((result as any).content).toContain('(required: yes)\n\n');
+    });
+
+    it('should handle prompt invocation successfully', async () => {
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+      const action = commands[0].action!;
+      const context = {} as any;
+      const result = await action(context, 'test-name 123');
+      expect(mockPrompt.invoke).toHaveBeenCalledWith({
+        name: 'test-name 123',
+      });
+      expect(result).toEqual({
+        type: 'submit_prompt',
+        content: JSON.stringify('Hello, world!'),
+      });
+    });
+
+    it('should return an error message if prompt invocation fails', async () => {
+      vi.spyOn(mockPrompt, 'invoke').mockRejectedValue(new Error('Invocation failed!'));
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+      const action = commands[0].action!;
+      const context = {} as any;
+      const result = await action(context, 'test-name');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Error: Invocation failed!',
+      });
+    });
+
+    it('should return an empty array if config is not available', async () => {
+      const loader = new McpPromptLoader(null);
+      const commands = await loader.loadCommands(new AbortController().signal);
+      expect(commands).toEqual([]);
     });
   });
 });
