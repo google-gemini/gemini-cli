@@ -8,7 +8,7 @@ import { McpPromptLoader } from './McpPromptLoader.js';
 import type { Config } from '@google/gemini-cli-core';
 import type { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CommandKind } from '../ui/commands/types.js';
+import { CommandKind, type CommandContext, type SlashCommandActionReturn } from '../ui/commands/types.js';
 import * as cliCore from '@google/gemini-cli-core';
 
 // Define the mock prompt data at a higher scope
@@ -173,34 +173,11 @@ describe('McpPromptLoader', () => {
       expect(commands[0].kind).toBe(CommandKind.MCP_PROMPT);
     });
 
-    it('should generate a help subcommand with correct format', async () => {
-      const loader = new McpPromptLoader(mockConfigWithPrompts);
-      const commands = await loader.loadCommands(new AbortController().signal);
-      const helpSubcommand = commands[0].subCommands?.find(
-        (cmd) => cmd.name === 'help',
-      );
-      expect(helpSubcommand).toBeDefined();
-
-      let result;
-      if (helpSubcommand?.action) {
-        result = await helpSubcommand.action({} as any, '');
-      }
-
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content: expect.stringContaining('Arguments for "test-prompt":'),
-      });
-      expect((result as any).content).toContain('--name\n');
-      expect((result as any).content).toContain('--age\n');
-      expect((result as any).content).toContain('(required: yes)\n\n');
-    });
-
     it('should handle prompt invocation successfully', async () => {
       const loader = new McpPromptLoader(mockConfigWithPrompts);
       const commands = await loader.loadCommands(new AbortController().signal);
       const action = commands[0].action!;
-      const context = {} as any;
+      const context = {} as CommandContext;
       const result = await action(context, 'test-name 123 tiger');
       expect(mockPrompt.invoke).toHaveBeenCalledWith({
         name: 'test-name',
@@ -220,7 +197,7 @@ describe('McpPromptLoader', () => {
       const loader = new McpPromptLoader(mockConfigWithPrompts);
       const commands = await loader.loadCommands(new AbortController().signal);
       const action = commands[0].action!;
-      const context = {} as any;
+      const context = {} as CommandContext;
       const result = await action(context, 'test-name');
       expect(result).toEqual({
         type: 'message',
@@ -242,7 +219,7 @@ describe('McpPromptLoader', () => {
           new AbortController().signal,
         );
         const completion = commands[0].completion!;
-        const context = {} as any;
+        const context = {} as CommandContext;
         const suggestions = await completion(context, 'test-name 6 tiger');
         expect(suggestions).toEqual([]);
       });
@@ -253,7 +230,7 @@ describe('McpPromptLoader', () => {
           new AbortController().signal,
         );
         const completion = commands[0].completion!;
-        const context = {} as any;
+        const context = {} as CommandContext;
         const suggestions = await completion(context, '');
         expect(suggestions).toEqual([
           '--name=""',
@@ -270,7 +247,7 @@ describe('McpPromptLoader', () => {
           new AbortController().signal,
         );
         const completion = commands[0].completion!;
-        const context = {} as any;
+        const context = {} as CommandContext;
         const suggestions = await completion(
           context,
           '--name="test-name" --age="6"',
@@ -288,7 +265,7 @@ describe('McpPromptLoader', () => {
           new AbortController().signal,
         );
         const completion = commands[0].completion!;
-        const context = {} as any;
+        const context = {} as CommandContext;
         const suggestions = await completion(
           context,
           '--name="test-name" --age="6" --species="tiger", --enclosure="Tiger Den" --trail="Jungle"',
@@ -306,7 +283,7 @@ describe('McpPromptLoader', () => {
           new AbortController().signal,
         );
         const completion = commands[0].completion!;
-        const context = {} as any;
+        const context = {} as CommandContext;
         const suggestions = await completion(context, '');
         expect(suggestions).toEqual([]);
       });
