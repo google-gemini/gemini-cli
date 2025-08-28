@@ -159,6 +159,10 @@ export class McpPromptLoader implements ICommandLoader {
             const positionalArgCount =
               (positionalArgsString.match(positionalArgRegex) || []).length;
 
+            if (positionalArgCount > 0 && usedArgNames.size === 0) {
+              return [];
+            }
+
             const availableArgs = prompt.arguments.filter(
               (arg) => !usedArgNames.has(arg.name),
             );
