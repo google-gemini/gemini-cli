@@ -20,6 +20,8 @@ import {
   performWorkspaceExtensionMigration,
   uninstallExtension,
   updateExtension,
+  type Extension,
+  type ExtensionConfig,
 } from './extension.js';
 import {
   type GeminiCLIExtension,
@@ -28,6 +30,7 @@ import {
 import { execSync } from 'node:child_process';
 import { SettingScope, loadSettings } from './settings.js';
 import { type SimpleGit, simpleGit } from 'simple-git';
+import { isWorkspaceTrusted } from './trustedFolders.js';
 
 vi.mock('simple-git', () => ({
   simpleGit: vi.fn(),
@@ -38,6 +41,14 @@ vi.mock('os', async (importOriginal) => {
   return {
     ...os,
     homedir: vi.fn(),
+  };
+});
+
+vi.mock('./trustedFolders.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./trustedFolders.js')>();
+  return {
+    ...actual,
+    isWorkspaceTrusted: vi.fn(),
   };
 });
 
@@ -54,6 +65,7 @@ const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
 describe('loadExtensions', () => {
   let tempWorkspaceDir: string;
   let tempHomeDir: string;
+  let workspaceExtensionsDir: string;
 
   beforeEach(() => {
     tempWorkspaceDir = fs.mkdtempSync(
@@ -63,6 +75,13 @@ describe('loadExtensions', () => {
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+
+    workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
   });
 
   afterEach(() => {
@@ -71,24 +90,30 @@ describe('loadExtensions', () => {
     vi.restoreAllMocks();
   });
 
-  it('should include extension path in loaded extension', () => {
-    const workspaceExtensionsDir = path.join(
-      tempWorkspaceDir,
-      EXTENSIONS_DIRECTORY_NAME,
-    );
-    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+  it('ignores extensions in untrusted workspaces', () => {
+    vi.mocked(isWorkspaceTrusted).mockReturnValue(false);
 
     const extensionDir = path.join(workspaceExtensionsDir, 'test-extension');
     fs.mkdirSync(extensionDir, { recursive: true });
+    createExtension({
+      extensionsDir: workspaceExtensionsDir,
+      name: 'ext1',
+      version: '1.0.0',
+      addContextFile: true,
+    });
+    const extensions = loadExtensions(tempWorkspaceDir);
+    expect(extensions.length).toBe(0);
+  });
 
-    const config = {
+  it('should include extension path in loaded extension', () => {
+    const extensionDir = path.join(workspaceExtensionsDir, 'test-extension');
+    fs.mkdirSync(extensionDir, { recursive: true });
+
+    createExtension({
+      extensionsDir: workspaceExtensionsDir,
       name: 'test-extension',
       version: '1.0.0',
-    };
-    fs.writeFileSync(
-      path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME),
-      JSON.stringify(config),
-    );
+    });
 
     const extensions = loadExtensions(tempWorkspaceDir);
     expect(extensions).toHaveLength(1);
@@ -97,13 +122,17 @@ describe('loadExtensions', () => {
   });
 
   it('should load context file path when GEMINI.md is present', () => {
-    const workspaceExtensionsDir = path.join(
-      tempWorkspaceDir,
-      EXTENSIONS_DIRECTORY_NAME,
-    );
-    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
-    createExtension(workspaceExtensionsDir, 'ext1', '1.0.0', true);
-    createExtension(workspaceExtensionsDir, 'ext2', '2.0.0');
+    createExtension({
+      extensionsDir: workspaceExtensionsDir,
+      name: 'ext1',
+      version: '1.0.0',
+      addContextFile: true,
+    });
+    createExtension({
+      extensionsDir: workspaceExtensionsDir,
+      name: 'ext2',
+      version: '2.0.0',
+    });
 
     const extensions = loadExtensions(tempWorkspaceDir);
 
@@ -117,18 +146,13 @@ describe('loadExtensions', () => {
   });
 
   it('should load context file path from the extension config', () => {
-    const workspaceExtensionsDir = path.join(
-      tempWorkspaceDir,
-      EXTENSIONS_DIRECTORY_NAME,
-    );
-    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
-    createExtension(
-      workspaceExtensionsDir,
-      'ext1',
-      '1.0.0',
-      false,
-      'my-context-file.md',
-    );
+    createExtension({
+      extensionsDir: workspaceExtensionsDir,
+      name: 'ext1',
+      version: '1.0.0',
+      addContextFile: false,
+      contextFileName: 'my-context-file.md',
+    });
 
     const extensions = loadExtensions(tempWorkspaceDir);
 
@@ -140,14 +164,16 @@ describe('loadExtensions', () => {
   });
 
   it('should filter out disabled extensions', () => {
-    const workspaceExtensionsDir = path.join(
-      tempWorkspaceDir,
-      EXTENSIONS_DIRECTORY_NAME,
-    );
-    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
-
-    createExtension(workspaceExtensionsDir, 'ext1', '1.0.0');
-    createExtension(workspaceExtensionsDir, 'ext2', '2.0.0');
+    createExtension({
+      extensionsDir: workspaceExtensionsDir,
+      name: 'ext1',
+      version: '1.0.0',
+    });
+    createExtension({
+      extensionsDir: workspaceExtensionsDir,
+      name: 'ext2',
+      version: '2.0.0',
+    });
 
     const settingsDir = path.join(tempWorkspaceDir, '.gemini');
     fs.mkdirSync(settingsDir, { recursive: true });
@@ -167,24 +193,18 @@ describe('loadExtensions', () => {
   });
 
   it('should hydrate variables', () => {
-    const workspaceExtensionsDir = path.join(
-      tempWorkspaceDir,
-      EXTENSIONS_DIRECTORY_NAME,
-    );
-    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
-
-    createExtension(
-      workspaceExtensionsDir,
-      'test-extension',
-      '1.0.0',
-      false,
-      undefined,
-      {
+    createExtension({
+      extensionsDir: workspaceExtensionsDir,
+      name: 'test-extension',
+      version: '1.0.0',
+      addContextFile: false,
+      contextFileName: undefined,
+      mcpServers: {
         'test-server': {
           cwd: '${extensionPath}${/}server',
         },
       },
-    );
+    });
 
     const extensions = loadExtensions(tempWorkspaceDir);
     expect(extensions).toHaveLength(1);
@@ -199,7 +219,7 @@ describe('loadExtensions', () => {
 });
 
 describe('annotateActiveExtensions', () => {
-  const extensions = [
+  const extensions: Extension[] = [
     {
       path: '/path/to/ext1',
       config: { name: 'ext1', version: '1.0.0' },
@@ -296,11 +316,11 @@ describe('installExtension', () => {
   });
 
   it('should install an extension from a local path', async () => {
-    const sourceExtDir = createExtension(
-      tempHomeDir,
-      'my-local-extension',
-      '1.0.0',
-    );
+    const sourceExtDir = createExtension({
+      extensionsDir: tempHomeDir,
+      name: 'my-local-extension',
+      version: '1.0.0',
+    });
     const targetExtDir = path.join(userExtensionsDir, 'my-local-extension');
     const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
 
@@ -317,11 +337,11 @@ describe('installExtension', () => {
   });
 
   it('should throw an error if the extension already exists', async () => {
-    const sourceExtDir = createExtension(
-      tempHomeDir,
-      'my-local-extension',
-      '1.0.0',
-    );
+    const sourceExtDir = createExtension({
+      extensionsDir: tempHomeDir,
+      name: 'my-local-extension',
+      version: '1.0.0',
+    });
     await installExtension({ source: sourceExtDir, type: 'local' });
     await expect(
       installExtension({ source: sourceExtDir, type: 'local' }),
@@ -396,11 +416,11 @@ describe('uninstallExtension', () => {
   });
 
   it('should uninstall an extension by name', async () => {
-    const sourceExtDir = createExtension(
-      userExtensionsDir,
-      'my-local-extension',
-      '1.0.0',
-    );
+    const sourceExtDir = createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'my-local-extension',
+      version: '1.0.0',
+    });
 
     await uninstallExtension('my-local-extension');
 
@@ -408,16 +428,16 @@ describe('uninstallExtension', () => {
   });
 
   it('should uninstall an extension by name and retain existing extensions', async () => {
-    const sourceExtDir = createExtension(
-      userExtensionsDir,
-      'my-local-extension',
-      '1.0.0',
-    );
-    const otherExtDir = createExtension(
-      userExtensionsDir,
-      'other-extension',
-      '1.0.0',
-    );
+    const sourceExtDir = createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'my-local-extension',
+      version: '1.0.0',
+    });
+    const otherExtDir = createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'other-extension',
+      version: '1.0.0',
+    });
 
     await uninstallExtension('my-local-extension');
 
@@ -459,9 +479,17 @@ describe('performWorkspaceExtensionMigration', () => {
       EXTENSIONS_DIRECTORY_NAME,
     );
     fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
-    const ext1Path = createExtension(workspaceExtensionsDir, 'ext1', '1.0.0');
-    const ext2Path = createExtension(workspaceExtensionsDir, 'ext2', '1.0.0');
-    const extensionsToMigrate = [
+    const ext1Path = createExtension({
+      extensionsDir: workspaceExtensionsDir,
+      name: 'ext1',
+      version: '1.0.0',
+    });
+    const ext2Path = createExtension({
+      extensionsDir: workspaceExtensionsDir,
+      name: 'ext2',
+      version: '1.0.0',
+    });
+    const extensionsToMigrate: Extension[] = [
       loadExtension(ext1Path)!,
       loadExtension(ext2Path)!,
     ];
@@ -491,9 +519,13 @@ describe('performWorkspaceExtensionMigration', () => {
     );
     fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
 
-    const ext1Path = createExtension(workspaceExtensionsDir, 'ext1', '1.0.0');
+    const ext1Path = createExtension({
+      extensionsDir: workspaceExtensionsDir,
+      name: 'ext1',
+      version: '1.0.0',
+    });
 
-    const extensions = [
+    const extensions: Extension[] = [
       loadExtension(ext1Path)!,
       {
         path: '/ext/path/1',
@@ -507,14 +539,14 @@ describe('performWorkspaceExtensionMigration', () => {
   });
 });
 
-function createExtension(
-  extensionsDir: string,
-  name: string,
-  version: string,
+function createExtension({
+  extensionsDir = '',
+  name = 'my-extension',
+  version = '1.0.0',
   addContextFile = false,
-  contextFileName?: string,
-  mcpServers?: Record<string, MCPServerConfig>,
-): string {
+  contextFileName = undefined as string | undefined,
+  mcpServers = {} as Record<string, MCPServerConfig>,
+} = {}): string {
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(
@@ -696,7 +728,11 @@ describe('enableExtension', () => {
   };
 
   it('should enable an extension at the user scope', () => {
-    createExtension(userExtensionsDir, 'ext1', '1.0.0');
+    createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'ext1',
+      version: '1.0.0',
+    });
     disableExtension('ext1', SettingScope.User);
     let activeExtensions = getActiveExtensions();
     expect(activeExtensions).toHaveLength(0);
@@ -708,7 +744,11 @@ describe('enableExtension', () => {
   });
 
   it('should enable an extension at the workspace scope', () => {
-    createExtension(userExtensionsDir, 'ext1', '1.0.0');
+    createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'ext1',
+      version: '1.0.0',
+    });
     disableExtension('ext1', SettingScope.Workspace);
     let activeExtensions = getActiveExtensions();
     expect(activeExtensions).toHaveLength(0);
