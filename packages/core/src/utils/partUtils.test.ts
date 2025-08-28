@@ -9,6 +9,7 @@ import {
   partToString,
   getResponseText,
   flatMapTextParts,
+  appendToLastTextPart,
 } from './partUtils.js';
 import type { GenerateContentResponse, Part, PartUnion } from '@google/genai';
 
@@ -185,7 +186,6 @@ describe('partUtils', () => {
     });
   });
 
-  // ⬇️ New test suite for flatMapTextParts
   describe('flatMapTextParts', () => {
     // A simple async transform function that splits a string into character parts.
     const splitCharsTransform = async (text: string): Promise<PartUnion[]> =>
@@ -257,6 +257,45 @@ describe('partUtils', () => {
       ];
       const result = await flatMapTextParts(parts, removeTransform);
       expect(result).toEqual([{ functionCall: { name: 'keep' } }]);
+    });
+  });
+
+  describe('appendToLastTextPart', () => {
+    it('should append to an empty prompt', () => {
+      const prompt: PartUnion[] = [];
+      const result = appendToLastTextPart(prompt, 'new text');
+      expect(result).toEqual([{ text: 'new text' }]);
+    });
+
+    it('should append to a prompt with a string as the last part', () => {
+      const prompt: PartUnion[] = ['first part'];
+      const result = appendToLastTextPart(prompt, 'new text');
+      expect(result).toEqual(['first part\n\nnew text']);
+    });
+
+    it('should append to a prompt with a text part object as the last part', () => {
+      const prompt: PartUnion[] = [{ text: 'first part' }];
+      const result = appendToLastTextPart(prompt, 'new text');
+      expect(result).toEqual([{ text: 'first part\n\nnew text' }]);
+    });
+
+    it('should append a new text part if the last part is not a text part', () => {
+      const nonTextPart: Part = { functionCall: { name: 'do_stuff' } };
+      const prompt: PartUnion[] = [nonTextPart];
+      const result = appendToLastTextPart(prompt, 'new text');
+      expect(result).toEqual([nonTextPart, { text: '\n\nnew text' }]);
+    });
+
+    it('should not append anything if the text to append is empty', () => {
+      const prompt: PartUnion[] = ['first part'];
+      const result = appendToLastTextPart(prompt, '');
+      expect(result).toEqual(['first part']);
+    });
+
+    it('should use a custom separator', () => {
+      const prompt: PartUnion[] = ['first part'];
+      const result = appendToLastTextPart(prompt, 'new text', '---');
+      expect(result).toEqual(['first part---new text']);
     });
   });
 });

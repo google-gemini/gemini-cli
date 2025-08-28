@@ -128,3 +128,42 @@ export async function flatMapTextParts(
   }
   return result;
 }
+
+/**
+ * Appends a string of text to the last text part of a prompt, or adds a new
+ * text part if the last part is not a text part.
+ *
+ * @param prompt The prompt to modify.
+ * @param textToAppend The text to append to the prompt.
+ * @param separator The separator to add between existing text and the new text.
+ * @returns The modified prompt.
+ */
+export function appendToLastTextPart(
+  prompt: PartUnion[],
+  textToAppend: string,
+  separator = '\n\n',
+): PartUnion[] {
+  if (!textToAppend) {
+    return prompt;
+  }
+
+  if (prompt.length === 0) {
+    return [{ text: textToAppend }];
+  }
+
+  const newPrompt = [...prompt];
+  const lastPart = newPrompt.at(-1);
+
+  if (typeof lastPart === 'string') {
+    newPrompt[newPrompt.length - 1] = `${lastPart}${separator}${textToAppend}`;
+  } else if (lastPart && 'text' in lastPart) {
+    newPrompt[newPrompt.length - 1] = {
+      ...lastPart,
+      text: `${lastPart.text}${separator}${textToAppend}`,
+    };
+  } else {
+    newPrompt.push({ text: `${separator}${textToAppend}` });
+  }
+
+  return newPrompt;
+}

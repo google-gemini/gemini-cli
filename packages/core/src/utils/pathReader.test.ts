@@ -13,9 +13,6 @@ import type { Config } from '../config/config.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
-// Helper to conditionally run tests (useful for OS-specific behaviors like permissions)
-const itif = (condition: boolean) => (condition ? it : it.skip);
-
 // --- Helper for creating a mock Config object ---
 // We use the actual implementations of WorkspaceContext and FileSystemService
 // to test the integration against mock-fs.
@@ -365,7 +362,7 @@ describe('readPathFromWorkspace', () => {
   });
 
   // mock-fs permission simulation is unreliable on Windows.
-  itif(process.platform !== 'win32')(
+  it.skipIf(process.platform === 'win32')(
     'should return an error string if reading a file with no permissions',
     async () => {
       mock({
