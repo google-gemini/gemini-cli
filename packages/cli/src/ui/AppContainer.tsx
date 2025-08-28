@@ -147,6 +147,15 @@ export const AppContainer = (props: AppContainerProps) => {
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
     initializationResult.geminiMdFileCount,
   );
+
+  // App-level abort controller for programmatic commands and lifecycle management
+  const appAbortController = useRef(new AbortController());
+
+  // Cleanup on unmount - cancel all app-level operations
+  useEffect(() => {
+    const controller = appAbortController.current;
+    return () => controller.abort();
+  }, []);
   const [shellModeActive, setShellModeActive] = useState(false);
   const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
     useState<boolean>(false);
@@ -885,7 +894,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const handleIdePromptComplete = useCallback(
     (result: IdeIntegrationNudgeResult) => {
       if (result.userSelection === 'yes') {
-        handleSlashCommand('/ide install');
+        handleSlashCommand('/ide install', appAbortController.current.signal);
         settings.setValue(
           SettingScope.User,
           'hasSeenIdeIntegrationNudge',
@@ -918,7 +927,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
         if (timerRef.current) {
           clearTimeout(timerRef.current);
         }
-        handleSlashCommand('/quit');
+        handleSlashCommand('/quit', appAbortController.current.signal);
       } else {
         setPressedOnce(true);
         timerRef.current = setTimeout(() => {
@@ -978,12 +987,23 @@ Logging in with Google... Please restart Gemini CLI to continue.
           refreshStatic();
           return newValue;
         });
+      } else if (keyMatchers[Command.TOGGLE_TOOL_DESCRIPTIONS](key)) {
+        const newValue = !showToolDescriptions;
+        setShowToolDescriptions(newValue);
+
+        const mcpServers = config.getMcpServers();
+        if (Object.keys(mcpServers || {}).length > 0) {
+          handleSlashCommand(
+            newValue ? '/mcp desc' : '/mcp nodesc',
+            appAbortController.current.signal,
+          );
+        }
       } else if (
         keyMatchers[Command.TOGGLE_IDE_CONTEXT_DETAIL](key) &&
         config.getIdeMode() &&
         ideContextState
       ) {
-        handleSlashCommand('/ide status');
+        handleSlashCommand('/ide status', appAbortController.current.signal);
       } else if (
         keyMatchers[Command.SHOW_MORE_LINES](key) &&
         !enteringConstrainHeightMode

@@ -28,6 +28,7 @@ export const createMockCommandContext = (
   overrides: DeepPartial<CommandContext> = {},
 ): CommandContext => {
   const defaultMocks: CommandContext = {
+    signal: new AbortController().signal,
     invocation: {
       raw: '',
       name: '',
