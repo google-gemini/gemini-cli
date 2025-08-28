@@ -9,12 +9,12 @@ import type {
   ToolCallConfirmationDetails,
   ToolInvocation,
   ToolResult,
-} from '@google/gemini-cli-core';
+} from '../tools/tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
-} from '@google/gemini-cli-core';
+} from '../tools/tools.js';
 
 type MockToolOptions = {
   name: string;
