@@ -177,6 +177,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         })),
         isTrustedFolder: vi.fn(() => true),
         getScreenReader: vi.fn(() => false),
+        getFolderTrustFeature: vi.fn(() => false),
+        getFolderTrust: vi.fn(() => false),
       };
     });
 
