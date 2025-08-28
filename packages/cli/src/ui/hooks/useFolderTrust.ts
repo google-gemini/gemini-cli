@@ -28,8 +28,12 @@ export const useFolderTrust = (
 
   useEffect(() => {
     const trusted = isWorkspaceTrusted({
-      folderTrust,
-      folderTrustFeature,
+      security: {
+        folderTrust: {
+          featureEnabled: folderTrustFeature,
+          enabled: folderTrust,
+        },
+      },
     } as Settings);
     setIsTrusted(trusted);
     setIsFolderTrustDialogOpen(trusted === undefined);
