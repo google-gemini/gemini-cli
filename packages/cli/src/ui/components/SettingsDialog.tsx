@@ -153,7 +153,7 @@ export function SettingsDialog({
             );
 
             // Special handling for vim mode to sync with VimModeContext
-            if (key === 'vimMode' && newValue !== vimEnabled) {
+            if (key === 'general.vimMode' && newValue !== vimEnabled) {
               // Call toggleVimEnabled to sync the VimModeContext local state
               toggleVimEnabled().catch((error) => {
                 console.error('Failed to toggle vim mode:', error);

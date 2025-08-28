@@ -152,6 +152,7 @@ describe('gemini.tsx main function', () => {
       workspaceSettingsFile,
       [settingsError],
       true,
+      new Set(),
     );
 
     loadSettingsMock.mockReturnValue(mockLoadedSettings);
@@ -241,7 +242,9 @@ describe('startInteractiveUI', () => {
   } as Config;
   const mockSettings = {
     merged: {
-      hideWindowTitle: false,
+      ui: {
+        hideWindowTitle: false,
+      },
     },
   } as LoadedSettings;
   const mockStartupWarnings = ['warning1'];

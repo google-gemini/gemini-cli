@@ -4,21 +4,38 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mocked,
+} from 'vitest';
 
 import type {
   Chat,
   Content,
   EmbedContentResponse,
   GenerateContentResponse,
+  Part,
 } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
 import { findIndexAfterFraction, GeminiClient } from './client.js';
-import type { ContentGenerator } from './contentGenerator.js';
-import { AuthType } from './contentGenerator.js';
-import type { GeminiChat } from './geminiChat.js';
+import {
+  AuthType,
+  type ContentGenerator,
+  type ContentGeneratorConfig,
+} from './contentGenerator.js';
+import { type GeminiChat } from './geminiChat.js';
 import { Config } from '../config/config.js';
-import { GeminiEventType, Turn } from './turn.js';
+import {
+  CompressionStatus,
+  GeminiEventType,
+  Turn,
+  type ChatCompressionInfo,
+} from './turn.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
@@ -34,7 +51,8 @@ const mockEmbedContentFn = vi.fn();
 const mockTurnRunFn = vi.fn();
 
 vi.mock('@google/genai');
-vi.mock('./turn', () => {
+vi.mock('./turn', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./turn.js')>();
   // Define a mock class that has the same shape as the real Turn
   class MockTurn {
     pendingToolCalls = [];
@@ -47,13 +65,8 @@ vi.mock('./turn', () => {
   }
   // Export the mock class as 'Turn'
   return {
+    ...actual,
     Turn: MockTurn,
-    GeminiEventType: {
-      MaxSessionTurns: 'MaxSessionTurns',
-      ChatCompressed: 'ChatCompressed',
-      Error: 'error',
-      Content: 'content',
-    },
   };
 });
 
@@ -77,6 +90,19 @@ vi.mock('../telemetry/index.js', () => ({
   logApiError: vi.fn(),
 }));
 vi.mock('../ide/ideContext.js');
+
+/**
+ * Array.fromAsync ponyfill, which will be available in es 2024.
+ *
+ * Buffers an async generator into an array and returns the result.
+ */
+async function fromAsync<T>(promise: AsyncGenerator<T>): Promise<readonly T[]> {
+  const results: T[] = [];
+  for await (const result of promise) {
+    results.push(result);
+  }
+  return results;
+}
 
 describe('findIndexAfterFraction', () => {
   const history: Content[] = [
@@ -176,7 +202,7 @@ describe('Gemini Client (client.ts)', () => {
       getTool: vi.fn().mockReturnValue(null),
     };
     const fileService = new FileDiscoveryService('/test/dir');
-    const contentGeneratorConfig = {
+    const contentGeneratorConfig: ContentGeneratorConfig = {
       model: 'test-model',
       apiKey: 'test-key',
       vertexai: false,
@@ -380,7 +406,9 @@ describe('Gemini Client (client.ts)', () => {
     });
 
     it('should allow overriding model and config', async () => {
-      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const contents: Content[] = [
+        { role: 'user', parts: [{ text: 'hello' }] },
+      ];
       const schema = { type: 'string' };
       const abortSignal = new AbortController().signal;
       const customModel = 'custom-json-model';
@@ -421,10 +449,10 @@ describe('Gemini Client (client.ts)', () => {
 
   describe('addHistory', () => {
     it('should call chat.addHistory with the provided content', async () => {
-      const mockChat = {
+      const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
       };
-      client['chat'] = mockChat as unknown as GeminiChat;
+      client['chat'] = mockChat as GeminiChat;
 
       const newContent = {
         role: 'user',
@@ -486,6 +514,139 @@ describe('Gemini Client (client.ts)', () => {
       } as unknown as GeminiChat;
     });
 
+    function setup({
+      chatHistory = [
+        { role: 'user', parts: [{ text: 'Long conversation' }] },
+        { role: 'model', parts: [{ text: 'Long response' }] },
+      ] as Content[],
+    } = {}) {
+      const mockChat: Partial<GeminiChat> = {
+        getHistory: vi.fn().mockReturnValue(chatHistory),
+        setHistory: vi.fn(),
+        sendMessage: vi.fn().mockResolvedValue({ text: 'Summary' }),
+      };
+      const mockCountTokens = vi
+        .fn()
+        .mockResolvedValueOnce({ totalTokens: 1000 })
+        .mockResolvedValueOnce({ totalTokens: 5000 });
+
+      const mockGenerator: Partial<Mocked<ContentGenerator>> = {
+        countTokens: mockCountTokens,
+      };
+
+      client['chat'] = mockChat as GeminiChat;
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+      client['startChat'] = vi.fn().mockResolvedValue({ ...mockChat });
+
+      return { client, mockChat, mockGenerator };
+    }
+
+    describe('when compression inflates the token count', () => {
+      it('uses the truncated history for compression');
+      it('allows compression to be forced/manual after a failure', async () => {
+        const { client, mockGenerator } = setup();
+        mockGenerator.countTokens?.mockResolvedValue({
+          totalTokens: 1000,
+        });
+        await client.tryCompressChat('prompt-id-4'); // Fails
+        const result = await client.tryCompressChat('prompt-id-4', true);
+
+        expect(result).toEqual({
+          compressionStatus: CompressionStatus.COMPRESSED,
+          newTokenCount: 1000,
+          originalTokenCount: 1000,
+        });
+      });
+
+      it('yields the result even if the compression inflated the tokens', async () => {
+        const { client } = setup();
+        const result = await client.tryCompressChat('prompt-id-4', true);
+
+        expect(result).toEqual({
+          compressionStatus:
+            CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+          newTokenCount: 5000,
+          originalTokenCount: 1000,
+        });
+      });
+
+      it('does not manipulate the source chat', async () => {
+        const { client, mockChat } = setup();
+        await client.tryCompressChat('prompt-id-4', true);
+
+        expect(client['chat']).toBe(mockChat); // a new chat session was not created
+      });
+
+      it('restores the history back to the original', async () => {
+        vi.mocked(tokenLimit).mockReturnValue(1000);
+        mockCountTokens.mockResolvedValue({
+          totalTokens: 999,
+        });
+
+        const originalHistory: Content[] = [
+          { role: 'user', parts: [{ text: 'what is your wisdom?' }] },
+          { role: 'model', parts: [{ text: 'some wisdom' }] },
+          { role: 'user', parts: [{ text: 'ahh that is a good a wisdom' }] },
+        ];
+
+        const { client } = setup({
+          chatHistory: originalHistory,
+        });
+        const { compressionStatus } =
+          await client.tryCompressChat('prompt-id-4');
+
+        expect(compressionStatus).toBe(
+          CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+        );
+        expect(client['chat']?.setHistory).toHaveBeenCalledWith(
+          originalHistory,
+        );
+      });
+
+      it('will not attempt to compress context after a failure', async () => {
+        const { client, mockGenerator } = setup();
+        await client.tryCompressChat('prompt-id-4');
+
+        const result = await client.tryCompressChat('prompt-id-5');
+
+        // it counts tokens for {original, compressed} and then never again
+        expect(mockGenerator.countTokens).toHaveBeenCalledTimes(2);
+        expect(result).toEqual({
+          compressionStatus: CompressionStatus.NOOP,
+          newTokenCount: 0,
+          originalTokenCount: 0,
+        });
+      });
+    });
+
+    it('attempts to compress with a maxOutputTokens set to the original token count', async () => {
+      vi.mocked(tokenLimit).mockReturnValue(1000);
+      mockCountTokens.mockResolvedValue({
+        totalTokens: 999,
+      });
+
+      mockGetHistory.mockReturnValue([
+        { role: 'user', parts: [{ text: '...history...' }] },
+      ]);
+
+      // Mock the summary response from the chat
+      mockSendMessage.mockResolvedValue({
+        role: 'model',
+        parts: [{ text: 'This is a summary.' }],
+      });
+
+      await client.tryCompressChat('prompt-id-2', true);
+
+      expect(mockSendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            maxOutputTokens: 999,
+          }),
+        }),
+        'prompt-id-2',
+      );
+    });
+
     it('should not trigger summarization if token count is below threshold', async () => {
       const MOCKED_TOKEN_LIMIT = 1000;
       vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
@@ -502,7 +663,11 @@ describe('Gemini Client (client.ts)', () => {
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
-      expect(result).toBeNull();
+      expect(result).toEqual({
+        compressionStatus: CompressionStatus.NOOP,
+        newTokenCount: 699,
+        originalTokenCount: 699,
+      });
       expect(newChat).toBe(initialChat);
     });
 
@@ -579,6 +744,7 @@ describe('Gemini Client (client.ts)', () => {
 
       // Assert that summarization happened and returned the correct stats
       expect(result).toEqual({
+        compressionStatus: CompressionStatus.COMPRESSED,
         originalTokenCount,
         newTokenCount,
       });
@@ -631,6 +797,7 @@ describe('Gemini Client (client.ts)', () => {
 
       // Assert that summarization happened and returned the correct stats
       expect(result).toEqual({
+        compressionStatus: CompressionStatus.COMPRESSED,
         originalTokenCount,
         newTokenCount,
       });
@@ -670,6 +837,7 @@ describe('Gemini Client (client.ts)', () => {
       expect(mockSendMessage).toHaveBeenCalled();
 
       expect(result).toEqual({
+        compressionStatus: CompressionStatus.COMPRESSED,
         originalTokenCount,
         newTokenCount,
       });
@@ -727,6 +895,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       expect(result).toEqual({
+        compressionStatus: CompressionStatus.COMPRESSED,
         originalTokenCount: 100000,
         newTokenCount: 5000,
       });
@@ -734,6 +903,109 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   describe('sendMessageStream', () => {
+    it('emits a compression event when the context was automatically compressed', async () => {
+      // Arrange
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Hello' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+        generateContent: mockGenerateContentFn,
+      };
+      client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+      const compressionInfo: ChatCompressionInfo = {
+        compressionStatus: CompressionStatus.COMPRESSED,
+        originalTokenCount: 1000,
+        newTokenCount: 500,
+      };
+
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValueOnce(
+        compressionInfo,
+      );
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-1',
+      );
+
+      const events = await fromAsync(stream);
+
+      // Assert
+      expect(events).toContainEqual({
+        type: GeminiEventType.ChatCompressed,
+        value: compressionInfo,
+      });
+    });
+
+    it.each([
+      {
+        compressionStatus:
+          CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+      },
+      { compressionStatus: CompressionStatus.NOOP },
+      {
+        compressionStatus:
+          CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
+      },
+    ])(
+      'does not emit a compression event when the status is $compressionStatus',
+      async ({ compressionStatus }) => {
+        // Arrange
+        const mockStream = (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })();
+        mockTurnRunFn.mockReturnValue(mockStream);
+
+        const mockChat: Partial<GeminiChat> = {
+          addHistory: vi.fn(),
+          getHistory: vi.fn().mockReturnValue([]),
+        };
+        client['chat'] = mockChat as GeminiChat;
+
+        const mockGenerator: Partial<ContentGenerator> = {
+          countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
+          generateContent: mockGenerateContentFn,
+        };
+        client['contentGenerator'] = mockGenerator as ContentGenerator;
+
+        const compressionInfo: ChatCompressionInfo = {
+          compressionStatus,
+          originalTokenCount: 1000,
+          newTokenCount: 500,
+        };
+
+        vi.spyOn(client, 'tryCompressChat').mockResolvedValueOnce(
+          compressionInfo,
+        );
+
+        // Act
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-1',
+        );
+
+        const events = await fromAsync(stream);
+
+        // Assert
+        expect(events).not.toContainEqual({
+          type: GeminiEventType.ChatCompressed,
+          value: expect.anything(),
+        });
+      },
+    );
+
     it('should include editor context when ideMode is enabled', async () => {
       // Arrange
       vi.mocked(ideContext.getIdeContext).mockReturnValue({
@@ -777,7 +1049,7 @@ describe('Gemini Client (client.ts)', () => {
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 
-      const initialRequest = [{ text: 'Hi' }];
+      const initialRequest: Part[] = [{ text: 'Hi' }];
 
       // Act
       const stream = client.sendMessageStream(
@@ -1292,7 +1564,11 @@ ${JSON.stringify(
 
       beforeEach(() => {
         client['forceFullIdeContext'] = false; // Reset before each delta test
-        vi.spyOn(client, 'tryCompressChat').mockResolvedValue(null);
+        vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+          originalTokenCount: 0,
+          newTokenCount: 0,
+          compressionStatus: CompressionStatus.COMPRESSED,
+        });
         vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
         mockTurnRunFn.mockReturnValue(mockStream);
 
@@ -1551,7 +1827,11 @@ ${JSON.stringify(
       let mockChat: Partial<GeminiChat>;
 
       beforeEach(() => {
-        vi.spyOn(client, 'tryCompressChat').mockResolvedValue(null);
+        vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+          originalTokenCount: 0,
+          newTokenCount: 0,
+          compressionStatus: CompressionStatus.COMPRESSED,
+        });
 
         const mockStream = (async function* () {
           yield { type: 'content', value: 'response' };

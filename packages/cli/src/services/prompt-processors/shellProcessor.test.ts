@@ -12,10 +12,11 @@ import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode } from '@google/gemini-cli-core';
 import os from 'node:os';
 import { quote } from 'shell-quote';
+import { createPartFromText } from '@google/genai';
+import type { PromptPipelineContent } from './types.js';
 
 // Helper function to determine the expected escaped string based on the current OS,
-// mirroring the logic in the actual `escapeShellArg` implementation. This makes
-// our tests robust and platform-agnostic.
+// mirroring the logic in the actual `escapeShellArg` implementation.
 function getExpectedEscapedArgForPlatform(arg: string): string {
   if (os.platform() === 'win32') {
     const comSpec = (process.env['ComSpec'] || 'cmd.exe').toLowerCase();
@@ -30,6 +31,11 @@ function getExpectedEscapedArgForPlatform(arg: string): string {
   } else {
     return quote([arg]);
   }
+}
+
+// Helper to create PromptPipelineContent
+function createPromptPipelineContent(text: string): PromptPipelineContent {
+  return [createPartFromText(text)];
 }
 
 const mockCheckCommandPermissions = vi.hoisted(() => vi.fn());
@@ -93,7 +99,7 @@ describe('ShellProcessor', () => {
 
   it('should throw an error if config is missing', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = '!{ls}';
+    const prompt: PromptPipelineContent = createPromptPipelineContent('!{ls}');
     const contextWithoutConfig = createMockCommandContext({
       services: {
         config: null,
@@ -107,15 +113,19 @@ describe('ShellProcessor', () => {
 
   it('should not change the prompt if no shell injections are present', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'This is a simple prompt with no injections.';
+    const prompt: PromptPipelineContent = createPromptPipelineContent(
+      'This is a simple prompt with no injections.',
+    );
     const result = await processor.process(prompt, context);
-    expect(result).toBe(prompt);
+    expect(result).toEqual(prompt);
     expect(mockShellExecute).not.toHaveBeenCalled();
   });
 
   it('should process a single valid shell injection if allowed', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'The current status is: !{git status}';
+    const prompt: PromptPipelineContent = createPromptPipelineContent(
+      'The current status is: !{git status}',
+    );
     mockCheckCommandPermissions.mockReturnValue({
       allAllowed: true,
       disallowedCommands: [],
@@ -138,12 +148,14 @@ describe('ShellProcessor', () => {
       expect.any(Object),
       false,
     );
-    expect(result).toBe('The current status is: On branch main');
+    expect(result).toEqual([{ text: 'The current status is: On branch main' }]);
   });
 
   it('should process multiple valid shell injections if all are allowed', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = '!{git status} in !{pwd}';
+    const prompt: PromptPipelineContent = createPromptPipelineContent(
+      '!{git status} in !{pwd}',
+    );
     mockCheckCommandPermissions.mockReturnValue({
       allAllowed: true,
       disallowedCommands: [],
@@ -164,12 +176,14 @@ describe('ShellProcessor', () => {
 
     expect(mockCheckCommandPermissions).toHaveBeenCalledTimes(2);
     expect(mockShellExecute).toHaveBeenCalledTimes(2);
-    expect(result).toBe('On branch main in /usr/home');
+    expect(result).toEqual([{ text: 'On branch main in /usr/home' }]);
   });
 
   it('should throw ConfirmationRequiredError if a command is not allowed in default mode', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'Do something dangerous: !{rm -rf /}';
+    const prompt: PromptPipelineContent = createPromptPipelineContent(
+      'Do something dangerous: !{rm -rf /}',
+    );
     mockCheckCommandPermissions.mockReturnValue({
       allAllowed: false,
       disallowedCommands: ['rm -rf /'],
@@ -182,7 +196,9 @@ describe('ShellProcessor', () => {
 
   it('should NOT throw ConfirmationRequiredError if a command is not allowed but approval mode is YOLO', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'Do something dangerous: !{rm -rf /}';
+    const prompt: PromptPipelineContent = createPromptPipelineContent(
+      'Do something dangerous: !{rm -rf /}',
+    );
     mockCheckCommandPermissions.mockReturnValue({
       allAllowed: false,
       disallowedCommands: ['rm -rf /'],
@@ -203,12 +219,14 @@ describe('ShellProcessor', () => {
       expect.any(Object),
       false,
     );
-    expect(result).toBe('Do something dangerous: deleted');
+    expect(result).toEqual([{ text: 'Do something dangerous: deleted' }]);
   });
 
   it('should still throw an error for a hard-denied command even in YOLO mode', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'Do something forbidden: !{reboot}';
+    const prompt: PromptPipelineContent = createPromptPipelineContent(
+      'Do something forbidden: !{reboot}',
+    );
     mockCheckCommandPermissions.mockReturnValue({
       allAllowed: false,
       disallowedCommands: ['reboot'],
@@ -228,7 +246,9 @@ describe('ShellProcessor', () => {
 
   it('should throw ConfirmationRequiredError with the correct command', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'Do something dangerous: !{rm -rf /}';
+    const prompt: PromptPipelineContent = createPromptPipelineContent(
+      'Do something dangerous: !{rm -rf /}',
+    );
     mockCheckCommandPermissions.mockReturnValue({
       allAllowed: false,
       disallowedCommands: ['rm -rf /'],
@@ -250,7 +270,9 @@ describe('ShellProcessor', () => {
 
   it('should throw ConfirmationRequiredError with multiple commands if multiple are disallowed', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = '!{cmd1} and !{cmd2}';
+    const prompt: PromptPipelineContent = createPromptPipelineContent(
+      '!{cmd1} and !{cmd2}',
+    );
     mockCheckCommandPermissions.mockImplementation((cmd) => {
       if (cmd === 'cmd1') {
         return { allAllowed: false, disallowedCommands: ['cmd1'] };
@@ -275,7 +297,9 @@ describe('ShellProcessor', () => {
 
   it('should not execute any commands if at least one requires confirmation', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'First: !{echo "hello"}, Second: !{rm -rf /}';
+    const prompt: PromptPipelineContent = createPromptPipelineContent(
+      'First: !{echo "hello"}, Second: !{rm -rf /}',
+    );
 
     mockCheckCommandPermissions.mockImplementation((cmd) => {
       if (cmd.includes('rm')) {
@@ -294,7 +318,9 @@ describe('ShellProcessor', () => {
 
   it('should only request confirmation for disallowed commands in a mixed prompt', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'Allowed: !{ls -l}, Disallowed: !{rm -rf /}';
+    const prompt: PromptPipelineContent = createPromptPipelineContent(
+      'Allowed: !{ls -l}, Disallowed: !{rm -rf /}',
+    );
 
     mockCheckCommandPermissions.mockImplementation((cmd) => ({
       allAllowed: !cmd.includes('rm'),
@@ -314,7 +340,9 @@ describe('ShellProcessor', () => {
 
   it('should execute all commands if they are on the session allowlist', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'Run !{cmd1} and !{cmd2}';
+    const prompt: PromptPipelineContent = createPromptPipelineContent(
+      'Run !{cmd1} and !{cmd2}',
+    );
 
     // Add commands to the session allowlist
     context.session.sessionShellAllowlist = new Set(['cmd1', 'cmd2']);
@@ -346,12 +374,14 @@ describe('ShellProcessor', () => {
       context.session.sessionShellAllowlist,
     );
     expect(mockShellExecute).toHaveBeenCalledTimes(2);
-    expect(result).toBe('Run output1 and output2');
+    expect(result).toEqual([{ text: 'Run output1 and output2' }]);
   });
 
   it('should trim whitespace from the command inside the injection before interpolation', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'Files: !{  ls {{args}} -l  }';
+    const prompt: PromptPipelineContent = createPromptPipelineContent(
+      'Files: !{  ls {{args}} -l  }',
+    );
 
     const rawArgs = context.invocation!.args;
 
@@ -385,7 +415,8 @@ describe('ShellProcessor', () => {
 
   it('should handle an empty command inside the injection gracefully (skips execution)', async () => {
     const processor = new ShellProcessor('test-command');
-    const prompt = 'This is weird: !{}';
+    const prompt: PromptPipelineContent =
+      createPromptPipelineContent('This is weird: !{}');
 
     const result = await processor.process(prompt, context);
 
@@ -393,77 +424,14 @@ describe('ShellProcessor', () => {
     expect(mockShellExecute).not.toHaveBeenCalled();
 
     // It replaces !{} with an empty string.
-    expect(result).toBe('This is weird: ');
-  });
-
-  describe('Robust Parsing (Balanced Braces)', () => {
-    it('should correctly parse commands containing nested braces (e.g., awk)', async () => {
-      const processor = new ShellProcessor('test-command');
-      const command = "awk '{print $1}' file.txt";
-      const prompt = `Output: !{${command}}`;
-      mockShellExecute.mockReturnValue({
-        result: Promise.resolve({ ...SUCCESS_RESULT, output: 'result' }),
-      });
-
-      const result = await processor.process(prompt, context);
-
-      expect(mockCheckCommandPermissions).toHaveBeenCalledWith(
-        command,
-        expect.any(Object),
-        context.session.sessionShellAllowlist,
-      );
-      expect(mockShellExecute).toHaveBeenCalledWith(
-        command,
-        expect.any(String),
-        expect.any(Function),
-        expect.any(Object),
-        false,
-      );
-      expect(result).toBe('Output: result');
-    });
-
-    it('should handle deeply nested braces correctly', async () => {
-      const processor = new ShellProcessor('test-command');
-      const command = "echo '{{a},{b}}'";
-      const prompt = `!{${command}}`;
-      mockShellExecute.mockReturnValue({
-        result: Promise.resolve({ ...SUCCESS_RESULT, output: '{{a},{b}}' }),
-      });
-
-      const result = await processor.process(prompt, context);
-      expect(mockShellExecute).toHaveBeenCalledWith(
-        command,
-        expect.any(String),
-        expect.any(Function),
-        expect.any(Object),
-        false,
-      );
-      expect(result).toBe('{{a},{b}}');
-    });
-
-    it('should throw an error for unclosed shell injections', async () => {
-      const processor = new ShellProcessor('test-command');
-      const prompt = 'This prompt is broken: !{ls -l';
-
-      await expect(processor.process(prompt, context)).rejects.toThrow(
-        /Unclosed shell injection/,
-      );
-    });
-
-    it('should throw an error for unclosed nested braces', async () => {
-      const processor = new ShellProcessor('test-command');
-      const prompt = 'Broken: !{echo {a}';
-
-      await expect(processor.process(prompt, context)).rejects.toThrow(
-        /Unclosed shell injection/,
-      );
-    });
+    expect(result).toEqual([{ text: 'This is weird: ' }]);
   });
 
   describe('Error Reporting', () => {
     it('should append exit code and command name on failure', async () => {
       const processor = new ShellProcessor('test-command');
-      const prompt = '!{cmd}';
+      const prompt: PromptPipelineContent =
+        createPromptPipelineContent('!{cmd}');
       mockShellExecute.mockReturnValue({
         result: Promise.resolve({
           ...SUCCESS_RESULT,
@@ -475,14 +443,17 @@ describe('ShellProcessor', () => {
 
       const result = await processor.process(prompt, context);
 
-      expect(result).toBe(
-        "some error output\n[Shell command 'cmd' exited with code 1]",
-      );
+      expect(result).toEqual([
+        {
+          text: "some error output\n[Shell command 'cmd' exited with code 1]",
+        },
+      ]);
     });
 
     it('should append signal info and command name if terminated by signal', async () => {
       const processor = new ShellProcessor('test-command');
-      const prompt = '!{cmd}';
+      const prompt: PromptPipelineContent =
+        createPromptPipelineContent('!{cmd}');
       mockShellExecute.mockReturnValue({
         result: Promise.resolve({
           ...SUCCESS_RESULT,
@@ -495,14 +466,17 @@ describe('ShellProcessor', () => {
 
       const result = await processor.process(prompt, context);
 
-      expect(result).toBe(
-        "output\n[Shell command 'cmd' terminated by signal SIGTERM]",
-      );
+      expect(result).toEqual([
+        {
+          text: "output\n[Shell command 'cmd' terminated by signal SIGTERM]",
+        },
+      ]);
     });
 
     it('should throw a detailed error if the shell fails to spawn', async () => {
       const processor = new ShellProcessor('test-command');
-      const prompt = '!{bad-command}';
+      const prompt: PromptPipelineContent =
+        createPromptPipelineContent('!{bad-command}');
       const spawnError = new Error('spawn EACCES');
       mockShellExecute.mockReturnValue({
         result: Promise.resolve({
@@ -522,7 +496,9 @@ describe('ShellProcessor', () => {
 
     it('should report abort status with command name if aborted', async () => {
       const processor = new ShellProcessor('test-command');
-      const prompt = '!{long-running-command}';
+      const prompt: PromptPipelineContent = createPromptPipelineContent(
+        '!{long-running-command}',
+      );
       const spawnError = new Error('Aborted');
       mockShellExecute.mockReturnValue({
         result: Promise.resolve({
@@ -536,9 +512,11 @@ describe('ShellProcessor', () => {
       });
 
       const result = await processor.process(prompt, context);
-      expect(result).toBe(
-        "partial output\n[Shell command 'long-running-command' aborted]",
-      );
+      expect(result).toEqual([
+        {
+          text: "partial output\n[Shell command 'long-running-command' aborted]",
+        },
+      ]);
     });
   });
 
@@ -552,29 +530,35 @@ describe('ShellProcessor', () => {
 
     it('should perform raw replacement if no shell injections are present (optimization path)', async () => {
       const processor = new ShellProcessor('test-command');
-      const prompt = 'The user said: {{args}}';
+      const prompt: PromptPipelineContent = createPromptPipelineContent(
+        'The user said: {{args}}',
+      );
 
       const result = await processor.process(prompt, context);
 
-      expect(result).toBe(`The user said: ${rawArgs}`);
+      expect(result).toEqual([{ text: `The user said: ${rawArgs}` }]);
       expect(mockShellExecute).not.toHaveBeenCalled();
     });
 
     it('should perform raw replacement outside !{} blocks', async () => {
       const processor = new ShellProcessor('test-command');
-      const prompt = 'Outside: {{args}}. Inside: !{echo "hello"}';
+      const prompt: PromptPipelineContent = createPromptPipelineContent(
+        'Outside: {{args}}. Inside: !{echo "hello"}',
+      );
       mockShellExecute.mockReturnValue({
         result: Promise.resolve({ ...SUCCESS_RESULT, output: 'hello' }),
       });
 
       const result = await processor.process(prompt, context);
 
-      expect(result).toBe(`Outside: ${rawArgs}. Inside: hello`);
+      expect(result).toEqual([{ text: `Outside: ${rawArgs}. Inside: hello` }]);
     });
 
     it('should perform escaped replacement inside !{} blocks', async () => {
       const processor = new ShellProcessor('test-command');
-      const prompt = 'Command: !{grep {{args}} file.txt}';
+      const prompt: PromptPipelineContent = createPromptPipelineContent(
+        'Command: !{grep {{args}} file.txt}',
+      );
       mockShellExecute.mockReturnValue({
         result: Promise.resolve({ ...SUCCESS_RESULT, output: 'match found' }),
       });
@@ -592,12 +576,14 @@ describe('ShellProcessor', () => {
         false,
       );
 
-      expect(result).toBe('Command: match found');
+      expect(result).toEqual([{ text: 'Command: match found' }]);
     });
 
     it('should handle both raw (outside) and escaped (inside) injection simultaneously', async () => {
       const processor = new ShellProcessor('test-command');
-      const prompt = 'User "({{args}})" requested search: !{search {{args}}}';
+      const prompt: PromptPipelineContent = createPromptPipelineContent(
+        'User "({{args}})" requested search: !{search {{args}}}',
+      );
       mockShellExecute.mockReturnValue({
         result: Promise.resolve({ ...SUCCESS_RESULT, output: 'results' }),
       });
@@ -614,12 +600,15 @@ describe('ShellProcessor', () => {
         false,
       );
 
-      expect(result).toBe(`User "(${rawArgs})" requested search: results`);
+      expect(result).toEqual([
+        { text: `User "(${rawArgs})" requested search: results` },
+      ]);
     });
 
     it('should perform security checks on the final, resolved (escaped) command', async () => {
       const processor = new ShellProcessor('test-command');
-      const prompt = '!{rm {{args}}}';
+      const prompt: PromptPipelineContent =
+        createPromptPipelineContent('!{rm {{args}}}');
 
       const expectedEscapedArgs = getExpectedEscapedArgForPlatform(rawArgs);
       const expectedResolvedCommand = `rm ${expectedEscapedArgs}`;
@@ -642,7 +631,8 @@ describe('ShellProcessor', () => {
 
     it('should report the resolved command if a hard denial occurs', async () => {
       const processor = new ShellProcessor('test-command');
-      const prompt = '!{rm {{args}}}';
+      const prompt: PromptPipelineContent =
+        createPromptPipelineContent('!{rm {{args}}}');
       const expectedEscapedArgs = getExpectedEscapedArgForPlatform(rawArgs);
       const expectedResolvedCommand = `rm ${expectedEscapedArgs}`;
       mockCheckCommandPermissions.mockReturnValue({
@@ -662,7 +652,9 @@ describe('ShellProcessor', () => {
       const processor = new ShellProcessor('test-command');
       const multilineArgs = 'first line\nsecond line';
       context.invocation!.args = multilineArgs;
-      const prompt = 'Commit message: !{git commit -m {{args}}}';
+      const prompt: PromptPipelineContent = createPromptPipelineContent(
+        'Commit message: !{git commit -m {{args}}}',
+      );
 
       const expectedEscapedArgs =
         getExpectedEscapedArgForPlatform(multilineArgs);
@@ -691,7 +683,8 @@ describe('ShellProcessor', () => {
     ])('should safely escape args containing $name', async ({ input }) => {
       const processor = new ShellProcessor('test-command');
       context.invocation!.args = input;
-      const prompt = '!{echo {{args}}}';
+      const prompt: PromptPipelineContent =
+        createPromptPipelineContent('!{echo {{args}}}');
 
       const expectedEscapedArgs = getExpectedEscapedArgForPlatform(input);
       const expectedCommand = `echo ${expectedEscapedArgs}`;

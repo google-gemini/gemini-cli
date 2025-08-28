@@ -44,7 +44,7 @@ jobs:
     timeout-minutes: 20
     runs-on: 'ubuntu-latest'
     outputs:
-      duplicate_issues_json: '${{ steps.gemini_issue_deduplication.outputs.summary }}'
+      duplicate_issues_csv: '${{ env.DUPLICATE_ISSUES_CSV }}'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -135,11 +135,10 @@ jobs:
                 - If your final list is empty, you are done.
                 - Print to the logs if you omitted any potential duplicates based on your analysis.
                 - If the `duplicates` tool returned 15+ results, use the top 15 matches (based on descending similarity score value) to perform this step.
-            3.  **Output final duplicates list as JSON:**
-                - Output the final list of duplicate issue numbers in a JSON format.
-                - For example: `{"duplicate_issues": [123, 456]}`
-                - If no duplicates are found, output `{"duplicate_issues": []}`.
-                - Do not include any explanation or additional text, just the JSON.
+            3.  **Output final duplicates list as CSV:**
+                - Convert the list of appropriate duplicate issue numbers into a comma-separated list (CSV). If there are no appropriate duplicates, use the empty string.
+                - Use the "echo" shell command to append the CSV of issue numbers into the filepath referenced by the environment variable "${GITHUB_ENV}":
+                  echo "DUPLICATE_ISSUES_CSV=[DUPLICATE_ISSUES_AS_CSV]" >> "${GITHUB_ENV}"
             ## Guidelines
             - Only use the `duplicates` and `run_shell_command` tools.
             - The `run_shell_command` tool can be used with `gh issue view`.
@@ -153,14 +152,20 @@ jobs:
     if: |-
       github.repository == 'google-gemini/gemini-cli' &&
       vars.TRIAGE_DEDUPLICATE_ISSUES != '' &&
-      needs.find-duplicates.outputs.duplicate_issues_json &&
-      (github.event_name == 'issues' ||
+      needs.find-duplicates.outputs.duplicate_issues_csv != '' &&
+      (
+       github.event_name == 'issues' ||
        github.event_name == 'workflow_dispatch' ||
-       (github.event_name == 'issue_comment' &&
-       contains(github.event.comment.body, '@gemini-cli /deduplicate') &&
-       (github.event.comment.author_association == 'OWNER' ||
-        github.event.comment.author_association == 'MEMBER' ||
-        github.event.comment.author_association == 'COLLABORATOR')))
+       (
+        github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@gemini-cli /deduplicate') &&
+        (
+         github.event.comment.author_association == 'OWNER' ||
+         github.event.comment.author_association == 'MEMBER' ||
+         github.event.comment.author_association == 'COLLABORATOR'
+        )
+       )
+      )
     permissions:
       issues: 'write'
     timeout-minutes: 5
@@ -177,34 +182,20 @@ jobs:
       - name: 'Comment and Label Duplicate Issue'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         env:
-          DUPLICATES_OUTPUT: '${{ needs.find-duplicates.outputs.duplicate_issues_json }}'
+          DUPLICATES_OUTPUT: '${{ needs.find-duplicates.outputs.duplicate_issues_csv }}'
         with:
           github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           script: |-
-            const rawJson = process.env.DUPLICATES_OUTPUT;
-            core.info(`Raw duplicates JSON: ${rawJson}`);
-            let parsedJson;
-            try {
-              const jsonStringMatch = rawJson.match(/{[\s\S]*}/);
-              if (!jsonStringMatch) {
-                core.setFailed(`Could not find JSON object in the output.\nRaw output: ${rawJson}`);
-                return;
-              }
-              const jsonString = jsonStringMatch[0];
-              parsedJson = JSON.parse(jsonString);
-              core.info(`Parsed duplicates JSON: ${JSON.stringify(parsedJson)}`);
-            } catch (err) {
-              core.setFailed(`Failed to parse duplicates JSON from Gemini output: ${err.message}\nRaw output: ${rawJson}`);
-              return;
-            }
+            const rawCsv = process.env.DUPLICATES_OUTPUT;
+            core.info(`Raw duplicates CSV: ${rawCsv}`);
+            const duplicateIssues = rawCsv.split(',').map(s => s.trim()).filter(s => s);
 
-            if (!parsedJson.duplicate_issues || parsedJson.duplicate_issues.length === 0) {
+            if (duplicateIssues.length === 0) {
               core.info('No duplicate issues found. Nothing to do.');
               return;
             }
 
             const issueNumber = ${{ github.event.issue.number }};
-            const duplicateIssues = parsedJson.duplicate_issues;
 
             function formatCommentBody(issues, updated = false) {
               const header = updated

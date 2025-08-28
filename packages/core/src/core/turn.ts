@@ -18,7 +18,7 @@ import type {
   ToolResultDisplay,
 } from '../tools/tools.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
-import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import {
   getErrorMessage,
@@ -125,9 +125,24 @@ export type ServerGeminiErrorEvent = {
   value: GeminiErrorEventValue;
 };
 
+export enum CompressionStatus {
+  /** The compression was successful */
+  COMPRESSED = 1,
+
+  /** The compression failed due to the compression inflating the token count */
+  COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+
+  /** The compression failed due to an error counting tokens */
+  COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
+
+  /** The compression was not necessary and no action was taken */
+  NOOP,
+}
+
 export interface ChatCompressionInfo {
   originalTokenCount: number;
   newTokenCount: number;
+  compressionStatus: CompressionStatus;
 }
 
 export type ServerGeminiChatCompressedEvent = {

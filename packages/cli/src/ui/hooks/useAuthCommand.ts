@@ -19,7 +19,7 @@ export const useAuthCommand = (
   config: Config,
 ) => {
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(
-    settings.merged.selectedAuthType === undefined,
+    settings.merged.security?.auth?.selectedType === undefined,
   );
 
   const openAuthDialog = useCallback(() => {
@@ -30,7 +30,7 @@ export const useAuthCommand = (
 
   useEffect(() => {
     const authFlow = async () => {
-      const authType = settings.merged.selectedAuthType;
+      const authType = settings.merged.security?.auth?.selectedType;
       if (isAuthDialogOpen || !authType) {
         return;
       }
@@ -55,7 +55,7 @@ export const useAuthCommand = (
       if (authType) {
         await clearCachedCredentialFile();
 
-        settings.setValue(scope, 'selectedAuthType', authType);
+        settings.setValue(scope, 'security.auth.selectedType', authType);
         if (
           authType === AuthType.LOGIN_WITH_GOOGLE &&
           config.isBrowserLaunchSuppressed()

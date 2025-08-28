@@ -92,7 +92,7 @@ export async function loadSandboxConfig(
   settings: Settings,
   argv: SandboxCliArgs,
 ): Promise<SandboxConfig | undefined> {
-  const sandboxOption = argv.sandbox ?? settings.sandbox;
+  const sandboxOption = argv.sandbox ?? settings.tools?.sandbox;
   const command = getSandboxCommand(sandboxOption);
 
   const packageJson = await getPackageJson();

@@ -1442,10 +1442,17 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      stdin.write('\x12');
+
+      act(() => {
+        stdin.write('\x12');
+      });
       await wait();
+
       expect(stdout.lastFrame()).toContain('(r:)');
-      stdin.write('\r');
+
+      act(() => {
+        stdin.write('\r');
+      });
 
       await waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');

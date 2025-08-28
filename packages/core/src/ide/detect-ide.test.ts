@@ -62,12 +62,6 @@ describe('detectIde', () => {
     expect(detectIde(ideProcessInfo)).toBe(DetectedIde.Trae);
   });
 
-  it('should detect Firebase Studio via FIREBASE_DEPLOY_AGENT', () => {
-    vi.stubEnv('TERM_PROGRAM', 'vscode');
-    vi.stubEnv('FIREBASE_DEPLOY_AGENT', 'true');
-    expect(detectIde(ideProcessInfo)).toBe(DetectedIde.FirebaseStudio);
-  });
-
   it('should detect Firebase Studio via MONOSPACE_ENV', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('MONOSPACE_ENV', 'true');
@@ -76,11 +70,13 @@ describe('detectIde', () => {
 
   it('should detect VSCode when no other IDE is detected and command includes "code"', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('MONOSPACE_ENV', '');
     expect(detectIde(ideProcessInfo)).toBe(DetectedIde.VSCode);
   });
 
   it('should detect VSCodeFork when no other IDE is detected and command does not include "code"', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('MONOSPACE_ENV', '');
     expect(detectIde(ideProcessInfoNoCode)).toBe(DetectedIde.VSCodeFork);
   });
 

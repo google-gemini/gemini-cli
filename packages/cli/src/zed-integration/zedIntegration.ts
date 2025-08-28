@@ -117,7 +117,11 @@ class GeminiAgent {
 
     await clearCachedCredentialFile();
     await this.config.refreshAuth(method);
-    this.settings.setValue(SettingScope.User, 'selectedAuthType', method);
+    this.settings.setValue(
+      SettingScope.User,
+      'security.auth.selectedType',
+      method,
+    );
   }
 
   async newSession({
@@ -128,9 +132,11 @@ class GeminiAgent {
     const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
 
     let isAuthenticated = false;
-    if (this.settings.merged.selectedAuthType) {
+    if (this.settings.merged.security?.auth?.selectedType) {
       try {
-        await config.refreshAuth(this.settings.merged.selectedAuthType);
+        await config.refreshAuth(
+          this.settings.merged.security.auth.selectedType,
+        );
         isAuthenticated = true;
       } catch (e) {
         console.error(`Authentication failed: ${e}`);

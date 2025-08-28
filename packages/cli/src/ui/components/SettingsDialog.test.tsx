@@ -40,7 +40,7 @@ const createMockSettings = (
 ) =>
   new LoadedSettings(
     {
-      settings: { customThemes: {}, mcpServers: {}, ...systemSettings },
+      settings: { ui: { customThemes: {} }, mcpServers: {}, ...systemSettings },
       path: '/system/settings.json',
     },
     {
@@ -49,18 +49,23 @@ const createMockSettings = (
     },
     {
       settings: {
-        customThemes: {},
+        ui: { customThemes: {} },
         mcpServers: {},
         ...userSettings,
       },
       path: '/user/settings.json',
     },
     {
-      settings: { customThemes: {}, mcpServers: {}, ...workspaceSettings },
+      settings: {
+        ui: { customThemes: {} },
+        mcpServers: {},
+        ...workspaceSettings,
+      },
       path: '/workspace/settings.json',
     },
     [],
     true,
+    new Set(),
   );
 
 vi.mock('../contexts/SettingsContext.js', async () => {
@@ -156,7 +161,11 @@ describe('SettingsDialog', () => {
   ) =>
     new LoadedSettings(
       {
-        settings: { customThemes: {}, mcpServers: {}, ...systemSettings },
+        settings: {
+          ui: { customThemes: {} },
+          mcpServers: {},
+          ...systemSettings,
+        },
         path: '/system/settings.json',
       },
       {
@@ -165,18 +174,23 @@ describe('SettingsDialog', () => {
       },
       {
         settings: {
-          customThemes: {},
+          ui: { customThemes: {} },
           mcpServers: {},
           ...userSettings,
         },
         path: '/user/settings.json',
       },
       {
-        settings: { customThemes: {}, mcpServers: {}, ...workspaceSettings },
+        settings: {
+          ui: { customThemes: {} },
+          mcpServers: {},
+          ...workspaceSettings,
+        },
         path: '/workspace/settings.json',
       },
       [],
       true,
+      new Set(),
     );
 
   describe('Initial Rendering', () => {
@@ -392,11 +406,11 @@ describe('SettingsDialog', () => {
 
       // Wait for initial render
       await waitFor(() => {
-        expect(lastFrame()).toContain('Hide Window Title');
+        expect(lastFrame()).toContain('Vim Mode');
       });
 
       // The UI should show the settings section is active and scope section is inactive
-      expect(lastFrame()).toContain('● Hide Window Title'); // Settings section active
+      expect(lastFrame()).toContain('● Vim Mode'); // Settings section active
       expect(lastFrame()).toContain('  Apply To'); // Scope section inactive
 
       // This test validates the initial state - scope selection behavior
@@ -814,11 +828,11 @@ describe('SettingsDialog', () => {
 
       // Wait for initial render
       await waitFor(() => {
-        expect(lastFrame()).toContain('Hide Window Title');
+        expect(lastFrame()).toContain('Vim Mode');
       });
 
       // Verify initial state: settings section active, scope section inactive
-      expect(lastFrame()).toContain('● Hide Window Title'); // Settings section active
+      expect(lastFrame()).toContain('● Vim Mode'); // Settings section active
       expect(lastFrame()).toContain('  Apply To'); // Scope section inactive
 
       // This test validates the rendered UI structure for tab navigation
@@ -876,12 +890,12 @@ describe('SettingsDialog', () => {
 
       // Wait for initial render
       await waitFor(() => {
-        expect(lastFrame()).toContain('Hide Window Title');
+        expect(lastFrame()).toContain('Vim Mode');
       });
 
       // Verify the complete UI is rendered with all necessary sections
       expect(lastFrame()).toContain('Settings'); // Title
-      expect(lastFrame()).toContain('● Hide Window Title'); // Active setting
+      expect(lastFrame()).toContain('● Vim Mode'); // Active setting
       expect(lastFrame()).toContain('Apply To'); // Scope section
       expect(lastFrame()).toContain('1. User Settings'); // Scope options
       expect(lastFrame()).toContain(
