@@ -7,13 +7,18 @@
 import type React from 'react';
 import { useState } from 'react';
 import { Box, Text } from 'ink';
+import { CustomTextInput } from './shared/CustomTextInput.js';
 import { Colors } from '../colors.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
-import { validateAuthMethod } from '../../config/auth.js';
+import {
+  validateAuthMethod,
+  saveGeminiApiKeyToEnvFile,
+} from '../../config/auth.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import Link from 'ink-link';
 
 interface AuthDialogProps {
   onSelect: (authMethod: AuthType | undefined, scope: SettingScope) => void;
@@ -62,6 +67,9 @@ export function AuthDialog({
     }
     return null;
   });
+  const [isEnteringApiKey, setIsEnteringApiKey] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+
   const items = [
     {
       label: 'Login with Google',
@@ -104,16 +112,46 @@ export function AuthDialog({
   const handleAuthSelect = (authMethod: AuthType) => {
     const error = validateAuthMethod(authMethod);
     if (error) {
-      setErrorMessage(error);
+      if (authMethod === AuthType.USE_GEMINI) {
+        setIsEnteringApiKey(true);
+        setErrorMessage(null);
+      } else {
+        setErrorMessage(error);
+      }
     } else {
       setErrorMessage(null);
       onSelect(authMethod, SettingScope.User);
     }
   };
 
+  const handleApiKeySubmit = () => {
+    if (!apiKey) {
+      setErrorMessage('API Key cannot be empty.');
+      return;
+    }
+    const saved = saveGeminiApiKeyToEnvFile(apiKey);
+    if (saved) {
+      // Manually set the environment variable for the current process
+      process.env['GEMINI_API_KEY'] = apiKey;
+      setErrorMessage(null);
+      setIsEnteringApiKey(false);
+      onSelect(AuthType.USE_GEMINI, SettingScope.User);
+    } else {
+      setErrorMessage(
+        'Failed to save API Key. Please try again or set it up manually by creating a `.env` file with `GEMINI_API_KEY="YOUR_API_KEY"` or by exporting it in your shell: `export GEMINI_API_KEY="YOUR_API_KEY"`',
+      );
+    }
+  };
+
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
+        if (isEnteringApiKey) {
+          setIsEnteringApiKey(false);
+          setErrorMessage(null);
+          return;
+        }
+
         // Prevent exit if there is an error message.
         // This means they user is not authenticated yet.
         if (errorMessage) {
@@ -142,14 +180,48 @@ export function AuthDialog({
     >
       <Text bold>Get started</Text>
       <Box marginTop={1}>
-        <Text>How would you like to authenticate for this project?</Text>
+        <Text>
+          {isEnteringApiKey
+            ? 'Enter your Gemini API Key'
+            : 'How would you like to authenticate for this project?'}
+        </Text>
       </Box>
       <Box marginTop={1}>
-        <RadioButtonSelect
-          items={items}
-          initialIndex={initialAuthIndex}
-          onSelect={handleAuthSelect}
-        />
+        {isEnteringApiKey ? (
+          <Box flexDirection="column">
+            <Box>
+              <Text>
+                Create an API key at{' '}
+                <Link url="https://aistudio.google.com/app/apikey">
+                  <Text color={Colors.AccentBlue}>
+                    https://aistudio.google.com/app/apikey
+                  </Text>
+                </Link>
+              </Text>
+            </Box>
+            <Box marginTop={1}>
+              <Text color={Colors.Gray}>
+                Your API key will be stored in a local .env file in your
+                project.
+              </Text>
+            </Box>
+            <Box>
+              <Text>Enter your Gemini API Key here: </Text>
+              <CustomTextInput
+                value={apiKey}
+                onChange={setApiKey}
+                onSubmit={handleApiKeySubmit}
+                mask="*"
+              />
+            </Box>
+          </Box>
+        ) : (
+          <RadioButtonSelect
+            items={items}
+            initialIndex={initialAuthIndex}
+            onSelect={handleAuthSelect}
+          />
+        )}
       </Box>
       {errorMessage && (
         <Box marginTop={1}>
@@ -157,7 +229,11 @@ export function AuthDialog({
         </Box>
       )}
       <Box marginTop={1}>
-        <Text color={Colors.Gray}>(Use Enter to select)</Text>
+        <Text color={Colors.Gray}>
+          {isEnteringApiKey
+            ? '(Use Enter to submit, Esc to go back)'
+            : '(Use Enter to select)'}
+        </Text>
       </Box>
       <Box marginTop={1}>
         <Text>Terms of Services and Privacy Notice for Gemini CLI</Text>
