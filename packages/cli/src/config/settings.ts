@@ -565,7 +565,6 @@ export function loadEnvironment(settings: Settings): void {
     setUpCloudShellEnvironment(envFilePath);
   }
 
-<<<<<<< HEAD
   // If no settings provided, try to load workspace settings for exclusions
   let resolvedSettings = settings;
   if (!resolvedSettings) {
