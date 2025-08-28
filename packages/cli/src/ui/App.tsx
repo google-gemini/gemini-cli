@@ -229,7 +229,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  
+
   const {
     showWorkspaceMigrationDialog,
     workspaceExtensions,
@@ -241,7 +241,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [proQuotaDialogResolver, setProQuotaDialogResolver] = useState<
     ((value: boolean) => void) | null
   >(null);
-
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
