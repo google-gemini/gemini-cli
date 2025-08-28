@@ -33,6 +33,7 @@ import {
   ShellProcessor,
 } from './prompt-processors/shellProcessor.js';
 import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
+import { loadTrustedFolders } from '../config/trustedFolders.js';
 
 interface CommandDirectory {
   path: string;
@@ -94,13 +95,14 @@ export class FileCommandLoader implements ICommandLoader {
     const commandDirs = this.getCommandDirectories();
     for (const dirInfo of commandDirs) {
       try {
-        const files = await glob('**/*.toml', {
+        let files = await glob('**/*.toml', {
           ...globOptions,
           cwd: dirInfo.path,
         });
 
         if(this.folderTrustEnabled) {
-          return [];
+          const trustedFolders = loadTrustedFolders();
+          files = files.filter((file) => trustedFolders.isPathTrusted(path.join(dirInfo.path, file)));
         }
 
         const commandPromises = files.map((file) =>
