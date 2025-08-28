@@ -254,6 +254,10 @@ describe('ClearcutLogger', () => {
             gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
             value: prompt_id,
           },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
+            value: process.platform,
+          },
         ]),
       );
     });
@@ -277,6 +281,7 @@ describe('ClearcutLogger', () => {
         env: {
           CURSOR_TRACE_ID: 'abc123',
           GITHUB_SHA: undefined,
+          TERM_PROGRAM: 'vscode',
         },
         expectedValue: 'cursor',
       },
@@ -284,6 +289,7 @@ describe('ClearcutLogger', () => {
         env: {
           TERM_PROGRAM: 'vscode',
           GITHUB_SHA: undefined,
+          MONOSPACE_ENV: '',
         },
         expectedValue: 'vscode',
       },
@@ -291,6 +297,7 @@ describe('ClearcutLogger', () => {
         env: {
           MONOSPACE_ENV: 'true',
           GITHUB_SHA: undefined,
+          TERM_PROGRAM: 'vscode',
         },
         expectedValue: 'firebasestudio',
       },
@@ -298,6 +305,7 @@ describe('ClearcutLogger', () => {
         env: {
           __COG_BASHRC_SOURCED: 'true',
           GITHUB_SHA: undefined,
+          TERM_PROGRAM: 'vscode',
         },
         expectedValue: 'devin',
       },
@@ -305,6 +313,7 @@ describe('ClearcutLogger', () => {
         env: {
           CLOUD_SHELL: 'true',
           GITHUB_SHA: undefined,
+          TERM_PROGRAM: 'vscode',
         },
         expectedValue: 'cloudshell',
       },
@@ -315,7 +324,6 @@ describe('ClearcutLogger', () => {
         for (const [key, value] of Object.entries(env)) {
           vi.stubEnv(key, value);
         }
-        vi.stubEnv('TERM_PROGRAM', 'vscode');
         const event = logger?.createLogEvent(EventNames.API_ERROR, []);
         expect(event?.event_metadata[0][3]).toEqual({
           gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,

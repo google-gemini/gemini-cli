@@ -208,6 +208,8 @@ describe('loggers', () => {
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           prompt_length: 11,
           prompt: 'test-prompt',
+          prompt_id: 'prompt-id-8',
+          auth_type: 'vertex-ai',
         },
       });
     });
@@ -222,8 +224,9 @@ describe('loggers', () => {
       } as unknown as Config;
       const event = new UserPromptEvent(
         11,
-        'test-prompt',
+        'prompt-id-9',
         AuthType.CLOUD_SHELL,
+        'test-prompt',
       );
 
       logUserPrompt(mockConfig, event);
@@ -236,6 +239,8 @@ describe('loggers', () => {
           'event.name': EVENT_USER_PROMPT,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           prompt_length: 11,
+          prompt_id: 'prompt-id-9',
+          auth_type: 'cloud-shell',
         },
       });
     });

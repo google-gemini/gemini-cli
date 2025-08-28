@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.21",
+  "version": "0.2.2",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,10 +14,11 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.21"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.2.2"
   },
   "scripts": {
     "start": "node scripts/start.js",
+    "start:a2a-server": "CODER_AGENT_PORT=41242 npm run start --workspace @google/gemini-cli-a2a-server",
     "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
     "auth:npm": "npx google-artifactregistry-auth",
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
@@ -36,7 +37,7 @@
     "test:e2e": "cross-env VERBOSE=true KEEP_OUTPUT=true npm run test:integration:sandbox:none",
     "test:integration:all": "npm run test:integration:sandbox:none && npm run test:integration:sandbox:docker && npm run test:integration:sandbox:podman",
     "test:integration:sandbox:none": "GEMINI_SANDBOX=false vitest run --root ./integration-tests",
-    "test:integration:sandbox:docker": "npm run build:sandbox && GEMINI_SANDBOX=docker vitest run --root ./integration-tests",
+    "test:integration:sandbox:docker": "GEMINI_SANDBOX=docker npm run build:sandbox && GEMINI_SANDBOX=docker vitest run --root ./integration-tests",
     "test:integration:sandbox:podman": "GEMINI_SANDBOX=podman vitest run --root ./integration-tests",
     "lint": "eslint . --ext .ts,.tsx && eslint integration-tests",
     "lint:fix": "eslint . --fix && eslint integration-tests --fix",
@@ -91,8 +92,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "@lvce-editor/ripgrep": "^2.1.0",
-    "node-fetch": "^3.3.2",
+    "@lvce-editor/ripgrep": "^1.6.0",
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0"
   },

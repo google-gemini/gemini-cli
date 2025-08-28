@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.1.21",
+  "version": "0.2.2",
   "description": "Gemini CLI Core",
   "repository": {
     "type": "git",
@@ -21,6 +21,7 @@
   ],
   "dependencies": {
     "@google/genai": "1.13.0",
+    "@lvce-editor/ripgrep": "^1.6.0",
     "@modelcontextprotocol/sdk": "^1.11.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "^0.203.0",
@@ -33,11 +34,14 @@
     "@opentelemetry/sdk-node": "^0.203.0",
     "@types/glob": "^8.1.0",
     "@types/html-to-text": "^9.0.4",
+    "@xterm/headless": "5.5.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.0",
     "chardet": "^2.1.0",
     "diff": "^7.0.0",
     "dotenv": "^17.1.0",
+    "fast-levenshtein": "^2.0.6",
+    "fast-uri": "^3.0.6",
     "fdir": "^6.4.6",
     "fzf": "^0.5.2",
     "glob": "^10.4.5",
@@ -53,22 +57,22 @@
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0",
     "undici": "^7.10.0",
-    "ws": "^8.18.0",
-    "@xterm/headless": "5.5.0"
+    "ws": "^8.18.0"
   },
   "optionalDependencies": {
     "@lydell/node-pty": "1.1.0",
-    "node-pty": "^1.0.0",
     "@lydell/node-pty-darwin-arm64": "1.1.0",
     "@lydell/node-pty-darwin-x64": "1.1.0",
     "@lydell/node-pty-linux-x64": "1.1.0",
     "@lydell/node-pty-win32-arm64": "1.1.0",
-    "@lydell/node-pty-win32-x64": "1.1.0"
+    "@lydell/node-pty-win32-x64": "1.1.0",
+    "node-pty": "^1.0.0"
   },
   "devDependencies": {
     "@google/gemini-cli-test-utils": "file:../test-utils",
     "@types/diff": "^7.0.2",
     "@types/dotenv": "^6.1.1",
+    "@types/fast-levenshtein": "^0.0.4",
     "@types/minimatch": "^5.1.2",
     "@types/picomatch": "^4.0.1",
     "@types/ws": "^8.5.10",

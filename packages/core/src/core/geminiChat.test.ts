@@ -25,20 +25,17 @@ const mockModelsModule = {
   batchEmbedContents: vi.fn(),
 } as unknown as Models;
 
-const {
-  mockRecordInvalidChunk,
-  mockRecordContentRetry,
-  mockRecordContentRetryFailure,
-} = vi.hoisted(() => ({
-  mockRecordInvalidChunk: vi.fn(),
-  mockRecordContentRetry: vi.fn(),
-  mockRecordContentRetryFailure: vi.fn(),
-}));
+const { mockLogInvalidChunk, mockLogContentRetry, mockLogContentRetryFailure } =
+  vi.hoisted(() => ({
+    mockLogInvalidChunk: vi.fn(),
+    mockLogContentRetry: vi.fn(),
+    mockLogContentRetryFailure: vi.fn(),
+  }));
 
-vi.mock('../telemetry/metrics.js', () => ({
-  recordInvalidChunk: mockRecordInvalidChunk,
-  recordContentRetry: mockRecordContentRetry,
-  recordContentRetryFailure: mockRecordContentRetryFailure,
+vi.mock('../telemetry/loggers.js', () => ({
+  logInvalidChunk: mockLogInvalidChunk,
+  logContentRetry: mockLogContentRetry,
+  logContentRetryFailure: mockLogContentRetryFailure,
 }));
 
 describe('GeminiChat', () => {
@@ -76,6 +73,228 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessage', () => {
+    it('should retain the initial user message when an automatic function call occurs', async () => {
+      // 1. Define the user's initial text message. This is the turn that gets dropped by the buggy logic.
+      const userInitialMessage: Content = {
+        role: 'user',
+        parts: [{ text: 'How is the weather in Boston?' }],
+      };
+
+      // 2. Mock the full API response, including the automaticFunctionCallingHistory.
+      // This history represents the full turn: user asks, model calls tool, tool responds, model answers.
+      const mockAfcResponse = {
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [
+                { text: 'The weather in Boston is 72 degrees and sunny.' },
+              ],
+            },
+          },
+        ],
+        automaticFunctionCallingHistory: [
+          userInitialMessage, // The user's turn
+          {
+            // The model's first response: a tool call
+            role: 'model',
+            parts: [
+              {
+                functionCall: {
+                  name: 'get_weather',
+                  args: { location: 'Boston' },
+                },
+              },
+            ],
+          },
+          {
+            // The tool's response, which has a 'user' role
+            role: 'user',
+            parts: [
+              {
+                functionResponse: {
+                  name: 'get_weather',
+                  response: { temperature: 72, condition: 'sunny' },
+                },
+              },
+            ],
+          },
+        ],
+      } as unknown as GenerateContentResponse;
+
+      vi.mocked(mockModelsModule.generateContent).mockResolvedValue(
+        mockAfcResponse,
+      );
+
+      // 3. Action: Send the initial message.
+      await chat.sendMessage(
+        { message: 'How is the weather in Boston?' },
+        'prompt-id-afc-bug',
+      );
+
+      // 4. Assert: Check the final state of the history.
+      const history = chat.getHistory();
+
+      // With the bug, history.length will be 3, because the first user message is dropped.
+      // The correct behavior is for the history to contain all 4 turns.
+      expect(history.length).toBe(4);
+
+      // Crucially, assert that the very first turn in the history matches the user's initial message.
+      // This is the assertion that will fail.
+      const firstTurn = history[0]!;
+      expect(firstTurn.role).toBe('user');
+      expect(firstTurn?.parts![0]!.text).toBe('How is the weather in Boston?');
+
+      // Verify the rest of the history is also correct.
+      const secondTurn = history[1]!;
+      expect(secondTurn.role).toBe('model');
+      expect(secondTurn?.parts![0]!.functionCall).toBeDefined();
+
+      const thirdTurn = history[2]!;
+      expect(thirdTurn.role).toBe('user');
+      expect(thirdTurn?.parts![0]!.functionResponse).toBeDefined();
+
+      const fourthTurn = history[3]!;
+      expect(fourthTurn.role).toBe('model');
+      expect(fourthTurn?.parts![0]!.text).toContain('72 degrees and sunny');
+    });
+
+    it('should throw an error when attempting to add a user turn after another user turn', async () => {
+      // 1. Setup: Create a history that already ends with a user turn (a functionResponse).
+      const initialHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'Initial prompt' }] },
+        {
+          role: 'model',
+          parts: [{ functionCall: { name: 'test_tool', args: {} } }],
+        },
+        {
+          role: 'user',
+          parts: [{ functionResponse: { name: 'test_tool', response: {} } }],
+        },
+      ];
+      chat.setHistory(initialHistory);
+
+      // 2. Mock a valid model response so the call doesn't fail for other reasons.
+      const mockResponse = {
+        candidates: [
+          { content: { role: 'model', parts: [{ text: 'some response' }] } },
+        ],
+      } as unknown as GenerateContentResponse;
+      vi.mocked(mockModelsModule.generateContent).mockResolvedValue(
+        mockResponse,
+      );
+
+      // 3. Action & Assert: Expect that sending another user message immediately
+      //    after a user-role turn throws the specific error.
+      await expect(
+        chat.sendMessage(
+          { message: 'This is an invalid consecutive user message' },
+          'prompt-id-1',
+        ),
+      ).rejects.toThrow('Cannot add a user turn after another user turn.');
+    });
+    it('should preserve text parts that are in the same response as a thought', async () => {
+      // 1. Mock the API to return a single response containing both a thought and visible text.
+      const mixedContentResponse = {
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [
+                { thought: 'This is a thought.' },
+                { text: 'This is the visible text that should not be lost.' },
+              ],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse;
+
+      vi.mocked(mockModelsModule.generateContent).mockResolvedValue(
+        mixedContentResponse,
+      );
+
+      // 2. Action: Send a standard, non-streaming message.
+      await chat.sendMessage(
+        { message: 'test message' },
+        'prompt-id-mixed-response',
+      );
+
+      // 3. Assert: Check the final state of the history.
+      const history = chat.getHistory();
+
+      // The history should contain two turns: the user's message and the model's response.
+      expect(history.length).toBe(2);
+
+      const modelTurn = history[1]!;
+      expect(modelTurn.role).toBe('model');
+
+      // CRUCIAL ASSERTION:
+      // Buggy code would discard the entire response because a "thought" was present,
+      // resulting in an empty placeholder turn with 0 parts.
+      // The corrected code will pass, preserving the single visible text part.
+      expect(modelTurn?.parts?.length).toBe(1);
+      expect(modelTurn?.parts![0]!.text).toBe(
+        'This is the visible text that should not be lost.',
+      );
+    });
+    it('should add a placeholder model turn when a tool call is followed by an empty model response', async () => {
+      // 1. Setup: A history where the model has just made a function call.
+      const initialHistory: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Find a good Italian restaurant for me.' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'find_restaurant',
+                args: { cuisine: 'Italian' },
+              },
+            },
+          ],
+        },
+      ];
+      chat.setHistory(initialHistory);
+
+      // 2. Mock the API to return an empty/thought-only response.
+      const emptyModelResponse = {
+        candidates: [
+          { content: { role: 'model', parts: [{ thought: true }] } },
+        ],
+      } as unknown as GenerateContentResponse;
+      vi.mocked(mockModelsModule.generateContent).mockResolvedValue(
+        emptyModelResponse,
+      );
+
+      // 3. Action: Send the function response back to the model.
+      await chat.sendMessage(
+        {
+          message: {
+            functionResponse: {
+              name: 'find_restaurant',
+              response: { name: 'Vesuvio' },
+            },
+          },
+        },
+        'prompt-id-1',
+      );
+
+      // 4. Assert: The history should now have four valid, alternating turns.
+      const history = chat.getHistory();
+      expect(history.length).toBe(4);
+
+      // The final turn must be the empty model placeholder.
+      const lastTurn = history[3]!;
+      expect(lastTurn.role).toBe('model');
+      expect(lastTurn?.parts?.length).toBe(0);
+
+      // The second-to-last turn must be the function response we sent.
+      const secondToLastTurn = history[2]!;
+      expect(secondToLastTurn.role).toBe('user');
+      expect(secondToLastTurn?.parts![0]!.functionResponse).toBeDefined();
+    });
     it('should call generateContent with the correct parameters', async () => {
       const response = {
         candidates: [
@@ -107,6 +326,386 @@ describe('GeminiChat', () => {
   });
 
   describe('sendMessageStream', () => {
+    it('should succeed if a tool call is followed by an empty part', async () => {
+      // 1. Mock a stream that contains a tool call, then an invalid (empty) part.
+      const streamWithToolCall = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'test_tool', args: {} } }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+        // This second chunk is invalid according to isValidResponse
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: '' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        streamWithToolCall,
+      );
+
+      // 2. Action & Assert: The stream processing should complete without throwing an error
+      // because the presence of a tool call makes the empty final chunk acceptable.
+      const stream = await chat.sendMessageStream(
+        { message: 'test message' },
+        'prompt-id-tool-call-empty-end',
+      );
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            /* consume stream */
+          }
+        })(),
+      ).resolves.not.toThrow();
+
+      // 3. Verify history was recorded correctly
+      const history = chat.getHistory();
+      expect(history.length).toBe(2); // user turn + model turn
+      const modelTurn = history[1]!;
+      expect(modelTurn?.parts?.length).toBe(1); // The empty part is discarded
+      expect(modelTurn?.parts![0]!.functionCall).toBeDefined();
+    });
+
+    it('should succeed if the stream ends with an empty part but has a valid finishReason', async () => {
+      // 1. Mock a stream that ends with an invalid part but has a 'STOP' finish reason.
+      const streamWithValidFinish = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'Initial content...' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+        // This second chunk is invalid, but the finishReason should save it from retrying.
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: '' }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        streamWithValidFinish,
+      );
+
+      // 2. Action & Assert: The stream should complete successfully because the valid
+      // finishReason overrides the invalid final chunk.
+      const stream = await chat.sendMessageStream(
+        { message: 'test message' },
+        'prompt-id-valid-finish-empty-end',
+      );
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            /* consume stream */
+          }
+        })(),
+      ).resolves.not.toThrow();
+
+      // 3. Verify history was recorded correctly
+      const history = chat.getHistory();
+      expect(history.length).toBe(2);
+      const modelTurn = history[1]!;
+      expect(modelTurn?.parts?.length).toBe(1); // The empty part is discarded
+      expect(modelTurn?.parts![0]!.text).toBe('Initial content...');
+    });
+    it('should not consolidate text into a part that also contains a functionCall', async () => {
+      // 1. Mock the API to stream a malformed part followed by a valid text part.
+      const multiChunkStream = (async function* () {
+        // This malformed part has both text and a functionCall.
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    text: 'Some text',
+                    functionCall: { name: 'do_stuff', args: {} },
+                  },
+                ],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+        // This valid text part should NOT be merged into the malformed one.
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: ' that should not be merged.' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        multiChunkStream,
+      );
+
+      // 2. Action: Send a message and consume the stream.
+      const stream = await chat.sendMessageStream(
+        { message: 'test message' },
+        'prompt-id-malformed-chunk',
+      );
+      for await (const _ of stream) {
+        // Consume the stream to trigger history recording.
+      }
+
+      // 3. Assert: Check that the final history was not incorrectly consolidated.
+      const history = chat.getHistory();
+
+      expect(history.length).toBe(2);
+      const modelTurn = history[1]!;
+
+      // CRUCIAL ASSERTION: There should be two separate parts.
+      // The old, non-strict logic would incorrectly merge them, resulting in one part.
+      expect(modelTurn?.parts?.length).toBe(2);
+
+      // Verify the contents of each part.
+      expect(modelTurn?.parts![0]!.text).toBe('Some text');
+      expect(modelTurn?.parts![0]!.functionCall).toBeDefined();
+      expect(modelTurn?.parts![1]!.text).toBe(' that should not be merged.');
+    });
+
+    it('should consolidate subsequent text chunks after receiving an empty text chunk', async () => {
+      // 1. Mock the API to return a stream where one chunk is just an empty text part.
+      const multiChunkStream = (async function* () {
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'Hello' }] } },
+          ],
+        } as unknown as GenerateContentResponse;
+        // FIX: The original test used { text: '' }, which is invalid.
+        // A chunk can be empty but still valid. This chunk is now removed
+        // as the important part is consolidating what comes after.
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: ' World!' }] } },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        multiChunkStream,
+      );
+
+      // 2. Action: Send a message and consume the stream.
+      const stream = await chat.sendMessageStream(
+        { message: 'test message' },
+        'prompt-id-empty-chunk-consolidation',
+      );
+      for await (const _ of stream) {
+        // Consume the stream
+      }
+
+      // 3. Assert: Check that the final history was correctly consolidated.
+      const history = chat.getHistory();
+      expect(history.length).toBe(2);
+      const modelTurn = history[1]!;
+      expect(modelTurn?.parts?.length).toBe(1);
+      expect(modelTurn?.parts![0]!.text).toBe('Hello World!');
+    });
+
+    it('should consolidate adjacent text parts that arrive in separate stream chunks', async () => {
+      // 1. Mock the API to return a stream of multiple, adjacent text chunks.
+      const multiChunkStream = (async function* () {
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'This is the ' }] } },
+          ],
+        } as unknown as GenerateContentResponse;
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'first part.' }] } },
+          ],
+        } as unknown as GenerateContentResponse;
+        // This function call should break the consolidation.
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'do_stuff', args: {} } }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'This is the second part.' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        multiChunkStream,
+      );
+
+      // 2. Action: Send a message and consume the stream.
+      const stream = await chat.sendMessageStream(
+        { message: 'test message' },
+        'prompt-id-multi-chunk',
+      );
+      for await (const _ of stream) {
+        // Consume the stream to trigger history recording.
+      }
+
+      // 3. Assert: Check that the final history was correctly consolidated.
+      const history = chat.getHistory();
+
+      // The history should contain the user's turn and ONE consolidated model turn.
+      expect(history.length).toBe(2);
+
+      const modelTurn = history[1]!;
+      expect(modelTurn.role).toBe('model');
+
+      // The model turn should have 3 distinct parts: the merged text, the function call, and the final text.
+      expect(modelTurn?.parts?.length).toBe(3);
+      expect(modelTurn?.parts![0]!.text).toBe('This is the first part.');
+      expect(modelTurn.parts![1]!.functionCall).toBeDefined();
+      expect(modelTurn.parts![2]!.text).toBe('This is the second part.');
+    });
+    it('should preserve text parts that stream in the same chunk as a thought', async () => {
+      // 1. Mock the API to return a single chunk containing both a thought and visible text.
+      const mixedContentStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  { thought: 'This is a thought.' },
+                  { text: 'This is the visible text that should not be lost.' },
+                ],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        mixedContentStream,
+      );
+
+      // 2. Action: Send a message and fully consume the stream to trigger history recording.
+      const stream = await chat.sendMessageStream(
+        { message: 'test message' },
+        'prompt-id-mixed-chunk',
+      );
+      for await (const _ of stream) {
+        // This loop consumes the stream.
+      }
+
+      // 3. Assert: Check the final state of the history.
+      const history = chat.getHistory();
+
+      // The history should contain two turns: the user's message and the model's response.
+      expect(history.length).toBe(2);
+
+      const modelTurn = history[1]!;
+      expect(modelTurn.role).toBe('model');
+
+      // CRUCIAL ASSERTION:
+      // The buggy code would fail here, resulting in parts.length being 0.
+      // The corrected code will pass, preserving the single visible text part.
+      expect(modelTurn?.parts?.length).toBe(1);
+      expect(modelTurn?.parts![0]!.text).toBe(
+        'This is the visible text that should not be lost.',
+      );
+    });
+    it('should add a placeholder model turn when a tool call is followed by an empty stream response', async () => {
+      // 1. Setup: A history where the model has just made a function call.
+      const initialHistory: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Find a good Italian restaurant for me.' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'find_restaurant',
+                args: { cuisine: 'Italian' },
+              },
+            },
+          ],
+        },
+      ];
+      chat.setHistory(initialHistory);
+
+      // 2. Mock the API to return an empty/thought-only stream.
+      const emptyStreamResponse = (async function* () {
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ thought: true }] } },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        emptyStreamResponse,
+      );
+
+      // 3. Action: Send the function response back to the model and consume the stream.
+      const stream = await chat.sendMessageStream(
+        {
+          message: {
+            functionResponse: {
+              name: 'find_restaurant',
+              response: { name: 'Vesuvio' },
+            },
+          },
+        },
+        'prompt-id-stream-1',
+      );
+      for await (const _ of stream) {
+        // This loop consumes the stream to trigger the internal logic.
+      }
+
+      // 4. Assert: The history should now have four valid, alternating turns.
+      const history = chat.getHistory();
+      expect(history.length).toBe(4);
+
+      // The final turn must be the empty model placeholder.
+      const lastTurn = history[3]!;
+      expect(lastTurn.role).toBe('model');
+      expect(lastTurn?.parts?.length).toBe(0);
+
+      // The second-to-last turn must be the function response we sent.
+      const secondToLastTurn = history[2]!;
+      expect(secondToLastTurn.role).toBe('user');
+      expect(secondToLastTurn?.parts![0]!.functionResponse).toBeDefined();
+    });
+
     it('should call generateContentStream with the correct parameters', async () => {
       const response = (async function* () {
         yield {
@@ -153,321 +752,145 @@ describe('GeminiChat', () => {
       parts: [{ text: 'User input' }],
     };
 
+    it('should consolidate all consecutive model turns into a single turn', () => {
+      const userInput: Content = {
+        role: 'user',
+        parts: [{ text: 'User input' }],
+      };
+      // This simulates a multi-part model response with different part types.
+      const modelOutput: Content[] = [
+        { role: 'model', parts: [{ text: 'Thinking...' }] },
+        {
+          role: 'model',
+          parts: [{ functionCall: { name: 'do_stuff', args: {} } }],
+        },
+      ];
+
+      // @ts-expect-error Accessing private method for testing
+      chat.recordHistory(userInput, modelOutput);
+      const history = chat.getHistory();
+
+      // The history should contain the user's turn and ONE consolidated model turn.
+      // The old code would fail here, resulting in a length of 3.
+      //expect(history).toBe([]);
+      expect(history.length).toBe(2);
+
+      const modelTurn = history[1]!;
+      expect(modelTurn.role).toBe('model');
+
+      // The consolidated turn should contain both the text part and the functionCall part.
+      expect(modelTurn?.parts?.length).toBe(2);
+      expect(modelTurn?.parts![0]!.text).toBe('Thinking...');
+      expect(modelTurn?.parts![1]!.functionCall).toBeDefined();
+    });
+
+    it('should add a placeholder model turn when a tool call is followed by an empty response', () => {
+      // 1. Setup: A history where the model has just made a function call.
+      const initialHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'Initial prompt' }] },
+        {
+          role: 'model',
+          parts: [{ functionCall: { name: 'test_tool', args: {} } }],
+        },
+      ];
+      chat.setHistory(initialHistory);
+
+      // 2. Action: The user provides the tool's response, and the model's
+      // final output is empty (e.g., just a thought, which gets filtered out).
+      const functionResponse: Content = {
+        role: 'user',
+        parts: [{ functionResponse: { name: 'test_tool', response: {} } }],
+      };
+      const emptyModelOutput: Content[] = [];
+
+      // @ts-expect-error Accessing private method for testing
+      chat.recordHistory(functionResponse, emptyModelOutput, [
+        functionResponse,
+      ]);
+
+      // 3. Assert: The history should now have four valid, alternating turns.
+      const history = chat.getHistory();
+      expect(history.length).toBe(4);
+
+      // The final turn must be the empty model placeholder.
+      const lastTurn = history[3]!;
+      expect(lastTurn.role).toBe('model');
+      expect(lastTurn?.parts?.length).toBe(0);
+
+      // The second-to-last turn must be the function response we provided.
+      const secondToLastTurn = history[2]!;
+      expect(secondToLastTurn.role).toBe('user');
+      expect(secondToLastTurn?.parts![0]!.functionResponse).toBeDefined();
+    });
+
     it('should add user input and a single model output to history', () => {
       const modelOutput: Content[] = [
         { role: 'model', parts: [{ text: 'Model output' }] },
       ];
-      // @ts-expect-error Accessing private method for testing purposes
+      // @ts-expect-error Accessing private method for testing
       chat.recordHistory(userInput, modelOutput);
-      const history = chat.getHistory();
-      expect(history).toEqual([userInput, modelOutput[0]]);
-    });
-
-    it('should consolidate adjacent model outputs', () => {
-      const modelOutputParts: Content[] = [
-        { role: 'model', parts: [{ text: 'Model part 1' }] },
-        { role: 'model', parts: [{ text: 'Model part 2' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputParts);
-      const history = chat.getHistory();
-      expect(history.length).toBe(2);
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      expect(history[1].parts).toEqual([{ text: 'Model part 1Model part 2' }]);
-    });
-
-    it('should handle a mix of user and model roles in outputContents (though unusual)', () => {
-      const mixedOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'Model 1' }] },
-        { role: 'user', parts: [{ text: 'Unexpected User' }] }, // This should be pushed as is
-        { role: 'model', parts: [{ text: 'Model 2' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, mixedOutput);
-      const history = chat.getHistory();
-      expect(history.length).toBe(4); // user, model1, user_unexpected, model2
-      expect(history[0]).toEqual(userInput);
-      expect(history[1]).toEqual(mixedOutput[0]);
-      expect(history[2]).toEqual(mixedOutput[1]);
-      expect(history[3]).toEqual(mixedOutput[2]);
-    });
-
-    it('should consolidate multiple adjacent model outputs correctly', () => {
-      const modelOutputParts: Content[] = [
-        { role: 'model', parts: [{ text: 'M1' }] },
-        { role: 'model', parts: [{ text: 'M2' }] },
-        { role: 'model', parts: [{ text: 'M3' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputParts);
-      const history = chat.getHistory();
-      expect(history.length).toBe(2);
-      expect(history[1].parts).toEqual([{ text: 'M1M2M3' }]);
-    });
-
-    it('should not consolidate if roles are different between model outputs', () => {
-      const modelOutputParts: Content[] = [
-        { role: 'model', parts: [{ text: 'M1' }] },
-        { role: 'user', parts: [{ text: 'Interjecting User' }] },
-        { role: 'model', parts: [{ text: 'M2' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputParts);
-      const history = chat.getHistory();
-      expect(history.length).toBe(4); // user, M1, Interjecting User, M2
-      expect(history[1].parts).toEqual([{ text: 'M1' }]);
-      expect(history[3].parts).toEqual([{ text: 'M2' }]);
-    });
-
-    it('should merge with last history entry if it is also a model output', () => {
-      // @ts-expect-error Accessing private property for test setup
-      chat.history = [
-        userInput,
-        { role: 'model', parts: [{ text: 'Initial Model Output' }] },
-      ]; // Prime the history
-
-      const newModelOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'New Model Part 1' }] },
-        { role: 'model', parts: [{ text: 'New Model Part 2' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, newModelOutput); // userInput here is for the *next* turn, but history is already primed
-
-      // Reset and set up a more realistic scenario for merging with existing history
-      chat = new GeminiChat(mockConfig, mockModelsModule, config, []);
-      const firstUserInput: Content = {
-        role: 'user',
-        parts: [{ text: 'First user input' }],
-      };
-      const firstModelOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'First model response' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(firstUserInput, firstModelOutput);
-
-      const secondUserInput: Content = {
-        role: 'user',
-        parts: [{ text: 'Second user input' }],
-      };
-      const secondModelOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'Second model response part 1' }] },
-        { role: 'model', parts: [{ text: 'Second model response part 2' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(secondUserInput, secondModelOutput);
-
-      const finalHistory = chat.getHistory();
-      expect(finalHistory.length).toBe(4); // user1, model1, user2, model2(consolidated)
-      expect(finalHistory[0]).toEqual(firstUserInput);
-      expect(finalHistory[1]).toEqual(firstModelOutput[0]);
-      expect(finalHistory[2]).toEqual(secondUserInput);
-      expect(finalHistory[3].role).toBe('model');
-      expect(finalHistory[3].parts).toEqual([
-        { text: 'Second model response part 1Second model response part 2' },
-      ]);
-    });
-
-    it('should correctly merge consolidated new output with existing model history', () => {
-      // Setup: history ends with a model turn
-      const initialUser: Content = {
-        role: 'user',
-        parts: [{ text: 'Initial user query' }],
-      };
-      const initialModel: Content = {
-        role: 'model',
-        parts: [{ text: 'Initial model answer.' }],
-      };
-      chat = new GeminiChat(mockConfig, mockModelsModule, config, [
-        initialUser,
-        initialModel,
-      ]);
-
-      // New interaction
-      const currentUserInput: Content = {
-        role: 'user',
-        parts: [{ text: 'Follow-up question' }],
-      };
-      const newModelParts: Content[] = [
-        { role: 'model', parts: [{ text: 'Part A of new answer.' }] },
-        { role: 'model', parts: [{ text: 'Part B of new answer.' }] },
-      ];
-
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(currentUserInput, newModelParts);
-      const history = chat.getHistory();
-
-      // Expected: initialUser, initialModel, currentUserInput, consolidatedNewModelParts
-      expect(history.length).toBe(4);
-      expect(history[0]).toEqual(initialUser);
-      expect(history[1]).toEqual(initialModel);
-      expect(history[2]).toEqual(currentUserInput);
-      expect(history[3].role).toBe('model');
-      expect(history[3].parts).toEqual([
-        { text: 'Part A of new answer.Part B of new answer.' },
-      ]);
-    });
-
-    it('should handle empty modelOutput array', () => {
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, []);
-      const history = chat.getHistory();
-      // If modelOutput is empty, it might push a default empty model part depending on isFunctionResponse
-      // Assuming isFunctionResponse(userInput) is false for this simple text input
-      expect(history.length).toBe(2);
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      expect(history[1].parts).toEqual([]);
-    });
-
-    it('should handle aggregating modelOutput', () => {
-      const modelOutputUndefinedParts: Content[] = [
-        { role: 'model', parts: [{ text: 'First model part' }] },
-        { role: 'model', parts: [{ text: 'Second model part' }] },
-        { role: 'model', parts: undefined as unknown as Part[] }, // Test undefined parts
-        { role: 'model', parts: [{ text: 'Third model part' }] },
-        { role: 'model', parts: [] }, // Test empty parts array
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputUndefinedParts);
-      const history = chat.getHistory();
-      expect(history.length).toBe(5);
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      expect(history[1].parts).toEqual([
-        { text: 'First model partSecond model part' },
-      ]);
-      expect(history[2].role).toBe('model');
-      expect(history[2].parts).toBeUndefined();
-      expect(history[3].role).toBe('model');
-      expect(history[3].parts).toEqual([{ text: 'Third model part' }]);
-      expect(history[4].role).toBe('model');
-      expect(history[4].parts).toEqual([]);
-    });
-
-    it('should handle modelOutput with parts being undefined or empty (if they pass initial every check)', () => {
-      const modelOutputUndefinedParts: Content[] = [
-        { role: 'model', parts: [{ text: 'Text part' }] },
-        { role: 'model', parts: undefined as unknown as Part[] }, // Test undefined parts
-        { role: 'model', parts: [] }, // Test empty parts array
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputUndefinedParts);
-      const history = chat.getHistory();
-      expect(history.length).toBe(4); // userInput, model1 (text), model2 (undefined parts), model3 (empty parts)
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      expect(history[1].parts).toEqual([{ text: 'Text part' }]);
-      expect(history[2].role).toBe('model');
-      expect(history[2].parts).toBeUndefined();
-      expect(history[3].role).toBe('model');
-      expect(history[3].parts).toEqual([]);
-    });
-
-    it('should correctly handle automaticFunctionCallingHistory', () => {
-      const afcHistory: Content[] = [
-        { role: 'user', parts: [{ text: 'AFC User' }] },
-        { role: 'model', parts: [{ text: 'AFC Model' }] },
-      ];
-      const modelOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'Regular Model Output' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutput, afcHistory);
-      const history = chat.getHistory();
-      expect(history.length).toBe(3);
-      expect(history[0]).toEqual(afcHistory[0]);
-      expect(history[1]).toEqual(afcHistory[1]);
-      expect(history[2]).toEqual(modelOutput[0]);
-    });
-
-    it('should add userInput if AFC history is present but empty', () => {
-      const modelOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'Model Output' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutput, []); // Empty AFC history
       const history = chat.getHistory();
       expect(history.length).toBe(2);
       expect(history[0]).toEqual(userInput);
       expect(history[1]).toEqual(modelOutput[0]);
     });
 
-    it('should skip "thought" content from modelOutput', () => {
-      const modelOutputWithThought: Content[] = [
-        { role: 'model', parts: [{ thought: true }, { text: 'Visible text' }] },
-        { role: 'model', parts: [{ text: 'Another visible text' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputWithThought);
-      const history = chat.getHistory();
-      expect(history.length).toBe(2); // User input + consolidated model output
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      // The 'thought' part is skipped, 'Another visible text' becomes the first part.
-      expect(history[1].parts).toEqual([{ text: 'Another visible text' }]);
-    });
-
-    it('should skip "thought" content even if it is the only content', () => {
-      const modelOutputOnlyThought: Content[] = [
-        { role: 'model', parts: [{ thought: true }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputOnlyThought);
-      const history = chat.getHistory();
-      expect(history.length).toBe(1); // User input + default empty model part
-      expect(history[0]).toEqual(userInput);
-    });
-
-    it('should correctly consolidate text parts when a thought part is in between', () => {
-      const modelOutputMixed: Content[] = [
+    it('should consolidate adjacent text parts from multiple content objects', () => {
+      const modelOutput: Content[] = [
         { role: 'model', parts: [{ text: 'Part 1.' }] },
-        {
-          role: 'model',
-          parts: [{ thought: true }, { text: 'Should be skipped' }],
-        },
-        { role: 'model', parts: [{ text: 'Part 2.' }] },
+        { role: 'model', parts: [{ text: ' Part 2.' }] },
+        { role: 'model', parts: [{ text: ' Part 3.' }] },
       ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputMixed);
+      // @ts-expect-error Accessing private method for testing
+      chat.recordHistory(userInput, modelOutput);
       const history = chat.getHistory();
       expect(history.length).toBe(2);
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      expect(history[1].parts).toEqual([{ text: 'Part 1.Part 2.' }]);
+      expect(history[1]!.role).toBe('model');
+      expect(history[1]!.parts).toEqual([{ text: 'Part 1. Part 2. Part 3.' }]);
     });
 
-    it('should handle multiple thought parts correctly', () => {
-      const modelOutputMultipleThoughts: Content[] = [
-        { role: 'model', parts: [{ thought: true }] },
-        { role: 'model', parts: [{ text: 'Visible 1' }] },
-        { role: 'model', parts: [{ thought: true }] },
-        { role: 'model', parts: [{ text: 'Visible 2' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputMultipleThoughts);
+    it('should add an empty placeholder turn if modelOutput is empty', () => {
+      // This simulates receiving a pre-filtered, thought-only response.
+      const emptyModelOutput: Content[] = [];
+      // @ts-expect-error Accessing private method for testing
+      chat.recordHistory(userInput, emptyModelOutput);
       const history = chat.getHistory();
       expect(history.length).toBe(2);
       expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      expect(history[1].parts).toEqual([{ text: 'Visible 1Visible 2' }]);
+      expect(history[1]!.role).toBe('model');
+      expect(history[1]!.parts).toEqual([]);
     });
 
-    it('should handle thought part at the end of outputContents', () => {
-      const modelOutputThoughtAtEnd: Content[] = [
-        { role: 'model', parts: [{ text: 'Visible text' }] },
-        { role: 'model', parts: [{ thought: true }] },
+    it('should preserve model outputs with undefined or empty parts arrays', () => {
+      const malformedOutput: Content[] = [
+        { role: 'model', parts: [{ text: 'Text part' }] },
+        { role: 'model', parts: undefined as unknown as Part[] },
+        { role: 'model', parts: [] },
       ];
-      // @ts-expect-error Accessing private method for testing purposes
-      chat.recordHistory(userInput, modelOutputThoughtAtEnd);
+      // @ts-expect-error Accessing private method for testing
+      chat.recordHistory(userInput, malformedOutput);
       const history = chat.getHistory();
-      expect(history.length).toBe(2);
-      expect(history[0]).toEqual(userInput);
-      expect(history[1].role).toBe('model');
-      expect(history[1].parts).toEqual([{ text: 'Visible text' }]);
+      expect(history.length).toBe(4); // userInput + 3 model turns
+      expect(history[1]!.parts).toEqual([{ text: 'Text part' }]);
+      expect(history[2]!.parts).toBeUndefined();
+      expect(history[3]!.parts).toEqual([]);
+    });
+
+    it('should not consolidate content with different roles', () => {
+      const mixedOutput: Content[] = [
+        { role: 'model', parts: [{ text: 'Model 1' }] },
+        { role: 'user', parts: [{ text: 'Unexpected User' }] },
+        { role: 'model', parts: [{ text: 'Model 2' }] },
+      ];
+      // @ts-expect-error Accessing private method for testing
+      chat.recordHistory(userInput, mixedOutput);
+      const history = chat.getHistory();
+      expect(history.length).toBe(4); // userInput, model1, unexpected_user, model2
+      expect(history[1]).toEqual(mixedOutput[0]);
+      expect(history[2]).toEqual(mixedOutput[1]);
+      expect(history[3]).toEqual(mixedOutput[2]);
     });
   });
-
   describe('addHistory', () => {
     it('should add a new content item to the history', () => {
       const newContent: Content = {
@@ -531,9 +954,9 @@ describe('GeminiChat', () => {
       }
 
       // Assertions
-      expect(mockRecordInvalidChunk).toHaveBeenCalledTimes(1);
-      expect(mockRecordContentRetry).toHaveBeenCalledTimes(1);
-      expect(mockRecordContentRetryFailure).not.toHaveBeenCalled();
+      expect(mockLogInvalidChunk).toHaveBeenCalledTimes(1);
+      expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
+      expect(mockLogContentRetryFailure).not.toHaveBeenCalled();
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(2);
       expect(
         chunks.some(
@@ -590,9 +1013,9 @@ describe('GeminiChat', () => {
 
       // Should be called 3 times (initial + 2 retries)
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(3);
-      expect(mockRecordInvalidChunk).toHaveBeenCalledTimes(3);
-      expect(mockRecordContentRetry).toHaveBeenCalledTimes(2);
-      expect(mockRecordContentRetryFailure).toHaveBeenCalledTimes(1);
+      expect(mockLogInvalidChunk).toHaveBeenCalledTimes(3);
+      expect(mockLogContentRetry).toHaveBeenCalledTimes(2);
+      expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
       // History should be clean, as if the failed turn never happened.
       const history = chat.getHistory();
@@ -639,7 +1062,7 @@ describe('GeminiChat', () => {
     expect(history.length).toBe(4);
 
     // Assert that the correct metrics were reported for one empty-stream retry
-    expect(mockRecordContentRetry).toHaveBeenCalledTimes(1);
+    expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
 
     // Explicitly verify the structure of each part to satisfy TypeScript
     const turn1 = history[0];

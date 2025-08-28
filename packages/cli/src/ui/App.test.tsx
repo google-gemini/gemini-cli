@@ -321,6 +321,7 @@ describe('App UI', () => {
       workspaceSettingsFile,
       [],
       true,
+      new Set(),
     );
   };
 
@@ -692,7 +693,10 @@ describe('App UI', () => {
 
   it('should display custom contextFileName in footer when set and count is 1', async () => {
     mockSettings = createMockSettings({
-      workspace: { contextFileName: 'AGENTS.md', theme: 'Default' },
+      workspace: {
+        context: { fileName: 'AGENTS.md' },
+        ui: { theme: 'Default' },
+      },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(1);
     mockConfig.getAllGeminiMdFilenames.mockReturnValue(['AGENTS.md']);
@@ -714,8 +718,8 @@ describe('App UI', () => {
   it('should display a generic message when multiple context files with different names are provided', async () => {
     mockSettings = createMockSettings({
       workspace: {
-        contextFileName: ['AGENTS.md', 'CONTEXT.md'],
-        theme: 'Default',
+        context: { fileName: ['AGENTS.md', 'CONTEXT.md'] },
+        ui: { theme: 'Default' },
       },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(2);
@@ -740,7 +744,10 @@ describe('App UI', () => {
 
   it('should display custom contextFileName with plural when set and count is > 1', async () => {
     mockSettings = createMockSettings({
-      workspace: { contextFileName: 'MY_NOTES.TXT', theme: 'Default' },
+      workspace: {
+        context: { fileName: 'MY_NOTES.TXT' },
+        ui: { theme: 'Default' },
+      },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(3);
     mockConfig.getAllGeminiMdFilenames.mockReturnValue([
@@ -765,7 +772,10 @@ describe('App UI', () => {
 
   it('should not display context file message if count is 0, even if contextFileName is set', async () => {
     mockSettings = createMockSettings({
-      workspace: { contextFileName: 'ANY_FILE.MD', theme: 'Default' },
+      workspace: {
+        context: { fileName: 'ANY_FILE.MD' },
+        ui: { theme: 'Default' },
+      },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(0);
     mockConfig.getAllGeminiMdFilenames.mockReturnValue([]);
@@ -846,7 +856,7 @@ describe('App UI', () => {
   it('should not display Tips component when hideTips is true', async () => {
     mockSettings = createMockSettings({
       workspace: {
-        hideTips: true,
+        ui: { hideTips: true },
       },
     });
 
@@ -879,7 +889,7 @@ describe('App UI', () => {
   it('should not display Header component when hideBanner is true', async () => {
     const { Header } = await import('./components/Header.js');
     mockSettings = createMockSettings({
-      user: { hideBanner: true },
+      user: { ui: { hideBanner: true } },
     });
 
     const { unmount } = renderWithProviders(
@@ -910,7 +920,7 @@ describe('App UI', () => {
 
   it('should not display Footer component when hideFooter is true', async () => {
     mockSettings = createMockSettings({
-      user: { hideFooter: true },
+      user: { ui: { hideFooter: true } },
     });
 
     const { lastFrame, unmount } = renderWithProviders(
@@ -928,9 +938,9 @@ describe('App UI', () => {
 
   it('should show footer if system says show, but workspace and user settings say hide', async () => {
     mockSettings = createMockSettings({
-      system: { hideFooter: false },
-      user: { hideFooter: true },
-      workspace: { hideFooter: true },
+      system: { ui: { hideFooter: false } },
+      user: { ui: { hideFooter: true } },
+      workspace: { ui: { hideFooter: true } },
     });
 
     const { lastFrame, unmount } = renderWithProviders(
@@ -948,9 +958,9 @@ describe('App UI', () => {
 
   it('should show tips if system says show, but workspace and user settings say hide', async () => {
     mockSettings = createMockSettings({
-      system: { hideTips: false },
-      user: { hideTips: true },
-      workspace: { hideTips: true },
+      system: { ui: { hideTips: false } },
+      user: { ui: { hideTips: true } },
+      workspace: { ui: { hideTips: true } },
     });
 
     const { unmount } = renderWithProviders(
@@ -1125,9 +1135,13 @@ describe('App UI', () => {
       const validateAuthMethodSpy = vi.spyOn(auth, 'validateAuthMethod');
       mockSettings = createMockSettings({
         workspace: {
-          selectedAuthType: 'USE_GEMINI' as AuthType,
-          useExternalAuth: false,
-          theme: 'Default',
+          security: {
+            auth: {
+              selectedType: 'USE_GEMINI' as AuthType,
+              useExternal: false,
+            },
+          },
+          ui: { theme: 'Default' },
         },
       });
 
@@ -1147,9 +1161,13 @@ describe('App UI', () => {
       const validateAuthMethodSpy = vi.spyOn(auth, 'validateAuthMethod');
       mockSettings = createMockSettings({
         workspace: {
-          selectedAuthType: 'USE_GEMINI' as AuthType,
-          useExternalAuth: true,
-          theme: 'Default',
+          security: {
+            auth: {
+              selectedType: 'USE_GEMINI' as AuthType,
+              useExternal: true,
+            },
+          },
+          ui: { theme: 'Default' },
         },
       });
 
@@ -1645,8 +1663,8 @@ describe('App UI', () => {
     it('should pass debugKeystrokeLogging setting to KeypressProvider', () => {
       const mockSettingsWithDebug = createMockSettings({
         workspace: {
-          theme: 'Default',
-          debugKeystrokeLogging: true,
+          ui: { theme: 'Default' },
+          advanced: { debugKeystrokeLogging: true },
         },
       });
 
@@ -1662,7 +1680,9 @@ describe('App UI', () => {
       const output = lastFrame();
 
       expect(output).toBeDefined();
-      expect(mockSettingsWithDebug.merged.debugKeystrokeLogging).toBe(true);
+      expect(mockSettingsWithDebug.merged.advanced?.debugKeystrokeLogging).toBe(
+        true,
+      );
     });
 
     it('should use default false value when debugKeystrokeLogging is not set', () => {
@@ -1678,7 +1698,90 @@ describe('App UI', () => {
       const output = lastFrame();
 
       expect(output).toBeDefined();
-      expect(mockSettings.merged.debugKeystrokeLogging).toBeUndefined();
+      expect(
+        mockSettings.merged.advanced?.debugKeystrokeLogging,
+      ).toBeUndefined();
+    });
+  });
+
+  describe('Ctrl+C behavior', () => {
+    it('should call cancel but only clear the prompt when a tool is executing', async () => {
+      const mockCancel = vi.fn();
+      let onCancelSubmitCallback = () => {};
+
+      // Simulate a tool in the "Executing" state.
+      vi.mocked(useGeminiStream).mockImplementation(
+        (
+          _client,
+          _history,
+          _addItem,
+          _config,
+          _onDebugMessage,
+          _handleSlashCommand,
+          _shellModeActive,
+          _getPreferredEditor,
+          _onAuthError,
+          _performMemoryRefresh,
+          _modelSwitchedFromQuotaError,
+          _setModelSwitchedFromQuotaError,
+          _onEditorClose,
+          onCancelSubmit, // Capture the cancel callback from App.tsx
+        ) => {
+          onCancelSubmitCallback = onCancelSubmit;
+          return {
+            streamingState: StreamingState.Responding,
+            submitQuery: vi.fn(),
+            initError: null,
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: [
+                  {
+                    name: 'test_tool',
+                    status: 'Executing',
+                    result: '',
+                    args: {},
+                  },
+                ],
+              },
+            ],
+            thought: null,
+            cancelOngoingRequest: () => {
+              mockCancel();
+              onCancelSubmitCallback(); // <--- This is the key change
+            },
+          };
+        },
+      );
+
+      const { stdin, lastFrame, unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Simulate user typing something into the prompt while a tool is running.
+      stdin.write('some text');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Verify the text is in the prompt.
+      expect(lastFrame()).toContain('some text');
+
+      // Simulate Ctrl+C.
+      stdin.write('\x03');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // The main cancellation handler SHOULD be called.
+      expect(mockCancel).toHaveBeenCalled();
+
+      // The prompt should now be empty as a result of the cancellation handler's logic.
+      // We can't directly test the buffer's state, but we can see the rendered output.
+      await waitFor(() => {
+        expect(lastFrame()).not.toContain('some text');
+      });
     });
   });
 });
