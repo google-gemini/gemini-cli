@@ -33,7 +33,6 @@ import {
   ShellProcessor,
 } from './prompt-processors/shellProcessor.js';
 import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
-import { loadTrustedFolders } from '../config/trustedFolders.js';
 
 interface CommandDirectory {
   path: string;
@@ -65,9 +64,11 @@ const TomlCommandDefSchema = z.object({
 export class FileCommandLoader implements ICommandLoader {
   private readonly projectRoot: string;
   private readonly folderTrustEnabled: boolean;
+  private readonly folderTrust: boolean;
 
   constructor(private readonly config: Config | null) {
     this.folderTrustEnabled = !!config?.getFolderTrustFeature();
+    this.folderTrust = !!config?.getFolderTrust();
     this.projectRoot = config?.getProjectRoot() || process.cwd();
   }
 
@@ -100,9 +101,8 @@ export class FileCommandLoader implements ICommandLoader {
           cwd: dirInfo.path,
         });
 
-        if(this.folderTrustEnabled) {
-          const trustedFolders = loadTrustedFolders();
-          files = files.filter((file) => trustedFolders.isPathTrusted(path.join(dirInfo.path, file)));
+        if(this.folderTrustEnabled && !this.folderTrust) {
+          return [];
         }
 
         const commandPromises = files.map((file) =>
