@@ -540,7 +540,7 @@ describe('performWorkspaceExtensionMigration', () => {
 });
 
 function createExtension({
-  extensionsDir = '',
+  extensionsDir = 'extensions-dir',
   name = 'my-extension',
   version = '1.0.0',
   addContextFile = false,
