@@ -19,7 +19,7 @@ import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
 import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import * as GenAiLib from '@google/genai';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
-import { AuthProviderType } from '../config/config.js';
+import { AuthProviderType, type Config } from '../config/config.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { WorkspaceContext } from '../utils/workspaceContext.js';
@@ -74,7 +74,7 @@ describe('mcp-client', () => {
         false,
       );
       await client.connect();
-      await client.discover();
+      await client.discover({} as Config);
       expect(mockedMcpToTool).toHaveBeenCalledOnce();
     });
 
@@ -136,7 +136,7 @@ describe('mcp-client', () => {
         false,
       );
       await client.connect();
-      await client.discover();
+      await client.discover({} as Config);
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
       expect(consoleWarnSpy).toHaveBeenCalledOnce();
       expect(consoleWarnSpy).toHaveBeenCalledWith(
@@ -180,7 +180,7 @@ describe('mcp-client', () => {
         false,
       );
       await client.connect();
-      await expect(client.discover()).rejects.toThrow(
+      await expect(client.discover({} as Config)).rejects.toThrow(
         'No prompts or tools found on the server.',
       );
       expect(consoleErrorSpy).toHaveBeenCalledWith(

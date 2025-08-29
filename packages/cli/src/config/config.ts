@@ -227,7 +227,50 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description: 'Enable screen reader mode for accessibility.',
           default: false,
         })
-
+        .deprecateOption(
+          'telemetry',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-target',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-otlp-endpoint',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-otlp-protocol',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-log-prompts',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-outfile',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'show-memory-usage',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'sandbox-image',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'proxy',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'checkpointing',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'all-files',
+          'Use @ includes in the application instead. This flag will be removed in a future version.',
+        )
         .check((argv) => {
           if (argv.prompt && argv['promptInteractive']) {
             throw new Error(
@@ -483,9 +526,7 @@ export async function loadCliConfig(
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
-
-  // The screen reader argument takes precedence over the accessibility setting.
-  const screenReader =
+  const screenReader =<<<<<<< ts-fix-critical-errors
     argv.screenReader ?? settings.ui?.accessibility?.screenReader ?? false;
   // Enforce safe default: if workspace is not trusted, drop workspace-level
   // mcpServers and only keep user/system entries already merged above.
