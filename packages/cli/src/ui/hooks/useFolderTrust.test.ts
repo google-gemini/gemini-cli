@@ -12,7 +12,6 @@ import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
 import { TrustLevel } from '../../config/trustedFolders.js';
 import * as process from 'node:process';
-import type { Config } from '@google/gemini-cli-core';
 
 import * as trustedFolders from '../../config/trustedFolders.js';
 
@@ -23,7 +22,6 @@ vi.mock('process', () => ({
 
 describe('useFolderTrust', () => {
   let mockSettings: LoadedSettings;
-  let mockConfig: Config;
   let mockTrustedFolders: LoadedTrustedFolders;
   let loadTrustedFoldersSpy: vi.SpyInstance;
   let isWorkspaceTrustedSpy: vi.SpyInstance;
@@ -37,13 +35,6 @@ describe('useFolderTrust', () => {
       },
       setValue: vi.fn(),
     } as unknown as LoadedSettings;
-
-    mockConfig = {
-      getIdeClient: vi.fn(() => ({
-        addTrustChangeListener: vi.fn(),
-        removeTrustChangeListener: vi.fn(),
-      })),
-    } as unknown as Config;
 
     mockTrustedFolders = {
       setValue: vi.fn(),
@@ -64,7 +55,7 @@ describe('useFolderTrust', () => {
   it('should not open dialog when folder is already trusted', () => {
     isWorkspaceTrustedSpy.mockReturnValue(true);
     const { result } = renderHook(() =>
-      useFolderTrust(mockSettings, mockConfig, onTrustChange),
+      useFolderTrust(mockSettings, onTrustChange),
     );
     expect(result.current.isFolderTrustDialogOpen).toBe(false);
     expect(onTrustChange).toHaveBeenCalledWith(true);
@@ -73,7 +64,7 @@ describe('useFolderTrust', () => {
   it('should not open dialog when folder is already untrusted', () => {
     isWorkspaceTrustedSpy.mockReturnValue(false);
     const { result } = renderHook(() =>
-      useFolderTrust(mockSettings, mockConfig, onTrustChange),
+      useFolderTrust(mockSettings, onTrustChange),
     );
     expect(result.current.isFolderTrustDialogOpen).toBe(false);
     expect(onTrustChange).toHaveBeenCalledWith(false);
@@ -82,7 +73,7 @@ describe('useFolderTrust', () => {
   it('should open dialog when folder trust is undefined', () => {
     isWorkspaceTrustedSpy.mockReturnValue(undefined);
     const { result } = renderHook(() =>
-      useFolderTrust(mockSettings, mockConfig, onTrustChange),
+      useFolderTrust(mockSettings, onTrustChange),
     );
     expect(result.current.isFolderTrustDialogOpen).toBe(true);
     expect(onTrustChange).toHaveBeenCalledWith(undefined);
@@ -93,7 +84,7 @@ describe('useFolderTrust', () => {
       .mockReturnValueOnce(undefined)
       .mockReturnValueOnce(true);
     const { result } = renderHook(() =>
-      useFolderTrust(mockSettings, mockConfig, onTrustChange),
+      useFolderTrust(mockSettings, onTrustChange),
     );
 
     isWorkspaceTrustedSpy.mockReturnValue(true);
@@ -115,7 +106,7 @@ describe('useFolderTrust', () => {
       .mockReturnValueOnce(undefined)
       .mockReturnValueOnce(true);
     const { result } = renderHook(() =>
-      useFolderTrust(mockSettings, mockConfig, onTrustChange),
+      useFolderTrust(mockSettings, onTrustChange),
     );
 
     act(() => {
@@ -135,7 +126,7 @@ describe('useFolderTrust', () => {
       .mockReturnValueOnce(undefined)
       .mockReturnValueOnce(false);
     const { result } = renderHook(() =>
-      useFolderTrust(mockSettings, mockConfig, onTrustChange),
+      useFolderTrust(mockSettings, onTrustChange),
     );
 
     act(() => {
@@ -154,7 +145,7 @@ describe('useFolderTrust', () => {
   it('should do nothing for default choice', () => {
     isWorkspaceTrustedSpy.mockReturnValue(undefined);
     const { result } = renderHook(() =>
-      useFolderTrust(mockSettings, mockConfig, onTrustChange),
+      useFolderTrust(mockSettings, onTrustChange),
     );
 
     act(() => {
@@ -172,7 +163,7 @@ describe('useFolderTrust', () => {
   it('should set isRestarting to true when trust status changes from false to true', () => {
     isWorkspaceTrustedSpy.mockReturnValueOnce(false).mockReturnValueOnce(true); // Initially untrusted, then trusted
     const { result } = renderHook(() =>
-      useFolderTrust(mockSettings, mockConfig, onTrustChange),
+      useFolderTrust(mockSettings, onTrustChange),
     );
 
     act(() => {
@@ -188,7 +179,7 @@ describe('useFolderTrust', () => {
       .mockReturnValueOnce(undefined)
       .mockReturnValueOnce(true); // Initially undefined, then trust
     const { result } = renderHook(() =>
-      useFolderTrust(mockSettings, mockConfig, onTrustChange),
+      useFolderTrust(mockSettings, onTrustChange),
     );
 
     act(() => {

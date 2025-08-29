@@ -17,6 +17,6 @@ export {
   IdeConnectionEvent,
   IdeConnectionType,
 } from './src/telemetry/types.js';
-export { getIdeWorkspaceTrustOverride } from './src/utils/trust.js';
+export { getIdeTrust } from './src/utils/ide-trust.js';
 export { makeFakeConfig } from './src/test-utils/config.js';
 export * from './src/utils/pathReader.js';

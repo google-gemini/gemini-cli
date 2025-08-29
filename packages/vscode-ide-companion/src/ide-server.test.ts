@@ -102,7 +102,7 @@ describe('IDEServer', () => {
     await ideServer.start(mockContext);
 
     const replaceMock = mockContext.environmentVariableCollection.replace;
-    expect(replaceMock).toHaveBeenCalledTimes(3);
+    expect(replaceMock).toHaveBeenCalledTimes(2);
 
     expect(replaceMock).toHaveBeenNthCalledWith(
       1,
@@ -119,12 +119,6 @@ describe('IDEServer', () => {
       2,
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
       expectedWorkspacePaths,
-    );
-
-    expect(replaceMock).toHaveBeenNthCalledWith(
-      3,
-      'GEMINI_CLI_IDE_WORKSPACE_TRUST',
-      'true',
     );
 
     const port = getPortFromMock(replaceMock);

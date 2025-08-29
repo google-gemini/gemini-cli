@@ -256,36 +256,46 @@ describe('isWorkspaceTrusted', () => {
   });
 });
 
+import { getIdeTrust } from '@google/gemini-cli-core';
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    getIdeTrust: vi.fn(),
+  };
+});
+
 describe('isWorkspaceTrusted with IDE override', () => {
   const mockSettings: Settings = {
-    folderTrustFeature: true,
-    folderTrust: true,
+    security: {
+      folderTrust: {
+        featureEnabled: true,
+        enabled: true,
+      },
+    },
   };
 
-  afterEach(() => {
-    delete process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'];
-  });
-
-  it('should return true when env var is "true", ignoring config', () => {
-    process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'] = 'true';
-    // Even if config says don't trust, env var should win.
+  it('should return true when ideTrust is true, ignoring config', () => {
+    vi.mocked(getIdeTrust).mockReturnValue(true);
+    // Even if config says don't trust, ideTrust should win.
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({ [process.cwd()]: TrustLevel.DO_NOT_TRUST }),
     );
     expect(isWorkspaceTrusted(mockSettings)).toBe(true);
   });
 
-  it('should return false when env var is "false", ignoring config', () => {
-    process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'] = 'false';
-    // Even if config says trust, env var should win.
+  it('should return false when ideTrust is false, ignoring config', () => {
+    vi.mocked(getIdeTrust).mockReturnValue(false);
+    // Even if config says trust, ideTrust should win.
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({ [process.cwd()]: TrustLevel.TRUST_FOLDER }),
     );
     expect(isWorkspaceTrusted(mockSettings)).toBe(false);
   });
 
-  it('should fall back to config when env var is undefined', () => {
-    delete process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'];
+  it('should fall back to config when ideTrust is undefined', () => {
+    vi.mocked(getIdeTrust).mockReturnValue(undefined);
     vi.spyOn(fs, 'existsSync').mockReturnValue(true);
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({ [process.cwd()]: TrustLevel.TRUST_FOLDER }),
@@ -293,30 +303,29 @@ describe('isWorkspaceTrusted with IDE override', () => {
     expect(isWorkspaceTrusted(mockSettings)).toBe(true);
   });
 
-  it('should fall back to config when env var is an empty string', () => {
-    process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'] = '';
-    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-    vi.spyOn(fs, 'readFileSync').mockReturnValue(
-      JSON.stringify({ [process.cwd()]: TrustLevel.TRUST_FOLDER }),
-    );
-    expect(isWorkspaceTrusted(mockSettings)).toBe(true);
-  });
-
-  it('should always return true if folderTrustFeature is disabled', () => {
+  it('should always return true if folderTrust feature is disabled', () => {
     const settings: Settings = {
-      folderTrustFeature: false,
-      folderTrust: true,
+      security: {
+        folderTrust: {
+          featureEnabled: false,
+          enabled: true,
+        },
+      },
     };
-    process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'] = 'false';
+    vi.mocked(getIdeTrust).mockReturnValue(false);
     expect(isWorkspaceTrusted(settings)).toBe(true);
   });
 
   it('should always return true if folderTrust setting is disabled', () => {
     const settings: Settings = {
-      folderTrustFeature: true,
-      folderTrust: false,
+      security: {
+        folderTrust: {
+          featureEnabled: true,
+          enabled: false,
+        },
+      },
     };
-    process.env['GEMINI_CLI_IDE_WORKSPACE_TRUST'] = 'false';
+    vi.mocked(getIdeTrust).mockReturnValue(false);
     expect(isWorkspaceTrusted(settings)).toBe(true);
   });
 });
