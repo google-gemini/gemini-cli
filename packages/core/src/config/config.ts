@@ -58,6 +58,7 @@ import type { PermissionRepository } from '../permissions/PermissionRepository.j
 import { ConfigPermissionRepository } from '../permissions/ConfigPermissionRepository.js';
 import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
 import { MemoryToolInvocation } from '../tools/memoryTool.js';
+import type { EventEmitter } from 'node:events';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -211,13 +212,14 @@ export interface ConfigParameters {
   skipNextSpeakerCheck?: boolean;
   extensionManagement?: boolean;
   enablePromptCompletion?: boolean;
+  eventEmitter?: EventEmitter;
 }
 
 export class Config {
   private toolRegistry!: ToolRegistry;
   private permissionRepository!: PermissionRepository;
   private promptRegistry!: PromptRegistry;
-  private sessionId: string;
+  private readonly sessionId: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private readonly embeddingModel: string;
@@ -287,6 +289,7 @@ export class Config {
   private initialized: boolean = false;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
+  private readonly eventEmitter?: EventEmitter;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -361,6 +364,7 @@ export class Config {
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
+    this.eventEmitter = params.eventEmitter;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -440,10 +444,6 @@ export class Config {
 
   getSessionId(): string {
     return this.sessionId;
-  }
-
-  setSessionId(sessionId: string): void {
-    this.sessionId = sessionId;
   }
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
@@ -587,7 +587,7 @@ export class Config {
   }
 
   setApprovalMode(mode: ApprovalMode): void {
-    if (this.isTrustedFolder() === false && mode !== ApprovalMode.DEFAULT) {
+    if (!this.isTrustedFolder() && mode !== ApprovalMode.DEFAULT) {
       throw new Error(
         'Cannot enable privileged approval modes in an untrusted folder.',
       );
@@ -745,8 +745,18 @@ export class Config {
     return this.folderTrust;
   }
 
-  isTrustedFolder(): boolean | undefined {
-    return this.trustedFolder;
+  isTrustedFolder(): boolean {
+    // isWorkspaceTrusted in cli/src/config/trustedFolder.js returns undefined
+    // when the file based trust value is unavailable, since it is mainly used
+    // in the initialization for trust dialogs, etc. Here we return true since
+    // config.isTrustedFolder() is used for the main business logic of blocking
+    // tool calls etc in the rest of the application.
+    //
+    // Default value is true since we load with trusted settings to avoid
+    // restarts in the more common path. If the user chooses to mark the folder
+    // as untrusted, the CLI will restart and we will have the trust value
+    // reloaded.
+    return this.trustedFolder ?? true;
   }
 
   setIdeMode(value: boolean): void {
@@ -826,7 +836,7 @@ export class Config {
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this);
+    const registry = new ToolRegistry(this, this.eventEmitter);
 
     // helper to create & register core tools that are enabled
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
