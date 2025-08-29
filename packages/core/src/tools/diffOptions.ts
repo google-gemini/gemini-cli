@@ -5,7 +5,7 @@
  */
 
 import * as Diff from 'diff';
-import { DiffStat } from './tools.js';
+import type { DiffStat } from './tools.js';
 
 export const DEFAULT_DIFF_OPTIONS: Diff.PatchOptions = {
   context: 3,

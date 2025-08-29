@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ToolCallRequestInfo, ToolCallResponseInfo, Config } from '../index.js';
+import type {
+  ToolCallRequestInfo,
+  ToolCallResponseInfo,
+  Config,
+} from '../index.js';
 import { CoreToolScheduler } from './coreToolScheduler.js';
 
 /**
