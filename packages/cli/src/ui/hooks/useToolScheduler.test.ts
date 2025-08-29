@@ -62,6 +62,7 @@ const mockConfig = {
     model: 'test-model',
     authType: 'oauth-personal',
   }),
+  getGeminiClient: () => null, // No client needed for these tests
 } as unknown as Config;
 
 class MockToolInvocation extends BaseToolInvocation<object, ToolResult> {

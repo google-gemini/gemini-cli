@@ -947,12 +947,47 @@ export class CoreToolScheduler {
   }
 
   private async checkAndNotifyCompletion(): Promise<void> {
-    const allCallsAreTerminal = this.toolCalls.every(
-      (call) =>
-        call.status === 'success' ||
-        call.status === 'error' ||
-        call.status === 'cancelled',
-    );
+    const isToolCallTerminal = (call: ToolCall) =>
+      call.status === 'success' ||
+      call.status === 'error' ||
+      call.status === 'cancelled';
+    const allCallsAreTerminal = this.toolCalls.every(isToolCallTerminal);
+
+    // Record all tool calls in their final state
+    const chatRecordingService = this.config
+      .getGeminiClient()
+      ?.getChatRecordingService();
+    if (chatRecordingService) {
+      const toolRegistry = await this.toolRegistry;
+
+      chatRecordingService.recordToolCalls(
+        this.toolCalls.map((c) => {
+          // Get UI data from tool registry
+          const toolInstance = toolRegistry.getTool(c.request.name);
+          const displayName = toolInstance?.displayName || c.request.name;
+          const description = toolInstance?.description || '';
+          const renderOutputAsMarkdown =
+            toolInstance?.isOutputMarkdown || false;
+          const resultDisplayRaw =
+            'response' in c ? c.response?.resultDisplay : undefined;
+          const resultDisplay =
+            typeof resultDisplayRaw === 'string' ? resultDisplayRaw : undefined;
+
+          return {
+            id: c.request.callId,
+            name: c.request.name,
+            args: c.request.args,
+            result: isToolCallTerminal(c) ? c.response?.responseParts : null,
+            status: c.status,
+            timestamp: new Date().toISOString(),
+            displayName,
+            description,
+            resultDisplay,
+            renderOutputAsMarkdown,
+          };
+        }),
+      );
+    }
 
     if (this.toolCalls.length > 0 && allCallsAreTerminal) {
       const completedCalls = [...this.toolCalls] as CompletedToolCall[];
