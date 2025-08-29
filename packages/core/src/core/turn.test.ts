@@ -445,6 +445,170 @@ describe('Turn', () => {
       ]);
     });
 
+    it('should yield citation and finished events when response has citationMetadata', async () => {
+      const mockResponseStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'Some text.' }] },
+              citationMetadata: {
+                citations: [
+                  {
+                    uri: 'https://example.com/source1',
+                    title: 'Source 1 Title',
+                  },
+                ],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      for await (const event of turn.run(
+        [{ text: 'Test citations' }],
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([
+        { type: GeminiEventType.Content, value: 'Some text.' },
+        {
+          type: GeminiEventType.Citation,
+          value: 'Citations:\n(Source 1 Title) https://example.com/source1',
+        },
+        { type: GeminiEventType.Finished, value: 'STOP' },
+      ]);
+    });
+
+    it('should yield a single citation event for multiple citations in one response', async () => {
+      const mockResponseStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'Some text.' }] },
+              citationMetadata: {
+                citations: [
+                  {
+                    uri: 'https://example.com/source2',
+                    title: 'Title2',
+                  },
+                  {
+                    uri: 'https://example.com/source1',
+                    title: 'Title1',
+                  },
+                ],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      for await (const event of turn.run(
+        [{ text: 'test' }],
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([
+        { type: GeminiEventType.Content, value: 'Some text.' },
+        {
+          type: GeminiEventType.Citation,
+          value:
+            'Citations:\n(Title1) https://example.com/source1\n(Title2) https://example.com/source2',
+        },
+        { type: GeminiEventType.Finished, value: 'STOP' },
+      ]);
+    });
+
+    it('should not yield citation event if there is no finish reason', async () => {
+      const mockResponseStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'Some text.' }] },
+              citationMetadata: {
+                citations: [
+                  {
+                    uri: 'https://example.com/source1',
+                    title: 'Source 1 Title',
+                  },
+                ],
+              },
+              // No finishReason
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      for await (const event of turn.run(
+        [{ text: 'test' }],
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([
+        { type: GeminiEventType.Content, value: 'Some text.' },
+      ]);
+      // No Citation or Finished event
+      expect(events.some((e) => e.type === GeminiEventType.Citation)).toBe(
+        false,
+      );
+    });
+
+    it('should ignore citations without a URI', async () => {
+      const mockResponseStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'Some text.' }] },
+              citationMetadata: {
+                citations: [
+                  {
+                    uri: 'https://example.com/source1',
+                    title: 'Good Source',
+                  },
+                  {
+                    // uri is undefined
+                    title: 'Bad Source',
+                  },
+                ],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      for await (const event of turn.run(
+        [{ text: 'test' }],
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      expect(events).toEqual([
+        { type: GeminiEventType.Content, value: 'Some text.' },
+        {
+          type: GeminiEventType.Citation,
+          value: 'Citations:\n(Good Source) https://example.com/source1',
+        },
+        { type: GeminiEventType.Finished, value: 'STOP' },
+      ]);
+    });
+
     it('should not crash when cancelled request has malformed error', async () => {
       const abortController = new AbortController();
 
