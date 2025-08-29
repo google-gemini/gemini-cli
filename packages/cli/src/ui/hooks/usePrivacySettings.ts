@@ -5,8 +5,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import type { Config } from '@google/gemini-cli-core';
 import {
-  Config,
   CodeAssistServer,
   UserTierId,
   LoggingContentGenerator,

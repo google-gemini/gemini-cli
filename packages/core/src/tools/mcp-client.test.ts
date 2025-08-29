@@ -12,16 +12,17 @@ import {
   isEnabled,
   hasValidTypes,
   McpClient,
+  hasNetworkTransport,
 } from './mcp-client.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
 import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import * as GenAiLib from '@google/genai';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
-import { AuthProviderType } from '../config/config.js';
-import { PromptRegistry } from '../prompts/prompt-registry.js';
-import { ToolRegistry } from './tool-registry.js';
-import { WorkspaceContext } from '../utils/workspaceContext.js';
+import { AuthProviderType, type Config } from '../config/config.js';
+import type { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { ToolRegistry } from './tool-registry.js';
+import type { WorkspaceContext } from '../utils/workspaceContext.js';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -73,7 +74,7 @@ describe('mcp-client', () => {
         false,
       );
       await client.connect();
-      await client.discover();
+      await client.discover({} as Config);
       expect(mockedMcpToTool).toHaveBeenCalledOnce();
     });
 
@@ -135,7 +136,7 @@ describe('mcp-client', () => {
         false,
       );
       await client.connect();
-      await client.discover();
+      await client.discover({} as Config);
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
       expect(consoleWarnSpy).toHaveBeenCalledOnce();
       expect(consoleWarnSpy).toHaveBeenCalledWith(
@@ -179,7 +180,7 @@ describe('mcp-client', () => {
         false,
       );
       await client.connect();
-      await expect(client.discover()).rejects.toThrow(
+      await expect(client.discover({} as Config)).rejects.toThrow(
         'No prompts or tools found on the server.',
       );
       expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -564,6 +565,36 @@ describe('mcp-client', () => {
         properties: {},
       };
       expect(hasValidTypes(schema)).toBe(true);
+    });
+  });
+
+  describe('hasNetworkTransport', () => {
+    it('should return true if only url is provided', () => {
+      const config = { url: 'http://example.com' };
+      expect(hasNetworkTransport(config)).toBe(true);
+    });
+
+    it('should return true if only httpUrl is provided', () => {
+      const config = { httpUrl: 'http://example.com' };
+      expect(hasNetworkTransport(config)).toBe(true);
+    });
+
+    it('should return true if both url and httpUrl are provided', () => {
+      const config = {
+        url: 'http://example.com/sse',
+        httpUrl: 'http://example.com/http',
+      };
+      expect(hasNetworkTransport(config)).toBe(true);
+    });
+
+    it('should return false if neither url nor httpUrl is provided', () => {
+      const config = { command: 'do-something' };
+      expect(hasNetworkTransport(config)).toBe(false);
+    });
+
+    it('should return false for an empty config object', () => {
+      const config = {};
+      expect(hasNetworkTransport(config)).toBe(false);
     });
   });
 });

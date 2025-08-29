@@ -15,8 +15,9 @@ import {
   DiscoveredMCPTool,
 } from '@google/gemini-cli-core';
 
-import { MessageActionReturn } from './types.js';
-import { Type, CallableTool } from '@google/genai';
+import type { MessageActionReturn } from './types.js';
+import type { CallableTool } from '@google/genai';
+import { Type } from '@google/genai';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -83,7 +84,7 @@ describe('mcpCommand', () => {
 
     // Create mock config with all necessary methods
     mockConfig = {
-      getToolRegistry: vi.fn().mockResolvedValue({
+      getToolRegistry: vi.fn().mockReturnValue({
         getAllTools: vi.fn().mockReturnValue([]),
       }),
       getMcpServers: vi.fn().mockReturnValue({}),
@@ -119,7 +120,7 @@ describe('mcpCommand', () => {
     });
 
     it('should show an error if tool registry is not available', async () => {
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue(undefined);
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue(undefined);
 
       const result = await mcpCommand.action!(mockContext, '');
 
@@ -133,7 +134,7 @@ describe('mcpCommand', () => {
 
   describe('no MCP servers configured', () => {
     beforeEach(() => {
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue({
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
         getAllTools: vi.fn().mockReturnValue([]),
       });
       mockConfig.getMcpServers = vi.fn().mockReturnValue({});
@@ -184,7 +185,7 @@ describe('mcpCommand', () => {
         ...mockServer3Tools,
       ];
 
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue({
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
         getAllTools: vi.fn().mockReturnValue(allTools),
       });
 
@@ -243,7 +244,7 @@ describe('mcpCommand', () => {
         createMockMCPTool('tool2', 'server1', 'This is tool 2 description'),
       ];
 
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue({
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
         getAllTools: vi.fn().mockReturnValue(mockServerTools),
       });
 
@@ -296,7 +297,7 @@ describe('mcpCommand', () => {
         createMockMCPTool('tool1', 'server1', 'This is tool 1 description'),
       ];
 
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue({
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
         getAllTools: vi.fn().mockReturnValue(mockServerTools),
       });
 
@@ -340,7 +341,7 @@ describe('mcpCommand', () => {
       // Mock tools - only server1 has tools
       const mockServerTools = [createMockMCPTool('server1_tool1', 'server1')];
 
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue({
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
         getAllTools: vi.fn().mockReturnValue(mockServerTools),
       });
 
@@ -386,7 +387,7 @@ describe('mcpCommand', () => {
         createMockMCPTool('server2_tool1', 'server2'),
       ];
 
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue({
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
         getAllTools: vi.fn().mockReturnValue(mockServerTools),
       });
 
@@ -523,7 +524,7 @@ describe('mcpCommand', () => {
 
       const mockServerTools = [tool1, tool2];
 
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue({
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
         getAllTools: vi.fn().mockReturnValue(mockServerTools),
       });
 
@@ -566,7 +567,7 @@ describe('mcpCommand', () => {
         createMockMCPTool('tool1', 'server1', 'Tool without schema'),
       ];
 
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue({
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
         getAllTools: vi.fn().mockReturnValue(mockServerTools),
       });
 
@@ -603,7 +604,7 @@ describe('mcpCommand', () => {
         createMockMCPTool('tool1', 'server1', 'Test tool'),
       ];
 
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue({
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
         getAllTools: vi.fn().mockReturnValue(mockServerTools),
       });
     });
@@ -766,7 +767,7 @@ describe('mcpCommand', () => {
       };
 
       mockConfig.getMcpServers = vi.fn().mockReturnValue(mockMcpServers);
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue({
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
         getAllTools: vi.fn().mockReturnValue([]),
       });
 
@@ -787,7 +788,7 @@ describe('mcpCommand', () => {
       };
 
       mockConfig.getMcpServers = vi.fn().mockReturnValue(mockMcpServers);
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue({
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
         getAllTools: vi.fn().mockReturnValue([]),
       });
 
@@ -879,7 +880,7 @@ describe('mcpCommand', () => {
                 oauth: { enabled: true },
               },
             }),
-            getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
+            getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
             getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
             getPromptRegistry: vi.fn().mockResolvedValue({
               removePromptsByServer: vi.fn(),
@@ -984,7 +985,7 @@ describe('mcpCommand', () => {
           config: {
             getMcpServers: vi.fn().mockReturnValue({ server1: {} }),
             getBlockedMcpServers: vi.fn().mockReturnValue([]),
-            getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
+            getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
             getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
             getPromptRegistry: vi.fn().mockResolvedValue({
               getPromptsByServer: vi.fn().mockReturnValue([]),
@@ -1040,7 +1041,7 @@ describe('mcpCommand', () => {
     });
 
     it('should show an error if tool registry is not available', async () => {
-      mockConfig.getToolRegistry = vi.fn().mockResolvedValue(undefined);
+      mockConfig.getToolRegistry = vi.fn().mockReturnValue(undefined);
 
       const refreshCommand = mcpCommand.subCommands?.find(
         (cmd) => cmd.name === 'refresh',

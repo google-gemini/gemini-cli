@@ -4,24 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import * as Diff from 'diff';
-import { Config, ApprovalMode } from '../config/config.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
+import type {
   FileDiff,
-  Kind,
   ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
   ToolEditConfirmationDetails,
   ToolInvocation,
   ToolLocation,
   ToolResult,
 } from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  ToolConfirmationOutcome,
+} from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import {
@@ -29,13 +31,16 @@ import {
   ensureCorrectFileContent,
 } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
-import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
+import type {
+  ModifiableDeclarativeTool,
+  ModifyContext,
+} from './modifiable-tool.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
-import {
-  recordFileOperationMetric,
-  FileOperation,
-} from '../telemetry/metrics.js';
+import { FileOperation } from '../telemetry/metrics.js';
 import { IDEConnectionStatus } from '../ide/ide-client.js';
+import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
+import { logFileOperation } from '../telemetry/loggers.js';
+import { FileOperationEvent } from '../telemetry/types.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -315,23 +320,32 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       const lines = fileContent.split('\n').length;
       const mimetype = getSpecificMimeType(file_path);
       const extension = path.extname(file_path); // Get extension
+      const programming_language = getProgrammingLanguage({ file_path });
       if (isNewFile) {
-        recordFileOperationMetric(
+        logFileOperation(
           this.config,
-          FileOperation.CREATE,
-          lines,
-          mimetype,
-          extension,
-          diffStat,
+          new FileOperationEvent(
+            WriteFileTool.Name,
+            FileOperation.CREATE,
+            lines,
+            mimetype,
+            extension,
+            diffStat,
+            programming_language,
+          ),
         );
       } else {
-        recordFileOperationMetric(
+        logFileOperation(
           this.config,
-          FileOperation.UPDATE,
-          lines,
-          mimetype,
-          extension,
-          diffStat,
+          new FileOperationEvent(
+            WriteFileTool.Name,
+            FileOperation.UPDATE,
+            lines,
+            mimetype,
+            extension,
+            diffStat,
+            programming_language,
+          ),
         );
       }
 
@@ -417,17 +431,9 @@ export class WriteFileTool
     );
   }
 
-  protected override validateToolParams(
+  protected override validateToolParamValues(
     params: WriteFileToolParams,
   ): string | null {
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
-    }
-
     const filePath = params.file_path;
 
     if (!filePath) {

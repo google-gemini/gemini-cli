@@ -11,7 +11,7 @@ import { getProjectHash } from '../utils/paths.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { PartListUnion } from '@google/genai';
+import type { PartListUnion } from '@google/genai';
 
 /**
  * Token usage summary for a message or conversation.
@@ -136,7 +136,10 @@ export class ChatRecordingService {
         this.cachedLastConvData = null;
       } else {
         // Create new session
-        const chatsDir = path.join(this.config.getProjectTempDir(), 'chats');
+        const chatsDir = path.join(
+          this.config.storage.getProjectTempDir(),
+          'chats',
+        );
         fs.mkdirSync(chatsDir, { recursive: true });
 
         const timestamp = new Date()
@@ -422,7 +425,10 @@ export class ChatRecordingService {
    */
   deleteSession(sessionId: string): void {
     try {
-      const chatsDir = path.join(this.config.getProjectTempDir(), 'chats');
+      const chatsDir = path.join(
+        this.config.storage.getProjectTempDir(),
+        'chats',
+      );
       const sessionPath = path.join(chatsDir, `${sessionId}.json`);
       fs.unlinkSync(sessionPath);
     } catch (error) {

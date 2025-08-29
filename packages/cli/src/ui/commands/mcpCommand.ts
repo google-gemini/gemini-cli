@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   SlashCommand,
   SlashCommandActionReturn,
   CommandContext,
-  CommandKind,
   MessageActionReturn,
 } from './types.js';
+import { CommandKind } from './types.js';
+import type { DiscoveredMCPPrompt } from '@google/gemini-cli-core';
 import {
-  DiscoveredMCPPrompt,
   DiscoveredMCPTool,
   getMCPDiscoveryState,
   getMCPServerStatus,
@@ -44,7 +44,7 @@ const getMcpStatus = async (
     };
   }
 
-  const toolRegistry = await config.getToolRegistry();
+  const toolRegistry = config.getToolRegistry();
   if (!toolRegistry) {
     return {
       type: 'message',
@@ -400,7 +400,7 @@ const authCommand: SlashCommand = {
       );
 
       // Trigger tool re-discovery to pick up authenticated server
-      const toolRegistry = await config.getToolRegistry();
+      const toolRegistry = config.getToolRegistry();
       if (toolRegistry) {
         context.ui.addItem(
           {
@@ -485,7 +485,7 @@ const refreshCommand: SlashCommand = {
       };
     }
 
-    const toolRegistry = await config.getToolRegistry();
+    const toolRegistry = config.getToolRegistry();
     if (!toolRegistry) {
       return {
         type: 'message',

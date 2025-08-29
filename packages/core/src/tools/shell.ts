@@ -4,28 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import crypto from 'crypto';
-import { Config } from '../config/config.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
+import fs from 'node:fs';
+import path from 'node:path';
+import os, { EOL } from 'node:os';
+import crypto from 'node:crypto';
+import type { Config } from '../config/config.js';
+import { ToolErrorType } from './tool-error.js';
+import type {
   ToolInvocation,
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
+} from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
 } from './tools.js';
-import { SchemaValidator } from '../utils/schemaValidator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
-import {
-  ShellExecutionService,
-  ShellOutputEvent,
-} from '../services/shellExecutionService.js';
+import type { ShellOutputEvent } from '../services/shellExecutionService.js';
+import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import {
   getCommandRoots,
@@ -97,6 +97,8 @@ class ShellToolInvocation extends BaseToolInvocation<
   async execute(
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
+    terminalColumns?: number,
+    terminalRows?: number,
   ): Promise<ToolResult> {
     const strippedCommand = stripShellWrapper(this.params.command);
 
@@ -129,13 +131,11 @@ class ShellToolInvocation extends BaseToolInvocation<
         this.params.directory || '',
       );
 
-      let cumulativeStdout = '';
-      let cumulativeStderr = '';
-
+      let cumulativeOutput = '';
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
 
-      const { result: resultPromise } = ShellExecutionService.execute(
+      const { result: resultPromise } = await ShellExecutionService.execute(
         commandToExecute,
         cwd,
         (event: ShellOutputEvent) => {
@@ -148,15 +148,9 @@ class ShellToolInvocation extends BaseToolInvocation<
 
           switch (event.type) {
             case 'data':
-              if (isBinaryStream) break; // Don't process text if we are in binary mode
-              if (event.stream === 'stdout') {
-                cumulativeStdout += event.chunk;
-              } else {
-                cumulativeStderr += event.chunk;
-              }
-              currentDisplayOutput =
-                cumulativeStdout +
-                (cumulativeStderr ? `\n${cumulativeStderr}` : '');
+              if (isBinaryStream) break;
+              cumulativeOutput = event.chunk;
+              currentDisplayOutput = cumulativeOutput;
               if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
                 shouldUpdate = true;
               }
@@ -187,6 +181,9 @@ class ShellToolInvocation extends BaseToolInvocation<
           }
         },
         signal,
+        this.config.getShouldUseNodePtyShell(),
+        terminalColumns,
+        terminalRows,
       );
 
       const result = await resultPromise;
@@ -196,7 +193,7 @@ class ShellToolInvocation extends BaseToolInvocation<
         if (fs.existsSync(tempFilePath)) {
           const pgrepLines = fs
             .readFileSync(tempFilePath, 'utf8')
-            .split('\n')
+            .split(EOL)
             .filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
@@ -218,7 +215,7 @@ class ShellToolInvocation extends BaseToolInvocation<
       if (result.aborted) {
         llmContent = 'Command was cancelled by user before it could complete.';
         if (result.output.trim()) {
-          llmContent += ` Below is the output (on stdout and stderr) before it was cancelled:\n${result.output}`;
+          llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
@@ -232,8 +229,7 @@ class ShellToolInvocation extends BaseToolInvocation<
         llmContent = [
           `Command: ${this.params.command}`,
           `Directory: ${this.params.directory || '(root)'}`,
-          `Stdout: ${result.stdout || '(empty)'}`,
-          `Stderr: ${result.stderr || '(empty)'}`,
+          `Output: ${result.output || '(empty)'}`,
           `Error: ${finalError}`, // Use the cleaned error string.
           `Exit Code: ${result.exitCode ?? '(none)'}`,
           `Signal: ${result.signal ?? '(none)'}`,
@@ -268,6 +264,14 @@ class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const summarizeConfig = this.config.getSummarizeToolOutputConfig();
+      const executionError = result.error
+        ? {
+            error: {
+              message: result.error.message,
+              type: ToolErrorType.SHELL_EXECUTE_ERROR,
+            },
+          }
+        : {};
       if (summarizeConfig && summarizeConfig[ShellTool.Name]) {
         const summary = await summarizeToolOutput(
           llmContent,
@@ -278,12 +282,14 @@ class ShellToolInvocation extends BaseToolInvocation<
         return {
           llmContent: summary,
           returnDisplay: returnDisplayMessage,
+          ...executionError,
         };
       }
 
       return {
         llmContent,
         returnDisplay: returnDisplayMessage,
+        ...executionError,
       };
     } finally {
       if (fs.existsSync(tempFilePath)) {
@@ -361,7 +367,7 @@ export class ShellTool extends BaseDeclarativeTool<
     );
   }
 
-  protected override validateToolParams(
+  protected override validateToolParamValues(
     params: ShellToolParams,
   ): string | null {
     const commandCheck = isCommandAllowed(params.command, this.config);
@@ -373,13 +379,6 @@ export class ShellTool extends BaseDeclarativeTool<
         return `Command is not allowed: ${params.command}`;
       }
       return commandCheck.reason;
-    }
-    const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
-      params,
-    );
-    if (errors) {
-      return errors;
     }
     if (!params.command.trim()) {
       return 'Command cannot be empty.';

@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { FunctionDeclaration, PartListUnion } from '@google/genai';
+import type { FunctionDeclaration, PartListUnion } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
-import { DiffUpdateResult } from '../ide/ideContext.js';
+import type { DiffUpdateResult } from '../ide/ideContext.js';
+import { SchemaValidator } from '../utils/schemaValidator.js';
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -23,6 +24,7 @@ export interface ToolInvocation<
 
   /**
    * Gets a pre-execution description of the tool operation.
+   *
    * @returns A markdown string describing what the tool will do.
    */
   getDescription(): string;
@@ -170,7 +172,7 @@ export abstract class DeclarativeTool<
    * @param params The raw parameters from the model.
    * @returns An error message string if invalid, null otherwise.
    */
-  protected validateToolParams(_params: TParams): string | null {
+  validateToolParams(_params: TParams): string | null {
     // Base implementation can be extended by subclasses.
     return null;
   }
@@ -278,6 +280,23 @@ export abstract class BaseDeclarativeTool<
     return this.createInvocation(params);
   }
 
+  override validateToolParams(params: TParams): string | null {
+    const errors = SchemaValidator.validate(
+      this.schema.parametersJsonSchema,
+      params,
+    );
+
+    if (errors) {
+      return errors;
+    }
+    return this.validateToolParamValues(params);
+  }
+
+  protected validateToolParamValues(_params: TParams): string | null {
+    // Base implementation can be extended by subclasses.
+    return null;
+  }
+
   protected abstract createInvocation(
     params: TParams,
   ): ToolInvocation<TParams, TResult>;
@@ -288,12 +307,22 @@ export abstract class BaseDeclarativeTool<
  */
 export type AnyDeclarativeTool = DeclarativeTool<object, ToolResult>;
 
+/**
+ * Type guard to check if an object is a Tool.
+ * @param obj The object to check.
+ * @returns True if the object is a Tool, false otherwise.
+ */
+export function isTool(obj: unknown): obj is AnyDeclarativeTool {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'name' in obj &&
+    'build' in obj &&
+    typeof (obj as AnyDeclarativeTool).build === 'function'
+  );
+}
+
 export interface ToolResult {
-  /**
-   * A short, one-line summary of the tool's action and result.
-   * e.g., "Read 5 files", "Wrote 256 bytes to foo.txt"
-   */
-  summary?: string;
   /**
    * Content meant to be included in LLM history.
    * This should represent the factual outcome of the tool execution.

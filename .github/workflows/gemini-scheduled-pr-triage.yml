@@ -28,6 +28,8 @@ jobs:
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
+          permission-pull-requests: 'write'
 
       - name: 'Run PR Triage Script'
         id: 'run_triage'

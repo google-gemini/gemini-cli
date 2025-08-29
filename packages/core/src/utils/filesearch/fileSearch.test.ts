@@ -32,6 +32,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -57,6 +58,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -84,6 +86,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -112,6 +115,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -144,6 +148,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -167,6 +172,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -201,6 +207,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -230,6 +237,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -259,6 +267,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     // Expect no errors to be thrown during initialization
@@ -285,6 +294,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -310,12 +320,67 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
     const results = await fileSearch.search('sst');
 
     expect(results).toEqual(['src/style.css']);
+  });
+
+  it('should not use fzf for fuzzy matching when disableFuzzySearch is true', async () => {
+    tmpDir = await createTmpDir({
+      src: {
+        'file1.js': '',
+        'flexible.js': '',
+        'other.ts': '',
+      },
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: false,
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: true,
+    });
+
+    await fileSearch.initialize();
+    const results = await fileSearch.search('fle');
+
+    expect(results).toEqual(['src/flexible.js']);
+  });
+
+  it('should use fzf for fuzzy matching when disableFuzzySearch is false', async () => {
+    tmpDir = await createTmpDir({
+      src: {
+        'file1.js': '',
+        'flexible.js': '',
+        'other.ts': '',
+      },
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: false,
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
+    });
+
+    await fileSearch.initialize();
+    const results = await fileSearch.search('fle');
+
+    expect(results).toEqual(
+      expect.arrayContaining(['src/file1.js', 'src/flexible.js']),
+    );
   });
 
   it('should return empty array when no matches are found', async () => {
@@ -331,6 +396,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -361,6 +427,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await expect(fileSearch.search('')).rejects.toThrow(
@@ -382,6 +449,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -404,6 +472,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -427,6 +496,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -463,6 +533,7 @@ describe('FileSearch', () => {
       cache: true, // Enable caching for this test
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -502,6 +573,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -545,6 +617,7 @@ describe('FileSearch', () => {
       cache: true, // Ensure caching is enabled
       cacheTtl: 10000,
       enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
@@ -566,6 +639,36 @@ describe('FileSearch', () => {
     expect(limitedResults).toEqual(['file1.js', 'file2.js']);
   });
 
+  it('should handle file paths with special characters that need escaping', async () => {
+    tmpDir = await createTmpDir({
+      src: {
+        'file with (special) chars.txt': '',
+        'another-file.txt': '',
+      },
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      useGitignore: false,
+      useGeminiignore: false,
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      disableFuzzySearch: false,
+    });
+
+    await fileSearch.initialize();
+
+    // Search for the file using a pattern that contains special characters.
+    // The `unescapePath` function should handle the escaped path correctly.
+    const results = await fileSearch.search(
+      'src/file with \\(special\\) chars.txt',
+    );
+
+    expect(results).toEqual(['src/file with (special) chars.txt']);
+  });
+
   describe('DirectoryFileSearch', () => {
     it('should search for files in the current directory', async () => {
       tmpDir = await createTmpDir({
@@ -582,6 +685,7 @@ describe('FileSearch', () => {
         cache: false,
         cacheTtl: 0,
         enableRecursiveFileSearch: false,
+        disableFuzzySearch: false,
       });
 
       await fileSearch.initialize();
@@ -606,6 +710,7 @@ describe('FileSearch', () => {
         cache: false,
         cacheTtl: 0,
         enableRecursiveFileSearch: false,
+        disableFuzzySearch: false,
       });
 
       await fileSearch.initialize();
@@ -630,6 +735,7 @@ describe('FileSearch', () => {
         cache: false,
         cacheTtl: 0,
         enableRecursiveFileSearch: false,
+        disableFuzzySearch: false,
       });
 
       await fileSearch.initialize();
@@ -652,6 +758,7 @@ describe('FileSearch', () => {
         cache: false,
         cacheTtl: 0,
         enableRecursiveFileSearch: false,
+        disableFuzzySearch: false,
       });
 
       await fileSearch.initialize();
