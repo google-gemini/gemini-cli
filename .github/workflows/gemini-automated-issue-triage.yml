@@ -275,6 +275,7 @@ jobs:
             }
 
             const issueNumber = parseInt(process.env.ISSUE_NUMBER);
+            const explanation = parsedLabels.explanation || '';
 
             // Set labels based on triage result
             if (parsedLabels.labels_to_set && parsedLabels.labels_to_set.length > 0) {
@@ -284,12 +285,21 @@ jobs:
                 issue_number: issueNumber,
                 labels: parsedLabels.labels_to_set
               });
-              const explanation = parsedLabels.explanation ? ` - ${parsedLabels.explanation}` : '';
-              core.info(`Successfully set labels for #${issueNumber}: ${parsedLabels.labels_to_set.join(', ')}${explanation}`);
+              const explanationInfo = explanation ? ` - ${explanation}` : '';
+              core.info(`Successfully set labels for #${issueNumber}: ${parsedLabels.labels_to_set.join(', ')}${explanationInfo}`);
             } else {
               // If no labels to set, leave the issue as is
-              const explanation = parsedLabels.explanation ? ` - ${parsedLabels.explanation}` : '';
-              core.info(`No labels to set for #${issueNumber}, leaving as is${explanation}`);
+              const explanationInfo = explanation ? ` - ${explanation}` : '';
+              core.info(`No labels to set for #${issueNumber}, leaving as is${explanationInfo}`);
+            }
+
+            if (explanation) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: explanation,
+              });
             }
 
       - name: 'Post Issue Analysis Failure Comment'

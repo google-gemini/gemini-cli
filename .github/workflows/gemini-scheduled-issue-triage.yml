@@ -309,6 +309,15 @@ jobs:
                 core.info(`Successfully removed labels for #${issueNumber}: ${entry.labels_to_remove.join(', ')}`);
               }
 
+              if (entry.explanation) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  body: entry.explanation,
+                });
+              }
+
               if ((!entry.labels_to_add || entry.labels_to_add.length === 0) && (!entry.labels_to_remove || entry.labels_to_remove.length === 0)) {
                 core.info(`No labels to add or remove for #${issueNumber}, leaving as is`);
               }
