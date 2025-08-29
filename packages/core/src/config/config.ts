@@ -726,6 +726,10 @@ export class Config {
     return this.folderTrustFeature;
   }
 
+  /**
+   * Returns 'true' if the workspace is considered "trusted".
+   * 'false' for untrusted.
+   */
   getFolderTrust(): boolean {
     return this.folderTrust;
   }
