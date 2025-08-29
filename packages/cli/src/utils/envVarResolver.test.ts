@@ -274,7 +274,7 @@ describe('resolveEnvVarsInObject', () => {
       value: '$NESTED_VAR',
     };
 
-    const result = resolveEnvVarsInObject(config)
+    const result = resolveEnvVarsInObject(config);
 
     expect(result.value).toBe('nested-resolved');
     expect(result.primary.name).toBe('nested-resolved');
