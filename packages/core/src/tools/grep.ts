@@ -10,8 +10,7 @@ import path from 'node:path';
 import { EOL } from 'node:os';
 import { spawn } from 'node:child_process';
 import { globStream } from 'glob';
-import type { ToolInvocation, ToolResult } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
@@ -637,6 +636,10 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
       new RegExp(params.pattern);
     } catch (error) {
       return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
+    }
+    // Prevent catastrophic (ReDoS-prone) regexes
+    if (!safeRegex(params.pattern)) {
+      return `The regular expression pattern provided is potentially unsafe or vulnerable to ReDoS (catastrophic backtracking): ${params.pattern}`;
     }
 
     // Only validate path if one is provided
