@@ -53,8 +53,8 @@ export type ContentGeneratorConfig = {
   model: string;
   apiKey?: string;
   vertexai?: boolean;
-  authType?: AuthType | undefined;
-  proxy?: string | undefined;
+  authType?: AuthType;
+  proxy?: string;
 };
 
 export function createContentGeneratorConfig(
