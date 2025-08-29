@@ -50,7 +50,8 @@ jobs:
           echo '🏷️ Finding issues that need triage...'
           NEED_TRIAGE_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
             --search 'is:open is:issue label:\"status/need-triage\"' --json number,title,body)"
-          echo "NEED_TRIAGE_ISSUES: ${NEED_TRIAGE_ISSUES}"
+          echo "Command: gh issue list --repo \"${GITHUB_REPOSITORY}\" --search 'is:open is:issue label:\"status/needs-triage\"' --json                         │
+ │    number,title,body"
           echo '🔄 Merging and deduplicating issues...'
           ISSUES="$(echo "${NO_LABEL_ISSUES}" "${NEED_TRIAGE_ISSUES}" | jq -c -s 'add | unique_by(.number)')"
 
