@@ -51,7 +51,30 @@ The Gemini CLI uses the `mcpServers` configuration in your `settings.json` file 
 
 ### Configure the MCP server in settings.json
 
-You can configure MCP servers at the global level in the `~/.gemini/settings.json` file or in your project's root directory, create or open the `.gemini/settings.json` file. Within the file, add the `mcpServers` configuration block.
+You can configure MCP servers in your `settings.json` file in two main ways: through the top-level `mcpServers` object for specific server definitions, and through the `mcp` object for global settings that control server discovery and execution.
+
+#### Global MCP Settings (`mcp`)
+
+The `mcp` object in your `settings.json` allows you to define global rules for all MCP servers.
+
+- **`mcp.serverCommand`** (string): A global command to start an MCP server.
+- **`mcp.allowed`** (array of strings): A whitelist of MCP server names to allow. If this is set, only servers from this list (matching the keys in the `mcpServers` object) will be connected to.
+- **`mcp.excluded`** (array of strings): A blacklist of MCP server names to exclude. Servers in this list will not be connected to.
+
+**Example:**
+
+```json
+{
+  "mcp": {
+    "allowed": ["my-trusted-server"],
+    "excluded": ["experimental-server"]
+  }
+}
+```
+
+#### Server-Specific Configuration (`mcpServers`)
+
+The `mcpServers` object is where you define each individual MCP server you want the CLI to connect to.
 
 ### Configuration Structure
 
@@ -667,9 +690,13 @@ await server.connect(transport);
 This can be included in `settings.json` under `mcpServers` with:
 
 ```json
-"nodeServer": {
-  "command": "node",
-  "args": ["filename.ts"],
+{
+  "mcpServers": {
+    "nodeServer": {
+      "command": "node",
+      "args": ["filename.ts"]
+    }
+  }
 }
 ```
 
