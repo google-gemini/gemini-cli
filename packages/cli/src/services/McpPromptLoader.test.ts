@@ -233,11 +233,11 @@ describe('McpPromptLoader', () => {
         const context = {} as CommandContext;
         const suggestions = await completion(context, '');
         expect(suggestions).toEqual([
-          '--name=""',
-          '--age=""',
-          '--species=""',
-          '--enclosure=""',
-          '--trail=""',
+          '--name="',
+          '--age="',
+          '--species="',
+          '--enclosure="',
+          '--trail="',
         ]);
       });
 
@@ -268,7 +268,7 @@ describe('McpPromptLoader', () => {
         const context = {} as CommandContext;
         const suggestions = await completion(
           context,
-          '--name="test-name" --age="6" --species="tiger", --enclosure="Tiger Den" --trail="Jungle"',
+          '--name="test-name" --age="6" --species="tiger" --enclosure="Tiger Den" --trail="Jungle"',
         );
         expect(suggestions).toEqual([]);
       });

@@ -6,7 +6,11 @@
 
 import { useState, useEffect } from 'react';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
-import type { CommandContext, SlashCommand } from '../commands/types.js';
+import {
+  CommandKind,
+  type CommandContext,
+  type SlashCommand,
+} from '../commands/types.js';
 
 export interface UseSlashCompletionProps {
   enabled: boolean;
@@ -62,7 +66,12 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       const found: SlashCommand | undefined = currentLevel.find(
         (cmd) => cmd.name === part || cmd.altNames?.includes(part),
       );
-      if (found) {
+      // / add --numberOne="23" --numberTwo="45"
+      if (found && found.kind === CommandKind.MCP_PROMPT) {
+        leafCommand = found;
+        currentLevel = found.subCommands as readonly SlashCommand[] | undefined;
+        break;
+      } else if (found) {
         leafCommand = found;
         currentLevel = found.subCommands as readonly SlashCommand[] | undefined;
       } else {
