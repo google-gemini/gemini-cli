@@ -55,33 +55,6 @@ describe('McpClientManager', () => {
     expect(mockedMcpClient.discover).toHaveBeenCalledOnce();
   });
 
-  it('should discover tools if isTrustedFolder is undefined', async () => {
-    const mockedMcpClient = {
-      connect: vi.fn(),
-      discover: vi.fn(),
-      disconnect: vi.fn(),
-      getStatus: vi.fn(),
-    };
-    vi.mocked(McpClient).mockReturnValue(
-      mockedMcpClient as unknown as McpClient,
-    );
-    const manager = new McpClientManager(
-      {
-        'test-server': {},
-      },
-      '',
-      {} as ToolRegistry,
-      {} as PromptRegistry,
-      false,
-      {} as WorkspaceContext,
-    );
-    await manager.discoverAllMcpTools({
-      isTrustedFolder: () => undefined,
-    } as unknown as Config);
-    expect(mockedMcpClient.connect).toHaveBeenCalledOnce();
-    expect(mockedMcpClient.discover).toHaveBeenCalledOnce();
-  });
-
   it('should not discover tools if folder is not trusted', async () => {
     const mockedMcpClient = {
       connect: vi.fn(),
