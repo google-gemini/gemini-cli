@@ -208,7 +208,13 @@ describe('resolveEnvVarsInObject', () => {
   it('should handle circular references in objects without infinite recursion', () => {
     process.env['TEST_VAR'] = 'resolved-value';
 
-    const config: any = {
+    type ConfigWithCircularRef = {
+      name: string;
+      value: number;
+      self?: ConfigWithCircularRef;
+    };
+
+    const config: ConfigWithCircularRef = {
       name: '$TEST_VAR',
       value: 42,
     };
@@ -220,8 +226,8 @@ describe('resolveEnvVarsInObject', () => {
     expect(result.name).toBe('resolved-value');
     expect(result.value).toBe(42);
     expect(result.self).toBeDefined();
-    expect(result.self.name).toBe('$TEST_VAR'); // Circular reference should be shallow copied
-    expect(result.self.value).toBe(42);
+    expect(result.self?.name).toBe('$TEST_VAR'); // Circular reference should be shallow copied
+    expect(result.self?.value).toBe(42);
     // Verify it doesn't create infinite recursion by checking it's not the same object
     expect(result.self).not.toBe(result);
   });
@@ -229,17 +235,19 @@ describe('resolveEnvVarsInObject', () => {
   it('should handle circular references in arrays without infinite recursion', () => {
     process.env['ARRAY_VAR'] = 'array-value';
 
-    const arr: any[] = ['$ARRAY_VAR', 123];
+    type ArrayWithCircularRef = Array<string | number | ArrayWithCircularRef>;
+    const arr: ArrayWithCircularRef = ['$ARRAY_VAR', 123];
     // Create circular reference
     arr.push(arr);
 
-    const result = resolveEnvVarsInObject(arr);
+    const result = resolveEnvVarsInObject(arr) as ArrayWithCircularRef;
 
     expect(result[0]).toBe('array-value');
     expect(result[1]).toBe(123);
     expect(Array.isArray(result[2])).toBe(true);
-    expect(result[2][0]).toBe('$ARRAY_VAR'); // Circular reference should be shallow copied
-    expect(result[2][1]).toBe(123);
+    const subArray = result[2] as ArrayWithCircularRef;
+    expect(subArray[0]).toBe('$ARRAY_VAR'); // Circular reference should be shallow copied
+    expect(subArray[1]).toBe(123);
     // Verify it doesn't create infinite recursion
     expect(result[2]).not.toBe(result);
   });
@@ -247,8 +255,14 @@ describe('resolveEnvVarsInObject', () => {
   it('should handle complex nested circular references', () => {
     process.env['NESTED_VAR'] = 'nested-resolved';
 
-    const obj1: any = { name: '$NESTED_VAR', id: 1 };
-    const obj2: any = { name: 'static', id: 2 };
+    type ObjWithRef = {
+      name: string;
+      id: number;
+      ref?: ObjWithRef;
+    };
+
+    const obj1: ObjWithRef = { name: '$NESTED_VAR', id: 1 };
+    const obj2: ObjWithRef = { name: 'static', id: 2 };
 
     // Create cross-references
     obj1.ref = obj2;
@@ -260,7 +274,7 @@ describe('resolveEnvVarsInObject', () => {
       value: '$NESTED_VAR',
     };
 
-    const result = resolveEnvVarsInObject(config);
+    const result = resolveEnvVarsInObject(config)
 
     expect(result.value).toBe('nested-resolved');
     expect(result.primary.name).toBe('nested-resolved');
@@ -271,8 +285,8 @@ describe('resolveEnvVarsInObject', () => {
     // Check that circular references are handled (shallow copied)
     expect(result.primary.ref).toBeDefined();
     expect(result.secondary.ref).toBeDefined();
-    expect(result.primary.ref.name).toBe('static'); // Should be shallow copy
-    expect(result.secondary.ref.name).toBe('nested-resolved'); // The shallow copy still gets processed
+    expect(result.primary.ref?.name).toBe('static'); // Should be shallow copy
+    expect(result.secondary.ref?.name).toBe('nested-resolved'); // The shallow copy still gets processed
 
     // Most importantly: verify no infinite recursion by checking objects are different
     expect(result.primary.ref).not.toBe(result.secondary);
