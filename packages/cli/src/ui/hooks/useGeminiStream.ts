@@ -479,6 +479,7 @@ export const useGeminiStream = (
             undefined,
             config.getModel(),
             DEFAULT_GEMINI_FLASH_MODEL,
+            eventValue.request,
           ),
         },
         userMessageTimestamp,
