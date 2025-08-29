@@ -131,6 +131,20 @@ class ShellToolInvocation extends BaseToolInvocation<
         this.params.directory || '',
       );
 
+      // Security Check: Ensure the resolved directory is within workspace boundaries
+      const workspaceContext = this.config.getWorkspaceContext();
+      if (!workspaceContext.isPathWithinWorkspace(cwd)) {
+        const directories = workspaceContext.getDirectories();
+        return {
+          llmContent: `Error: Directory must be within workspace directories: ${directories.join(', ')}`,
+          returnDisplay: 'Invalid directory path',
+          error: {
+            message: `Directory not in workspace: ${cwd}`,
+            type: ToolErrorType.INVALID_TOOL_PARAMS,
+          },
+        };
+      }
+
       let cumulativeOutput = '';
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
