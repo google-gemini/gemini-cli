@@ -28,7 +28,8 @@ export const GeminiMessageContent: React.FC<GeminiMessageContentProps> = ({
   availableTerminalHeight,
   terminalWidth,
 }) => {
-  const { isRawMode, toggleComponent } = useRawMode();
+  const isMarkdown = text && /[`*_[\\\]()#~|]/.test(text);
+  const { isRawMode, toggleComponent } = useRawMode(isMarkdown);
   const originalPrefix = '✦ ';
   const prefixWidth = originalPrefix.length;
 
