@@ -1245,6 +1245,77 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('paste auto-submission protection', () => {
+    it('should prevent auto-submission immediately after paste with newlines', async () => {
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // First type some text manually
+      stdin.write('test command');
+      await wait();
+
+      // Simulate a paste operation (this should set the paste protection)
+      stdin.write(`\x1b[200~\npasted content\x1b[201~`);
+      await wait();
+
+      // Simulate an Enter key press immediately after paste
+      stdin.write('\r');
+      await wait();
+
+      // Verify that onSubmit was NOT called due to recent paste protection
+      expect(props.onSubmit).not.toHaveBeenCalled();
+
+      unmount();
+    });
+
+    it('should allow submission after paste protection timeout', async () => {
+      // Set up buffer with text for submission
+      props.buffer.text = 'test command';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Simulate a paste operation (this sets the protection)
+      stdin.write(`\x1b[200~\npasted\x1b[201~`);
+      await wait();
+
+      // Wait for the protection timeout to naturally expire
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      // Now Enter should work normally
+      stdin.write('\r');
+      await wait();
+
+      // Verify that onSubmit was called after the timeout
+      expect(props.onSubmit).toHaveBeenCalledWith('test command');
+
+      unmount();
+    });
+
+    it('should not interfere with normal Enter key submission when no recent paste', async () => {
+      // Set up buffer with text before rendering to ensure submission works
+      props.buffer.text = 'normal command';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Press Enter without any recent paste
+      stdin.write('\r');
+      await wait();
+
+      // Verify that onSubmit was called normally
+      expect(props.onSubmit).toHaveBeenCalledWith('normal command');
+
+      unmount();
+    });
+  });
+
   describe('enhanced input UX - double ESC clear functionality', () => {
     it('should clear buffer on second ESC press', async () => {
       const onEscapePromptChange = vi.fn();
@@ -1426,6 +1497,7 @@ describe('InputPrompt', () => {
       act(() => {
         stdin.write('\t');
       });
+      await wait(); // Allow time for Tab keypress to be processed
 
       await waitFor(
         () => {
