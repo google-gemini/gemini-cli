@@ -17,6 +17,7 @@ import { SettingScope, loadSettings } from '../config/settings.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
+import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
@@ -184,7 +185,7 @@ export function loadExtension(extensionDir: string): Extension | null {
 
   try {
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
-    const config = recursivelyHydrateStrings(JSON.parse(configContent), {
+    let config = recursivelyHydrateStrings(JSON.parse(configContent), {
       extensionPath: extensionDir,
       '/': path.sep,
       pathSeparator: path.sep,
@@ -195,6 +196,8 @@ export function loadExtension(extensionDir: string): Extension | null {
       );
       return null;
     }
+
+    config = resolveEnvVarsInObject(config);
 
     const contextFiles = getContextFileNames(config)
       .map((contextFileName) => path.join(extensionDir, contextFileName))
