@@ -32,9 +32,9 @@ import {
   assertUniqueFinalEventIsLast,
   assertTaskCreationAndWorkingStatus,
   createStreamMessageRequest,
-  MockTool,
   createMockConfig,
 } from './testing_utils.js';
+import { MockTool } from '@google/gemini-cli-core';
 
 const mockToolConfirmationFn = async () =>
   ({}) as unknown as ToolCallConfirmationDetails;
@@ -175,13 +175,10 @@ describe('E2E Tests', () => {
       yield* [];
     });
 
-    const mockTool = new MockTool(
-      'test-tool',
-      'Test Tool',
-      true,
-      false,
-      mockToolConfirmationFn,
-    );
+    const mockTool = new MockTool({
+      name: 'test-tool',
+      shouldConfirmExecute: vi.fn(mockToolConfirmationFn),
+    });
 
     getToolRegistrySpy.mockReturnValue({
       getAllTools: vi.fn().mockReturnValue([mockTool]),
@@ -270,20 +267,16 @@ describe('E2E Tests', () => {
       yield* [];
     });
 
-    const mockTool1 = new MockTool(
-      'test-tool-1',
-      'Test Tool 1',
-      false,
-      false,
-      mockToolConfirmationFn,
-    );
-    const mockTool2 = new MockTool(
-      'test-tool-2',
-      'Test Tool 2',
-      false,
-      false,
-      mockToolConfirmationFn,
-    );
+    const mockTool1 = new MockTool({
+      name: 'test-tool-1',
+      displayName: 'Test Tool 1',
+      shouldConfirmExecute: vi.fn(mockToolConfirmationFn),
+    });
+    const mockTool2 = new MockTool({
+      name: 'test-tool-2',
+      displayName: 'Test Tool 2',
+      shouldConfirmExecute: vi.fn(mockToolConfirmationFn),
+    });
 
     getToolRegistrySpy.mockReturnValue({
       getAllTools: vi.fn().mockReturnValue([mockTool1, mockTool2]),
@@ -390,13 +383,13 @@ describe('E2E Tests', () => {
       yield* [{ type: 'content', value: 'Tool executed successfully.' }];
     });
 
-    const mockTool = new MockTool(
-      'test-tool-no-approval',
-      'Test Tool No Approval',
-    );
-    mockTool.execute.mockResolvedValue({
-      llmContent: 'Tool executed successfully.',
-      returnDisplay: 'Tool executed successfully.',
+    const mockTool = new MockTool({
+      name: 'test-tool-no-approval',
+      displayName: 'Test Tool No Approval',
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'Tool executed successfully.',
+        returnDisplay: 'Tool executed successfully.',
+      }),
     });
 
     getToolRegistrySpy.mockReturnValue({
@@ -521,15 +514,13 @@ describe('E2E Tests', () => {
     // Set approval mode to yolo
     getApprovalModeSpy.mockReturnValue(ApprovalMode.YOLO);
 
-    const mockTool = new MockTool(
-      'test-tool-yolo',
-      'Test Tool YOLO',
-      false,
-      false,
-    );
-    mockTool.execute.mockResolvedValue({
-      llmContent: 'Tool executed successfully.',
-      returnDisplay: 'Tool executed successfully.',
+    const mockTool = new MockTool({
+      name: 'test-tool-yolo',
+      displayName: 'Test Tool YOLO',
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'Tool executed successfully.',
+        returnDisplay: 'Tool executed successfully.',
+      }),
     });
 
     getToolRegistrySpy.mockReturnValue({
