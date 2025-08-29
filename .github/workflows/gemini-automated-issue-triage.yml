@@ -137,7 +137,7 @@ jobs:
 
             ## Steps
 
-            1. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
+            1.  You are only able to use the echo command. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
             2. Review the issue title and body provided in the environment variables: "${ISSUE_TITLE}" and "${ISSUE_BODY}".
             3. If there is an existing area/ label, don't change it if there is a kind/ label don't change it and if there is a priority/ label dont' change it. 
             4. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. For area/* and kind/* limit yourself to only the single most applicable label in each case.
