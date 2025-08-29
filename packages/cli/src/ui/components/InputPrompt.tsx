@@ -29,7 +29,7 @@ import {
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
 import * as path from 'node:path';
-import { SCREEN_READER_USER_PREFIX } from '../constants.js';
+import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
