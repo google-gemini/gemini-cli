@@ -227,7 +227,50 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description: 'Enable screen reader mode for accessibility.',
           default: false,
         })
-
+        .deprecateOption(
+          'telemetry',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-target',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-otlp-endpoint',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-otlp-protocol',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-log-prompts',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-outfile',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'show-memory-usage',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'sandbox-image',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'proxy',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'checkpointing',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'all-files',
+          'Use @ includes in the application instead. This flag will be removed in a future version.',
+        )
         .check((argv) => {
           if (argv.prompt && argv['promptInteractive']) {
             throw new Error(
