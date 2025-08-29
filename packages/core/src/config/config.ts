@@ -54,6 +54,7 @@ import type { AnyToolInvocation } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
+import type { EventEmitter } from 'node:events';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -211,12 +212,13 @@ export interface ConfigParameters {
   skipNextSpeakerCheck?: boolean;
   extensionManagement?: boolean;
   enablePromptCompletion?: boolean;
+  eventEmitter?: EventEmitter;
 }
 
 export class Config {
   private toolRegistry!: ToolRegistry;
   private promptRegistry!: PromptRegistry;
-  private sessionId: string;
+  private readonly sessionId: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private readonly embeddingModel: string;
@@ -290,6 +292,7 @@ export class Config {
   private initialized: boolean = false;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
+  private readonly eventEmitter?: EventEmitter;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -369,6 +372,7 @@ export class Config {
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
+    this.eventEmitter = params.eventEmitter;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -438,10 +442,6 @@ export class Config {
 
   getSessionId(): string {
     return this.sessionId;
-  }
-
-  setSessionId(sessionId: string): void {
-    this.sessionId = sessionId;
   }
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
@@ -836,7 +836,7 @@ export class Config {
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this);
+    const registry = new ToolRegistry(this, this.eventEmitter);
 
     // helper to create & register core tools that are enabled
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
