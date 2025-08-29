@@ -13,6 +13,8 @@ import { MCPOAuthToken, MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { OAuthUtils } from './oauth-utils.js';
 
+export const OAUTH_DISPLAY_MESSAGE_EVENT = 'oauth-display-message' as const;
+
 /**
  * OAuth configuration for an MCP server.
  */
@@ -589,7 +591,7 @@ export class MCPOAuthProvider {
     // Helper function to display messages through handler or fallback to console.log
     const displayMessage = (message: string) => {
       if (events) {
-        events.emit('oauth-display-message', message);
+        events.emit(OAUTH_DISPLAY_MESSAGE_EVENT, message);
       } else {
         console.log(message);
       }
