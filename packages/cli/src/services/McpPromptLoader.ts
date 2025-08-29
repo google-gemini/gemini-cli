@@ -141,23 +141,84 @@ export class McpPromptLoader implements ICommandLoader {
               };
             }
           },
-          completion: async (_: CommandContext, partialArg: string) => {
+          completion: async (
+            commandContext: CommandContext,
+            partialArg: string,
+          ) => {
             if (!prompt || !prompt.arguments) {
               return [];
             }
-
-            const suggestions: string[] = [];
-            const usedArgNames = new Set(
-              (partialArg.match(/--([^=]+)/g) || []).map((s) => s.substring(2)),
+            // /add --numberOne="23"
+            const emptyFlagArguments = prompt.arguments.map(
+              (argument) => `--${argument.name}="`,
             );
 
-            for (const arg of prompt.arguments) {
-              if (!usedArgNames.has(arg.name)) {
-                suggestions.push(`--${arg.name}=""`);
-              }
+            if (
+              partialArg === '' ||
+              partialArg === '-' ||
+              partialArg === '--'
+            ) {
+              const unusedArgs = emptyFlagArguments.filter(
+                (argument) =>
+                  !commandContext.invocation?.raw.includes(argument),
+              );
+              return unusedArgs;
             }
 
-            return suggestions;
+            const unusedArgs = emptyFlagArguments.filter(
+              (flagArgument) => !partialArg.includes(flagArgument),
+            );
+
+            const exactlyMatchingArguments = emptyFlagArguments.filter(
+              (flagArgument) => partialArg.startsWith(flagArgument),
+            );
+
+            if (exactlyMatchingArguments.length === 1) {
+              if (exactlyMatchingArguments[0] === partialArg) {
+                return [`${partialArg}"`];
+              }
+              if (partialArg.endsWith('"')) {
+                return [partialArg];
+              }
+              return [`${partialArg}"`];
+            }
+
+            const matchingArguments = unusedArgs.filter((flagArgument) =>
+              flagArgument.startsWith(partialArg),
+            );
+
+            return matchingArguments;
+
+            // const usedArgNames = new Set(
+            //   (partialArg.match(/--([^=]+)/g) || []).map((s) => s.substring(2)),
+            // );
+
+            // const namedArgRegex = /--([^=]+)=(?:"((?:\\.|[^"\\])*)"|([^ ]+))/g;
+            // const positionalArgsString = partialArg
+            //   .replace(namedArgRegex, '')
+            //   .trim();
+
+            // const positionalArgRegex = /(?:"((?:\\.|[^"\\])*)"|([^ ]+))/g;
+            // const positionalArgCount = (
+            //   positionalArgsString.match(positionalArgRegex) || []
+            // ).length;
+
+            // if (positionalArgCount > 0 && usedArgNames.size === 0) {
+            //   return [];
+            // }
+
+            // const availableArgs = prompt.arguments.filter(
+            //   (arg) => !usedArgNames.has(arg.name),
+            // );
+
+            // const remainingArgs = availableArgs.slice(positionalArgCount);
+
+            // const suggestions: string[] = [];
+            // for (const arg of remainingArgs) {
+            //   suggestions.push(`--${arg.name}=""`);
+            // }
+
+            // return suggestions;
           },
         };
         promptCommands.push(newPromptCommand);

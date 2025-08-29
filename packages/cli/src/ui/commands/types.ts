@@ -15,7 +15,7 @@ import type { SessionStatsState } from '../contexts/SessionContext.js';
 // Grouped dependencies for clarity and easier mocking
 export interface CommandContext {
   // Invocation properties for when commands are called.
-  invocation?: {
+  invocation: {
     /** The raw, untrimmed input string from the user. */
     raw: string;
     /** The primary name of the command that was matched. */
@@ -69,7 +69,7 @@ export interface CommandContext {
     sessionShellAllowlist: Set<string>;
   };
   // Flag to indicate if an overwrite has been confirmed
-  overwriteConfirmed?: boolean;
+  overwriteConfirmed: boolean;
 }
 
 /**
@@ -179,7 +179,6 @@ export interface SlashCommand {
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (
     context: CommandContext,
-    args: string, // TODO: Remove args. CommandContext now contains the complete invocation.
   ) =>
     | void
     | SlashCommandActionReturn
