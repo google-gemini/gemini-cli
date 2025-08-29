@@ -162,6 +162,11 @@ export const useSlashCommandProcessor = (
   );
   const commandContext = useMemo(
     (): CommandContext => ({
+      invocation: {
+        raw: '',
+        name: '',
+        args: '',
+      },
       services: {
         config,
         settings,
@@ -188,6 +193,7 @@ export const useSlashCommandProcessor = (
         stats: session.stats,
         sessionShellAllowlist,
       },
+      overwriteConfirmed: false,
     }),
     [
       config,
@@ -327,7 +333,7 @@ export const useSlashCommandProcessor = (
                 name: commandToExecute.name,
                 args,
               },
-              overwriteConfirmed,
+              overwriteConfirmed: overwriteConfirmed || false,
             };
 
             // If a one-time list is provided for a "Proceed" action, temporarily
@@ -341,10 +347,7 @@ export const useSlashCommandProcessor = (
                 ]),
               };
             }
-            const result = await commandToExecute.action(
-              fullCommandContext,
-              args,
-            );
+            const result = await commandToExecute.action(fullCommandContext);
 
             if (result) {
               switch (result.type) {
