@@ -25,7 +25,6 @@ export async function handleUpdate(args: UpdateArgs) {
     );
   } catch (error) {
     console.error(getErrorMessage(error));
-    process.exit(1);
   }
 }
 
