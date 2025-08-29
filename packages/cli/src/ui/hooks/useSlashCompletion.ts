@@ -97,6 +97,7 @@ function useCommandParser(
       const found: SlashCommand | undefined = currentLevel.find((cmd) =>
         matchesCommand(cmd, part),
       );
+
       if (found && found.kind === CommandKind.MCP_PROMPT) {
         leafCommand = found;
         currentLevel = found.subCommands as readonly SlashCommand[] | undefined;
@@ -202,7 +203,14 @@ function useCommandSuggestions(
           const depth = commandPathParts.length;
           const argString = rawParts.slice(depth).join(' ');
           const results =
-            (await leafCommand.completion(commandContext, argString)) || [];
+            (await leafCommand.completion({
+              ...commandContext,
+              invocation: {
+                raw: `/${rawParts.join(' ')}`,
+                name: leafCommand.name,
+                args: argString,
+              }
+            }, argString)) || [];
 
           if (!signal.aborted) {
             const finalSuggestions = results.map((s) => ({

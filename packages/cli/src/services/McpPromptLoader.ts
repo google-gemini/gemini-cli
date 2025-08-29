@@ -145,7 +145,8 @@ export class McpPromptLoader implements ICommandLoader {
             commandContext: CommandContext,
             partialArg: string,
           ) => {
-            if (!prompt || !prompt.arguments) {
+            const rawInvocation = commandContext.invocation?.raw;
+            if (!prompt || !prompt.arguments || !rawInvocation) {
               return [];
             }
             // /add --numberOne="23"
@@ -153,28 +154,22 @@ export class McpPromptLoader implements ICommandLoader {
               (argument) => `--${argument.name}="`,
             );
 
-            if (
-              partialArg === '' ||
-              partialArg === '-' ||
-              partialArg === '--'
-            ) {
-              const unusedArgs = emptyFlagArguments.filter(
-                (argument) =>
-                  !commandContext.invocation?.raw.includes(argument),
-              );
-              return unusedArgs;
-            }
-
-            const unusedArgs = emptyFlagArguments.filter(
-              (flagArgument) => !partialArg.includes(flagArgument),
+            const unusedArguments = emptyFlagArguments.filter(
+              (flagArgument) => {
+                const regex = new RegExp(`${flagArgument}([^"]*)"`);
+                return !regex.test(rawInvocation);
+              }
             );
 
-            const exactlyMatchingArguments = emptyFlagArguments.filter(
-              (flagArgument) => partialArg.startsWith(flagArgument),
+            const exactlyMatchingArgumentAtTheEnd = unusedArguments.filter(
+              (flagArgument) => {
+                const regex = new RegExp(`${flagArgument}[^"]*$`);
+                return regex.test(rawInvocation);
+              }
             );
 
-            if (exactlyMatchingArguments.length === 1) {
-              if (exactlyMatchingArguments[0] === partialArg) {
+            if (exactlyMatchingArgumentAtTheEnd.length === 1) {
+              if (exactlyMatchingArgumentAtTheEnd[0] === partialArg) {
                 return [`${partialArg}"`];
               }
               if (partialArg.endsWith('"')) {
@@ -183,42 +178,19 @@ export class McpPromptLoader implements ICommandLoader {
               return [`${partialArg}"`];
             }
 
-            const matchingArguments = unusedArgs.filter((flagArgument) =>
+            if (
+              partialArg === '' ||
+              partialArg === '-' ||
+              partialArg === '--'
+            ) {
+              return unusedArguments;
+            }
+
+            const matchingArguments = unusedArguments.filter((flagArgument) =>
               flagArgument.startsWith(partialArg),
             );
 
             return matchingArguments;
-
-            // const usedArgNames = new Set(
-            //   (partialArg.match(/--([^=]+)/g) || []).map((s) => s.substring(2)),
-            // );
-
-            // const namedArgRegex = /--([^=]+)=(?:"((?:\\.|[^"\\])*)"|([^ ]+))/g;
-            // const positionalArgsString = partialArg
-            //   .replace(namedArgRegex, '')
-            //   .trim();
-
-            // const positionalArgRegex = /(?:"((?:\\.|[^"\\])*)"|([^ ]+))/g;
-            // const positionalArgCount = (
-            //   positionalArgsString.match(positionalArgRegex) || []
-            // ).length;
-
-            // if (positionalArgCount > 0 && usedArgNames.size === 0) {
-            //   return [];
-            // }
-
-            // const availableArgs = prompt.arguments.filter(
-            //   (arg) => !usedArgNames.has(arg.name),
-            // );
-
-            // const remainingArgs = availableArgs.slice(positionalArgCount);
-
-            // const suggestions: string[] = [];
-            // for (const arg of remainingArgs) {
-            //   suggestions.push(`--${arg.name}=""`);
-            // }
-
-            // return suggestions;
           },
         };
         promptCommands.push(newPromptCommand);
