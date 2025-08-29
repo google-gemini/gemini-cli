@@ -2168,7 +2168,7 @@ describe('loadCliConfig fileFiltering', () => {
       const settings: Settings = {
         context: {
           fileFiltering: { [property]: value },
-        }
+        },
       };
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, [], 'test-session', argv);
