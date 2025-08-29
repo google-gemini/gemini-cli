@@ -47,7 +47,7 @@ jobs:
         )
       )
     timeout-minutes: 5
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
     steps:
       - name: 'Get issue data for manual trigger'
         id: get_issue_data
@@ -105,7 +105,7 @@ jobs:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
           ISSUE_TITLE: "${{ github.event_name == 'workflow_dispatch' && steps.get_issue_data.outputs.title || github.event.issue.title }}"
           ISSUE_BODY: "${{ github.event_name == 'workflow_dispatch' && steps.get_issue_data.outputs.body || github.event.issue.body }}"
-          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number}}'
+          ISSUE_NUMBER: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.issue_number || github.event.issue.number }}"
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         with:
