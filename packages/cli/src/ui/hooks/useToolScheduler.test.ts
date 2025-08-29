@@ -61,7 +61,12 @@ const mockConfig = {
   }),
 } as unknown as Config;
 
-const mockTool = new MockTool({ name: 'mockTool', displayName: 'Mock Tool' });
+const mockTool = new MockTool({
+  name: 'mockTool',
+  displayName: 'Mock Tool',
+  execute: vi.fn(),
+  shouldConfirmExecute: vi.fn(),
+});
 const mockToolWithLiveOutput = new MockTool({
   name: 'mockToolWithLiveOutput',
   displayName: 'Mock Tool With Live Output',
@@ -69,11 +74,15 @@ const mockToolWithLiveOutput = new MockTool({
   params: {},
   isOutputMarkdown: true,
   canUpdateOutput: true,
+  execute: vi.fn(),
+  shouldConfirmExecute: vi.fn(),
 });
 let mockOnUserConfirmForToolConfirmation: Mock;
 const mockToolRequiresConfirmation = new MockTool({
   name: 'mockToolRequiresConfirmation',
   displayName: 'Mock Tool Requires Confirmation',
+  execute: vi.fn(),
+  shouldConfirmExecute: vi.fn(),
 });
 
 describe('useReactToolScheduler in YOLO Mode', () => {

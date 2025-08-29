@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
 import type {
   ToolCallConfirmationDetails,
   ToolInvocation,
@@ -16,7 +15,7 @@ import {
   Kind,
 } from '../tools/tools.js';
 
-type MockToolOptions = {
+interface MockToolOptions {
   name: string;
   displayName?: string;
   description?: string;
@@ -27,7 +26,7 @@ type MockToolOptions = {
   ) => Promise<ToolCallConfirmationDetails | false>;
   execute?: (...args: unknown[]) => Promise<ToolResult>;
   params?: object;
-};
+}
 
 class MockToolInvocation extends BaseToolInvocation<
   { [key: string]: unknown },
@@ -92,13 +91,17 @@ export class MockTool extends BaseDeclarativeTool<
     if (options.shouldConfirmExecute) {
       this.shouldConfirmExecute = options.shouldConfirmExecute;
     } else {
-      this.shouldConfirmExecute = vi.fn().mockResolvedValue(false);
+      this.shouldConfirmExecute = () => Promise.resolve(false);
     }
 
     if (options.execute) {
       this.execute = options.execute;
     } else {
-      this.execute = vi.fn();
+      this.execute = () =>
+        Promise.resolve({
+          llmContent: `Tool ${this.name} executed successfully.`,
+          returnDisplay: `Tool ${this.name} executed successfully.`,
+        });
     }
   }
 
