@@ -61,7 +61,7 @@ i18n
     ns: ['help', 'commands', 'dialogs', 'ui', 'errors', 'messages', 'feedback', 'validation', 'tools'],
     defaultNS: 'help',
     
-    debug: false, // Set to true for debugging
+    debug: !!process.env['DEBUG'],
   });
 
 // Export i18n instance for potential core package integration
