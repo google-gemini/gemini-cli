@@ -596,7 +596,7 @@ export class MCPOAuthProvider {
     };
 
     if (!config.authorizationUrl && mcpServerUrl) {
-      displayMessage(`Starting OAuth for MCP server "${serverName}"…
+      console.debug(`Starting OAuth for MCP server "${serverName}"…
 ✓ No authorization URL; using OAuth discovery`);
 
       // First check if the server requires authentication via WWW-Authenticate header
@@ -673,7 +673,7 @@ export class MCPOAuthProvider {
       const authUrl = new URL(config.authorizationUrl);
       const serverUrl = `${authUrl.protocol}//${authUrl.host}`;
 
-      displayMessage('→ Attempting dynamic client registration...');
+      console.debug('→ Attempting dynamic client registration...');
 
       // Get the authorization server metadata for registration
       const authServerMetadataUrl = new URL(
@@ -703,7 +703,7 @@ export class MCPOAuthProvider {
           config.clientSecret = clientRegistration.client_secret;
         }
 
-        displayMessage('✓ Dynamic client registration successful');
+        console.debug('✓ Dynamic client registration successful');
       } else {
         throw new Error(
           'No client ID provided and dynamic registration not supported',
@@ -752,7 +752,7 @@ ${authUrl}
     // Wait for callback
     const { code } = await callbackPromise;
 
-    displayMessage('\n✓ Authorization code received, exchanging for tokens...');
+    console.debug('✓ Authorization code received, exchanging for tokens...');
 
     // Exchange code for tokens
     const tokenResponse = await this.exchangeCodeForToken(
@@ -787,7 +787,7 @@ ${authUrl}
         config.tokenUrl,
         mcpServerUrl,
       );
-      displayMessage('✓ Authentication successful! Token saved.');
+      console.debug('✓ Authentication successful! Token saved.');
 
       // Verify token was saved
       const savedToken = await MCPOAuthTokenStorage.getToken(serverName);
@@ -796,7 +796,7 @@ ${authUrl}
           savedToken.token.accessToken.length > 20
             ? `${savedToken.token.accessToken.substring(0, 20)}...`
             : '[token]';
-        displayMessage(`✓ Token verification successful: ${tokenPreview}`);
+        console.debug(`✓ Token verification successful: ${tokenPreview}`);
       } else {
         console.error(
           'Token verification failed: token not found or invalid after save',
