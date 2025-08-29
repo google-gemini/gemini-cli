@@ -185,13 +185,6 @@ async function getGeminiMdFilePathsInternalForEachDir(
         : path.dirname(resolvedHome);
 
       while (currentDir && currentDir !== path.dirname(currentDir)) {
-        const isCurrentDirectoryProjectRoot =
-          projectRoot && currentDir === path.dirname(projectRoot);
-        if (isCurrentDirectoryProjectRoot && !folderTrust) {
-          console.log('skipping dir for folder trust');
-          break;
-        }
-
         if (currentDir === path.join(resolvedHome, GEMINI_DIR)) {
           break;
         }
