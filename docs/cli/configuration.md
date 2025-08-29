@@ -61,7 +61,7 @@ Settings are organized into categories. All settings should be placed within the
   - **Default:** `undefined`
 
 - **`general.vimMode`** (boolean):
-  - **Description:** Enables or disables vim mode for input editing. When enabled, the input area supports vim-style navigation and editing commands with NORMAL and INSERT modes. The vim mode status is displayed in the footer and persists between sessions.
+  - **Description:** Enable Vim keybindings.
   - **Default:** `false`
 
 - **`general.showNonInteractiveToolInfo`** (boolean):

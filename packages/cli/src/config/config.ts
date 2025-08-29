@@ -61,7 +61,6 @@ export interface CliArgs {
   promptInteractive: string | undefined;
   allFiles: boolean | undefined;
   showMemoryUsage: boolean | undefined;
-  show_memory_usage: boolean | undefined;
   showNonInteractiveToolInfo: boolean | undefined;
   yolo: boolean | undefined;
   approvalMode: string | undefined;
@@ -134,15 +133,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description: 'Show memory usage in status bar',
           default: false,
         })
-        .option('show_memory_usage', {
-          type: 'boolean',
-          description: 'Show memory usage in status bar',
-          default: false,
-        })
-        .deprecateOption(
-          'show_memory_usage',
-          'Use --show-memory-usage instead. We will be removing --show_memory_usage in the coming weeks.',
-        )
         .option('show-non-interactive-tool-info', {
           type: 'boolean',
           description: 'Show tool usage in non-interactive mode',
@@ -568,10 +558,7 @@ export async function loadCliConfig(
     geminiMdFileCount: fileCount,
     approvalMode,
     showMemoryUsage:
-      argv.showMemoryUsage ||
-      argv.show_memory_usage ||
-      settings.ui?.showMemoryUsage ||
-      false,
+      argv.showMemoryUsage || settings.ui?.showMemoryUsage || false,
     showNonInteractiveToolInfo:
       argv.showNonInteractiveToolInfo ||
       settings.general?.showNonInteractiveToolInfo ||

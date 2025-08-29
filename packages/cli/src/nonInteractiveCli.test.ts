@@ -271,6 +271,15 @@ describe('runNonInteractive', () => {
     );
   });
 
+  it('should exit when max session turns are exceeded', async () => {
+    vi.mocked(mockConfig.getMaxSessionTurns).mockReturnValue(0);
+    await expect(
+      runNonInteractive(mockConfig, 'Trigger loop', 'prompt-id-6'),
+    ).rejects.toThrow(
+      'Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
+    );
+  });
+
   it('should log tool usage when showNonInteractiveToolInfo is enabled', async () => {
     const toolCallEvent: ServerGeminiStreamEvent = {
       type: GeminiEventType.ToolCallRequest,
@@ -374,13 +383,13 @@ describe('runNonInteractive', () => {
     );
 
     // 4. Run the non-interactive mode with the raw input
-    await runNonInteractive(mockConfig, rawInput, 'prompt-id-8');
+    await runNonInteractive(mockConfig, rawInput, 'prompt-id-7');
 
     // 5. Assert that sendMessageStream was called with the PROCESSED parts, not the raw input
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledWith(
       processedParts,
       expect.any(AbortSignal),
-      'prompt-id-8',
+      'prompt-id-7',
     );
 
     // 6. Assert the final output is correct
