@@ -34,7 +34,7 @@ import {
 } from '../../utils/settingsUtils.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { useTranslation } from '../../i18n/useTranslation.js';
+import { useTranslation, switchLanguage } from '../../i18n/useTranslation.js';
 import chalk from 'chalk';
 import { cpSlice, cpLen } from '../utils/textUtils.js';
 
@@ -51,7 +51,7 @@ export function SettingsDialog({
   onSelect,
   onRestartRequest,
 }: SettingsDialogProps): React.JSX.Element {
-  const { t } = useTranslation('dialogs');
+  const { t: tUI } = useTranslation('ui');
   
   // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
@@ -125,6 +125,12 @@ export function SettingsDialog({
         value: key,
         type: definition?.type,
         toggle: () => {
+          // Special handling for language setting
+          if (key === 'language') {
+            setShowLanguageSelect(true);
+            return;
+          }
+          
           if (definition?.type !== 'boolean') {
             // For non-boolean (e.g., number) items, toggle will be handled via edit mode.
             return;
@@ -228,6 +234,17 @@ export function SettingsDialog({
   const [editBuffer, setEditBuffer] = useState<string>('');
   const [editCursorPos, setEditCursorPos] = useState<number>(0); // Cursor position within edit buffer
   const [cursorVisible, setCursorVisible] = useState<boolean>(true);
+
+  // Language selection state
+  const [showLanguageSelect, setShowLanguageSelect] = useState<boolean>(false);
+  
+  // Available language options
+  const languageOptions = [
+    { label: 'English', value: 'en' },
+    { label: '中文', value: 'zh' },
+    { label: 'Español', value: 'es' },
+    { label: 'Français', value: 'fr' },
+  ];
 
   useEffect(() => {
     if (!editingKey) {
@@ -586,7 +603,9 @@ export function SettingsDialog({
         if (onRestartRequest) onRestartRequest();
       }
       if (name === 'escape') {
-        if (editingKey) {
+        if (showLanguageSelect) {
+          setShowLanguageSelect(false);
+        } else if (editingKey) {
           commitNumberEdit(editingKey);
         } else {
           onSelect(undefined, selectedScope);
@@ -607,7 +626,7 @@ export function SettingsDialog({
     >
       <Box flexDirection="column" flexGrow={1}>
         <Text bold color={Colors.AccentBlue}>
-          {t('settings.title')}
+          {tUI('settings.title')}
         </Text>
         <Box height={1} />
         {showScrollUp && <Text color={Colors.Gray}>▲</Text>}
@@ -728,7 +747,7 @@ export function SettingsDialog({
 
         <Box marginTop={1} flexDirection="column">
           <Text bold={focusSection === 'scope'} wrap="truncate">
-            {focusSection === 'scope' ? '> ' : '  '}{t('settings.applyTo')}
+            {focusSection === 'scope' ? '> ' : '  '}{tUI('settings.applyTo')}
           </Text>
           <RadioButtonSelect
             items={scopeItems}
@@ -740,13 +759,62 @@ export function SettingsDialog({
           />
         </Box>
 
+        {showLanguageSelect && (
+          <Box marginTop={1} flexDirection="column">
+            <Text bold wrap="truncate">
+              {tUI('settings.selectLanguage')}
+            </Text>
+            <RadioButtonSelect
+              items={languageOptions}
+              initialIndex={Math.max(0, languageOptions.findIndex(
+                (opt) => {
+                  const currentLang = getSettingValue('language', pendingSettings, {});
+                  return opt.value === (typeof currentLang === 'string' ? currentLang : 'en');
+                }
+              ))}
+              onSelect={async (selectedLanguage: string) => {
+                // Switch language immediately
+                const success = await switchLanguage(selectedLanguage);
+                if (success) {
+                  // Update the setting
+                  setPendingSettings((prev) =>
+                    setPendingSettingValueAny('language', selectedLanguage, prev)
+                  );
+                  
+                  // Save the setting immediately since language doesn't require restart
+                  const settingsToSave = new Set(['language']);
+                  const languageSettings = setPendingSettingValueAny('language', selectedLanguage, {});
+                  try {
+                    saveModifiedSettings(
+                      settingsToSave,
+                      languageSettings,
+                      settings,
+                      selectedScope
+                    );
+                    // Close language selection
+                    setShowLanguageSelect(false);
+                  } catch (error) {
+                    console.error('Failed to save language setting:', error);
+                  }
+                }
+              }}
+              isFocused={true}
+              showNumbers={true}
+            />
+            <Box height={1} />
+            <Text color={Colors.Gray}>
+              Press Escape to cancel
+            </Text>
+          </Box>
+        )}
+
         <Box height={1} />
         <Text color={Colors.Gray}>
-          {t('settings.instructions')}
+          {tUI('settings.instructions')}
         </Text>
         {showRestartPrompt && (
           <Text color={Colors.AccentYellow}>
-            {t('settings.restartPrompt')}
+            {tUI('settings.restartPrompt')}
           </Text>
         )}
       </Box>

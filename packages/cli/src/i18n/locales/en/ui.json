@@ -318,5 +318,12 @@
     "authAndToolsSuccess": "Successfully authenticated and refreshed tools for '{{serverName}}'.",
     "authError": "Authentication failed for MCP server '{{serverName}}'.",
     "restartingServers": "Restarting MCP servers..."
+  },
+  "settings": {
+    "title": "Settings",
+    "applyTo": "Apply to:",
+    "instructions": "Use up/down arrows, space to toggle, or type numbers to edit. Tab to switch sections.",
+    "restartPrompt": "Restart required for some changes.",
+    "selectLanguage": "Select Language"
   }
 }

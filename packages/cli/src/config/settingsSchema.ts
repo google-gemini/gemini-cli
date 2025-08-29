@@ -104,7 +104,15 @@ export const SETTINGS_SCHEMA = {
     description: 'Display memory usage information in the UI',
     showInDialog: true,
   },
-
+  language: {
+    type: 'string',
+    label: 'Language',
+    category: 'UI',
+    requiresRestart: false,
+    default: 'en' as string,
+    description: 'Interface language for the CLI',
+    showInDialog: true,
+  },
   usageStatisticsEnabled: {
     type: 'boolean',
     label: 'Enable Usage Statistics',
