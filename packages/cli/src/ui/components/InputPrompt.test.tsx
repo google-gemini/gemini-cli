@@ -1500,7 +1500,6 @@ describe('InputPrompt', () => {
         stdin.write('\t');
       });
 
-
       await waitFor(
         () => {
           expect(stdout.lastFrame()).not.toContain('(r:)');
