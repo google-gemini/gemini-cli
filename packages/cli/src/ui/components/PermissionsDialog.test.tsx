@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PermissionsDialog } from './PermissionsDialog.js';
 import type { ToolPermission } from '../../services/PermissionService.js';
@@ -93,14 +93,16 @@ describe('PermissionsDialog', () => {
     vi.clearAllMocks();
 
     mockOnClose = vi.fn();
-    mockConfig = {} as Config;
+    mockConfig = {
+      getPermissionRepository: vi.fn().mockReturnValue({}),
+    } as unknown as Config;
 
     // Setup mock permission service
     mockPermissionService = {
       getAllPermissions: vi.fn(),
-      resetAllPermissions: vi.fn(),
-      resetPermissionsByType: vi.fn(),
-      resetPermission: vi.fn(),
+      resetAllPermissions: vi.fn().mockResolvedValue(undefined),
+      resetPermissionsByType: vi.fn().mockResolvedValue(undefined),
+      resetPermission: vi.fn().mockResolvedValue(undefined),
     } as unknown as PermissionService;
 
     // Mock the PermissionService constructor
@@ -111,7 +113,7 @@ describe('PermissionsDialog', () => {
     // Default mock implementation
     (
       mockPermissionService.getAllPermissions as ReturnType<typeof vi.fn>
-    ).mockReturnValue(samplePermissions);
+    ).mockResolvedValue(samplePermissions);
   });
 
   describe('Rendering', () => {
@@ -127,59 +129,69 @@ describe('PermissionsDialog', () => {
       // expect(getByText('Loading permissions...')).toBeDefined();
     });
 
-    it('should render no permissions message when no permissions exist', () => {
+    it('should render no permissions message when no permissions exist', async () => {
       (
         mockPermissionService.getAllPermissions as ReturnType<typeof vi.fn>
-      ).mockReturnValue([]);
+      ).mockResolvedValue([]);
 
       const { getByText } = render(
         <PermissionsDialog config={mockConfig} onClose={mockOnClose} />,
       );
 
-      expect(
-        getByText('No "Always Allow" permissions are currently granted.'),
-      ).toBeDefined();
+      await waitFor(() => {
+        expect(
+          getByText('No "Always Allow" permissions are currently granted.'),
+        ).toBeDefined();
+      });
     });
 
-    it('should render permission groups with correct counts', () => {
+    it('should render permission groups with correct counts', async () => {
       const { getByText } = render(
         <PermissionsDialog config={mockConfig} onClose={mockOnClose} />,
       );
 
-      expect(getByText('Total granted permissions: 6')).toBeDefined();
-      expect(getByText('Shell Commands (2)')).toBeDefined();
-      expect(getByText('MCP Tools (2)')).toBeDefined();
-      expect(getByText('Memory Operations (1)')).toBeDefined();
-      expect(getByText('Global Settings (1)')).toBeDefined();
+      await waitFor(() => {
+        expect(getByText('Total granted permissions: 6')).toBeDefined();
+        expect(getByText('Shell Commands (2)')).toBeDefined();
+        expect(getByText('MCP Tools (2)')).toBeDefined();
+        expect(getByText('Memory Operations (1)')).toBeDefined();
+        expect(getByText('Global Settings (1)')).toBeDefined();
+      });
     });
 
-    it('should render individual permissions for selected group', () => {
+    it('should render individual permissions for selected group', async () => {
       const { getByText } = render(
         <PermissionsDialog config={mockConfig} onClose={mockOnClose} />,
       );
 
       // Should show Shell Commands permissions by default (first group)
-      expect(getByText('ls')).toBeDefined();
-      expect(getByText('git status')).toBeDefined();
-      expect(getByText('Always allow shell command: ls')).toBeDefined();
-      expect(getByText('Always allow shell command: git status')).toBeDefined();
+      await waitFor(() => {
+        expect(getByText('ls')).toBeDefined();
+        expect(getByText('git status')).toBeDefined();
+        expect(getByText('Always allow shell command: ls')).toBeDefined();
+        expect(
+          getByText('Always allow shell command: git status'),
+        ).toBeDefined();
+      });
     });
 
-    it('should render help text with keyboard shortcuts', () => {
+    it('should render help text with keyboard shortcuts', async () => {
       const { getByText } = render(
         <PermissionsDialog config={mockConfig} onClose={mockOnClose} />,
       );
 
-      expect(
-        getByText("Press 'r' to reset selected group/permission"),
-      ).toBeDefined();
-      expect(getByText("Press 'A' to reset ALL permissions")).toBeDefined();
-      expect(
-        getByText('(Tab to switch view, ↑↓ to navigate, Esc to close)'),
-      ).toBeDefined();
+      await waitFor(() => {
+        expect(
+          getByText("Press 'r' to reset selected group/permission"),
+        ).toBeDefined();
+        expect(getByText("Press 'A' to reset ALL permissions")).toBeDefined();
+        expect(
+          getByText('(Tab to switch view, ↑↓ to navigate, Esc to close)'),
+        ).toBeDefined();
+      });
     });
 
-    it('should show "No permissions granted" for empty groups', () => {
+    it('should show "No permissions granted" for empty groups', async () => {
       const permissionsWithEmptyGroup: ToolPermission[] = [
         {
           id: 'ls',
@@ -191,7 +203,7 @@ describe('PermissionsDialog', () => {
 
       (
         mockPermissionService.getAllPermissions as ReturnType<typeof vi.fn>
-      ).mockReturnValue(permissionsWithEmptyGroup);
+      ).mockResolvedValue(permissionsWithEmptyGroup);
 
       const { getByText } = render(
         <PermissionsDialog config={mockConfig} onClose={mockOnClose} />,
@@ -199,17 +211,17 @@ describe('PermissionsDialog', () => {
 
       // Switch to a group that should be empty (like Memory Operations)
       // In actual usage, this would be done via keyboard navigation
-      expect(getByText('Memory Operations (0)')).toBeDefined();
+      await waitFor(() => {
+        expect(getByText('Memory Operations (0)')).toBeDefined();
+      });
     });
   });
 
   describe('Error Handling', () => {
-    it('should handle errors during permission loading gracefully', () => {
+    it('should handle errors during permission loading gracefully', async () => {
       (
         mockPermissionService.getAllPermissions as ReturnType<typeof vi.fn>
-      ).mockImplementation(() => {
-        throw new Error('Permission loading failed');
-      });
+      ).mockRejectedValue(new Error('Permission loading failed'));
 
       const { getByText } = render(
         <PermissionsDialog config={mockConfig} onClose={mockOnClose} />,
@@ -217,18 +229,20 @@ describe('PermissionsDialog', () => {
 
       // Should still render the dialog structure
       expect(getByText('Tool Permissions')).toBeDefined();
-      expect(console.error).toHaveBeenCalledWith(
-        'Failed to load permissions:',
-        expect.any(Error),
-      );
+
+      // Wait for the error to be logged
+      await waitFor(() => {
+        expect(console.error).toHaveBeenCalledWith(
+          'Failed to load permissions:',
+          expect.any(Error),
+        );
+      });
     });
 
     it('should handle errors during reset operations gracefully', () => {
       (
         mockPermissionService.resetAllPermissions as ReturnType<typeof vi.fn>
-      ).mockImplementation(() => {
-        throw new Error('Reset failed');
-      });
+      ).mockRejectedValue(new Error('Reset failed'));
 
       const { getByText } = render(
         <PermissionsDialog config={mockConfig} onClose={mockOnClose} />,
@@ -241,9 +255,7 @@ describe('PermissionsDialog', () => {
     it('should handle errors during individual permission reset gracefully', () => {
       (
         mockPermissionService.resetPermission as ReturnType<typeof vi.fn>
-      ).mockImplementation(() => {
-        throw new Error('Individual reset failed');
-      });
+      ).mockRejectedValue(new Error('Individual reset failed'));
 
       const { getByText } = render(
         <PermissionsDialog config={mockConfig} onClose={mockOnClose} />,
@@ -256,9 +268,7 @@ describe('PermissionsDialog', () => {
     it('should handle errors during type-based reset gracefully', () => {
       (
         mockPermissionService.resetPermissionsByType as ReturnType<typeof vi.fn>
-      ).mockImplementation(() => {
-        throw new Error('Type reset failed');
-      });
+      ).mockRejectedValue(new Error('Type reset failed'));
 
       const { getByText } = render(
         <PermissionsDialog config={mockConfig} onClose={mockOnClose} />,
@@ -357,7 +367,7 @@ describe('PermissionsDialog', () => {
   });
 
   describe('Permission Grouping', () => {
-    it('should correctly group shell permissions', () => {
+    it('should correctly group shell permissions', async () => {
       const shellOnlyPermissions: ToolPermission[] = [
         {
           id: 'ls',
@@ -375,19 +385,21 @@ describe('PermissionsDialog', () => {
 
       (
         mockPermissionService.getAllPermissions as ReturnType<typeof vi.fn>
-      ).mockReturnValue(shellOnlyPermissions);
+      ).mockResolvedValue(shellOnlyPermissions);
 
       const { getByText } = render(
         <PermissionsDialog config={mockConfig} onClose={mockOnClose} />,
       );
 
-      expect(getByText('Shell Commands (2)')).toBeDefined();
-      expect(getByText('MCP Tools (0)')).toBeDefined();
-      expect(getByText('Memory Operations (0)')).toBeDefined();
-      expect(getByText('Global Settings (0)')).toBeDefined();
+      await waitFor(() => {
+        expect(getByText('Shell Commands (2)')).toBeDefined();
+        expect(getByText('MCP Tools (0)')).toBeDefined();
+        expect(getByText('Memory Operations (0)')).toBeDefined();
+        expect(getByText('Global Settings (0)')).toBeDefined();
+      });
     });
 
-    it('should correctly group MCP permissions by type', () => {
+    it('should correctly group MCP permissions by type', async () => {
       const mcpPermissions: ToolPermission[] = [
         {
           id: 'server1',
@@ -405,16 +417,18 @@ describe('PermissionsDialog', () => {
 
       (
         mockPermissionService.getAllPermissions as ReturnType<typeof vi.fn>
-      ).mockReturnValue(mcpPermissions);
+      ).mockResolvedValue(mcpPermissions);
 
       const { getByText } = render(
         <PermissionsDialog config={mockConfig} onClose={mockOnClose} />,
       );
 
-      expect(getByText('MCP Tools (2)')).toBeDefined();
+      await waitFor(() => {
+        expect(getByText('MCP Tools (2)')).toBeDefined();
+      });
     });
 
-    it('should correctly group memory permissions', () => {
+    it('should correctly group memory permissions', async () => {
       const memoryPermissions: ToolPermission[] = [
         {
           id: 'read-memory',
@@ -426,16 +440,18 @@ describe('PermissionsDialog', () => {
 
       (
         mockPermissionService.getAllPermissions as ReturnType<typeof vi.fn>
-      ).mockReturnValue(memoryPermissions);
+      ).mockResolvedValue(memoryPermissions);
 
       const { getByText } = render(
         <PermissionsDialog config={mockConfig} onClose={mockOnClose} />,
       );
 
-      expect(getByText('Memory Operations (1)')).toBeDefined();
+      await waitFor(() => {
+        expect(getByText('Memory Operations (1)')).toBeDefined();
+      });
     });
 
-    it('should correctly group global permissions', () => {
+    it('should correctly group global permissions', async () => {
       const globalPermissions: ToolPermission[] = [
         {
           id: 'global_auto_edit',
@@ -448,27 +464,40 @@ describe('PermissionsDialog', () => {
 
       (
         mockPermissionService.getAllPermissions as ReturnType<typeof vi.fn>
-      ).mockReturnValue(globalPermissions);
+      ).mockResolvedValue(globalPermissions);
 
       const { getByText } = render(
         <PermissionsDialog config={mockConfig} onClose={mockOnClose} />,
       );
 
-      expect(getByText('Global Settings (1)')).toBeDefined();
+      await waitFor(() => {
+        expect(getByText('Global Settings (1)')).toBeDefined();
+      });
     });
   });
 
   describe('Permission Reloading', () => {
-    it('should reload permissions after resetting all', () => {
+    it('should reload permissions after resetting all', async () => {
       render(<PermissionsDialog config={mockConfig} onClose={mockOnClose} />);
 
       const keyHandler = vi.mocked(useKeypress).mock.calls[0][0];
+
+      // Wait for initial load to complete
+      await waitFor(() => {
+        expect(mockPermissionService.getAllPermissions).toHaveBeenCalledTimes(
+          1,
+        );
+      });
 
       // Reset all permissions
       keyHandler(createKey({ sequence: 'A', shift: true, name: 'a' }));
 
       // Should call getAllPermissions again for reload
-      expect(mockPermissionService.getAllPermissions).toHaveBeenCalledTimes(2); // Initial load + reload
+      await waitFor(() => {
+        expect(mockPermissionService.getAllPermissions).toHaveBeenCalledTimes(
+          2,
+        ); // Initial load + reload
+      });
     });
 
     it('should reload permissions after resetting by type', () => {
@@ -499,7 +528,7 @@ describe('PermissionsDialog', () => {
       // Start with 2 permissions
       (
         mockPermissionService.getAllPermissions as ReturnType<typeof vi.fn>
-      ).mockReturnValueOnce([
+      ).mockResolvedValueOnce([
         {
           id: 'ls',
           type: 'shell',
@@ -517,7 +546,7 @@ describe('PermissionsDialog', () => {
       // After reload, only 1 permission
       (
         mockPermissionService.getAllPermissions as ReturnType<typeof vi.fn>
-      ).mockReturnValueOnce([
+      ).mockResolvedValueOnce([
         {
           id: 'ls',
           type: 'shell',
@@ -552,7 +581,7 @@ describe('PermissionsDialog', () => {
 
       (
         mockPermissionService.getAllPermissions as ReturnType<typeof vi.fn>
-      ).mockReturnValue(mcpPermissions);
+      ).mockResolvedValue(mcpPermissions);
 
       render(<PermissionsDialog config={mockConfig} onClose={mockOnClose} />);
 
@@ -568,7 +597,7 @@ describe('PermissionsDialog', () => {
     it('should not reset when group has no permissions', () => {
       (
         mockPermissionService.getAllPermissions as ReturnType<typeof vi.fn>
-      ).mockReturnValue([]);
+      ).mockResolvedValue([]);
 
       render(<PermissionsDialog config={mockConfig} onClose={mockOnClose} />);
 
@@ -585,7 +614,7 @@ describe('PermissionsDialog', () => {
     it('should not reset individual permission when no permissions exist in group', () => {
       (
         mockPermissionService.getAllPermissions as ReturnType<typeof vi.fn>
-      ).mockReturnValue([]);
+      ).mockResolvedValue([]);
 
       render(<PermissionsDialog config={mockConfig} onClose={mockOnClose} />);
 
@@ -605,7 +634,7 @@ describe('PermissionsDialog', () => {
     it('should create new PermissionService instance with provided config', () => {
       render(<PermissionsDialog config={mockConfig} onClose={mockOnClose} />);
 
-      expect(PermissionService).toHaveBeenCalledWith(mockConfig);
+      expect(PermissionService).toHaveBeenCalledWith(mockConfig, {});
     });
 
     it('should load permissions on mount', () => {
