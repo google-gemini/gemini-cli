@@ -4,14 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import React from 'react';
+import { Box, Text } from 'ink';
 import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
+import { useRawMode } from '../../hooks/useRawMode.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -40,19 +41,13 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   emphasis = 'medium',
   renderOutputAsMarkdown = true,
 }) => {
-  const [isRawMode, setIsRawMode] = useState(false);
+  const { isRawMode, toggleComponent } = useRawMode();
   const availableHeight = availableTerminalHeight
     ? Math.max(
         availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
         MIN_LINES_SHOWN + 1, // enforce minimum lines shown
       )
     : undefined;
-
-  useInput((input) => {
-    if (input.toLowerCase() === 'r') {
-      setIsRawMode((prev) => !prev);
-    }
-  });
 
   // Long tool call response in MarkdownDisplay doesn't respect availableTerminalHeight properly,
   // we're forcing it to not render as markdown when the response is too long, it will fallback
@@ -69,6 +64,10 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
     }
   }
+
+  const showToggle =
+    typeof resultDisplay === 'string' && renderOutputAsMarkdown;
+
   return (
     <Box paddingX={1} paddingY={0} flexDirection="column">
       <Box minHeight={1}>
@@ -84,12 +83,8 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
       {resultDisplay && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
           <Box flexDirection="column">
-            <Box alignSelf="flex-end">
-              <Text dimColor>
-                {isRawMode ? 'Press `r` to see rendered' : 'Press `r` to see raw'}
-              </Text>
-            </Box>
-            {isRawMode ? (
+            {showToggle && toggleComponent}
+            {isRawMode && showToggle ? (
               <MarkdownDisplay
                 text={resultDisplay as string}
                 isPending={false}

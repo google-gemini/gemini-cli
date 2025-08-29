@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import React from 'react';
+import { Box } from 'ink';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
+import { useRawMode } from '../../hooks/useRawMode.js';
 
 interface GeminiMessageContentProps {
   text: string;
@@ -27,23 +28,13 @@ export const GeminiMessageContent: React.FC<GeminiMessageContentProps> = ({
   availableTerminalHeight,
   terminalWidth,
 }) => {
-  const [isRawMode, setIsRawMode] = useState(false);
+  const { isRawMode, toggleComponent } = useRawMode();
   const originalPrefix = '✦ ';
   const prefixWidth = originalPrefix.length;
 
-  useInput((input) => {
-    if (input.toLowerCase() === 'r') {
-      setIsRawMode((prev) => !prev);
-    }
-  });
-
   return (
     <Box flexDirection="column" paddingLeft={prefixWidth}>
-      <Box alignSelf="flex-end">
-        <Text dimColor>
-          {isRawMode ? 'Press `r` to see rendered' : 'Press `r` to see raw'}
-        </Text>
-      </Box>
+      {toggleComponent}
       <MarkdownDisplay
         text={text}
         isPending={isPending}
