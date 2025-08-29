@@ -382,6 +382,11 @@ async function cacheCredentials(credentials: Credentials) {
 
   const credString = JSON.stringify(credentials, null, 2);
   await fs.writeFile(filePath, credString, { mode: 0o600 });
+  try {
+    await fs.chmod(filePath, 0o600);
+  } catch {
+    /* empty */
+  }
 }
 
 export function clearOauthClientCache() {
