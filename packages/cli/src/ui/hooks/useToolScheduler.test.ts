@@ -154,9 +154,7 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     expect(mockToolRequiresConfirmation.execute).toHaveBeenCalledWith(
       request.args,
       expect.any(AbortSignal),
-      undefined,
-      undefined,
-      undefined,
+      undefined /*updateOutputFn*/,
     );
 
     // Check that onComplete was called with success
@@ -307,9 +305,7 @@ describe('useReactToolScheduler', () => {
     expect(mockTool.execute).toHaveBeenCalledWith(
       request.args,
       expect.any(AbortSignal),
-      undefined,
-      undefined,
-      undefined,
+      undefined /*updateOutputFn*/,
     );
     expect(onComplete).toHaveBeenCalledWith([
       expect.objectContaining({

@@ -22,9 +22,14 @@ interface MockToolOptions {
   canUpdateOutput?: boolean;
   isOutputMarkdown?: boolean;
   shouldConfirmExecute?: (
-    ...args: unknown[]
+    params: { [key: string]: unknown },
+    signal: AbortSignal,
   ) => Promise<ToolCallConfirmationDetails | false>;
-  execute?: (...args: unknown[]) => Promise<ToolResult>;
+  execute?: (
+    params: { [key: string]: unknown },
+    signal: AbortSignal,
+    updateOutput?: (output: string) => void,
+  ) => Promise<ToolResult>;
   params?: object;
 }
 
@@ -42,16 +47,8 @@ class MockToolInvocation extends BaseToolInvocation<
   execute(
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
-    terminalColumns?: number,
-    terminalRows?: number,
   ): Promise<ToolResult> {
-    return this.tool.execute(
-      this.params,
-      signal,
-      updateOutput,
-      terminalColumns,
-      terminalRows,
-    );
+    return this.tool.execute(this.params, signal, updateOutput);
   }
 
   override shouldConfirmExecute(
@@ -72,10 +69,15 @@ export class MockTool extends BaseDeclarativeTool<
   { [key: string]: unknown },
   ToolResult
 > {
-  execute: (...args: unknown[]) => Promise<ToolResult>;
   shouldConfirmExecute: (
-    ...args: unknown[]
+    params: { [key: string]: unknown },
+    signal: AbortSignal,
   ) => Promise<ToolCallConfirmationDetails | false>;
+  execute: (
+    params: { [key: string]: unknown },
+    signal: AbortSignal,
+    updateOutput?: (output: string) => void,
+  ) => Promise<ToolResult>;
 
   constructor(options: MockToolOptions) {
     super(
