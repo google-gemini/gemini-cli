@@ -60,7 +60,7 @@ jobs:
           ISSUE_COUNT="$(echo "${ISSUES}" | jq 'length')"
           echo "✅ Found ${ISSUE_COUNT} issues to triage! 🎯"
 
-          GEMINI_CLI_VERSION="$gemini --version"
+          GEMINI_CLI_VERSION="$"gemini --version""
           echo "G:$GEMINI_CLI_VERSION"
 
       - name: 'Get Repository Labels'
