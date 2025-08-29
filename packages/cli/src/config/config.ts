@@ -540,6 +540,9 @@ export async function loadCliConfig(
     },
     checkpointing:
       argv.checkpointing || settings.general?.checkpointing?.enabled,
+    autoSaveEnabled: settings.general?.checkpointing?.autoSave?.enabled ?? true,
+    autoSaveIdleTimeout:
+      settings.general?.checkpointing?.autoSave?.idleTimeout ?? 120,
     proxy:
       argv.proxy ||
       process.env['HTTPS_PROXY'] ||

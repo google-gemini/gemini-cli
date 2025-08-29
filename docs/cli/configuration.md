@@ -121,6 +121,20 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
   - **Default:** `false`
   - **Example:** `"autoAccept": true`
 
+- **`autoSave`** (object):
+  - **Description:** Configures the auto-save feature.
+  - **Default:** `{"enabled": false, "idleTime": 300}`
+  - **Properties:**
+    - **`enabled`** (boolean): "Enable auto-save". When `true`, every turn creates a new checkpoint.
+    - **`idleTime`** (number): "Idle time until auto-save". The idle time in seconds until auto-save is triggered.
+  - **Example:**
+    ```json
+    "autoSave": {
+      "enabled": true,
+      "idleTime": 300
+    }
+    ```
+
 - **`theme`** (string):
   - **Description:** Sets the visual [theme](./themes.md) for Gemini CLI.
   - **Default:** `"Default"`

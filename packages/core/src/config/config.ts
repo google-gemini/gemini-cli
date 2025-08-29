@@ -180,7 +180,11 @@ export interface ConfigParameters {
     enableRecursiveFileSearch?: boolean;
     disableFuzzySearch?: boolean;
   };
-  checkpointing?: boolean;
+  checkpointing?: boolean; // Auto-save settings
+  autoSaveEnabled?: boolean;
+  autoSaveIdleTimeout?: number;
+  autoSaveConversationInterval?: number;
+  autoSaveMaxSaves?: number;
   proxy?: string;
   cwd: string;
   fileDiscoveryService?: FileDiscoveryService;
@@ -245,7 +249,11 @@ export class Config {
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
-  private readonly checkpointing: boolean;
+  private readonly checkpointing: boolean; // Auto-save properties
+  private readonly autoSaveEnabled: boolean;
+  private readonly autoSaveIdleTimeout: number;
+  private readonly autoSaveConversationInterval: number;
+  private readonly autoSaveMaxSaves: number;
   private readonly proxy: string | undefined;
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
@@ -327,6 +335,11 @@ export class Config {
       disableFuzzySearch: params.fileFiltering?.disableFuzzySearch ?? false,
     };
     this.checkpointing = params.checkpointing ?? false;
+    this.autoSaveEnabled = params.autoSaveEnabled ?? true;
+    this.autoSaveIdleTimeout = params.autoSaveIdleTimeout ?? 2;
+    this.autoSaveConversationInterval =
+      params.autoSaveConversationInterval ?? 5;
+    this.autoSaveMaxSaves = params.autoSaveMaxSaves ?? 5;
     this.proxy = params.proxy;
     this.cwd = params.cwd ?? process.cwd();
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
@@ -655,6 +668,22 @@ export class Config {
 
   getCheckpointingEnabled(): boolean {
     return this.checkpointing;
+  }
+
+  getAutoSaveEnabled(): boolean {
+    return this.autoSaveEnabled;
+  }
+
+  getAutoSaveIdleTimeout(): number {
+    return this.autoSaveIdleTimeout;
+  }
+
+  getAutoSaveConversationInterval(): number {
+    return this.autoSaveConversationInterval;
+  }
+
+  getAutoSaveMaxSaves(): number {
+    return this.autoSaveMaxSaves;
   }
 
   getProxy(): string | undefined {

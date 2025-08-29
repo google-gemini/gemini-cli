@@ -36,6 +36,8 @@ import type { HistoryItem, SlashCommandProcessorResult } from '../types.js';
 import { MessageType, StreamingState } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 
+import { useAutoSave } from './useAutoSave.js';
+
 // --- MOCKS ---
 const mockSendMessageStream = vi
   .fn()
@@ -199,6 +201,10 @@ describe('useGeminiStream', () => {
       getContentGeneratorConfig: vi
         .fn()
         .mockReturnValue(contentGeneratorConfig),
+      getAutoSaveEnabled: vi.fn(() => false),
+      getAutoSaveConversationInterval: vi.fn(() => 5),
+      getAutoSaveIdleTimeout: vi.fn(() => 2),
+      getAutoSaveMaxSaves: vi.fn(() => 5),
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
@@ -1746,5 +1752,127 @@ describe('useGeminiStream', () => {
         'gemini-2.5-flash',
       );
     });
+  });
+});
+
+describe('useAutoSave', () => {
+  let mockConfig: Partial<Config>;
+  let mockOnAutoSave: () => void;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockOnAutoSave = vi.fn();
+    mockConfig = {
+      getAutoSaveEnabled: vi.fn().mockReturnValue(true),
+      getAutoSaveConversationInterval: vi.fn().mockReturnValue(3),
+      getAutoSaveIdleTimeout: vi.fn().mockReturnValue(2), // 2 minutes
+      getAutoSaveMaxSaves: vi.fn().mockReturnValue(5),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      } as any,
+    };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it('should not trigger auto-save if disabled', () => {
+    (mockConfig.getAutoSaveEnabled as vi.Mock).mockReturnValue(false);
+    const { result } = renderHook(() =>
+      useAutoSave({
+        config: mockConfig as Config,
+        history: [],
+        onAutoSave: mockOnAutoSave,
+      }),
+    );
+
+    result.current.triggerAutoSaveIfNeeded();
+    act(() => {
+      vi.advanceTimersByTime(2 * 60 * 1000); // Advance past idle timeout
+    });
+
+    expect(mockOnAutoSave).not.toHaveBeenCalled();
+  });
+
+  it('should trigger auto-save after conversation interval is reached', () => {
+    const history: HistoryItem[] = [
+      { id: 1, type: MessageType.USER, text: 'msg 1' },
+      { id: 2, type: MessageType.GEMINI, text: 'response 1' },
+      { id: 3, type: MessageType.USER, text: 'msg 2' },
+      { id: 4, type: MessageType.GEMINI, text: 'response 2' },
+    ];
+
+    const { result, rerender } = renderHook(
+      ({ history }) =>
+        useAutoSave({
+          config: mockConfig as Config,
+          history,
+          onAutoSave: mockOnAutoSave,
+        }),
+      { initialProps: { history: [] as HistoryItem[] } },
+    );
+
+    rerender({ history: history.slice(0, 1) }); // User message 1
+    result.current.triggerAutoSaveIfNeeded();
+    expect(mockOnAutoSave).not.toHaveBeenCalled();
+
+    rerender({ history: history.slice(0, 3) }); // User message 2
+    result.current.triggerAutoSaveIfNeeded();
+    expect(mockOnAutoSave).not.toHaveBeenCalled();
+
+    rerender({
+      history: [...history, { id: 5, type: MessageType.USER, text: 'msg 3' }],
+    }); // User message 3
+    result.current.triggerAutoSaveIfNeeded();
+    expect(mockOnAutoSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('should trigger auto-save after idle timeout', () => {
+    const { result } = renderHook(() =>
+      useAutoSave({
+        config: mockConfig as Config,
+        history: [],
+        onAutoSave: mockOnAutoSave,
+      }),
+    );
+
+    result.current.triggerAutoSaveIfNeeded(); // Start activity timer
+    expect(mockOnAutoSave).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(2 * 60 * 1000); // Advance past idle timeout
+    });
+
+    expect(mockOnAutoSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('should reset message count', () => {
+    const history: HistoryItem[] = [
+      { id: 1, type: MessageType.USER, text: 'msg 1' },
+      { id: 2, type: MessageType.USER, text: 'msg 2' },
+    ];
+    const { result, rerender } = renderHook(
+      ({ history }) =>
+        useAutoSave({
+          config: mockConfig as Config,
+          history,
+          onAutoSave: mockOnAutoSave,
+        }),
+      { initialProps: { history: [] as HistoryItem[] } },
+    );
+
+    rerender({ history });
+    result.current.triggerAutoSaveIfNeeded();
+    expect(mockOnAutoSave).not.toHaveBeenCalled();
+
+    result.current.resetMessageCount();
+
+    rerender({
+      history: [...history, { id: 3, type: MessageType.USER, text: 'msg 3' }],
+    });
+    result.current.triggerAutoSaveIfNeeded();
+    expect(mockOnAutoSave).not.toHaveBeenCalled();
   });
 });
