@@ -118,7 +118,7 @@ jobs:
             3. Review the issue title, body and any comments provided in the environment variables.
             4. Identify the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*.
             5. If the issue already has area/ label, dont try to change it. Similarly, if the issue already has a kind/ label don't change it. And if the issue already has a priority/ label do not change it for example:
-               If an issue has area/core and kind/bug  you will only add a priority/ label. 
+               If an issue has area/core and kind/bug  you will only add a priority/ label.
                Instead if an issue has no labels, you will could add one lable of each kind.
             6. Identify other applicable labels based on the issue content, such as status/*, help wanted, good first issue, etc.
             7. For area/* and kind/* limit yourself to only the single most applicable label in each case.
@@ -264,9 +264,9 @@ jobs:
               const jsonMatch = rawLabels.match(/```json\s*([\s\S]*?)\s*```/);
               if (!jsonMatch || !jsonMatch[1]) {
                 throw new Error("Could not find a ```json ... ``` block in the output.");
-              } 
+              }
               const jsonString = jsonMatch[1].trim();
-              parsedLabels = JSON.parse(jsonString); 
+              parsedLabels = JSON.parse(jsonString);
               core.info(`Parsed labels JSON: ${JSON.stringify(parsedLabels)}`);
             } catch (err) {
               core.setFailed(`Failed to parse labels JSON from Gemini output: ${err.message}\nRaw output: ${rawLabels}`);
