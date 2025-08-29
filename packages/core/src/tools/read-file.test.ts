@@ -4,18 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ReadFileTool, ReadFileToolParams } from './read-file.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { ReadFileToolParams } from './read-file.js';
+import { ReadFileTool } from './read-file.js';
 import { ToolErrorType } from './tool-error.js';
-import path from 'path';
-import os from 'os';
-import fs from 'fs';
-import fsp from 'fs/promises';
-import { Config } from '../config/config.js';
+import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import type { Config } from '../config/config.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
-import { ToolInvocation, ToolResult } from './tools.js';
+import type { ToolInvocation, ToolResult } from './tools.js';
+
+vi.mock('../telemetry/loggers.js', () => ({
+  logFileOperation: vi.fn(),
+}));
 
 describe('ReadFileTool', () => {
   let tempRootDir: string;
@@ -219,7 +224,7 @@ describe('ReadFileTool', () => {
         returnDisplay: 'Path is a directory.',
         error: {
           message: `Path is a directory, not a file: ${dirPath}`,
-          type: ToolErrorType.INVALID_TOOL_PARAMS,
+          type: ToolErrorType.TARGET_IS_DIRECTORY,
         },
       });
     });

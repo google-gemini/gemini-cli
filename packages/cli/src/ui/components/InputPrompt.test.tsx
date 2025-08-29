@@ -5,29 +5,21 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
-import { waitFor } from '@testing-library/react';
-import { InputPrompt, InputPromptProps } from './InputPrompt.js';
+import { waitFor, act } from '@testing-library/react';
+import type { InputPromptProps } from './InputPrompt.js';
+import { InputPrompt } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
-import { Config } from '@google/gemini-cli-core';
-import * as path from 'path';
-import {
-  CommandContext,
-  SlashCommand,
-  CommandKind,
-} from '../commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
+import * as path from 'node:path';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import { CommandKind } from '../commands/types.js';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  useShellHistory,
-  UseShellHistoryReturn,
-} from '../hooks/useShellHistory.js';
-import {
-  useCommandCompletion,
-  UseCommandCompletionReturn,
-} from '../hooks/useCommandCompletion.js';
-import {
-  useInputHistory,
-  UseInputHistoryReturn,
-} from '../hooks/useInputHistory.js';
+import type { UseShellHistoryReturn } from '../hooks/useShellHistory.js';
+import { useShellHistory } from '../hooks/useShellHistory.js';
+import type { UseCommandCompletionReturn } from '../hooks/useCommandCompletion.js';
+import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import type { UseInputHistoryReturn } from '../hooks/useInputHistory.js';
+import { useInputHistory } from '../hooks/useInputHistory.js';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 
@@ -119,9 +111,9 @@ describe('InputPrompt', () => {
       visualScrollRow: 0,
       handleInput: vi.fn(),
       move: vi.fn(),
-      moveToOffset: (offset: number) => {
+      moveToOffset: vi.fn((offset: number) => {
         mockBuffer.cursor = [0, offset];
-      },
+      }),
       killLineRight: vi.fn(),
       killLineLeft: vi.fn(),
       openInExternalEditor: vi.fn(),
@@ -160,6 +152,11 @@ describe('InputPrompt', () => {
       setActiveSuggestionIndex: vi.fn(),
       setShowSuggestions: vi.fn(),
       handleAutocomplete: vi.fn(),
+      promptCompletion: {
+        text: '',
+        accept: vi.fn(),
+        clear: vi.fn(),
+      },
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
 
@@ -1415,13 +1412,27 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      stdin.write('\x12');
-      await wait();
-      stdin.write('\t');
 
-      await waitFor(() => {
-        expect(stdout.lastFrame()).not.toContain('(r:)');
+      // Enter reverse search mode with Ctrl+R
+      act(() => {
+        stdin.write('\x12');
       });
+      await wait();
+
+      // Verify reverse search is active
+      expect(stdout.lastFrame()).toContain('(r:)');
+
+      // Press Tab to complete the highlighted entry
+      act(() => {
+        stdin.write('\t');
+      });
+
+      await waitFor(
+        () => {
+          expect(stdout.lastFrame()).not.toContain('(r:)');
+        },
+        { timeout: 5000 },
+      ); // Increase timeout
 
       expect(props.buffer.setText).toHaveBeenCalledWith('echo hello');
       unmount();
@@ -1431,10 +1442,17 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      stdin.write('\x12');
+
+      act(() => {
+        stdin.write('\x12');
+      });
       await wait();
+
       expect(stdout.lastFrame()).toContain('(r:)');
-      stdin.write('\r');
+
+      act(() => {
+        stdin.write('\r');
+      });
 
       await waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
@@ -1461,6 +1479,44 @@ describe('InputPrompt', () => {
       expect(props.buffer.text).toBe('initial text');
       expect(props.buffer.cursor).toEqual([0, 3]);
 
+      unmount();
+    });
+  });
+
+  describe('Ctrl+E keyboard shortcut', () => {
+    it('should move cursor to end of current line in multiline input', async () => {
+      props.buffer.text = 'line 1\nline 2\nline 3';
+      props.buffer.cursor = [1, 2];
+      props.buffer.lines = ['line 1', 'line 2', 'line 3'];
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\x05'); // Ctrl+E
+      await wait();
+
+      expect(props.buffer.move).toHaveBeenCalledWith('end');
+      expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should move cursor to end of current line for single line input', async () => {
+      props.buffer.text = 'single line text';
+      props.buffer.cursor = [0, 5];
+      props.buffer.lines = ['single line text'];
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\x05'); // Ctrl+E
+      await wait();
+
+      expect(props.buffer.move).toHaveBeenCalledWith('end');
+      expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
       unmount();
     });
   });

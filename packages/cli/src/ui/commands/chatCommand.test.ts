@@ -4,29 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  Mocked,
-} from 'vitest';
+import type { Mocked } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import {
-  type CommandContext,
+import type {
   MessageActionReturn,
   SlashCommand,
+  type CommandContext,
 } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { Content } from '@google/genai';
-import { GeminiClient } from '@google/gemini-cli-core';
+import type { Content } from '@google/genai';
+import type { GeminiClient } from '@google/gemini-cli-core';
 
-import * as fsPromises from 'fs/promises';
+import * as fsPromises from 'node:fs/promises';
 import { chatCommand } from './chatCommand.js';
-import { Stats } from 'fs';
-import { HistoryItemWithoutId } from '../types.js';
+import type { Stats } from 'node:fs';
+import type { HistoryItemWithoutId } from '../types.js';
 
 vi.mock('fs/promises', () => ({
   stat: vi.fn(),

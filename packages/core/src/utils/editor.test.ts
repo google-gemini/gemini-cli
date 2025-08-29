@@ -21,7 +21,7 @@ import {
   isEditorAvailable,
   type EditorType,
 } from './editor.js';
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn } from 'node:child_process';
 
 vi.mock('child_process', () => ({
   execSync: vi.fn(),
@@ -290,7 +290,7 @@ describe('editor utils', () => {
             '-c',
             'wincmd l | setlocal statusline=%#StatusBold#NEW\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ i/esc(toggle\\ edit\\ mode)',
             '-c',
-            'autocmd WinClosed * wqa',
+            'autocmd BufWritePost * wqa',
             'old.txt',
             'new.txt',
           ],

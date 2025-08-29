@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import * as os from 'os';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 vi.mock('fs', async (importOriginal) => {

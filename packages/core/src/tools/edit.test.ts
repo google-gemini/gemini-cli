@@ -26,15 +26,23 @@ vi.mock('../utils/editor.js', () => ({
   openDiff: mockOpenDiff,
 }));
 
-import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
-import { applyReplacement, EditTool, EditToolParams } from './edit.js';
-import { FileDiff, ToolConfirmationOutcome } from './tools.js';
+vi.mock('../telemetry/loggers.js', () => ({
+  logFileOperation: vi.fn(),
+}));
+
+import type { Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { EditToolParams } from './edit.js';
+import { applyReplacement, EditTool } from './edit.js';
+import type { FileDiff } from './tools.js';
+import { ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
-import { ApprovalMode, Config } from '../config/config.js';
-import { Content, Part, SchemaUnion } from '@google/genai';
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
+import type { Content, Part, SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 
@@ -627,6 +635,33 @@ describe('EditTool', () => {
       const result = await invocation.execute(new AbortController().signal);
       expect(result.llmContent).toMatch(/No changes to apply/);
       expect(result.returnDisplay).toMatch(/No changes to apply/);
+    });
+
+    it('should return EDIT_NO_CHANGE error if replacement results in identical content', async () => {
+      // This can happen if ensureCorrectEdit finds a fuzzy match, but the literal
+      // string replacement with `replaceAll` results in no change.
+      const initialContent = 'line 1\nline  2\nline 3'; // Note the double space
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        // old_string has a single space, so it won't be found by replaceAll
+        old_string: 'line 1\nline 2\nline 3',
+        new_string: 'line 1\nnew line 2\nline 3',
+      };
+
+      // Mock ensureCorrectEdit to simulate it finding a match (e.g., via fuzzy matching)
+      // but it doesn't correct the old_string to the literal content.
+      mockEnsureCorrectEdit.mockResolvedValueOnce({ params, occurrences: 1 });
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_CHANGE);
+      expect(result.returnDisplay).toMatch(
+        /No changes to apply. The new content is identical to the current content./,
+      );
+      // Ensure the file was not actually changed
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent);
     });
   });
 

@@ -9,16 +9,15 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useCommandCompletion } from './useCommandCompletion.js';
-import { CommandContext } from '../commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import type { CommandContext } from '../commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import { useEffect } from 'react';
-import { Suggestion } from '../components/SuggestionsDisplay.js';
-import { UseAtCompletionProps, useAtCompletion } from './useAtCompletion.js';
-import {
-  UseSlashCompletionProps,
-  useSlashCompletion,
-} from './useSlashCompletion.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
+import type { UseAtCompletionProps } from './useAtCompletion.js';
+import { useAtCompletion } from './useAtCompletion.js';
+import type { UseSlashCompletionProps } from './useSlashCompletion.js';
+import { useSlashCompletion } from './useSlashCompletion.js';
 
 vi.mock('./useAtCompletion', () => ({
   useAtCompletion: vi.fn(),
@@ -84,7 +83,9 @@ const setupMocks = ({
 
 describe('useCommandCompletion', () => {
   const mockCommandContext = {} as CommandContext;
-  const mockConfig = {} as Config;
+  const mockConfig = {
+    getEnablePromptCompletion: () => false,
+  } as Config;
   const testDirs: string[] = [];
   const testRootDir = '/';
 
@@ -511,7 +512,84 @@ describe('useCommandCompletion', () => {
       });
 
       expect(result.current.textBuffer.text).toBe(
-        '@src/file1.txt  is a good file',
+        '@src/file1.txt is a good file',
+      );
+    });
+  });
+
+  describe('prompt completion filtering', () => {
+    it('should not trigger prompt completion for line comments', async () => {
+      const mockConfig = {
+        getEnablePromptCompletion: () => true,
+      } as Config;
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('// This is a line comment');
+        const completion = useCommandCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      // Should not trigger prompt completion for comments
+      expect(result.current.suggestions.length).toBe(0);
+    });
+
+    it('should not trigger prompt completion for block comments', async () => {
+      const mockConfig = {
+        getEnablePromptCompletion: () => true,
+      } as Config;
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest(
+          '/* This is a block comment */',
+        );
+        const completion = useCommandCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      // Should not trigger prompt completion for comments
+      expect(result.current.suggestions.length).toBe(0);
+    });
+
+    it('should trigger prompt completion for regular text when enabled', async () => {
+      const mockConfig = {
+        getEnablePromptCompletion: () => true,
+      } as Config;
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest(
+          'This is regular text that should trigger completion',
+        );
+        const completion = useCommandCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      // This test verifies that comments are filtered out while regular text is not
+      expect(result.current.textBuffer.text).toBe(
+        'This is regular text that should trigger completion',
       );
     });
   });

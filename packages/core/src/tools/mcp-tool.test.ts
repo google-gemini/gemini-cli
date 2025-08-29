@@ -5,18 +5,14 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  Mocked,
-} from 'vitest';
+import type { Mocked } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
-import { ToolResult, ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
-import { CallableTool, Part } from '@google/genai';
+import type { ToolResult } from './tools.js';
+import { ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
+import type { CallableTool, Part } from '@google/genai';
+import { ToolErrorType } from './tool-error.js';
 
 // Mock @google/genai mcpToTool and CallableTool
 // We only need to mock the parts of CallableTool that DiscoveredMCPTool uses.
@@ -189,7 +185,7 @@ describe('DiscoveredMCPTool', () => {
       { isErrorValue: true, description: 'true (bool)' },
       { isErrorValue: 'true', description: '"true" (str)' },
     ])(
-      'should consider a ToolResult with isError $description to be a failure',
+      'should return a structured error if MCP tool reports an error',
       async ({ isErrorValue }) => {
         const tool = new DiscoveredMCPTool(
           mockCallableToolInstance,
@@ -199,6 +195,10 @@ describe('DiscoveredMCPTool', () => {
           inputSchema,
         );
         const params = { param: 'isErrorTrueCase' };
+        const functionCall = {
+          name: serverToolName,
+          args: params,
+        };
 
         const errorResponse = { isError: isErrorValue };
         const mockMcpToolResponseParts: Part[] = [
@@ -210,16 +210,19 @@ describe('DiscoveredMCPTool', () => {
           },
         ];
         mockCallTool.mockResolvedValue(mockMcpToolResponseParts);
-        const expectedError = new Error(
-          `MCP tool '${serverToolName}' reported tool error with response: ${JSON.stringify(
-            mockMcpToolResponseParts,
-          )}`,
-        );
-
+        const expectedErrorMessage = `MCP tool '${
+          serverToolName
+        }' reported tool error for function call: ${safeJsonStringify(
+          functionCall,
+        )} with response: ${safeJsonStringify(mockMcpToolResponseParts)}`;
         const invocation = tool.build(params);
-        await expect(
-          invocation.execute(new AbortController().signal),
-        ).rejects.toThrow(expectedError);
+        const result = await invocation.execute(new AbortController().signal);
+
+        expect(result.error?.type).toBe(ToolErrorType.MCP_TOOL_ERROR);
+        expect(result.llmContent).toBe(expectedErrorMessage);
+        expect(result.returnDisplay).toContain(
+          `Error: MCP tool '${serverToolName}' reported an error.`,
+        );
       },
     );
 
@@ -595,6 +598,8 @@ describe('DiscoveredMCPTool', () => {
         inputSchema,
         undefined,
         true,
+        undefined,
+        { isTrustedFolder: () => true } as any,
       );
       const invocation = trustedTool.build({ param: 'mock' });
       expect(
@@ -741,6 +746,70 @@ describe('DiscoveredMCPTool', () => {
           'Confirmation details or onConfirm not in expected format',
         );
       }
+    });
+  });
+
+  describe('shouldConfirmExecute with folder trust', () => {
+    const mockConfig = (isTrusted: boolean | undefined) => ({
+      isTrustedFolder: () => isTrusted,
+    });
+
+    it('should return false if trust is true and folder is trusted', async () => {
+      const trustedTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+        undefined,
+        true, // trust = true
+        undefined,
+        mockConfig(true) as any, // isTrustedFolder = true
+      );
+      const invocation = trustedTool.build({ param: 'mock' });
+      expect(
+        await invocation.shouldConfirmExecute(new AbortController().signal),
+      ).toBe(false);
+    });
+
+    it('should return confirmation details if trust is true but folder is not trusted', async () => {
+      const trustedTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+        undefined,
+        true, // trust = true
+        undefined,
+        mockConfig(false) as any, // isTrustedFolder = false
+      );
+      const invocation = trustedTool.build({ param: 'mock' });
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      expect(confirmation).toHaveProperty('type', 'mcp');
+    });
+
+    it('should return confirmation details if trust is false, even if folder is trusted', async () => {
+      const untrustedTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+        undefined,
+        false, // trust = false
+        undefined,
+        mockConfig(true) as any, // isTrustedFolder = true
+      );
+      const invocation = untrustedTool.build({ param: 'mock' });
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      expect(confirmation).toHaveProperty('type', 'mcp');
     });
   });
 
