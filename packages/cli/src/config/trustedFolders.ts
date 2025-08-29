@@ -157,7 +157,7 @@ export function saveTrustedFolders(
 export function isFolderTrustEnabled(settings: Settings): boolean {
   const folderTrustFeature =
     settings.security?.folderTrust?.featureEnabled ?? false;
-  const folderTrustSetting = settings.security?.folderTrust?.enabled ?? true;
+  const folderTrustSetting = settings.security?.folderTrust?.enabled ?? false;
   return folderTrustFeature && folderTrustSetting;
 }
 
