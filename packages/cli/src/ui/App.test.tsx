@@ -584,9 +584,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() =>
-      expect(lastFrame()).toContain('1 open file (ctrl+g to view)'),
-    );
+    await Promise.resolve();
+    expect(lastFrame()).toContain('1 open file (ctrl+g to view)');
   });
 
   it('should not display any files when not available', async () => {
@@ -604,7 +603,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() => expect(lastFrame()).not.toContain('Open File'));
+    await Promise.resolve();
+    expect(lastFrame()).not.toContain('Open File');
   });
 
   it('should display active file and other open files', async () => {
@@ -639,9 +639,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() =>
-      expect(lastFrame()).toContain('3 open files (ctrl+g to view)'),
-    );
+    await Promise.resolve();
+    expect(lastFrame()).toContain('3 open files (ctrl+g to view)');
   });
 
   it('should display active file and other context', async () => {
@@ -668,10 +667,9 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() =>
-      expect(lastFrame()).toContain(
-        'Using: 1 open file (ctrl+g to view) | 1 GEMINI.md file',
-      ),
+    await Promise.resolve();
+    expect(lastFrame()).toContain(
+      'Using: 1 open file (ctrl+g to view) | 1 GEMINI.md file',
     );
   });
 
@@ -726,9 +724,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() =>
-      expect(lastFrame()).toContain('Using: 1 GEMINI.md file'),
-    );
+    await Promise.resolve(); // Wait for any async updates
+    expect(lastFrame()).toContain('Using: 1 GEMINI.md file');
   });
 
   it('should display default "GEMINI.md" with plural when contextFileName is not set and count is > 1', async () => {
@@ -748,9 +745,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() =>
-      expect(lastFrame()).toContain('Using: 2 GEMINI.md files'),
-    );
+    await Promise.resolve();
+    expect(lastFrame()).toContain('Using: 2 GEMINI.md files');
   });
 
   it('should display custom contextFileName in footer when set and count is 1', async () => {
@@ -773,9 +769,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() =>
-      expect(lastFrame()).toContain('Using: 1 AGENTS.md file'),
-    );
+    await Promise.resolve();
+    expect(lastFrame()).toContain('Using: 1 AGENTS.md file');
   });
 
   it('should display a generic message when multiple context files with different names are provided', async () => {
@@ -801,9 +796,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() =>
-      expect(lastFrame()).toContain('Using: 2 context files'),
-    );
+    await Promise.resolve();
+    expect(lastFrame()).toContain('Using: 2 context files');
   });
 
   it('should display custom contextFileName with plural when set and count is > 1', async () => {
@@ -830,9 +824,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() =>
-      expect(lastFrame()).toContain('Using: 3 MY_NOTES.TXT files'),
-    );
+    await Promise.resolve();
+    expect(lastFrame()).toContain('Using: 3 MY_NOTES.TXT files');
   });
 
   it('should not display context file message if count is 0, even if contextFileName is set', async () => {
@@ -855,7 +848,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() => expect(lastFrame()).not.toContain('ANY_FILE.MD'));
+    await Promise.resolve();
+    expect(lastFrame()).not.toContain('ANY_FILE.MD');
   });
 
   it('should display GEMINI.md and MCP server count when both are present', async () => {
@@ -878,7 +872,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() => expect(lastFrame()).toContain('1 MCP server'));
+    await Promise.resolve();
+    expect(lastFrame()).toContain('1 MCP server');
   });
 
   it('should display only MCP server count when GEMINI.md count is 0', async () => {
@@ -899,9 +894,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() =>
-      expect(lastFrame()).toContain('Using: 2 MCP servers (ctrl+t to view)'),
-    );
+    await Promise.resolve();
+    expect(lastFrame()).toContain('Using: 2 MCP servers (ctrl+t to view)');
   });
 
   it('should display Tips component by default', async () => {
@@ -913,7 +907,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() => expect(vi.mocked(Tips)).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(vi.mocked(Tips)).toHaveBeenCalled();
   });
 
   it('should not display Tips component when hideTips is true', async () => {
@@ -931,7 +926,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() => expect(vi.mocked(Tips)).not.toHaveBeenCalled());
+    await Promise.resolve();
+    expect(vi.mocked(Tips)).not.toHaveBeenCalled();
   });
 
   it('should display Header component by default', async () => {
@@ -944,7 +940,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() => expect(vi.mocked(Header)).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(vi.mocked(Header)).toHaveBeenCalled();
   });
 
   it('should not display Header component when hideBanner is true', async () => {
@@ -961,7 +958,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() => expect(vi.mocked(Header)).not.toHaveBeenCalled());
+    await Promise.resolve();
+    expect(vi.mocked(Header)).not.toHaveBeenCalled();
   });
 
   it('should display Footer component by default', async () => {
@@ -973,8 +971,9 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
+    await Promise.resolve();
     // Footer should render - look for target directory which is always shown
-    await waitFor(() => expect(lastFrame()).toContain('/test/dir'));
+    expect(lastFrame()).toContain('/test/dir');
   });
 
   it('should not display Footer component when hideFooter is true', async () => {
@@ -990,8 +989,9 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
+    await Promise.resolve();
     // Footer should not render - target directory should not appear
-    await waitFor(() => expect(lastFrame()).not.toContain('/test/dir'));
+    expect(lastFrame()).not.toContain('/test/dir');
   });
 
   it('should show footer if system says show, but workspace and user settings say hide', async () => {
@@ -1009,8 +1009,9 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
+    await Promise.resolve();
     // Footer should render because system overrides - look for target directory
-    await waitFor(() => expect(lastFrame()).toContain('/test/dir'));
+    expect(lastFrame()).toContain('/test/dir');
   });
 
   it('should show tips if system says show, but workspace and user settings say hide', async () => {
@@ -1028,7 +1029,8 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() => expect(vi.mocked(Tips)).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(vi.mocked(Tips)).toHaveBeenCalled();
   });
 
   describe('when no theme is set', () => {
@@ -1078,7 +1080,7 @@ describe('App UI', () => {
     });
   });
 
-  it('should render the initial UI correctly', async () => {
+  it('should render the initial UI correctly', () => {
     const { lastFrame, unmount } = renderWithProviders(
       <App
         config={mockConfig as unknown as ServerConfig}
@@ -1087,10 +1089,10 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() => expect(lastFrame()).toMatchSnapshot());
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('should render correctly with the prompt input box', async () => {
+  it('should render correctly with the prompt input box', () => {
     vi.mocked(useGeminiStream).mockReturnValue({
       streamingState: StreamingState.Idle,
       submitQuery: vi.fn(),
@@ -1107,7 +1109,7 @@ describe('App UI', () => {
       />,
     );
     currentUnmount = unmount;
-    await waitFor(() => expect(lastFrame()).toMatchSnapshot());
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   describe('with initial prompt from --prompt-interactive', () => {
@@ -1147,10 +1149,10 @@ describe('App UI', () => {
         />,
       );
 
-      await waitFor(() =>
-        expect(mockSubmitQuery).toHaveBeenCalledWith(
-          'hello from prompt-interactive',
-        ),
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockSubmitQuery).toHaveBeenCalledWith(
+        'hello from prompt-interactive',
       );
     });
   });
@@ -1179,9 +1181,10 @@ describe('App UI', () => {
         />,
       );
       currentUnmount = unmount;
+      await Promise.resolve();
 
       // Total error count should be 1 + 3 + 1 = 5
-      await waitFor(() => expect(lastFrame()).toContain('5 errors'));
+      expect(lastFrame()).toContain('5 errors');
     });
   });
 
@@ -1209,9 +1212,7 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      await waitFor(() =>
-        expect(validateAuthMethodSpy).toHaveBeenCalledWith('USE_GEMINI'),
-      );
+      expect(validateAuthMethodSpy).toHaveBeenCalledWith('USE_GEMINI');
     });
 
     it('should NOT call validateAuthMethod when useExternalAuth is true', async () => {
@@ -1237,12 +1238,12 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      await waitFor(() => expect(validateAuthMethodSpy).not.toHaveBeenCalled());
+      expect(validateAuthMethodSpy).not.toHaveBeenCalled();
     });
   });
 
   describe('when in a narrow terminal', () => {
-    it('should render with a column layout', async () => {
+    it('should render with a column layout', () => {
       vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
         columns: 60,
         rows: 24,
@@ -1256,7 +1257,7 @@ describe('App UI', () => {
         />,
       );
       currentUnmount = unmount;
-      await waitFor(() => expect(lastFrame()).toMatchSnapshot());
+      expect(lastFrame()).toMatchSnapshot();
     });
   });
 
@@ -1283,10 +1284,8 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      await waitFor(() => {
-        expect(lastFrame()).toBeTruthy();
-        expect(lastFrame()).toContain('Type your message or @path/to/file');
-      });
+      expect(lastFrame()).toBeTruthy();
+      expect(lastFrame()).toContain('Type your message or @path/to/file');
     });
   });
 
@@ -1306,9 +1305,8 @@ describe('App UI', () => {
         />,
       );
       currentUnmount = unmount;
-      await waitFor(() =>
-        expect(lastFrame()).toContain('Do you trust this folder?'),
-      );
+      await Promise.resolve();
+      expect(lastFrame()).toContain('Do you trust this folder?');
     });
 
     it('should display the folder trust dialog when the feature is enabled but the folder is not trusted', async () => {
@@ -1327,9 +1325,8 @@ describe('App UI', () => {
         />,
       );
       currentUnmount = unmount;
-      await waitFor(() =>
-        expect(lastFrame()).toContain('Do you trust this folder?'),
-      );
+      await Promise.resolve();
+      expect(lastFrame()).toContain('Do you trust this folder?');
     });
 
     it('should not display the folder trust dialog when the feature is disabled', async () => {
@@ -1348,9 +1345,8 @@ describe('App UI', () => {
         />,
       );
       currentUnmount = unmount;
-      await waitFor(() =>
-        expect(lastFrame()).not.toContain('Do you trust this folder?'),
-      );
+      await Promise.resolve();
+      expect(lastFrame()).not.toContain('Do you trust this folder?');
     });
   });
 
@@ -1366,7 +1362,7 @@ describe('App UI', () => {
       vi.useRealTimers();
     });
 
-    it('should queue messages when handleFinalSubmit is called during streaming', async () => {
+    it('should queue messages when handleFinalSubmit is called during streaming', () => {
       vi.mocked(useGeminiStream).mockReturnValue({
         streamingState: StreamingState.Responding,
         submitQuery: mockSubmitQuery,
@@ -1385,7 +1381,7 @@ describe('App UI', () => {
       currentUnmount = unmount;
 
       // The message should not be sent immediately during streaming
-      await waitFor(() => expect(mockSubmitQuery).not.toHaveBeenCalled());
+      expect(mockSubmitQuery).not.toHaveBeenCalled();
     });
 
     it('should auto-send queued messages when transitioning from Responding to Idle', async () => {
@@ -1434,7 +1430,7 @@ describe('App UI', () => {
       // This test verifies the auto-send mechanism works when state transitions
     });
 
-    it('should display queued messages with dimmed color', async () => {
+    it('should display queued messages with dimmed color', () => {
       // This test would require being able to simulate handleFinalSubmit
       // and then checking the rendered output for the queued messages
       // with the ▸ prefix and dimColor styling
@@ -1459,7 +1455,7 @@ describe('App UI', () => {
       // The actual queued messages display is tested visually
       // since we need to trigger handleFinalSubmit which is internal
       const output = lastFrame();
-      await waitFor(() => expect(output).toBeDefined());
+      expect(output).toBeDefined();
     });
 
     it('should clear message queue after sending', async () => {
@@ -1487,10 +1483,11 @@ describe('App UI', () => {
       // This is handled internally by setMessageQueue([]) in the useEffect
       await vi.advanceTimersByTimeAsync(100);
 
-      await waitFor(() => expect(lastFrame()).toBeDefined());
+      // Verify the component renders without errors
+      expect(lastFrame()).toBeDefined();
     });
 
-    it('should handle empty messages by filtering them out', async () => {
+    it('should handle empty messages by filtering them out', () => {
       // The handleFinalSubmit function trims and checks if length > 0
       // before adding to queue, so empty messages are filtered
 
@@ -1513,7 +1510,7 @@ describe('App UI', () => {
 
       // Empty or whitespace-only messages won't be added to queue
       // This is enforced by the trimmedValue.length > 0 check
-      await waitFor(() => expect(mockSubmitQuery).not.toHaveBeenCalled());
+      expect(mockSubmitQuery).not.toHaveBeenCalled();
     });
 
     it('should combine multiple queued messages with double newlines', async () => {
@@ -1543,10 +1540,10 @@ describe('App UI', () => {
       // This is tested by the implementation in the useEffect
       await vi.advanceTimersByTimeAsync(100);
 
-      await waitFor(() => expect(lastFrame()).toBeDefined());
+      expect(lastFrame()).toBeDefined();
     });
 
-    it('should limit displayed messages to MAX_DISPLAYED_QUEUED_MESSAGES', async () => {
+    it('should limit displayed messages to MAX_DISPLAYED_QUEUED_MESSAGES', () => {
       // This test verifies the display logic handles multiple messages correctly
       // by checking that the MAX_DISPLAYED_QUEUED_MESSAGES constant is respected
 
@@ -1571,13 +1568,13 @@ describe('App UI', () => {
 
       // Verify the display logic exists and can handle multiple messages
       // The actual queue behavior is tested in the useMessageQueue hook tests
-      await waitFor(() => expect(output).toBeDefined());
+      expect(output).toBeDefined();
 
       // Check that the component renders without errors when there are messages to display
-      await waitFor(() => expect(output).not.toContain('Error'));
+      expect(output).not.toContain('Error');
     });
 
-    it('should render message queue display without errors', async () => {
+    it('should render message queue display without errors', () => {
       // Test that the message queue display logic renders correctly
       // This verifies the UI changes for performance improvements work
 
@@ -1601,11 +1598,11 @@ describe('App UI', () => {
       const output = lastFrame();
 
       // Verify component renders without errors
-      await waitFor(() => expect(output).toBeDefined());
-      await waitFor(() => expect(output).not.toContain('Error'));
+      expect(output).toBeDefined();
+      expect(output).not.toContain('Error');
 
       // Verify the component structure is intact (loading indicator should be present)
-      await waitFor(() => expect(output).toContain('esc to cancel'));
+      expect(output).toContain('esc to cancel');
     });
   });
 
@@ -1620,7 +1617,7 @@ describe('App UI', () => {
       consoleLogSpy.mockRestore();
     });
 
-    it('should pass debugKeystrokeLogging setting to KeypressProvider', async () => {
+    it('should pass debugKeystrokeLogging setting to KeypressProvider', () => {
       const mockSettingsWithDebug = createMockSettings({
         workspace: {
           ui: { theme: 'Default' },
@@ -1639,13 +1636,13 @@ describe('App UI', () => {
 
       const output = lastFrame();
 
-      await waitFor(() => expect(output).toBeDefined());
+      expect(output).toBeDefined();
       expect(mockSettingsWithDebug.merged.advanced?.debugKeystrokeLogging).toBe(
         true,
       );
     });
 
-    it('should use default false value when debugKeystrokeLogging is not set', async () => {
+    it('should use default false value when debugKeystrokeLogging is not set', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <App
           config={mockConfig as unknown as ServerConfig}
@@ -1657,7 +1654,7 @@ describe('App UI', () => {
 
       const output = lastFrame();
 
-      await waitFor(() => expect(output).toBeDefined());
+      expect(output).toBeDefined();
       expect(
         mockSettings.merged.advanced?.debugKeystrokeLogging,
       ).toBeUndefined();
@@ -1729,7 +1726,7 @@ describe('App UI', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify the text is in the prompt.
-      await waitFor(() => expect(lastFrame()).toContain('some text'));
+      expect(lastFrame()).toContain('some text');
 
       // Simulate Ctrl+C.
       stdin.write('\x03');

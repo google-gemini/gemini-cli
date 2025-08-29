@@ -24,23 +24,6 @@ export const useFolderTrust = (
 
   const folderTrust = settings.merged.security?.folderTrust?.enabled;
 
-  const updateTrust = useCallback(
-    (newIsTrusted: boolean) => {
-      const wasTrusted = isTrusted ?? true;
-      setIsTrusted(newIsTrusted);
-      onTrustChange(newIsTrusted);
-
-      const needsRestart = wasTrusted !== newIsTrusted;
-      if (needsRestart) {
-        setIsRestarting(true);
-        setIsFolderTrustDialogOpen(true);
-      } else {
-        setIsFolderTrustDialogOpen(false);
-      }
-    },
-    [isTrusted, onTrustChange],
-  );
-
   useEffect(() => {
     const trusted = isWorkspaceTrusted({
       security: {
@@ -60,6 +43,8 @@ export const useFolderTrust = (
       const cwd = process.cwd();
       let trustLevel: TrustLevel;
 
+      const wasTrusted = isTrusted ?? true;
+
       switch (choice) {
         case FolderTrustChoice.TRUST_FOLDER:
           trustLevel = TrustLevel.TRUST_FOLDER;
@@ -78,9 +63,18 @@ export const useFolderTrust = (
       const newIsTrusted =
         trustLevel === TrustLevel.TRUST_FOLDER ||
         trustLevel === TrustLevel.TRUST_PARENT;
-      updateTrust(newIsTrusted);
+      setIsTrusted(newIsTrusted);
+      onTrustChange(newIsTrusted);
+
+      const needsRestart = wasTrusted !== newIsTrusted;
+      if (needsRestart) {
+        setIsRestarting(true);
+        setIsFolderTrustDialogOpen(true);
+      } else {
+        setIsFolderTrustDialogOpen(false);
+      }
     },
-    [updateTrust],
+    [onTrustChange, isTrusted],
   );
 
   return {

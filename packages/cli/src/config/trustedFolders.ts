@@ -164,51 +164,17 @@ export function isFolderTrustEnabled(settings: Settings): boolean {
 }
 
 function getWorkspaceTrustFromLocalConfig(): boolean | undefined {
-  const { rules, errors } = loadTrustedFolders();
+  const folders = loadTrustedFolders();
 
-  if (errors.length > 0) {
-    for (const error of errors) {
+  if (folders.errors.length > 0) {
+    for (const error of folders.errors) {
       console.error(
         `Error loading trusted folders config from ${error.path}: ${error.message}`,
       );
     }
   }
 
-  const trustedPaths: string[] = [];
-  const untrustedPaths: string[] = [];
-
-  for (const rule of rules) {
-    switch (rule.trustLevel) {
-      case TrustLevel.TRUST_FOLDER:
-        trustedPaths.push(rule.path);
-        break;
-      case TrustLevel.TRUST_PARENT:
-        trustedPaths.push(path.dirname(rule.path));
-        break;
-      case TrustLevel.DO_NOT_TRUST:
-        untrustedPaths.push(rule.path);
-        break;
-      default:
-        // Do nothing for unknown trust levels.
-        break;
-    }
-  }
-
-  const cwd = process.cwd();
-
-  for (const trustedPath of trustedPaths) {
-    if (isWithinRoot(cwd, trustedPath)) {
-      return true;
-    }
-  }
-
-  for (const untrustedPath of untrustedPaths) {
-    if (path.normalize(cwd) === path.normalize(untrustedPath)) {
-      return false;
-    }
-  }
-
-  return undefined;
+  return folders.isPathTrusted(process.cwd());
 }
 
 export function isWorkspaceTrusted(settings: Settings): boolean | undefined {

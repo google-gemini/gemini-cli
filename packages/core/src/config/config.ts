@@ -752,13 +752,8 @@ export class Config {
     // reloaded.
     const context = ideContext.getIdeContext();
     if (context?.workspaceState?.isTrusted !== undefined) {
-      console.log(
-        'isTrustedFolder Overriding trust',
-        context?.workspaceState?.isTrusted,
-      );
       return context.workspaceState.isTrusted;
     }
-    console.log('isTrustedFolder returning', this.trustedFolder ?? true);
 
     return this.trustedFolder ?? true;
   }
