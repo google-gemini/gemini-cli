@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Config } from '../config/config.js';
+import fs from 'node:fs';
 import {
   setSimulate429,
   disableSimulationAfterFallback,
@@ -17,10 +18,16 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { retryWithBackoff } from './retry.js';
 import { AuthType } from '../core/contentGenerator.js';
 
+vi.mock('node:fs');
+
 describe('Flash Fallback Integration', () => {
   let config: Config;
 
   beforeEach(() => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.statSync).mockReturnValue({
+      isDirectory: () => true,
+    } as fs.Stats);
     config = new Config({
       sessionId: 'test-session',
       targetDir: '/test',

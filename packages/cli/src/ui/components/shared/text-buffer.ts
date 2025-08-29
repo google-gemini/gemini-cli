@@ -4,15 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import stripAnsi from 'strip-ansi';
-import { spawnSync } from 'child_process';
-import fs from 'fs';
-import os from 'os';
-import pathMod from 'path';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import pathMod from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
 import stringWidth from 'string-width';
 import { unescapePath } from '@google/gemini-cli-core';
-import { toCodePoints, cpLen, cpSlice } from '../../utils/textUtils.js';
+import {
+  toCodePoints,
+  cpLen,
+  cpSlice,
+  stripUnsafeCharacters,
+} from '../../utils/textUtils.js';
+import type { VimAction } from './vim-buffer-actions.js';
+import { handleVimAction } from './vim-buffer-actions.js';
 
 export type Direction =
   | 'left'
@@ -32,27 +38,465 @@ function isWordChar(ch: string | undefined): boolean {
   return !/[\s,.;!?]/.test(ch);
 }
 
-/**
- * Strip characters that can break terminal rendering.
- *
- * Strip ANSI escape codes and control characters except for line breaks.
- * Control characters such as delete break terminal UI rendering.
- */
-function stripUnsafeCharacters(str: string): string {
-  const stripped = stripAnsi(str);
-  return toCodePoints(stripAnsi(stripped))
-    .filter((char) => {
-      if (char.length > 1) return false;
-      const code = char.codePointAt(0);
-      if (code === undefined) {
-        return false;
+// Helper functions for line-based word navigation
+export const isWordCharStrict = (char: string): boolean =>
+  /[\w\p{L}\p{N}]/u.test(char); // Matches a single character that is any Unicode letter, any Unicode number, or an underscore
+
+export const isWhitespace = (char: string): boolean => /\s/.test(char);
+
+// Check if a character is a combining mark (only diacritics for now)
+export const isCombiningMark = (char: string): boolean => /\p{M}/u.test(char);
+
+// Check if a character should be considered part of a word (including combining marks)
+export const isWordCharWithCombining = (char: string): boolean =>
+  isWordCharStrict(char) || isCombiningMark(char);
+
+// Get the script of a character (simplified for common scripts)
+export const getCharScript = (char: string): string => {
+  if (/[\p{Script=Latin}]/u.test(char)) return 'latin'; // All Latin script chars including diacritics
+  if (/[\p{Script=Han}]/u.test(char)) return 'han'; // Chinese
+  if (/[\p{Script=Arabic}]/u.test(char)) return 'arabic';
+  if (/[\p{Script=Hiragana}]/u.test(char)) return 'hiragana';
+  if (/[\p{Script=Katakana}]/u.test(char)) return 'katakana';
+  if (/[\p{Script=Cyrillic}]/u.test(char)) return 'cyrillic';
+  return 'other';
+};
+
+// Check if two characters are from different scripts (indicating word boundary)
+export const isDifferentScript = (char1: string, char2: string): boolean => {
+  if (!isWordCharStrict(char1) || !isWordCharStrict(char2)) return false;
+  return getCharScript(char1) !== getCharScript(char2);
+};
+
+// Find next word start within a line, starting from col
+export const findNextWordStartInLine = (
+  line: string,
+  col: number,
+): number | null => {
+  const chars = toCodePoints(line);
+  let i = col;
+
+  if (i >= chars.length) return null;
+
+  const currentChar = chars[i];
+
+  // Skip current word/sequence based on character type
+  if (isWordCharStrict(currentChar)) {
+    while (i < chars.length && isWordCharWithCombining(chars[i])) {
+      // Check for script boundary - if next character is from different script, stop here
+      if (
+        i + 1 < chars.length &&
+        isWordCharStrict(chars[i + 1]) &&
+        isDifferentScript(chars[i], chars[i + 1])
+      ) {
+        i++; // Include current character
+        break; // Stop at script boundary
       }
-      const isUnsafe =
-        code === 127 || (code <= 31 && code !== 13 && code !== 10);
-      return !isUnsafe;
-    })
-    .join('');
-}
+      i++;
+    }
+  } else if (!isWhitespace(currentChar)) {
+    while (
+      i < chars.length &&
+      !isWordCharStrict(chars[i]) &&
+      !isWhitespace(chars[i])
+    ) {
+      i++;
+    }
+  }
+
+  // Skip whitespace
+  while (i < chars.length && isWhitespace(chars[i])) {
+    i++;
+  }
+
+  return i < chars.length ? i : null;
+};
+
+// Find previous word start within a line
+export const findPrevWordStartInLine = (
+  line: string,
+  col: number,
+): number | null => {
+  const chars = toCodePoints(line);
+  let i = col;
+
+  if (i <= 0) return null;
+
+  i--;
+
+  // Skip whitespace moving backwards
+  while (i >= 0 && isWhitespace(chars[i])) {
+    i--;
+  }
+
+  if (i < 0) return null;
+
+  if (isWordCharStrict(chars[i])) {
+    // We're in a word, move to its beginning
+    while (i >= 0 && isWordCharStrict(chars[i])) {
+      // Check for script boundary - if previous character is from different script, stop here
+      if (
+        i - 1 >= 0 &&
+        isWordCharStrict(chars[i - 1]) &&
+        isDifferentScript(chars[i], chars[i - 1])
+      ) {
+        return i; // Return current position at script boundary
+      }
+      i--;
+    }
+    return i + 1;
+  } else {
+    // We're in punctuation, move to its beginning
+    while (i >= 0 && !isWordCharStrict(chars[i]) && !isWhitespace(chars[i])) {
+      i--;
+    }
+    return i + 1;
+  }
+};
+
+// Find word end within a line
+export const findWordEndInLine = (line: string, col: number): number | null => {
+  const chars = toCodePoints(line);
+  let i = col;
+
+  // If we're already at the end of a word (including punctuation sequences), advance to next word
+  // This includes both regular word endings and script boundaries
+  const atEndOfWordChar =
+    i < chars.length &&
+    isWordCharWithCombining(chars[i]) &&
+    (i + 1 >= chars.length ||
+      !isWordCharWithCombining(chars[i + 1]) ||
+      (isWordCharStrict(chars[i]) &&
+        i + 1 < chars.length &&
+        isWordCharStrict(chars[i + 1]) &&
+        isDifferentScript(chars[i], chars[i + 1])));
+
+  const atEndOfPunctuation =
+    i < chars.length &&
+    !isWordCharWithCombining(chars[i]) &&
+    !isWhitespace(chars[i]) &&
+    (i + 1 >= chars.length ||
+      isWhitespace(chars[i + 1]) ||
+      isWordCharWithCombining(chars[i + 1]));
+
+  if (atEndOfWordChar || atEndOfPunctuation) {
+    // We're at the end of a word or punctuation sequence, move forward to find next word
+    i++;
+    // Skip whitespace to find next word or punctuation
+    while (i < chars.length && isWhitespace(chars[i])) {
+      i++;
+    }
+  }
+
+  // If we're not on a word character, find the next word or punctuation sequence
+  if (i < chars.length && !isWordCharWithCombining(chars[i])) {
+    // Skip whitespace to find next word or punctuation
+    while (i < chars.length && isWhitespace(chars[i])) {
+      i++;
+    }
+  }
+
+  // Move to end of current word (including combining marks, but stop at script boundaries)
+  let foundWord = false;
+  let lastBaseCharPos = -1;
+
+  if (i < chars.length && isWordCharWithCombining(chars[i])) {
+    // Handle word characters
+    while (i < chars.length && isWordCharWithCombining(chars[i])) {
+      foundWord = true;
+
+      // Track the position of the last base character (not combining mark)
+      if (isWordCharStrict(chars[i])) {
+        lastBaseCharPos = i;
+      }
+
+      // Check if next character is from a different script (word boundary)
+      if (
+        i + 1 < chars.length &&
+        isWordCharStrict(chars[i + 1]) &&
+        isDifferentScript(chars[i], chars[i + 1])
+      ) {
+        i++; // Include current character
+        if (isWordCharStrict(chars[i - 1])) {
+          lastBaseCharPos = i - 1;
+        }
+        break; // Stop at script boundary
+      }
+
+      i++;
+    }
+  } else if (i < chars.length && !isWhitespace(chars[i])) {
+    // Handle punctuation sequences (like ████)
+    while (
+      i < chars.length &&
+      !isWordCharStrict(chars[i]) &&
+      !isWhitespace(chars[i])
+    ) {
+      foundWord = true;
+      lastBaseCharPos = i;
+      i++;
+    }
+  }
+
+  // Only return a position if we actually found a word
+  // Return the position of the last base character, not combining marks
+  if (foundWord && lastBaseCharPos >= col) {
+    return lastBaseCharPos;
+  }
+
+  return null;
+};
+
+// Find next word across lines
+export const findNextWordAcrossLines = (
+  lines: string[],
+  cursorRow: number,
+  cursorCol: number,
+  searchForWordStart: boolean,
+): { row: number; col: number } | null => {
+  // First try current line
+  const currentLine = lines[cursorRow] || '';
+  const colInCurrentLine = searchForWordStart
+    ? findNextWordStartInLine(currentLine, cursorCol)
+    : findWordEndInLine(currentLine, cursorCol);
+
+  if (colInCurrentLine !== null) {
+    return { row: cursorRow, col: colInCurrentLine };
+  }
+
+  // Search subsequent lines
+  for (let row = cursorRow + 1; row < lines.length; row++) {
+    const line = lines[row] || '';
+    const chars = toCodePoints(line);
+
+    // For empty lines, if we haven't found any words yet, return the empty line
+    if (chars.length === 0) {
+      // Check if there are any words in remaining lines
+      let hasWordsInLaterLines = false;
+      for (let laterRow = row + 1; laterRow < lines.length; laterRow++) {
+        const laterLine = lines[laterRow] || '';
+        const laterChars = toCodePoints(laterLine);
+        let firstNonWhitespace = 0;
+        while (
+          firstNonWhitespace < laterChars.length &&
+          isWhitespace(laterChars[firstNonWhitespace])
+        ) {
+          firstNonWhitespace++;
+        }
+        if (firstNonWhitespace < laterChars.length) {
+          hasWordsInLaterLines = true;
+          break;
+        }
+      }
+
+      // If no words in later lines, return the empty line
+      if (!hasWordsInLaterLines) {
+        return { row, col: 0 };
+      }
+      continue;
+    }
+
+    // Find first non-whitespace
+    let firstNonWhitespace = 0;
+    while (
+      firstNonWhitespace < chars.length &&
+      isWhitespace(chars[firstNonWhitespace])
+    ) {
+      firstNonWhitespace++;
+    }
+
+    if (firstNonWhitespace < chars.length) {
+      if (searchForWordStart) {
+        return { row, col: firstNonWhitespace };
+      } else {
+        // For word end, find the end of the first word
+        const endCol = findWordEndInLine(line, firstNonWhitespace);
+        if (endCol !== null) {
+          return { row, col: endCol };
+        }
+      }
+    }
+  }
+
+  return null;
+};
+
+// Find previous word across lines
+export const findPrevWordAcrossLines = (
+  lines: string[],
+  cursorRow: number,
+  cursorCol: number,
+): { row: number; col: number } | null => {
+  // First try current line
+  const currentLine = lines[cursorRow] || '';
+  const colInCurrentLine = findPrevWordStartInLine(currentLine, cursorCol);
+
+  if (colInCurrentLine !== null) {
+    return { row: cursorRow, col: colInCurrentLine };
+  }
+
+  // Search previous lines
+  for (let row = cursorRow - 1; row >= 0; row--) {
+    const line = lines[row] || '';
+    const chars = toCodePoints(line);
+
+    if (chars.length === 0) continue;
+
+    // Find last word start
+    let lastWordStart = chars.length;
+    while (lastWordStart > 0 && isWhitespace(chars[lastWordStart - 1])) {
+      lastWordStart--;
+    }
+
+    if (lastWordStart > 0) {
+      // Find start of this word
+      const wordStart = findPrevWordStartInLine(line, lastWordStart);
+      if (wordStart !== null) {
+        return { row, col: wordStart };
+      }
+    }
+  }
+
+  return null;
+};
+
+// Helper functions for vim line operations
+export const getPositionFromOffsets = (
+  startOffset: number,
+  endOffset: number,
+  lines: string[],
+) => {
+  let offset = 0;
+  let startRow = 0;
+  let startCol = 0;
+  let endRow = 0;
+  let endCol = 0;
+
+  // Find start position
+  for (let i = 0; i < lines.length; i++) {
+    const lineLength = lines[i].length + 1; // +1 for newline
+    if (offset + lineLength > startOffset) {
+      startRow = i;
+      startCol = startOffset - offset;
+      break;
+    }
+    offset += lineLength;
+  }
+
+  // Find end position
+  offset = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const lineLength = lines[i].length + (i < lines.length - 1 ? 1 : 0); // +1 for newline except last line
+    if (offset + lineLength >= endOffset) {
+      endRow = i;
+      endCol = endOffset - offset;
+      break;
+    }
+    offset += lineLength;
+  }
+
+  return { startRow, startCol, endRow, endCol };
+};
+
+export const getLineRangeOffsets = (
+  startRow: number,
+  lineCount: number,
+  lines: string[],
+) => {
+  let startOffset = 0;
+
+  // Calculate start offset
+  for (let i = 0; i < startRow; i++) {
+    startOffset += lines[i].length + 1; // +1 for newline
+  }
+
+  // Calculate end offset
+  let endOffset = startOffset;
+  for (let i = 0; i < lineCount; i++) {
+    const lineIndex = startRow + i;
+    if (lineIndex < lines.length) {
+      endOffset += lines[lineIndex].length;
+      if (lineIndex < lines.length - 1) {
+        endOffset += 1; // +1 for newline
+      }
+    }
+  }
+
+  return { startOffset, endOffset };
+};
+
+export const replaceRangeInternal = (
+  state: TextBufferState,
+  startRow: number,
+  startCol: number,
+  endRow: number,
+  endCol: number,
+  text: string,
+): TextBufferState => {
+  const currentLine = (row: number) => state.lines[row] || '';
+  const currentLineLen = (row: number) => cpLen(currentLine(row));
+  const clamp = (value: number, min: number, max: number) =>
+    Math.min(Math.max(value, min), max);
+
+  if (
+    startRow > endRow ||
+    (startRow === endRow && startCol > endCol) ||
+    startRow < 0 ||
+    startCol < 0 ||
+    endRow >= state.lines.length ||
+    (endRow < state.lines.length && endCol > currentLineLen(endRow))
+  ) {
+    return state; // Invalid range
+  }
+
+  const newLines = [...state.lines];
+
+  const sCol = clamp(startCol, 0, currentLineLen(startRow));
+  const eCol = clamp(endCol, 0, currentLineLen(endRow));
+
+  const prefix = cpSlice(currentLine(startRow), 0, sCol);
+  const suffix = cpSlice(currentLine(endRow), eCol);
+
+  const normalisedReplacement = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+  const replacementParts = normalisedReplacement.split('\n');
+
+  // The combined first line of the new text
+  const firstLine = prefix + replacementParts[0];
+
+  if (replacementParts.length === 1) {
+    // No newlines in replacement: combine prefix, replacement, and suffix on one line.
+    newLines.splice(startRow, endRow - startRow + 1, firstLine + suffix);
+  } else {
+    // Newlines in replacement: create new lines.
+    const lastLine = replacementParts[replacementParts.length - 1] + suffix;
+    const middleLines = replacementParts.slice(1, -1);
+    newLines.splice(
+      startRow,
+      endRow - startRow + 1,
+      firstLine,
+      ...middleLines,
+      lastLine,
+    );
+  }
+
+  const finalCursorRow = startRow + replacementParts.length - 1;
+  const finalCursorCol =
+    (replacementParts.length > 1 ? 0 : sCol) +
+    cpLen(replacementParts[replacementParts.length - 1]);
+
+  return {
+    ...state,
+    lines: newLines,
+    cursorRow: Math.min(Math.max(finalCursorRow, 0), newLines.length - 1),
+    cursorCol: Math.max(
+      0,
+      Math.min(finalCursorCol, cpLen(newLines[finalCursorRow] || '')),
+    ),
+    preferredCol: null,
+  };
+};
 
 export interface Viewport {
   height: number;
@@ -156,6 +600,33 @@ export function offsetToLogicalPos(
     col = 0;
   }
   return [row, col];
+}
+
+/**
+ * Converts logical row/col position to absolute text offset
+ * Inverse operation of offsetToLogicalPos
+ */
+export function logicalPosToOffset(
+  lines: string[],
+  row: number,
+  col: number,
+): number {
+  let offset = 0;
+
+  // Clamp row to valid range
+  const actualRow = Math.min(row, lines.length - 1);
+
+  // Add lengths of all lines before the target row
+  for (let i = 0; i < actualRow; i++) {
+    offset += cpLen(lines[i]) + 1; // +1 for newline
+  }
+
+  // Add column offset within the target row
+  if (actualRow >= 0 && actualRow < lines.length) {
+    offset += Math.min(col, cpLen(lines[actualRow]));
+  }
+
+  return offset;
 }
 
 // Helper to calculate visual lines and map cursor positions
@@ -376,7 +847,7 @@ function calculateVisualLayout(
 
 // --- Start of reducer logic ---
 
-interface TextBufferState {
+export interface TextBufferState {
   lines: string[];
   cursorRow: number;
   cursorCol: number;
@@ -390,7 +861,20 @@ interface TextBufferState {
 
 const historyLimit = 100;
 
-type TextBufferAction =
+export const pushUndo = (currentState: TextBufferState): TextBufferState => {
+  const snapshot = {
+    lines: [...currentState.lines],
+    cursorRow: currentState.cursorRow,
+    cursorCol: currentState.cursorCol,
+  };
+  const newStack = [...currentState.undoStack, snapshot];
+  if (newStack.length > historyLimit) {
+    newStack.shift();
+  }
+  return { ...currentState, undoStack: newStack, redoStack: [] };
+};
+
+export type TextBufferAction =
   | { type: 'set_text'; payload: string; pushToUndo?: boolean }
   | { type: 'insert'; payload: string }
   | { type: 'backspace' }
@@ -419,24 +903,49 @@ type TextBufferAction =
     }
   | { type: 'move_to_offset'; payload: { offset: number } }
   | { type: 'create_undo_snapshot' }
-  | { type: 'set_viewport_width'; payload: number };
+  | { type: 'set_viewport_width'; payload: number }
+  | { type: 'vim_delete_word_forward'; payload: { count: number } }
+  | { type: 'vim_delete_word_backward'; payload: { count: number } }
+  | { type: 'vim_delete_word_end'; payload: { count: number } }
+  | { type: 'vim_change_word_forward'; payload: { count: number } }
+  | { type: 'vim_change_word_backward'; payload: { count: number } }
+  | { type: 'vim_change_word_end'; payload: { count: number } }
+  | { type: 'vim_delete_line'; payload: { count: number } }
+  | { type: 'vim_change_line'; payload: { count: number } }
+  | { type: 'vim_delete_to_end_of_line' }
+  | { type: 'vim_change_to_end_of_line' }
+  | {
+      type: 'vim_change_movement';
+      payload: { movement: 'h' | 'j' | 'k' | 'l'; count: number };
+    }
+  // New vim actions for stateless command handling
+  | { type: 'vim_move_left'; payload: { count: number } }
+  | { type: 'vim_move_right'; payload: { count: number } }
+  | { type: 'vim_move_up'; payload: { count: number } }
+  | { type: 'vim_move_down'; payload: { count: number } }
+  | { type: 'vim_move_word_forward'; payload: { count: number } }
+  | { type: 'vim_move_word_backward'; payload: { count: number } }
+  | { type: 'vim_move_word_end'; payload: { count: number } }
+  | { type: 'vim_delete_char'; payload: { count: number } }
+  | { type: 'vim_insert_at_cursor' }
+  | { type: 'vim_append_at_cursor' }
+  | { type: 'vim_open_line_below' }
+  | { type: 'vim_open_line_above' }
+  | { type: 'vim_append_at_line_end' }
+  | { type: 'vim_insert_at_line_start' }
+  | { type: 'vim_move_to_line_start' }
+  | { type: 'vim_move_to_line_end' }
+  | { type: 'vim_move_to_first_nonwhitespace' }
+  | { type: 'vim_move_to_first_line' }
+  | { type: 'vim_move_to_last_line' }
+  | { type: 'vim_move_to_line'; payload: { lineNumber: number } }
+  | { type: 'vim_escape_insert_mode' };
 
 export function textBufferReducer(
   state: TextBufferState,
   action: TextBufferAction,
 ): TextBufferState {
-  const pushUndo = (currentState: TextBufferState): TextBufferState => {
-    const snapshot = {
-      lines: [...currentState.lines],
-      cursorRow: currentState.cursorRow,
-      cursorCol: currentState.cursorCol,
-    };
-    const newStack = [...currentState.undoStack, snapshot];
-    if (newStack.length > historyLimit) {
-      newStack.shift();
-    }
-    return { ...currentState, undoStack: newStack, redoStack: [] };
-  };
+  const pushUndoLocal = pushUndo;
 
   const currentLine = (r: number): string => state.lines[r] ?? '';
   const currentLineLen = (r: number): number => cpLen(currentLine(r));
@@ -445,7 +954,7 @@ export function textBufferReducer(
     case 'set_text': {
       let nextState = state;
       if (action.pushToUndo !== false) {
-        nextState = pushUndo(state);
+        nextState = pushUndoLocal(state);
       }
       const newContentLines = action.payload
         .replace(/\r\n?/g, '\n')
@@ -462,7 +971,7 @@ export function textBufferReducer(
     }
 
     case 'insert': {
-      const nextState = pushUndo(state);
+      const nextState = pushUndoLocal(state);
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
       let newCursorCol = nextState.cursorCol;
@@ -504,7 +1013,7 @@ export function textBufferReducer(
     }
 
     case 'backspace': {
-      const nextState = pushUndo(state);
+      const nextState = pushUndoLocal(state);
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
       let newCursorCol = nextState.cursorCol;
@@ -700,14 +1209,14 @@ export function textBufferReducer(
       const { cursorRow, cursorCol, lines } = state;
       const lineContent = currentLine(cursorRow);
       if (cursorCol < currentLineLen(cursorRow)) {
-        const nextState = pushUndo(state);
+        const nextState = pushUndoLocal(state);
         const newLines = [...nextState.lines];
         newLines[cursorRow] =
           cpSlice(lineContent, 0, cursorCol) +
           cpSlice(lineContent, cursorCol + 1);
         return { ...nextState, lines: newLines, preferredCol: null };
       } else if (cursorRow < lines.length - 1) {
-        const nextState = pushUndo(state);
+        const nextState = pushUndoLocal(state);
         const nextLineContent = currentLine(cursorRow + 1);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = lineContent + nextLineContent;
@@ -722,7 +1231,7 @@ export function textBufferReducer(
       if (cursorCol === 0 && cursorRow === 0) return state;
       if (cursorCol === 0) {
         // Act as a backspace
-        const nextState = pushUndo(state);
+        const nextState = pushUndoLocal(state);
         const prevLineContent = currentLine(cursorRow - 1);
         const currentLineContentVal = currentLine(cursorRow);
         const newCol = cpLen(prevLineContent);
@@ -737,7 +1246,7 @@ export function textBufferReducer(
           preferredCol: null,
         };
       }
-      const nextState = pushUndo(state);
+      const nextState = pushUndoLocal(state);
       const lineContent = currentLine(cursorRow);
       const arr = toCodePoints(lineContent);
       let start = cursorCol;
@@ -773,14 +1282,14 @@ export function textBufferReducer(
         return state;
       if (cursorCol >= arr.length) {
         // Act as a delete
-        const nextState = pushUndo(state);
+        const nextState = pushUndoLocal(state);
         const nextLineContent = currentLine(cursorRow + 1);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = lineContent + nextLineContent;
         newLines.splice(cursorRow + 1, 1);
         return { ...nextState, lines: newLines, preferredCol: null };
       }
-      const nextState = pushUndo(state);
+      const nextState = pushUndoLocal(state);
       let end = cursorCol;
       while (end < arr.length && !isWordChar(arr[end])) end++;
       while (end < arr.length && isWordChar(arr[end])) end++;
@@ -794,13 +1303,13 @@ export function textBufferReducer(
       const { cursorRow, cursorCol, lines } = state;
       const lineContent = currentLine(cursorRow);
       if (cursorCol < currentLineLen(cursorRow)) {
-        const nextState = pushUndo(state);
+        const nextState = pushUndoLocal(state);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = cpSlice(lineContent, 0, cursorCol);
         return { ...nextState, lines: newLines };
       } else if (cursorRow < lines.length - 1) {
         // Act as a delete
-        const nextState = pushUndo(state);
+        const nextState = pushUndoLocal(state);
         const nextLineContent = currentLine(cursorRow + 1);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = lineContent + nextLineContent;
@@ -813,7 +1322,7 @@ export function textBufferReducer(
     case 'kill_line_left': {
       const { cursorRow, cursorCol } = state;
       if (cursorCol > 0) {
-        const nextState = pushUndo(state);
+        const nextState = pushUndoLocal(state);
         const lineContent = currentLine(cursorRow);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = cpSlice(lineContent, cursorCol);
@@ -863,66 +1372,15 @@ export function textBufferReducer(
 
     case 'replace_range': {
       const { startRow, startCol, endRow, endCol, text } = action.payload;
-      if (
-        startRow > endRow ||
-        (startRow === endRow && startCol > endCol) ||
-        startRow < 0 ||
-        startCol < 0 ||
-        endRow >= state.lines.length ||
-        (endRow < state.lines.length && endCol > currentLineLen(endRow))
-      ) {
-        return state; // Invalid range
-      }
-
-      const nextState = pushUndo(state);
-      const newLines = [...nextState.lines];
-
-      const sCol = clamp(startCol, 0, currentLineLen(startRow));
-      const eCol = clamp(endCol, 0, currentLineLen(endRow));
-
-      const prefix = cpSlice(currentLine(startRow), 0, sCol);
-      const suffix = cpSlice(currentLine(endRow), eCol);
-
-      const normalisedReplacement = text
-        .replace(/\r\n/g, '\n')
-        .replace(/\r/g, '\n');
-      const replacementParts = normalisedReplacement.split('\n');
-
-      // Replace the content
-      if (startRow === endRow) {
-        newLines[startRow] = prefix + normalisedReplacement + suffix;
-      } else {
-        const firstLine = prefix + replacementParts[0];
-        if (replacementParts.length === 1) {
-          // Single line of replacement text, but spanning multiple original lines
-          newLines.splice(startRow, endRow - startRow + 1, firstLine + suffix);
-        } else {
-          // Multi-line replacement text
-          const lastLine =
-            replacementParts[replacementParts.length - 1] + suffix;
-          const middleLines = replacementParts.slice(1, -1);
-          newLines.splice(
-            startRow,
-            endRow - startRow + 1,
-            firstLine,
-            ...middleLines,
-            lastLine,
-          );
-        }
-      }
-
-      const finalCursorRow = startRow + replacementParts.length - 1;
-      const finalCursorCol =
-        (replacementParts.length > 1 ? 0 : sCol) +
-        cpLen(replacementParts[replacementParts.length - 1]);
-
-      return {
-        ...nextState,
-        lines: newLines,
-        cursorRow: finalCursorRow,
-        cursorCol: finalCursorCol,
-        preferredCol: null,
-      };
+      const nextState = pushUndoLocal(state);
+      return replaceRangeInternal(
+        nextState,
+        startRow,
+        startCol,
+        endRow,
+        endCol,
+        text,
+      );
     }
 
     case 'move_to_offset': {
@@ -940,8 +1398,43 @@ export function textBufferReducer(
     }
 
     case 'create_undo_snapshot': {
-      return pushUndo(state);
+      return pushUndoLocal(state);
     }
+
+    // Vim-specific operations
+    case 'vim_delete_word_forward':
+    case 'vim_delete_word_backward':
+    case 'vim_delete_word_end':
+    case 'vim_change_word_forward':
+    case 'vim_change_word_backward':
+    case 'vim_change_word_end':
+    case 'vim_delete_line':
+    case 'vim_change_line':
+    case 'vim_delete_to_end_of_line':
+    case 'vim_change_to_end_of_line':
+    case 'vim_change_movement':
+    case 'vim_move_left':
+    case 'vim_move_right':
+    case 'vim_move_up':
+    case 'vim_move_down':
+    case 'vim_move_word_forward':
+    case 'vim_move_word_backward':
+    case 'vim_move_word_end':
+    case 'vim_delete_char':
+    case 'vim_insert_at_cursor':
+    case 'vim_append_at_cursor':
+    case 'vim_open_line_below':
+    case 'vim_open_line_above':
+    case 'vim_append_at_line_end':
+    case 'vim_insert_at_line_start':
+    case 'vim_move_to_line_start':
+    case 'vim_move_to_line_end':
+    case 'vim_move_to_first_nonwhitespace':
+    case 'vim_move_to_first_line':
+    case 'vim_move_to_last_line':
+    case 'vim_move_to_line':
+    case 'vim_escape_insert_mode':
+      return handleVimAction(state, action as VimAction);
 
     default: {
       const exhaustiveCheck: never = action;
@@ -1023,26 +1516,27 @@ export function useTextBuffer({
   }, [visualCursor, visualScrollRow, viewport]);
 
   const insert = useCallback(
-    (ch: string): void => {
+    (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
       if (/[\n\r]/.test(ch)) {
         dispatch({ type: 'insert', payload: ch });
         return;
       }
 
       const minLengthToInferAsDragDrop = 3;
-      if (ch.length >= minLengthToInferAsDragDrop && !shellModeActive) {
-        let potentialPath = ch;
-        if (
-          potentialPath.length > 2 &&
-          potentialPath.startsWith("'") &&
-          potentialPath.endsWith("'")
-        ) {
-          potentialPath = ch.slice(1, -1);
+      if (
+        ch.length >= minLengthToInferAsDragDrop &&
+        !shellModeActive &&
+        paste
+      ) {
+        let potentialPath = ch.trim();
+        const quoteMatch = potentialPath.match(/^'(.*)'$/);
+        if (quoteMatch) {
+          potentialPath = quoteMatch[1];
         }
 
         potentialPath = potentialPath.trim();
         if (isValidPath(unescapePath(potentialPath))) {
-          ch = `@${potentialPath}`;
+          ch = `@${potentialPath} `;
         }
       }
 
@@ -1109,6 +1603,139 @@ export function useTextBuffer({
     dispatch({ type: 'kill_line_left' });
   }, []);
 
+  // Vim-specific operations
+  const vimDeleteWordForward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_word_forward', payload: { count } });
+  }, []);
+
+  const vimDeleteWordBackward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_word_backward', payload: { count } });
+  }, []);
+
+  const vimDeleteWordEnd = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_word_end', payload: { count } });
+  }, []);
+
+  const vimChangeWordForward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_change_word_forward', payload: { count } });
+  }, []);
+
+  const vimChangeWordBackward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_change_word_backward', payload: { count } });
+  }, []);
+
+  const vimChangeWordEnd = useCallback((count: number): void => {
+    dispatch({ type: 'vim_change_word_end', payload: { count } });
+  }, []);
+
+  const vimDeleteLine = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_line', payload: { count } });
+  }, []);
+
+  const vimChangeLine = useCallback((count: number): void => {
+    dispatch({ type: 'vim_change_line', payload: { count } });
+  }, []);
+
+  const vimDeleteToEndOfLine = useCallback((): void => {
+    dispatch({ type: 'vim_delete_to_end_of_line' });
+  }, []);
+
+  const vimChangeToEndOfLine = useCallback((): void => {
+    dispatch({ type: 'vim_change_to_end_of_line' });
+  }, []);
+
+  const vimChangeMovement = useCallback(
+    (movement: 'h' | 'j' | 'k' | 'l', count: number): void => {
+      dispatch({ type: 'vim_change_movement', payload: { movement, count } });
+    },
+    [],
+  );
+
+  // New vim navigation and operation methods
+  const vimMoveLeft = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_left', payload: { count } });
+  }, []);
+
+  const vimMoveRight = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_right', payload: { count } });
+  }, []);
+
+  const vimMoveUp = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_up', payload: { count } });
+  }, []);
+
+  const vimMoveDown = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_down', payload: { count } });
+  }, []);
+
+  const vimMoveWordForward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_word_forward', payload: { count } });
+  }, []);
+
+  const vimMoveWordBackward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_word_backward', payload: { count } });
+  }, []);
+
+  const vimMoveWordEnd = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_word_end', payload: { count } });
+  }, []);
+
+  const vimDeleteChar = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_char', payload: { count } });
+  }, []);
+
+  const vimInsertAtCursor = useCallback((): void => {
+    dispatch({ type: 'vim_insert_at_cursor' });
+  }, []);
+
+  const vimAppendAtCursor = useCallback((): void => {
+    dispatch({ type: 'vim_append_at_cursor' });
+  }, []);
+
+  const vimOpenLineBelow = useCallback((): void => {
+    dispatch({ type: 'vim_open_line_below' });
+  }, []);
+
+  const vimOpenLineAbove = useCallback((): void => {
+    dispatch({ type: 'vim_open_line_above' });
+  }, []);
+
+  const vimAppendAtLineEnd = useCallback((): void => {
+    dispatch({ type: 'vim_append_at_line_end' });
+  }, []);
+
+  const vimInsertAtLineStart = useCallback((): void => {
+    dispatch({ type: 'vim_insert_at_line_start' });
+  }, []);
+
+  const vimMoveToLineStart = useCallback((): void => {
+    dispatch({ type: 'vim_move_to_line_start' });
+  }, []);
+
+  const vimMoveToLineEnd = useCallback((): void => {
+    dispatch({ type: 'vim_move_to_line_end' });
+  }, []);
+
+  const vimMoveToFirstNonWhitespace = useCallback((): void => {
+    dispatch({ type: 'vim_move_to_first_nonwhitespace' });
+  }, []);
+
+  const vimMoveToFirstLine = useCallback((): void => {
+    dispatch({ type: 'vim_move_to_first_line' });
+  }, []);
+
+  const vimMoveToLastLine = useCallback((): void => {
+    dispatch({ type: 'vim_move_to_last_line' });
+  }, []);
+
+  const vimMoveToLine = useCallback((lineNumber: number): void => {
+    dispatch({ type: 'vim_move_to_line', payload: { lineNumber } });
+  }, []);
+
+  const vimEscapeInsertMode = useCallback((): void => {
+    dispatch({ type: 'vim_escape_insert_mode' });
+  }, []);
+
   const openInExternalEditor = useCallback(
     async (opts: { editor?: string } = {}): Promise<void> => {
       const editor =
@@ -1165,6 +1792,13 @@ export function useTextBuffer({
     }): void => {
       const { sequence: input } = key;
 
+      if (key.paste) {
+        // Do not do any other processing on pastes so ensure we handle them
+        // before all other cases.
+        insert(input, { paste: key.paste });
+        return;
+      }
+
       if (
         key.name === 'return' ||
         input === '\r' ||
@@ -1203,7 +1837,7 @@ export function useTextBuffer({
         backspace();
       else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
       else if (input && !key.ctrl && !key.meta) {
-        insert(input);
+        insert(input, { paste: key.paste });
       }
     },
     [newline, move, deleteWordLeft, deleteWordRight, backspace, del, insert],
@@ -1272,6 +1906,39 @@ export function useTextBuffer({
     killLineLeft,
     handleInput,
     openInExternalEditor,
+    // Vim-specific operations
+    vimDeleteWordForward,
+    vimDeleteWordBackward,
+    vimDeleteWordEnd,
+    vimChangeWordForward,
+    vimChangeWordBackward,
+    vimChangeWordEnd,
+    vimDeleteLine,
+    vimChangeLine,
+    vimDeleteToEndOfLine,
+    vimChangeToEndOfLine,
+    vimChangeMovement,
+    vimMoveLeft,
+    vimMoveRight,
+    vimMoveUp,
+    vimMoveDown,
+    vimMoveWordForward,
+    vimMoveWordBackward,
+    vimMoveWordEnd,
+    vimDeleteChar,
+    vimInsertAtCursor,
+    vimAppendAtCursor,
+    vimOpenLineBelow,
+    vimOpenLineAbove,
+    vimAppendAtLineEnd,
+    vimInsertAtLineStart,
+    vimMoveToLineStart,
+    vimMoveToLineEnd,
+    vimMoveToFirstNonWhitespace,
+    vimMoveToFirstLine,
+    vimMoveToLastLine,
+    vimMoveToLine,
+    vimEscapeInsertMode,
   };
   return returnValue;
 }
@@ -1306,7 +1973,7 @@ export interface TextBuffer {
   /**
    * Insert a single character or string without newlines.
    */
-  insert: (ch: string) => void;
+  insert: (ch: string, opts?: { paste?: boolean }) => void;
   newline: () => void;
   backspace: () => void;
   del: () => void;
@@ -1386,4 +2053,134 @@ export interface TextBuffer {
     replacementText: string,
   ) => void;
   moveToOffset(offset: number): void;
+
+  // Vim-specific operations
+  /**
+   * Delete N words forward from cursor position (vim 'dw' command)
+   */
+  vimDeleteWordForward: (count: number) => void;
+  /**
+   * Delete N words backward from cursor position (vim 'db' command)
+   */
+  vimDeleteWordBackward: (count: number) => void;
+  /**
+   * Delete to end of N words from cursor position (vim 'de' command)
+   */
+  vimDeleteWordEnd: (count: number) => void;
+  /**
+   * Change N words forward from cursor position (vim 'cw' command)
+   */
+  vimChangeWordForward: (count: number) => void;
+  /**
+   * Change N words backward from cursor position (vim 'cb' command)
+   */
+  vimChangeWordBackward: (count: number) => void;
+  /**
+   * Change to end of N words from cursor position (vim 'ce' command)
+   */
+  vimChangeWordEnd: (count: number) => void;
+  /**
+   * Delete N lines from cursor position (vim 'dd' command)
+   */
+  vimDeleteLine: (count: number) => void;
+  /**
+   * Change N lines from cursor position (vim 'cc' command)
+   */
+  vimChangeLine: (count: number) => void;
+  /**
+   * Delete from cursor to end of line (vim 'D' command)
+   */
+  vimDeleteToEndOfLine: () => void;
+  /**
+   * Change from cursor to end of line (vim 'C' command)
+   */
+  vimChangeToEndOfLine: () => void;
+  /**
+   * Change movement operations (vim 'ch', 'cj', 'ck', 'cl' commands)
+   */
+  vimChangeMovement: (movement: 'h' | 'j' | 'k' | 'l', count: number) => void;
+  /**
+   * Move cursor left N times (vim 'h' command)
+   */
+  vimMoveLeft: (count: number) => void;
+  /**
+   * Move cursor right N times (vim 'l' command)
+   */
+  vimMoveRight: (count: number) => void;
+  /**
+   * Move cursor up N times (vim 'k' command)
+   */
+  vimMoveUp: (count: number) => void;
+  /**
+   * Move cursor down N times (vim 'j' command)
+   */
+  vimMoveDown: (count: number) => void;
+  /**
+   * Move cursor forward N words (vim 'w' command)
+   */
+  vimMoveWordForward: (count: number) => void;
+  /**
+   * Move cursor backward N words (vim 'b' command)
+   */
+  vimMoveWordBackward: (count: number) => void;
+  /**
+   * Move cursor to end of Nth word (vim 'e' command)
+   */
+  vimMoveWordEnd: (count: number) => void;
+  /**
+   * Delete N characters at cursor (vim 'x' command)
+   */
+  vimDeleteChar: (count: number) => void;
+  /**
+   * Enter insert mode at cursor (vim 'i' command)
+   */
+  vimInsertAtCursor: () => void;
+  /**
+   * Enter insert mode after cursor (vim 'a' command)
+   */
+  vimAppendAtCursor: () => void;
+  /**
+   * Open new line below and enter insert mode (vim 'o' command)
+   */
+  vimOpenLineBelow: () => void;
+  /**
+   * Open new line above and enter insert mode (vim 'O' command)
+   */
+  vimOpenLineAbove: () => void;
+  /**
+   * Move to end of line and enter insert mode (vim 'A' command)
+   */
+  vimAppendAtLineEnd: () => void;
+  /**
+   * Move to first non-whitespace and enter insert mode (vim 'I' command)
+   */
+  vimInsertAtLineStart: () => void;
+  /**
+   * Move cursor to beginning of line (vim '0' command)
+   */
+  vimMoveToLineStart: () => void;
+  /**
+   * Move cursor to end of line (vim '$' command)
+   */
+  vimMoveToLineEnd: () => void;
+  /**
+   * Move cursor to first non-whitespace character (vim '^' command)
+   */
+  vimMoveToFirstNonWhitespace: () => void;
+  /**
+   * Move cursor to first line (vim 'gg' command)
+   */
+  vimMoveToFirstLine: () => void;
+  /**
+   * Move cursor to last line (vim 'G' command)
+   */
+  vimMoveToLastLine: () => void;
+  /**
+   * Move cursor to specific line number (vim '[N]G' command)
+   */
+  vimMoveToLine: (lineNumber: number) => void;
+  /**
+   * Handle escape from insert mode (moves cursor left if not at line start)
+   */
+  vimEscapeInsertMode: () => void;
 }

@@ -17,11 +17,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { execSync } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { execSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import stripJsonComments from 'strip-json-comments';
-import os from 'os';
+import os from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import dotenv from 'dotenv';

@@ -17,9 +17,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { rmSync, readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { rmSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { globSync } from 'glob';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -44,4 +44,12 @@ for (const workspace of rootPackageJson.workspaces) {
     const pkgDir = dirname(join(root, pkgPath));
     rmSync(join(pkgDir, 'dist'), RMRF_OPTIONS);
   }
+}
+
+// Clean up vsix files in vscode-ide-companion
+const vsixFiles = globSync('packages/vscode-ide-companion/*.vsix', {
+  cwd: root,
+});
+for (const vsixFile of vsixFiles) {
+  rmSync(join(root, vsixFile), RMRF_OPTIONS);
 }

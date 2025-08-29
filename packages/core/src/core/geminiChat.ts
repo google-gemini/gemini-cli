@@ -7,34 +7,47 @@
 // DISCLAIMER: This is a copied version of https://github.com/googleapis/js-genai/blob/main/src/chats.ts with the intention of working around a key bug
 // where function responses are not treated as "valid" responses: https://b.corp.google.com/issues/420354090
 
-import {
+import type {
   GenerateContentResponse,
   Content,
   GenerateContentConfig,
   SendMessageParameters,
-  createUserContent,
   Part,
-  GenerateContentResponseUsageMetadata,
+  Tool,
 } from '@google/genai';
+import { createUserContent } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
-import { isFunctionResponse } from '../utils/messageInspectors.js';
-import { ContentGenerator, AuthType } from './contentGenerator.js';
-import { Config } from '../config/config.js';
+import type { ContentGenerator } from './contentGenerator.js';
+import { AuthType } from './contentGenerator.js';
+import type { Config } from '../config/config.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { hasCycleInSchema } from '../tools/tools.js';
+import type { StructuredError } from './turn.js';
 import {
-  logApiRequest,
-  logApiResponse,
-  logApiError,
+  logContentRetry,
+  logContentRetryFailure,
+  logInvalidChunk,
 } from '../telemetry/loggers.js';
 import {
-  getStructuredResponse,
-  getStructuredResponseFromParts,
-} from '../utils/generateContentResponseUtilities.js';
-import {
-  ApiErrorEvent,
-  ApiRequestEvent,
-  ApiResponseEvent,
+  ContentRetryEvent,
+  ContentRetryFailureEvent,
+  InvalidChunkEvent,
 } from '../telemetry/types.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+
+/**
+ * Options for retrying due to invalid content from the model.
+ */
+interface ContentRetryOptions {
+  /** Total number of attempts to make (1 initial + N retries). */
+  maxAttempts: number;
+  /** The base delay in milliseconds for linear backoff. */
+  initialDelayMs: number;
+}
+
+const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
+  maxAttempts: 3, // 1 initial call + 2 retries
+  initialDelayMs: 500,
+};
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -110,13 +123,21 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
       }
       if (isValid) {
         curatedHistory.push(...modelOutput);
-      } else {
-        // Remove the last user input when model content is invalid.
-        curatedHistory.pop();
       }
     }
   }
   return curatedHistory;
+}
+
+/**
+ * Custom error to signal that a stream completed without valid content,
+ * which should trigger a retry.
+ */
+export class EmptyStreamError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'EmptyStreamError';
+  }
 }
 
 /**
@@ -140,69 +161,9 @@ export class GeminiChat {
     validateHistory(history);
   }
 
-  private _getRequestTextFromContents(contents: Content[]): string {
-    return contents
-      .flatMap((content) => content.parts ?? [])
-      .map((part) => part.text)
-      .filter(Boolean)
-      .join('');
-  }
-
-  private async _logApiRequest(
-    contents: Content[],
-    model: string,
-    prompt_id: string,
-  ): Promise<void> {
-    const requestText = this._getRequestTextFromContents(contents);
-    logApiRequest(
-      this.config,
-      new ApiRequestEvent(model, prompt_id, requestText),
-    );
-  }
-
-  private async _logApiResponse(
-    durationMs: number,
-    prompt_id: string,
-    usageMetadata?: GenerateContentResponseUsageMetadata,
-    responseText?: string,
-  ): Promise<void> {
-    logApiResponse(
-      this.config,
-      new ApiResponseEvent(
-        this.config.getModel(),
-        durationMs,
-        prompt_id,
-        this.config.getContentGeneratorConfig()?.authType,
-        usageMetadata,
-        responseText,
-      ),
-    );
-  }
-
-  private _logApiError(
-    durationMs: number,
-    error: unknown,
-    prompt_id: string,
-  ): void {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorType = error instanceof Error ? error.name : 'unknown';
-
-    logApiError(
-      this.config,
-      new ApiErrorEvent(
-        this.config.getModel(),
-        errorMessage,
-        durationMs,
-        prompt_id,
-        this.config.getContentGeneratorConfig()?.authType,
-        errorType,
-      ),
-    );
-  }
-
   /**
-   * Handles fallback to Flash model when persistent 429 errors occur for OAuth users.
-   * Uses a fallback handler if provided by the config, otherwise returns null.
+   * Handles falling back to Flash model when persistent 429 errors occur for OAuth users.
+   * Uses a fallback handler if provided by the config; otherwise, returns null.
    */
   private async handleFlashFallback(
     authType?: string,
@@ -232,6 +193,7 @@ export class GeminiChat {
         );
         if (accepted !== false && accepted !== null) {
           this.config.setModel(fallbackModel);
+          this.config.setFallbackMode(true);
           return fallbackModel;
         }
         // Check if the model was switched manually in the handler
@@ -246,6 +208,9 @@ export class GeminiChat {
     return null;
   }
 
+  setSystemInstruction(sysInstr: string) {
+    this.generationConfig.systemInstruction = sysInstr;
+  }
   /**
    * Sends a message to the model and returns the response.
    *
@@ -261,7 +226,7 @@ export class GeminiChat {
    * ```ts
    * const chat = ai.chats.create({model: 'gemini-2.0-flash'});
    * const response = await chat.sendMessage({
-   *   message: 'Why is the sky blue?'
+   * message: 'Why is the sky blue?'
    * });
    * console.log(response.text);
    * ```
@@ -274,9 +239,6 @@ export class GeminiChat {
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
 
-    this._logApiRequest(requestContents, this.config.getModel(), prompt_id);
-
-    const startTime = Date.now();
     let response: GenerateContentResponse;
 
     try {
@@ -293,35 +255,35 @@ export class GeminiChat {
           );
         }
 
-        return this.contentGenerator.generateContent({
-          model: modelToUse,
-          contents: requestContents,
-          config: { ...this.generationConfig, ...params.config },
-        });
+        return this.contentGenerator.generateContent(
+          {
+            model: modelToUse,
+            contents: requestContents,
+            config: { ...this.generationConfig, ...params.config },
+          },
+          prompt_id,
+        );
       };
 
       response = await retryWithBackoff(apiCall, {
-        shouldRetry: (error: Error) => {
-          if (error && error.message) {
+        shouldRetry: (error: unknown) => {
+          // Check for known error messages and codes.
+          if (error instanceof Error && error.message) {
+            if (isSchemaDepthError(error.message)) return false;
             if (error.message.includes('429')) return true;
             if (error.message.match(/5\d{2}/)) return true;
           }
-          return false;
+          return false; // Don't retry other errors by default
         },
         onPersistent429: async (authType?: string, error?: unknown) =>
           await this.handleFlashFallback(authType, error),
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
-      const durationMs = Date.now() - startTime;
-      await this._logApiResponse(
-        durationMs,
-        prompt_id,
-        response.usageMetadata,
-        getStructuredResponse(response),
-      );
 
       this.sendPromise = (async () => {
         const outputContent = response.candidates?.[0]?.content;
+        const modelOutput = outputContent ? [outputContent] : [];
+
         // Because the AFC input contains the entire curated chat history in
         // addition to the new user input, we need to truncate the AFC history
         // to deduplicate the existing chat history.
@@ -333,21 +295,21 @@ export class GeminiChat {
           automaticFunctionCallingHistory =
             fullAutomaticFunctionCallingHistory.slice(index) ?? [];
         }
-        const modelOutput = outputContent ? [outputContent] : [];
+
         this.recordHistory(
           userContent,
           modelOutput,
           automaticFunctionCallingHistory,
         );
       })();
-      await this.sendPromise.catch(() => {
+      await this.sendPromise.catch((error) => {
         // Resets sendPromise to avoid subsequent calls failing
         this.sendPromise = Promise.resolve();
+        // Re-throw the error so the caller knows something went wrong.
+        throw error;
       });
       return response;
     } catch (error) {
-      const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, prompt_id);
       this.sendPromise = Promise.resolve();
       throw error;
     }
@@ -368,10 +330,10 @@ export class GeminiChat {
    * ```ts
    * const chat = ai.chats.create({model: 'gemini-2.0-flash'});
    * const response = await chat.sendMessageStream({
-   *   message: 'Why is the sky blue?'
+   * message: 'Why is the sky blue?'
    * });
    * for await (const chunk of response) {
-   *   console.log(chunk.text);
+   * console.log(chunk.text);
    * }
    * ```
    */
@@ -380,71 +342,138 @@ export class GeminiChat {
     prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     await this.sendPromise;
+
+    let streamDoneResolver: () => void;
+    const streamDonePromise = new Promise<void>((resolve) => {
+      streamDoneResolver = resolve;
+    });
+    this.sendPromise = streamDonePromise;
+
     const userContent = createUserContent(params.message);
-    const requestContents = this.getHistory(true).concat(userContent);
-    this._logApiRequest(requestContents, this.config.getModel(), prompt_id);
 
-    const startTime = Date.now();
+    // Add user content to history ONCE before any attempts.
+    this.history.push(userContent);
+    const requestContents = this.getHistory(true);
 
-    try {
-      const apiCall = () => {
-        const modelToUse = this.config.getModel();
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
+    return (async function* () {
+      try {
+        let lastError: unknown = new Error('Request failed after all retries.');
 
-        // Prevent Flash model calls immediately after quota error
-        if (
-          this.config.getQuotaErrorOccurred() &&
-          modelToUse === DEFAULT_GEMINI_FLASH_MODEL
+        for (
+          let attempt = 0;
+          attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
+          attempt++
         ) {
-          throw new Error(
-            'Please submit a new query to continue with the Flash model.',
-          );
+          try {
+            const stream = await self.makeApiCallAndProcessStream(
+              requestContents,
+              params,
+              prompt_id,
+              userContent,
+            );
+
+            for await (const chunk of stream) {
+              yield chunk;
+            }
+
+            lastError = null;
+            break;
+          } catch (error) {
+            lastError = error;
+            const isContentError = error instanceof EmptyStreamError;
+
+            if (isContentError) {
+              // Check if we have more attempts left.
+              if (attempt < INVALID_CONTENT_RETRY_OPTIONS.maxAttempts - 1) {
+                logContentRetry(
+                  self.config,
+                  new ContentRetryEvent(
+                    attempt,
+                    'EmptyStreamError',
+                    INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs,
+                  ),
+                );
+                await new Promise((res) =>
+                  setTimeout(
+                    res,
+                    INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs *
+                      (attempt + 1),
+                  ),
+                );
+                continue;
+              }
+            }
+            break;
+          }
         }
 
-        return this.contentGenerator.generateContentStream({
+        if (lastError) {
+          if (lastError instanceof EmptyStreamError) {
+            logContentRetryFailure(
+              self.config,
+              new ContentRetryFailureEvent(
+                INVALID_CONTENT_RETRY_OPTIONS.maxAttempts,
+                'EmptyStreamError',
+              ),
+            );
+          }
+          // If the stream fails, remove the user message that was added.
+          if (self.history[self.history.length - 1] === userContent) {
+            self.history.pop();
+          }
+          throw lastError;
+        }
+      } finally {
+        streamDoneResolver!();
+      }
+    })();
+  }
+
+  private async makeApiCallAndProcessStream(
+    requestContents: Content[],
+    params: SendMessageParameters,
+    prompt_id: string,
+    userContent: Content,
+  ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    const apiCall = () => {
+      const modelToUse = this.config.getModel();
+
+      if (
+        this.config.getQuotaErrorOccurred() &&
+        modelToUse === DEFAULT_GEMINI_FLASH_MODEL
+      ) {
+        throw new Error(
+          'Please submit a new query to continue with the Flash model.',
+        );
+      }
+
+      return this.contentGenerator.generateContentStream(
+        {
           model: modelToUse,
           contents: requestContents,
           config: { ...this.generationConfig, ...params.config },
-        });
-      };
-
-      // Note: Retrying streams can be complex. If generateContentStream itself doesn't handle retries
-      // for transient issues internally before yielding the async generator, this retry will re-initiate
-      // the stream. For simple 429/500 errors on initial call, this is fine.
-      // If errors occur mid-stream, this setup won't resume the stream; it will restart it.
-      const streamResponse = await retryWithBackoff(apiCall, {
-        shouldRetry: (error: Error) => {
-          // Check error messages for status codes, or specific error names if known
-          if (error && error.message) {
-            if (error.message.includes('429')) return true;
-            if (error.message.match(/5\d{2}/)) return true;
-          }
-          return false; // Don't retry other errors by default
         },
-        onPersistent429: async (authType?: string, error?: unknown) =>
-          await this.handleFlashFallback(authType, error),
-        authType: this.config.getContentGeneratorConfig()?.authType,
-      });
-
-      // Resolve the internal tracking of send completion promise - `sendPromise`
-      // for both success and failure response. The actual failure is still
-      // propagated by the `await streamResponse`.
-      this.sendPromise = Promise.resolve(streamResponse)
-        .then(() => undefined)
-        .catch(() => undefined);
-
-      const result = this.processStreamResponse(
-        streamResponse,
-        userContent,
-        startTime,
         prompt_id,
       );
-      return result;
-    } catch (error) {
-      const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, prompt_id);
-      this.sendPromise = Promise.resolve();
-      throw error;
-    }
+    };
+
+    const streamResponse = await retryWithBackoff(apiCall, {
+      shouldRetry: (error: unknown) => {
+        if (error instanceof Error && error.message) {
+          if (isSchemaDepthError(error.message)) return false;
+          if (error.message.includes('429')) return true;
+          if (error.message.match(/5\d{2}/)) return true;
+        }
+        return false;
+      },
+      onPersistent429: async (authType?: string, error?: unknown) =>
+        await this.handleFlashFallback(authType, error),
+      authType: this.config.getContentGeneratorConfig()?.authType,
+    });
+
+    return this.processStreamResponse(streamResponse, userContent);
   }
 
   /**
@@ -457,7 +486,7 @@ export class GeminiChat {
    * - The `curated history` contains only the valid turns between user and
    * model, which will be included in the subsequent requests sent to the model.
    * - The `comprehensive history` contains all turns, including invalid or
-   *   empty model outputs, providing a complete record of the history.
+   * empty model outputs, providing a complete record of the history.
    *
    * The history is updated after receiving the response from the model,
    * for streaming response, it means receiving the last chunk of the response.
@@ -466,9 +495,9 @@ export class GeminiChat {
    * history`, set the `curated` parameter to `true`.
    *
    * @param curated - whether to return the curated history or the comprehensive
-   *     history.
+   * history.
    * @return History contents alternating between user and model for the entire
-   *     chat session.
+   * chat session.
    */
   getHistory(curated: boolean = false): Content[] {
     const history = curated
@@ -488,8 +517,6 @@ export class GeminiChat {
 
   /**
    * Adds a new entry to the chat history.
-   *
-   * @param content - The content to add to the history.
    */
   addHistory(content: Content): void {
     this.history.push(content);
@@ -498,66 +525,114 @@ export class GeminiChat {
     this.history = history;
   }
 
-  getFinalUsageMetadata(
-    chunks: GenerateContentResponse[],
-  ): GenerateContentResponseUsageMetadata | undefined {
-    const lastChunkWithMetadata = chunks
-      .slice()
-      .reverse()
-      .find((chunk) => chunk.usageMetadata);
+  setTools(tools: Tool[]): void {
+    this.generationConfig.tools = tools;
+  }
 
-    return lastChunkWithMetadata?.usageMetadata;
+  async maybeIncludeSchemaDepthContext(error: StructuredError): Promise<void> {
+    // Check for potentially problematic cyclic tools with cyclic schemas
+    // and include a recommendation to remove potentially problematic tools.
+    if (
+      isSchemaDepthError(error.message) ||
+      isInvalidArgumentError(error.message)
+    ) {
+      const tools = this.config.getToolRegistry().getAllTools();
+      const cyclicSchemaTools: string[] = [];
+      for (const tool of tools) {
+        if (
+          (tool.schema.parametersJsonSchema &&
+            hasCycleInSchema(tool.schema.parametersJsonSchema)) ||
+          (tool.schema.parameters && hasCycleInSchema(tool.schema.parameters))
+        ) {
+          cyclicSchemaTools.push(tool.displayName);
+        }
+      }
+      if (cyclicSchemaTools.length > 0) {
+        const extraDetails =
+          `\n\nThis error was probably caused by cyclic schema references in one of the following tools, try disabling them with excludeTools:\n\n - ` +
+          cyclicSchemaTools.join(`\n - `) +
+          `\n`;
+        error.message += extraDetails;
+      }
+    }
   }
 
   private async *processStreamResponse(
     streamResponse: AsyncGenerator<GenerateContentResponse>,
-    inputContent: Content,
-    startTime: number,
-    prompt_id: string,
-  ) {
-    const outputContent: Content[] = [];
-    const chunks: GenerateContentResponse[] = [];
-    let errorOccurred = false;
+    userInput: Content,
+  ): AsyncGenerator<GenerateContentResponse> {
+    const modelResponseParts: Part[] = [];
+    let hasReceivedAnyChunk = false;
+    let hasToolCall = false;
+    let lastChunk: GenerateContentResponse | null = null;
 
-    try {
-      for await (const chunk of streamResponse) {
-        if (isValidResponse(chunk)) {
-          chunks.push(chunk);
-          const content = chunk.candidates?.[0]?.content;
-          if (content !== undefined) {
-            if (this.isThoughtContent(content)) {
-              yield chunk;
-              continue;
-            }
-            outputContent.push(content);
+    let isStreamInvalid = false;
+    let firstInvalidChunkEncountered = false;
+    let validChunkAfterInvalidEncountered = false;
+
+    for await (const chunk of streamResponse) {
+      hasReceivedAnyChunk = true;
+      lastChunk = chunk;
+
+      if (isValidResponse(chunk)) {
+        if (firstInvalidChunkEncountered) {
+          // A valid chunk appeared *after* an invalid one.
+          validChunkAfterInvalidEncountered = true;
+        }
+
+        const content = chunk.candidates?.[0]?.content;
+        if (content?.parts) {
+          modelResponseParts.push(...content.parts);
+          if (content.parts.some((part) => part.functionCall)) {
+            hasToolCall = true;
           }
         }
-        yield chunk;
+      } else {
+        logInvalidChunk(
+          this.config,
+          new InvalidChunkEvent('Invalid chunk received from stream.'),
+        );
+        isStreamInvalid = true;
+        firstInvalidChunkEncountered = true;
       }
-    } catch (error) {
-      errorOccurred = true;
-      const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, prompt_id);
-      throw error;
+      yield chunk;
     }
 
-    if (!errorOccurred) {
-      const durationMs = Date.now() - startTime;
-      const allParts: Part[] = [];
-      for (const content of outputContent) {
-        if (content.parts) {
-          allParts.push(...content.parts);
+    if (!hasReceivedAnyChunk) {
+      throw new EmptyStreamError('Model stream completed without any chunks.');
+    }
+
+    // --- FIX: The entire validation block was restructured for clarity and correctness ---
+    // Only apply complex validation if an invalid chunk was actually found.
+    if (isStreamInvalid) {
+      // Fail immediately if an invalid chunk was not the absolute last chunk.
+      if (validChunkAfterInvalidEncountered) {
+        throw new EmptyStreamError(
+          'Model stream had invalid intermediate chunks without a tool call.',
+        );
+      }
+
+      if (!hasToolCall) {
+        // If the *only* invalid part was the last chunk, we still check its finish reason.
+        const finishReason = lastChunk?.candidates?.[0]?.finishReason;
+        const isSuccessfulFinish =
+          finishReason === 'STOP' || finishReason === 'MAX_TOKENS';
+        if (!isSuccessfulFinish) {
+          throw new EmptyStreamError(
+            'Model stream ended with an invalid chunk and a failed finish reason.',
+          );
         }
       }
-      const fullText = getStructuredResponseFromParts(allParts);
-      await this._logApiResponse(
-        durationMs,
-        prompt_id,
-        this.getFinalUsageMetadata(chunks),
-        fullText,
-      );
     }
-    this.recordHistory(inputContent, outputContent);
+
+    // Bundle all streamed parts into a single Content object
+    const modelOutput: Content[] =
+      modelResponseParts.length > 0
+        ? [{ role: 'model', parts: modelResponseParts }]
+        : [];
+
+    // Pass the raw, bundled data to the new, robust recordHistory
+    this.recordHistory(userInput, modelOutput);
   }
 
   private recordHistory(
@@ -565,30 +640,7 @@ export class GeminiChat {
     modelOutput: Content[],
     automaticFunctionCallingHistory?: Content[],
   ) {
-    const nonThoughtModelOutput = modelOutput.filter(
-      (content) => !this.isThoughtContent(content),
-    );
-
-    let outputContents: Content[] = [];
-    if (
-      nonThoughtModelOutput.length > 0 &&
-      nonThoughtModelOutput.every((content) => content.role !== undefined)
-    ) {
-      outputContents = nonThoughtModelOutput;
-    } else if (nonThoughtModelOutput.length === 0 && modelOutput.length > 0) {
-      // This case handles when the model returns only a thought.
-      // We don't want to add an empty model response in this case.
-    } else {
-      // When not a function response appends an empty content when model returns empty response, so that the
-      // history is always alternating between user and model.
-      // Workaround for: https://b.corp.google.com/issues/420354090
-      if (!isFunctionResponse(userInput)) {
-        outputContents.push({
-          role: 'model',
-          parts: [],
-        } as Content);
-      }
-    }
+    // Part 1: Handle the user's turn.
     if (
       automaticFunctionCallingHistory &&
       automaticFunctionCallingHistory.length > 0
@@ -597,78 +649,97 @@ export class GeminiChat {
         ...extractCuratedHistory(automaticFunctionCallingHistory),
       );
     } else {
-      this.history.push(userInput);
+      if (
+        this.history.length === 0 ||
+        this.history[this.history.length - 1] !== userInput
+      ) {
+        const lastTurn = this.history[this.history.length - 1];
+        // The only time we don't push is if it's the *exact same* object,
+        // which happens in streaming where we add it preemptively.
+        if (lastTurn !== userInput) {
+          if (lastTurn?.role === 'user') {
+            // This is an invalid sequence.
+            throw new Error('Cannot add a user turn after another user turn.');
+          }
+          this.history.push(userInput);
+        }
+      }
     }
 
-    // Consolidate adjacent model roles in outputContents
-    const consolidatedOutputContents: Content[] = [];
-    for (const content of outputContents) {
-      if (this.isThoughtContent(content)) {
+    // Part 2: Process the model output into a final, consolidated list of turns.
+    const finalModelTurns: Content[] = [];
+    for (const content of modelOutput) {
+      // A. Preserve malformed content that has no 'parts' array.
+      if (!content.parts) {
+        finalModelTurns.push(content);
         continue;
       }
-      const lastContent =
-        consolidatedOutputContents[consolidatedOutputContents.length - 1];
-      if (this.isTextContent(lastContent) && this.isTextContent(content)) {
-        // If both current and last are text, combine their text into the lastContent's first part
-        // and append any other parts from the current content.
-        lastContent.parts[0].text += content.parts[0].text || '';
-        if (content.parts.length > 1) {
-          lastContent.parts.push(...content.parts.slice(1));
-        }
-      } else {
-        consolidatedOutputContents.push(content);
-      }
-    }
 
-    if (consolidatedOutputContents.length > 0) {
-      const lastHistoryEntry = this.history[this.history.length - 1];
-      const canMergeWithLastHistory =
-        !automaticFunctionCallingHistory ||
-        automaticFunctionCallingHistory.length === 0;
+      // B. Filter out 'thought' parts.
+      const visibleParts = content.parts.filter((part) => !part.thought);
 
+      const newTurn = { ...content, parts: visibleParts };
+      const lastTurnInFinal = finalModelTurns[finalModelTurns.length - 1];
+
+      // Consolidate this new turn with the PREVIOUS turn if they are adjacent model turns.
       if (
-        canMergeWithLastHistory &&
-        this.isTextContent(lastHistoryEntry) &&
-        this.isTextContent(consolidatedOutputContents[0])
+        lastTurnInFinal &&
+        lastTurnInFinal.role === 'model' &&
+        newTurn.role === 'model' &&
+        lastTurnInFinal.parts && // SAFETY CHECK: Ensure the destination has a parts array.
+        newTurn.parts
       ) {
-        // If both current and last are text, combine their text into the lastHistoryEntry's first part
-        // and append any other parts from the current content.
-        lastHistoryEntry.parts[0].text +=
-          consolidatedOutputContents[0].parts[0].text || '';
-        if (consolidatedOutputContents[0].parts.length > 1) {
-          lastHistoryEntry.parts.push(
-            ...consolidatedOutputContents[0].parts.slice(1),
-          );
-        }
-        consolidatedOutputContents.shift(); // Remove the first element as it's merged
+        lastTurnInFinal.parts.push(...newTurn.parts);
+      } else {
+        finalModelTurns.push(newTurn);
       }
-      this.history.push(...consolidatedOutputContents);
+    }
+
+    // Part 3: Add the processed model turns to the history, with one final consolidation pass.
+    if (finalModelTurns.length > 0) {
+      // Re-consolidate parts within any turns that were merged in the previous step.
+      for (const turn of finalModelTurns) {
+        if (turn.parts && turn.parts.length > 1) {
+          const consolidatedParts: Part[] = [];
+          for (const part of turn.parts) {
+            const lastPart = consolidatedParts[consolidatedParts.length - 1];
+            if (
+              lastPart &&
+              // Ensure lastPart is a pure text part
+              typeof lastPart.text === 'string' &&
+              !lastPart.functionCall &&
+              !lastPart.functionResponse &&
+              !lastPart.inlineData &&
+              !lastPart.fileData &&
+              !lastPart.thought &&
+              // Ensure current part is a pure text part
+              typeof part.text === 'string' &&
+              !part.functionCall &&
+              !part.functionResponse &&
+              !part.inlineData &&
+              !part.fileData &&
+              !part.thought
+            ) {
+              lastPart.text += part.text;
+            } else {
+              consolidatedParts.push({ ...part });
+            }
+          }
+          turn.parts = consolidatedParts;
+        }
+      }
+      this.history.push(...finalModelTurns);
+    } else {
+      // If, after all processing, there's NO model output, add the placeholder.
+      this.history.push({ role: 'model', parts: [] });
     }
   }
+}
+/** Visible for Testing */
+export function isSchemaDepthError(errorMessage: string): boolean {
+  return errorMessage.includes('maximum schema depth exceeded');
+}
 
-  private isTextContent(
-    content: Content | undefined,
-  ): content is Content & { parts: [{ text: string }, ...Part[]] } {
-    return !!(
-      content &&
-      content.role === 'model' &&
-      content.parts &&
-      content.parts.length > 0 &&
-      typeof content.parts[0].text === 'string' &&
-      content.parts[0].text !== ''
-    );
-  }
-
-  private isThoughtContent(
-    content: Content | undefined,
-  ): content is Content & { parts: [{ thought: boolean }, ...Part[]] } {
-    return !!(
-      content &&
-      content.role === 'model' &&
-      content.parts &&
-      content.parts.length > 0 &&
-      typeof content.parts[0].thought === 'boolean' &&
-      content.parts[0].thought === true
-    );
-  }
+export function isInvalidArgumentError(errorMessage: string): boolean {
+  return errorMessage.includes('Request contains an invalid argument');
 }

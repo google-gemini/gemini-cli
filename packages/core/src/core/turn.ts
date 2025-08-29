@@ -4,25 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
+  Part,
   PartListUnion,
   GenerateContentResponse,
   FunctionCall,
   FunctionDeclaration,
+  FinishReason,
 } from '@google/genai';
-import {
+import type {
   ToolCallConfirmationDetails,
   ToolResult,
   ToolResultDisplay,
 } from '../tools/tools.js';
-import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import type { ToolErrorType } from '../tools/tool-error.js';
+import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import {
   getErrorMessage,
   UnauthorizedError,
   toFriendlyError,
 } from '../utils/errors.js';
-import { GeminiChat } from './geminiChat.js';
+import type { GeminiChat } from './geminiChat.js';
 
 // Define a structure for tools passed to the server
 export interface ServerTool {
@@ -49,6 +52,9 @@ export enum GeminiEventType {
   ChatCompressed = 'chat_compressed',
   Thought = 'thought',
   MaxSessionTurns = 'max_session_turns',
+  Finished = 'finished',
+  LoopDetected = 'loop_detected',
+  Citation = 'citation',
 }
 
 export interface StructuredError {
@@ -70,9 +76,10 @@ export interface ToolCallRequestInfo {
 
 export interface ToolCallResponseInfo {
   callId: string;
-  responseParts: PartListUnion;
+  responseParts: Part[];
   resultDisplay: ToolResultDisplay | undefined;
   error: Error | undefined;
+  errorType: ToolErrorType | undefined;
 }
 
 export interface ServerToolCallConfirmationDetails {
@@ -119,9 +126,24 @@ export type ServerGeminiErrorEvent = {
   value: GeminiErrorEventValue;
 };
 
+export enum CompressionStatus {
+  /** The compression was successful */
+  COMPRESSED = 1,
+
+  /** The compression failed due to the compression inflating the token count */
+  COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+
+  /** The compression failed due to an error counting tokens */
+  COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
+
+  /** The compression was not necessary and no action was taken */
+  NOOP,
+}
+
 export interface ChatCompressionInfo {
   originalTokenCount: number;
   newTokenCount: number;
+  compressionStatus: CompressionStatus;
 }
 
 export type ServerGeminiChatCompressedEvent = {
@@ -133,30 +155,46 @@ export type ServerGeminiMaxSessionTurnsEvent = {
   type: GeminiEventType.MaxSessionTurns;
 };
 
+export type ServerGeminiFinishedEvent = {
+  type: GeminiEventType.Finished;
+  value: FinishReason;
+};
+
+export type ServerGeminiLoopDetectedEvent = {
+  type: GeminiEventType.LoopDetected;
+};
+
+export type ServerGeminiCitationEvent = {
+  type: GeminiEventType.Citation;
+  value: string;
+};
+
 // The original union type, now composed of the individual types
 export type ServerGeminiStreamEvent =
+  | ServerGeminiChatCompressedEvent
+  | ServerGeminiCitationEvent
   | ServerGeminiContentEvent
+  | ServerGeminiErrorEvent
+  | ServerGeminiFinishedEvent
+  | ServerGeminiLoopDetectedEvent
+  | ServerGeminiMaxSessionTurnsEvent
+  | ServerGeminiThoughtEvent
+  | ServerGeminiToolCallConfirmationEvent
   | ServerGeminiToolCallRequestEvent
   | ServerGeminiToolCallResponseEvent
-  | ServerGeminiToolCallConfirmationEvent
-  | ServerGeminiUserCancelledEvent
-  | ServerGeminiErrorEvent
-  | ServerGeminiChatCompressedEvent
-  | ServerGeminiThoughtEvent
-  | ServerGeminiMaxSessionTurnsEvent;
+  | ServerGeminiUserCancelledEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
-  readonly pendingToolCalls: ToolCallRequestInfo[];
-  private debugResponses: GenerateContentResponse[];
+  readonly pendingToolCalls: ToolCallRequestInfo[] = [];
+  private debugResponses: GenerateContentResponse[] = [];
+  private pendingCitations = new Set<string>();
+  finishReason: FinishReason | undefined = undefined;
 
   constructor(
     private readonly chat: GeminiChat,
     private readonly prompt_id: string,
-  ) {
-    this.pendingToolCalls = [];
-    this.debugResponses = [];
-  }
+  ) {}
   // The run method yields simpler events suitable for server logic
   async *run(
     req: PartListUnion,
@@ -216,16 +254,40 @@ export class Turn {
             yield event;
           }
         }
+
+        for (const citation of getCitations(resp)) {
+          this.pendingCitations.add(citation);
+        }
+
+        // Check if response was truncated or stopped for various reasons
+        const finishReason = resp.candidates?.[0]?.finishReason;
+
+        if (finishReason) {
+          if (this.pendingCitations.size > 0) {
+            yield {
+              type: GeminiEventType.Citation,
+              value: `Citations:\n${[...this.pendingCitations].sort().join('\n')}`,
+            };
+            this.pendingCitations.clear();
+          }
+
+          this.finishReason = finishReason;
+          yield {
+            type: GeminiEventType.Finished,
+            value: finishReason as FinishReason,
+          };
+        }
       }
     } catch (e) {
-      const error = toFriendlyError(e);
-      if (error instanceof UnauthorizedError) {
-        throw error;
-      }
       if (signal.aborted) {
         yield { type: GeminiEventType.UserCancelled };
         // Regular cancellation error, fail gracefully.
         return;
+      }
+
+      const error = toFriendlyError(e);
+      if (error instanceof UnauthorizedError) {
+        throw error;
       }
 
       const contextForReport = [...this.chat.getHistory(/*curated*/ true), req];
@@ -246,6 +308,7 @@ export class Turn {
         message: getErrorMessage(error),
         status,
       };
+      await this.chat.maybeIncludeSchemaDepthContext(structuredError);
       yield { type: GeminiEventType.Error, value: { error: structuredError } };
       return;
     }
@@ -277,4 +340,15 @@ export class Turn {
   getDebugResponses(): GenerateContentResponse[] {
     return this.debugResponses;
   }
+}
+
+function getCitations(resp: GenerateContentResponse): string[] {
+  return (resp.candidates?.[0]?.citationMetadata?.citations ?? [])
+    .filter((citation) => citation.uri !== undefined)
+    .map((citation) => {
+      if (citation.title) {
+        return `(${citation.title}) ${citation.uri}`;
+      }
+      return citation.uri!;
+    });
 }

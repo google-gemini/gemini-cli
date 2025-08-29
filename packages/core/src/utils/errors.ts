@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GaxiosError } from 'gaxios';
+interface GaxiosError {
+  response?: {
+    data?: unknown;
+  };
+}
 
 export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
@@ -21,6 +25,41 @@ export function getErrorMessage(error: unknown): string {
   }
 }
 
+export class FatalError extends Error {
+  constructor(
+    message: string,
+    readonly exitCode: number,
+  ) {
+    super(message);
+  }
+}
+
+export class FatalAuthenticationError extends FatalError {
+  constructor(message: string) {
+    super(message, 41);
+  }
+}
+export class FatalInputError extends FatalError {
+  constructor(message: string) {
+    super(message, 42);
+  }
+}
+export class FatalSandboxError extends FatalError {
+  constructor(message: string) {
+    super(message, 44);
+  }
+}
+export class FatalConfigError extends FatalError {
+  constructor(message: string) {
+    super(message, 52);
+  }
+}
+export class FatalTurnLimitedError extends FatalError {
+  constructor(message: string) {
+    super(message, 53);
+  }
+}
+
 export class ForbiddenError extends Error {}
 export class UnauthorizedError extends Error {}
 export class BadRequestError extends Error {}
@@ -33,8 +72,9 @@ interface ResponseData {
 }
 
 export function toFriendlyError(error: unknown): unknown {
-  if (error instanceof GaxiosError) {
-    const data = parseResponseData(error);
+  if (error && typeof error === 'object' && 'response' in error) {
+    const gaxiosError = error as GaxiosError;
+    const data = parseResponseData(gaxiosError);
     if (data.error && data.error.message && data.error.code) {
       switch (data.error.code) {
         case 400:
@@ -58,5 +98,5 @@ function parseResponseData(error: GaxiosError): ResponseData {
   if (typeof error.response?.data === 'string') {
     return JSON.parse(error.response?.data) as ResponseData;
   }
-  return typeof error.response?.data as ResponseData;
+  return error.response?.data as ResponseData;
 }

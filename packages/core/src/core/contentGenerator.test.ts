@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { ContentGenerator } from './contentGenerator.js';
 import {
   createContentGenerator,
   AuthType,
@@ -12,7 +13,8 @@ import {
 } from './contentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
+import { LoggingContentGenerator } from './loggingContentGenerator.js';
 
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('@google/genai');
@@ -21,7 +23,7 @@ const mockConfig = {} as unknown as Config;
 
 describe('createContentGenerator', () => {
   it('should create a CodeAssistContentGenerator', async () => {
-    const mockGenerator = {} as unknown;
+    const mockGenerator = {} as unknown as ContentGenerator;
     vi.mocked(createCodeAssistContentGenerator).mockResolvedValue(
       mockGenerator as never,
     );
@@ -33,13 +35,53 @@ describe('createContentGenerator', () => {
       mockConfig,
     );
     expect(createCodeAssistContentGenerator).toHaveBeenCalled();
-    expect(generator).toBe(mockGenerator);
+    expect(generator).toEqual(
+      new LoggingContentGenerator(mockGenerator, mockConfig),
+    );
   });
 
   it('should create a GoogleGenAI content generator', async () => {
+    const mockConfig = {
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
     const mockGenerator = {
       models: {},
-    } as unknown;
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    const generator = await createContentGenerator(
+      {
+        model: 'test-model',
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: undefined,
+      httpOptions: {
+        headers: {
+          'User-Agent': expect.any(String),
+          'x-gemini-api-privileged-user-id': expect.any(String),
+        },
+      },
+    });
+    expect(generator).toEqual(
+      new LoggingContentGenerator(
+        (mockGenerator as GoogleGenAI).models,
+        mockConfig,
+      ),
+    );
+  });
+
+  it('should create a GoogleGenAI content generator with client install id logging disabled', async () => {
+    const mockConfig = {
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
     vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
     const generator = await createContentGenerator(
       {
@@ -58,29 +100,37 @@ describe('createContentGenerator', () => {
         },
       },
     });
-    expect(generator).toBe((mockGenerator as GoogleGenAI).models);
+    expect(generator).toEqual(
+      new LoggingContentGenerator(
+        (mockGenerator as GoogleGenAI).models,
+        mockConfig,
+      ),
+    );
   });
 });
 
 describe('createContentGeneratorConfig', () => {
-  const originalEnv = process.env;
+  const mockConfig = {
+    getModel: vi.fn().mockReturnValue('gemini-pro'),
+    setModel: vi.fn(),
+    flashFallbackHandler: vi.fn(),
+    getProxy: vi.fn(),
+  } as unknown as Config;
 
   beforeEach(() => {
     // Reset modules to re-evaluate imports and environment variables
     vi.resetModules();
-    // Restore process.env before each test
-    process.env = { ...originalEnv };
+    vi.clearAllMocks();
   });
 
-  afterAll(() => {
-    // Restore original process.env after all tests
-    process.env = originalEnv;
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('should configure for Gemini using GEMINI_API_KEY when set', async () => {
-    process.env.GEMINI_API_KEY = 'env-gemini-key';
+    vi.stubEnv('GEMINI_API_KEY', 'env-gemini-key');
     const config = await createContentGeneratorConfig(
-      undefined,
+      mockConfig,
       AuthType.USE_GEMINI,
     );
     expect(config.apiKey).toBe('env-gemini-key');
@@ -88,9 +138,9 @@ describe('createContentGeneratorConfig', () => {
   });
 
   it('should not configure for Gemini if GEMINI_API_KEY is empty', async () => {
-    process.env.GEMINI_API_KEY = '';
+    vi.stubEnv('GEMINI_API_KEY', '');
     const config = await createContentGeneratorConfig(
-      undefined,
+      mockConfig,
       AuthType.USE_GEMINI,
     );
     expect(config.apiKey).toBeUndefined();
@@ -98,9 +148,9 @@ describe('createContentGeneratorConfig', () => {
   });
 
   it('should configure for Vertex AI using GOOGLE_API_KEY when set', async () => {
-    process.env.GOOGLE_API_KEY = 'env-google-key';
+    vi.stubEnv('GOOGLE_API_KEY', 'env-google-key');
     const config = await createContentGeneratorConfig(
-      undefined,
+      mockConfig,
       AuthType.USE_VERTEX_AI,
     );
     expect(config.apiKey).toBe('env-google-key');
@@ -108,10 +158,10 @@ describe('createContentGeneratorConfig', () => {
   });
 
   it('should configure for Vertex AI using GCP project and location when set', async () => {
-    process.env.GOOGLE_CLOUD_PROJECT = 'env-gcp-project';
-    process.env.GOOGLE_CLOUD_LOCATION = 'env-gcp-location';
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'env-gcp-project');
+    vi.stubEnv('GOOGLE_CLOUD_LOCATION', 'env-gcp-location');
     const config = await createContentGeneratorConfig(
-      undefined,
+      mockConfig,
       AuthType.USE_VERTEX_AI,
     );
     expect(config.vertexai).toBe(true);
@@ -119,11 +169,11 @@ describe('createContentGeneratorConfig', () => {
   });
 
   it('should not configure for Vertex AI if required env vars are empty', async () => {
-    process.env.GOOGLE_API_KEY = '';
-    process.env.GOOGLE_CLOUD_PROJECT = '';
-    process.env.GOOGLE_CLOUD_LOCATION = '';
+    vi.stubEnv('GOOGLE_API_KEY', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    vi.stubEnv('GOOGLE_CLOUD_LOCATION', '');
     const config = await createContentGeneratorConfig(
-      undefined,
+      mockConfig,
       AuthType.USE_VERTEX_AI,
     );
     expect(config.apiKey).toBeUndefined();

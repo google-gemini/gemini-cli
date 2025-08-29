@@ -44,6 +44,7 @@ index 0000000..e69de29
       'python',
       undefined,
       80,
+      undefined,
     );
   });
 
@@ -71,6 +72,7 @@ index 0000000..e69de29
       null,
       undefined,
       80,
+      undefined,
     );
   });
 
@@ -94,6 +96,7 @@ index 0000000..e69de29
       null,
       undefined,
       80,
+      undefined,
     );
   });
 
@@ -127,8 +130,8 @@ index 0000001..0000002 100644
     );
     const output = lastFrame();
     const lines = output!.split('\n');
-    expect(lines[0]).toBe('1    - old line');
-    expect(lines[1]).toBe('1    + new line');
+    expect(lines[0]).toBe('1 - old line');
+    expect(lines[1]).toBe('1 + new line');
   });
 
   it('should handle diff with only header and no changes', () => {
@@ -250,35 +253,35 @@ index 123..789 100644
       {
         terminalWidth: 80,
         height: undefined,
-        expected: `1      console.log('first hunk');
-2    - const oldVar = 1;
-2    + const newVar = 1;
-3      console.log('end of first hunk');
+        expected: ` 1   console.log('first hunk');
+ 2 - const oldVar = 1;
+ 2 + const newVar = 1;
+ 3   console.log('end of first hunk');
 ════════════════════════════════════════════════════════════════════════════════
-20     console.log('second hunk');
-21   - const anotherOld = 'test';
-21   + const anotherNew = 'test';
-22     console.log('end of second hunk');`,
+20   console.log('second hunk');
+21 - const anotherOld = 'test';
+21 + const anotherNew = 'test';
+22   console.log('end of second hunk');`,
       },
       {
         terminalWidth: 80,
         height: 6,
         expected: `... first 4 lines hidden ...
 ════════════════════════════════════════════════════════════════════════════════
-20     console.log('second hunk');
-21   - const anotherOld = 'test';
-21   + const anotherNew = 'test';
-22     console.log('end of second hunk');`,
+20   console.log('second hunk');
+21 - const anotherOld = 'test';
+21 + const anotherNew = 'test';
+22   console.log('end of second hunk');`,
       },
       {
         terminalWidth: 30,
         height: 6,
         expected: `... first 10 lines hidden ...
-       'test';
-21   + const anotherNew =
-       'test';
-22     console.log('end of
-       second hunk');`,
+   ;
+21 + const anotherNew = 'test'
+   ;
+22   console.log('end of
+     second hunk');`,
       },
     ])(
       'with terminalWidth $terminalWidth and height $height',
@@ -326,11 +329,11 @@ fileDiff Index: file.txt
     );
     const output = lastFrame();
 
-    expect(output).toEqual(`1    - const oldVar = 1;
-1    + const newVar = 1;
+    expect(output).toEqual(` 1 - const oldVar = 1;
+ 1 + const newVar = 1;
 ════════════════════════════════════════════════════════════════════════════════
-20   - const anotherOld = 'test';
-20   + const anotherNew = 'test';`);
+20 - const anotherOld = 'test';
+20 + const anotherNew = 'test';`);
   });
 
   it('should correctly render a new file with no file extension correctly', () => {

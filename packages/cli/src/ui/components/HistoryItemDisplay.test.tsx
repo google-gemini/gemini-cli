@@ -7,8 +7,10 @@
 import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
-import { HistoryItem, MessageType } from '../types.js';
+import type { HistoryItem } from '../types.js';
+import { MessageType } from '../types.js';
 import { SessionStatsProvider } from '../contexts/SessionContext.js';
+import type { Config } from '@google/gemini-cli-core';
 
 // Mock child components
 vi.mock('./messages/ToolGroupMessage.js', () => ({
@@ -16,11 +18,13 @@ vi.mock('./messages/ToolGroupMessage.js', () => ({
 }));
 
 describe('<HistoryItemDisplay />', () => {
+  const mockConfig = {} as unknown as Config;
   const baseItem = {
     id: 1,
     timestamp: 12345,
     isPending: false,
     terminalWidth: 80,
+    config: mockConfig,
   };
 
   it('renders UserMessage for "user" type', () => {
@@ -33,6 +37,18 @@ describe('<HistoryItemDisplay />', () => {
       <HistoryItemDisplay {...baseItem} item={item} />,
     );
     expect(lastFrame()).toContain('Hello');
+  });
+
+  it('renders UserMessage for "user" type with slash command', () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: MessageType.USER,
+      text: '/theme',
+    };
+    const { lastFrame } = render(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    expect(lastFrame()).toContain('/theme');
   });
 
   it('renders StatsDisplay for "stats" type', () => {
@@ -59,6 +75,7 @@ describe('<HistoryItemDisplay />', () => {
       modelVersion: 'test-model',
       selectedAuthType: 'test-auth',
       gcpProject: 'test-project',
+      ideClient: 'test-ide',
     };
     const { lastFrame } = render(
       <HistoryItemDisplay {...baseItem} item={item} />,

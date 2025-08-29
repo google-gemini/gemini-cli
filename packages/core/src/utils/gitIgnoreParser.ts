@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import ignore, { type Ignore } from 'ignore';
 import { isGitRepository } from './gitUtils.js';
 
@@ -57,19 +57,15 @@ export class GitIgnoreParser implements GitIgnoreFilter {
   }
 
   isIgnored(filePath: string): boolean {
-    const relativePath = path.isAbsolute(filePath)
-      ? path.relative(this.projectRoot, filePath)
-      : filePath;
+    const resolved = path.resolve(this.projectRoot, filePath);
+    const relativePath = path.relative(this.projectRoot, resolved);
 
     if (relativePath === '' || relativePath.startsWith('..')) {
       return false;
     }
 
-    let normalizedPath = relativePath.replace(/\\/g, '/');
-    if (normalizedPath.startsWith('./')) {
-      normalizedPath = normalizedPath.substring(2);
-    }
-
+    // Even in windows, Ignore expects forward slashes.
+    const normalizedPath = relativePath.replace(/\\/g, '/');
     return this.ig.ignores(normalizedPath);
   }
 
