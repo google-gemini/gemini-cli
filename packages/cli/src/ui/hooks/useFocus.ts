@@ -8,12 +8,12 @@ import { useStdin, useStdout } from 'ink';
 import { useEffect, useState } from 'react';
 
 // ANSI escape codes to enable/disable terminal focus reporting
-const ENABLE_FOCUS_REPORTING = '\x1b[?1004h';
-const DISABLE_FOCUS_REPORTING = '\x1b[?1004l';
+export const ENABLE_FOCUS_REPORTING = '\x1b[?1004h';
+export const DISABLE_FOCUS_REPORTING = '\x1b[?1004l';
 
 // ANSI escape codes for focus events
-const FOCUS_IN = '\x1b[I';
-const FOCUS_OUT = '\x1b[O';
+export const FOCUS_IN = '\x1b[I';
+export const FOCUS_OUT = '\x1b[O';
 
 export const useFocus = () => {
   const { stdin } = useStdin();

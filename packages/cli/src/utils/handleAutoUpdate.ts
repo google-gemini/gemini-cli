@@ -4,25 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn } from 'node:child_process';
-import { UpdateObject } from '../ui/utils/updateCheck.js';
-import { LoadedSettings } from '../config/settings.js';
+import type { UpdateObject } from '../ui/utils/updateCheck.js';
+import type { LoadedSettings } from '../config/settings.js';
 import { getInstallationInfo } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
-import { HistoryItem, MessageType } from '../ui/types.js';
+import type { HistoryItem } from '../ui/types.js';
+import { MessageType } from '../ui/types.js';
+import { spawnWrapper } from './spawnWrapper.js';
+import type { spawn } from 'node:child_process';
 
 export function handleAutoUpdate(
   info: UpdateObject | null,
   settings: LoadedSettings,
   projectRoot: string,
+  spawnFn: typeof spawn = spawnWrapper,
 ) {
   if (!info) {
     return;
   }
 
+  if (settings.merged.general?.disableUpdateNag) {
+    return;
+  }
+
   const installationInfo = getInstallationInfo(
     projectRoot,
-    settings.merged.disableAutoUpdate ?? false,
+    settings.merged.general?.disableAutoUpdate ?? false,
   );
 
   let combinedMessage = info.message;
@@ -34,16 +41,19 @@ export function handleAutoUpdate(
     message: combinedMessage,
   });
 
-  if (!installationInfo.updateCommand || settings.merged.disableAutoUpdate) {
+  if (
+    !installationInfo.updateCommand ||
+    settings.merged.general?.disableAutoUpdate
+  ) {
     return;
   }
+  const isNightly = info.update.latest.includes('nightly');
 
   const updateCommand = installationInfo.updateCommand.replace(
     '@latest',
-    `@${info.update.latest}`,
+    isNightly ? '@nightly' : `@${info.update.latest}`,
   );
-
-  const updateProcess = spawn(updateCommand, { stdio: 'pipe', shell: true });
+  const updateProcess = spawnFn(updateCommand, { stdio: 'pipe', shell: true });
   let errorOutput = '';
   updateProcess.stderr.on('data', (data) => {
     errorOutput += data.toString();

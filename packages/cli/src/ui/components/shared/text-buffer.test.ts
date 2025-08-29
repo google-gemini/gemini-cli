@@ -5,17 +5,24 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import stripAnsi from 'strip-ansi';
 import { renderHook, act } from '@testing-library/react';
-import {
-  useTextBuffer,
+import type {
   Viewport,
   TextBuffer,
-  offsetToLogicalPos,
-  logicalPosToOffset,
-  textBufferReducer,
   TextBufferState,
   TextBufferAction,
 } from './text-buffer.js';
+import {
+  useTextBuffer,
+  offsetToLogicalPos,
+  logicalPosToOffset,
+  textBufferReducer,
+  findWordEndInLine,
+  findNextWordStartInLine,
+  isWordCharStrict,
+} from './text-buffer.js';
+import { cpLen } from '../../utils/textUtils.js';
 
 const initialState: TextBufferState = {
   lines: [''],
@@ -32,6 +39,7 @@ describe('textBufferReducer', () => {
   it('should return the initial state if state is undefined', () => {
     const action = { type: 'unknown_action' } as unknown as TextBufferAction;
     const state = textBufferReducer(initialState, action);
+    expect(state).toHaveOnlyValidCharacters();
     expect(state).toEqual(initialState);
   });
 
@@ -42,6 +50,7 @@ describe('textBufferReducer', () => {
         payload: 'hello\nworld',
       };
       const state = textBufferReducer(initialState, action);
+      expect(state).toHaveOnlyValidCharacters();
       expect(state.lines).toEqual(['hello', 'world']);
       expect(state.cursorRow).toBe(1);
       expect(state.cursorCol).toBe(5);
@@ -55,6 +64,7 @@ describe('textBufferReducer', () => {
         pushToUndo: false,
       };
       const state = textBufferReducer(initialState, action);
+      expect(state).toHaveOnlyValidCharacters();
       expect(state.lines).toEqual(['no undo']);
       expect(state.undoStack.length).toBe(0);
     });
@@ -64,6 +74,7 @@ describe('textBufferReducer', () => {
     it('should insert a character', () => {
       const action: TextBufferAction = { type: 'insert', payload: 'a' };
       const state = textBufferReducer(initialState, action);
+      expect(state).toHaveOnlyValidCharacters();
       expect(state.lines).toEqual(['a']);
       expect(state.cursorCol).toBe(1);
     });
@@ -72,6 +83,7 @@ describe('textBufferReducer', () => {
       const stateWithText = { ...initialState, lines: ['hello'] };
       const action: TextBufferAction = { type: 'insert', payload: '\n' };
       const state = textBufferReducer(stateWithText, action);
+      expect(state).toHaveOnlyValidCharacters();
       expect(state.lines).toEqual(['', 'hello']);
       expect(state.cursorRow).toBe(1);
       expect(state.cursorCol).toBe(0);
@@ -88,6 +100,7 @@ describe('textBufferReducer', () => {
       };
       const action: TextBufferAction = { type: 'backspace' };
       const state = textBufferReducer(stateWithText, action);
+      expect(state).toHaveOnlyValidCharacters();
       expect(state.lines).toEqual(['']);
       expect(state.cursorCol).toBe(0);
     });
@@ -101,6 +114,7 @@ describe('textBufferReducer', () => {
       };
       const action: TextBufferAction = { type: 'backspace' };
       const state = textBufferReducer(stateWithText, action);
+      expect(state).toHaveOnlyValidCharacters();
       expect(state.lines).toEqual(['helloworld']);
       expect(state.cursorRow).toBe(0);
       expect(state.cursorCol).toBe(5);
@@ -115,12 +129,14 @@ describe('textBufferReducer', () => {
         payload: 'test',
       };
       const stateAfterInsert = textBufferReducer(initialState, insertAction);
+      expect(stateAfterInsert).toHaveOnlyValidCharacters();
       expect(stateAfterInsert.lines).toEqual(['test']);
       expect(stateAfterInsert.undoStack.length).toBe(1);
 
       // 2. Undo
       const undoAction: TextBufferAction = { type: 'undo' };
       const stateAfterUndo = textBufferReducer(stateAfterInsert, undoAction);
+      expect(stateAfterUndo).toHaveOnlyValidCharacters();
       expect(stateAfterUndo.lines).toEqual(['']);
       expect(stateAfterUndo.undoStack.length).toBe(0);
       expect(stateAfterUndo.redoStack.length).toBe(1);
@@ -128,6 +144,7 @@ describe('textBufferReducer', () => {
       // 3. Redo
       const redoAction: TextBufferAction = { type: 'redo' };
       const stateAfterRedo = textBufferReducer(stateAfterUndo, redoAction);
+      expect(stateAfterRedo).toHaveOnlyValidCharacters();
       expect(stateAfterRedo.lines).toEqual(['test']);
       expect(stateAfterRedo.undoStack.length).toBe(1);
       expect(stateAfterRedo.redoStack.length).toBe(0);
@@ -144,6 +161,7 @@ describe('textBufferReducer', () => {
       };
       const action: TextBufferAction = { type: 'create_undo_snapshot' };
       const state = textBufferReducer(stateWithText, action);
+      expect(state).toHaveOnlyValidCharacters();
 
       expect(state.lines).toEqual(['hello']);
       expect(state.cursorRow).toBe(0);
@@ -157,16 +175,19 @@ describe('textBufferReducer', () => {
 });
 
 // Helper to get the state from the hook
-const getBufferState = (result: { current: TextBuffer }) => ({
-  text: result.current.text,
-  lines: [...result.current.lines], // Clone for safety
-  cursor: [...result.current.cursor] as [number, number],
-  allVisualLines: [...result.current.allVisualLines],
-  viewportVisualLines: [...result.current.viewportVisualLines],
-  visualCursor: [...result.current.visualCursor] as [number, number],
-  visualScrollRow: result.current.visualScrollRow,
-  preferredCol: result.current.preferredCol,
-});
+const getBufferState = (result: { current: TextBuffer }) => {
+  expect(result.current).toHaveOnlyValidCharacters();
+  return {
+    text: result.current.text,
+    lines: [...result.current.lines], // Clone for safety
+    cursor: [...result.current.cursor] as [number, number],
+    allVisualLines: [...result.current.allVisualLines],
+    viewportVisualLines: [...result.current.viewportVisualLines],
+    visualCursor: [...result.current.visualCursor] as [number, number],
+    visualScrollRow: result.current.visualScrollRow,
+    preferredCol: result.current.preferredCol,
+  };
+};
 
 describe('useTextBuffer', () => {
   let viewport: Viewport;
@@ -874,7 +895,7 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
-    it('should handle inserts that contain delete characters ', () => {
+    it('should handle inserts that contain delete characters', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: 'abcde',
@@ -892,7 +913,7 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
-    it('should handle inserts with a mix of regular and delete characters ', () => {
+    it('should handle inserts with a mix of regular and delete characters', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: 'abcde',
@@ -1152,6 +1173,22 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(state.text).toBe('fiXrd');
       expect(state.cursor).toEqual([0, 3]); // After 'X'
     });
+
+    it('should replace a single-line range with multi-line text', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'one two three',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+      // Replace "two" with "new\nline"
+      act(() => result.current.replaceRange(0, 4, 0, 7, 'new\nline'));
+      const state = getBufferState(result);
+      expect(state.lines).toEqual(['one new', 'line three']);
+      expect(state.text).toBe('one new\nline three');
+      expect(state.cursor).toEqual([1, 4]); // cursor after 'line'
+    });
   });
 
   describe('Input Sanitization', () => {
@@ -1159,7 +1196,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
-      const textWithAnsi = '\x1B[31mHello\x1B[0m';
+      const textWithAnsi = '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m';
       act(() =>
         result.current.handleInput({
           name: '',
@@ -1170,7 +1207,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           sequence: textWithAnsi,
         }),
       );
-      expect(getBufferState(result).text).toBe('Hello');
+      expect(getBufferState(result).text).toBe('Hello World');
     });
 
     it('should strip control characters from input', () => {
@@ -1243,6 +1280,45 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
         }),
       );
       expect(getBufferState(result).text).toBe('Pasted Text');
+    });
+
+    it('should not strip popular emojis', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const emojis = '🐍🐳🦀🦄';
+      act(() =>
+        result.current.handleInput({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: emojis,
+        }),
+      );
+      expect(getBufferState(result).text).toBe(emojis);
+    });
+  });
+
+  describe('stripAnsi', () => {
+    it('should correctly strip ANSI escape codes', () => {
+      const textWithAnsi = '\x1B[31mHello\x1B[0m World';
+      expect(stripAnsi(textWithAnsi)).toBe('Hello World');
+    });
+
+    it('should handle multiple ANSI codes', () => {
+      const textWithMultipleAnsi = '\x1B[1m\x1B[34mBold Blue\x1B[0m Text';
+      expect(stripAnsi(textWithMultipleAnsi)).toBe('Bold Blue Text');
+    });
+
+    it('should not modify text without ANSI codes', () => {
+      const plainText = 'Plain text';
+      expect(stripAnsi(plainText)).toBe('Plain text');
+    });
+
+    it('should handle empty string', () => {
+      expect(stripAnsi('')).toBe('');
     });
   });
 });
@@ -1425,6 +1501,7 @@ describe('textBufferReducer vim operations', () => {
       };
 
       const result = textBufferReducer(initialState, action);
+      expect(result).toHaveOnlyValidCharacters();
 
       // After deleting line2, we should have line1 and line3, with cursor on line3 (now at index 1)
       expect(result.lines).toEqual(['line1', 'line3']);
@@ -1452,6 +1529,7 @@ describe('textBufferReducer vim operations', () => {
       };
 
       const result = textBufferReducer(initialState, action);
+      expect(result).toHaveOnlyValidCharacters();
 
       // Should delete line2 and line3, leaving line1 and line4
       expect(result.lines).toEqual(['line1', 'line4']);
@@ -1479,6 +1557,7 @@ describe('textBufferReducer vim operations', () => {
       };
 
       const result = textBufferReducer(initialState, action);
+      expect(result).toHaveOnlyValidCharacters();
 
       // Should clear the line content but keep the line
       expect(result.lines).toEqual(['']);
@@ -1506,6 +1585,7 @@ describe('textBufferReducer vim operations', () => {
       };
 
       const result = textBufferReducer(initialState, action);
+      expect(result).toHaveOnlyValidCharacters();
 
       // Should delete the last line completely, not leave empty line
       expect(result.lines).toEqual(['line1']);
@@ -1534,6 +1614,7 @@ describe('textBufferReducer vim operations', () => {
       };
 
       const afterDelete = textBufferReducer(initialState, deleteAction);
+      expect(afterDelete).toHaveOnlyValidCharacters();
 
       // After deleting all lines, should have one empty line
       expect(afterDelete.lines).toEqual(['']);
@@ -1547,11 +1628,103 @@ describe('textBufferReducer vim operations', () => {
       };
 
       const afterPaste = textBufferReducer(afterDelete, pasteAction);
+      expect(afterPaste).toHaveOnlyValidCharacters();
 
       // All lines including the first one should be present
       expect(afterPaste.lines).toEqual(['new1', 'new2', 'new3', 'new4']);
       expect(afterPaste.cursorRow).toBe(3);
       expect(afterPaste.cursorCol).toBe(4);
+    });
+  });
+});
+
+describe('Unicode helper functions', () => {
+  describe('findWordEndInLine with Unicode', () => {
+    it('should handle combining characters', () => {
+      // café with combining accent
+      const cafeWithCombining = 'cafe\u0301';
+      const result = findWordEndInLine(cafeWithCombining + ' test', 0);
+      expect(result).toBe(3); // End of 'café' at base character 'e', not combining accent
+    });
+
+    it('should handle precomposed characters with diacritics', () => {
+      // café with precomposed é (U+00E9)
+      const cafePrecomposed = 'café';
+      const result = findWordEndInLine(cafePrecomposed + ' test', 0);
+      expect(result).toBe(3); // End of 'café' at precomposed character 'é'
+    });
+
+    it('should return null when no word end found', () => {
+      const result = findWordEndInLine('   ', 0);
+      expect(result).toBeNull(); // No word end found in whitespace-only string string
+    });
+  });
+
+  describe('findNextWordStartInLine with Unicode', () => {
+    it('should handle right-to-left text', () => {
+      const result = findNextWordStartInLine('hello مرحبا world', 0);
+      expect(result).toBe(6); // Start of Arabic word
+    });
+
+    it('should handle Chinese characters', () => {
+      const result = findNextWordStartInLine('hello 你好 world', 0);
+      expect(result).toBe(6); // Start of Chinese word
+    });
+
+    it('should return null at end of line', () => {
+      const result = findNextWordStartInLine('hello', 10);
+      expect(result).toBeNull();
+    });
+
+    it('should handle combining characters', () => {
+      // café with combining accent + next word
+      const textWithCombining = 'cafe\u0301 test';
+      const result = findNextWordStartInLine(textWithCombining, 0);
+      expect(result).toBe(6); // Start of 'test' after 'café ' (combining char makes string longer)
+    });
+
+    it('should handle precomposed characters with diacritics', () => {
+      // café with precomposed é + next word
+      const textPrecomposed = 'café test';
+      const result = findNextWordStartInLine(textPrecomposed, 0);
+      expect(result).toBe(5); // Start of 'test' after 'café '
+    });
+  });
+
+  describe('isWordCharStrict with Unicode', () => {
+    it('should return true for ASCII word characters', () => {
+      expect(isWordCharStrict('a')).toBe(true);
+      expect(isWordCharStrict('Z')).toBe(true);
+      expect(isWordCharStrict('0')).toBe(true);
+      expect(isWordCharStrict('_')).toBe(true);
+    });
+
+    it('should return false for punctuation', () => {
+      expect(isWordCharStrict('.')).toBe(false);
+      expect(isWordCharStrict(',')).toBe(false);
+      expect(isWordCharStrict('!')).toBe(false);
+    });
+
+    it('should return true for non-Latin scripts', () => {
+      expect(isWordCharStrict('你')).toBe(true); // Chinese character
+      expect(isWordCharStrict('م')).toBe(true); // Arabic character
+    });
+
+    it('should return false for whitespace', () => {
+      expect(isWordCharStrict(' ')).toBe(false);
+      expect(isWordCharStrict('\t')).toBe(false);
+    });
+  });
+
+  describe('cpLen with Unicode', () => {
+    it('should handle combining characters', () => {
+      expect(cpLen('é')).toBe(1); // Precomposed
+      expect(cpLen('e\u0301')).toBe(2); // e + combining acute
+    });
+
+    it('should handle Chinese and Arabic text', () => {
+      expect(cpLen('hello 你好 world')).toBe(14); // 5 + 1 + 2 + 1 + 5 = 14
+      expect(cpLen('hello مرحبا world')).toBe(17);
     });
   });
 });

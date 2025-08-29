@@ -31,6 +31,14 @@ All submissions, including submissions by project members, require review. We
 use [GitHub pull requests](https://docs.github.com/articles/about-pull-requests)
 for this purpose.
 
+### Self Assigning Issues
+
+If you're looking for an issue to work on, check out our list of issues that are labeled ["help wanted"](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue+state%3Aopen+label%3A%22help+wanted%22).
+
+To assign an issue to yourself, simply add a comment with the text `/assign`. The comment must contain only that text and nothing else. This command will assign the issue to you, provided it is not already assigned.
+
+Please note that you can have a maximum of 3 issues assigned to you at any given time.
+
 ### Pull Request Guidelines
 
 To help us review and merge your PRs quickly, please follow these guidelines. PRs that do not meet these standards may be closed.
@@ -241,6 +249,8 @@ To hit a breakpoint inside the sandbox container run:
 ```bash
 DEBUG=1 gemini
 ```
+
+**Note:** If you have `DEBUG=true` in a project's `.env` file, it won't affect gemini-cli due to automatic exclusion. Use `.gemini/.env` files for gemini-cli specific debug settings.
 
 ### React DevTools
 
