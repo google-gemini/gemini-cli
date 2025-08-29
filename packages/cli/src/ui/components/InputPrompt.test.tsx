@@ -1493,11 +1493,12 @@ describe('InputPrompt', () => {
       // Verify reverse search is active
       expect(stdout.lastFrame()).toContain('(r:)');
 
+      stdin.write('\t');
+      await wait(); // Allow time for Tab keypress to be processed
       // Press Tab to complete the highlighted entry
       act(() => {
         stdin.write('\t');
       });
-      await wait(); // Allow time for Tab keypress to be processed
 
       await waitFor(
         () => {
