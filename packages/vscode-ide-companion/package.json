@@ -113,17 +113,17 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "20.x",
-    "@types/vscode": "^1.99.0",
+    "@types/vscode": "^1.103.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
-    "esbuild": "^0.25.3",
-    "eslint": "^9.25.1",
+    "esbuild": "^0.25.9",
+    "eslint": "^9.34.0",
     "npm-run-all": "^4.1.5",
-    "typescript": "^5.8.3",
+    "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.15.1",
+    "@modelcontextprotocol/sdk": "^1.17.4",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "zod": "^3.25.76"
