@@ -52,19 +52,23 @@ export function SettingsDialogI18n({
   onRestartRequest,
 }: SettingsDialogI18nProps): React.JSX.Element {
   const { t } = useTranslation('dialogs');
-  
+
   // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
 
   // Focus state: 'settings' or 'scope'
-  const [focusSection, setFocusSection] = useState<'settings' | 'scope'>('settings');
-  
+  const [focusSection, setFocusSection] = useState<'settings' | 'scope'>(
+    'settings',
+  );
+
   // Scope selector state (User by default)
-  const [selectedScope, setSelectedScope] = useState<SettingScope>(SettingScope.User);
-  
+  const [selectedScope, setSelectedScope] = useState<SettingScope>(
+    SettingScope.User,
+  );
+
   // Active indices
   const [activeSettingIndex, setActiveSettingIndex] = useState(0);
-  
+
   // Scroll offset for settings
   const [scrollOffset, setScrollOffset] = useState(0);
   const [showRestartPrompt, setShowRestartPrompt] = useState(false);
@@ -76,7 +80,9 @@ export function SettingsDialogI18n({
   );
 
   // Track which settings have been modified by the user
-  const [modifiedSettings, setModifiedSettings] = useState<Set<string>>(new Set());
+  const [modifiedSettings, setModifiedSettings] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Preserve pending changes across scope switches (boolean and number values only)
   type PendingValue = boolean | number;
@@ -725,7 +731,8 @@ export function SettingsDialogI18n({
 
         <Box marginTop={1} flexDirection="column">
           <Text bold={focusSection === 'scope'} wrap="truncate">
-            {focusSection === 'scope' ? '> ' : '  '}{t('settings.applyTo')}
+            {focusSection === 'scope' ? '> ' : '  '}
+            {t('settings.applyTo')}
           </Text>
           <RadioButtonSelect
             items={scopeItems}
@@ -738,13 +745,9 @@ export function SettingsDialogI18n({
         </Box>
 
         <Box height={1} />
-        <Text color={Colors.Gray}>
-          {t('settings.instructions')}
-        </Text>
+        <Text color={Colors.Gray}>{t('settings.instructions')}</Text>
         {showRestartPrompt && (
-          <Text color={Colors.AccentYellow}>
-            {t('settings.restartPrompt')}
-          </Text>
+          <Text color={Colors.AccentYellow}>{t('settings.restartPrompt')}</Text>
         )}
       </Box>
     </Box>

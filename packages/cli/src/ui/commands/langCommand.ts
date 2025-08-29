@@ -10,7 +10,8 @@ import i18n from '../../i18n/index.js';
 
 export const langCommand: SlashCommand = {
   name: 'lang',
-  description: 'Switch interface language / 切换界面语言 / Changer la langue / Cambiar idioma',
+  description:
+    'Switch interface language / 切换界面语言 / Changer la langue / Cambiar idioma',
   kind: CommandKind.BUILT_IN,
   subCommands: [
     {
@@ -102,9 +103,14 @@ export const langCommand: SlashCommand = {
       description: 'Show current language / 显示当前语言',
       kind: CommandKind.BUILT_IN,
       action: async (context) => {
-        const currentLangDisplay = i18n.language === 'zh' ? '中文 (zh)' : 
-                                    i18n.language === 'fr' ? 'Français (fr)' :
-                                    i18n.language === 'es' ? 'Español (es)' : 'English (en)';
+        const currentLangDisplay =
+          i18n.language === 'zh'
+            ? '中文 (zh)'
+            : i18n.language === 'fr'
+              ? 'Français (fr)'
+              : i18n.language === 'es'
+                ? 'Español (es)'
+                : 'English (en)';
         const infoItem: Omit<HistoryItemInfo, 'id'> = {
           type: MessageType.INFO,
           text: currentLangDisplay,
@@ -114,22 +120,35 @@ export const langCommand: SlashCommand = {
     },
   ],
   action: async (context, args) => {
-    const subCommand = (args?.trim() || '') as 'en' | 'zh' | 'fr' | 'es' | 'current' | '';
+    const subCommand = (args?.trim() || '') as
+      | 'en'
+      | 'zh'
+      | 'fr'
+      | 'es'
+      | 'current'
+      | '';
 
     if (!subCommand) {
       // Show usage with fallback
-      const currentLangDisplay = i18n.language === 'zh' ? '中文 (zh)' : 
-                                  i18n.language === 'fr' ? 'Français (fr)' :
-                                  i18n.language === 'es' ? 'Español (es)' : 'English (en)';
+      const currentLangDisplay =
+        i18n.language === 'zh'
+          ? '中文 (zh)'
+          : i18n.language === 'fr'
+            ? 'Français (fr)'
+            : i18n.language === 'es'
+              ? 'Español (es)'
+              : 'English (en)';
       const usageText = `Language / 语言 / Langue / Idioma\n\nUsage:\n  /lang en       - Switch to English\n  /lang zh       - 切换到中文\n  /lang fr       - Changer en français\n  /lang es       - Cambiar a español\n  /lang current  - Show current language / 显示当前语言 / Afficher la langue actuelle / Mostrar idioma actual`;
-      
+
       let currentText;
       try {
-        currentText = i18n.t('commands:lang.currentLanguage', { language: currentLangDisplay });
+        currentText = i18n.t('commands:lang.currentLanguage', {
+          language: currentLangDisplay,
+        });
       } catch (error) {
         currentText = currentLangDisplay;
       }
-      
+
       const infoItem: Omit<HistoryItemInfo, 'id'> = {
         type: MessageType.INFO,
         text: `${usageText}\n\n${currentText}`,
@@ -139,12 +158,19 @@ export const langCommand: SlashCommand = {
     }
 
     if (subCommand === 'current') {
-      const currentLangDisplay = i18n.language === 'zh' ? '中文 (zh)' : 
-                                  i18n.language === 'fr' ? 'Français (fr)' :
-                                  i18n.language === 'es' ? 'Español (es)' : 'English (en)';
+      const currentLangDisplay =
+        i18n.language === 'zh'
+          ? '中文 (zh)'
+          : i18n.language === 'fr'
+            ? 'Français (fr)'
+            : i18n.language === 'es'
+              ? 'Español (es)'
+              : 'English (en)';
       let messageText;
       try {
-        messageText = i18n.t('commands:lang.currentLanguage', { language: currentLangDisplay });
+        messageText = i18n.t('commands:lang.currentLanguage', {
+          language: currentLangDisplay,
+        });
       } catch (error) {
         messageText = currentLangDisplay;
       }
@@ -156,31 +182,44 @@ export const langCommand: SlashCommand = {
       return;
     }
 
-    if (subCommand === 'en' || subCommand === 'zh' || subCommand === 'fr' || subCommand === 'es') {
+    if (
+      subCommand === 'en' ||
+      subCommand === 'zh' ||
+      subCommand === 'fr' ||
+      subCommand === 'es'
+    ) {
       try {
         // Change language
         await i18n.changeLanguage(subCommand);
-        
+
         // Store preference (for future enhancement)
         // TODO: Save to user config file
-        
-        const languageDisplay = subCommand === 'zh' ? '中文' : 
-                                 subCommand === 'fr' ? 'français' :
-                                 subCommand === 'es' ? 'español' : 'English';
+
+        const languageDisplay =
+          subCommand === 'zh'
+            ? '中文'
+            : subCommand === 'fr'
+              ? 'français'
+              : subCommand === 'es'
+                ? 'español'
+                : 'English';
         // Use fallback message if translation fails
         let successMessage;
         try {
-          successMessage = i18n.t('commands:lang.languageChanged', { language: languageDisplay });
+          successMessage = i18n.t('commands:lang.languageChanged', {
+            language: languageDisplay,
+          });
         } catch (error) {
-          successMessage = subCommand === 'zh' 
-            ? `语言已切换到 ${languageDisplay}` 
-            : subCommand === 'fr'
-            ? `Langue changée en ${languageDisplay}`
-            : subCommand === 'es'
-            ? `Idioma cambiado a ${languageDisplay}`
-            : `Language switched to ${languageDisplay}`;
+          successMessage =
+            subCommand === 'zh'
+              ? `语言已切换到 ${languageDisplay}`
+              : subCommand === 'fr'
+                ? `Langue changée en ${languageDisplay}`
+                : subCommand === 'es'
+                  ? `Idioma cambiado a ${languageDisplay}`
+                  : `Language switched to ${languageDisplay}`;
         }
-        
+
         const infoItem: Omit<HistoryItemInfo, 'id'> = {
           type: MessageType.INFO,
           text: `${successMessage}`,
@@ -189,13 +228,14 @@ export const langCommand: SlashCommand = {
         return;
       } catch (error) {
         // Fallback error handling
-        const errorMsg = subCommand === 'zh' 
-          ? '❌ 语言切换失败，请重试' 
-          : subCommand === 'fr'
-          ? '❌ Échec du changement de langue, veuillez réessayer'
-          : subCommand === 'es'
-          ? '❌ Error al cambiar idioma, inténtalo de nuevo'
-          : '❌ Failed to switch language, please try again';
+        const errorMsg =
+          subCommand === 'zh'
+            ? '❌ 语言切换失败，请重试'
+            : subCommand === 'fr'
+              ? '❌ Échec du changement de langue, veuillez réessayer'
+              : subCommand === 'es'
+                ? '❌ Error al cambiar idioma, inténtalo de nuevo'
+                : '❌ Failed to switch language, please try again';
         const errorItem: Omit<HistoryItemInfo, 'id'> = {
           type: MessageType.INFO,
           text: errorMsg,
@@ -208,9 +248,9 @@ export const langCommand: SlashCommand = {
     // Invalid subcommand
     let errorMessage;
     try {
-      errorMessage = i18n.t('commands:lang.invalidLanguage', { 
-        language: subCommand, 
-        languages: 'en, zh, fr, es' 
+      errorMessage = i18n.t('commands:lang.invalidLanguage', {
+        language: subCommand,
+        languages: 'en, zh, fr, es',
       });
     } catch (error) {
       errorMessage = `❌ Invalid language option: ${subCommand}\n\nSupported options: en, zh, fr, es, current`;

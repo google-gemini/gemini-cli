@@ -6,7 +6,8 @@
 
 import { useTranslation as useI18nTranslation } from 'react-i18next';
 
-export const useTranslation = (namespace = 'help') => useI18nTranslation(namespace);
+export const useTranslation = (namespace = 'help') =>
+  useI18nTranslation(namespace);
 
 // Language switching utility
 export const switchLanguage = (lng: string) => {

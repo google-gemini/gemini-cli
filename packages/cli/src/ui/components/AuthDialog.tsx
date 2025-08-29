@@ -50,7 +50,7 @@ export function AuthDialog({
     if (process.env['GEMINI_DEFAULT_AUTH_TYPE'] && defaultAuthType === null) {
       return t('auth.errors.invalidAuthType', {
         value: process.env['GEMINI_DEFAULT_AUTH_TYPE'],
-        validValues: Object.values(AuthType).join(', ')
+        validValues: Object.values(AuthType).join(', '),
       });
     }
 
@@ -161,9 +161,7 @@ export function AuthDialog({
         <Text>{t('auth.terms')}</Text>
       </Box>
       <Box marginTop={1}>
-        <Text color={Colors.AccentBlue}>
-          {t('auth.termsUrl')}
-        </Text>
+        <Text color={Colors.AccentBlue}>{t('auth.termsUrl')}</Text>
       </Box>
     </Box>
   );

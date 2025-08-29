@@ -187,7 +187,9 @@ const resumeCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: i18n.t('ui:chat.noCheckpointFound', { tag: decodeTagName(tag) }),
+        content: i18n.t('ui:chat.noCheckpointFound', {
+          tag: decodeTagName(tag),
+        }),
       };
     }
 
@@ -256,7 +258,9 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: i18n.t('ui:chat.checkpointDeleted', { tag: decodeTagName(tag) }),
+        content: i18n.t('ui:chat.checkpointDeleted', {
+          tag: decodeTagName(tag),
+        }),
       };
     } else {
       return {

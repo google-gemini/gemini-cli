@@ -31,7 +31,10 @@ export const memoryCommand: SlashCommand = {
 
         const messageContent =
           memoryContent.length > 0
-            ? i18n.t('messages:memory.currentContent', { fileCount, content: memoryContent })
+            ? i18n.t('messages:memory.currentContent', {
+                fileCount,
+                content: memoryContent,
+              })
             : i18n.t('messages:memory.empty');
 
         context.ui.addItem(
@@ -59,7 +62,9 @@ export const memoryCommand: SlashCommand = {
         context.ui.addItem(
           {
             type: MessageType.INFO,
-            text: i18n.t('messages:memory.saveAttempt', { content: args.trim() }),
+            text: i18n.t('messages:memory.saveAttempt', {
+              content: args.trim(),
+            }),
           },
           Date.now(),
         );
@@ -105,7 +110,10 @@ export const memoryCommand: SlashCommand = {
 
             const successMessage =
               memoryContent.length > 0
-                ? i18n.t('messages:memory.refreshedSuccess', { characters: memoryContent.length, fileCount })
+                ? i18n.t('messages:memory.refreshedSuccess', {
+                    characters: memoryContent.length,
+                    fileCount,
+                  })
                 : i18n.t('messages:memory.refreshedEmpty');
 
             context.ui.addItem(
@@ -121,7 +129,9 @@ export const memoryCommand: SlashCommand = {
           context.ui.addItem(
             {
               type: MessageType.ERROR,
-              text: i18n.t('messages:memory.refreshError', { error: errorMessage }),
+              text: i18n.t('messages:memory.refreshError', {
+                error: errorMessage,
+              }),
             },
             Date.now(),
           );
