@@ -363,7 +363,7 @@ export class ShellTool extends BaseDeclarativeTool<
           directory: {
             type: 'string',
             description:
-              '(OPTIONAL) Directory to run the command in, if not the project root directory. Must be relative to the project root directory and must already exist.',
+              '(OPTIONAL) Directory to run the command in, specified as a relative path that will be resolved from any registered workspace directory. Must be a relative path and must exist. If ambiguous (exists in multiple workspaces), the command will fail - in such cases, provide a longer, more specific relative path that uniquely identifies the directory (e.g., "packages/core/src" instead of just "src").',
           },
         },
         required: ['command'],
