@@ -139,8 +139,10 @@ jobs:
 
             1.  You are only able to use the echo command. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
             2. Review the issue title and body provided in the environment variables: "${ISSUE_TITLE}" and "${ISSUE_BODY}".
-            3. If there is an existing area/ label, don't change it if there is a kind/ label don't change it and if there is a priority/ label dont' change it. 
-            4. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. For area/* and kind/* limit yourself to only the single most applicable label in each case.
+            3. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. For area/* and kind/* limit yourself to only the single most applicable label in each case. 
+            4. If the issue already has area/ label, dont try to change it. Similarly, if the issue already has a kind/ label don't change it. And if the issue already has a priority/ label do not change it for example:
+               If an issue has area/core and kind/bug  you will only add a priority/ label. 
+               Instead if an issue has no labels, you will could add one lable of each kind.
             5. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5 for anything more than 6 versions older than the most recent should add the status/need-retesting label.
             6. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label and leave a comment politely requesting the relevant information, eg.. if repro steps are missing request for repro steps. if version information is missing request for version information.
             7. Output the appropriate labels for this issue in JSON format with explanation, for example:
