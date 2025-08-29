@@ -7,17 +7,11 @@
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import { URL } from 'node:url';
+import { EventEmitter } from 'node:events';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import { MCPOAuthToken, MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { OAuthUtils } from './oauth-utils.js';
-
-/**
- * Message handler for displaying user-facing messages during OAuth flow.
- */
-export interface MCPOAuthMessageHandler {
-  onDisplayMessage: (message: string) => void;
-}
 
 /**
  * OAuth configuration for an MCP server.
@@ -590,12 +584,12 @@ export class MCPOAuthProvider {
     serverName: string,
     config: MCPOAuthConfig,
     mcpServerUrl?: string,
-    messageHandler?: MCPOAuthMessageHandler,
+    events?: EventEmitter,
   ): Promise<MCPOAuthToken> {
     // Helper function to display messages through handler or fallback to console.log
     const displayMessage = (message: string) => {
-      if (messageHandler) {
-        messageHandler.onDisplayMessage(message);
+      if (events) {
+        events.emit('oauth-display-message', message);
       } else {
         console.log(message);
       }
