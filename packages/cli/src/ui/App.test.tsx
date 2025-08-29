@@ -361,6 +361,19 @@ describe('App UI', () => {
         getDirectories: vi.fn(() => ['/test/dir']),
       }));
     }
+
+    // Ensure getPermissionRepository is available for PermissionsDialog
+    if (!mockConfig.getPermissionRepository) {
+      mockConfig.getPermissionRepository = vi.fn(() => ({
+        isAllowed: vi.fn().mockResolvedValue(false),
+        grant: vi.fn().mockResolvedValue(undefined),
+        revoke: vi.fn().mockResolvedValue(undefined),
+        revokeAllForTool: vi.fn().mockResolvedValue(undefined),
+        revokeAll: vi.fn().mockResolvedValue(undefined),
+        getAllGranted: vi.fn().mockResolvedValue(new Map()),
+      }));
+    }
+
     vi.mocked(ideContext.getIdeContext).mockReturnValue(undefined);
   });
 

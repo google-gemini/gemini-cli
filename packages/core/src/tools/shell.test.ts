@@ -26,6 +26,7 @@ vi.mock('../utils/summarizer.js');
 import { isCommandAllowed } from '../utils/shell-utils.js';
 import { ShellTool } from './shell.js';
 import { type Config } from '../config/config.js';
+import type { PermissionRepository } from '../permissions/PermissionRepository.js';
 import {
   type ShellExecutionResult,
   type ShellOutputEvent,
@@ -44,11 +45,45 @@ import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.j
 describe('ShellTool', () => {
   let shellTool: ShellTool;
   let mockConfig: Config;
+  let mockPermissionRepo: PermissionRepository;
   let mockShellOutputCallback: (event: ShellOutputEvent) => void;
   let resolveExecutionPromise: (result: ShellExecutionResult) => void;
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Create mock permission repository
+    const permissions = new Map<string, Set<string>>();
+    mockPermissionRepo = {
+      isAllowed: vi
+        .fn()
+        .mockImplementation(
+          async (toolId: string, permissionKey: string) =>
+            permissions.get(toolId)?.has(permissionKey) ?? false,
+        ),
+      grant: vi
+        .fn()
+        .mockImplementation(async (toolId: string, permissionKey: string) => {
+          if (!permissions.has(toolId)) {
+            permissions.set(toolId, new Set());
+          }
+          permissions.get(toolId)!.add(permissionKey);
+        }),
+      revoke: vi
+        .fn()
+        .mockImplementation(async (toolId: string, permissionKey: string) => {
+          permissions.get(toolId)?.delete(permissionKey);
+        }),
+      revokeAllForTool: vi.fn().mockImplementation(async (toolId: string) => {
+        permissions.delete(toolId);
+      }),
+      revokeAll: vi.fn().mockImplementation(async () => {
+        permissions.clear();
+      }),
+      getAllGranted: vi
+        .fn()
+        .mockImplementation(async () => new Map(permissions)),
+    };
 
     mockConfig = {
       getCoreTools: vi.fn().mockReturnValue([]),
@@ -61,7 +96,7 @@ describe('ShellTool', () => {
       getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
-    shellTool = new ShellTool(mockConfig);
+    shellTool = new ShellTool(mockConfig, mockPermissionRepo);
 
     vi.mocked(os.platform).mockReturnValue('linux');
     vi.mocked(os.tmpdir).mockReturnValue('/tmp');
@@ -411,13 +446,13 @@ describe('ShellTool', () => {
   describe('getDescription', () => {
     it('should return the windows description when on windows', () => {
       vi.mocked(os.platform).mockReturnValue('win32');
-      const shellTool = new ShellTool(mockConfig);
+      const shellTool = new ShellTool(mockConfig, mockPermissionRepo);
       expect(shellTool.description).toMatchSnapshot();
     });
 
     it('should return the non-windows description when not on windows', () => {
       vi.mocked(os.platform).mockReturnValue('linux');
-      const shellTool = new ShellTool(mockConfig);
+      const shellTool = new ShellTool(mockConfig, mockPermissionRepo);
       expect(shellTool.description).toMatchSnapshot();
     });
   });
@@ -432,7 +467,15 @@ describe('build', () => {
       getWorkspaceContext: () =>
         createMockWorkspaceContext('/root', ['/users/test']),
     } as unknown as Config;
-    const shellTool = new ShellTool(config);
+    const localMockPermissionRepo = {
+      isAllowed: vi.fn().mockResolvedValue(false),
+      grant: vi.fn().mockResolvedValue(undefined),
+      revoke: vi.fn().mockResolvedValue(undefined),
+      revokeAllForTool: vi.fn().mockResolvedValue(undefined),
+      revokeAll: vi.fn().mockResolvedValue(undefined),
+      getAllGranted: vi.fn().mockResolvedValue(new Map()),
+    };
+    const shellTool = new ShellTool(config, localMockPermissionRepo);
     const invocation = shellTool.build({
       command: 'ls',
       directory: 'test',
@@ -448,7 +491,15 @@ describe('build', () => {
       getWorkspaceContext: () =>
         createMockWorkspaceContext('/root', ['/users/test']),
     } as unknown as Config;
-    const shellTool = new ShellTool(config);
+    const localMockPermissionRepo = {
+      isAllowed: vi.fn().mockResolvedValue(false),
+      grant: vi.fn().mockResolvedValue(undefined),
+      revoke: vi.fn().mockResolvedValue(undefined),
+      revokeAllForTool: vi.fn().mockResolvedValue(undefined),
+      revokeAll: vi.fn().mockResolvedValue(undefined),
+      getAllGranted: vi.fn().mockResolvedValue(new Map()),
+    };
+    const shellTool = new ShellTool(config, localMockPermissionRepo);
     expect(() =>
       shellTool.build({
         command: 'ls',
@@ -460,8 +511,42 @@ describe('build', () => {
   describe('permission management methods', () => {
     let shellTool: ShellTool;
     let mockConfig: Config;
+    let localMockPermissionRepo: PermissionRepository;
 
     beforeEach(() => {
+      // Create mock permission repository
+      const permissions = new Map<string, Set<string>>();
+      localMockPermissionRepo = {
+        isAllowed: vi
+          .fn()
+          .mockImplementation(
+            async (toolId: string, permissionKey: string) =>
+              permissions.get(toolId)?.has(permissionKey) ?? false,
+          ),
+        grant: vi
+          .fn()
+          .mockImplementation(async (toolId: string, permissionKey: string) => {
+            if (!permissions.has(toolId)) {
+              permissions.set(toolId, new Set());
+            }
+            permissions.get(toolId)!.add(permissionKey);
+          }),
+        revoke: vi
+          .fn()
+          .mockImplementation(async (toolId: string, permissionKey: string) => {
+            permissions.get(toolId)?.delete(permissionKey);
+          }),
+        revokeAllForTool: vi.fn().mockImplementation(async (toolId: string) => {
+          permissions.delete(toolId);
+        }),
+        revokeAll: vi.fn().mockImplementation(async () => {
+          permissions.clear();
+        }),
+        getAllGranted: vi
+          .fn()
+          .mockImplementation(async () => new Map(permissions)),
+      };
+
       mockConfig = {
         getCoreTools: vi.fn().mockReturnValue([]),
         getExcludeTools: vi.fn().mockReturnValue([]),
@@ -473,68 +558,63 @@ describe('build', () => {
         getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
       } as unknown as Config;
 
-      shellTool = new ShellTool(mockConfig);
+      shellTool = new ShellTool(mockConfig, localMockPermissionRepo);
     });
 
-    it('should start with empty allowed commands', () => {
-      const commands = shellTool.getAllowedCommands();
+    it('should start with empty allowed commands', async () => {
+      const commands = await shellTool.getAllowedCommands();
       expect(commands).toEqual([]);
     });
 
-    it('should return array of allowed commands', () => {
-      const commands = shellTool.getAllowedCommands();
+    it('should return array of allowed commands', async () => {
+      const commands = await shellTool.getAllowedCommands();
       expect(Array.isArray(commands)).toBe(true);
     });
 
     it('should add commands to allowlist through tool execution flow', async () => {
-      // Simulate adding a command to allowlist (this normally happens during shouldConfirmExecute)
-      shellTool.build({ command: 'ls -la' });
+      // Grant permission directly through repository
+      await localMockPermissionRepo.grant('shell', 'ls');
 
-      // The allowlist is private, but we can test that the methods work without error
-      expect(() => {
-        shellTool.revokeCommandPermission('ls');
-      }).not.toThrow();
+      const commands = await shellTool.getAllowedCommands();
+      expect(commands).toContain('ls');
 
-      expect(() => {
-        shellTool.clearAllPermissions();
-      }).not.toThrow();
+      // Test revoking command
+      await shellTool.revokeCommandPermission('ls');
+      const commandsAfterRevoke = await shellTool.getAllowedCommands();
+      expect(commandsAfterRevoke).not.toContain('ls');
     });
 
-    it('should revoke specific command permissions', () => {
-      // Since the allowlist is private, we test that the method works without throwing
-      expect(() => {
-        shellTool.revokeCommandPermission('git');
-      }).not.toThrow();
+    it('should revoke specific command permissions', async () => {
+      // Grant permission first
+      await localMockPermissionRepo.grant('shell', 'git');
+      let commands = await shellTool.getAllowedCommands();
+      expect(commands).toContain('git');
 
-      // After revoking, the command should not be in the list
-      const commands = shellTool.getAllowedCommands();
+      // Test revoking
+      await shellTool.revokeCommandPermission('git');
+      commands = await shellTool.getAllowedCommands();
       expect(commands).not.toContain('git');
     });
 
-    it('should clear all command permissions', () => {
-      // Clear should work regardless of current state
-      expect(() => {
-        shellTool.clearAllPermissions();
-      }).not.toThrow();
+    it('should clear all command permissions', async () => {
+      // Grant some permissions first
+      await localMockPermissionRepo.grant('shell', 'ls');
+      await localMockPermissionRepo.grant('shell', 'git');
 
-      // After clearing, the list should be empty
-      const commands = shellTool.getAllowedCommands();
+      await shellTool.clearAllPermissions();
+      const commands = await shellTool.getAllowedCommands();
       expect(commands).toEqual([]);
     });
 
-    it('should handle revoking non-existent commands gracefully', () => {
-      // Revoking a command that doesn't exist should not throw
-      expect(() => {
-        shellTool.revokeCommandPermission('non-existent-command');
-      }).not.toThrow();
-
-      const commands = shellTool.getAllowedCommands();
+    it('should handle revoking non-existent commands gracefully', async () => {
+      await shellTool.revokeCommandPermission('non-existent-command');
+      const commands = await shellTool.getAllowedCommands();
       expect(commands).toEqual([]);
     });
 
-    it('should return consistent array references', () => {
-      const commands1 = shellTool.getAllowedCommands();
-      const commands2 = shellTool.getAllowedCommands();
+    it('should return consistent array references', async () => {
+      const commands1 = await shellTool.getAllowedCommands();
+      const commands2 = await shellTool.getAllowedCommands();
 
       expect(Array.isArray(commands1)).toBe(true);
       expect(Array.isArray(commands2)).toBe(true);
@@ -544,13 +624,10 @@ describe('build', () => {
       expect(commands1).toEqual(commands2);
     });
 
-    it('should handle clearing empty allowlist', () => {
+    it('should handle clearing empty allowlist', async () => {
       // Clear empty list should not throw
-      expect(() => {
-        shellTool.clearAllPermissions();
-      }).not.toThrow();
-
-      const commands = shellTool.getAllowedCommands();
+      await shellTool.clearAllPermissions();
+      const commands = await shellTool.getAllowedCommands();
       expect(commands).toEqual([]);
     });
   });

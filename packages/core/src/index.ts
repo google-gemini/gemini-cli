@@ -7,6 +7,10 @@
 // Export config
 export * from './config/config.js';
 
+// Export permissions
+export * from './permissions/PermissionRepository.js';
+export * from './permissions/ConfigPermissionRepository.js';
+
 // Export Core Logic
 export * from './core/client.js';
 export * from './core/contentGenerator.js';

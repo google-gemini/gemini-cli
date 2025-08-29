@@ -9,6 +9,7 @@ import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
+import type { PermissionRepository } from '../permissions/PermissionRepository.js';
 import { ToolErrorType } from './tool-error.js';
 import type {
   ToolInvocation,
@@ -48,7 +49,7 @@ class ShellToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: ShellToolParams,
-    private readonly allowlist: Set<string>,
+    private readonly permissionRepo: PermissionRepository,
   ) {
     super(params);
   }
@@ -72,9 +73,15 @@ class ShellToolInvocation extends BaseToolInvocation<
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
     const rootCommands = [...new Set(getCommandRoots(command))];
-    const commandsToConfirm = rootCommands.filter(
-      (command) => !this.allowlist.has(command),
-    );
+
+    // Check which commands are not already allowed
+    const commandsToConfirm: string[] = [];
+    for (const cmd of rootCommands) {
+      const isAllowed = await this.permissionRepo.isAllowed('shell', cmd);
+      if (!isAllowed) {
+        commandsToConfirm.push(cmd);
+      }
+    }
 
     if (commandsToConfirm.length === 0) {
       return false; // already approved and whitelisted
@@ -87,7 +94,9 @@ class ShellToolInvocation extends BaseToolInvocation<
       rootCommand: commandsToConfirm.join(', '),
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          commandsToConfirm.forEach((command) => this.allowlist.add(command));
+          for (const cmd of commandsToConfirm) {
+            await this.permissionRepo.grant('shell', cmd);
+          }
         }
       },
     };
@@ -334,9 +343,11 @@ export class ShellTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static Name: string = 'run_shell_command';
-  private allowlist: Set<string> = new Set();
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    private readonly permissionRepo: PermissionRepository,
+  ) {
     super(
       ShellTool.Name,
       'Shell',
@@ -409,27 +420,32 @@ export class ShellTool extends BaseDeclarativeTool<
   protected createInvocation(
     params: ShellToolParams,
   ): ToolInvocation<ShellToolParams, ToolResult> {
-    return new ShellToolInvocation(this.config, params, this.allowlist);
+    return new ShellToolInvocation(this.config, params, this.permissionRepo);
   }
 
   /**
    * Gets all commands in the allowlist for permission management
+   * @deprecated Use PermissionRepository directly instead
    */
-  getAllowedCommands(): string[] {
-    return Array.from(this.allowlist);
+  async getAllowedCommands(): Promise<string[]> {
+    const allPermissions = await this.permissionRepo.getAllGranted();
+    const shellPermissions = allPermissions.get('shell');
+    return shellPermissions ? Array.from(shellPermissions) : [];
   }
 
   /**
    * Removes a specific command from the allowlist
+   * @deprecated Use PermissionRepository directly instead
    */
-  revokeCommandPermission(command: string): void {
-    this.allowlist.delete(command);
+  async revokeCommandPermission(command: string): Promise<void> {
+    await this.permissionRepo.revoke('shell', command);
   }
 
   /**
    * Clears all command permissions
+   * @deprecated Use PermissionRepository directly instead
    */
-  clearAllPermissions(): void {
-    this.allowlist.clear();
+  async clearAllPermissions(): Promise<void> {
+    await this.permissionRepo.revokeAllForTool('shell');
   }
 }

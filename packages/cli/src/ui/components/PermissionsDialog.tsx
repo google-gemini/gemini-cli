@@ -28,7 +28,9 @@ export function PermissionsDialog({
   config,
   onClose,
 }: PermissionsDialogProps): React.JSX.Element {
-  const [permissionService] = useState(() => new PermissionService(config));
+  const [permissionService] = useState(
+    () => new PermissionService(config, config.getPermissionRepository()),
+  );
   const [permissions, setPermissions] = useState<ToolPermission[]>([]);
   const [permissionGroups, setPermissionGroups] = useState<PermissionGroup[]>(
     [],
@@ -42,10 +44,10 @@ export function PermissionsDialog({
 
   // Load permissions on mount
   useEffect(() => {
-    const loadPermissions = () => {
+    const loadPermissions = async () => {
       setLoading(true);
       try {
-        const allPermissions = permissionService.getAllPermissions();
+        const allPermissions = await permissionService.getAllPermissions();
         setPermissions(allPermissions);
 
         // Group permissions by type
@@ -84,35 +86,35 @@ export function PermissionsDialog({
     loadPermissions();
   }, [permissionService]);
 
-  const handleResetAll = () => {
+  const handleResetAll = async () => {
     try {
-      permissionService.resetAllPermissions();
+      await permissionService.resetAllPermissions();
       reloadPermissions();
     } catch (error) {
       console.error('Failed to reset permissions:', error);
     }
   };
 
-  const handleResetByType = (type: string) => {
+  const handleResetByType = async (type: string) => {
     try {
-      permissionService.resetPermissionsByType(type);
-      reloadPermissions();
+      await permissionService.resetPermissionsByType(type);
+      await reloadPermissions();
     } catch (error) {
       console.error('Failed to reset permissions by type:', error);
     }
   };
 
-  const handleResetIndividualPermission = (permissionId: string) => {
+  const handleResetIndividualPermission = async (permissionId: string) => {
     try {
-      permissionService.resetPermission(permissionId);
-      reloadPermissions();
+      await permissionService.resetPermission(permissionId);
+      await reloadPermissions();
     } catch (error) {
       console.error('Failed to reset individual permission:', error);
     }
   };
 
-  const reloadPermissions = () => {
-    const allPermissions = permissionService.getAllPermissions();
+  const reloadPermissions = async () => {
+    const allPermissions = await permissionService.getAllPermissions();
     setPermissions(allPermissions);
 
     // Regroup permissions

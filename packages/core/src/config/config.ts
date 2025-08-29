@@ -54,6 +54,10 @@ import type { AnyToolInvocation } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
+import type { PermissionRepository } from '../permissions/PermissionRepository.js';
+import { ConfigPermissionRepository } from '../permissions/ConfigPermissionRepository.js';
+import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
+import { MemoryToolInvocation } from '../tools/memoryTool.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -211,6 +215,7 @@ export interface ConfigParameters {
 
 export class Config {
   private toolRegistry!: ToolRegistry;
+  private permissionRepository!: PermissionRepository;
   private promptRegistry!: PromptRegistry;
   private sessionId: string;
   private fileSystemService: FileSystemService;
@@ -381,6 +386,16 @@ export class Config {
       await this.getGitService();
     }
     this.promptRegistry = new PromptRegistry();
+
+    // Initialize permission repository before creating tools
+    this.permissionRepository = new ConfigPermissionRepository();
+
+    // Set the permission repository for tools that need it
+    DiscoveredMCPToolInvocation.setPermissionRepository(
+      this.permissionRepository,
+    );
+    MemoryToolInvocation.setPermissionRepository(this.permissionRepository);
+
     this.toolRegistry = await this.createToolRegistry();
     logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
   }
@@ -806,6 +821,10 @@ export class Config {
     return this.fileExclusions;
   }
 
+  getPermissionRepository(): PermissionRepository {
+    return this.permissionRepository;
+  }
+
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this);
 
@@ -855,8 +874,8 @@ export class Config {
     registerCoreTool(WriteFileTool, this);
     registerCoreTool(WebFetchTool, this);
     registerCoreTool(ReadManyFilesTool, this);
-    registerCoreTool(ShellTool, this);
-    registerCoreTool(MemoryTool);
+    registerCoreTool(ShellTool, this, this.permissionRepository);
+    registerCoreTool(MemoryTool, this.permissionRepository);
     registerCoreTool(WebSearchTool, this);
 
     await registry.discoverAllTools();

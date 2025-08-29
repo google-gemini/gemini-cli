@@ -19,6 +19,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
+import type { PermissionRepository } from '../permissions/PermissionRepository.js';
 
 // Mock dependencies
 vi.mock(import('node:fs/promises'), async (importOriginal) => {
@@ -200,7 +201,15 @@ describe('MemoryTool', () => {
     let performAddMemoryEntrySpy: Mock<typeof MemoryTool.performAddMemoryEntry>;
 
     beforeEach(() => {
-      memoryTool = new MemoryTool();
+      const mockPermissionRepo: PermissionRepository = {
+        isAllowed: vi.fn().mockResolvedValue(false),
+        grant: vi.fn().mockResolvedValue(undefined),
+        revoke: vi.fn().mockResolvedValue(undefined),
+        revokeAllForTool: vi.fn().mockResolvedValue(undefined),
+        revokeAll: vi.fn().mockResolvedValue(undefined),
+        getAllGranted: vi.fn().mockResolvedValue(new Map()),
+      };
+      memoryTool = new MemoryTool(mockPermissionRepo);
       // Spy on the static method for these tests
       performAddMemoryEntrySpy = vi
         .spyOn(MemoryTool, 'performAddMemoryEntry')
@@ -300,11 +309,15 @@ describe('MemoryTool', () => {
     let memoryTool: MemoryTool;
 
     beforeEach(() => {
-      memoryTool = new MemoryTool();
-      // Clear the allowlist before each test
-      const invocation = memoryTool.build({ fact: 'mock-fact' });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (invocation.constructor as any).allowlist.clear();
+      const mockPermissionRepo: PermissionRepository = {
+        isAllowed: vi.fn().mockResolvedValue(false),
+        grant: vi.fn().mockResolvedValue(undefined),
+        revoke: vi.fn().mockResolvedValue(undefined),
+        revokeAllForTool: vi.fn().mockResolvedValue(undefined),
+        revokeAll: vi.fn().mockResolvedValue(undefined),
+        getAllGranted: vi.fn().mockResolvedValue(new Map()),
+      };
+      memoryTool = new MemoryTool(mockPermissionRepo);
       // Mock fs.readFile to return empty string (file doesn't exist)
       vi.mocked(fs.readFile).mockResolvedValue('');
     });
@@ -331,25 +344,27 @@ describe('MemoryTool', () => {
       }
     });
 
-    it('should return false when memory file is already allowlisted', async () => {
+    it('should return false when memory file is already allowed', async () => {
       const params = { fact: 'Test fact' };
-      const memoryFilePath = path.join(
-        os.homedir(),
-        '.gemini',
-        getCurrentGeminiMdFilename(),
-      );
 
+      const mockPermissionRepo: PermissionRepository = {
+        isAllowed: vi.fn().mockResolvedValue(true), // Return true for allowed
+        grant: vi.fn().mockResolvedValue(undefined),
+        revoke: vi.fn().mockResolvedValue(undefined),
+        revokeAllForTool: vi.fn().mockResolvedValue(undefined),
+        revokeAll: vi.fn().mockResolvedValue(undefined),
+        getAllGranted: vi.fn().mockResolvedValue(new Map()),
+      };
+
+      memoryTool = new MemoryTool(mockPermissionRepo);
       const invocation = memoryTool.build(params);
-      // Add the memory file to the allowlist
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (invocation.constructor as any).allowlist.add(memoryFilePath);
 
       const result = await invocation.shouldConfirmExecute(mockAbortSignal);
 
       expect(result).toBe(false);
     });
 
-    it('should add memory file to allowlist when ProceedAlways is confirmed', async () => {
+    it('should grant permission when ProceedAlways is confirmed', async () => {
       const params = { fact: 'Test fact' };
       const memoryFilePath = path.join(
         os.homedir(),
@@ -357,6 +372,17 @@ describe('MemoryTool', () => {
         getCurrentGeminiMdFilename(),
       );
 
+      const mockGrantFn = vi.fn().mockResolvedValue(undefined);
+      const mockPermissionRepo: PermissionRepository = {
+        isAllowed: vi.fn().mockResolvedValue(false),
+        grant: mockGrantFn,
+        revoke: vi.fn().mockResolvedValue(undefined),
+        revokeAllForTool: vi.fn().mockResolvedValue(undefined),
+        revokeAll: vi.fn().mockResolvedValue(undefined),
+        getAllGranted: vi.fn().mockResolvedValue(new Map()),
+      };
+
+      memoryTool = new MemoryTool(mockPermissionRepo);
       const invocation = memoryTool.build(params);
       const result = await invocation.shouldConfirmExecute(mockAbortSignal);
 
@@ -367,22 +393,25 @@ describe('MemoryTool', () => {
         // Simulate the onConfirm callback
         await result.onConfirm(ToolConfirmationOutcome.ProceedAlways);
 
-        // Check that the memory file was added to the allowlist
-        expect(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (invocation.constructor as any).allowlist.has(memoryFilePath),
-        ).toBe(true);
+        // Check that the permission was granted
+        expect(mockGrantFn).toHaveBeenCalledWith('memory', memoryFilePath);
       }
     });
 
-    it('should not add memory file to allowlist when other outcomes are confirmed', async () => {
+    it('should not grant permission when other outcomes are confirmed', async () => {
       const params = { fact: 'Test fact' };
-      const memoryFilePath = path.join(
-        os.homedir(),
-        '.gemini',
-        getCurrentGeminiMdFilename(),
-      );
 
+      const mockGrantFn = vi.fn().mockResolvedValue(undefined);
+      const mockPermissionRepo: PermissionRepository = {
+        isAllowed: vi.fn().mockResolvedValue(false),
+        grant: mockGrantFn,
+        revoke: vi.fn().mockResolvedValue(undefined),
+        revokeAllForTool: vi.fn().mockResolvedValue(undefined),
+        revokeAll: vi.fn().mockResolvedValue(undefined),
+        getAllGranted: vi.fn().mockResolvedValue(new Map()),
+      };
+
+      memoryTool = new MemoryTool(mockPermissionRepo);
       const invocation = memoryTool.build(params);
       const result = await invocation.shouldConfirmExecute(mockAbortSignal);
 
@@ -392,12 +421,10 @@ describe('MemoryTool', () => {
       if (result && result.type === 'edit') {
         // Simulate the onConfirm callback with different outcomes
         await result.onConfirm(ToolConfirmationOutcome.ProceedOnce);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const allowlist = (invocation.constructor as any).allowlist;
-        expect(allowlist.has(memoryFilePath)).toBe(false);
+        expect(mockGrantFn).not.toHaveBeenCalled();
 
         await result.onConfirm(ToolConfirmationOutcome.Cancel);
-        expect(allowlist.has(memoryFilePath)).toBe(false);
+        expect(mockGrantFn).not.toHaveBeenCalled();
       }
     });
 
@@ -428,74 +455,107 @@ describe('MemoryTool', () => {
   });
 
   describe('MemoryToolInvocation static permission management methods', () => {
+    let mockPermissionRepo: PermissionRepository;
+
     beforeEach(() => {
-      // Clear permissions before each test
-      MemoryToolInvocation.clearAllMemoryPermissions();
+      // Set up mock permission repository
+      mockPermissionRepo = {
+        isAllowed: vi.fn().mockResolvedValue(false),
+        grant: vi.fn().mockResolvedValue(undefined),
+        revoke: vi.fn().mockResolvedValue(undefined),
+        revokeAllForTool: vi.fn().mockResolvedValue(undefined),
+        revokeAll: vi.fn().mockResolvedValue(undefined),
+        getAllGranted: vi.fn().mockResolvedValue(new Map()),
+      };
+
+      // Set the static permission repository for the tests
+      MemoryToolInvocation.setPermissionRepository(mockPermissionRepo);
     });
 
     afterEach(() => {
-      // Clear permissions after each test to avoid test pollution
-      MemoryToolInvocation.clearAllMemoryPermissions();
+      // Clean up after each test - not needed as each test sets up its own mock
     });
 
-    it('should start with empty memory permissions', () => {
-      const permissions = MemoryToolInvocation.getAllowedMemoryPermissions();
+    it('should start with empty memory permissions', async () => {
+      const permissions =
+        await MemoryToolInvocation.getAllowedMemoryPermissions();
       expect(permissions).toEqual([]);
     });
 
-    it('should return array of allowed memory permissions', () => {
+    it('should return array of allowed memory permissions', async () => {
       // Test that the method returns an array (even if empty)
-      const permissions = MemoryToolInvocation.getAllowedMemoryPermissions();
+      const permissions =
+        await MemoryToolInvocation.getAllowedMemoryPermissions();
       expect(Array.isArray(permissions)).toBe(true);
     });
 
-    it('should handle revoking permissions gracefully', () => {
-      // Since allowlist is private, we can only test that the public methods work
-      expect(() => {
-        MemoryToolInvocation.revokeMemoryPermission('save_memory');
-      }).not.toThrow();
+    it('should handle revoking permissions gracefully', async () => {
+      // Test that revoking non-existent permissions doesn't throw
+      await expect(
+        MemoryToolInvocation.revokeMemoryPermission('save_memory'),
+      ).resolves.not.toThrow();
+
+      expect(mockPermissionRepo.revoke).toHaveBeenCalledWith(
+        'memory',
+        'save_memory',
+      );
     });
 
-    it('should clear all memory permissions', () => {
+    it('should clear all memory permissions', async () => {
       // Clear all permissions should work regardless of current state
-      expect(() => {
-        MemoryToolInvocation.clearAllMemoryPermissions();
-      }).not.toThrow();
+      await MemoryToolInvocation.clearAllMemoryPermissions();
+
+      // Verify revokeAllForTool was called
+      expect(mockPermissionRepo.revokeAllForTool).toHaveBeenCalledWith(
+        'memory',
+      );
 
       // Verify permissions are empty after clearing
-      const permissions = MemoryToolInvocation.getAllowedMemoryPermissions();
+      const permissions =
+        await MemoryToolInvocation.getAllowedMemoryPermissions();
       expect(permissions).toEqual([]);
     });
 
-    it('should handle revoking non-existent memory permissions gracefully', () => {
+    it('should handle revoking non-existent memory permissions gracefully', async () => {
       // Try to revoke a permission that doesn't exist - should not throw
-      expect(() => {
-        MemoryToolInvocation.revokeMemoryPermission('non-existent-permission');
-      }).not.toThrow();
+      await MemoryToolInvocation.revokeMemoryPermission(
+        'non-existent-permission',
+      );
+
+      expect(mockPermissionRepo.revoke).toHaveBeenCalledWith(
+        'memory',
+        'non-existent-permission',
+      );
 
       // Permissions should still be empty
-      const permissions = MemoryToolInvocation.getAllowedMemoryPermissions();
+      const permissions =
+        await MemoryToolInvocation.getAllowedMemoryPermissions();
       expect(permissions).toEqual([]);
     });
 
-    it('should handle clearing already empty permissions', () => {
+    it('should handle clearing already empty permissions', async () => {
       // Verify permissions start empty
-      let permissions = MemoryToolInvocation.getAllowedMemoryPermissions();
+      let permissions =
+        await MemoryToolInvocation.getAllowedMemoryPermissions();
       expect(permissions).toEqual([]);
 
       // Clear all permissions when already empty - should not throw
-      expect(() => {
-        MemoryToolInvocation.clearAllMemoryPermissions();
-      }).not.toThrow();
+      await MemoryToolInvocation.clearAllMemoryPermissions();
+
+      expect(mockPermissionRepo.revokeAllForTool).toHaveBeenCalledWith(
+        'memory',
+      );
 
       // Permissions should still be empty
-      permissions = MemoryToolInvocation.getAllowedMemoryPermissions();
+      permissions = await MemoryToolInvocation.getAllowedMemoryPermissions();
       expect(permissions).toEqual([]);
     });
 
-    it('should return consistent array references', () => {
-      const permissions1 = MemoryToolInvocation.getAllowedMemoryPermissions();
-      const permissions2 = MemoryToolInvocation.getAllowedMemoryPermissions();
+    it('should return consistent array references', async () => {
+      const permissions1 =
+        await MemoryToolInvocation.getAllowedMemoryPermissions();
+      const permissions2 =
+        await MemoryToolInvocation.getAllowedMemoryPermissions();
 
       expect(Array.isArray(permissions1)).toBe(true);
       expect(Array.isArray(permissions2)).toBe(true);

@@ -11,6 +11,7 @@ import {
   Kind,
   ToolConfirmationOutcome,
 } from './tools.js';
+import type { PermissionRepository } from '../permissions/PermissionRepository.js';
 import type { FunctionDeclaration } from '@google/genai';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -175,7 +176,23 @@ export class MemoryToolInvocation extends BaseToolInvocation<
   SaveMemoryParams,
   ToolResult
 > {
-  private static readonly allowlist: Set<string> = new Set();
+  private static permissionRepo: PermissionRepository | null = null;
+
+  /**
+   * Sets the global permission repository for all memory tool invocations
+   */
+  static setPermissionRepository(repo: PermissionRepository): void {
+    MemoryToolInvocation.permissionRepo = repo;
+  }
+
+  constructor(params: SaveMemoryParams) {
+    super(params);
+    if (!MemoryToolInvocation.permissionRepo) {
+      throw new Error(
+        'PermissionRepository must be set before creating memory tool invocations',
+      );
+    }
+  }
 
   getDescription(): string {
     const memoryFilePath = getGlobalMemoryFilePath();
@@ -188,7 +205,11 @@ export class MemoryToolInvocation extends BaseToolInvocation<
     const memoryFilePath = getGlobalMemoryFilePath();
     const allowlistKey = memoryFilePath;
 
-    if (MemoryToolInvocation.allowlist.has(allowlistKey)) {
+    const isAllowed = await MemoryToolInvocation.permissionRepo!.isAllowed(
+      'memory',
+      allowlistKey,
+    );
+    if (isAllowed) {
       return false;
     }
 
@@ -215,7 +236,10 @@ export class MemoryToolInvocation extends BaseToolInvocation<
       newContent,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          MemoryToolInvocation.allowlist.add(allowlistKey);
+          await MemoryToolInvocation.permissionRepo!.grant(
+            'memory',
+            allowlistKey,
+          );
         }
       },
     };
@@ -286,23 +310,36 @@ export class MemoryToolInvocation extends BaseToolInvocation<
 
   /**
    * Gets all memory permissions in the allowlist for permission management
+   * @deprecated Use PermissionRepository directly instead
    */
-  static getAllowedMemoryPermissions(): string[] {
-    return Array.from(MemoryToolInvocation.allowlist);
+  static async getAllowedMemoryPermissions(): Promise<string[]> {
+    if (!MemoryToolInvocation.permissionRepo) {
+      return [];
+    }
+    const allPermissions =
+      await MemoryToolInvocation.permissionRepo.getAllGranted();
+    const memoryPermissions = allPermissions.get('memory');
+    return memoryPermissions ? Array.from(memoryPermissions) : [];
   }
 
   /**
    * Removes a specific memory permission from the allowlist
+   * @deprecated Use PermissionRepository directly instead
    */
-  static revokeMemoryPermission(permission: string): void {
-    MemoryToolInvocation.allowlist.delete(permission);
+  static async revokeMemoryPermission(permission: string): Promise<void> {
+    if (MemoryToolInvocation.permissionRepo) {
+      await MemoryToolInvocation.permissionRepo.revoke('memory', permission);
+    }
   }
 
   /**
    * Clears all memory permissions
+   * @deprecated Use PermissionRepository directly instead
    */
-  static clearAllMemoryPermissions(): void {
-    MemoryToolInvocation.allowlist.clear();
+  static async clearAllMemoryPermissions(): Promise<void> {
+    if (MemoryToolInvocation.permissionRepo) {
+      await MemoryToolInvocation.permissionRepo.revokeAllForTool('memory');
+    }
   }
 }
 
@@ -311,7 +348,8 @@ export class MemoryTool
   implements ModifiableDeclarativeTool<SaveMemoryParams>
 {
   static readonly Name: string = memoryToolSchemaData.name!;
-  constructor() {
+
+  constructor(private readonly permissionRepo: PermissionRepository) {
     super(
       MemoryTool.Name,
       'Save Memory',
@@ -332,6 +370,8 @@ export class MemoryTool
   }
 
   protected createInvocation(params: SaveMemoryParams) {
+    // Set the permission repository if not already set
+    MemoryToolInvocation.setPermissionRepository(this.permissionRepo);
     return new MemoryToolInvocation(params);
   }
 
