@@ -18,7 +18,7 @@ import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import type { Settings, MemoryImportFormat } from './settingsSchema.js';
-import { mergeWith } from 'lodash-es';
+import { merge } from 'ts-deepmerge';
 
 export type { Settings, MemoryImportFormat };
 
@@ -711,7 +711,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   }
 
   // For the initial trust check, we can only use user and system settings.
-  const initialTrustCheckSettings = mergeWith({}, systemSettings, userSettings);
+  const initialTrustCheckSettings = merge({}, systemSettings, userSettings);
   const isTrusted =
     isWorkspaceTrusted(initialTrustCheckSettings as Settings) ?? true;
 
