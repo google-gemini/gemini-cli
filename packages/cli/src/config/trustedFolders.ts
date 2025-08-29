@@ -42,8 +42,8 @@ export interface TrustedFoldersFile {
 
 export class LoadedTrustedFolders {
   constructor(
-    public user: TrustedFoldersFile,
-    public errors: TrustedFoldersError[],
+    readonly user: TrustedFoldersFile,
+    readonly errors: TrustedFoldersError[],
   ) {}
 
   get rules(): TrustRule[] {
@@ -51,6 +51,49 @@ export class LoadedTrustedFolders {
       path,
       trustLevel,
     }));
+  }
+
+  /**
+   * Returns true or false if the path should be "trusted". This function
+   * should only be invoked when the folder trust setting is active.
+   *
+   * @param location path
+   * @returns
+   */
+  isPathTrusted(location: string): boolean | undefined {
+    const trustedPaths: string[] = [];
+    const untrustedPaths: string[] = [];
+
+    for (const rule of this.rules) {
+      switch (rule.trustLevel) {
+        case TrustLevel.TRUST_FOLDER:
+          trustedPaths.push(rule.path);
+          break;
+        case TrustLevel.TRUST_PARENT:
+          trustedPaths.push(path.dirname(rule.path));
+          break;
+        case TrustLevel.DO_NOT_TRUST:
+          untrustedPaths.push(rule.path);
+          break;
+        default:
+          // Do nothing for unknown trust levels.
+          break;
+      }
+    }
+
+    for (const trustedPath of trustedPaths) {
+      if (isWithinRoot(location, trustedPath)) {
+        return true;
+      }
+    }
+
+    for (const untrustedPath of untrustedPaths) {
+      if (path.normalize(location) === path.normalize(untrustedPath)) {
+        return false;
+      }
+    }
+
+    return undefined;
   }
 
   setValue(path: string, trustLevel: TrustLevel): void {
@@ -110,58 +153,28 @@ export function saveTrustedFolders(
   }
 }
 
-export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
-  const folderTrustFeature = settings.folderTrustFeature ?? false;
-  const folderTrustSetting = settings.folderTrust ?? true;
-  const folderTrustEnabled = folderTrustFeature && folderTrustSetting;
+/** Is folder trust feature enabled per the current applied settings */
+export function isFolderTrustEnabled(settings: Settings): boolean {
+  const folderTrustFeature =
+    settings.security?.folderTrust?.featureEnabled ?? false;
+  const folderTrustSetting = settings.security?.folderTrust?.enabled ?? true;
+  return folderTrustFeature && folderTrustSetting;
+}
 
-  if (!folderTrustEnabled) {
+export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
+  if (!isFolderTrustEnabled(settings)) {
     return true;
   }
 
-  const { rules, errors } = loadTrustedFolders();
+  const folders = loadTrustedFolders();
 
-  if (errors.length > 0) {
-    for (const error of errors) {
+  if (folders.errors.length > 0) {
+    for (const error of folders.errors) {
       console.error(
         `Error loading trusted folders config from ${error.path}: ${error.message}`,
       );
     }
   }
 
-  const trustedPaths: string[] = [];
-  const untrustedPaths: string[] = [];
-
-  for (const rule of rules) {
-    switch (rule.trustLevel) {
-      case TrustLevel.TRUST_FOLDER:
-        trustedPaths.push(rule.path);
-        break;
-      case TrustLevel.TRUST_PARENT:
-        trustedPaths.push(path.dirname(rule.path));
-        break;
-      case TrustLevel.DO_NOT_TRUST:
-        untrustedPaths.push(rule.path);
-        break;
-      default:
-        // Do nothing for unknown trust levels.
-        break;
-    }
-  }
-
-  const cwd = process.cwd();
-
-  for (const trustedPath of trustedPaths) {
-    if (isWithinRoot(cwd, trustedPath)) {
-      return true;
-    }
-  }
-
-  for (const untrustedPath of untrustedPaths) {
-    if (path.normalize(cwd) === path.normalize(untrustedPath)) {
-      return false;
-    }
-  }
-
-  return undefined;
+  return folders.isPathTrusted(process.cwd());
 }

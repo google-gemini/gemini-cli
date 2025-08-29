@@ -19,15 +19,20 @@ import type {
 } from '../ui/commands/types.js';
 import { CommandKind } from '../ui/commands/types.js';
 import { DefaultArgumentProcessor } from './prompt-processors/argumentProcessor.js';
-import type { IPromptProcessor } from './prompt-processors/types.js';
+import type {
+  IPromptProcessor,
+  PromptPipelineContent,
+} from './prompt-processors/types.js';
 import {
   SHORTHAND_ARGS_PLACEHOLDER,
   SHELL_INJECTION_TRIGGER,
+  AT_FILE_INJECTION_TRIGGER,
 } from './prompt-processors/types.js';
 import {
   ConfirmationRequiredError,
   ShellProcessor,
 } from './prompt-processors/shellProcessor.js';
+import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 
 interface CommandDirectory {
   path: string;
@@ -58,8 +63,12 @@ const TomlCommandDefSchema = z.object({
  */
 export class FileCommandLoader implements ICommandLoader {
   private readonly projectRoot: string;
+  private readonly folderTrustEnabled: boolean;
+  private readonly folderTrust: boolean;
 
   constructor(private readonly config: Config | null) {
+    this.folderTrustEnabled = !!config?.getFolderTrustFeature();
+    this.folderTrust = !!config?.getFolderTrust();
     this.projectRoot = config?.getProjectRoot() || process.cwd();
   }
 
@@ -91,6 +100,10 @@ export class FileCommandLoader implements ICommandLoader {
           ...globOptions,
           cwd: dirInfo.path,
         });
+
+        if (this.folderTrustEnabled && !this.folderTrust) {
+          return [];
+        }
 
         const commandPromises = files.map((file) =>
           this.parseAndAdaptFile(
@@ -224,16 +237,25 @@ export class FileCommandLoader implements ICommandLoader {
     const usesShellInjection = validDef.prompt.includes(
       SHELL_INJECTION_TRIGGER,
     );
+    const usesAtFileInjection = validDef.prompt.includes(
+      AT_FILE_INJECTION_TRIGGER,
+    );
 
-    // Interpolation (Shell Execution and Argument Injection)
-    // If the prompt uses either shell injection OR argument placeholders,
-    // we must use the ShellProcessor.
+    // 1. @-File Injection (Security First).
+    // This runs first to ensure we're not executing shell commands that
+    // could dynamically generate malicious @-paths.
+    if (usesAtFileInjection) {
+      processors.push(new AtFileProcessor(baseCommandName));
+    }
+
+    // 2. Argument and Shell Injection.
+    // This runs after file content has been safely injected.
     if (usesShellInjection || usesArgs) {
       processors.push(new ShellProcessor(baseCommandName));
     }
 
-    // Default Argument Handling
-    // If NO explicit argument injection ({{args}}) was used, we append the raw invocation.
+    // 3. Default Argument Handling.
+    // Appends the raw invocation if no explicit {{args}} are used.
     if (!usesArgs) {
       processors.push(new DefaultArgumentProcessor());
     }
@@ -253,19 +275,24 @@ export class FileCommandLoader implements ICommandLoader {
           );
           return {
             type: 'submit_prompt',
-            content: validDef.prompt, // Fallback to unprocessed prompt
+            content: [{ text: validDef.prompt }], // Fallback to unprocessed prompt
           };
         }
 
         try {
-          let processedPrompt = validDef.prompt;
+          let processedContent: PromptPipelineContent = [
+            { text: validDef.prompt },
+          ];
           for (const processor of processors) {
-            processedPrompt = await processor.process(processedPrompt, context);
+            processedContent = await processor.process(
+              processedContent,
+              context,
+            );
           }
 
           return {
             type: 'submit_prompt',
-            content: processedPrompt,
+            content: processedContent,
           };
         } catch (e) {
           // Check if it's our specific error type
