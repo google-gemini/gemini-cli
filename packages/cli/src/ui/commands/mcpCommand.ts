@@ -11,6 +11,7 @@ import {
   CommandKind,
   MessageActionReturn,
 } from './types.js';
+
 import {
   DiscoveredMCPPrompt,
   DiscoveredMCPTool,
@@ -20,8 +21,8 @@ import {
   MCPServerStatus,
   mcpServerRequiresOAuth,
   getErrorMessage,
-  MCPOAuthMessageHandler,
 } from '@google/gemini-cli-core';
+import { appEvents, AppEvent } from '../../utils/events.js';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
@@ -367,6 +368,12 @@ const authCommand: SlashCommand = {
     // Always attempt OAuth authentication, even if not explicitly configured
     // The authentication process will discover OAuth requirements automatically
 
+    const displayListener = (message: string) => {
+      context.ui.addItem({ type: 'info', text: message }, Date.now());
+    };
+
+    appEvents.on(AppEvent.OauthDisplayMessage, displayListener);
+
     try {
       context.ui.addItem(
         {
@@ -384,25 +391,12 @@ const authCommand: SlashCommand = {
         oauthConfig = { enabled: false };
       }
 
-      // Pass the MCP server URL for OAuth discovery
-      const messageHandler: MCPOAuthMessageHandler = {
-        onDisplayMessage: (message: string) => {
-          context.ui.addItem(
-            {
-              type: 'info',
-              text: message,
-            },
-            Date.now(),
-          );
-        },
-      };
-
       const mcpServerUrl = server.httpUrl || server.url;
       await MCPOAuthProvider.authenticate(
         serverName,
         oauthConfig,
         mcpServerUrl,
-        messageHandler,
+        appEvents,
       );
 
       context.ui.addItem(
@@ -445,6 +439,8 @@ const authCommand: SlashCommand = {
         messageType: 'error',
         content: `Failed to authenticate with MCP server '${serverName}': ${getErrorMessage(error)}`,
       };
+    } finally {
+      appEvents.removeListener(AppEvent.OauthDisplayMessage, displayListener);
     }
   },
   completion: async (context: CommandContext, partialArg: string) => {

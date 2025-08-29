@@ -93,7 +93,7 @@ export {
   MCPOAuthCredentials,
   MCPOAuthTokenStorage,
 } from './mcp/oauth-token-storage.js';
-export type { MCPOAuthConfig, MCPOAuthMessageHandler } from './mcp/oauth-provider.js';
+export type { MCPOAuthConfig } from './mcp/oauth-provider.js';
 export type {
   OAuthAuthorizationServerMetadata,
   OAuthProtectedResourceMetadata,

@@ -901,6 +901,7 @@ describe('mcpCommand', () => {
         'test-server',
         { enabled: true },
         'http://localhost:3000',
+        expect.any(Object),
       );
       expect(mockToolRegistry.discoverToolsForServer).toHaveBeenCalledWith(
         'test-server',
