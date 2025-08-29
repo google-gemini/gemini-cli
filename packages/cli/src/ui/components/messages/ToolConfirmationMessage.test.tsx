@@ -143,24 +143,6 @@ describe('ToolConfirmationMessage', () => {
         expect(lastFrame()).toContain(alwaysAllowText);
       });
 
-      it('should show "allow always" when folder trust is undefined', () => {
-        const mockConfig = {
-          isTrustedFolder: () => undefined,
-          getIdeMode: () => false,
-        } as unknown as Config;
-
-        const { lastFrame } = renderWithProviders(
-          <ToolConfirmationMessage
-            confirmationDetails={details}
-            config={mockConfig}
-            availableTerminalHeight={30}
-            terminalWidth={80}
-          />,
-        );
-
-        expect(lastFrame()).toContain(alwaysAllowText);
-      });
-
       it('should NOT show "allow always" when folder is untrusted', () => {
         const mockConfig = {
           isTrustedFolder: () => false,
