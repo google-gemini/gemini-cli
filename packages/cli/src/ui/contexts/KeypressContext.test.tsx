@@ -589,197 +589,77 @@ describe('KeypressContext - Kitty Protocol', () => {
   });
 
   describe('Parameterized functional keys', () => {
-    it('should recognize Home/End with modifiers using ESC[1;NmX', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
+    it.each([
+      // Parameterized
+      { sequence: `\x1b[1;2H`, expected: { name: 'home', shift: true } },
+      { sequence: `\x1b[1;5F`, expected: { name: 'end', ctrl: true } },
+      { sequence: `\x1b[1;1P`, expected: { name: 'f1' } },
+      { sequence: `\x1b[1;3Q`, expected: { name: 'f2', meta: true } },
+      { sequence: `\x1b[3~`, expected: { name: 'delete' } },
+      { sequence: `\x1b[5~`, expected: { name: 'pageup' } },
+      { sequence: `\x1b[6~`, expected: { name: 'pagedown' } },
+      { sequence: `\x1b[1~`, expected: { name: 'home' } },
+      { sequence: `\x1b[4~`, expected: { name: 'end' } },
+      { sequence: `\x1b[2~`, expected: { name: 'insert' } },
+      // Legacy Arrows
+      {
+        sequence: `\x1b[A`,
+        expected: { name: 'up', ctrl: false, meta: false, shift: false },
+      },
+      {
+        sequence: `\x1b[B`,
+        expected: { name: 'down', ctrl: false, meta: false, shift: false },
+      },
+      {
+        sequence: `\x1b[C`,
+        expected: { name: 'right', ctrl: false, meta: false, shift: false },
+      },
+      {
+        sequence: `\x1b[D`,
+        expected: { name: 'left', ctrl: false, meta: false, shift: false },
+      },
+      // Legacy Home/End
+      {
+        sequence: `\x1b[H`,
+        expected: { name: 'home', ctrl: false, meta: false, shift: false },
+      },
+      {
+        sequence: `\x1b[F`,
+        expected: { name: 'end', ctrl: false, meta: false, shift: false },
+      },
+    ])(
+      'should recognize sequence "$sequence" as $expected.name',
+      ({ sequence, expected }) => {
+        const keyHandler = vi.fn();
+        const { result } = renderHook(() => useKeypressContext(), { wrapper });
+        act(() => result.current.subscribe(keyHandler));
 
-      // Shift+Home: mods=2, symbol=H
-      act(() => stdin.sendKittySequence(`\x1b[1;2H`));
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'home', shift: true }),
-      );
+        act(() => stdin.sendKittySequence(sequence));
 
-      // Ctrl+End: mods=5, symbol=F
-      act(() => stdin.sendKittySequence(`\x1b[1;5F`));
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'end', ctrl: true }),
-      );
-    });
-
-    it('should recognize F1–F4 using ESC[1;NmP/Q/R/S', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-
-      act(() => stdin.sendKittySequence(`\x1b[1;1P`)); // F1 no modifiers
-      act(() => stdin.sendKittySequence(`\x1b[1;3Q`)); // F2 Alt
-
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'f1' }),
-      );
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'f2', meta: true }),
-      );
-    });
-
-    it('should recognize Delete via CSI[3~', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-      act(() => stdin.sendKittySequence(`\x1b[3~`));
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'delete' }),
-      );
-    });
-
-    it('should recognize PageUp via CSI[5~', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-      act(() => stdin.sendKittySequence(`\x1b[5~`));
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'pageup' }),
-      );
-    });
-
-    it('should recognize PageDown via CSI[6~', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-      act(() => stdin.sendKittySequence(`\x1b[6~`));
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'pagedown' }),
-      );
-    });
-
-    it('should recognize Home via CSI[1~', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-      act(() => stdin.sendKittySequence(`\x1b[1~`));
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'home' }),
-      );
-    });
-
-    it('should recognize End via CSI[4~', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-      act(() => stdin.sendKittySequence(`\x1b[4~`));
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'end' }),
-      );
-    });
-
-    it('should recognize Insert via CSI[2~', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-      act(() => stdin.sendKittySequence(`\x1b[2~`));
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'insert' }),
-      );
-    });
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining(expected),
+        );
+      },
+    );
   });
 
   describe('Shift+Tab forms', () => {
-    it('should recognize legacy reverse Tab ESC[Z as Shift+Tab', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
+    it.each([
+      { sequence: `\x1b[Z`, description: 'legacy reverse Tab' },
+      { sequence: `\x1b[1;2Z`, description: 'parameterized reverse Tab' },
+    ])(
+      'should recognize $description "$sequence" as Shift+Tab',
+      ({ sequence }) => {
+        const keyHandler = vi.fn();
+        const { result } = renderHook(() => useKeypressContext(), { wrapper });
+        act(() => result.current.subscribe(keyHandler));
 
-      act(() => stdin.sendKittySequence(`\x1b[Z`));
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'tab', shift: true }),
-      );
-    });
-
-    it('should recognize parameterized reverse Tab ESC[1;2Z as Shift+Tab', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-
-      act(() => stdin.sendKittySequence(`\x1b[1;2Z`));
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'tab', shift: true }),
-      );
-    });
-  });
-
-  describe('Legacy arrows while Kitty enabled', () => {
-    it('should parse ESC[A/B/C/D as arrows without modifiers', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-
-      act(() => stdin.sendKittySequence(`\x1b[A`));
-      act(() => stdin.sendKittySequence(`\x1b[B`));
-      act(() => stdin.sendKittySequence(`\x1b[C`));
-      act(() => stdin.sendKittySequence(`\x1b[D`));
-
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'up',
-          ctrl: false,
-          meta: false,
-          shift: false,
-        }),
-      );
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'down',
-          ctrl: false,
-          meta: false,
-          shift: false,
-        }),
-      );
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'right',
-          ctrl: false,
-          meta: false,
-          shift: false,
-        }),
-      );
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'left',
-          ctrl: false,
-          meta: false,
-          shift: false,
-        }),
-      );
-    });
-  });
-
-  describe('Legacy Home/End while Kitty enabled', () => {
-    it('should parse ESC[H/ESC[F as home/end without modifiers', async () => {
-      const keyHandler = vi.fn();
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-      act(() => result.current.subscribe(keyHandler));
-
-      act(() => stdin.sendKittySequence(`\x1b[H`));
-      act(() => stdin.sendKittySequence(`\x1b[F`));
-
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'home',
-          ctrl: false,
-          meta: false,
-          shift: false,
-        }),
-      );
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'end',
-          ctrl: false,
-          meta: false,
-          shift: false,
-        }),
-      );
-    });
+        act(() => stdin.sendKittySequence(sequence));
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'tab', shift: true }),
+        );
+      },
+    );
   });
 
   describe('Double-tap and batching', () => {

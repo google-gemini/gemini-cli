@@ -121,7 +121,7 @@ export function KeypressProvider({
     let backslashTimeout: NodeJS.Timeout | null = null;
     let waitingForEnterAfterBackslash = false;
 
-    // New: Parse a single complete kitty sequence from the start (prefix) of the
+    // Parse a single complete kitty sequence from the start (prefix) of the
     // buffer and return both the Key and the number of characters consumed.
     // This lets us "peel off" one complete event when multiple sequences arrive
     // in a single chunk, preventing buffer overflow and fragmentation.
@@ -131,6 +131,10 @@ export function KeypressProvider({
     const parseKittyPrefix = (
       buffer: string,
     ): { key: Key; length: number } | null => {
+      // In older terminals ESC [ Z was used as Cursor Backward Tabulation (CBT)
+      // In newer terminals the same functionality of key combination for moving
+      // backward through focusable elements is Shift+Tab, hence we will
+      // map ESC [ Z to Shift+Tab
       // 0) Reverse Tab (legacy): ESC [ Z
       //    Treat as Shift+Tab for UI purposes.
       //    Regex parts:
@@ -283,62 +287,19 @@ export function KeypressProvider({
           }
         }
 
-        // Escape
-        if (keyCode === CHAR_CODE_ESC) {
-          return {
-            key: {
-              name: 'escape',
-              ctrl,
-              meta: alt,
-              shift,
-              paste: false,
-              sequence: buffer.slice(0, m[0].length),
-              kittyProtocol: true,
-            },
-            length: m[0].length,
-          };
-        }
+        const kittyKeyCodeToName: { [key: number]: string } = {
+          [CHAR_CODE_ESC]: 'escape',
+          [KITTY_KEYCODE_TAB]: 'tab',
+          [KITTY_KEYCODE_BACKSPACE]: 'backspace',
+          [KITTY_KEYCODE_ENTER]: 'return',
+          [KITTY_KEYCODE_NUMPAD_ENTER]: 'return',
+        };
 
-        // Tab
-        if (keyCode === KITTY_KEYCODE_TAB) {
+        const name = kittyKeyCodeToName[keyCode];
+        if (name) {
           return {
             key: {
-              name: 'tab',
-              ctrl,
-              meta: alt,
-              shift,
-              paste: false,
-              sequence: buffer.slice(0, m[0].length),
-              kittyProtocol: true,
-            },
-            length: m[0].length,
-          };
-        }
-
-        // Backspace
-        if (keyCode === KITTY_KEYCODE_BACKSPACE) {
-          return {
-            key: {
-              name: 'backspace',
-              ctrl,
-              meta: alt,
-              shift,
-              paste: false,
-              sequence: buffer.slice(0, m[0].length),
-              kittyProtocol: true,
-            },
-            length: m[0].length,
-          };
-        }
-
-        // Enter (regular or numpad)
-        if (
-          keyCode === KITTY_KEYCODE_ENTER ||
-          keyCode === KITTY_KEYCODE_NUMPAD_ENTER
-        ) {
-          return {
-            key: {
-              name: 'return',
+              name,
               ctrl,
               meta: alt,
               shift,
@@ -548,10 +509,21 @@ export function KeypressProvider({
               break;
             }
             if (debugKeystrokeLogging) {
-              console.log(
-                '[DEBUG] Kitty sequence parsed successfully (prefix):',
-                kittySequenceBuffer.slice(0, parsed.length),
+              const parsedSequence = kittySequenceBuffer.slice(
+                0,
+                parsed.length,
               );
+              if (kittySequenceBuffer.length > parsed.length) {
+                console.log(
+                  '[DEBUG] Kitty sequence parsed successfully (prefix):',
+                  parsedSequence,
+                );
+              } else {
+                console.log(
+                  '[DEBUG] Kitty sequence parsed successfully:',
+                  parsedSequence,
+                );
+              }
             }
             // Consume the parsed prefix and broadcast it.
             kittySequenceBuffer = kittySequenceBuffer.slice(parsed.length);
