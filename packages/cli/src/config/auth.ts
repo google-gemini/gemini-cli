@@ -5,26 +5,14 @@
  */
 
 import { AuthType } from '@google/gemini-cli-core';
-import { loadEnvironment } from './settings.js';
+import { loadEnvironment, loadSettings } from './settings.js';
 
-export const validateAuthMethod = (authMethod: string): string | null => {
-  loadEnvironment();
+export function validateAuthMethod(authMethod: string): string | null {
+  loadEnvironment(loadSettings(process.cwd()).merged);
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.CLOUD_SHELL
   ) {
-    return null;
-  }
-
-  if (authMethod === AuthType.LOGIN_WITH_GOOGLE_GCA) {
-    if (!process.env['GOOGLE_CLOUD_PROJECT']) {
-      return (
-        '[Error] GOOGLE_CLOUD_PROJECT is not set.\n' +
-        'Please set it using:\n' +
-        '  export GOOGLE_CLOUD_PROJECT=<your-project-id>\n' +
-        'and try again.'
-      );
-    }
     return null;
   }
 
@@ -52,4 +40,4 @@ export const validateAuthMethod = (authMethod: string): string | null => {
   }
 
   return 'Invalid auth method selected.';
-};
+}

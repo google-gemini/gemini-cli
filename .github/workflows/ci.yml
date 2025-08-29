@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - 'main'
-      - 'release'
+      - 'release/**'
   pull_request:
     branches:
       - 'main'
-      - 'release'
+      - 'release/**'
   merge_group:
 
 concurrency:
@@ -93,6 +93,10 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+
+      - name: 'Run lockfile check'
+        run: |-
+          npm run check:lockfile
 
       - name: 'Install dependencies'
         run: |-

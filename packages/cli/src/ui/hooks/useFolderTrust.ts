@@ -5,14 +5,14 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { Settings, LoadedSettings } from '../../config/settings.js';
+import type { Settings, LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import {
   loadTrustedFolders,
   TrustLevel,
   isWorkspaceTrusted,
 } from '../../config/trustedFolders.js';
-import * as process from 'process';
+import * as process from 'node:process';
 
 export const useFolderTrust = (
   settings: LoadedSettings,
@@ -22,11 +22,18 @@ export const useFolderTrust = (
   const [isFolderTrustDialogOpen, setIsFolderTrustDialogOpen] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
 
-  const { folderTrust, folderTrustFeature } = settings.merged;
+  const folderTrust = settings.merged.security?.folderTrust?.enabled;
+  const folderTrustFeature =
+    settings.merged.security?.folderTrust?.featureEnabled;
+
   useEffect(() => {
     const trusted = isWorkspaceTrusted({
-      folderTrust,
-      folderTrustFeature,
+      security: {
+        folderTrust: {
+          featureEnabled: folderTrustFeature,
+          enabled: folderTrust,
+        },
+      },
     } as Settings);
     setIsTrusted(trusted);
     setIsFolderTrustDialogOpen(trusted === undefined);

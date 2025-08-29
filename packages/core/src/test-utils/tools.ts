@@ -5,15 +5,17 @@
  */
 
 import { vi } from 'vitest';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
+import type {
   ToolCallConfirmationDetails,
   ToolInvocation,
   ToolResult,
-  Kind,
 } from '../tools/tools.js';
 import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+} from '../tools/tools.js';
+import type {
   ModifiableDeclarativeTool,
   ModifyContext,
 } from '../tools/modifiable-tool.js';

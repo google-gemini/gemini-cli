@@ -17,10 +17,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { execSync } from 'child_process';
-import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'fs';
-import { join } from 'path';
-import os from 'os';
+import { execSync } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { join } from 'node:path';
+import os from 'node:os';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import cliPkgJson from '../packages/cli/package.json' with { type: 'json' };
@@ -53,9 +59,10 @@ try {
   sandboxCommand = execSync('node scripts/sandbox_command.js')
     .toString()
     .trim();
-} catch {
+} catch (e) {
   console.warn('ERROR: could not detect sandbox container command');
-  process.exit(0);
+  console.error(e);
+  process.exit(1);
 }
 
 if (sandboxCommand === 'sandbox-exec') {
