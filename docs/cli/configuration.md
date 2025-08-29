@@ -76,6 +76,14 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Enable session checkpointing for recovery.
   - **Default:** `false`
 
+- **`general.checkpointing.autoSave.enabled`** (boolean):
+  - **Description:** Automatically save conversation checkpoints.
+  - **Default:** `true`
+
+- **`general.checkpointing.autoSave.idleTimeout`** (number):
+  - **Description:** Seconds of inactivity before auto-save.
+  - **Default:** `120`
+
 #### `ui`
 
 - **`ui.theme`** (string):
@@ -303,7 +311,13 @@ Here is an example of a `settings.json` file with the new nested structure:
 {
   "general": {
     "vimMode": true,
-    "preferredEditor": "code"
+    "preferredEditor": "code",
+    "checkpointing": {
+      "autoSave": {
+        "enabled": true,
+        "idleTimeout": 120
+      }
+    }
   },
   "ui": {
     "theme": "GitHub",
