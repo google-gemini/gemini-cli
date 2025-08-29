@@ -5,6 +5,7 @@
  */
 
 import path from 'node:path';
+// @ts-ignore
 import { fdir } from 'fdir';
 import { Ignore } from './ignore.js';
 import * as cache from './crawlCache.js';
@@ -51,7 +52,7 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
       .withRelativePaths()
       .withDirs()
       .withPathSeparator('/') // Always use unix style paths
-      .exclude((_, dirPath) => {
+      .exclude((_: any, dirPath: any) => {
         const relativePath = path.posix.relative(posixCrawlDirectory, dirPath);
         return dirFilter(`${relativePath}/`);
       });

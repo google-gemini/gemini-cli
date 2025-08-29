@@ -16,7 +16,7 @@ export interface GitIgnoreFilter {
 
 export class GitIgnoreParser implements GitIgnoreFilter {
   private projectRoot: string;
-  private ig: Ignore = ignore();
+  private ig: Ignore = (ignore as any)();
   private patterns: string[] = [];
 
   constructor(projectRoot: string) {

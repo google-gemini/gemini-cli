@@ -49,8 +49,8 @@ export function loadIgnoreRules(options: LoadIgnoreRulesOptions): Ignore {
 
 export class Ignore {
   private readonly allPatterns: string[] = [];
-  private dirIgnorer = ignore();
-  private fileIgnorer = ignore();
+  private dirIgnorer = (ignore as any)();
+  private fileIgnorer = (ignore as any)();
 
   /**
    * Adds one or more ignore patterns.

@@ -15,5 +15,9 @@
   },
   "typescript.preferences.includePackageJsonAutoImports": "off",
   "typescript.suggest.autoImports": true,
-  "typescript.validate.enable": true
+  "typescript.validate.enable": true,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit"
+  }
 }
