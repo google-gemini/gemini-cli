@@ -56,6 +56,7 @@ import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
+import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import process from 'node:process';
 import type { EditorType, Config, IdeContext } from '@google/gemini-cli-core';
 import {
@@ -624,7 +625,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     shellModeActive,
   });
 
-  const [userMessages, setUserMessages] = useState<string[]>([]);
+  // Independent input history management (unaffected by /clear)
+  const inputHistoryStore = useInputHistoryStore();
 
   // Stable reference for cancel handler to avoid circular dependency
   const cancelHandlerRef = useRef<() => void>(() => {});
@@ -673,7 +675,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       return;
     }
 
-    const lastUserMessage = userMessages.at(-1);
+    const lastUserMessage = inputHistoryStore.inputHistory.at(-1);
     let textToSet = lastUserMessage || '';
 
     // Append queued messages if any exist
@@ -688,7 +690,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     }
   }, [
     buffer,
-    userMessages,
+    inputHistoryStore.inputHistory,
     getQueuedMessagesText,
     clearQueue,
     pendingHistoryItems,
@@ -697,9 +699,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   // Input handling - queue messages for processing
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
+      const trimmedValue = submittedValue.trim();
+      if (trimmedValue.length > 0) {
+        // Add to independent input history
+        inputHistoryStore.addInput(trimmedValue);
+      }
+      // Always add to message queue
       addMessage(submittedValue);
     },
-    [addMessage],
+    [addMessage, inputHistoryStore],
   );
 
   const handleIdePromptComplete = useCallback(
@@ -842,41 +850,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const logger = useLogger(config.storage);
 
+  // Initialize independent input history from logger
   useEffect(() => {
-    const fetchUserMessages = async () => {
-      const pastMessagesRaw = (await logger?.getPreviousUserMessages()) || []; // Newest first
-
-      const currentSessionUserMessages = history
-        .filter(
-          (item): item is HistoryItem & { type: 'user'; text: string } =>
-            item.type === 'user' &&
-            typeof item.text === 'string' &&
-            item.text.trim() !== '',
-        )
-        .map((item) => item.text)
-        .reverse(); // Newest first, to match pastMessagesRaw sorting
-
-      // Combine, with current session messages being more recent
-      const combinedMessages = [
-        ...currentSessionUserMessages,
-        ...pastMessagesRaw,
-      ];
-
-      // Deduplicate consecutive identical messages from the combined list (still newest first)
-      const deduplicatedMessages: string[] = [];
-      if (combinedMessages.length > 0) {
-        deduplicatedMessages.push(combinedMessages[0]); // Add the newest one unconditionally
-        for (let i = 1; i < combinedMessages.length; i++) {
-          if (combinedMessages[i] !== combinedMessages[i - 1]) {
-            deduplicatedMessages.push(combinedMessages[i]);
-          }
-        }
-      }
-      // Reverse to oldest first for useInputHistory
-      setUserMessages(deduplicatedMessages.reverse());
-    };
-    fetchUserMessages();
-  }, [history, logger]);
+    inputHistoryStore.initializeFromLogger(logger);
+  }, [logger, inputHistoryStore]);
 
   const isInputActive =
     (streamingState === StreamingState.Idle ||
@@ -1336,7 +1313,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   inputWidth={inputWidth}
                   suggestionsWidth={suggestionsWidth}
                   onSubmit={handleFinalSubmit}
-                  userMessages={userMessages}
+                  userMessages={inputHistoryStore.inputHistory}
                   onClearScreen={handleClearScreen}
                   config={config}
                   slashCommands={slashCommands}
