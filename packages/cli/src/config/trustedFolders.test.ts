@@ -80,6 +80,52 @@ describe('Trusted Folders Loading', () => {
     expect(errors).toEqual([]);
   });
 
+  describe('isPathTrusted', () => {
+    function setup({ config = {} as Record<string, TrustLevel> } = {}) {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p) => p === USER_TRUSTED_FOLDERS_PATH,
+      );
+      (fs.readFileSync as Mock).mockImplementation((p) => {
+        if (p === USER_TRUSTED_FOLDERS_PATH) return JSON.stringify(config);
+        return '{}';
+      });
+
+      const folders = loadTrustedFolders();
+
+      return { folders };
+    }
+
+    it('provides a method to determine if a path is trusted', () => {
+      const { folders } = setup({
+        config: {
+          './myfolder': TrustLevel.TRUST_FOLDER,
+          '/trustedparent/trustme': TrustLevel.TRUST_PARENT,
+          '/user/folder': TrustLevel.TRUST_FOLDER,
+          '/secret': TrustLevel.DO_NOT_TRUST,
+          '/secret/publickeys': TrustLevel.TRUST_FOLDER,
+        },
+      });
+      expect(folders.isPathTrusted('/secret')).toBe(false);
+      expect(folders.isPathTrusted('/user/folder')).toBe(true);
+      expect(folders.isPathTrusted('/secret/publickeys/public.pem')).toBe(true);
+      expect(folders.isPathTrusted('/user/folder/harhar')).toBe(true);
+      expect(folders.isPathTrusted('myfolder/somefile.jpg')).toBe(true);
+      expect(folders.isPathTrusted('/trustedparent/someotherfolder')).toBe(
+        true,
+      );
+      expect(folders.isPathTrusted('/trustedparent/trustme')).toBe(true);
+
+      // No explicit rule covers this file
+      expect(folders.isPathTrusted('/secret/bankaccounts.json')).toBe(
+        undefined,
+      );
+      expect(folders.isPathTrusted('/secret/mine/privatekey.pem')).toBe(
+        undefined,
+      );
+      expect(folders.isPathTrusted('/user/someotherfolder')).toBe(undefined);
+    });
+  });
+
   it('should load user rules if only user file exists', () => {
     const userPath = USER_TRUSTED_FOLDERS_PATH;
     (mockFsExistsSync as Mock).mockImplementation((p) => p === userPath);
@@ -132,8 +178,12 @@ describe('isWorkspaceTrusted', () => {
   let mockCwd: string;
   const mockRules: Record<string, TrustLevel> = {};
   const mockSettings: Settings = {
-    folderTrustFeature: true,
-    folderTrust: true,
+    security: {
+      folderTrust: {
+        featureEnabled: true,
+        enabled: true,
+      },
+    },
   };
 
   beforeEach(() => {

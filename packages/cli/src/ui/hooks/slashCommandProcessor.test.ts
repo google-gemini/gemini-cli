@@ -77,7 +77,6 @@ import type {
   SlashCommand,
 } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
-import { ToolConfirmationOutcome } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
@@ -85,9 +84,11 @@ import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import {
   SlashCommandStatus,
+  ToolConfirmationOutcome,
   makeFakeConfig,
+  ToolConfirmationOutcome,
   type IdeClient,
-} from '@google/gemini-cli-core/index.js';
+} from '@google/gemini-cli-core';
 
 function createTestCommand(
   overrides: Partial<SlashCommand>,
@@ -416,6 +417,44 @@ describe('useSlashCommandProcessor', () => {
       );
     });
 
+    it('should strip thoughts when handling "load_history" action', async () => {
+      const mockSetHistory = vi.fn();
+      const mockGeminiClient = {
+        setHistory: mockSetHistory,
+      };
+      vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockGeminiClient as any,
+      );
+
+      const historyWithThoughts = [
+        {
+          role: 'model',
+          parts: [{ text: 'response', thoughtSignature: 'CikB...' }],
+        },
+      ];
+      const command = createTestCommand({
+        name: 'loadwiththoughts',
+        action: vi.fn().mockResolvedValue({
+          type: 'load_history',
+          history: [{ type: MessageType.MODEL, text: 'response' }],
+          clientHistory: historyWithThoughts,
+        }),
+      });
+
+      const result = setupProcessorHook([command]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/loadwiththoughts');
+      });
+
+      expect(mockSetHistory).toHaveBeenCalledTimes(1);
+      expect(mockSetHistory).toHaveBeenCalledWith(historyWithThoughts, {
+        stripThoughts: true,
+      });
+    });
+
     describe('with fake timers', () => {
       // This test needs to let the async `waitFor` complete with REAL timers
       // before switching to FAKE timers to test setTimeout.
@@ -490,7 +529,7 @@ describe('useSlashCommandProcessor', () => {
           description: 'A command from a file',
           action: async () => ({
             type: 'submit_prompt',
-            content: 'The actual prompt from the TOML file.',
+            content: [{ text: 'The actual prompt from the TOML file.' }],
           }),
         },
         CommandKind.FILE,
@@ -506,7 +545,7 @@ describe('useSlashCommandProcessor', () => {
 
       expect(actionResult).toEqual({
         type: 'submit_prompt',
-        content: 'The actual prompt from the TOML file.',
+        content: [{ text: 'The actual prompt from the TOML file.' }],
       });
 
       expect(mockAddItem).toHaveBeenCalledWith(
@@ -522,7 +561,7 @@ describe('useSlashCommandProcessor', () => {
           description: 'A command from mcp',
           action: async () => ({
             type: 'submit_prompt',
-            content: 'The actual prompt from the mcp command.',
+            content: [{ text: 'The actual prompt from the mcp command.' }],
           }),
         },
         CommandKind.MCP_PROMPT,
@@ -538,7 +577,7 @@ describe('useSlashCommandProcessor', () => {
 
       expect(actionResult).toEqual({
         type: 'submit_prompt',
-        content: 'The actual prompt from the mcp command.',
+        content: [{ text: 'The actual prompt from the mcp command.' }],
       });
 
       expect(mockAddItem).toHaveBeenCalledWith(

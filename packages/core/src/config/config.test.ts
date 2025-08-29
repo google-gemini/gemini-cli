@@ -23,6 +23,9 @@ import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
+import { ShellTool } from '../tools/shell.js';
+import { ReadFileTool } from '../tools/read-file.js';
+
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
   return {
@@ -96,6 +99,16 @@ vi.mock('../services/gitService.js', () => {
   GitServiceMock.prototype.initialize = vi.fn();
   return { GitService: GitServiceMock };
 });
+
+vi.mock('../ide/ide-client.js', () => ({
+  IdeClient: {
+    getInstance: vi.fn().mockResolvedValue({
+      getConnectionStatus: vi.fn(),
+      initialize: vi.fn(),
+      shutdown: vi.fn(),
+    }),
+  },
+}));
 
 describe('Server Config (config.ts)', () => {
   const MODEL = 'gemini-pro';
@@ -629,58 +642,80 @@ describe('Server Config (config.ts)', () => {
       expect(config.getUseRipgrep()).toBe(false);
     });
   });
+
+  describe('createToolRegistry', () => {
+    it('should register a tool if coreTools contains an argument-specific pattern', async () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        coreTools: ['ShellTool(git status)'],
+      };
+      const config = new Config(params);
+      await config.initialize();
+
+      // The ToolRegistry class is mocked, so we can inspect its prototype's methods.
+      const registerToolMock = (
+        (await vi.importMock('../tools/tool-registry')) as {
+          ToolRegistry: { prototype: { registerTool: Mock } };
+        }
+      ).ToolRegistry.prototype.registerTool;
+
+      // Check that registerTool was called for ShellTool
+      const wasShellToolRegistered = (registerToolMock as Mock).mock.calls.some(
+        (call) => call[0] instanceof vi.mocked(ShellTool),
+      );
+      expect(wasShellToolRegistered).toBe(true);
+
+      // Check that registerTool was NOT called for ReadFileTool
+      const wasReadFileToolRegistered = (
+        registerToolMock as Mock
+      ).mock.calls.some((call) => call[0] instanceof vi.mocked(ReadFileTool));
+      expect(wasReadFileToolRegistered).toBe(false);
+    });
+  });
 });
 
 describe('setApprovalMode with folder trust', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+  };
+
   it('should throw an error when setting YOLO mode in an untrusted folder', () => {
-    const config = new Config({
-      sessionId: 'test',
-      targetDir: '.',
-      debugMode: false,
-      model: 'test-model',
-      cwd: '.',
-      trustedFolder: false, // Untrusted
-    });
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
     expect(() => config.setApprovalMode(ApprovalMode.YOLO)).toThrow(
       'Cannot enable privileged approval modes in an untrusted folder.',
     );
   });
 
   it('should throw an error when setting AUTO_EDIT mode in an untrusted folder', () => {
-    const config = new Config({
-      sessionId: 'test',
-      targetDir: '.',
-      debugMode: false,
-      model: 'test-model',
-      cwd: '.',
-      trustedFolder: false, // Untrusted
-    });
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
     expect(() => config.setApprovalMode(ApprovalMode.AUTO_EDIT)).toThrow(
       'Cannot enable privileged approval modes in an untrusted folder.',
     );
   });
 
   it('should NOT throw an error when setting DEFAULT mode in an untrusted folder', () => {
-    const config = new Config({
-      sessionId: 'test',
-      targetDir: '.',
-      debugMode: false,
-      model: 'test-model',
-      cwd: '.',
-      trustedFolder: false, // Untrusted
-    });
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
   });
 
   it('should NOT throw an error when setting any mode in a trusted folder', () => {
-    const config = new Config({
-      sessionId: 'test',
-      targetDir: '.',
-      debugMode: false,
-      model: 'test-model',
-      cwd: '.',
-      trustedFolder: true, // Trusted
-    });
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    expect(() => config.setApprovalMode(ApprovalMode.YOLO)).not.toThrow();
+    expect(() => config.setApprovalMode(ApprovalMode.AUTO_EDIT)).not.toThrow();
+    expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
+  });
+
+  it('should NOT throw an error when setting any mode if trustedFolder is undefined', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true); // isTrustedFolder defaults to true
     expect(() => config.setApprovalMode(ApprovalMode.YOLO)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.AUTO_EDIT)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();

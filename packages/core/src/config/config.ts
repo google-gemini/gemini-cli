@@ -49,10 +49,12 @@ import { logCliConfiguration, logIdeConnection } from '../telemetry/loggers.js';
 import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
 
 // Re-export OAuth config type
-export type { MCPOAuthConfig };
+export type { MCPOAuthConfig, AnyToolInvocation };
+import type { AnyToolInvocation } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
+import type { EventEmitter } from 'node:events';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -159,6 +161,7 @@ export interface ConfigParameters {
   question?: string;
   fullContext?: boolean;
   coreTools?: string[];
+  allowedTools?: string[];
   excludeTools?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
@@ -205,12 +208,13 @@ export interface ConfigParameters {
   skipNextSpeakerCheck?: boolean;
   extensionManagement?: boolean;
   enablePromptCompletion?: boolean;
+  eventEmitter?: EventEmitter;
 }
 
 export class Config {
   private toolRegistry!: ToolRegistry;
   private promptRegistry!: PromptRegistry;
-  private sessionId: string;
+  private readonly sessionId: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private readonly embeddingModel: string;
@@ -221,6 +225,7 @@ export class Config {
   private readonly question: string | undefined;
   private readonly fullContext: boolean;
   private readonly coreTools: string[] | undefined;
+  private readonly allowedTools: string[] | undefined;
   private readonly excludeTools: string[] | undefined;
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
@@ -279,6 +284,7 @@ export class Config {
   private initialized: boolean = false;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
+  private readonly eventEmitter?: EventEmitter;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -295,6 +301,7 @@ export class Config {
     this.question = params.question;
     this.fullContext = params.fullContext ?? false;
     this.coreTools = params.coreTools;
+    this.allowedTools = params.allowedTools;
     this.excludeTools = params.excludeTools;
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
     this.toolCallCommand = params.toolCallCommand;
@@ -352,6 +359,7 @@ export class Config {
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
+    this.eventEmitter = params.eventEmitter;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -421,10 +429,6 @@ export class Config {
 
   getSessionId(): string {
     return this.sessionId;
-  }
-
-  setSessionId(sessionId: string): void {
-    this.sessionId = sessionId;
   }
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
@@ -521,6 +525,10 @@ export class Config {
 
   getCoreTools(): string[] | undefined {
     return this.coreTools;
+  }
+
+  getAllowedTools(): string[] | undefined {
+    return this.allowedTools;
   }
 
   getExcludeTools(): string[] | undefined {
@@ -722,8 +730,18 @@ export class Config {
     return this.folderTrust;
   }
 
-  isTrustedFolder(): boolean | undefined {
-    return this.trustedFolder;
+  isTrustedFolder(): boolean {
+    // isWorkspaceTrusted in cli/src/config/trustedFolder.js returns undefined
+    // when the file based trust value is unavailable, since it is mainly used
+    // in the initialization for trust dialogs, etc. Here we return true since
+    // config.isTrustedFolder() is used for the main business logic of blocking
+    // tool calls etc in the rest of the application.
+    //
+    // Default value is true since we load with trusted settings to avoid
+    // restarts in the more common path. If the user chooses to mark the folder
+    // as untrusted, the CLI will restart and we will have the trust value
+    // reloaded.
+    return this.trustedFolder ?? true;
   }
 
   setIdeMode(value: boolean): void {
@@ -799,7 +817,7 @@ export class Config {
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this);
+    const registry = new ToolRegistry(this, this.eventEmitter);
 
     // helper to create & register core tools that are enabled
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -807,12 +825,10 @@ export class Config {
       const className = ToolClass.name;
       const toolName = ToolClass.Name || className;
       const coreTools = this.getCoreTools();
-      const excludeTools = this.getExcludeTools();
+      const excludeTools = this.getExcludeTools() || [];
 
-      let isEnabled = false;
-      if (coreTools === undefined) {
-        isEnabled = true;
-      } else {
+      let isEnabled = true; // Enabled by default if coreTools is not set.
+      if (coreTools) {
         isEnabled = coreTools.some(
           (tool) =>
             tool === className ||
@@ -822,10 +838,11 @@ export class Config {
         );
       }
 
-      if (
-        excludeTools?.includes(className) ||
-        excludeTools?.includes(toolName)
-      ) {
+      const isExcluded = excludeTools.some(
+        (tool) => tool === className || tool === toolName,
+      );
+
+      if (isExcluded) {
         isEnabled = false;
       }
 

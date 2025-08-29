@@ -20,6 +20,7 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import type { EventEmitter } from 'node:events';
 
 type ToolParams = Record<string, unknown>;
 
@@ -170,7 +171,7 @@ export class ToolRegistry {
   private config: Config;
   private mcpClientManager: McpClientManager;
 
-  constructor(config: Config) {
+  constructor(config: Config, eventEmitter?: EventEmitter) {
     this.config = config;
     this.mcpClientManager = new McpClientManager(
       this.config.getMcpServers() ?? {},
@@ -179,6 +180,7 @@ export class ToolRegistry {
       this.config.getPromptRegistry(),
       this.config.getDebugMode(),
       this.config.getWorkspaceContext(),
+      eventEmitter,
     );
   }
 
@@ -234,7 +236,7 @@ export class ToolRegistry {
     await this.discoverAndRegisterToolsFromCommand();
 
     // discover tools using MCP servers, if configured
-    await this.mcpClientManager.discoverAllMcpTools();
+    await this.mcpClientManager.discoverAllMcpTools(this.config);
   }
 
   /**
@@ -249,7 +251,7 @@ export class ToolRegistry {
     this.config.getPromptRegistry().clear();
 
     // discover tools using MCP servers, if configured
-    await this.mcpClientManager.discoverAllMcpTools();
+    await this.mcpClientManager.discoverAllMcpTools(this.config);
   }
 
   /**
@@ -283,6 +285,7 @@ export class ToolRegistry {
         this.config.getPromptRegistry(),
         this.config.getDebugMode(),
         this.config.getWorkspaceContext(),
+        this.config,
       );
     }
   }
@@ -435,6 +438,13 @@ export class ToolRegistry {
       }
     }
     return declarations;
+  }
+
+  /**
+   * Returns an array of all registered and discovered tool names.
+   */
+  getAllToolNames(): string[] {
+    return Array.from(this.tools.keys());
   }
 
   /**

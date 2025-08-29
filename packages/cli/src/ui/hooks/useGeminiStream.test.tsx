@@ -277,6 +277,7 @@ describe('useGeminiStream', () => {
           props.history,
           props.addItem,
           props.config,
+          props.loadedSettings,
           props.onDebugMessage,
           props.handleSlashCommand,
           props.shellModeActive,
@@ -438,6 +439,7 @@ describe('useGeminiStream', () => {
         [],
         mockAddItem,
         mockConfig,
+        mockLoadedSettings,
         mockOnDebugMessage,
         mockHandleSlashCommand,
         false,
@@ -517,6 +519,7 @@ describe('useGeminiStream', () => {
         [],
         mockAddItem,
         mockConfig,
+        mockLoadedSettings,
         mockOnDebugMessage,
         mockHandleSlashCommand,
         false,
@@ -625,6 +628,7 @@ describe('useGeminiStream', () => {
         [],
         mockAddItem,
         mockConfig,
+        mockLoadedSettings,
         mockOnDebugMessage,
         mockHandleSlashCommand,
         false,
@@ -734,6 +738,7 @@ describe('useGeminiStream', () => {
         [],
         mockAddItem,
         mockConfig,
+        mockLoadedSettings,
         mockOnDebugMessage,
         mockHandleSlashCommand,
         false,
@@ -863,6 +868,7 @@ describe('useGeminiStream', () => {
           [],
           mockAddItem,
           mockConfig,
+          mockLoadedSettings,
           mockOnDebugMessage,
           mockHandleSlashCommand,
           false,
@@ -1089,6 +1095,42 @@ describe('useGeminiStream', () => {
         );
       });
     });
+
+    it('should not call handleSlashCommand for line comments', async () => {
+      const { result, mockSendMessageStream: localMockSendMessageStream } =
+        renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('// This is a line comment');
+      });
+
+      await waitFor(() => {
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        expect(localMockSendMessageStream).toHaveBeenCalledWith(
+          '// This is a line comment',
+          expect.any(AbortSignal),
+          expect.any(String),
+        );
+      });
+    });
+
+    it('should not call handleSlashCommand for block comments', async () => {
+      const { result, mockSendMessageStream: localMockSendMessageStream } =
+        renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('/* This is a block comment */');
+      });
+
+      await waitFor(() => {
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        expect(localMockSendMessageStream).toHaveBeenCalledWith(
+          '/* This is a block comment */',
+          expect.any(AbortSignal),
+          expect.any(String),
+        );
+      });
+    });
   });
 
   describe('Memory Refresh on save_memory', () => {
@@ -1138,6 +1180,7 @@ describe('useGeminiStream', () => {
           [],
           mockAddItem,
           mockConfig,
+          mockLoadedSettings,
           mockOnDebugMessage,
           mockHandleSlashCommand,
           false,
@@ -1191,6 +1234,7 @@ describe('useGeminiStream', () => {
           [],
           mockAddItem,
           testConfig,
+          mockLoadedSettings,
           mockOnDebugMessage,
           mockHandleSlashCommand,
           false,
@@ -1241,6 +1285,7 @@ describe('useGeminiStream', () => {
           [],
           mockAddItem,
           mockConfig,
+          mockLoadedSettings,
           mockOnDebugMessage,
           mockHandleSlashCommand,
           false,
@@ -1289,6 +1334,7 @@ describe('useGeminiStream', () => {
           [],
           mockAddItem,
           mockConfig,
+          mockLoadedSettings,
           mockOnDebugMessage,
           mockHandleSlashCommand,
           false,
@@ -1338,6 +1384,7 @@ describe('useGeminiStream', () => {
           [],
           mockAddItem,
           mockConfig,
+          mockLoadedSettings,
           mockOnDebugMessage,
           mockHandleSlashCommand,
           false,
@@ -1477,6 +1524,7 @@ describe('useGeminiStream', () => {
         [],
         mockAddItem,
         mockConfig,
+        mockLoadedSettings,
         mockOnDebugMessage,
         mockHandleSlashCommand,
         false, // shellModeActive
@@ -1541,6 +1589,7 @@ describe('useGeminiStream', () => {
           [],
           mockAddItem,
           mockConfig,
+          mockLoadedSettings,
           mockOnDebugMessage,
           mockHandleSlashCommand,
           false,
@@ -1619,6 +1668,7 @@ describe('useGeminiStream', () => {
           [],
           mockAddItem,
           mockConfig,
+          mockLoadedSettings,
           mockOnDebugMessage,
           mockHandleSlashCommand,
           false,
@@ -1673,6 +1723,7 @@ describe('useGeminiStream', () => {
           [],
           mockAddItem,
           mockConfig,
+          mockLoadedSettings,
           mockOnDebugMessage,
           mockHandleSlashCommand,
           false,

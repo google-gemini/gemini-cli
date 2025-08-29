@@ -20,7 +20,7 @@ interface ToolGroupMessageProps {
   toolCalls: IndividualToolCallDisplay[];
   availableTerminalHeight?: number;
   terminalWidth: number;
-  config?: Config;
+  config: Config;
   isFocused?: boolean;
 }
 

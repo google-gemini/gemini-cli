@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.1.21",
+  "version": "0.2.2",
   "description": "Gemini CLI",
   "repository": {
     "type": "git",
@@ -25,7 +25,7 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.21"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.2.2"
   },
   "dependencies": {
     "@google/gemini-cli-core": "file:../core",
@@ -38,15 +38,16 @@
     "dotenv": "^17.1.0",
     "glob": "^10.4.1",
     "highlight.js": "^11.11.1",
-    "ink": "^6.1.1",
+    "ink": "^6.2.3",
     "ink-gradient": "^3.0.0",
-    "ink-select-input": "^6.2.0",
     "ink-spinner": "^5.0.0",
+    "lodash-es": "^4.17.21",
     "lowlight": "^3.3.0",
     "mime-types": "^3.0.1",
     "open": "^10.1.2",
     "react": "^19.1.0",
     "read-package-up": "^11.0.0",
+    "simple-git": "^3.28.0",
     "shell-quote": "^1.8.3",
     "string-width": "^7.1.0",
     "strip-ansi": "^7.1.0",
@@ -58,10 +59,12 @@
   },
   "devDependencies": {
     "@babel/runtime": "^7.27.6",
+    "@google/gemini-cli-test-utils": "file:../test-utils",
     "@testing-library/react": "^16.3.0",
     "@types/command-exists": "^1.2.3",
     "@types/diff": "^7.0.2",
     "@types/dotenv": "^6.1.1",
+    "@types/lodash-es": "^4.17.12",
     "@types/node": "^20.11.24",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
@@ -73,8 +76,7 @@
     "pretty-format": "^30.0.2",
     "react-dom": "^19.1.0",
     "typescript": "^5.3.3",
-    "vitest": "^3.1.1",
-    "@google/gemini-cli-test-utils": "file:../test-utils"
+    "vitest": "^3.1.1"
   },
   "engines": {
     "node": ">=20"
