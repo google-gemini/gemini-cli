@@ -49,7 +49,7 @@ jobs:
 
           echo '🏷️ Finding issues that need triage...'
           NEED_TRIAGE_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue label:"status/needs-triage"' --json number,title,body)"
+            --search 'is:open is:issue label:\"status/needs-triage\"' --json number,title,body)"
 
           echo '🔄 Merging and deduplicating issues...'
           ISSUES="$(echo "${NO_LABEL_ISSUES}" "${NEED_TRIAGE_ISSUES}" | jq -c -s 'add | unique_by(.number)')"
@@ -62,9 +62,9 @@ jobs:
 
       - name: 'Get Repository Labels'
         id: 'get_labels'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        uses: 'actions/github-script@v6'
         with:
-          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          github-token: '${{ steps.generate_token.outputs.token }}'
           script: |-
             const { data: labels } = await github.rest.issues.listLabelsForRepo({
               owner: context.repo.owner,
@@ -251,17 +251,20 @@ jobs:
         env:
           REPOSITORY: '${{ github.repository }}'
           LABELS_OUTPUT: '${{ steps.gemini_issue_analysis.outputs.summary }}'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        uses: 'actions/github-script@v6'
         with:
-          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          github-token: '${{ steps.generate_token.outputs.token }}'
           script: |-
-            // Strip code block markers if present
             const rawLabels = process.env.LABELS_OUTPUT;
             core.info(`Raw labels JSON: ${rawLabels}`);
             let parsedLabels;
             try {
-              const trimmedLabels = rawLabels.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '').trim();
-              parsedLabels = JSON.parse(trimmedLabels);
+              const jsonMatch = rawLabels.match(/```json\s*([\s\S]*?)\s*```/);
+              if (!jsonMatch || !jsonMatch[1]) {
+                throw new Error("Could not find a ```json ... ``` block in the output.");
+              } 
+              const jsonString = jsonMatch[1].trim();
+              parsedLabels = JSON.parse(jsonString); 
               core.info(`Parsed labels JSON: ${JSON.stringify(parsedLabels)}`);
             } catch (err) {
               core.setFailed(`Failed to parse labels JSON from Gemini output: ${err.message}\nRaw output: ${rawLabels}`);
@@ -275,18 +278,36 @@ jobs:
                 continue;
               }
 
-              // Set labels based on triage result
-              if (entry.labels_to_set && entry.labels_to_set.length > 0) {
-                await github.rest.issues.setLabels({
+              if (entry.labels_to_add && entry.labels_to_add.length > 0) {
+                await github.rest.issues.addLabels({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: issueNumber,
-                  labels: entry.labels_to_set
+                  labels: entry.labels_to_add
                 });
                 const explanation = entry.explanation ? ` - ${entry.explanation}` : '';
-                core.info(`Successfully set labels for #${issueNumber}: ${entry.labels_to_set.join(', ')}${explanation}`);
-              } else {
-                // If no labels to set, leave the issue as is
-                core.info(`No labels to set for #${issueNumber}, leaving as is`);
+                core.info(`Successfully added labels for #${issueNumber}: ${entry.labels_to_add.join(', ')}${explanation}`);
+              }
+
+              if (entry.labels_to_remove && entry.labels_to_remove.length > 0) {
+                for (const label of entry.labels_to_remove) {
+                  try {
+                    await github.rest.issues.removeLabel({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issueNumber,
+                      name: label
+                    });
+                  } catch (error) {
+                    if (error.status !== 404) {
+                      throw error;
+                    }
+                  }
+                }
+                core.info(`Successfully removed labels for #${issueNumber}: ${entry.labels_to_remove.join(', ')}`);
+              }
+
+              if ((!entry.labels_to_add || entry.labels_to_add.length === 0) && (!entry.labels_to_remove || entry.labels_to_remove.length === 0)) {
+                core.info(`No labels to add or remove for #${issueNumber}, leaving as is`);
               }
             }
