@@ -374,7 +374,12 @@ export class Config {
       throw Error('Config was already initialized');
     }
     this.initialized = true;
-    this.ideClient = await IdeClient.getInstance();
+    
+    // Only initialize IdeClient if ideMode is enabled
+    if (this.ideMode) {
+      this.ideClient = await IdeClient.getInstance();
+    }
+    
     // Initialize centralized FileDiscoveryService
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
@@ -749,6 +754,9 @@ export class Config {
   }
 
   getIdeClient(): IdeClient {
+    if (!this.ideMode || !this.ideClient) {
+      throw new Error('IDE mode is disabled or not initialized');
+    }
     return this.ideClient;
   }
 

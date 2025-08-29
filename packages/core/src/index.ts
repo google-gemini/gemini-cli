@@ -45,6 +45,10 @@ export * from './utils/generateContentResponseUtilities.js';
 export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
 export * from './utils/workspaceContext.js';
+export * from './utils/WorkspaceManager.js';
+
+// Export template system
+export * from './templates/index.js';
 export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
 
@@ -69,6 +73,8 @@ export * from './services/shellExecutionService.js';
 export * from './tools/tools.js';
 export * from './tools/tool-error.js';
 export * from './tools/tool-registry.js';
+export * from './tools/ToolsetManager.js';
+export * from './tools/ToolsetOptimizer.js';
 
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';
@@ -102,6 +108,33 @@ export type {
   OAuthProtectedResourceMetadata,
 } from './mcp/oauth-utils.js';
 export { OAuthUtils } from './mcp/oauth-utils.js';
+
+// Export multi-model system
+export { MultiModelSystem } from './multimodel/index.js';
+
+// Export provider system
+export type {
+  ModelProviderConfig,
+  UniversalMessage,
+  UniversalResponse,
+  UniversalStreamEvent,
+  ProviderCapabilities,
+  ConnectionStatus
+} from './providers/index.js';
+export { 
+  ModelProviderType,
+  BaseModelProvider,
+  OpenAIProvider,
+  LMStudioProvider,
+  GeminiProvider,
+  ModelProviderFactory,
+  UniversalModelClient,
+  ProviderConfigManager
+} from './providers/index.js';
+
+// Export role system  
+export type { RoleDefinition, RoleContext, RoleCategory } from './roles/index.js';
+export { BUILTIN_ROLES, RoleManager } from './roles/index.js';
 
 // Export telemetry functions
 export * from './telemetry/index.js';
