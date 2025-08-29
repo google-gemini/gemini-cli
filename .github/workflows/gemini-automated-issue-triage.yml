@@ -33,7 +33,7 @@ permissions:
 
 jobs:
   triage-issue:
-    if: |- 
+    if: |-
       github.repository == 'google-gemini/gemini-cli' &&
       (
         github.event_name == 'workflow_dispatch' ||
