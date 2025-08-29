@@ -22,7 +22,11 @@ describe('ConfigPermissionRepository', () => {
   let mockWriteFile: Mock;
   let mockMkdir: Mock;
 
-  const mockPermissionsPath = '/mock/home/.gemini/tool-permissions.json';
+  const mockPermissionsPath = path.join(
+    '/mock/home',
+    '.gemini',
+    'tool-permissions.json',
+  );
 
   beforeEach(() => {
     // Setup mocks
@@ -465,7 +469,7 @@ describe('ConfigPermissionRepository', () => {
       newRepo.isAllowed('shell', '/test');
 
       expect(mockReadFile).toHaveBeenCalledWith(
-        '/different/home/.gemini/tool-permissions.json',
+        path.join('/different/home', '.gemini', 'tool-permissions.json'),
         'utf-8',
       );
     });
