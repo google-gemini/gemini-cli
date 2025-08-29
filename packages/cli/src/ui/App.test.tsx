@@ -233,6 +233,14 @@ vi.mock('./hooks/useLogger', () => ({
   })),
 }));
 
+vi.mock('./hooks/useInputHistoryStore.js', () => ({
+  useInputHistoryStore: vi.fn(() => ({
+    inputHistory: [],
+    addInput: vi.fn(),
+    initializeFromLogger: vi.fn(),
+  })),
+}));
+
 vi.mock('./hooks/useConsoleMessages.js', () => ({
   useConsoleMessages: vi.fn(() => ({
     consoleMessages: [],
