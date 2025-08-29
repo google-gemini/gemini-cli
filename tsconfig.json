@@ -9,7 +9,7 @@
     "noImplicitThis": true,
     "forceConsistentCasingInFileNames": true,
     "noPropertyAccessFromIndexSignature": true,
-    "noUnusedLocals": false,
+    "noUnusedLocals": true,
     "strictBindCallApply": true,
     "strictFunctionTypes": true,
     "strictNullChecks": true,
