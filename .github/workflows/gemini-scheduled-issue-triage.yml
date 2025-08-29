@@ -113,7 +113,7 @@ jobs:
 
             ## Steps
 
-            1. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
+            1. You are only able to use the echo command. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
             2. Check environment variable for issues to triage: $ISSUES_TO_TRIAGE (JSON array of issues)
             3. Review the issue title, body and any comments provided in the environment variables.
             4. If there is an existing area/ label, don't change it if there is a kind/ label don't change it and if there is a priority/ label dont' change it
