@@ -79,7 +79,7 @@ export async function loadConfig(
     false,
     fileService,
     extensionContextFilePaths,
-    false, /// TODO: Wire up folder trust logic here.
+    true, /// TODO: Wire up folder trust logic here.
   );
   configParams.userMemory = memoryContent;
   configParams.geminiMdFileCount = fileCount;
