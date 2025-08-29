@@ -301,7 +301,7 @@ export const useGeminiStream = (
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 
         // Trigger auto-save after user message
-        triggerAutoSaveIfNeeded();
+        await triggerAutoSaveIfNeeded();
 
         // Handle UI-only commands first
         const slashCommandResult = isSlashCommand(trimmedQuery)

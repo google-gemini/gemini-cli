@@ -11,11 +11,11 @@ import type { HistoryItem } from '../types.js';
 interface UseAutoSaveOptions {
   config: Config | null;
   history: HistoryItem[];
-  onAutoSave: (tag: string) => void;
+  onAutoSave: (tag: string) => Promise<void>;
 }
 
 interface UseAutoSaveReturn {
-  triggerAutoSaveIfNeeded: () => void;
+  triggerAutoSaveIfNeeded: () => Promise<void>;
   resetMessageCount: () => void;
 }
 
@@ -49,13 +49,13 @@ export function useAutoSave({
   /**
    * Performs the auto-save operation
    */
-  const performAutoSave = useCallback(() => {
+  const performAutoSave = useCallback(async () => {
     if (!isAutoSaveEnabled || !config) {
       return;
     }
 
     const tag = createAutoSaveTag();
-    onAutoSave(tag);
+    await onAutoSave(tag);
   }, [isAutoSaveEnabled, config, createAutoSaveTag, onAutoSave]);
 
   /**
@@ -116,16 +116,17 @@ export function useAutoSave({
   /**
    * Triggers auto-save if conditions are met
    */
-  const triggerAutoSaveIfNeeded = useCallback(() => {
+  const triggerAutoSaveIfNeeded = useCallback(async () => {
     if (!isAutoSaveEnabled) return;
 
     // Check message count trigger
     if (userMessageCountRef.current >= conversationInterval) {
-      performAutoSave();
+      // Perform save first, then cleanup to avoid race conditions
+      await performAutoSave();
       userMessageCountRef.current = 0;
 
       // Clean up old auto-saves after successful save
-      cleanupOldAutoSaves();
+      await cleanupOldAutoSaves();
     }
 
     // Update last activity time
@@ -160,8 +161,14 @@ export function useAutoSave({
       const idleThreshold = idleTimeoutSeconds * 1000; // Convert seconds to milliseconds
 
       if (timeSinceLastActivity >= idleThreshold) {
-        performAutoSave();
-        cleanupOldAutoSaves();
+        // Perform save first, then cleanup to avoid race conditions
+        performAutoSave()
+          .then(() => {
+            cleanupOldAutoSaves();
+          })
+          .catch(() => {
+            // Ignore errors in idle timeout auto-save
+          });
       }
     }, idleTimeoutSeconds * 1000);
   }, [
