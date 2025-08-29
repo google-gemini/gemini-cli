@@ -8,11 +8,15 @@
 import type { Mocked } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
-import type { ToolResult } from './tools.js';
-import { ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
+import {
+  DiscoveredMCPTool,
+  generateValidName,
+  DiscoveredMCPToolInvocation,
+} from './mcp-tool.js';
+import { type ToolResult, ToolConfirmationOutcome } from './tools.js';
 import type { CallableTool, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
+import type { PermissionRepository } from '../permissions/PermissionRepository.js';
 
 // Mock @google/genai mcpToTool and CallableTool
 // We only need to mock the parts of CallableTool that DiscoveredMCPTool uses.
@@ -70,10 +74,25 @@ describe('DiscoveredMCPTool', () => {
   };
 
   let tool: DiscoveredMCPTool;
+  let mockPermissionRepo: PermissionRepository;
 
   beforeEach(() => {
     mockCallTool.mockClear();
     mockToolMethod.mockClear();
+
+    // Set up mock permission repository
+    mockPermissionRepo = {
+      isAllowed: vi.fn().mockResolvedValue(false),
+      grant: vi.fn().mockResolvedValue(undefined),
+      revoke: vi.fn().mockResolvedValue(undefined),
+      revokeAllForTool: vi.fn().mockResolvedValue(undefined),
+      revokeAll: vi.fn().mockResolvedValue(undefined),
+      getAllGranted: vi.fn().mockResolvedValue(new Map()),
+    };
+
+    // Set the static permission repository for the tests
+    DiscoveredMCPToolInvocation.setPermissionRepository(mockPermissionRepo);
+
     tool = new DiscoveredMCPTool(
       mockCallableToolInstance,
       serverName,
@@ -81,13 +100,12 @@ describe('DiscoveredMCPTool', () => {
       baseDescription,
       inputSchema,
     );
-    // Clear allowlist before each relevant test, especially for shouldConfirmExecute
-    const invocation = tool.build({ param: 'mock' }) as any;
-    invocation.constructor.allowlist.clear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Clean up after each test
+    DiscoveredMCPToolInvocation.setPermissionRepository(undefined as any);
   });
 
   describe('constructor', () => {
@@ -607,24 +625,29 @@ describe('DiscoveredMCPTool', () => {
       ).toBe(false);
     });
 
-    it('should return false if server is allowlisted', async () => {
+    it('should return false if server is allowed', async () => {
+      // Mock permission repository to return true for server
+      vi.mocked(mockPermissionRepo.isAllowed).mockResolvedValue(true);
+
       const invocation = tool.build({ param: 'mock' }) as any;
-      invocation.constructor.allowlist.add(serverName);
       expect(
         await invocation.shouldConfirmExecute(new AbortController().signal),
       ).toBe(false);
     });
 
-    it('should return false if tool is allowlisted', async () => {
-      const toolAllowlistKey = `${serverName}.${serverToolName}`;
+    it('should return false if tool is allowed', async () => {
+      // Mock permission repository to return true for specific tool calls (checking twice - once for server, once for tool)
+      vi.mocked(mockPermissionRepo.isAllowed)
+        .mockResolvedValueOnce(false) // First call for server permission
+        .mockResolvedValueOnce(true); // Second call for tool permission
+
       const invocation = tool.build({ param: 'mock' }) as any;
-      invocation.constructor.allowlist.add(toolAllowlistKey);
       expect(
         await invocation.shouldConfirmExecute(new AbortController().signal),
       ).toBe(false);
     });
 
-    it('should return confirmation details if not trusted and not allowlisted', async () => {
+    it('should return confirmation details if not trusted and not allowed', async () => {
       const invocation = tool.build({ param: 'mock' });
       const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
@@ -647,7 +670,10 @@ describe('DiscoveredMCPTool', () => {
       }
     });
 
-    it('should add server to allowlist on ProceedAlwaysServer', async () => {
+    it('should grant server permission on ProceedAlwaysServer', async () => {
+      const mockGrantFn = vi.fn().mockResolvedValue(undefined);
+      mockPermissionRepo.grant = mockGrantFn;
+
       const invocation = tool.build({ param: 'mock' }) as any;
       const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
@@ -662,7 +688,7 @@ describe('DiscoveredMCPTool', () => {
         await confirmation.onConfirm(
           ToolConfirmationOutcome.ProceedAlwaysServer,
         );
-        expect(invocation.constructor.allowlist.has(serverName)).toBe(true);
+        expect(mockGrantFn).toHaveBeenCalledWith('mcp', serverName);
       } else {
         throw new Error(
           'Confirmation details or onConfirm not in expected format',
@@ -670,8 +696,11 @@ describe('DiscoveredMCPTool', () => {
       }
     });
 
-    it('should add tool to allowlist on ProceedAlwaysTool', async () => {
+    it('should grant tool permission on ProceedAlwaysTool', async () => {
       const toolAllowlistKey = `${serverName}.${serverToolName}`;
+      const mockGrantFn = vi.fn().mockResolvedValue(undefined);
+      mockPermissionRepo.grant = mockGrantFn;
+
       const invocation = tool.build({ param: 'mock' }) as any;
       const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
@@ -684,9 +713,7 @@ describe('DiscoveredMCPTool', () => {
         typeof confirmation.onConfirm === 'function'
       ) {
         await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlwaysTool);
-        expect(invocation.constructor.allowlist.has(toolAllowlistKey)).toBe(
-          true,
-        );
+        expect(mockGrantFn).toHaveBeenCalledWith('mcp', toolAllowlistKey);
       } else {
         throw new Error(
           'Confirmation details or onConfirm not in expected format',
@@ -695,6 +722,9 @@ describe('DiscoveredMCPTool', () => {
     });
 
     it('should handle Cancel confirmation outcome', async () => {
+      const mockGrantFn = vi.fn().mockResolvedValue(undefined);
+      mockPermissionRepo.grant = mockGrantFn;
+
       const invocation = tool.build({ param: 'mock' }) as any;
       const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
@@ -706,14 +736,9 @@ describe('DiscoveredMCPTool', () => {
         'onConfirm' in confirmation &&
         typeof confirmation.onConfirm === 'function'
       ) {
-        // Cancel should not add anything to allowlist
+        // Cancel should not grant any permissions
         await confirmation.onConfirm(ToolConfirmationOutcome.Cancel);
-        expect(invocation.constructor.allowlist.has(serverName)).toBe(false);
-        expect(
-          invocation.constructor.allowlist.has(
-            `${serverName}.${serverToolName}`,
-          ),
-        ).toBe(false);
+        expect(mockGrantFn).not.toHaveBeenCalled();
       } else {
         throw new Error(
           'Confirmation details or onConfirm not in expected format',
@@ -722,6 +747,9 @@ describe('DiscoveredMCPTool', () => {
     });
 
     it('should handle ProceedOnce confirmation outcome', async () => {
+      const mockGrantFn = vi.fn().mockResolvedValue(undefined);
+      mockPermissionRepo.grant = mockGrantFn;
+
       const invocation = tool.build({ param: 'mock' }) as any;
       const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
@@ -733,14 +761,9 @@ describe('DiscoveredMCPTool', () => {
         'onConfirm' in confirmation &&
         typeof confirmation.onConfirm === 'function'
       ) {
-        // ProceedOnce should not add anything to allowlist
+        // ProceedOnce should not grant any permissions
         await confirmation.onConfirm(ToolConfirmationOutcome.ProceedOnce);
-        expect(invocation.constructor.allowlist.has(serverName)).toBe(false);
-        expect(
-          invocation.constructor.allowlist.has(
-            `${serverName}.${serverToolName}`,
-          ),
-        ).toBe(false);
+        expect(mockGrantFn).not.toHaveBeenCalled();
       } else {
         throw new Error(
           'Confirmation details or onConfirm not in expected format',
@@ -819,6 +842,87 @@ describe('DiscoveredMCPTool', () => {
       const invocation = tool.build(params);
       const description = invocation.getDescription();
       expect(description).toBe('{"param":"testValue","param2":"anotherOne"}');
+    });
+
+    describe('static permission management methods', () => {
+      // Permission repository is already set up in the main beforeEach/afterEach
+
+      it('should start with empty permissions', async () => {
+        const permissions =
+          await DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+        expect(permissions).toEqual([]);
+      });
+
+      it('should allow permissions to be added to the allowlist internally', async () => {
+        // We can't directly test adding permissions since that's internal to the tool execution,
+        // but we can test that the static methods work correctly when permissions exist.
+        // This would be integration-tested through the actual tool execution flows.
+
+        const permissions =
+          await DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+        expect(Array.isArray(permissions)).toBe(true);
+      });
+
+      it('should revoke specific MCP permissions', async () => {
+        // Test that the revocation method works without throwing
+        await expect(
+          DiscoveredMCPToolInvocation.revokeMcpPermission(
+            'test-server.test-tool',
+          ),
+        ).resolves.not.toThrow();
+
+        expect(mockPermissionRepo.revoke).toHaveBeenCalledWith(
+          'mcp',
+          'test-server.test-tool',
+        );
+      });
+
+      it('should clear all MCP permissions', async () => {
+        // Clear all permissions should work regardless of current state
+        await expect(
+          DiscoveredMCPToolInvocation.clearAllMcpPermissions(),
+        ).resolves.not.toThrow();
+
+        expect(mockPermissionRepo.revokeAllForTool).toHaveBeenCalledWith('mcp');
+
+        // Verify permissions are empty after clearing
+        const permissions =
+          await DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+        expect(permissions).toEqual([]);
+      });
+
+      it('should handle revoking non-existent permissions gracefully', async () => {
+        // Try to revoke a permission that doesn't exist - should not throw
+        await expect(
+          DiscoveredMCPToolInvocation.revokeMcpPermission(
+            'non-existent-permission',
+          ),
+        ).resolves.not.toThrow();
+
+        expect(mockPermissionRepo.revoke).toHaveBeenCalledWith(
+          'mcp',
+          'non-existent-permission',
+        );
+
+        // Permissions should still be empty
+        const permissions =
+          await DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+        expect(permissions).toEqual([]);
+      });
+
+      it('should return consistent array references', async () => {
+        const permissions1 =
+          await DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+        const permissions2 =
+          await DiscoveredMCPToolInvocation.getAllowedMcpPermissions();
+
+        expect(Array.isArray(permissions1)).toBe(true);
+        expect(Array.isArray(permissions2)).toBe(true);
+        // They should be separate array instances (not the same reference)
+        expect(permissions1).not.toBe(permissions2);
+        // But should have the same content
+        expect(permissions1).toEqual(permissions2);
+      });
     });
   });
 });

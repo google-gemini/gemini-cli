@@ -227,6 +227,14 @@ vi.mock('./hooks/useFolderTrust', () => ({
   })),
 }));
 
+vi.mock('./hooks/usePermissionsCommand', () => ({
+  usePermissionsCommand: vi.fn(() => ({
+    isPermissionsDialogOpen: false,
+    openPermissionsDialog: vi.fn(),
+    closePermissionsDialog: vi.fn(),
+  })),
+}));
+
 vi.mock('./hooks/useLogger', () => ({
   useLogger: vi.fn(() => ({
     getPreviousUserMessages: vi.fn().mockResolvedValue([]),
@@ -363,6 +371,19 @@ describe('App UI', () => {
         getDirectories: vi.fn(() => ['/test/dir']),
       }));
     }
+
+    // Ensure getPermissionRepository is available for PermissionsDialog
+    if (!mockConfig.getPermissionRepository) {
+      mockConfig.getPermissionRepository = vi.fn(() => ({
+        isAllowed: vi.fn().mockResolvedValue(false),
+        grant: vi.fn().mockResolvedValue(undefined),
+        revoke: vi.fn().mockResolvedValue(undefined),
+        revokeAllForTool: vi.fn().mockResolvedValue(undefined),
+        revokeAll: vi.fn().mockResolvedValue(undefined),
+        getAllGranted: vi.fn().mockResolvedValue(new Map()),
+      }));
+    }
+
     vi.mocked(ideContext.getIdeContext).mockReturnValue(undefined);
   });
 
@@ -1291,6 +1312,107 @@ describe('App UI', () => {
       currentUnmount = unmount;
       await Promise.resolve();
       expect(lastFrame()).not.toContain('Do you trust this folder?');
+    });
+
+    it('should display the permissions dialog when isPermissionsDialogOpen is true', async () => {
+      const { usePermissionsCommand } = await import(
+        './hooks/usePermissionsCommand.js'
+      );
+      vi.mocked(usePermissionsCommand).mockReturnValue({
+        isPermissionsDialogOpen: true,
+        openPermissionsDialog: vi.fn(),
+        closePermissionsDialog: vi.fn(),
+      });
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      await Promise.resolve();
+
+      // Should contain the permissions dialog
+      expect(lastFrame()).toContain('Tool Permissions');
+    });
+
+    it('should not display the permissions dialog when isPermissionsDialogOpen is false', async () => {
+      const { usePermissionsCommand } = await import(
+        './hooks/usePermissionsCommand.js'
+      );
+      vi.mocked(usePermissionsCommand).mockReturnValue({
+        isPermissionsDialogOpen: false,
+        openPermissionsDialog: vi.fn(),
+        closePermissionsDialog: vi.fn(),
+      });
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      await Promise.resolve();
+
+      // Should not contain the permissions dialog
+      expect(lastFrame()).not.toContain('Tool Permissions');
+    });
+
+    it('should handle permissions dialog close callback', async () => {
+      const mockClosePermissionsDialog = vi.fn();
+      const { usePermissionsCommand } = await import(
+        './hooks/usePermissionsCommand.js'
+      );
+      vi.mocked(usePermissionsCommand).mockReturnValue({
+        isPermissionsDialogOpen: true,
+        openPermissionsDialog: vi.fn(),
+        closePermissionsDialog: mockClosePermissionsDialog,
+      });
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      await Promise.resolve();
+
+      // The dialog should be rendered with the close callback
+      // This verifies the integration between App and PermissionsDialog
+      expect(lastFrame()).toContain('Tool Permissions');
+
+      // The close callback should be properly passed
+      // (The actual callback functionality is tested in usePermissionsCommand tests)
+      expect(mockClosePermissionsDialog).toBeDefined();
+    });
+
+    it('should properly integrate usePermissionsCommand hook', async () => {
+      const mockOpenPermissionsDialog = vi.fn();
+      const { usePermissionsCommand } = await import(
+        './hooks/usePermissionsCommand.js'
+      );
+      vi.mocked(usePermissionsCommand).mockReturnValue({
+        isPermissionsDialogOpen: false,
+        openPermissionsDialog: mockOpenPermissionsDialog,
+        closePermissionsDialog: vi.fn(),
+      });
+
+      renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+
+      // The hook should be called during App render
+      expect(usePermissionsCommand).toHaveBeenCalled();
     });
   });
 

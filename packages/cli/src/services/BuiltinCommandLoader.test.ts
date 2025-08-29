@@ -53,6 +53,13 @@ vi.mock('../ui/commands/mcpCommand.js', () => ({
     kind: 'BUILT_IN',
   },
 }));
+vi.mock('../ui/commands/permissionsCommand.js', () => ({
+  permissionsCommand: {
+    name: 'permissions',
+    description: 'Manage tool permissions and reset "Always Allow" settings',
+    kind: 'BUILT_IN',
+  },
+}));
 
 describe('BuiltinCommandLoader', () => {
   let mockConfig: Config;
@@ -123,5 +130,17 @@ describe('BuiltinCommandLoader', () => {
 
     const mcpCmd = commands.find((c) => c.name === 'mcp');
     expect(mcpCmd).toBeDefined();
+  });
+
+  it('should include the permissions command in the loaded commands', async () => {
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+
+    const permissionsCmd = commands.find((c) => c.name === 'permissions');
+    expect(permissionsCmd).toBeDefined();
+    expect(permissionsCmd?.description).toBe(
+      'Manage tool permissions and reset "Always Allow" settings',
+    );
+    expect(permissionsCmd?.kind).toBe('BUILT_IN');
   });
 });

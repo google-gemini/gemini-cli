@@ -96,6 +96,16 @@ Slash commands provide meta-level control over the CLI itself.
   - **Details:** This command provides a user-friendly interface for changing settings that control the behavior and appearance of Gemini CLI. It is equivalent to manually editing the `.gemini/settings.json` file, but with validation and guidance to prevent errors.
   - **Usage:** Simply run `/settings` and the editor will open. You can then browse or search for specific settings, view their current values, and modify them as desired. Changes to some settings are applied immediately, while others require a restart.
 
+- **`/permissions`**
+  - **Description:** Manage tool permissions and reset "Always Allow" settings.
+  - **Details:** This command provides an interactive interface for viewing and managing granular tool permissions that have been granted through "Always Allow" confirmations. You can see all currently granted permissions organized by tool type (Shell Commands, MCP Tools, Memory Operations, Global Settings) and selectively reset them.
+  - **Usage:** Simply run `/permissions` to open the permissions management dialog. Navigate between permission groups using arrow keys or vim keys (j/k), press 'r' to reset the selected group's permissions, or press 'A' to reset all permissions.
+  - **Permission Types:**
+    - **Shell Commands:** Commands that have been granted "always allow" permission for shell execution
+    - **MCP Tools:** Individual tools or entire servers from MCP (Model Context Protocol) that have been granted permanent access
+    - **Memory Operations:** Memory file operations that have been granted permanent access
+    - **Global Settings:** System-wide approval modes (like auto-approval for file edits)
+
 - **`/stats`**
   - **Description:** Display detailed statistics for the current Gemini CLI session, including token usage, cached token savings (when available), and session duration. Note: Cached token information is only displayed when cached tokens are being used, which occurs with API key authentication but not with OAuth authentication at this time.
 
