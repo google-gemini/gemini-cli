@@ -52,7 +52,7 @@ jobs:
       - name: 'Get issue data for manual trigger'
         id: get_issue_data
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/github-script@v6
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           script: |
