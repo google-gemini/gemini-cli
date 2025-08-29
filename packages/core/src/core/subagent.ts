@@ -20,7 +20,7 @@ import type {
   FunctionDeclaration,
 } from '@google/genai';
 import { Type } from '@google/genai';
-import { GeminiChat } from './geminiChat.js';
+import { GeminiChat, StreamEventType } from './geminiChat.js';
 
 /**
  * @fileoverview Defines the configuration interfaces for a subagent.
@@ -439,12 +439,11 @@ export class SubAgentScope {
         let textResponse = '';
         for await (const resp of responseStream) {
           if (abortController.signal.aborted) return;
-          if (resp.functionCalls) {
-            functionCalls.push(...resp.functionCalls);
+          if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
+            functionCalls.push(...resp.value.functionCalls);
           }
-          const text = resp.text;
-          if (text) {
-            textResponse += text;
+          if (resp.type === StreamEventType.CHUNK && resp.value.text) {
+            textResponse += resp.value.text;
           }
         }
 
