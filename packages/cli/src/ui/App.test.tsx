@@ -177,6 +177,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         })),
         isTrustedFolder: vi.fn(() => true),
         getScreenReader: vi.fn(() => false),
+        getFolderTrustFeature: vi.fn(() => false),
+        getFolderTrust: vi.fn(() => false),
       };
     });
 
@@ -228,6 +230,14 @@ vi.mock('./hooks/useFolderTrust', () => ({
 vi.mock('./hooks/useLogger', () => ({
   useLogger: vi.fn(() => ({
     getPreviousUserMessages: vi.fn().mockResolvedValue([]),
+  })),
+}));
+
+vi.mock('./hooks/useInputHistoryStore.js', () => ({
+  useInputHistoryStore: vi.fn(() => ({
+    inputHistory: [],
+    addInput: vi.fn(),
+    initializeFromLogger: vi.fn(),
   })),
 }));
 
@@ -1607,6 +1617,7 @@ describe('App UI', () => {
           _history,
           _addItem,
           _config,
+          _settings,
           _onDebugMessage,
           _handleSlashCommand,
           _shellModeActive,
