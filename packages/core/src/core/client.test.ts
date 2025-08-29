@@ -22,7 +22,12 @@ import type {
   Part,
 } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
-import { findIndexAfterFraction, GeminiClient } from './client.js';
+import {
+  findIndexAfterFraction,
+  isThinkingDefault,
+  isThinkingSupported,
+  GeminiClient,
+} from './client.js';
 import {
   AuthType,
   type ContentGenerator,
@@ -159,6 +164,40 @@ describe('findIndexAfterFraction', () => {
       { role: 'user', parts: [{ text: 'Message 2' }] },
     ];
     expect(findIndexAfterFraction(historyWithEmptyParts, 0.5)).toBe(1);
+  });
+});
+
+describe('isThinkingSupported', () => {
+  it('should return true for gemini-2.5', () => {
+    expect(isThinkingSupported('gemini-2.5')).toBe(true);
+  });
+
+  it('should return true for gemini-2.5-pro', () => {
+    expect(isThinkingSupported('gemini-2.5-pro')).toBe(true);
+  });
+
+  it('should return false for other models', () => {
+    expect(isThinkingSupported('gemini-1.5-flash')).toBe(false);
+    expect(isThinkingSupported('some-other-model')).toBe(false);
+  });
+});
+
+describe('isThinkingDefault', () => {
+  it('should return false for gemini-2.5-flash-lite', () => {
+    expect(isThinkingDefault('gemini-2.5-flash-lite')).toBe(false);
+  });
+
+  it('should return true for gemini-2.5', () => {
+    expect(isThinkingDefault('gemini-2.5')).toBe(true);
+  });
+
+  it('should return true for gemini-2.5-pro', () => {
+    expect(isThinkingDefault('gemini-2.5-pro')).toBe(true);
+  });
+
+  it('should return false for other models', () => {
+    expect(isThinkingDefault('gemini-1.5-flash')).toBe(false);
+    expect(isThinkingDefault('some-other-model')).toBe(false);
   });
 });
 
