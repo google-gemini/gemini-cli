@@ -25,15 +25,20 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   vscodium: 'VSCodium',
   windsurf: 'Windsurf',
   zed: 'Zed',
+  GeminiEditor: 'Gemini Editor (GUI)',
 };
 
 class EditorSettingsManager {
-  private readonly availableEditors: EditorDisplay[];
+  availableEditors: EditorDisplay[];
 
   constructor() {
     const editorTypes = Object.keys(
       EDITOR_DISPLAY_NAMES,
     ).sort() as EditorType[];
+
+    if (process.env['GEMINI_CLI_CONTEXT'] === 'electron') {
+      editorTypes.unshift('GeminiEditor');
+    }
     this.availableEditors = [
       {
         name: 'None',
@@ -41,7 +46,8 @@ class EditorSettingsManager {
         disabled: false,
       },
       ...editorTypes.map((type) => {
-        const hasEditor = checkHasEditorType(type);
+        const hasEditor =
+          type === 'GeminiEditor' ? true : checkHasEditorType(type);
         const isAllowedInSandbox = allowEditorTypeInSandbox(type);
 
         let labelSuffix = !isAllowedInSandbox

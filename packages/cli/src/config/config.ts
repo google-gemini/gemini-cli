@@ -77,6 +77,7 @@ export interface CliArgs {
   listExtensions: boolean | undefined;
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
+  _: Array<string | number>;
   screenReader: boolean | undefined;
 }
 
@@ -87,7 +88,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
     )
-    .command('$0', 'Launch Gemini CLI', (yargsInstance) =>
+    .command('$0 [scriptPath]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
         .option('model', {
           alias: 'm',
