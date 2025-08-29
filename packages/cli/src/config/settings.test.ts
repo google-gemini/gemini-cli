@@ -543,6 +543,27 @@ describe('Settings Loading and Merging', () => {
       });
     });
 
+    it('should rewrite allowedTools to tools.allowed during migration', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const legacySettingsContent = {
+        allowedTools: ['fs', 'shell'],
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(legacySettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.tools?.allowed).toEqual(['fs', 'shell']);
+      expect((settings.merged as TestSettings)['allowedTools']).toBeUndefined();
+    });
+
     it('should correctly merge and migrate legacy array properties from multiple scopes', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const legacyUserSettings = {
