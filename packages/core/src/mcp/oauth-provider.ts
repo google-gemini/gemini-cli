@@ -794,11 +794,15 @@ ${authUrl}
       // Verify token was saved
       const savedToken = await MCPOAuthTokenStorage.getToken(serverName);
       if (savedToken && savedToken.token && savedToken.token.accessToken) {
-        const tokenPreview =
-          savedToken.token.accessToken.length > 20
-            ? `${savedToken.token.accessToken.substring(0, 20)}...`
-            : '[token]';
-        console.debug(`✓ Token verification successful: ${tokenPreview}`);
+        // Avoid leaking token material; log a short SHA-256 fingerprint instead.
+        const tokenFingerprint = crypto
+          .createHash('sha256')
+          .update(savedToken.token.accessToken)
+          .digest('hex')
+          .slice(0, 8);
+        console.debug(
+          `✓ Token verification successful (fingerprint: ${tokenFingerprint})`,
+        );
       } else {
         console.error(
           'Token verification failed: token not found or invalid after save',
