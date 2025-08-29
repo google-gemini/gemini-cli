@@ -49,6 +49,7 @@
     "prepare:package": "node scripts/prepare-package.js",
     "release:version": "node scripts/version.js",
     "telemetry": "node scripts/telemetry.js",
+    "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js"
   },
   "bin": {
