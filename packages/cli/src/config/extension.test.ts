@@ -216,6 +216,100 @@ describe('loadExtensions', () => {
     );
     expect(loadedConfig.mcpServers?.['test-server'].cwd).toBe(expectedCwd);
   });
+
+  it('should resolve environment variables in extension configuration', () => {
+    process.env.TEST_API_KEY = 'test-api-key-123';
+    process.env.TEST_DB_URL = 'postgresql://localhost:5432/testdb';
+
+    try {
+      const workspaceExtensionsDir = path.join(
+        tempWorkspaceDir,
+        EXTENSIONS_DIRECTORY_NAME,
+      );
+      fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+
+      const extDir = path.join(workspaceExtensionsDir, 'test-extension');
+      fs.mkdirSync(extDir);
+
+      // Write config to a separate file for clarity and good practices
+      const configPath = path.join(extDir, EXTENSIONS_CONFIG_FILENAME);
+      const extensionConfig = {
+        name: 'test-extension',
+        version: '1.0.0',
+        mcpServers: {
+          'test-server': {
+            command: 'node',
+            args: ['server.js'],
+            env: {
+              API_KEY: '$TEST_API_KEY',
+              DATABASE_URL: '${TEST_DB_URL}',
+              STATIC_VALUE: 'no-substitution',
+            },
+          },
+        },
+      };
+      fs.writeFileSync(configPath, JSON.stringify(extensionConfig));
+
+      const extensions = loadExtensions(tempWorkspaceDir);
+
+      expect(extensions).toHaveLength(1);
+      const extension = extensions[0];
+      expect(extension.config.name).toBe('test-extension');
+      expect(extension.config.mcpServers).toBeDefined();
+
+      const serverConfig = extension.config.mcpServers?.['test-server'];
+      expect(serverConfig).toBeDefined();
+      expect(serverConfig?.env).toBeDefined();
+      expect(serverConfig?.env?.API_KEY).toBe('test-api-key-123');
+      expect(serverConfig?.env?.DATABASE_URL).toBe(
+        'postgresql://localhost:5432/testdb',
+      );
+      expect(serverConfig?.env?.STATIC_VALUE).toBe('no-substitution');
+    } finally {
+      delete process.env.TEST_API_KEY;
+      delete process.env.TEST_DB_URL;
+    }
+  });
+
+  it('should handle missing environment variables gracefully', () => {
+    const workspaceExtensionsDir = path.join(
+      tempWorkspaceDir,
+      EXTENSIONS_DIRECTORY_NAME,
+    );
+    fs.mkdirSync(workspaceExtensionsDir, { recursive: true });
+
+    const extDir = path.join(workspaceExtensionsDir, 'test-extension');
+    fs.mkdirSync(extDir);
+
+    const extensionConfig = {
+      name: 'test-extension',
+      version: '1.0.0',
+      mcpServers: {
+        'test-server': {
+          command: 'node',
+          args: ['server.js'],
+          env: {
+            MISSING_VAR: '$UNDEFINED_ENV_VAR',
+            MISSING_VAR_BRACES: '${ALSO_UNDEFINED}',
+          },
+        },
+      },
+    };
+
+    fs.writeFileSync(
+      path.join(extDir, EXTENSIONS_CONFIG_FILENAME),
+      JSON.stringify(extensionConfig),
+    );
+
+    const extensions = loadExtensions(tempWorkspaceDir);
+
+    expect(extensions).toHaveLength(1);
+    const extension = extensions[0];
+    const serverConfig = extension.config.mcpServers!['test-server'];
+    expect(serverConfig.env).toBeDefined();
+    expect(serverConfig.env!.MISSING_VAR).toBe('$UNDEFINED_ENV_VAR');
+    expect(serverConfig.env!.MISSING_VAR_BRACES).toBe('${ALSO_UNDEFINED}');
+  });
 });
 
 describe('annotateActiveExtensions', () => {
@@ -635,13 +729,11 @@ describe('updateExtension', () => {
   });
 
   it('should update a git-installed extension', async () => {
-    // 1. "Install" an extension
     const gitUrl = 'https://github.com/google/gemini-extensions.git';
     const extensionName = 'gemini-extensions';
     const targetExtDir = path.join(userExtensionsDir, extensionName);
     const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
 
-    // Create the "installed" extension directory and files
     fs.mkdirSync(targetExtDir, { recursive: true });
     fs.writeFileSync(
       path.join(targetExtDir, EXTENSIONS_CONFIG_FILENAME),
@@ -652,10 +744,8 @@ describe('updateExtension', () => {
       JSON.stringify({ source: gitUrl, type: 'git' }),
     );
 
-    // 2. Mock the git clone for the update
     const clone = vi.fn().mockImplementation(async (_, destination) => {
       fs.mkdirSync(destination, { recursive: true });
-      // This is the "updated" version
       fs.writeFileSync(
         path.join(destination, EXTENSIONS_CONFIG_FILENAME),
         JSON.stringify({ name: extensionName, version: '1.1.0' }),
@@ -667,16 +757,14 @@ describe('updateExtension', () => {
       clone,
     } as unknown as SimpleGit);
 
-    // 3. Call updateExtension
-    const updateInfo = await updateExtension(extensionName);
+    const updateInfo = await updateExtension(loadExtension(targetExtDir));
 
-    // 4. Assertions
     expect(updateInfo).toEqual({
+      name: 'gemini-extensions',
       originalVersion: '1.0.0',
       updatedVersion: '1.1.0',
     });
 
-    // Check that the config file reflects the new version
     const updatedConfig = JSON.parse(
       fs.readFileSync(
         path.join(targetExtDir, EXTENSIONS_CONFIG_FILENAME),
