@@ -9,17 +9,51 @@ import type {
   TaskStatusUpdateEvent,
   SendStreamingMessageSuccessResponse,
 } from '@a2a-js/sdk';
+import { ApprovalMode } from '@google/gemini-cli-core';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
 } from '@google/gemini-cli-core';
 import type {
+  Config,
   ToolCallConfirmationDetails,
   ToolResult,
   ToolInvocation,
 } from '@google/gemini-cli-core';
 import { expect, vi } from 'vitest';
+
+export function createMockConfig(
+  overrides: Partial<Config> = {},
+): Partial<Config> {
+  const mockConfig = {
+    getToolRegistry: vi.fn().mockReturnValue({
+      getTool: vi.fn(),
+      getAllToolNames: vi.fn().mockReturnValue([]),
+    }),
+    getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+    getIdeMode: vi.fn().mockReturnValue(false),
+    getAllowedTools: vi.fn().mockReturnValue([]),
+    getIdeClient: vi.fn(),
+    getWorkspaceContext: vi.fn().mockReturnValue({
+      isPathWithinWorkspace: () => true,
+    }),
+    getTargetDir: () => '/test',
+    getGeminiClient: vi.fn(),
+    getDebugMode: vi.fn().mockReturnValue(false),
+    getContentGeneratorConfig: vi.fn().mockReturnValue({ model: 'gemini-pro' }),
+    getModel: vi.fn().mockReturnValue('gemini-pro'),
+    getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
+    setFlashFallbackHandler: vi.fn(),
+    initialize: vi.fn().mockResolvedValue(undefined),
+    getProxy: vi.fn().mockReturnValue(undefined),
+    getHistory: vi.fn().mockReturnValue([]),
+    getEmbeddingModel: vi.fn().mockReturnValue('text-embedding-004'),
+    getSessionId: vi.fn().mockReturnValue('test-session-id'),
+    ...overrides,
+  };
+  return mockConfig;
+}
 
 export const mockOnUserConfirmForToolConfirmation = vi.fn();
 
