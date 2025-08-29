@@ -107,6 +107,7 @@ import { appEvents, AppEvent } from '../utils/events.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
 import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
 import { WorkspaceMigrationDialog } from './components/WorkspaceMigrationDialog.js';
+import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 // Maximum number of queued messages to display in UI to prevent performance issues
@@ -204,7 +205,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [footerHeight, setFooterHeight] = useState<number>(0);
   const [corgiMode, setCorgiMode] = useState(false);
   const [isTrustedFolderState, setIsTrustedFolder] = useState(
-    config.isTrustedFolder(),
+    isWorkspaceTrusted(settings.merged),
   );
   const [currentModel, setCurrentModel] = useState(config.getModel());
   const [shellModeActive, setShellModeActive] = useState(false);

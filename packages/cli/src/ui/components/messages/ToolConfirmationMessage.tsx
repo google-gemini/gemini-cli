@@ -56,7 +56,7 @@ export const ToolConfirmationMessage: React.FC<
     onConfirm(outcome);
   };
 
-  const isTrustedFolder = config.isTrustedFolder() !== false;
+  const isTrustedFolder = config.isTrustedFolder();
 
   useKeypress(
     (key) => {

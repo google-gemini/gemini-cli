@@ -598,6 +598,8 @@ describe('DiscoveredMCPTool', () => {
         inputSchema,
         undefined,
         true,
+        undefined,
+        { isTrustedFolder: () => true } as any,
       );
       const invocation = trustedTool.build({ param: 'mock' });
       expect(
@@ -808,25 +810,6 @@ describe('DiscoveredMCPTool', () => {
       );
       expect(confirmation).not.toBe(false);
       expect(confirmation).toHaveProperty('type', 'mcp');
-    });
-
-    it('should return false if trust is true and folder trust is undefined', async () => {
-      // The check is `isTrustedFolder() !== false`, so `undefined` should pass
-      const trustedTool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-        undefined,
-        true, // trust = true
-        undefined,
-        mockConfig(undefined) as any, // isTrustedFolder = undefined
-      );
-      const invocation = trustedTool.build({ param: 'mock' });
-      expect(
-        await invocation.shouldConfirmExecute(new AbortController().signal),
-      ).toBe(false);
     });
   });
 

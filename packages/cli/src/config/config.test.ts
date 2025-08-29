@@ -2004,28 +2004,16 @@ describe('loadCliConfig trustedFolder', () => {
       description:
         'feature disabled, folderTrust false, workspace trusted -> behave as trusted',
     },
-
-    // Cases where folderTrustFeature is true but folderTrust setting is false
     {
-      folderTrustFeature: true,
-      folderTrust: false,
-      isWorkspaceTrusted: true,
-      expectedFolderTrust: false,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature on, folderTrust false, workspace trusted -> behave as trusted',
-    },
-    {
-      folderTrustFeature: true,
+      folderTrustFeature: false,
       folderTrust: false,
       isWorkspaceTrusted: false,
       expectedFolderTrust: false,
       expectedIsTrustedFolder: true,
       description:
-        'feature on, folderTrust false, workspace not trusted -> behave as trusted',
+        'feature disabled, folderTrust false, workspace not trusted -> behave as trusted',
     },
-
-    // Cases where feature is fully enabled (folderTrustFeature and folderTrust are true)
+    // Cases where folderTrustFeature is true (feature enabled)
     {
       folderTrustFeature: true,
       folderTrust: true,
@@ -2033,7 +2021,7 @@ describe('loadCliConfig trustedFolder', () => {
       expectedFolderTrust: true,
       expectedIsTrustedFolder: true,
       description:
-        'feature on, folderTrust on, workspace trusted -> is trusted',
+        'feature enabled, folderTrust true, workspace trusted -> behave as trusted',
     },
     {
       folderTrustFeature: true,
@@ -2042,28 +2030,46 @@ describe('loadCliConfig trustedFolder', () => {
       expectedFolderTrust: true,
       expectedIsTrustedFolder: false,
       description:
-        'feature on, folderTrust on, workspace NOT trusted -> is NOT trusted',
+        'feature enabled, folderTrust true, workspace not trusted -> behave as not trusted',
     },
     {
       folderTrustFeature: true,
       folderTrust: true,
       isWorkspaceTrusted: undefined,
       expectedFolderTrust: true,
-      expectedIsTrustedFolder: undefined,
+      expectedIsTrustedFolder: true,
       description:
-        'feature on, folderTrust on, workspace trust unknown -> is unknown',
+        'feature enabled, folderTrust false, workspace trust unknown -> behave as trusted',
+    },
+    {
+      folderTrustFeature: true,
+      folderTrust: false,
+      isWorkspaceTrusted: true,
+      expectedFolderTrust: false,
+      expectedIsTrustedFolder: true,
+      description:
+        'feature enabled, folderTrust false, workspace trusted -> behave as trusted',
+    },
+    {
+      folderTrustFeature: true,
+      folderTrust: false,
+      isWorkspaceTrusted: false,
+      expectedFolderTrust: false,
+      expectedIsTrustedFolder: true,
+      description:
+        'feature enabled, folderTrust false, workspace not trusted -> behave as trusted',
     },
   ];
 
   for (const {
     folderTrustFeature,
     folderTrust,
-    isWorkspaceTrusted: mockTrustValue,
+    isWorkspaceTrusted: isWorkspaceTrustedValue,
     expectedFolderTrust,
     expectedIsTrustedFolder,
     description,
   } of testCases) {
-    it(`should be correct for: ${description}`, async () => {
+    it(`should correctly set folderTrust and isTrustedFolder when ${description}`, async () => {
       (isWorkspaceTrusted as Mock).mockImplementation((settings: Settings) => {
         const folderTrustFeature =
           settings.security?.folderTrust?.featureEnabled ?? false;
@@ -2074,7 +2080,7 @@ describe('loadCliConfig trustedFolder', () => {
         if (!folderTrustEnabled) {
           return true;
         }
-        return mockTrustValue; // This is the part that comes from the test case
+        return isWorkspaceTrustedValue; // This is the part that comes from the test case
       });
       const argv = await parseArguments({} as Settings);
       const settings: Settings = {
