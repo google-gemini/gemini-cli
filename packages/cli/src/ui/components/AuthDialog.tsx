@@ -4,13 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import type React from 'react';
+import { useState } from 'react';
+import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
+import { SettingScope } from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../../config/auth.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface AuthDialogProps {
   onSelect: (authMethod: AuthType | undefined, scope: SettingScope) => void;
@@ -41,18 +44,18 @@ export function AuthDialog({
     }
 
     const defaultAuthType = parseDefaultAuthType(
-      process.env.GEMINI_DEFAULT_AUTH_TYPE,
+      process.env['GEMINI_DEFAULT_AUTH_TYPE'],
     );
 
-    if (process.env.GEMINI_DEFAULT_AUTH_TYPE && defaultAuthType === null) {
+    if (process.env['GEMINI_DEFAULT_AUTH_TYPE'] && defaultAuthType === null) {
       return (
-        `Invalid value for GEMINI_DEFAULT_AUTH_TYPE: "${process.env.GEMINI_DEFAULT_AUTH_TYPE}". ` +
+        `Invalid value for GEMINI_DEFAULT_AUTH_TYPE: "${process.env['GEMINI_DEFAULT_AUTH_TYPE']}". ` +
         `Valid values are: ${Object.values(AuthType).join(', ')}.`
       );
     }
 
     if (
-      process.env.GEMINI_API_KEY &&
+      process.env['GEMINI_API_KEY'] &&
       (!defaultAuthType || defaultAuthType === AuthType.USE_GEMINI)
     ) {
       return 'Existing API key detected (GEMINI_API_KEY). Select "Gemini API Key" option to use it.';
@@ -64,7 +67,7 @@ export function AuthDialog({
       label: 'Login with Google',
       value: AuthType.LOGIN_WITH_GOOGLE,
     },
-    ...(process.env.CLOUD_SHELL === 'true'
+    ...(process.env['CLOUD_SHELL'] === 'true'
       ? [
           {
             label: 'Use Cloud Shell user credentials',
@@ -80,18 +83,18 @@ export function AuthDialog({
   ];
 
   const initialAuthIndex = items.findIndex((item) => {
-    if (settings.merged.selectedAuthType) {
-      return item.value === settings.merged.selectedAuthType;
+    if (settings.merged.security?.auth?.selectedType) {
+      return item.value === settings.merged.security.auth.selectedType;
     }
 
     const defaultAuthType = parseDefaultAuthType(
-      process.env.GEMINI_DEFAULT_AUTH_TYPE,
+      process.env['GEMINI_DEFAULT_AUTH_TYPE'],
     );
     if (defaultAuthType) {
       return item.value === defaultAuthType;
     }
 
-    if (process.env.GEMINI_API_KEY) {
+    if (process.env['GEMINI_API_KEY']) {
       return item.value === AuthType.USE_GEMINI;
     }
 
@@ -108,23 +111,26 @@ export function AuthDialog({
     }
   };
 
-  useInput((_input, key) => {
-    if (key.escape) {
-      // Prevent exit if there is an error message.
-      // This means they user is not authenticated yet.
-      if (errorMessage) {
-        return;
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape') {
+        // Prevent exit if there is an error message.
+        // This means they user is not authenticated yet.
+        if (errorMessage) {
+          return;
+        }
+        if (settings.merged.security?.auth?.selectedType === undefined) {
+          // Prevent exiting if no auth method is set
+          setErrorMessage(
+            'You must select an auth method to proceed. Press Ctrl+C twice to exit.',
+          );
+          return;
+        }
+        onSelect(undefined, SettingScope.User);
       }
-      if (settings.merged.selectedAuthType === undefined) {
-        // Prevent exiting if no auth method is set
-        setErrorMessage(
-          'You must select an auth method to proceed. Press Ctrl+C twice to exit.',
-        );
-        return;
-      }
-      onSelect(undefined, SettingScope.User);
-    }
-  });
+    },
+    { isActive: true },
+  );
 
   return (
     <Box
@@ -143,7 +149,6 @@ export function AuthDialog({
           items={items}
           initialIndex={initialAuthIndex}
           onSelect={handleAuthSelect}
-          isFocused={true}
         />
       </Box>
       {errorMessage && (

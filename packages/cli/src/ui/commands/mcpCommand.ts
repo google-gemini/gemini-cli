@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   SlashCommand,
   SlashCommandActionReturn,
   CommandContext,
-  CommandKind,
   MessageActionReturn,
 } from './types.js';
+import { CommandKind } from './types.js';
+import type { DiscoveredMCPPrompt } from '@google/gemini-cli-core';
 import {
-  DiscoveredMCPPrompt,
   DiscoveredMCPTool,
   getMCPDiscoveryState,
   getMCPServerStatus,
@@ -21,7 +21,6 @@ import {
   mcpServerRequiresOAuth,
   getErrorMessage,
 } from '@google/gemini-cli-core';
-import open from 'open';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
@@ -45,7 +44,7 @@ const getMcpStatus = async (
     };
   }
 
-  const toolRegistry = await config.getToolRegistry();
+  const toolRegistry = config.getToolRegistry();
   if (!toolRegistry) {
     return {
       type: 'message',
@@ -60,21 +59,11 @@ const getMcpStatus = async (
 
   if (serverNames.length === 0 && blockedMcpServers.length === 0) {
     const docsUrl = 'https://goo.gle/gemini-cli-docs-mcp';
-    if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: `No MCP servers configured. Please open the following URL in your browser to view documentation:\n${docsUrl}`,
-      };
-    } else {
-      // Open the URL in the browser
-      await open(docsUrl);
-      return {
-        type: 'message',
-        messageType: 'info',
-        content: `No MCP servers configured. Opening documentation in your browser: ${docsUrl}`,
-      };
-    }
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: `No MCP servers configured. Please view MCP documentation in your browser: ${docsUrl} or use the cli /docs command`,
+    };
   }
 
   // Check if any servers are still connecting
@@ -105,7 +94,15 @@ const getMcpStatus = async (
     const promptRegistry = await config.getPromptRegistry();
     const serverPrompts = promptRegistry.getPromptsByServer(serverName) || [];
 
-    const status = getMCPServerStatus(serverName);
+    const originalStatus = getMCPServerStatus(serverName);
+    const hasCachedItems = serverTools.length > 0 || serverPrompts.length > 0;
+
+    // If the server is "disconnected" but has prompts or cached tools, display it as Ready
+    // by using CONNECTED as the display status.
+    const status =
+      originalStatus === MCPServerStatus.DISCONNECTED && hasCachedItems
+        ? MCPServerStatus.CONNECTED
+        : originalStatus;
 
     // Add status indicator with descriptive text
     let statusIndicator = '';
@@ -271,11 +268,14 @@ const getMcpStatus = async (
       message += '  No tools or prompts available\n';
     } else if (serverTools.length === 0) {
       message += '  No tools available';
-      if (status === MCPServerStatus.DISCONNECTED && needsAuthHint) {
+      if (originalStatus === MCPServerStatus.DISCONNECTED && needsAuthHint) {
         message += ` ${COLOR_GREY}(type: "/mcp auth ${serverName}" to authenticate this server)${RESET_COLOR}`;
       }
       message += '\n';
-    } else if (status === MCPServerStatus.DISCONNECTED && needsAuthHint) {
+    } else if (
+      originalStatus === MCPServerStatus.DISCONNECTED &&
+      needsAuthHint
+    ) {
       // This case is for when serverTools.length > 0
       message += `  ${COLOR_GREY}(type: "/mcp auth ${serverName}" to authenticate this server)${RESET_COLOR}\n`;
     }
@@ -400,7 +400,7 @@ const authCommand: SlashCommand = {
       );
 
       // Trigger tool re-discovery to pick up authenticated server
-      const toolRegistry = await config.getToolRegistry();
+      const toolRegistry = config.getToolRegistry();
       if (toolRegistry) {
         context.ui.addItem(
           {
@@ -416,6 +416,9 @@ const authCommand: SlashCommand = {
       if (geminiClient) {
         await geminiClient.setTools();
       }
+
+      // Reload the slash commands to reflect the changes.
+      context.ui.reloadCommands();
 
       return {
         type: 'message',
@@ -468,7 +471,7 @@ const listCommand: SlashCommand = {
 
 const refreshCommand: SlashCommand = {
   name: 'refresh',
-  description: 'Refresh the list of MCP servers and tools',
+  description: 'Restarts MCP servers.',
   kind: CommandKind.BUILT_IN,
   action: async (
     context: CommandContext,
@@ -482,7 +485,7 @@ const refreshCommand: SlashCommand = {
       };
     }
 
-    const toolRegistry = await config.getToolRegistry();
+    const toolRegistry = config.getToolRegistry();
     if (!toolRegistry) {
       return {
         type: 'message',
@@ -494,18 +497,21 @@ const refreshCommand: SlashCommand = {
     context.ui.addItem(
       {
         type: 'info',
-        text: 'Refreshing MCP servers and tools...',
+        text: 'Restarting MCP servers...',
       },
       Date.now(),
     );
 
-    await toolRegistry.discoverMcpTools();
+    await toolRegistry.restartMcpServers();
 
     // Update the client with the new tools
     const geminiClient = config.getGeminiClient();
     if (geminiClient) {
       await geminiClient.setTools();
     }
+
+    // Reload the slash commands to reflect the changes.
+    context.ui.reloadCommands();
 
     return getMcpStatus(context, false, false, false);
   },

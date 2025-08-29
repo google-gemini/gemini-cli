@@ -4,40 +4,53 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import {
   populateMcpServerCommand,
   createTransport,
   isEnabled,
-  discoverTools,
-  discoverPrompts,
+  hasValidTypes,
+  McpClient,
+  hasNetworkTransport,
 } from './mcp-client.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
 import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import * as GenAiLib from '@google/genai';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
-import { AuthProviderType } from '../config/config.js';
-import { PromptRegistry } from '../prompts/prompt-registry.js';
-
-import { DiscoveredMCPTool } from './mcp-tool.js';
+import { AuthProviderType, type Config } from '../config/config.js';
+import type { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { ToolRegistry } from './tool-registry.js';
+import type { WorkspaceContext } from '../utils/workspaceContext.js';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 vi.mock('@google/genai');
 vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
-vi.mock('./mcp-tool.js');
 
 describe('mcp-client', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  describe('discoverTools', () => {
+  describe('McpClient', () => {
     it('should discover tools', async () => {
-      const mockedClient = {} as unknown as ClientLib.Client;
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
       const mockedMcpToTool = vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () => ({
           functionDeclarations: [
@@ -47,131 +60,135 @@ describe('mcp-client', () => {
           ],
         }),
       } as unknown as GenAiLib.CallableTool);
-
-      const tools = await discoverTools('test-server', {}, mockedClient);
-
-      expect(tools.length).toBe(1);
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+      } as unknown as ToolRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        {} as PromptRegistry,
+        {} as WorkspaceContext,
+        false,
+      );
+      await client.connect();
+      await client.discover({} as Config);
       expect(mockedMcpToTool).toHaveBeenCalledOnce();
     });
 
-    it('should log an error if there is an error discovering a tool', async () => {
-      const mockedClient = {} as unknown as ClientLib.Client;
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {
-          // no-op
-        });
-
-      const testError = new Error('Invalid tool name');
-      vi.mocked(DiscoveredMCPTool).mockImplementation(
-        (
-          _mcpCallableTool: GenAiLib.CallableTool,
-          _serverName: string,
-          name: string,
-        ) => {
-          if (name === 'invalid tool name') {
-            throw testError;
-          }
-          return { name: 'validTool' } as DiscoveredMCPTool;
-        },
+    it('should skip tools if a parameter is missing a type', async () => {
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        tool: vi.fn(),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
       );
-
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
       vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
         tool: () =>
           Promise.resolve({
             functionDeclarations: [
               {
                 name: 'validTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: { type: 'string' },
+                  },
+                },
               },
               {
-                name: 'invalid tool name', // this will fail validation
+                name: 'invalidTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: { description: 'a param with no type' },
+                  },
+                },
               },
             ],
           }),
       } as unknown as GenAiLib.CallableTool);
-
-      const tools = await discoverTools('test-server', {}, mockedClient);
-
-      expect(tools.length).toBe(1);
-      expect(tools[0].name).toBe('validTool');
-      expect(consoleErrorSpy).toHaveBeenCalledOnce();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        `Error discovering tool: 'invalid tool name' from MCP server 'test-server': ${testError.message}`,
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+      } as unknown as ToolRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        {} as PromptRegistry,
+        {} as WorkspaceContext,
+        false,
       );
-    });
-  });
-
-  describe('discoverPrompts', () => {
-    const mockedPromptRegistry = {
-      registerPrompt: vi.fn(),
-    } as unknown as PromptRegistry;
-
-    it('should discover and log prompts', async () => {
-      const mockRequest = vi.fn().mockResolvedValue({
-        prompts: [
-          { name: 'prompt1', description: 'desc1' },
-          { name: 'prompt2' },
-        ],
-      });
-      const mockedClient = {
-        request: mockRequest,
-      } as unknown as ClientLib.Client;
-
-      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
-
-      expect(mockRequest).toHaveBeenCalledWith(
-        { method: 'prompts/list', params: {} },
-        expect.anything(),
+      await client.connect();
+      await client.discover({} as Config);
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+      expect(consoleWarnSpy).toHaveBeenCalledOnce();
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
+          `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
       );
+      consoleWarnSpy.mockRestore();
     });
 
-    it('should do nothing if no prompts are discovered', async () => {
-      const mockRequest = vi.fn().mockResolvedValue({
-        prompts: [],
-      });
-      const mockedClient = {
-        request: mockRequest,
-      } as unknown as ClientLib.Client;
-
-      const consoleLogSpy = vi
-        .spyOn(console, 'debug')
-        .mockImplementation(() => {
-          // no-op
-        });
-
-      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
-
-      expect(mockRequest).toHaveBeenCalledOnce();
-      expect(consoleLogSpy).not.toHaveBeenCalled();
-
-      consoleLogSpy.mockRestore();
-    });
-
-    it('should log an error if discovery fails', async () => {
-      const testError = new Error('test error');
-      testError.message = 'test error';
-      const mockRequest = vi.fn().mockRejectedValue(testError);
-      const mockedClient = {
-        request: mockRequest,
-      } as unknown as ClientLib.Client;
-
+    it('should handle errors when discovering prompts', async () => {
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
-        .mockImplementation(() => {
-          // no-op
-        });
-
-      await discoverPrompts('test-server', mockedClient, mockedPromptRegistry);
-
-      expect(mockRequest).toHaveBeenCalledOnce();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        `Error discovering prompts from test-server: ${testError.message}`,
+        .mockImplementation(() => {});
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ prompts: {} }),
+        request: vi.fn().mockRejectedValue(new Error('Test error')),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
       );
-
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () => Promise.resolve({ functionDeclarations: [] }),
+      } as unknown as GenAiLib.CallableTool);
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        {} as ToolRegistry,
+        {} as PromptRegistry,
+        {} as WorkspaceContext,
+        false,
+      );
+      await client.connect();
+      await expect(client.discover({} as Config)).rejects.toThrow(
+        'No prompts or tools found on the server.',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        `Error discovering prompts from test-server: Test error`,
+      );
       consoleErrorSpy.mockRestore();
     });
   });
-
   describe('appendMcpServerCommand', () => {
     it('should do nothing if no MCP servers or command are configured', () => {
       const out = populateMcpServerCommand({}, undefined);
@@ -195,17 +212,6 @@ describe('mcp-client', () => {
   });
 
   describe('createTransport', () => {
-    const originalEnv = process.env;
-
-    beforeEach(() => {
-      vi.resetModules();
-      process.env = {};
-    });
-
-    afterEach(() => {
-      process.env = originalEnv;
-    });
-
     describe('should connect via httpUrl', () => {
       it('without headers', async () => {
         const transport = await createTransport(
@@ -276,7 +282,9 @@ describe('mcp-client', () => {
     });
 
     it('should connect via command', async () => {
-      const mockedTransport = vi.mocked(SdkClientStdioLib.StdioClientTransport);
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
 
       await createTransport(
         'test-server',
@@ -293,7 +301,7 @@ describe('mcp-client', () => {
         command: 'test-command',
         args: ['--foo', 'bar'],
         cwd: 'test/cwd',
-        env: { FOO: 'bar' },
+        env: { ...process.env, FOO: 'bar' },
         stderr: 'pipe',
       });
     });
@@ -303,7 +311,7 @@ describe('mcp-client', () => {
         const transport = await createTransport(
           'test-server',
           {
-            httpUrl: 'http://test-server',
+            httpUrl: 'http://test.googleapis.com',
             authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
             oauth: {
               scopes: ['scope1'],
@@ -322,7 +330,7 @@ describe('mcp-client', () => {
         const transport = await createTransport(
           'test-server',
           {
-            url: 'http://test-server',
+            url: 'http://test.googleapis.com',
             authProviderType: AuthProviderType.GOOGLE_CREDENTIALS,
             oauth: {
               scopes: ['scope1'],
@@ -350,7 +358,7 @@ describe('mcp-client', () => {
             false,
           ),
         ).rejects.toThrow(
-          'No URL configured for Google Credentials MCP server',
+          'URL must be provided in the config for Google Credentials provider',
         );
       });
     });
@@ -398,6 +406,195 @@ describe('mcp-client', () => {
       expect(isEnabled(namelessFuncDecl, serverName, mcpServerConfig)).toBe(
         false,
       );
+    });
+  });
+
+  describe('hasValidTypes', () => {
+    it('should return true for a valid schema with anyOf', () => {
+      const schema = {
+        anyOf: [{ type: 'string' }, { type: 'number' }],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with anyOf', () => {
+      const schema = {
+        anyOf: [{ type: 'string' }, { description: 'no type' }],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema with allOf', () => {
+      const schema = {
+        allOf: [
+          { type: 'string' },
+          { type: 'object', properties: { foo: { type: 'string' } } },
+        ],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with allOf', () => {
+      const schema = {
+        allOf: [{ type: 'string' }, { description: 'no type' }],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema with oneOf', () => {
+      const schema = {
+        oneOf: [{ type: 'string' }, { type: 'number' }],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with oneOf', () => {
+      const schema = {
+        oneOf: [{ type: 'string' }, { description: 'no type' }],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema with nested subschemas', () => {
+      const schema = {
+        anyOf: [
+          { type: 'string' },
+          {
+            allOf: [
+              { type: 'object', properties: { a: { type: 'string' } } },
+              { type: 'object', properties: { b: { type: 'number' } } },
+            ],
+          },
+        ],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for an invalid schema with nested subschemas', () => {
+      const schema = {
+        anyOf: [
+          { type: 'string' },
+          {
+            allOf: [
+              { type: 'object', properties: { a: { type: 'string' } } },
+              { description: 'no type' },
+            ],
+          },
+        ],
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a schema with a type and subschemas', () => {
+      const schema = {
+        type: 'string',
+        anyOf: [{ minLength: 1 }, { maxLength: 5 }],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for a schema with no type and no subschemas', () => {
+      const schema = {
+        description: 'a schema with no type',
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a valid schema', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: { type: 'string' },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false if a parameter is missing a type', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: { description: 'a param with no type' },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return false if a nested parameter is missing a type', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: {
+            type: 'object',
+            properties: {
+              nestedParam: {
+                description: 'a nested param with no type',
+              },
+            },
+          },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return false if an array item is missing a type', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          param1: {
+            type: 'array',
+            items: {
+              description: 'an array item with no type',
+            },
+          },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for a schema with no properties', () => {
+      const schema = {
+        type: 'object',
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for a schema with an empty properties object', () => {
+      const schema = {
+        type: 'object',
+        properties: {},
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+  });
+
+  describe('hasNetworkTransport', () => {
+    it('should return true if only url is provided', () => {
+      const config = { url: 'http://example.com' };
+      expect(hasNetworkTransport(config)).toBe(true);
+    });
+
+    it('should return true if only httpUrl is provided', () => {
+      const config = { httpUrl: 'http://example.com' };
+      expect(hasNetworkTransport(config)).toBe(true);
+    });
+
+    it('should return true if both url and httpUrl are provided', () => {
+      const config = {
+        url: 'http://example.com/sse',
+        httpUrl: 'http://example.com/http',
+      };
+      expect(hasNetworkTransport(config)).toBe(true);
+    });
+
+    it('should return false if neither url nor httpUrl is provided', () => {
+      const config = { command: 'do-something' };
+      expect(hasNetworkTransport(config)).toBe(false);
+    });
+
+    it('should return false for an empty config object', () => {
+      const config = {};
+      expect(hasNetworkTransport(config)).toBe(false);
     });
   });
 });

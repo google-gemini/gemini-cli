@@ -55,7 +55,9 @@ gemini -p "run the test suite"
 
 # Configure in settings.json
 {
-  "sandbox": "docker"
+  "tools": {
+    "sandbox": "docker"
+  }
 }
 ```
 
@@ -65,7 +67,7 @@ gemini -p "run the test suite"
 
 1. **Command flag**: `-s` or `--sandbox`
 2. **Environment variable**: `GEMINI_SANDBOX=true|docker|podman|sandbox-exec`
-3. **Settings file**: `"sandbox": true` in `settings.json`
+3. **Settings file**: `"sandbox": true` in the `tools` object of your `settings.json` file (e.g., `{"tools": {"sandbox": true}}`).
 
 ### macOS Seatbelt profiles
 
@@ -128,6 +130,8 @@ export SANDBOX_SET_UID_GID=false  # Disable UID/GID mapping
 ```bash
 DEBUG=1 gemini -s -p "debug command"
 ```
+
+**Note:** If you have `DEBUG=true` in a project's `.env` file, it won't affect gemini-cli due to automatic exclusion. Use `.gemini/.env` files for gemini-cli specific debug settings.
 
 ### Inspect sandbox
 

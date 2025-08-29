@@ -8,7 +8,8 @@ import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import { URL } from 'node:url';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
-import { MCPOAuthToken, MCPOAuthTokenStorage } from './oauth-token-storage.js';
+import type { OAuthToken } from './token-storage/types.js';
+import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { OAuthUtils } from './oauth-utils.js';
 
@@ -22,6 +23,7 @@ export interface MCPOAuthConfig {
   authorizationUrl?: string;
   tokenUrl?: string;
   scopes?: string[];
+  audiences?: string[];
   redirectUri?: string;
   tokenParamName?: string; // For SSE connections, specifies the query parameter name for the token
 }
@@ -90,7 +92,6 @@ export class MCPOAuthProvider {
   private static readonly REDIRECT_PORT = 7777;
   private static readonly REDIRECT_PATH = '/oauth/callback';
   private static readonly HTTP_OK = 200;
-  private static readonly HTTP_REDIRECT = 302;
 
   /**
    * Register a client dynamically with the OAuth server.
@@ -144,8 +145,8 @@ export class MCPOAuthProvider {
   private static async discoverOAuthFromMCPServer(
     mcpServerUrl: string,
   ): Promise<MCPOAuthConfig | null> {
-    const baseUrl = OAuthUtils.extractBaseUrl(mcpServerUrl);
-    return OAuthUtils.discoverOAuthConfig(baseUrl);
+    // Use the full URL with path preserved for OAuth discovery
+    return OAuthUtils.discoverOAuthConfig(mcpServerUrl);
   }
 
   /**
@@ -297,18 +298,30 @@ export class MCPOAuthProvider {
       params.append('scope', config.scopes.join(' '));
     }
 
-    // Add resource parameter for MCP OAuth spec compliance
-    // Use the MCP server URL if provided, otherwise fall back to authorization URL
-    const resourceUrl = mcpServerUrl || config.authorizationUrl!;
-    try {
-      params.append('resource', OAuthUtils.buildResourceParameter(resourceUrl));
-    } catch (error) {
-      throw new Error(
-        `Invalid resource URL: "${resourceUrl}". ${getErrorMessage(error)}`,
-      );
+    if (config.audiences && config.audiences.length > 0) {
+      params.append('audience', config.audiences.join(' '));
     }
 
-    return `${config.authorizationUrl}?${params.toString()}`;
+    // Add resource parameter for MCP OAuth spec compliance
+    // Only add if we have an MCP server URL (indicates MCP OAuth flow, not standard OAuth)
+    if (mcpServerUrl) {
+      try {
+        params.append(
+          'resource',
+          OAuthUtils.buildResourceParameter(mcpServerUrl),
+        );
+      } catch (error) {
+        console.warn(
+          `Could not add resource parameter: ${getErrorMessage(error)}`,
+        );
+      }
+    }
+
+    const url = new URL(config.authorizationUrl!);
+    params.forEach((value, key) => {
+      url.searchParams.append(key, value);
+    });
+    return url.toString();
   }
 
   /**
@@ -342,33 +355,98 @@ export class MCPOAuthProvider {
       params.append('client_secret', config.clientSecret);
     }
 
+    if (config.audiences && config.audiences.length > 0) {
+      params.append('audience', config.audiences.join(' '));
+    }
+
     // Add resource parameter for MCP OAuth spec compliance
-    // Use the MCP server URL if provided, otherwise fall back to token URL
-    const resourceUrl = mcpServerUrl || config.tokenUrl!;
-    try {
-      params.append('resource', OAuthUtils.buildResourceParameter(resourceUrl));
-    } catch (error) {
-      throw new Error(
-        `Invalid resource URL: "${resourceUrl}". ${getErrorMessage(error)}`,
-      );
+    // Only add if we have an MCP server URL (indicates MCP OAuth flow, not standard OAuth)
+    if (mcpServerUrl) {
+      const resourceUrl = mcpServerUrl;
+      try {
+        params.append(
+          'resource',
+          OAuthUtils.buildResourceParameter(resourceUrl),
+        );
+      } catch (error) {
+        console.warn(
+          `Could not add resource parameter: ${getErrorMessage(error)}`,
+        );
+      }
     }
 
     const response = await fetch(config.tokenUrl!, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json, application/x-www-form-urlencoded',
       },
       body: params.toString(),
     });
 
+    const responseText = await response.text();
+    const contentType = response.headers.get('content-type') || '';
+
     if (!response.ok) {
-      const errorText = await response.text();
+      // Try to parse error from form-urlencoded response
+      let errorMessage: string | null = null;
+      try {
+        const errorParams = new URLSearchParams(responseText);
+        const error = errorParams.get('error');
+        const errorDescription = errorParams.get('error_description');
+        if (error) {
+          errorMessage = `Token exchange failed: ${error} - ${errorDescription || 'No description'}`;
+        }
+      } catch {
+        // Fall back to raw error
+      }
       throw new Error(
-        `Token exchange failed: ${response.status} - ${errorText}`,
+        errorMessage ||
+          `Token exchange failed: ${response.status} - ${responseText}`,
       );
     }
 
-    return (await response.json()) as OAuthTokenResponse;
+    // Log unexpected content types for debugging
+    if (
+      !contentType.includes('application/json') &&
+      !contentType.includes('application/x-www-form-urlencoded')
+    ) {
+      console.warn(
+        `Token endpoint returned unexpected content-type: ${contentType}. ` +
+          `Expected application/json or application/x-www-form-urlencoded. ` +
+          `Will attempt to parse response.`,
+      );
+    }
+
+    // Try to parse as JSON first, fall back to form-urlencoded
+    try {
+      return JSON.parse(responseText) as OAuthTokenResponse;
+    } catch {
+      // Parse form-urlencoded response
+      const tokenParams = new URLSearchParams(responseText);
+      const accessToken = tokenParams.get('access_token');
+      const tokenType = tokenParams.get('token_type') || 'Bearer';
+      const expiresIn = tokenParams.get('expires_in');
+      const refreshToken = tokenParams.get('refresh_token');
+      const scope = tokenParams.get('scope');
+
+      if (!accessToken) {
+        // Check for error in response
+        const error = tokenParams.get('error');
+        const errorDescription = tokenParams.get('error_description');
+        throw new Error(
+          `Token exchange failed: ${error || 'no_access_token'} - ${errorDescription || responseText}`,
+        );
+      }
+
+      return {
+        access_token: accessToken,
+        token_type: tokenType,
+        expires_in: expiresIn ? parseInt(expiresIn, 10) : undefined,
+        refresh_token: refreshToken || undefined,
+        scope: scope || undefined,
+      } as OAuthTokenResponse;
+    }
   }
 
   /**
@@ -400,33 +478,97 @@ export class MCPOAuthProvider {
       params.append('scope', config.scopes.join(' '));
     }
 
+    if (config.audiences && config.audiences.length > 0) {
+      params.append('audience', config.audiences.join(' '));
+    }
+
     // Add resource parameter for MCP OAuth spec compliance
-    // Use the MCP server URL if provided, otherwise fall back to token URL
-    const resourceUrl = mcpServerUrl || tokenUrl;
-    try {
-      params.append('resource', OAuthUtils.buildResourceParameter(resourceUrl));
-    } catch (error) {
-      throw new Error(
-        `Invalid resource URL: "${resourceUrl}". ${getErrorMessage(error)}`,
-      );
+    // Only add if we have an MCP server URL (indicates MCP OAuth flow, not standard OAuth)
+    if (mcpServerUrl) {
+      try {
+        params.append(
+          'resource',
+          OAuthUtils.buildResourceParameter(mcpServerUrl),
+        );
+      } catch (error) {
+        console.warn(
+          `Could not add resource parameter: ${getErrorMessage(error)}`,
+        );
+      }
     }
 
     const response = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json, application/x-www-form-urlencoded',
       },
       body: params.toString(),
     });
 
+    const responseText = await response.text();
+    const contentType = response.headers.get('content-type') || '';
+
     if (!response.ok) {
-      const errorText = await response.text();
+      // Try to parse error from form-urlencoded response
+      let errorMessage: string | null = null;
+      try {
+        const errorParams = new URLSearchParams(responseText);
+        const error = errorParams.get('error');
+        const errorDescription = errorParams.get('error_description');
+        if (error) {
+          errorMessage = `Token refresh failed: ${error} - ${errorDescription || 'No description'}`;
+        }
+      } catch {
+        // Fall back to raw error
+      }
       throw new Error(
-        `Token refresh failed: ${response.status} - ${errorText}`,
+        errorMessage ||
+          `Token refresh failed: ${response.status} - ${responseText}`,
       );
     }
 
-    return (await response.json()) as OAuthTokenResponse;
+    // Log unexpected content types for debugging
+    if (
+      !contentType.includes('application/json') &&
+      !contentType.includes('application/x-www-form-urlencoded')
+    ) {
+      console.warn(
+        `Token refresh endpoint returned unexpected content-type: ${contentType}. ` +
+          `Expected application/json or application/x-www-form-urlencoded. ` +
+          `Will attempt to parse response.`,
+      );
+    }
+
+    // Try to parse as JSON first, fall back to form-urlencoded
+    try {
+      return JSON.parse(responseText) as OAuthTokenResponse;
+    } catch {
+      // Parse form-urlencoded response
+      const tokenParams = new URLSearchParams(responseText);
+      const accessToken = tokenParams.get('access_token');
+      const tokenType = tokenParams.get('token_type') || 'Bearer';
+      const expiresIn = tokenParams.get('expires_in');
+      const refreshToken = tokenParams.get('refresh_token');
+      const scope = tokenParams.get('scope');
+
+      if (!accessToken) {
+        // Check for error in response
+        const error = tokenParams.get('error');
+        const errorDescription = tokenParams.get('error_description');
+        throw new Error(
+          `Token refresh failed: ${error || 'unknown_error'} - ${errorDescription || responseText}`,
+        );
+      }
+
+      return {
+        access_token: accessToken,
+        token_type: tokenType,
+        expires_in: expiresIn ? parseInt(expiresIn, 10) : undefined,
+        refresh_token: refreshToken || undefined,
+        scope: scope || undefined,
+      } as OAuthTokenResponse;
+    }
   }
 
   /**
@@ -441,44 +583,50 @@ export class MCPOAuthProvider {
     serverName: string,
     config: MCPOAuthConfig,
     mcpServerUrl?: string,
-  ): Promise<MCPOAuthToken> {
+  ): Promise<OAuthToken> {
     // If no authorization URL is provided, try to discover OAuth configuration
     if (!config.authorizationUrl && mcpServerUrl) {
       console.log(
         'No authorization URL provided, attempting OAuth discovery...',
       );
 
-      // For SSE URLs, first check if authentication is required
-      if (OAuthUtils.isSSEEndpoint(mcpServerUrl)) {
-        try {
-          const response = await fetch(mcpServerUrl, {
-            method: 'HEAD',
-            headers: {
-              Accept: 'text/event-stream',
-            },
-          });
+      // First check if the server requires authentication via WWW-Authenticate header
+      try {
+        const headers: HeadersInit = OAuthUtils.isSSEEndpoint(mcpServerUrl)
+          ? { Accept: 'text/event-stream' }
+          : { Accept: 'application/json' };
 
-          if (response.status === 401 || response.status === 307) {
-            const wwwAuthenticate = response.headers.get('www-authenticate');
-            if (wwwAuthenticate) {
-              const discoveredConfig =
-                await OAuthUtils.discoverOAuthFromWWWAuthenticate(
-                  wwwAuthenticate,
-                );
-              if (discoveredConfig) {
-                config = {
-                  ...config,
-                  ...discoveredConfig,
-                  scopes: discoveredConfig.scopes || config.scopes || [],
-                };
-              }
+        const response = await fetch(mcpServerUrl, {
+          method: 'HEAD',
+          headers,
+        });
+
+        if (response.status === 401 || response.status === 307) {
+          const wwwAuthenticate = response.headers.get('www-authenticate');
+
+          if (wwwAuthenticate) {
+            const discoveredConfig =
+              await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+                wwwAuthenticate,
+              );
+            if (discoveredConfig) {
+              // Merge discovered config with existing config, preserving clientId and clientSecret
+              config = {
+                ...config,
+                authorizationUrl: discoveredConfig.authorizationUrl,
+                tokenUrl: discoveredConfig.tokenUrl,
+                scopes: discoveredConfig.scopes || config.scopes || [],
+                // Preserve existing client credentials
+                clientId: config.clientId,
+                clientSecret: config.clientSecret,
+              };
             }
           }
-        } catch (error) {
-          console.debug(
-            `Failed to check SSE endpoint for authentication requirements: ${getErrorMessage(error)}`,
-          );
         }
+      } catch (error) {
+        console.debug(
+          `Failed to check endpoint for authentication requirements: ${getErrorMessage(error)}`,
+        );
       }
 
       // If we still don't have OAuth config, try the standard discovery
@@ -486,8 +634,16 @@ export class MCPOAuthProvider {
         const discoveredConfig =
           await this.discoverOAuthFromMCPServer(mcpServerUrl);
         if (discoveredConfig) {
-          config = { ...config, ...discoveredConfig };
-          console.log('OAuth configuration discovered successfully');
+          // Merge discovered config with existing config, preserving clientId and clientSecret
+          config = {
+            ...config,
+            authorizationUrl: discoveredConfig.authorizationUrl,
+            tokenUrl: discoveredConfig.tokenUrl,
+            scopes: discoveredConfig.scopes || config.scopes || [],
+            // Preserve existing client credentials
+            clientId: config.clientId,
+            clientSecret: config.clientSecret,
+          };
         } else {
           throw new Error(
             'Failed to discover OAuth configuration from MCP server',
@@ -617,9 +773,13 @@ export class MCPOAuthProvider {
     );
 
     // Convert to our token format
-    const token: MCPOAuthToken = {
+    if (!tokenResponse.access_token) {
+      throw new Error('No access token received from token endpoint');
+    }
+
+    const token: OAuthToken = {
       accessToken: tokenResponse.access_token,
-      tokenType: tokenResponse.token_type,
+      tokenType: tokenResponse.token_type || 'Bearer',
       refreshToken: tokenResponse.refresh_token,
       scope: tokenResponse.scope,
     };
@@ -641,12 +801,16 @@ export class MCPOAuthProvider {
 
       // Verify token was saved
       const savedToken = await MCPOAuthTokenStorage.getToken(serverName);
-      if (savedToken) {
-        console.log(
-          `Token verification successful: ${savedToken.token.accessToken.substring(0, 20)}...`,
-        );
+      if (savedToken && savedToken.token && savedToken.token.accessToken) {
+        const tokenPreview =
+          savedToken.token.accessToken.length > 20
+            ? `${savedToken.token.accessToken.substring(0, 20)}...`
+            : '[token]';
+        console.log(`Token verification successful: ${tokenPreview}`);
       } else {
-        console.error('Token verification failed: token not found after save');
+        console.error(
+          'Token verification failed: token not found or invalid after save',
+        );
       }
     } catch (saveError) {
       console.error(`Failed to save token: ${getErrorMessage(saveError)}`);
@@ -699,7 +863,7 @@ export class MCPOAuthProvider {
         );
 
         // Update stored token
-        const newToken: MCPOAuthToken = {
+        const newToken: OAuthToken = {
           accessToken: newTokenResponse.access_token,
           tokenType: newTokenResponse.token_type,
           refreshToken: newTokenResponse.refresh_token || token.refreshToken,

@@ -10,6 +10,7 @@ export * from './config/config.js';
 // Export Core Logic
 export * from './core/client.js';
 export * from './core/contentGenerator.js';
+export * from './core/loggingContentGenerator.js';
 export * from './core/geminiChat.js';
 export * from './core/logger.js';
 export * from './core/prompts.js';
@@ -40,16 +41,26 @@ export * from './utils/shell-utils.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
 export * from './utils/formatters.js';
+export * from './utils/generateContentResponseUtilities.js';
+export * from './utils/filesearch/fileSearch.js';
+export * from './utils/errorParsing.js';
+export * from './utils/workspaceContext.js';
+export * from './utils/ignorePatterns.js';
+export * from './utils/partUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
+export * from './services/chatRecordingService.js';
+export * from './services/fileSystemService.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';
 export * from './ide/ideContext.js';
 export * from './ide/ide-installer.js';
-export { getIdeDisplayName, DetectedIde } from './ide/detect-ide.js';
+export { getIdeInfo, DetectedIde } from './ide/detect-ide.js';
+export { type IdeInfo } from './ide/detect-ide.js';
+export * from './ide/constants.js';
 
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
@@ -66,6 +77,7 @@ export * from './prompts/mcp-prompts.js';
 export * from './tools/read-file.js';
 export * from './tools/ls.js';
 export * from './tools/grep.js';
+export * from './tools/ripGrep.js';
 export * from './tools/glob.js';
 export * from './tools/edit.js';
 export * from './tools/write-file.js';
@@ -79,11 +91,11 @@ export * from './tools/mcp-tool.js';
 
 // MCP OAuth
 export { MCPOAuthProvider } from './mcp/oauth-provider.js';
-export {
-  MCPOAuthToken,
-  MCPOAuthCredentials,
-  MCPOAuthTokenStorage,
-} from './mcp/oauth-token-storage.js';
+export type {
+  OAuthToken,
+  OAuthCredentials,
+} from './mcp/token-storage/types.js';
+export { MCPOAuthTokenStorage } from './mcp/oauth-token-storage.js';
 export type { MCPOAuthConfig } from './mcp/oauth-provider.js';
 export type {
   OAuthAuthorizationServerMetadata,
@@ -95,3 +107,4 @@ export { OAuthUtils } from './mcp/oauth-utils.js';
 export * from './telemetry/index.js';
 export { sessionId } from './utils/session.js';
 export * from './utils/browser.js';
+export { Storage } from './config/storage.js';

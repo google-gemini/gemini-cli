@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn } from 'node:child_process';
 
 export type EditorType =
   | 'vscode'
@@ -72,7 +72,7 @@ export function checkHasEditorType(editor: EditorType): boolean {
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
-  const notUsingSandbox = !process.env.SANDBOX;
+  const notUsingSandbox = !process.env['SANDBOX'];
   if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
     return notUsingSandbox;
   }
@@ -140,7 +140,7 @@ export function getDiffCommand(
           'wincmd l | setlocal statusline=%#StatusBold#NEW\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ i/esc(toggle\\ edit\\ mode)',
           // Auto close all windows when one is closed
           '-c',
-          'autocmd WinClosed * wqa',
+          'autocmd BufWritePost * wqa',
           oldPath,
           newPath,
         ],
@@ -164,6 +164,7 @@ export async function openDiff(
   oldPath: string,
   newPath: string,
   editor: EditorType,
+  onEditorClose: () => void,
 ): Promise<void> {
   const diffCommand = getDiffCommand(oldPath, newPath, editor);
   if (!diffCommand) {
@@ -206,10 +207,16 @@ export async function openDiff(
           process.platform === 'win32'
             ? `${diffCommand.command} ${diffCommand.args.join(' ')}`
             : `${diffCommand.command} ${diffCommand.args.map((arg) => `"${arg}"`).join(' ')}`;
-        execSync(command, {
-          stdio: 'inherit',
-          encoding: 'utf8',
-        });
+        try {
+          execSync(command, {
+            stdio: 'inherit',
+            encoding: 'utf8',
+          });
+        } catch (e) {
+          console.error('Error in onEditorClose callback:', e);
+        } finally {
+          onEditorClose();
+        }
         break;
       }
 

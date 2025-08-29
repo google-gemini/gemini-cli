@@ -5,34 +5,41 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import {
-  SSEClientTransport,
-  SSEClientTransportOptions,
-} from '@modelcontextprotocol/sdk/client/sse.js';
-import {
-  StreamableHTTPClientTransport,
-  StreamableHTTPClientTransportOptions,
-} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import {
+import type { SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import type { StreamableHTTPClientTransportOptions } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type {
   Prompt,
-  ListPromptsResultSchema,
   GetPromptResult,
+} from '@modelcontextprotocol/sdk/types.js';
+import {
+  ListPromptsResultSchema,
   GetPromptResultSchema,
+  ListRootsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
-import { AuthProviderType, MCPServerConfig } from '../config/config.js';
+import type { Config, MCPServerConfig } from '../config/config.js';
+import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 
-import { FunctionDeclaration, mcpToTool } from '@google/genai';
-import { ToolRegistry } from './tool-registry.js';
-import { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { FunctionDeclaration } from '@google/genai';
+import { mcpToTool } from '@google/genai';
+import type { ToolRegistry } from './tool-registry.js';
+import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { basename } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import type {
+  Unsubscribe,
+  WorkspaceContext,
+} from '../utils/workspaceContext.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -63,6 +70,139 @@ export enum MCPDiscoveryState {
   IN_PROGRESS = 'in_progress',
   /** Discovery has completed (with or without errors) */
   COMPLETED = 'completed',
+}
+
+/**
+ * A client for a single MCP server.
+ *
+ * This class is responsible for connecting to, discovering tools from, and
+ * managing the state of a single MCP server.
+ */
+export class McpClient {
+  private client: Client;
+  private transport: Transport | undefined;
+  private status: MCPServerStatus = MCPServerStatus.DISCONNECTED;
+  private isDisconnecting = false;
+
+  constructor(
+    private readonly serverName: string,
+    private readonly serverConfig: MCPServerConfig,
+    private readonly toolRegistry: ToolRegistry,
+    private readonly promptRegistry: PromptRegistry,
+    private readonly workspaceContext: WorkspaceContext,
+    private readonly debugMode: boolean,
+  ) {
+    this.client = new Client({
+      name: `gemini-cli-mcp-client-${this.serverName}`,
+      version: '0.0.1',
+    });
+  }
+
+  /**
+   * Connects to the MCP server.
+   */
+  async connect(): Promise<void> {
+    this.isDisconnecting = false;
+    this.updateStatus(MCPServerStatus.CONNECTING);
+    try {
+      this.transport = await this.createTransport();
+
+      this.client.onerror = (error) => {
+        if (this.isDisconnecting) {
+          return;
+        }
+        console.error(`MCP ERROR (${this.serverName}):`, error.toString());
+        this.updateStatus(MCPServerStatus.DISCONNECTED);
+      };
+
+      this.client.registerCapabilities({
+        roots: {},
+      });
+
+      this.client.setRequestHandler(ListRootsRequestSchema, async () => {
+        const roots = [];
+        for (const dir of this.workspaceContext.getDirectories()) {
+          roots.push({
+            uri: pathToFileURL(dir).toString(),
+            name: basename(dir),
+          });
+        }
+        return {
+          roots,
+        };
+      });
+
+      await this.client.connect(this.transport, {
+        timeout: this.serverConfig.timeout,
+      });
+
+      this.updateStatus(MCPServerStatus.CONNECTED);
+    } catch (error) {
+      this.updateStatus(MCPServerStatus.DISCONNECTED);
+      throw error;
+    }
+  }
+
+  /**
+   * Discovers tools and prompts from the MCP server.
+   */
+  async discover(cliConfig: Config): Promise<void> {
+    if (this.status !== MCPServerStatus.CONNECTED) {
+      throw new Error('Client is not connected.');
+    }
+
+    const prompts = await this.discoverPrompts();
+    const tools = await this.discoverTools(cliConfig);
+
+    if (prompts.length === 0 && tools.length === 0) {
+      throw new Error('No prompts or tools found on the server.');
+    }
+
+    for (const tool of tools) {
+      this.toolRegistry.registerTool(tool);
+    }
+  }
+
+  /**
+   * Disconnects from the MCP server.
+   */
+  async disconnect(): Promise<void> {
+    this.isDisconnecting = true;
+    if (this.transport) {
+      await this.transport.close();
+    }
+    this.client.close();
+    this.updateStatus(MCPServerStatus.DISCONNECTED);
+  }
+
+  /**
+   * Returns the current status of the client.
+   */
+  getStatus(): MCPServerStatus {
+    return this.status;
+  }
+
+  private updateStatus(status: MCPServerStatus): void {
+    this.status = status;
+    updateMCPServerStatus(this.serverName, status);
+  }
+
+  private async createTransport(): Promise<Transport> {
+    return createTransport(this.serverName, this.serverConfig, this.debugMode);
+  }
+
+  private async discoverTools(cliConfig: Config): Promise<DiscoveredMCPTool[]> {
+    return discoverTools(
+      this.serverName,
+      this.serverConfig,
+      this.client,
+      cliConfig,
+    );
+  }
+
+  private async discoverPrompts(): Promise<Prompt[]> {
+    return discoverPrompts(this.serverName, this.client, this.promptRegistry);
+  }
 }
 
 /**
@@ -113,7 +253,7 @@ export function removeMCPStatusChangeListener(
 /**
  * Update the status of an MCP server
  */
-function updateMCPServerStatus(
+export function updateMCPServerStatus(
   serverName: string,
   status: MCPServerStatus,
 ): void {
@@ -193,15 +333,12 @@ async function handleAutomaticOAuth(
       OAuthUtils.parseWWWAuthenticateHeader(wwwAuthenticate);
     if (resourceMetadataUri) {
       oauthConfig = await OAuthUtils.discoverOAuthConfig(resourceMetadataUri);
-    } else if (mcpServerConfig.url) {
-      // Fallback: try to discover OAuth config from the base URL for SSE
-      const sseUrl = new URL(mcpServerConfig.url);
-      const baseUrl = `${sseUrl.protocol}//${sseUrl.host}`;
-      oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
-    } else if (mcpServerConfig.httpUrl) {
-      // Fallback: try to discover OAuth config from the base URL for HTTP
-      const httpUrl = new URL(mcpServerConfig.httpUrl);
-      const baseUrl = `${httpUrl.protocol}//${httpUrl.host}`;
+    } else if (hasNetworkTransport(mcpServerConfig)) {
+      // Fallback: try to discover OAuth config from the base URL
+      const serverUrl = new URL(
+        mcpServerConfig.httpUrl || mcpServerConfig.url!,
+      );
+      const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
       oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
     }
 
@@ -223,10 +360,16 @@ async function handleAutomaticOAuth(
     };
 
     // Perform OAuth authentication
+    // Pass the server URL for proper discovery
+    const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
     console.log(
       `Starting OAuth authentication for server '${mcpServerName}'...`,
     );
-    await MCPOAuthProvider.authenticate(mcpServerName, oauthAuthConfig);
+    await MCPOAuthProvider.authenticate(
+      mcpServerName,
+      oauthAuthConfig,
+      serverUrl,
+    );
 
     console.log(
       `OAuth authentication successful for server '${mcpServerName}'`,
@@ -306,6 +449,8 @@ export async function discoverMcpTools(
   toolRegistry: ToolRegistry,
   promptRegistry: PromptRegistry,
   debugMode: boolean,
+  workspaceContext: WorkspaceContext,
+  cliConfig: Config,
 ): Promise<void> {
   mcpDiscoveryState = MCPDiscoveryState.IN_PROGRESS;
   try {
@@ -319,6 +464,8 @@ export async function discoverMcpTools(
           toolRegistry,
           promptRegistry,
           debugMode,
+          workspaceContext,
+          cliConfig,
         ),
     );
     await Promise.all(discoveryPromises);
@@ -363,36 +510,54 @@ export async function connectAndDiscover(
   toolRegistry: ToolRegistry,
   promptRegistry: PromptRegistry,
   debugMode: boolean,
+  workspaceContext: WorkspaceContext,
+  cliConfig: Config,
 ): Promise<void> {
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
+  let mcpClient: Client | undefined;
   try {
-    const mcpClient = await connectToMcpServer(
+    mcpClient = await connectToMcpServer(
       mcpServerName,
       mcpServerConfig,
       debugMode,
+      workspaceContext,
     );
-    try {
-      updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
-      mcpClient.onerror = (error) => {
-        console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
-        updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
-      };
-      await discoverPrompts(mcpServerName, mcpClient, promptRegistry);
 
-      const tools = await discoverTools(
-        mcpServerName,
-        mcpServerConfig,
-        mcpClient,
-      );
-      for (const tool of tools) {
-        toolRegistry.registerTool(tool);
-      }
-    } catch (error) {
-      mcpClient.close();
-      throw error;
+    mcpClient.onerror = (error) => {
+      console.error(`MCP ERROR (${mcpServerName}):`, error.toString());
+      updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+    };
+
+    // Attempt to discover both prompts and tools
+    const prompts = await discoverPrompts(
+      mcpServerName,
+      mcpClient,
+      promptRegistry,
+    );
+    const tools = await discoverTools(
+      mcpServerName,
+      mcpServerConfig,
+      mcpClient,
+      cliConfig,
+    );
+
+    // If we have neither prompts nor tools, it's a failed discovery
+    if (prompts.length === 0 && tools.length === 0) {
+      throw new Error('No prompts or tools found on the server.');
+    }
+
+    // If we found anything, the server is connected
+    updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTED);
+
+    // Register any discovered tools
+    for (const tool of tools) {
+      toolRegistry.registerTool(tool);
     }
   } catch (error) {
+    if (mcpClient) {
+      mcpClient.close();
+    }
     console.error(
       `Error connecting to MCP server '${mcpServerName}': ${getErrorMessage(
         error,
@@ -400,6 +565,65 @@ export async function connectAndDiscover(
     );
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   }
+}
+
+/**
+ * Recursively validates that a JSON schema and all its nested properties and
+ * items have a `type` defined.
+ *
+ * @param schema The JSON schema to validate.
+ * @returns `true` if the schema is valid, `false` otherwise.
+ *
+ * @visiblefortesting
+ */
+export function hasValidTypes(schema: unknown): boolean {
+  if (typeof schema !== 'object' || schema === null) {
+    // Not a schema object we can validate, or not a schema at all.
+    // Treat as valid as it has no properties to be invalid.
+    return true;
+  }
+
+  const s = schema as Record<string, unknown>;
+
+  if (!s['type']) {
+    // These keywords contain an array of schemas that should be validated.
+    //
+    // If no top level type was given, then they must each have a type.
+    let hasSubSchema = false;
+    const schemaArrayKeywords = ['anyOf', 'allOf', 'oneOf'];
+    for (const keyword of schemaArrayKeywords) {
+      const subSchemas = s[keyword];
+      if (Array.isArray(subSchemas)) {
+        hasSubSchema = true;
+        for (const subSchema of subSchemas) {
+          if (!hasValidTypes(subSchema)) {
+            return false;
+          }
+        }
+      }
+    }
+
+    // If the node itself is missing a type and had no subschemas, then it isn't valid.
+    if (!hasSubSchema) return false;
+  }
+
+  if (s['type'] === 'object' && s['properties']) {
+    if (typeof s['properties'] === 'object' && s['properties'] !== null) {
+      for (const prop of Object.values(s['properties'])) {
+        if (!hasValidTypes(prop)) {
+          return false;
+        }
+      }
+    }
+  }
+
+  if (s['type'] === 'array' && s['items']) {
+    if (!hasValidTypes(s['items'])) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -417,19 +641,30 @@ export async function discoverTools(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   mcpClient: Client,
+  cliConfig: Config,
 ): Promise<DiscoveredMCPTool[]> {
   try {
     const mcpCallableTool = mcpToTool(mcpClient);
     const tool = await mcpCallableTool.tool();
 
     if (!Array.isArray(tool.functionDeclarations)) {
-      throw new Error(`Server did not return valid function declarations.`);
+      // This is a valid case for a prompt-only server
+      return [];
     }
 
     const discoveredTools: DiscoveredMCPTool[] = [];
     for (const funcDecl of tool.functionDeclarations) {
       try {
         if (!isEnabled(funcDecl, mcpServerName, mcpServerConfig)) {
+          continue;
+        }
+
+        if (!hasValidTypes(funcDecl.parametersJsonSchema)) {
+          console.warn(
+            `Skipping tool '${funcDecl.name}' from MCP server '${mcpServerName}' ` +
+              `because it has missing types in its parameter schema. Please file an ` +
+              `issue with the owner of the MCP server.`,
+          );
           continue;
         }
 
@@ -442,6 +677,8 @@ export async function discoverTools(
             funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
             mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
             mcpServerConfig.trust,
+            undefined,
+            cliConfig,
           ),
         );
       } catch (error) {
@@ -454,7 +691,17 @@ export async function discoverTools(
     }
     return discoveredTools;
   } catch (error) {
-    throw new Error(`Error discovering tools: ${error}`);
+    if (
+      error instanceof Error &&
+      !error.message?.includes('Method not found')
+    ) {
+      console.error(
+        `Error discovering tools from ${mcpServerName}: ${getErrorMessage(
+          error,
+        )}`,
+      );
+    }
+    return [];
   }
 }
 
@@ -469,8 +716,11 @@ export async function discoverPrompts(
   mcpServerName: string,
   mcpClient: Client,
   promptRegistry: PromptRegistry,
-): Promise<void> {
+): Promise<Prompt[]> {
   try {
+    // Only request prompts if the server supports them.
+    if (mcpClient.getServerCapabilities()?.prompts == null) return [];
+
     const response = await mcpClient.request(
       { method: 'prompts/list', params: {} },
       ListPromptsResultSchema,
@@ -484,6 +734,7 @@ export async function discoverPrompts(
           invokeMcpPrompt(mcpServerName, mcpClient, prompt.name, params),
       });
     }
+    return response.prompts;
   } catch (error) {
     // It's okay if this fails, not all servers will have prompts.
     // Don't log an error if the method is not found, which is a common case.
@@ -497,6 +748,7 @@ export async function discoverPrompts(
         )}`,
       );
     }
+    return [];
   }
 }
 
@@ -544,6 +796,16 @@ export async function invokeMcpPrompt(
 }
 
 /**
+ * @visiblefortesting
+ * Checks if the MCP server configuration has a network transport URL (SSE or HTTP).
+ * @param config The MCP server configuration.
+ * @returns True if a `url` or `httpUrl` is present, false otherwise.
+ */
+export function hasNetworkTransport(config: MCPServerConfig): boolean {
+  return !!(config.url || config.httpUrl);
+}
+
+/**
  * Creates and connects an MCP client to a server based on the provided configuration.
  * It determines the appropriate transport (Stdio, SSE, or Streamable HTTP) and
  * establishes a connection. It also applies a patch to handle request timeouts.
@@ -557,11 +819,57 @@ export async function connectToMcpServer(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
+  workspaceContext: WorkspaceContext,
 ): Promise<Client> {
   const mcpClient = new Client({
     name: 'gemini-cli-mcp-client',
     version: '0.0.1',
   });
+
+  mcpClient.registerCapabilities({
+    roots: {
+      listChanged: true,
+    },
+  });
+
+  mcpClient.setRequestHandler(ListRootsRequestSchema, async () => {
+    const roots = [];
+    for (const dir of workspaceContext.getDirectories()) {
+      roots.push({
+        uri: pathToFileURL(dir).toString(),
+        name: basename(dir),
+      });
+    }
+    return {
+      roots,
+    };
+  });
+
+  let unlistenDirectories: Unsubscribe | undefined =
+    workspaceContext.onDirectoriesChanged(async () => {
+      try {
+        await mcpClient.notification({
+          method: 'notifications/roots/list_changed',
+        });
+      } catch (_) {
+        // If this fails, its almost certainly because the connection was closed
+        // and we should just stop listening for future directory changes.
+        unlistenDirectories?.();
+        unlistenDirectories = undefined;
+      }
+    });
+
+  // Attempt to pro-actively unsubscribe if the mcp client closes. This API is
+  // very brittle though so we don't have any guarantees, hence the try/catch
+  // above as well.
+  //
+  // Be a good steward and don't just bash over onclose.
+  const oldOnClose = mcpClient.onclose;
+  mcpClient.onclose = () => {
+    oldOnClose?.();
+    unlistenDirectories?.();
+    unlistenDirectories = undefined;
+  };
 
   // patch Client.callTool to use request timeout as genai McpCallTool.callTool does not do it
   // TODO: remove this hack once GenAI SDK does callTool with request options
@@ -593,10 +901,7 @@ export async function connectToMcpServer(
   } catch (error) {
     // Check if this is a 401 error that might indicate OAuth is required
     const errorString = String(error);
-    if (
-      errorString.includes('401') &&
-      (mcpServerConfig.httpUrl || mcpServerConfig.url)
-    ) {
+    if (errorString.includes('401') && hasNetworkTransport(mcpServerConfig)) {
       mcpServerRequiresOAuth.set(mcpServerName, true);
       // Only trigger automatic OAuth discovery for HTTP servers or when OAuth is explicitly configured
       // For SSE servers, we should not trigger new OAuth flows automatically
@@ -636,15 +941,18 @@ export async function connectToMcpServer(
       let wwwAuthenticate = extractWWWAuthenticateHeader(errorString);
 
       // If we didn't get the header from the error string, try to get it from the server
-      if (!wwwAuthenticate && mcpServerConfig.url) {
+      if (!wwwAuthenticate && hasNetworkTransport(mcpServerConfig)) {
         console.log(
           `No www-authenticate header in error, trying to fetch it from server...`,
         );
         try {
-          const response = await fetch(mcpServerConfig.url, {
+          const urlToFetch = mcpServerConfig.httpUrl || mcpServerConfig.url!;
+          const response = await fetch(urlToFetch, {
             method: 'HEAD',
             headers: {
-              Accept: 'text/event-stream',
+              Accept: mcpServerConfig.httpUrl
+                ? 'application/json'
+                : 'text/event-stream',
             },
             signal: AbortSignal.timeout(5000),
           });
@@ -659,7 +967,9 @@ export async function connectToMcpServer(
           }
         } catch (fetchError) {
           console.debug(
-            `Failed to fetch www-authenticate header: ${getErrorMessage(fetchError)}`,
+            `Failed to fetch www-authenticate header: ${getErrorMessage(
+              fetchError,
+            )}`,
           );
         }
       }
@@ -785,12 +1095,14 @@ export async function connectToMcpServer(
           );
         }
 
-        // For SSE servers, try to discover OAuth configuration from the base URL
+        // For SSE/HTTP servers, try to discover OAuth configuration from the base URL
         console.log(`🔍 Attempting OAuth discovery for '${mcpServerName}'...`);
 
-        if (mcpServerConfig.url) {
-          const sseUrl = new URL(mcpServerConfig.url);
-          const baseUrl = `${sseUrl.protocol}//${sseUrl.host}`;
+        if (hasNetworkTransport(mcpServerConfig)) {
+          const serverUrl = new URL(
+            mcpServerConfig.httpUrl || mcpServerConfig.url!,
+          );
+          const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
 
           try {
             // Try to discover OAuth configuration from the base URL
@@ -809,12 +1121,16 @@ export async function connectToMcpServer(
               };
 
               // Perform OAuth authentication
+              // Pass the server URL for proper discovery
+              const authServerUrl =
+                mcpServerConfig.httpUrl || mcpServerConfig.url;
               console.log(
                 `Starting OAuth authentication for server '${mcpServerName}'...`,
               );
               await MCPOAuthProvider.authenticate(
                 mcpServerName,
                 oauthAuthConfig,
+                authServerUrl,
               );
 
               // Retry connection with OAuth token
@@ -913,7 +1229,7 @@ export async function connectToMcpServer(
         conciseError = `Connection failed for '${mcpServerName}': ${errorMessage}`;
       }
 
-      if (process.env.SANDBOX) {
+      if (process.env['SANDBOX']) {
         conciseError += ` (check sandbox availability)`;
       }
 

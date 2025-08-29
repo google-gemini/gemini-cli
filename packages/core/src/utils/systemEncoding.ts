@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'child_process';
-import os from 'os';
+import { execSync } from 'node:child_process';
+import os from 'node:os';
 import { detect as chardetDetect } from 'chardet';
 
 // Cache for system encoding to avoid repeated detection
@@ -79,7 +79,7 @@ export function getSystemEncoding(): string | null {
   // system encoding. However, these environment variables might not always
   // be set or accurate. Handle cases where none of these variables are set.
   const env = process.env;
-  let locale = env.LC_ALL || env.LC_CTYPE || env.LANG || '';
+  let locale = env['LC_ALL'] || env['LC_CTYPE'] || env['LANG'] || '';
 
   // Fallback to querying the system directly when environment variables are missing
   if (!locale) {

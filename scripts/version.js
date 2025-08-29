@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'child_process';
-import { readFileSync, writeFileSync } from 'fs';
-import { resolve } from 'path';
+import { execSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 // A script to handle versioning and ensure all related changes are in a single, atomic commit.
 
@@ -35,7 +35,7 @@ if (!versionType) {
 run(`npm version ${versionType} --no-git-tag-version --allow-same-version`);
 
 // 3. Get all workspaces and filter out the one we don't want to version.
-const workspacesToExclude = ['gemini-cli-vscode-ide-companion'];
+const workspacesToExclude = [];
 const lsOutput = JSON.parse(
   execSync('npm ls --workspaces --json --depth=0').toString(),
 );
