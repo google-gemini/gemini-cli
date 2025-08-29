@@ -128,7 +128,7 @@ jobs:
                  {
                    "issue_number": 123,
                    "labels_to_add": ["kind/bug", "priority/p2"],
-                   "labels_to_remove": ["status/needs-triage"],
+                   "labels_to_remove": ["status/need-triage"],
                    "explanation": "This issue is a bug that needs to be addressed with medium priority."
                  },
                  {
