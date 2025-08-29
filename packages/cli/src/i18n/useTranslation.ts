@@ -9,13 +9,12 @@ import { useTranslation as useI18nTranslation } from 'react-i18next';
 export const useTranslation = (namespace = 'help') =>
   useI18nTranslation(namespace);
 
-// Language switching utility
+// Language switching utility for CLI environment
 export const switchLanguage = (lng: string) => {
-  // This will be implemented to switch languages
-  // For PoC, we'll add a simple mechanism
-  if (typeof window !== 'undefined') {
-    // In a browser environment
-    localStorage.setItem('gemini-cli-language', lng);
-  }
-  // Note: In a CLI environment, we might use a config file or environment variable
+  // Language switching in CLI should be handled through:
+  // 1. GEMINI_LANG environment variable
+  // 2. Configuration file settings
+  // 3. Command line arguments
+  // This function serves as a placeholder for future implementation
+  console.log(`Language switch requested: ${lng}`);
 };
