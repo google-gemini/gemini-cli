@@ -2166,7 +2166,9 @@ describe('loadCliConfig fileFiltering', () => {
     'should pass $property from settings to config when $value',
     async ({ property, getter, value }) => {
       const settings: Settings = {
-        fileFiltering: { [property]: value },
+        context: {
+          fileFiltering: { [property]: value },
+        }
       };
       const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, [], 'test-session', argv);
