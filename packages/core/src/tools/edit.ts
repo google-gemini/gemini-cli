@@ -29,10 +29,7 @@ import type {
   ModifyContext,
 } from './modifiable-tool.js';
 import { IDEConnectionStatus } from '../ide/ide-client.js';
-import {
-  FileOperation,
-  recordFileOperationMetric,
-} from '../telemetry/metrics.js';
+import { FileOperation } from '../telemetry/metrics.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
@@ -427,16 +424,6 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           diffStat,
           programming_language,
         ),
-      );
-
-      recordFileOperationMetric(
-        this.config,
-        editData.isNewFile ? FileOperation.CREATE : FileOperation.UPDATE,
-        lines,
-        mimetype,
-        extension,
-        diffStat,
-        programming_language,
       );
 
       return {
