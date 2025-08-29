@@ -613,7 +613,15 @@ export const SETTINGS_SCHEMA = {
       },
     },
   },
-
+  useSmartEdit: {
+    type: 'boolean',
+    label: 'Use Smart Edit',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: false,
+    description: 'Enable the smart-edit tool instead of the replace tool.',
+    showInDialog: false,
+  },
   security: {
     type: 'object',
     label: 'Security',
