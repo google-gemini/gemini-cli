@@ -41,7 +41,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   emphasis = 'medium',
   renderOutputAsMarkdown = true,
 }) => {
-  const { isRawMode, toggleComponent } = useRawMode();
+  const { isRawMode, toggleComponent } = useRawMode(showToggle);
   const availableHeight = availableTerminalHeight
     ? Math.max(
         availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
