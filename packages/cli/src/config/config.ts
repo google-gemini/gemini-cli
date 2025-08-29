@@ -78,6 +78,7 @@ export interface CliArgs {
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
+  sessionSummary: string | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -226,6 +227,10 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'boolean',
           description: 'Enable screen reader mode for accessibility.',
           default: false,
+        })
+        .option('session-summary', {
+          type: 'string',
+          description: 'File to write session summary to.',
         })
         .deprecateOption(
           'telemetry',

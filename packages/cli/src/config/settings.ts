@@ -64,6 +64,7 @@ const MIGRATION_MAP: Record<string, string> = {
   fileFiltering: 'context.fileFiltering',
   sandbox: 'tools.sandbox',
   shouldUseNodePtyShell: 'tools.usePty',
+  allowedTools: 'tools.allowed',
   coreTools: 'tools.core',
   excludeTools: 'tools.exclude',
   toolDiscoveryCommand: 'tools.discoveryCommand',
