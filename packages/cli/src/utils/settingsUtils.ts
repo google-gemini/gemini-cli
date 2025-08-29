@@ -416,6 +416,16 @@ export function saveModifiedSettings(
 }
 
 /**
+ * Language code to display name mapping
+ */
+const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
+  en: 'English',
+  zh: '中文',
+  es: 'Español',
+  fr: 'Français',
+};
+
+/**
  * Get the display value for a setting, showing current scope value with default change indicator
  */
 export function getDisplayValue(
@@ -425,8 +435,11 @@ export function getDisplayValue(
   modifiedSettings: Set<string>,
   pendingSettings?: Settings,
 ): string {
+  // Get the setting definition to understand the type
+  const definition = getSettingDefinition(key);
+  
   // Prioritize pending changes if user has modified this setting
-  let value: boolean;
+  let value: unknown;
   if (pendingSettings && settingExistsInScope(key, pendingSettings)) {
     // Show the value from the pending (unsaved) edits when it exists
     value = getSettingValue(key, pendingSettings, {});
@@ -435,16 +448,22 @@ export function getDisplayValue(
     value = getSettingValue(key, settings, {});
   } else {
     // Fall back to the schema default when the key is unset in this scope
-    const defaultValue = getDefaultValue(key);
-    value = typeof defaultValue === 'boolean' ? defaultValue : false;
+    value = getDefaultValue(key);
   }
 
-  const valueString = String(value);
+  // Convert value to display string based on type
+  let valueString: string;
+  if (definition?.type === 'string' && key === 'language') {
+    // Special handling for language setting
+    const langCode = typeof value === 'string' ? value : 'en';
+    valueString = LANGUAGE_DISPLAY_NAMES[langCode] || langCode;
+  } else {
+    valueString = String(value);
+  }
 
   // Check if value is different from default OR if it's in modified settings OR if there are pending changes
   const defaultValue = getDefaultValue(key);
-  const isChangedFromDefault =
-    typeof defaultValue === 'boolean' ? value !== defaultValue : value === true;
+  const isChangedFromDefault = value !== defaultValue;
   const isInModifiedSettings = modifiedSettings.has(key);
 
   // Mark as modified if setting exists in current scope OR is in modified settings
