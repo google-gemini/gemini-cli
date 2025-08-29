@@ -24,7 +24,11 @@ import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions } from './config/extension.js';
-import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
+import {
+  cleanupCheckpoints,
+  registerCleanup,
+  runExitCleanup,
+} from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
 import type { Config } from '@google/gemini-cli-core';
 import {
@@ -36,6 +40,7 @@ import {
   IdeConnectionEvent,
   IdeConnectionType,
   FatalConfigError,
+  uiTelemetryService,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
@@ -45,6 +50,7 @@ import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
+import { writeFileSync } from 'node:fs';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -224,6 +230,16 @@ export async function main() {
     sessionId,
     argv,
   );
+
+  if (argv.sessionSummary) {
+    registerCleanup(() => {
+      const metrics = uiTelemetryService.getMetrics();
+      writeFileSync(
+        argv.sessionSummary!,
+        JSON.stringify({ sessionMetrics: metrics }, null, 2),
+      );
+    });
+  }
 
   const consolePatcher = new ConsolePatcher({
     stderr: true,
@@ -434,6 +450,8 @@ export async function main() {
   }
 
   await runNonInteractive(nonInteractiveConfig, input, prompt_id);
+  // Call cleanup before process.exit, which causes cleanup to not run
+  await runExitCleanup();
   process.exit(0);
 }
 
