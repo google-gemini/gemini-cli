@@ -1,12 +1,4 @@
 {
-  "lang": {
-    "description": "Cambiar el idioma de la interfaz",
-    "usage": "Uso: /lang [en|zh|fr|es|current]",
-    "currentLanguage": "Idioma actual: {{language}}",
-    "languageChanged": "Idioma cambiado a {{language}}",
-    "invalidLanguage": "Idioma inválido: {{language}}. Disponibles: en, zh, fr, es",
-    "availableLanguages": "Idiomas disponibles: {{languages}}"
-  },
   "auth": {
     "description": "Configurar el método de autenticación",
     "openingDialog": "Abriendo diálogo de autenticación..."
@@ -72,7 +64,6 @@
     "help": "Mostrar información de ayuda",
     "ide": "Configurar integración del IDE",
     "init": "Inicializar un nuevo proyecto",
-    "lang": "Cambiar idioma de la interfaz / Switch interface language",
     "mcp": "Gestionar servidores MCP",
     "memory": "Gestionar memoria de conversación",
     "privacy": "Mostrar información de privacidad",

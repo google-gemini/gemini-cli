@@ -1,12 +1,4 @@
 {
-  "lang": {
-    "description": "Changer la langue de l'interface",
-    "usage": "Usage: /lang [en|zh|fr|current]",
-    "currentLanguage": "Langue actuelle: {{language}}",
-    "languageChanged": "Langue changée en {{language}}",
-    "invalidLanguage": "Langue invalide: {{language}}. Disponibles: en, zh, fr",
-    "availableLanguages": "Langues disponibles: {{languages}}"
-  },
   "auth": {
     "description": "Configurer la méthode d'authentification",
     "openingDialog": "Ouverture du dialogue d'authentification..."
@@ -72,7 +64,6 @@
     "help": "Afficher les informations d'aide",
     "ide": "Configurer l'intégration IDE",
     "init": "Initialiser un nouveau projet",
-    "lang": "Changer la langue de l'interface / Switch interface language",
     "mcp": "Gérer les serveurs MCP",
     "memory": "Gérer la mémoire de conversation",
     "privacy": "Afficher les informations de confidentialité",

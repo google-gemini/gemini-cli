@@ -1,12 +1,4 @@
 {
-  "lang": {
-    "description": "切换界面语言",
-    "usage": "用法: /lang [en|zh|current]",
-    "currentLanguage": "当前语言: {{language}}",
-    "languageChanged": "语言已切换到 {{language}}",
-    "invalidLanguage": "无效语言: {{language}}。可用语言: en, zh",
-    "availableLanguages": "可用语言: {{languages}}"
-  },
   "auth": {
     "description": "配置身份验证方法",
     "openingDialog": "正在打开身份验证对话框..."
@@ -70,7 +62,6 @@
     "help": "显示帮助信息",
     "ide": "配置 IDE 集成",
     "init": "初始化新项目",
-    "lang": "切换界面语言",
     "mcp": "管理 MCP 服务器",
     "memory": "管理对话内存",
     "privacy": "显示隐私信息",

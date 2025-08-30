@@ -60,12 +60,8 @@ const resources = languages.reduce(
   {} as Record<string, Record<string, Record<string, unknown>>>,
 );
 
-// Get initial language from environment variable or default to 'en'
+// Default language is 'en', will be overridden by settings
 const getInitialLanguage = (): string => {
-  const envLang = process.env['GEMINI_LANG'];
-  if (envLang && languages.includes(envLang)) {
-    return envLang;
-  }
   return 'en';
 };
 

@@ -1,12 +1,4 @@
 {
-  "lang": {
-    "description": "Switch interface language",
-    "usage": "Usage: /lang [en|zh|current]",
-    "currentLanguage": "Current language: {{language}}",
-    "languageChanged": "Language switched to {{language}}",
-    "invalidLanguage": "Invalid language: {{language}}. Available: en, zh",
-    "availableLanguages": "Available languages: {{languages}}"
-  },
   "auth": {
     "description": "Configure authentication method",
     "openingDialog": "Opening authentication dialog..."
@@ -72,7 +64,6 @@
     "help": "Show help information",
     "ide": "Configure IDE integration",
     "init": "Initialize a new project",
-    "lang": "Switch interface language / 切换界面语言",
     "mcp": "Manage MCP servers",
     "memory": "Manage memory",
     "privacy": "Show privacy information",
