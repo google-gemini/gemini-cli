@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { homedir, platform } from 'node:os';
 import * as dotenv from 'dotenv';
+import process from 'node:process';
 import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
@@ -18,6 +19,7 @@ import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import type { Settings, MemoryImportFormat } from './settingsSchema.js';
+import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { mergeWith } from 'lodash-es';
 
 export type { Settings, MemoryImportFormat };
@@ -45,6 +47,7 @@ const MIGRATION_MAP: Record<string, string> = {
   hideFooter: 'ui.hideFooter',
   showMemoryUsage: 'ui.showMemoryUsage',
   showLineNumbers: 'ui.showLineNumbers',
+  showCitations: 'ui.showCitations',
   accessibility: 'ui.accessibility',
   ideMode: 'ide.enabled',
   hasSeenIdeIntegrationNudge: 'ide.hasSeenNudge',
@@ -63,6 +66,7 @@ const MIGRATION_MAP: Record<string, string> = {
   fileFiltering: 'context.fileFiltering',
   sandbox: 'tools.sandbox',
   shouldUseNodePtyShell: 'tools.usePty',
+  allowedTools: 'tools.allowed',
   coreTools: 'tools.core',
   excludeTools: 'tools.exclude',
   toolDiscoveryCommand: 'tools.discoveryCommand',
@@ -460,48 +464,6 @@ export class LoadedSettings {
   }
 }
 
-function resolveEnvVarsInString(value: string): string {
-  const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
-  return value.replace(envVarRegex, (match, varName1, varName2) => {
-    const varName = varName1 || varName2;
-    if (process && process.env && typeof process.env[varName] === 'string') {
-      return process.env[varName]!;
-    }
-    return match;
-  });
-}
-
-function resolveEnvVarsInObject<T>(obj: T): T {
-  if (
-    obj === null ||
-    obj === undefined ||
-    typeof obj === 'boolean' ||
-    typeof obj === 'number'
-  ) {
-    return obj;
-  }
-
-  if (typeof obj === 'string') {
-    return resolveEnvVarsInString(obj) as unknown as T;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map((item) => resolveEnvVarsInObject(item)) as unknown as T;
-  }
-
-  if (typeof obj === 'object') {
-    const newObj = { ...obj } as T;
-    for (const key in newObj) {
-      if (Object.prototype.hasOwnProperty.call(newObj, key)) {
-        newObj[key] = resolveEnvVarsInObject(newObj[key]);
-      }
-    }
-    return newObj;
-  }
-
-  return obj;
-}
-
 function findEnvFile(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
   while (true) {
@@ -553,34 +515,16 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   }
 }
 
-export function loadEnvironment(settings?: Settings): void {
+export function loadEnvironment(settings: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
+
+  if (!isWorkspaceTrusted(settings)) {
+    return;
+  }
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
     setUpCloudShellEnvironment(envFilePath);
-  }
-
-  // If no settings provided, try to load workspace settings for exclusions
-  let resolvedSettings = settings;
-  if (!resolvedSettings) {
-    const workspaceSettingsPath = new Storage(
-      process.cwd(),
-    ).getWorkspaceSettingsPath();
-    try {
-      if (fs.existsSync(workspaceSettingsPath)) {
-        const workspaceContent = fs.readFileSync(
-          workspaceSettingsPath,
-          'utf-8',
-        );
-        const parsedWorkspaceSettings = JSON.parse(
-          stripJsonComments(workspaceContent),
-        ) as Settings;
-        resolvedSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
-      }
-    } catch (_e) {
-      // Ignore errors loading workspace settings
-    }
   }
 
   if (envFilePath) {
@@ -591,8 +535,7 @@ export function loadEnvironment(settings?: Settings): void {
       const parsedEnv = dotenv.parse(envFileContent);
 
       const excludedVars =
-        resolvedSettings?.advanced?.excludedEnvVars ||
-        DEFAULT_EXCLUDED_ENV_VARS;
+        settings?.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
       const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
 
       for (const key in parsedEnv) {
@@ -667,7 +610,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
 
         let settingsObject = rawSettings as Record<string, unknown>;
         if (needsMigration(settingsObject)) {
-          console.error(`Legacy settings file detected at: ${filePath}`);
           const migratedSettings = migrateSettingsToV2(settingsObject);
           if (migratedSettings) {
             if (MIGRATE_V2_OVERWRITE) {
@@ -678,9 +620,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
                   JSON.stringify(migratedSettings, null, 2),
                   'utf-8',
                 );
-                console.log(
-                  `Successfully migrated and saved settings file: ${filePath}`,
-                );
               } catch (e) {
                 console.error(
                   `Error migrating settings file on disk: ${getErrorMessage(
@@ -689,9 +628,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
                 );
               }
             } else {
-              console.log(
-                `Successfully migrated settings for ${filePath} in-memory for the current session.`,
-              );
               migratedInMemorScopes.add(scope);
             }
             settingsObject = migratedSettings;

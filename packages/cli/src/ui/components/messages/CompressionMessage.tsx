@@ -9,7 +9,7 @@ import { Box, Text } from 'ink';
 import type { CompressionProps } from '../../types.js';
 import Spinner from 'ink-spinner';
 import { Colors } from '../../colors.js';
-import { SCREEN_READER_MODEL_PREFIX } from '../../constants.js';
+import { SCREEN_READER_MODEL_PREFIX } from '../../textConstants.js';
 
 export interface CompressionDisplayProps {
   compression: CompressionProps;

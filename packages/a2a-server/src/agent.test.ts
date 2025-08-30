@@ -32,6 +32,7 @@ import {
   assertUniqueFinalEventIsLast,
   assertTaskCreationAndWorkingStatus,
   createStreamMessageRequest,
+  createMockConfig,
 } from './testing_utils.js';
 import { MockTool } from '@google/gemini-cli-core';
 
@@ -68,26 +69,11 @@ vi.mock('./config.js', async () => {
   return {
     ...actual,
     loadConfig: vi.fn().mockImplementation(async () => {
-      config = {
+      const mockConfig = createMockConfig({
         getToolRegistry: getToolRegistrySpy,
         getApprovalMode: getApprovalModeSpy,
-        getIdeMode: vi.fn().mockReturnValue(false),
-        getAllowedTools: vi.fn().mockReturnValue([]),
-        getIdeClient: vi.fn(),
-        getWorkspaceContext: vi.fn().mockReturnValue({
-          isPathWithinWorkspace: () => true,
-        }),
-        getTargetDir: () => '/test',
-        getGeminiClient: vi.fn(),
-        getDebugMode: vi.fn().mockReturnValue(false),
-        getContentGeneratorConfig: vi
-          .fn()
-          .mockReturnValue({ model: 'gemini-pro' }),
-        getModel: vi.fn().mockReturnValue('gemini-pro'),
-        getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
-        setFlashFallbackHandler: vi.fn(),
-        initialize: vi.fn().mockResolvedValue(undefined),
-      } as unknown as Config;
+      });
+      config = mockConfig as Config;
       return config;
     }),
   };
