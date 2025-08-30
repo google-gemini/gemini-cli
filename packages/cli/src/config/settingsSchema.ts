@@ -791,6 +791,64 @@ export const SETTINGS_SCHEMA = {
       },
     },
   },
+  skipNextSpeakerCheck: {
+    type: 'boolean',
+    label: 'Skip Next Speaker Check',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Skip the next speaker check.',
+    showInDialog: true,
+  },
+
+  researchOptIn: {
+    type: 'boolean',
+    label: 'Research Participation',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description:
+      'Opt-in to participate in UX research studies to help improve Gemini CLI',
+    showInDialog: true,
+  },
+  researchContact: {
+    type: 'string',
+    label: 'Research Contact Email',
+    category: 'General',
+    requiresRestart: false,
+    default: '' as string,
+    description: 'Email address for research study invitations (optional)',
+    showInDialog: true,
+  },
+  useRipgrep: {
+    type: 'boolean',
+    label: 'Use Ripgrep',
+    category: 'Tools',
+    requiresRestart: false,
+    default: false,
+    description:
+      'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
+    showInDialog: true,
+  },
+  enablePromptCompletion: {
+    type: 'boolean',
+    label: 'Enable Prompt Completion',
+    category: 'General',
+    requiresRestart: true,
+    default: false,
+    description:
+      'Enable AI-powered prompt completion suggestions while typing.',
+    showInDialog: true,
+  },
+  debugKeystrokeLogging: {
+    type: 'boolean',
+    label: 'Debug Keystroke Logging',
+    category: 'General',
+    requiresRestart: false,
+    default: false,
+    description: 'Enable debug logging of keystrokes to the console.',
+    showInDialog: true,
+  },
 } as const;
 
 type InferSettings<T extends SettingsSchema> = {
