@@ -424,7 +424,6 @@ export class FileOperationEvent implements BaseTelemetryEvent {
   lines?: number;
   mimetype?: string;
   extension?: string;
-  diff_stat?: DiffStat;
   programming_language?: string;
 
   constructor(
@@ -433,7 +432,6 @@ export class FileOperationEvent implements BaseTelemetryEvent {
     lines?: number,
     mimetype?: string,
     extension?: string,
-    diff_stat?: DiffStat,
     programming_language?: string,
   ) {
     this['event.name'] = 'file_operation';
@@ -443,7 +441,6 @@ export class FileOperationEvent implements BaseTelemetryEvent {
     this.lines = lines;
     this.mimetype = mimetype;
     this.extension = extension;
-    this.diff_stat = diff_stat;
     this.programming_language = programming_language;
   }
 }

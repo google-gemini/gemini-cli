@@ -36,7 +36,10 @@ import type {
   ModifyContext,
 } from './modifiable-tool.js';
 import { IDEConnectionStatus } from '../ide/ide-client.js';
-import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
+import { logFileOperation } from '../telemetry/loggers.js';
+import { FileOperationEvent } from '../telemetry/types.js';
+import { FileOperation } from '../telemetry/metrics.js';
+import { getSpecificMimeType, getProgrammingLanguage } from '../utils/mimeDetection.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -305,6 +308,24 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         );
       }
 
+      // Log file operation for telemetry (without diff_stat to avoid double-counting)
+      const mimetype = getSpecificMimeType(file_path);
+      const programmingLanguage = getProgrammingLanguage(file_path);
+      const extension = path.extname(file_path);
+      const operation = isNewFile ? FileOperation.CREATE : FileOperation.UPDATE;
+      
+      logFileOperation(
+        this.config,
+        new FileOperationEvent(
+          'WriteFile',
+          operation,
+          fileContent.split('\n').length,
+          mimetype,
+          extension,
+          programmingLanguage,
+        ),
+      );
+
       const displayResult: FileDiff = {
         fileDiff,
         fileName,
@@ -312,8 +333,6 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         newContent: correctedContentResult.correctedContent,
         diffStat,
       };
-
-      getProgrammingLanguage({ file_path });
 
       return {
         llmContent: llmSuccessMessageParts.join(' '),
