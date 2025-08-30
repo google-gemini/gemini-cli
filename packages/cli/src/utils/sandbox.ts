@@ -424,6 +424,9 @@ export async function start_sandbox(
       args.push('-t');
     }
 
+    // allow access to host.docker.internal
+    args.push('--add-host', 'host.docker.internal:host-gateway');
+
     // mount current directory as working directory in sandbox (set via --workdir)
     args.push('--volume', `${workdir}:${containerWorkdir}`);
 
