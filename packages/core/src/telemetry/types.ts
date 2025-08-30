@@ -9,7 +9,7 @@ import type { Config } from '../config/config.js';
 import type { ApprovalMode } from '../config/config.js';
 import type { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import type { DiffStat, FileDiff } from '../tools/tools.js';
+import type { FileDiff } from '../tools/tools.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   getDecisionFromOutcome,

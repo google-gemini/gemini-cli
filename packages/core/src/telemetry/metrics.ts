@@ -21,7 +21,6 @@ import {
   METRIC_CONTENT_RETRY_FAILURE_COUNT,
 } from './constants.js';
 import type { Config } from '../config/config.js';
-import type { DiffStat } from '../tools/tools.js';
 
 export enum FileOperation {
   CREATE = 'create',
