@@ -346,6 +346,22 @@ describe('loadCliConfig', () => {
     expect(config.getShowMemoryUsage()).toBe(true);
   });
 
+  it('should set useEnvProxy flag from settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = { general: { useEnvProxy: true } };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getUseEnvProxy()).toBe(true);
+  });
+
+  it('should set useEnvProxy flag default false', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getUseEnvProxy()).toBe(false);
+  });
+
   describe('Proxy configuration', () => {
     const originalProxyEnv: { [key: string]: string | undefined } = {};
     const proxyEnvVars = [

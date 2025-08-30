@@ -48,6 +48,7 @@ import { setSimulate429 } from '../utils/testUtils.js';
 import { tokenLimit } from './tokenLimits.js';
 import { ideContext } from '../ide/ideContext.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
@@ -95,6 +96,7 @@ vi.mock('../telemetry/index.js', () => ({
   logApiError: vi.fn(),
 }));
 vi.mock('../ide/ideContext.js');
+vi.mock('undici');
 
 /**
  * Array.fromAsync ponyfill, which will be available in es 2024.
@@ -261,6 +263,7 @@ describe('Gemini Client (client.ts)', () => {
       getFullContext: vi.fn().mockReturnValue(false),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProxy: vi.fn().mockReturnValue(undefined),
+      getUseEnvProxy: vi.fn().mockReturnValue(true),
       getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
       getFileService: vi.fn().mockReturnValue(fileService),
       getMaxSessionTurns: vi.fn().mockReturnValue(0),
@@ -2448,6 +2451,14 @@ ${JSON.stringify(
       client.setHistory(historyWithThoughts, { stripThoughts: false });
 
       expect(mockChat.setHistory).toHaveBeenCalledWith(historyWithThoughts);
+    });
+  });
+
+  describe('useEnvProxy', () => {
+    it('should use EnvProxyAgent when flag is on', () => {
+      expect(setGlobalDispatcher).toHaveBeenCalledExactlyOnceWith(
+        expect.any(EnvHttpProxyAgent),
+      );
     });
   });
 });

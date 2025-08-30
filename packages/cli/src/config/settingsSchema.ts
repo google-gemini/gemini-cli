@@ -135,6 +135,16 @@ export const SETTINGS_SCHEMA = {
         description: 'Enable debug logging of keystrokes to the console.',
         showInDialog: true,
       },
+      useEnvProxy: {
+        type: 'boolean',
+        label: 'Use proxy settings from environment variables',
+        category: 'General',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Use proxy settings from environment variables such as `https_proxy` and `no_proxy`.',
+        showInDialog: true,
+      },
     },
   },
 
