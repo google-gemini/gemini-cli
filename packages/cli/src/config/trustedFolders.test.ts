@@ -255,4 +255,129 @@ describe('isWorkspaceTrusted', () => {
       TrustLevel.TRUST_FOLDER;
     expect(isWorkspaceTrusted(mockSettings)).toBe(true);
   });
+
+  describe('GEMINI_SAFE_TRUST_DEFAULT security tests', () => {
+    let originalEnv: string | undefined;
+
+    beforeEach(() => {
+      originalEnv = process.env['GEMINI_SAFE_TRUST_DEFAULT'];
+      mockCwd = '/home/user/project';
+      // Clear any existing rules
+      Object.keys(mockRules).forEach((key) => delete mockRules[key]);
+    });
+
+    afterEach(() => {
+      if (originalEnv !== undefined) {
+        process.env['GEMINI_SAFE_TRUST_DEFAULT'] = originalEnv;
+      } else {
+        delete process.env['GEMINI_SAFE_TRUST_DEFAULT'];
+      }
+    });
+
+    it('should default to trusted when GEMINI_SAFE_TRUST_DEFAULT is not set', () => {
+      delete process.env['GEMINI_SAFE_TRUST_DEFAULT'];
+      const settingsWithoutTrust: Settings = {
+        security: {
+          folderTrust: {
+            featureEnabled: false,
+            enabled: true,
+          },
+        },
+      };
+
+      expect(isWorkspaceTrusted(settingsWithoutTrust)).toBe(true);
+    });
+
+    it('should default to untrusted when GEMINI_SAFE_TRUST_DEFAULT=1', () => {
+      process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
+      const settingsWithoutTrust: Settings = {
+        security: {
+          folderTrust: {
+            featureEnabled: false,
+            enabled: true,
+          },
+        },
+      };
+
+      expect(isWorkspaceTrusted(settingsWithoutTrust)).toBe(false);
+    });
+
+    it('should respect explicit trust settings when GEMINI_SAFE_TRUST_DEFAULT=1', () => {
+      process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
+      mockRules['/home/user/project'] = TrustLevel.TRUST_FOLDER;
+
+      expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+    });
+
+    it('should override explicit distrust with GEMINI_SAFE_TRUST_DEFAULT=1 when trust is disabled', () => {
+      process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
+      mockRules['/home/user/project'] = TrustLevel.DO_NOT_TRUST;
+
+      const settingsWithoutTrust: Settings = {
+        security: {
+          folderTrust: {
+            featureEnabled: false,
+            enabled: true,
+          },
+        },
+      };
+
+      expect(isWorkspaceTrusted(settingsWithoutTrust)).toBe(false);
+    });
+
+    it('should handle GEMINI_SAFE_TRUST_DEFAULT with different values', () => {
+      // Test with various falsy values
+      const falsyValues = ['0', 'false', 'no', ''];
+
+      for (const value of falsyValues) {
+        process.env['GEMINI_SAFE_TRUST_DEFAULT'] = value;
+        const settingsWithoutTrust: Settings = {
+          security: {
+            folderTrust: {
+              featureEnabled: false,
+              enabled: true,
+            },
+          },
+        };
+
+        expect(isWorkspaceTrusted(settingsWithoutTrust)).toBe(true);
+      }
+
+      // Test with truthy values
+      const truthyValues = ['1', 'true', 'yes', 'any-value'];
+
+      for (const value of truthyValues) {
+        process.env['GEMINI_SAFE_TRUST_DEFAULT'] = value;
+        const settingsWithoutTrust: Settings = {
+          security: {
+            folderTrust: {
+              featureEnabled: false,
+              enabled: true,
+            },
+          },
+        };
+
+        if (value === '1') {
+          expect(isWorkspaceTrusted(settingsWithoutTrust)).toBe(false);
+        } else {
+          expect(isWorkspaceTrusted(settingsWithoutTrust)).toBe(true);
+        }
+      }
+    });
+
+    it('should maintain security when folder trust is explicitly disabled', () => {
+      process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
+
+      const disabledSettings: Settings = {
+        security: {
+          folderTrust: {
+            featureEnabled: false,
+            enabled: false,
+          },
+        },
+      };
+
+      expect(isWorkspaceTrusted(disabledSettings)).toBe(false);
+    });
+  });
 });
