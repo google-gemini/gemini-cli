@@ -520,30 +520,36 @@ export class Task {
       return;
     }
 
-    for (const request of requests) {
-      if (
-        !request.args['newContent'] &&
-        request.name === 'replace' &&
-        request.args &&
-        request.args['file_path'] &&
-        request.args['old_string'] &&
-        request.args['new_string']
-      ) {
-        request.args['newContent'] = await this.getProposedContent(
-          request.args['file_path'] as string,
-          request.args['old_string'] as string,
-          request.args['new_string'] as string,
-        );
-      }
-    }
+    const updatedRequests = await Promise.all(
+      requests.map(async (request) => {
+        if (
+          request.name === 'replace' &&
+          request.args &&
+          !request.args['newContent'] &&
+          request.args['file_path'] &&
+          request.args['old_string'] &&
+          request.args['new_string']
+        ) {
+          const newContent = await this.getProposedContent(
+            request.args['file_path'] as string,
+            request.args['old_string'] as string,
+            request.args['new_string'] as string,
+          );
+          return { ...request, args: { ...request.args, newContent } };
+        }
+        return request;
+      }),
+    );
 
-    logger.info(`[Task] Scheduling batch of ${requests.length} tool calls.`);
+    logger.info(
+      `[Task] Scheduling batch of ${updatedRequests.length} tool calls.`,
+    );
     const stateChange: StateChange = {
       kind: CoderAgentEvent.StateChangeEvent,
     };
     this.setTaskStateAndPublishUpdate('working', stateChange);
 
-    await this.scheduler.schedule(requests, abortSignal);
+    await this.scheduler.schedule(updatedRequests, abortSignal);
   }
 
   async acceptAgentMessage(event: ServerGeminiStreamEvent): Promise<void> {

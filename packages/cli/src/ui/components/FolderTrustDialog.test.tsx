@@ -8,19 +8,23 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import { FolderTrustDialog, FolderTrustChoice } from './FolderTrustDialog.js';
-import * as process from 'node:process';
+
+const mockedExit = vi.hoisted(() => vi.fn());
+const mockedCwd = vi.hoisted(() => vi.fn());
 
 vi.mock('process', async () => {
   const actual = await vi.importActual('process');
   return {
     ...actual,
-    exit: vi.fn(),
+    exit: mockedExit,
+    cwd: mockedCwd,
   };
 });
 
 describe('FolderTrustDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedCwd.mockReturnValue('/home/user/project');
   });
 
   it('should render the dialog with title and description', () => {
@@ -78,7 +82,7 @@ describe('FolderTrustDialog', () => {
     stdin.write('r');
 
     await waitFor(() => {
-      expect(process.exit).toHaveBeenCalledWith(0);
+      expect(mockedExit).toHaveBeenCalledWith(0);
     });
   });
 
@@ -90,7 +94,25 @@ describe('FolderTrustDialog', () => {
     stdin.write('r');
 
     await waitFor(() => {
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(mockedExit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('parentFolder display', () => {
+    it('should correctly display the parent folder name for a nested directory', () => {
+      mockedCwd.mockReturnValue('/home/user/project');
+      const { lastFrame } = renderWithProviders(
+        <FolderTrustDialog onSelect={vi.fn()} />,
+      );
+      expect(lastFrame()).toContain('Trust parent folder (user)');
+    });
+
+    it('should correctly display an empty parent folder name for a directory directly under root', () => {
+      mockedCwd.mockReturnValue('/project');
+      const { lastFrame } = renderWithProviders(
+        <FolderTrustDialog onSelect={vi.fn()} />,
+      );
+      expect(lastFrame()).toContain('Trust parent folder ()');
     });
   });
 });
