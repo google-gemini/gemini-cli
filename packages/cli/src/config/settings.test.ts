@@ -57,6 +57,7 @@ import {
   getSystemDefaultsPath,
   SETTINGS_DIRECTORY_NAME, // This is from the original module, but used by the mock.
   migrateSettingsToV1,
+  needsMigration,
   type Settings,
   loadEnvironment,
 } from './settings.js';
@@ -124,27 +125,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.system.settings).toEqual({});
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual({
-        ui: {
-          customThemes: {},
-        },
-        mcp: {},
-        mcpServers: {},
-        context: {
-          includeDirectories: [],
-        },
-        model: {
-          chatCompression: {},
-        },
-        advanced: {
-          excludedEnvVars: [],
-        },
-        extensions: {
-          disabled: [],
-          workspacesWithMigrationNudge: [],
-        },
-        security: {},
-      });
+      expect(settings.merged).toEqual({});
       expect(settings.errors.length).toBe(0);
     });
 
@@ -179,26 +160,6 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...systemSettingsContent,
-        ui: {
-          ...systemSettingsContent.ui,
-          customThemes: {},
-        },
-        mcp: {},
-        mcpServers: {},
-        context: {
-          includeDirectories: [],
-        },
-        model: {
-          chatCompression: {},
-        },
-        advanced: {
-          excludedEnvVars: [],
-        },
-        extensions: {
-          disabled: [],
-          workspacesWithMigrationNudge: [],
-        },
-        security: {},
       });
     });
 
@@ -234,27 +195,6 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...userSettingsContent,
-        ui: {
-          ...userSettingsContent.ui,
-          customThemes: {},
-        },
-        mcp: {},
-        mcpServers: {},
-        context: {
-          ...userSettingsContent.context,
-          includeDirectories: [],
-        },
-        model: {
-          chatCompression: {},
-        },
-        advanced: {
-          excludedEnvVars: [],
-        },
-        extensions: {
-          disabled: [],
-          workspacesWithMigrationNudge: [],
-        },
-        security: {},
       });
     });
 
@@ -287,29 +227,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
-        tools: {
-          sandbox: true,
-        },
-        context: {
-          fileName: 'WORKSPACE_CONTEXT.md',
-          includeDirectories: [],
-        },
-        ui: {
-          customThemes: {},
-        },
-        mcp: {},
-        mcpServers: {},
-        model: {
-          chatCompression: {},
-        },
-        advanced: {
-          excludedEnvVars: [],
-        },
-        extensions: {
-          disabled: [],
-          workspacesWithMigrationNudge: [],
-        },
-        security: {},
+        ...workspaceSettingsContent,
       });
     });
 
@@ -353,7 +271,6 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged).toEqual({
         ui: {
           theme: 'dark',
-          customThemes: {},
         },
         tools: {
           sandbox: true,
@@ -361,21 +278,7 @@ describe('Settings Loading and Merging', () => {
         },
         context: {
           fileName: 'WORKSPACE_CONTEXT.md',
-          includeDirectories: [],
         },
-        advanced: {
-          excludedEnvVars: [],
-        },
-        extensions: {
-          disabled: [],
-          workspacesWithMigrationNudge: [],
-        },
-        mcp: {},
-        mcpServers: {},
-        model: {
-          chatCompression: {},
-        },
-        security: {},
       });
     });
 
@@ -437,31 +340,18 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged).toEqual({
         ui: {
           theme: 'system-theme',
-          customThemes: {},
         },
         tools: {
           sandbox: false,
+          core: ['tool1'],
         },
         telemetry: { enabled: false },
         context: {
           fileName: 'WORKSPACE_CONTEXT.md',
-          includeDirectories: [],
         },
         mcp: {
           allowed: ['server1', 'server2'],
         },
-        advanced: {
-          excludedEnvVars: [],
-        },
-        extensions: {
-          disabled: [],
-          workspacesWithMigrationNudge: [],
-        },
-        mcpServers: {},
-        model: {
-          chatCompression: {},
-        },
-        security: {},
       });
     });
 
@@ -503,18 +393,15 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged).toEqual({
         ui: {
           theme: 'legacy-dark',
-          customThemes: {},
         },
         general: {
           vimMode: true,
         },
         context: {
           fileName: 'LEGACY_CONTEXT.md',
-          includeDirectories: [],
         },
         model: {
           name: 'gemini-pro',
-          chatCompression: {},
         },
         mcpServers: {
           'legacy-server-1': {
@@ -532,14 +419,6 @@ describe('Settings Loading and Merging', () => {
           allowed: ['legacy-server-1'],
         },
         someUnrecognizedSetting: 'should-be-preserved',
-        advanced: {
-          excludedEnvVars: [],
-        },
-        extensions: {
-          disabled: [],
-          workspacesWithMigrationNudge: [],
-        },
-        security: {},
       });
     });
 
@@ -668,9 +547,6 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
-        advanced: {
-          excludedEnvVars: [],
-        },
         context: {
           fileName: 'WORKSPACE_CONTEXT.md',
           includeDirectories: [
@@ -681,22 +557,11 @@ describe('Settings Loading and Merging', () => {
             '/system/dir',
           ],
         },
-        extensions: {
-          disabled: [],
-          workspacesWithMigrationNudge: [],
-        },
-        mcp: {},
-        mcpServers: {},
-        model: {
-          chatCompression: {},
-        },
-        security: {},
         telemetry: false,
         tools: {
           sandbox: false,
         },
         ui: {
-          customThemes: {},
           theme: 'system-theme',
         },
       });
@@ -974,8 +839,8 @@ describe('Settings Loading and Merging', () => {
       (fs.readFileSync as Mock).mockReturnValue('{}');
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.merged.telemetry).toBeUndefined();
-      expect(settings.merged.ui?.customThemes).toEqual({});
-      expect(settings.merged.mcpServers).toEqual({});
+      expect(settings.merged.ui).toBeUndefined();
+      expect(settings.merged.mcpServers).toBeUndefined();
     });
 
     it('should merge MCP servers correctly, with workspace taking precedence', () => {
@@ -1097,11 +962,11 @@ describe('Settings Loading and Merging', () => {
       });
     });
 
-    it('should have mcpServers as empty object if not in any settings file', () => {
+    it('should have mcpServers as undefined if not in any settings file', () => {
       (mockFsExistsSync as Mock).mockReturnValue(false); // No settings files exist
       (fs.readFileSync as Mock).mockReturnValue('{}');
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.mcpServers).toEqual({});
+      expect(settings.merged.mcpServers).toBeUndefined();
     });
 
     it('should merge MCP servers from system, user, and workspace with system taking precedence', () => {
@@ -1269,11 +1134,11 @@ describe('Settings Loading and Merging', () => {
       });
     });
 
-    it('should have chatCompression as an empty object if not in any settings file', () => {
+    it('should have model as undefined if not in any settings file', () => {
       (mockFsExistsSync as Mock).mockReturnValue(false); // No settings files exist
       (fs.readFileSync as Mock).mockReturnValue('{}');
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.model?.chatCompression).toEqual({});
+      expect(settings.merged.model).toBeUndefined();
     });
 
     it('should ignore chatCompression if contextPercentageThreshold is invalid', () => {
@@ -1403,27 +1268,7 @@ describe('Settings Loading and Merging', () => {
       // Check that settings are empty due to parsing errors
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual({
-        ui: {
-          customThemes: {},
-        },
-        mcp: {},
-        mcpServers: {},
-        context: {
-          includeDirectories: [],
-        },
-        model: {
-          chatCompression: {},
-        },
-        advanced: {
-          excludedEnvVars: [],
-        },
-        extensions: {
-          disabled: [],
-          workspacesWithMigrationNudge: [],
-        },
-        security: {},
-      });
+      expect(settings.merged).toEqual({});
 
       // Check that error objects are populated in settings.errors
       expect(settings.errors).toBeDefined();
@@ -1831,26 +1676,6 @@ describe('Settings Loading and Merging', () => {
         expect(settings.system.settings).toEqual(systemSettingsContent);
         expect(settings.merged).toEqual({
           ...systemSettingsContent,
-          ui: {
-            ...systemSettingsContent.ui,
-            customThemes: {},
-          },
-          mcp: {},
-          mcpServers: {},
-          context: {
-            includeDirectories: [],
-          },
-          model: {
-            chatCompression: {},
-          },
-          advanced: {
-            excludedEnvVars: [],
-          },
-          extensions: {
-            disabled: [],
-            workspacesWithMigrationNudge: [],
-          },
-          security: {},
         });
       });
     });
@@ -2434,6 +2259,73 @@ describe('Settings Loading and Merging', () => {
       loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
 
       expect(process.env['TESTTEST']).not.toEqual('1234');
+    });
+  });
+
+  describe('needsMigration', () => {
+    it('should return false for an empty object', () => {
+      expect(needsMigration({})).toBe(false);
+    });
+
+    it('should return false for settings that are already in V2 format', () => {
+      const v2Settings = {
+        ui: {
+          theme: 'dark',
+        },
+        tools: {
+          sandbox: true,
+        },
+      };
+      expect(needsMigration(v2Settings)).toBe(false);
+    });
+
+    it('should return true for settings with a V1 key that needs to be moved', () => {
+      const v1Settings = {
+        theme: 'dark', // v1 key
+      };
+      expect(needsMigration(v1Settings)).toBe(true);
+    });
+
+    it('should return true for settings with a mix of V1 and V2 keys', () => {
+      const mixedSettings = {
+        theme: 'dark', // v1 key
+        tools: {
+          sandbox: true, // v2 key
+        },
+      };
+      expect(needsMigration(mixedSettings)).toBe(true);
+    });
+
+    it('should return false for settings with only V1 keys that are the same in V2', () => {
+      const v1Settings = {
+        mcpServers: {},
+        telemetry: {},
+        extensions: [],
+      };
+      expect(needsMigration(v1Settings)).toBe(false);
+    });
+
+    it('should return true for settings with a mix of V1 keys that are the same in V2 and V1 keys that need moving', () => {
+      const v1Settings = {
+        mcpServers: {}, // same in v2
+        theme: 'dark', // needs moving
+      };
+      expect(needsMigration(v1Settings)).toBe(true);
+    });
+
+    it('should return false for settings with unrecognized keys', () => {
+      const settings = {
+        someUnrecognizedKey: 'value',
+      };
+      expect(needsMigration(settings)).toBe(false);
+    });
+
+    it('should return false for settings with v2 keys and unrecognized keys', () => {
+      const settings = {
+        ui: { theme: 'dark' },
+        someUnrecognizedKey: 'value',
+      };
+      expect(needsMigration(settings)).toBe(false);
     });
   });
 });

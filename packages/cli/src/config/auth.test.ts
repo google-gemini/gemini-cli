@@ -59,6 +59,9 @@ describe('validateAuthMethod', () => {
     });
 
     it('should return an error message if no required environment variables are set', () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+      vi.stubEnv('GOOGLE_CLOUD_LOCATION', '');
+      vi.stubEnv('GOOGLE_API_KEY', '');
       expect(validateAuthMethod(AuthType.USE_VERTEX_AI)).toBe(
         'When using Vertex AI, you must specify either:\n' +
           '• GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment variables.\n' +
