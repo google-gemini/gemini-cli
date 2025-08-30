@@ -23,10 +23,11 @@ const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 const IDE_WORKSPACE_PATH_ENV_VAR = 'GEMINI_CLI_IDE_WORKSPACE_PATH';
 
-function writePortAndWorkspace(
+async function writePortAndWorkspace(
   context: vscode.ExtensionContext,
   port: number,
   portFile: string,
+  ppidPortFile: string,
   log: (message: string) => void,
 ): Promise<void> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -44,13 +45,20 @@ function writePortAndWorkspace(
     workspacePath,
   );
 
+  const content = JSON.stringify({ port, workspacePath, ppid: process.ppid });
+
   log(`Writing port file to: ${portFile}`);
-  return fs
-    .writeFile(portFile, JSON.stringify({ port, workspacePath }))
-    .catch((err) => {
-      const message = err instanceof Error ? err.message : String(err);
-      log(`Failed to write port to file: ${message}`);
-    });
+  log(`Writing ppid port file to: ${ppidPortFile}`);
+
+  try {
+    await Promise.all([
+      fs.writeFile(portFile, content),
+      fs.writeFile(ppidPortFile, content),
+    ]);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log(`Failed to write port to file: ${message}`);
+  }
 }
 
 function sendIdeContextUpdateNotification(
@@ -80,17 +88,14 @@ export class IDEServer {
   private server: HTTPServer | undefined;
   private context: vscode.ExtensionContext | undefined;
   private log: (message: string) => void;
-  private portFile: string;
+  private portFile: string | undefined;
+  private ppidPortFile: string | undefined;
   private port: number | undefined;
   diffManager: DiffManager;
 
   constructor(log: (message: string) => void, diffManager: DiffManager) {
     this.log = log;
     this.diffManager = diffManager;
-    this.portFile = path.join(
-      os.tmpdir(),
-      `gemini-ide-server-${process.ppid}.json`,
-    );
   }
 
   start(context: vscode.ExtensionContext): Promise<void> {
@@ -233,11 +238,20 @@ export class IDEServer {
         const address = (this.server as HTTPServer).address();
         if (address && typeof address !== 'string') {
           this.port = address.port;
+          this.portFile = path.join(
+            os.tmpdir(),
+            `gemini-ide-server-${this.port}.json`,
+          );
+          this.ppidPortFile = path.join(
+            os.tmpdir(),
+            `gemini-ide-server-${process.ppid}.json`,
+          );
           this.log(`IDE server listening on port ${this.port}`);
           await writePortAndWorkspace(
             context,
             this.port,
             this.portFile,
+            this.ppidPortFile,
             this.log,
           );
         }
@@ -247,11 +261,18 @@ export class IDEServer {
   }
 
   async updateWorkspacePath(): Promise<void> {
-    if (this.context && this.port) {
+    if (
+      this.context &&
+      this.server &&
+      this.port &&
+      this.portFile &&
+      this.ppidPortFile
+    ) {
       await writePortAndWorkspace(
         this.context,
         this.port,
         this.portFile,
+        this.ppidPortFile,
         this.log,
       );
     }
@@ -275,10 +296,19 @@ export class IDEServer {
     if (this.context) {
       this.context.environmentVariableCollection.clear();
     }
-    try {
-      await fs.unlink(this.portFile);
-    } catch (_err) {
-      // Ignore errors if the file doesn't exist.
+    if (this.portFile) {
+      try {
+        await fs.unlink(this.portFile);
+      } catch (_err) {
+        // Ignore errors if the file doesn't exist.
+      }
+    }
+    if (this.ppidPortFile) {
+      try {
+        await fs.unlink(this.ppidPortFile);
+      } catch (_err) {
+        // Ignore errors if the file doesn't exist.
+      }
     }
   }
 }
