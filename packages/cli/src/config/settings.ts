@@ -690,6 +690,7 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
 
   // Now that the environment is loaded, resolve variables in the settings.
   systemSettings = resolveEnvVarsInObject(systemSettings);
+  systemDefaultSettings = resolveEnvVarsInObject(systemDefaultSettings);
   userSettings = resolveEnvVarsInObject(userSettings);
   workspaceSettings = resolveEnvVarsInObject(workspaceSettings);
 
