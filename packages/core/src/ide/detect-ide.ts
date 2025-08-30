@@ -85,7 +85,7 @@ export function detectIdeFromEnv(): DetectedIde {
   if (process.env['TERM_PRODUCT'] === 'Trae') {
     return DetectedIde.Trae;
   }
-  if (process.env['FIREBASE_DEPLOY_AGENT'] || process.env['MONOSPACE_ENV']) {
+  if (process.env['MONOSPACE_ENV']) {
     return DetectedIde.FirebaseStudio;
   }
   return DetectedIde.VSCode;
