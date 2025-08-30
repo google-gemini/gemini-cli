@@ -12,6 +12,7 @@ import { SettingsContext } from './contexts/SettingsContext.js';
 import { AppWrapper } from './App.js';
 import { loadCliConfig, CliArgs } from '../config/config.js';
 import { Extension } from '../config/extension.js';
+import { initializeLanguageFromSettings } from '../i18n/index.js';
 
 interface MainComponentProps {
   initialConfig: Config;
@@ -40,6 +41,13 @@ export const MainComponent = ({
     const newSettings = loadSettings(workspaceRoot);
     setCurrentSettings(newSettings);
   };
+
+  React.useEffect(() => {
+    // Initialize language from settings on component mount
+    initializeLanguageFromSettings(workspaceRoot).catch((error) => {
+      console.debug('Failed to initialize language from settings:', error);
+    });
+  }, [workspaceRoot]);
 
   React.useEffect(() => {
     const recomputeConfigAndTheme = async () => {
@@ -71,6 +79,9 @@ export const MainComponent = ({
       }
 
       setConfig(newConfig);
+
+      // Reload language from settings when settings change
+      await initializeLanguageFromSettings(workspaceRoot);
     };
 
     recomputeConfigAndTheme();

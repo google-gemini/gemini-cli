@@ -322,7 +322,7 @@
   "settings": {
     "title": "Settings",
     "applyTo": "Apply to:",
-    "instructions": "Use up/down arrows, space to toggle, or type numbers to edit. Tab to switch sections.",
+    "instructions": "↑↓ navigate, ←→ for options, space toggle, numbers edit, Tab switch",
     "restartPrompt": "Restart required for some changes.",
     "selectLanguage": "Select Language"
   }

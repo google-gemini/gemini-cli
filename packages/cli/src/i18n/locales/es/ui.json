@@ -212,5 +212,12 @@
     "authAndToolsSuccess": "Autenticación exitosa y herramientas actualizadas para '{{serverName}}'.",
     "authError": "Error de autenticación para el servidor MCP '{{serverName}}'.",
     "restartingServers": "Reiniciando servidores MCP..."
+  },
+  "settings": {
+    "title": "Configuración",
+    "applyTo": "Aplicar a:",
+    "instructions": "↑↓ navegar, ←→ opciones, espacio alternar, números editar, Tab cambiar",
+    "restartPrompt": "Reinicio requerido para algunos cambios.",
+    "selectLanguage": "Seleccionar idioma"
   }
 }

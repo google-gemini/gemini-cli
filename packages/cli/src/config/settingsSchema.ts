@@ -13,8 +13,13 @@ import {
 } from '@google/gemini-cli-core';
 import { CustomTheme } from '../ui/themes/theme.js';
 
+export interface SettingOption {
+  label: string;
+  value: string;
+}
+
 export interface SettingDefinition {
-  type: 'boolean' | 'string' | 'number' | 'array' | 'object';
+  type: 'boolean' | 'string' | 'number' | 'array' | 'object' | 'enum';
   label: string;
   category: string;
   requiresRestart: boolean;
@@ -25,6 +30,7 @@ export interface SettingDefinition {
   key?: string;
   properties?: SettingsSchema;
   showInDialog?: boolean;
+  options?: readonly SettingOption[]; // Available for 'enum' type
 }
 
 export interface SettingsSchema {
@@ -105,13 +111,19 @@ export const SETTINGS_SCHEMA = {
     showInDialog: true,
   },
   language: {
-    type: 'string',
+    type: 'enum',
     label: 'Language',
     category: 'UI',
     requiresRestart: false,
     default: 'en' as string,
     description: 'Interface language for the CLI',
     showInDialog: true,
+    options: [
+      { label: 'English', value: 'en' },
+      { label: '中文', value: 'zh' },
+      { label: 'Español', value: 'es' },
+      { label: 'Français', value: 'fr' },
+    ],
   },
   usageStatisticsEnabled: {
     type: 'boolean',

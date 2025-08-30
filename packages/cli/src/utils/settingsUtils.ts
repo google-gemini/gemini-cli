@@ -453,8 +453,13 @@ export function getDisplayValue(
 
   // Convert value to display string based on type
   let valueString: string;
-  if (definition?.type === 'string' && key === 'language') {
-    // Special handling for language setting
+  if (definition?.type === 'enum' && definition.options) {
+    // Handle enum type with options
+    const stringValue = typeof value === 'string' ? value : String(value);
+    const option = definition.options.find(opt => opt.value === stringValue);
+    valueString = option ? option.label : stringValue;
+  } else if (definition?.type === 'string' && key === 'language') {
+    // Fallback for legacy language handling
     const langCode = typeof value === 'string' ? value : 'en';
     valueString = LANGUAGE_DISPLAY_NAMES[langCode] || langCode;
   } else {

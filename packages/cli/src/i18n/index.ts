@@ -98,4 +98,22 @@ i18n.use(initReactI18next).init({
 // This addresses bot feedback about error translation initialization
 export { i18n as errorTranslator };
 
+/**
+ * Initialize i18n language from settings on application startup
+ */
+export const initializeLanguageFromSettings = async (workspaceRoot?: string): Promise<void> => {
+  try {
+    const { loadSettings } = await import('../config/settings.js');
+    const settings = loadSettings(workspaceRoot || process.cwd());
+    const settingsLang = settings.merged.language;
+    if (settingsLang && typeof settingsLang === 'string' && languages.includes(settingsLang)) {
+      await i18n.changeLanguage(settingsLang);
+    }
+  } catch (error) {
+    console.debug('Failed to load language from settings:', error);
+  }
+};
+
+export { languages };
+
 export default i18n;

@@ -17,6 +17,7 @@ import {
   getScopeMessageForSetting,
 } from '../../utils/dialogScopeUtils.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import { EnumSelector } from './shared/EnumSelector.js';
 import {
   getDialogSettingKeys,
   getSettingValue,
@@ -125,9 +126,8 @@ export function SettingsDialog({
         value: key,
         type: definition?.type,
         toggle: () => {
-          // Special handling for language setting
-          if (key === 'language') {
-            setShowLanguageSelect(true);
+          // Enum settings are handled by left/right arrow keys, not toggle
+          if (definition?.type === 'enum') {
             return;
           }
           
@@ -235,16 +235,6 @@ export function SettingsDialog({
   const [editCursorPos, setEditCursorPos] = useState<number>(0); // Cursor position within edit buffer
   const [cursorVisible, setCursorVisible] = useState<boolean>(true);
 
-  // Language selection state
-  const [showLanguageSelect, setShowLanguageSelect] = useState<boolean>(false);
-  
-  // Available language options
-  const languageOptions = [
-    { label: 'English', value: 'en' },
-    { label: '中文', value: 'zh' },
-    { label: 'Español', value: 'es' },
-    { label: 'Français', value: 'fr' },
-  ];
 
   useEffect(() => {
     if (!editingKey) {
@@ -352,6 +342,53 @@ export function SettingsDialog({
   const handleScopeSelect = (scope: SettingScope) => {
     handleScopeHighlight(scope);
     setFocusSection('settings');
+  };
+
+  const handleEnumNavigation = async (settingKey: string, direction: 'left' | 'right') => {
+    const definition = getSettingDefinition(settingKey);
+    if (!definition || definition.type !== 'enum' || !definition.options) {
+      return;
+    }
+
+    const currentValue = getNestedValue(pendingSettings, settingKey.split('.'));
+    const currentStringValue = typeof currentValue === 'string' ? currentValue : String(currentValue);
+    const currentIndex = definition.options.findIndex(opt => opt.value === currentStringValue);
+    
+    let newIndex;
+    if (direction === 'left') {
+      newIndex = currentIndex > 0 ? currentIndex - 1 : definition.options.length - 1;
+    } else {
+      newIndex = currentIndex < definition.options.length - 1 ? currentIndex + 1 : 0;
+    }
+    
+    const newValue = definition.options[newIndex].value;
+    
+    // Update pending settings
+    setPendingSettings((prev) => 
+      setPendingSettingValueAny(settingKey, newValue, prev)
+    );
+
+    // Mark as modified
+    setModifiedSettings((prev) => new Set(prev).add(settingKey));
+
+    // Handle language switching immediately (special case)
+    if (settingKey === 'language') {
+      const success = await switchLanguage(newValue);
+      if (success) {
+        // Save language setting immediately since it doesn't require restart
+        const languageSettings = setPendingSettingValueAny('language', newValue, {});
+        try {
+          saveModifiedSettings(
+            new Set(['language']),
+            languageSettings,
+            settings,
+            selectedScope
+          );
+        } catch (error) {
+          console.error('Failed to save language setting:', error);
+        }
+      }
+    }
   };
 
   // Scroll logic for settings
@@ -473,6 +510,11 @@ export function SettingsDialog({
             startEditingNumber(currentItem.value);
           } else {
             currentItem?.toggle();
+          }
+        } else if ((name === 'left' || name === 'right') && !editingKey) {
+          const currentItem = items[activeSettingIndex];
+          if (currentItem?.type === 'enum') {
+            handleEnumNavigation(currentItem.value, name);
           }
         } else if (/^[0-9]$/.test(key.sequence || '') && !editingKey) {
           const currentItem = items[activeSettingIndex];
@@ -603,9 +645,7 @@ export function SettingsDialog({
         if (onRestartRequest) onRestartRequest();
       }
       if (name === 'escape') {
-        if (showLanguageSelect) {
-          setShowLanguageSelect(false);
-        } else if (editingKey) {
+        if (editingKey) {
           commitNumberEdit(editingKey);
         } else {
           onSelect(undefined, selectedScope);
@@ -725,17 +765,28 @@ export function SettingsDialog({
                   </Text>
                 </Box>
                 <Box minWidth={3} />
-                <Text
-                  color={
-                    isActive
-                      ? Colors.AccentGreen
-                      : shouldBeGreyedOut
-                        ? Colors.Gray
-                        : Colors.Foreground
-                  }
-                >
-                  {displayValue}
-                </Text>
+                {item.type === 'enum' ? (
+                  <EnumSelector
+                    options={getSettingDefinition(item.value)?.options || []}
+                    currentValue={typeof getNestedValue(pendingSettings, item.value.split('.')) === 'string' 
+                      ? getNestedValue(pendingSettings, item.value.split('.')) as string
+                      : String(getNestedValue(pendingSettings, item.value.split('.')) || getDefaultValue(item.value))}
+                    isActive={isActive}
+                    onValueChange={() => {}} // Not used - navigation handled by keyboard
+                  />
+                ) : (
+                  <Text
+                    color={
+                      isActive
+                        ? Colors.AccentGreen
+                        : shouldBeGreyedOut
+                          ? Colors.Gray
+                          : Colors.Foreground
+                    }
+                  >
+                    {displayValue}
+                  </Text>
+                )}
               </Box>
               <Box height={1} />
             </React.Fragment>
@@ -759,54 +810,6 @@ export function SettingsDialog({
           />
         </Box>
 
-        {showLanguageSelect && (
-          <Box marginTop={1} flexDirection="column">
-            <Text bold wrap="truncate">
-              {tUI('settings.selectLanguage')}
-            </Text>
-            <RadioButtonSelect
-              items={languageOptions}
-              initialIndex={Math.max(0, languageOptions.findIndex(
-                (opt) => {
-                  const currentLang = getSettingValue('language', pendingSettings, {});
-                  return opt.value === (typeof currentLang === 'string' ? currentLang : 'en');
-                }
-              ))}
-              onSelect={async (selectedLanguage: string) => {
-                // Switch language immediately
-                const success = await switchLanguage(selectedLanguage);
-                if (success) {
-                  // Update the setting
-                  setPendingSettings((prev) =>
-                    setPendingSettingValueAny('language', selectedLanguage, prev)
-                  );
-                  
-                  // Save the setting immediately since language doesn't require restart
-                  const settingsToSave = new Set(['language']);
-                  const languageSettings = setPendingSettingValueAny('language', selectedLanguage, {});
-                  try {
-                    saveModifiedSettings(
-                      settingsToSave,
-                      languageSettings,
-                      settings,
-                      selectedScope
-                    );
-                    // Close language selection
-                    setShowLanguageSelect(false);
-                  } catch (error) {
-                    console.error('Failed to save language setting:', error);
-                  }
-                }
-              }}
-              isFocused={true}
-              showNumbers={true}
-            />
-            <Box height={1} />
-            <Text color={Colors.Gray}>
-              Press Escape to cancel
-            </Text>
-          </Box>
-        )}
 
         <Box height={1} />
         <Text color={Colors.Gray}>

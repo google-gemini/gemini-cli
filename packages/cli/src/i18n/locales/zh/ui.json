@@ -322,7 +322,7 @@
   "settings": {
     "title": "设置",
     "applyTo": "应用到：",
-    "instructions": "使用上下箭头、空格键切换，或输入数字进行编辑。Tab键切换区域。",
+    "instructions": "↑↓导航，←→选项，空格切换，数字编辑，Tab切换",
     "restartPrompt": "某些更改需要重启。",
     "selectLanguage": "选择语言"
   }
