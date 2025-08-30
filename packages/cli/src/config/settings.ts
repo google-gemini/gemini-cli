@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { homedir, platform } from 'node:os';
 import * as dotenv from 'dotenv';
+import process from 'node:process';
 import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
@@ -18,6 +19,7 @@ import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import type { Settings, MemoryImportFormat } from './settingsSchema.js';
+import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { mergeWith } from 'lodash-es';
 
 export type { Settings, MemoryImportFormat };
@@ -64,6 +66,7 @@ const MIGRATION_MAP: Record<string, string> = {
   fileFiltering: 'context.fileFiltering',
   sandbox: 'tools.sandbox',
   shouldUseNodePtyShell: 'tools.usePty',
+  allowedTools: 'tools.allowed',
   coreTools: 'tools.core',
   excludeTools: 'tools.exclude',
   toolDiscoveryCommand: 'tools.discoveryCommand',
@@ -459,48 +462,6 @@ export class LoadedSettings {
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
   }
-}
-
-function resolveEnvVarsInString(value: string): string {
-  const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
-  return value.replace(envVarRegex, (match, varName1, varName2) => {
-    const varName = varName1 || varName2;
-    if (process && process.env && typeof process.env[varName] === 'string') {
-      return process.env[varName]!;
-    }
-    return match;
-  });
-}
-
-function resolveEnvVarsInObject<T>(obj: T): T {
-  if (
-    obj === null ||
-    obj === undefined ||
-    typeof obj === 'boolean' ||
-    typeof obj === 'number'
-  ) {
-    return obj;
-  }
-
-  if (typeof obj === 'string') {
-    return resolveEnvVarsInString(obj) as unknown as T;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map((item) => resolveEnvVarsInObject(item)) as unknown as T;
-  }
-
-  if (typeof obj === 'object') {
-    const newObj = { ...obj } as T;
-    for (const key in newObj) {
-      if (Object.prototype.hasOwnProperty.call(newObj, key)) {
-        newObj[key] = resolveEnvVarsInObject(newObj[key]);
-      }
-    }
-    return newObj;
-  }
-
-  return obj;
 }
 
 function findEnvFile(startDir: string): string | null {
