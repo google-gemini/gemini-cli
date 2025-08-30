@@ -611,6 +611,15 @@ export const SETTINGS_SCHEMA = {
         description: 'A blacklist of MCP servers to exclude.',
         showInDialog: false,
       },
+      hideMcpToolResponse: {
+        type: 'boolean',
+        label: 'Hide MCP Tool Response',
+        category: 'MCP',
+        requiresRestart: false,
+        default: false,
+        description: 'Hide MCP tool response from display.',
+        showInDialog: true,
+      },
     },
   },
   useSmartEdit: {

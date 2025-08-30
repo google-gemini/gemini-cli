@@ -106,6 +106,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                       : 'medium'
                 }
                 renderOutputAsMarkdown={tool.renderOutputAsMarkdown}
+                hideMcpToolResponse={config.getHideMcpToolResponse()}
               />
             </Box>
             {tool.status === ToolCallStatus.Confirming &&

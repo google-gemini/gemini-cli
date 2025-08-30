@@ -64,7 +64,17 @@ describe('<ToolMessage />', () => {
     terminalWidth: 80,
     confirmationDetails: undefined,
     emphasis: 'medium',
+    hideMcpToolResponse: false,
   };
+
+  it('hides tool response when hideMcpToolResponse is true', () => {
+    const { lastFrame } = renderWithContext(
+      <ToolMessage {...baseProps} hideMcpToolResponse={true} />,
+      StreamingState.Idle,
+    );
+    const output = lastFrame();
+    expect(output).not.toContain('MockMarkdown:Test result');
+  });
 
   it('renders basic tool information', () => {
     const { lastFrame } = renderWithContext(
