@@ -31,6 +31,8 @@ import {
   ConversationFinishedEvent,
   ApprovalMode,
   parseAndFormatApiError,
+  getCodeAssistServer,
+  UserTierId,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -488,18 +490,30 @@ export const useGeminiStream = (
     [addItem, pendingHistoryItemRef, setPendingHistoryItem, config, setThought],
   );
 
+  // Respect whatever settings is in settings.json. Otherwise, disable citations
+  // unless the they are a CodeAssist user that is not on free tier.
+  const showCitations = useCallback(() => {
+    const enabled = settings?.merged?.ui?.showCitations;
+    if (enabled !== undefined) {
+      return enabled;
+    }
+    const server = getCodeAssistServer(config);
+    return server && server.userTier !== UserTierId.FREE;
+  }, [settings, config]);
+
   const handleCitationEvent = useCallback(
     (text: string, userMessageTimestamp: number) => {
-      if (!settings?.merged?.ui?.showCitations) {
+      if (!showCitations()) {
         return;
       }
+
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
       }
       addItem({ type: MessageType.INFO, text }, userMessageTimestamp);
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, showCitations],
   );
 
   const handleFinishedEvent = useCallback(
