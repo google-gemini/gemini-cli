@@ -19,6 +19,7 @@ export enum Command {
   // Text deletion
   KILL_LINE_RIGHT = 'killLineRight',
   KILL_LINE_LEFT = 'killLineLeft',
+  KILL_WORD_LEFT = 'killWordLeft',
   CLEAR_INPUT = 'clearInput',
 
   // Screen control
@@ -103,6 +104,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.KILL_LINE_RIGHT]: [{ key: 'k', ctrl: true }],
   // Original: key.ctrl && key.name === 'u'
   [Command.KILL_LINE_LEFT]: [{ key: 'u', ctrl: true }],
+  // Ctrl+Backspace for deleting a word
+  [Command.KILL_WORD_LEFT]: [{ key: 'backspace', ctrl: true }],
   // Original: key.ctrl && key.name === 'c'
   [Command.CLEAR_INPUT]: [{ key: 'c', ctrl: true }],
 
