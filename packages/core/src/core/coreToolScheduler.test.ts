@@ -168,6 +168,7 @@ describe('CoreToolScheduler', () => {
         authType: 'oauth-personal',
       }),
       getToolRegistry: () => mockToolRegistry,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -201,6 +202,7 @@ describe('CoreToolScheduler', () => {
       // Create mocked tool registry
       const mockConfig = {
         getToolRegistry: () => mockToolRegistry,
+        getGeminiClient: () => null, // No client needed for these tests
       } as unknown as Config;
       const mockToolRegistry = {
         getAllToolNames: () => ['list_files', 'read_file', 'write_file'],
@@ -265,6 +267,7 @@ describe('CoreToolScheduler with payload', () => {
         authType: 'oauth-personal',
       }),
       getToolRegistry: () => mockToolRegistry,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -571,6 +574,7 @@ describe('CoreToolScheduler edit cancellation', () => {
         authType: 'oauth-personal',
       }),
       getToolRegistry: () => mockToolRegistry,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -662,6 +666,7 @@ describe('CoreToolScheduler YOLO mode', () => {
         authType: 'oauth-personal',
       }),
       getToolRegistry: () => mockToolRegistry,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -752,6 +757,7 @@ describe('CoreToolScheduler request queueing', () => {
         authType: 'oauth-personal',
       }),
       getToolRegistry: () => mockToolRegistry,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -868,6 +874,7 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -948,6 +955,7 @@ describe('CoreToolScheduler request queueing', () => {
         authType: 'oauth-personal',
       }),
       getToolRegistry: () => mockToolRegistry,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -1007,6 +1015,7 @@ describe('CoreToolScheduler request queueing', () => {
       setApprovalMode: (mode: ApprovalMode) => {
         approvalMode = mode;
       },
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const testTool = new TestApprovalTool(mockConfig);
