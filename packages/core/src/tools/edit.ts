@@ -29,9 +29,6 @@ import type {
   ModifyContext,
 } from './modifiable-tool.js';
 import { IDEConnectionStatus } from '../ide/ide-client.js';
-import { FileOperation } from '../telemetry/metrics.js';
-import { logFileOperation } from '../telemetry/loggers.js';
-import { FileOperationEvent } from '../telemetry/types.js';
 import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
 
@@ -406,25 +403,10 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         );
       }
 
-      const lines = editData.newContent.split('\n').length;
-      const mimetype = getSpecificMimeType(this.params.file_path);
-      const extension = path.extname(this.params.file_path);
-      const programming_language = getProgrammingLanguage({
+      getSpecificMimeType(this.params.file_path);
+      getProgrammingLanguage({
         file_path: this.params.file_path,
       });
-
-      logFileOperation(
-        this.config,
-        new FileOperationEvent(
-          EditTool.Name,
-          editData.isNewFile ? FileOperation.CREATE : FileOperation.UPDATE,
-          lines,
-          mimetype,
-          extension,
-          diffStat,
-          programming_language,
-        ),
-      );
 
       return {
         llmContent: llmSuccessMessageParts.join(' '),
