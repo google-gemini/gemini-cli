@@ -535,10 +535,15 @@ export async function loadCliConfig(
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
-  const screenReader =
-    argv.screenReader !== undefined
-      ? argv.screenReader
-      : (settings.ui?.accessibility?.screenReader ?? false);
+  const screenReader =<<<<<<< ts-fix-critical-errors
+    argv.screenReader ?? settings.ui?.accessibility?.screenReader ?? false;
+  // Enforce safe default: if workspace is not trusted, drop workspace-level
+  // mcpServers and only keep user/system entries already merged above.
+  // Harden only when explicitly requested to avoid breaking existing behavior.
+  if (!trustedFolder && process.env['GEMINI_SAFE_TRUST_DEFAULT'] === '1') {
+    mcpServers = {};
+  }
+
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
