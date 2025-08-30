@@ -18,6 +18,11 @@ vi.mock('./settings.js', () => ({
 describe('validateAuthMethod', () => {
   beforeEach(() => {
     vi.resetModules();
+    vi.unstubAllEnvs();
+    vi.stubEnv('GEMINI_API_KEY', undefined);
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', undefined);
+    vi.stubEnv('GOOGLE_CLOUD_LOCATION', undefined);
+    vi.stubEnv('GOOGLE_API_KEY', undefined);
   });
 
   afterEach(() => {
@@ -39,7 +44,6 @@ describe('validateAuthMethod', () => {
     });
 
     it('should return an error message if GEMINI_API_KEY is not set', () => {
-      vi.stubEnv('GEMINI_API_KEY', '');
       expect(validateAuthMethod(AuthType.USE_GEMINI)).toBe(
         'GEMINI_API_KEY environment variable not found. Add that to your environment and try again (no reload needed if using .env)!',
       );
