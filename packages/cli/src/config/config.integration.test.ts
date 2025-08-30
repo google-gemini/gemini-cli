@@ -79,6 +79,7 @@ describe('Configuration Integration Tests', () => {
         targetDir: tempDir,
         debugMode: false,
         fileFilteringRespectGitIgnore: undefined, // Should default to true
+        version: '0.1.0-test',
       };
 
       const config = new Config(configParams);
@@ -97,6 +98,7 @@ describe('Configuration Integration Tests', () => {
         fileFiltering: {
           respectGitIgnore: false,
         },
+        version: '0.1.0-test',
       };
 
       const config = new Config(configParams);
@@ -113,6 +115,7 @@ describe('Configuration Integration Tests', () => {
         targetDir: tempDir,
         debugMode: false,
         fileFilteringRespectGitIgnore: true,
+        version: '0.1.0-test',
       };
 
       const config = new Config(configParams);
@@ -133,6 +136,7 @@ describe('Configuration Integration Tests', () => {
         fileFiltering: {
           respectGitIgnore: false,
         },
+        version: '0.1.0-test',
       };
 
       const config = new Config(configParams);
@@ -150,6 +154,7 @@ describe('Configuration Integration Tests', () => {
         targetDir: tempDir,
         debugMode: false,
         fileFilteringRespectGitIgnore: undefined,
+        version: '0.1.0-test',
       };
 
       const config = new Config(configParams);
@@ -167,6 +172,7 @@ describe('Configuration Integration Tests', () => {
         targetDir: tempDir,
         debugMode: false,
         // Missing fileFiltering configuration
+        version: '0.1.0-test',
       };
 
       const config = new Config(configParams);
@@ -186,6 +192,7 @@ describe('Configuration Integration Tests', () => {
         targetDir: tempDir,
         debugMode: false,
         fileFilteringRespectGitIgnore: true,
+        version: '0.1.0-test',
       };
 
       const config = new Config(configParams);
@@ -222,6 +229,7 @@ describe('Configuration Integration Tests', () => {
         targetDir: tempDir,
         debugMode: false,
         checkpointing: true,
+        version: '0.1.0-test',
       };
 
       const config = new Config(configParams);
@@ -239,6 +247,7 @@ describe('Configuration Integration Tests', () => {
         sandbox: false,
         targetDir: tempDir,
         debugMode: false,
+        version: '0.1.0-test',
       };
       const config = new Config(configParams);
       expect(config.getExtensionContextFilePaths()).toEqual([]);
@@ -254,6 +263,7 @@ describe('Configuration Integration Tests', () => {
         targetDir: tempDir,
         debugMode: false,
         extensionContextFilePaths: contextFiles,
+        version: '0.1.0-test',
       };
       const config = new Config(configParams);
       expect(config.getExtensionContextFilePaths()).toEqual(contextFiles);

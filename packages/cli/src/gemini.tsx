@@ -229,6 +229,7 @@ export async function main() {
     extensions,
     sessionId,
     argv,
+    await getCliVersion(),
   );
 
   if (argv.sessionSummary) {
