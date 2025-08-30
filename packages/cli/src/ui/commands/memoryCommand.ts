@@ -18,12 +18,12 @@ import {
 
 export const memoryCommand: SlashCommand = {
   name: 'memory',
-  description: 'Commands for interacting with memory.',
+  description: 'Manage memory',
   kind: CommandKind.BUILT_IN,
   subCommands: [
     {
       name: 'show',
-      description: 'Show the current memory contents.',
+      description: 'Show memory',
       kind: CommandKind.BUILT_IN,
       action: async (context) => {
         const memoryContent = context.services.config?.getUserMemory() || '';

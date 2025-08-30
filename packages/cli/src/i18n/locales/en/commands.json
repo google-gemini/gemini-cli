@@ -44,8 +44,8 @@
     "refresh": "Refresh the list of MCP servers and tools"
   },
   "memory": {
-    "description": "manage conversation memory",
-    "show": "Show the current memory contents",
+    "description": "manage memory",
+    "show": "Show memory",
     "add": "Add content to the memory",
     "refresh": "Refresh the memory from the source"
   },
@@ -74,7 +74,7 @@
     "init": "Initialize a new project",
     "lang": "Switch interface language / 切换界面语言",
     "mcp": "Manage MCP servers",
-    "memory": "Manage conversation memory",
+    "memory": "Manage memory",
     "privacy": "Show privacy information",
     "quit": "Exit the application",
     "restore": "Restore from backup",
