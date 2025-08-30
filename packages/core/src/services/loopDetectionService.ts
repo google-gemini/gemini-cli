@@ -324,20 +324,6 @@ export class LoopDetectionService {
       .getHistory()
       .slice(-LLM_LOOP_CHECK_HISTORY_COUNT);
 
-    // Filter out entries with empty parts to prevent API errors
-    const validHistory = recentHistory.filter(entry =>
-      Array.isArray(entry.parts) &&
-      entry.parts.some(part => 
-        (part.text?.trim().length ?? 0) > 0 || 
-        part.functionCall || 
-        part.functionResponse
-      )
-    );
-
-    // If we don't have enough valid history, skip the LLM check
-    if (validHistory.length < 3) {
-      return false;
-    }
 
     const prompt = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
 
@@ -352,7 +338,7 @@ For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distin
 
 Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state.`;
     const contents = [
-      ...validHistory,
+      ...recentHistory,
       { role: 'user', parts: [{ text: prompt }] },
     ];
     const schema: Record<string, unknown> = {
