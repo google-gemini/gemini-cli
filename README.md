@@ -25,7 +25,7 @@ Gemini CLI is an open-source AI agent that brings the power of Gemini directly i
 
 Using npx (no installation required)
 ```bash
-npx https://github.com/google-gemini/gemini-cli
+npx @google/gemini-cli
 ```
 
 #### Install globally with npm
