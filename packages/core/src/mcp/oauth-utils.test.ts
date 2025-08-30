@@ -215,6 +215,7 @@ describe('OAuthUtils', () => {
       const metadata: OAuthAuthorizationServerMetadata = {
         issuer: 'https://auth.example.com',
         authorization_endpoint: 'https://auth.example.com/authorize',
+        registration_endpoint: 'https://auth.example.com/register',
         token_endpoint: 'https://auth.example.com/token',
         scopes_supported: ['read', 'write'],
       };
@@ -223,6 +224,7 @@ describe('OAuthUtils', () => {
 
       expect(config).toEqual({
         authorizationUrl: 'https://auth.example.com/authorize',
+        registrationUrl: 'https://auth.example.com/register',
         tokenUrl: 'https://auth.example.com/token',
         scopes: ['read', 'write'],
       });
