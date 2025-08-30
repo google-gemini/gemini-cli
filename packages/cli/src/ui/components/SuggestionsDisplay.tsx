@@ -6,8 +6,7 @@
 
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { PrepareLabel } from './PrepareLabel.js';
-import { isSlashCommand } from '../utils/commandUtils.js';
+import { PrepareLabel, MAX_WIDTH } from './PrepareLabel.js';
 export interface Suggestion {
   label: string;
   value: string;
@@ -21,11 +20,12 @@ interface SuggestionsDisplayProps {
   width: number;
   scrollOffset: number;
   userInput: string;
+  mode: 'reverse' | 'slash';
   expandedIndex?: number;
 }
 
 export const MAX_SUGGESTIONS_TO_SHOW = 8;
-export const MAX_SUGGESTION_WIDTH = 150; // Maximum width for the suggestion text
+export { MAX_WIDTH };
 
 export function SuggestionsDisplay({
   suggestions,
@@ -34,6 +34,7 @@ export function SuggestionsDisplay({
   width,
   scrollOffset,
   userInput,
+  mode,
   expandedIndex,
 }: SuggestionsDisplayProps) {
   if (isLoading) {
@@ -56,8 +57,9 @@ export function SuggestionsDisplay({
   );
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
-  const isSlashCommandMode = isSlashCommand(userInput);
+  // const isSlashCommandMode = isSlashCommand(userInput);
   let commandNameWidth = 0;
+  const isSlashCommandMode = mode === 'slash';
 
   if (isSlashCommandMode) {
     const maxLabelLength = visibleSuggestions.length
@@ -80,7 +82,7 @@ export function SuggestionsDisplay({
         const isActive = originalIndex === activeIndex;
         const isExpanded = originalIndex === expandedIndex;
         const textColor = isActive ? Colors.AccentPurple : Colors.Gray;
-        const isLong = suggestion.value.length >= MAX_SUGGESTION_WIDTH;
+        const isLong = suggestion.value.length >= MAX_WIDTH;
         const labelElement = (
           <PrepareLabel
             label={suggestion.value}
@@ -113,18 +115,11 @@ export function SuggestionsDisplay({
                 </>
               ) : (
                 <>
-                  {labelElement}
-                  {suggestion.description ? (
-                    <Box flexGrow={1} marginLeft={1}>
-                      <Text color={textColor} wrap="wrap">
-                        {suggestion.description}
-                      </Text>
-                    </Box>
-                  ) : null}
+                  <Box flexGrow={1}>{labelElement}</Box>
                 </>
               )}
               {isActive && isLong && (
-                <Box marginLeft={1}>
+                <Box>
                   <Text color={Colors.Gray}>{isExpanded ? ' ← ' : ' → '}</Text>
                 </Box>
               )}

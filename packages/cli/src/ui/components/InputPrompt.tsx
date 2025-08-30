@@ -7,10 +7,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
-import {
-  SuggestionsDisplay,
-  MAX_SUGGESTION_WIDTH,
-} from './SuggestionsDisplay.js';
+import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import type { TextBuffer } from './shared/text-buffer.js';
@@ -33,6 +30,7 @@ import {
 } from '../utils/clipboardUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../constants.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -396,19 +394,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             return;
           }
           if (keyMatchers[Command.COLLAPSE_SUGGESTION](key)) {
-            if (
-              suggestions[activeSuggestionIndex].value.length >=
-              MAX_SUGGESTION_WIDTH
-            ) {
+            if (suggestions[activeSuggestionIndex].value.length >= MAX_WIDTH) {
               setExpandedSuggestionIndex(-1);
               return;
             }
           }
           if (keyMatchers[Command.EXPAND_SUGGESTION](key)) {
-            if (
-              suggestions[activeSuggestionIndex].value.length >=
-              MAX_SUGGESTION_WIDTH
-            ) {
+            if (suggestions[activeSuggestionIndex].value.length >= MAX_WIDTH) {
               setExpandedSuggestionIndex(activeSuggestionIndex);
               return;
             }
@@ -901,6 +893,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             width={suggestionsWidth}
             scrollOffset={activeCompletion.visibleStartIndex}
             userInput={buffer.text}
+            mode={
+              isSlashCommand(buffer.text) &&
+              !reverseSearchActive &&
+              !commandSearchActive
+                ? 'slash'
+                : 'reverse'
+            }
             expandedIndex={expandedSuggestionIndex}
           />
         </Box>
