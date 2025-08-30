@@ -139,6 +139,12 @@ describe('isCommandAllowed', () => {
       expect(result.reason).toContain('Command substitution');
     });
 
+    it('should block command substitution using `>(...)`', () => {
+      const result = isCommandAllowed('cat >(echo hi)', config);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('Command substitution');
+    });
+
     it('should block command substitution using `<(...)`', () => {
       const result = isCommandAllowed('diff <(ls) <(ls -a)', config);
       expect(result.allowed).toBe(false);
