@@ -155,7 +155,7 @@ jobs:
             - Do not include any explanation or additional text, just the JSON
             - Only use labels that already exist in the repository.
               - Do not add comments or modify the issue content.
-              - Do not remove labels titled help wanted or good first issue.
+              - Do not remove the following labels maintainer, help wanted or good first issue.
               - Triage only the current issue.
               - Identify only one area/ label
               - Identify only one kind/ label (Do not apply kind/duplicate or kind/parent-issue)
