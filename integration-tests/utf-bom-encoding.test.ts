@@ -127,6 +127,6 @@ d('BOM end-to-end integration', () => {
   });
 
   it('Binary sentinel', async () => {
-    await runAndAssert('image.png', fakePng(), null);
+    await runAndAssert('binary.bin', fakePng(), null);
   });
 });
