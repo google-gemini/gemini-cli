@@ -45,6 +45,7 @@ import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.j
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { initializeI18nWithSettings } from './i18n/index.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -134,6 +135,9 @@ export async function main() {
   setupUnhandledRejectionHandler();
   const workspaceRoot = process.cwd();
   const settings = loadSettings(workspaceRoot);
+
+  // Initialize i18n with official settings
+  initializeI18nWithSettings(settings);
 
   await cleanupCheckpoints();
   if (settings.errors.length > 0) {

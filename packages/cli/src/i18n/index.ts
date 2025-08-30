@@ -9,6 +9,7 @@ import { initReactI18next } from 'react-i18next';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import type { LoadedSettings } from '../config/settings.js';
 
 // Get current directory in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -60,14 +61,11 @@ const resources = languages.reduce(
   {} as Record<string, Record<string, Record<string, unknown>>>,
 );
 
-// Default language is 'en', will be overridden by settings
-const getInitialLanguage = (): string => {
-  return 'en';
-};
+// Initialize with default language, will be updated by initializeI18nWithSettings
 
 i18n.use(initReactI18next).init({
   resources,
-  lng: getInitialLanguage(),
+  lng: 'en', // Default to English, will be updated by main() function
   fallbackLng: 'en',
 
   interpolation: {
@@ -95,16 +93,29 @@ i18n.use(initReactI18next).init({
 export { i18n as errorTranslator };
 
 /**
- * Initialize i18n language from settings on application startup
+ * Initialize i18n language using official settings system
+ * This should be called from main() after settings are loaded
+ */
+export const initializeI18nWithSettings = (settings: LoadedSettings): void => {
+  try {
+    const settingsLang = settings.merged.language;
+    if (settingsLang && typeof settingsLang === 'string' && languages.includes(settingsLang)) {
+      i18n.changeLanguage(settingsLang);
+    }
+  } catch (error) {
+    console.debug('[i18n] Failed to initialize language from settings:', error);
+  }
+};
+
+/**
+ * @deprecated Use initializeI18nWithSettings instead
+ * This function is kept for compatibility but should not be used in new code
  */
 export const initializeLanguageFromSettings = async (workspaceRoot?: string): Promise<void> => {
   try {
     const { loadSettings } = await import('../config/settings.js');
     const settings = loadSettings(workspaceRoot || process.cwd());
-    const settingsLang = settings.merged.language;
-    if (settingsLang && typeof settingsLang === 'string' && languages.includes(settingsLang)) {
-      await i18n.changeLanguage(settingsLang);
-    }
+    initializeI18nWithSettings(settings);
   } catch (error) {
     console.debug('Failed to load language from settings:', error);
   }
