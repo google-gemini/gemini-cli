@@ -41,6 +41,11 @@ describe('executeToolCall', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () => 4_000_000,
+      getTruncateToolOutputLines: () => 1000,
     } as unknown as Config;
 
     abortController = new AbortController();
@@ -73,6 +78,7 @@ describe('executeToolCall', () => {
       callId: 'call1',
       error: undefined,
       errorType: undefined,
+      outputFile: undefined,
       resultDisplay: 'Success!',
       responseParts: [
         {
@@ -272,6 +278,7 @@ describe('executeToolCall', () => {
       callId: 'call6',
       error: undefined,
       errorType: undefined,
+      outputFile: undefined,
       resultDisplay: 'Image processed',
       responseParts: [
         {
