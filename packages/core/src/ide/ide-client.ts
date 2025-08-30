@@ -77,6 +77,7 @@ export class IdeClient {
   private ideProcessInfo: { pid: number; command: string } | undefined;
   private diffResponses = new Map<string, (result: DiffUpdateResult) => void>();
   private statusListeners = new Set<(state: IDEConnectionState) => void>();
+  private trustChangeListeners = new Set<(isTrusted: boolean) => void>();
 
   private constructor() {}
 
@@ -101,6 +102,14 @@ export class IdeClient {
 
   removeStatusChangeListener(listener: (state: IDEConnectionState) => void) {
     this.statusListeners.delete(listener);
+  }
+
+  addTrustChangeListener(listener: (isTrusted: boolean) => void) {
+    this.trustChangeListeners.add(listener);
+  }
+
+  removeTrustChangeListener(listener: (isTrusted: boolean) => void) {
+    this.trustChangeListeners.delete(listener);
   }
 
   async connect(): Promise<void> {
@@ -422,6 +431,12 @@ export class IdeClient {
       IdeContextNotificationSchema,
       (notification) => {
         ideContext.setIdeContext(notification.params);
+        const isTrusted = notification.params.workspaceState?.isTrusted;
+        if (isTrusted !== undefined) {
+          for (const listener of this.trustChangeListeners) {
+            listener(isTrusted);
+          }
+        }
       },
     );
     this.client.onerror = (_error) => {

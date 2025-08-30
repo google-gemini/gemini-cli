@@ -82,6 +82,9 @@ export class IDEServer {
   private log: (message: string) => void;
   private portFile: string;
   private port: number | undefined;
+  private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
+    {};
+  private openFilesManager: OpenFilesManager | undefined;
   diffManager: DiffManager;
 
   constructor(log: (message: string) => void, diffManager: DiffManager) {
@@ -97,27 +100,19 @@ export class IDEServer {
     return new Promise((resolve) => {
       this.context = context;
       const sessionsWithInitialNotification = new Set<string>();
-      const transports: { [sessionId: string]: StreamableHTTPServerTransport } =
-        {};
 
       const app = express();
       app.use(express.json());
       const mcpServer = createMcpServer(this.diffManager);
 
-      const openFilesManager = new OpenFilesManager(context);
-      const onDidChangeSubscription = openFilesManager.onDidChange(() => {
-        for (const transport of Object.values(transports)) {
-          sendIdeContextUpdateNotification(
-            transport,
-            this.log.bind(this),
-            openFilesManager,
-          );
-        }
+      this.openFilesManager = new OpenFilesManager(context);
+      const onDidChangeSubscription = this.openFilesManager.onDidChange(() => {
+        this.broadcastIdeContextUpdate();
       });
       context.subscriptions.push(onDidChangeSubscription);
       const onDidChangeDiffSubscription = this.diffManager.onDidChange(
         (notification) => {
-          for (const transport of Object.values(transports)) {
+          for (const transport of Object.values(this.transports)) {
             transport.send(notification);
           }
         },
@@ -130,14 +125,14 @@ export class IDEServer {
           | undefined;
         let transport: StreamableHTTPServerTransport;
 
-        if (sessionId && transports[sessionId]) {
-          transport = transports[sessionId];
+        if (sessionId && this.transports[sessionId]) {
+          transport = this.transports[sessionId];
         } else if (!sessionId && isInitializeRequest(req.body)) {
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (newSessionId) => {
               this.log(`New session initialized: ${newSessionId}`);
-              transports[newSessionId] = transport;
+              this.transports[newSessionId] = transport;
             },
           });
           const keepAlive = setInterval(() => {
@@ -156,7 +151,7 @@ export class IDEServer {
             if (transport.sessionId) {
               this.log(`Session closed: ${transport.sessionId}`);
               sessionsWithInitialNotification.delete(transport.sessionId);
-              delete transports[transport.sessionId];
+              delete this.transports[transport.sessionId];
             }
           };
           mcpServer.connect(transport);
@@ -199,13 +194,13 @@ export class IDEServer {
         const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
           | string
           | undefined;
-        if (!sessionId || !transports[sessionId]) {
+        if (!sessionId || !this.transports[sessionId]) {
           this.log('Invalid or missing session ID');
           res.status(400).send('Invalid or missing session ID');
           return;
         }
 
-        const transport = transports[sessionId];
+        const transport = this.transports[sessionId];
         try {
           await transport.handleRequest(req, res);
         } catch (error) {
@@ -217,11 +212,14 @@ export class IDEServer {
           }
         }
 
-        if (!sessionsWithInitialNotification.has(sessionId)) {
+        if (
+          this.openFilesManager &&
+          !sessionsWithInitialNotification.has(sessionId)
+        ) {
           sendIdeContextUpdateNotification(
             transport,
             this.log.bind(this),
-            openFilesManager,
+            this.openFilesManager,
           );
           sessionsWithInitialNotification.add(sessionId);
         }
@@ -246,7 +244,20 @@ export class IDEServer {
     });
   }
 
-  async updateWorkspacePath(): Promise<void> {
+  broadcastIdeContextUpdate() {
+    if (!this.openFilesManager) {
+      return;
+    }
+    for (const transport of Object.values(this.transports)) {
+      sendIdeContextUpdateNotification(
+        transport,
+        this.log.bind(this),
+        this.openFilesManager,
+      );
+    }
+  }
+
+  async syncEnvVars(): Promise<void> {
     if (this.context && this.port) {
       await writePortAndWorkspace(
         this.context,
@@ -254,6 +265,7 @@ export class IDEServer {
         this.portFile,
         this.log,
       );
+      this.broadcastIdeContextUpdate();
     }
   }
 

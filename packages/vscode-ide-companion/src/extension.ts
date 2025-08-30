@@ -72,7 +72,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
-      ideServer.updateWorkspacePath();
+      ideServer.syncEnvVars();
+    }),
+    vscode.workspace.onDidGrantWorkspaceTrust(() => {
+      ideServer.syncEnvVars();
     }),
     vscode.commands.registerCommand('gemini-cli.runGeminiCLI', async () => {
       const workspaceFolders = vscode.workspace.workspaceFolders;
