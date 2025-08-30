@@ -13,10 +13,10 @@ import {
   KeypressProvider,
   useKeypressContext,
   DRAG_COMPLETION_TIMEOUT_MS,
-  DRAG_START_TIMEOUT_MS,
-  MAC_DRAG_MODE_PREFIX,
-  MAC_FOCUS_EVENT_OUT_OF_EDITOR,
-  DRAG_COMPLETION_REVERSE_DELAY_BUDGET_MS,
+  // CSI_END_O,
+  // SS3_END,
+  SINGLE_QUOTE,
+  DOUBLE_QUOTE,
 } from './KeypressContext.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
@@ -616,8 +616,8 @@ describe('Drag and Drop Handling', () => {
     vi.useRealTimers();
   });
 
-  describe('isDragFocusEvent detection', () => {
-    it('should detect MAC_DRAG_MODE_PREFIX as drag focus event', async () => {
+  describe('drag start by quotes', () => {
+    it('should start collecting when single quote arrives and not broadcast immediately', async () => {
       const keyHandler = vi.fn();
 
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
@@ -626,7 +626,6 @@ describe('Drag and Drop Handling', () => {
         result.current.subscribe(keyHandler);
       });
 
-      // Send MAC_DRAG_MODE_PREFIX
       act(() => {
         stdin.pressKey({
           name: undefined,
@@ -634,15 +633,14 @@ describe('Drag and Drop Handling', () => {
           meta: false,
           shift: false,
           paste: false,
-          sequence: MAC_DRAG_MODE_PREFIX,
+          sequence: SINGLE_QUOTE,
         });
       });
 
-      // Should not broadcast the drag focus event itself
       expect(keyHandler).not.toHaveBeenCalled();
     });
 
-    it('should detect MAC_FOCUS_EVENT_OUT_OF_EDITOR as drag focus event', async () => {
+    it('should start collecting when double quote arrives and not broadcast immediately', async () => {
       const keyHandler = vi.fn();
 
       const { result } = renderHook(() => useKeypressContext(), { wrapper });
@@ -651,7 +649,6 @@ describe('Drag and Drop Handling', () => {
         result.current.subscribe(keyHandler);
       });
 
-      // Send MAC_FOCUS_EVENT_OUT_OF_EDITOR
       act(() => {
         stdin.pressKey({
           name: undefined,
@@ -659,11 +656,10 @@ describe('Drag and Drop Handling', () => {
           meta: false,
           shift: false,
           paste: false,
-          sequence: MAC_FOCUS_EVENT_OUT_OF_EDITOR,
+          sequence: DOUBLE_QUOTE,
         });
       });
 
-      // Should not broadcast the drag focus event itself
       expect(keyHandler).not.toHaveBeenCalled();
     });
   });
@@ -678,7 +674,7 @@ describe('Drag and Drop Handling', () => {
         result.current.subscribe(keyHandler);
       });
 
-      // Start drag mode
+      // Start by single quote
       act(() => {
         stdin.pressKey({
           name: undefined,
@@ -686,7 +682,7 @@ describe('Drag and Drop Handling', () => {
           meta: false,
           shift: false,
           paste: false,
-          sequence: MAC_DRAG_MODE_PREFIX,
+          sequence: SINGLE_QUOTE,
         });
       });
 
@@ -707,16 +703,15 @@ describe('Drag and Drop Handling', () => {
 
       // Fast-forward to completion timeout
       act(() => {
-        vi.advanceTimersByTime(
-          DRAG_COMPLETION_TIMEOUT_MS + DRAG_COMPLETION_REVERSE_DELAY_BUDGET_MS,
-        );
+        vi.advanceTimersByTime(DRAG_COMPLETION_TIMEOUT_MS + 10);
       });
 
-      // Should broadcast the collected path as paste
+      // Should broadcast the collected path as paste (includes starting quote)
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
+          name: '',
           paste: true,
-          sequence: 'a',
+          sequence: `${SINGLE_QUOTE}a`,
         }),
       );
     });
@@ -730,7 +725,7 @@ describe('Drag and Drop Handling', () => {
         result.current.subscribe(keyHandler);
       });
 
-      // Start drag mode
+      // Start by single quote
       act(() => {
         stdin.pressKey({
           name: undefined,
@@ -738,7 +733,7 @@ describe('Drag and Drop Handling', () => {
           meta: false,
           shift: false,
           paste: false,
-          sequence: MAC_DRAG_MODE_PREFIX,
+          sequence: SINGLE_QUOTE,
         });
       });
 
@@ -792,65 +787,15 @@ describe('Drag and Drop Handling', () => {
 
       // Fast-forward to completion timeout
       act(() => {
-        vi.advanceTimersByTime(
-          DRAG_COMPLETION_TIMEOUT_MS + DRAG_COMPLETION_REVERSE_DELAY_BUDGET_MS,
-        );
+        vi.advanceTimersByTime(DRAG_COMPLETION_TIMEOUT_MS + 10);
       });
 
-      // Should broadcast the collected path as paste
+      // Should broadcast the collected path as paste (includes starting quote)
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
+          name: '',
           paste: true,
-          sequence: 'path',
-        }),
-      );
-    });
-
-    it('should timeout and reset if no characters received after drag start', async () => {
-      const keyHandler = vi.fn();
-
-      const { result } = renderHook(() => useKeypressContext(), { wrapper });
-
-      act(() => {
-        result.current.subscribe(keyHandler);
-      });
-
-      // Start drag mode
-      act(() => {
-        stdin.pressKey({
-          name: undefined,
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: false,
-          sequence: MAC_DRAG_MODE_PREFIX,
-        });
-      });
-
-      // No characters sent, just timeout
-      act(() => {
-        vi.advanceTimersByTime(DRAG_START_TIMEOUT_MS);
-      });
-
-      // Should not broadcast anything
-      expect(keyHandler).not.toHaveBeenCalled();
-
-      // Subsequent normal keys should work normally
-      act(() => {
-        stdin.pressKey({
-          name: 'a',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: false,
-          sequence: 'a',
-        });
-      });
-
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'a',
-          sequence: 'a',
+          sequence: `${SINGLE_QUOTE}path`,
         }),
       );
     });

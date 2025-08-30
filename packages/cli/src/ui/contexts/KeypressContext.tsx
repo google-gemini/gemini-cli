@@ -36,12 +36,9 @@ import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 const ESC = '\u001B';
 export const PASTE_MODE_PREFIX = `${ESC}[200~`;
 export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
-export const MAC_DRAG_MODE_PREFIX = `${ESC}[I`;
-export const MAC_FOCUS_EVENT_OUT_OF_EDITOR = "'"; // When editor does NOT have focus (macOS Finder.app)
-
-export const DRAG_START_TIMEOUT_MS = 200; // Reset DragState after 200ms to avoid blocking other events like paste
-export const DRAG_COMPLETION_TIMEOUT_MS = 200; // Base debounce to broadcast full path
-export const DRAG_COMPLETION_REVERSE_DELAY_BUDGET_MS = 100; //longer path shorter delay, and be broadcasted last
+export const DRAG_COMPLETION_TIMEOUT_MS = 100; // Broadcast full path after 100ms if no more input
+export const SINGLE_QUOTE = "'";
+export const DOUBLE_QUOTE = '"';
 
 export interface Key {
   name: string;
@@ -87,12 +84,9 @@ export function KeypressProvider({
 }) {
   const { stdin, setRawMode } = useStdin();
   const subscribers = useRef<Set<KeypressHandler>>(new Set()).current;
-
+  const isDraggingRef = useRef(false);
   const dragBufferRef = useRef('');
-  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const dragCompletionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isDragCollectingRef = useRef(false);
-  const dragBroadcastedRef = useRef(false);
+  const draggingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const subscribe = useCallback(
     (handler: KeypressHandler) => {
@@ -109,25 +103,12 @@ export function KeypressProvider({
   );
 
   useEffect(() => {
-    const clearDragStartTimeout = () => {
-      if (dragTimeoutRef.current) {
-        clearTimeout(dragTimeoutRef.current);
-        dragTimeoutRef.current = null;
+    const clearDraggingTimer = () => {
+      if (draggingTimerRef.current) {
+        clearTimeout(draggingTimerRef.current);
+        draggingTimerRef.current = null;
       }
     };
-
-    const clearDragCompletionTimeout = () => {
-      if (dragCompletionTimeoutRef.current) {
-        clearTimeout(dragCompletionTimeoutRef.current);
-        dragCompletionTimeoutRef.current = null;
-      }
-    };
-
-    clearDragStartTimeout();
-    clearDragCompletionTimeout();
-    isDragCollectingRef.current = false;
-    dragBufferRef.current = '';
-    dragBroadcastedRef.current = false;
 
     setRawMode(true);
 
@@ -226,71 +207,23 @@ export function KeypressProvider({
         return;
       }
 
-      const resetDragState = () => {
-        clearDragStartTimeout();
-        clearDragCompletionTimeout();
-        isDragCollectingRef.current = false;
-        dragBufferRef.current = '';
-        dragBroadcastedRef.current = false;
-      };
-
-      const isDragStartEvent = (sequence: string) =>
-        sequence === MAC_DRAG_MODE_PREFIX ||
-        sequence === MAC_FOCUS_EVENT_OUT_OF_EDITOR;
-
       if (
-        !isDragCollectingRef.current &&
-        isDragStartEvent(key.sequence) &&
-        !key.paste
+        key.sequence === SINGLE_QUOTE ||
+        key.sequence === DOUBLE_QUOTE ||
+        isDraggingRef.current
       ) {
-        isDragCollectingRef.current = true;
-        dragBufferRef.current = '';
-        dragBroadcastedRef.current = false;
-
-        clearDragStartTimeout();
-        dragTimeoutRef.current = setTimeout(() => {
-          resetDragState();
-        }, DRAG_START_TIMEOUT_MS);
-
-        return;
-      }
-
-      if (
-        isDragCollectingRef.current &&
-        key.sequence &&
-        key.sequence.length === 1 &&
-        !key.paste
-      ) {
-        clearDragStartTimeout();
-        clearDragCompletionTimeout();
-
+        isDraggingRef.current = true;
         dragBufferRef.current += key.sequence;
 
-        const pathSnapshot = dragBufferRef.current;
-        const currentBufferLength = pathSnapshot.length;
-        const delayMs =
-          DRAG_COMPLETION_TIMEOUT_MS +
-          Math.max(
-            0,
-            DRAG_COMPLETION_REVERSE_DELAY_BUDGET_MS - currentBufferLength,
-          ); // longest path (full path) wins and be broadcasted
-
-        dragCompletionTimeoutRef.current = setTimeout(() => {
-          if (pathSnapshot && !dragBroadcastedRef.current) {
-            dragBroadcastedRef.current = true;
-            broadcast({
-              name: '',
-              ctrl: false,
-              meta: false,
-              shift: false,
-              paste: true,
-              sequence: pathSnapshot,
-            });
+        clearDraggingTimer();
+        draggingTimerRef.current = setTimeout(() => {
+          isDraggingRef.current = false;
+          const seq = dragBufferRef.current;
+          dragBufferRef.current = '';
+          if (seq) {
+            broadcast({ ...key, name: '', paste: true, sequence: seq });
           }
-          if (isDragCollectingRef.current) {
-            resetDragState();
-          }
-        }, delayMs);
+        }, DRAG_COMPLETION_TIMEOUT_MS);
 
         return;
       }
@@ -528,6 +461,23 @@ export function KeypressProvider({
           sequence: pasteBuffer.toString(),
         });
         pasteBuffer = Buffer.alloc(0);
+      }
+
+      if (draggingTimerRef.current) {
+        clearTimeout(draggingTimerRef.current);
+        draggingTimerRef.current = null;
+      }
+      if (isDraggingRef.current && dragBufferRef.current) {
+        broadcast({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: true,
+          sequence: dragBufferRef.current,
+        });
+        isDraggingRef.current = false;
+        dragBufferRef.current = '';
       }
     };
   }, [
