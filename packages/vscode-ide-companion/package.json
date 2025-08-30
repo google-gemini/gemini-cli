@@ -123,9 +123,11 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
+    "@google/gemini-cli-core": "file:../core",
     "@modelcontextprotocol/sdk": "^1.15.1",
     "cors": "^2.8.5",
     "express": "^5.1.0",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "zod-from-json-schema": "^0.4.2"
   }
 }
