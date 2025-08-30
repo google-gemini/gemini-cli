@@ -12,7 +12,7 @@ import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 import { logicalPosToOffset } from './shared/text-buffer.js';
-import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
+import { cpSlice, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
@@ -47,6 +47,65 @@ export interface InputPromptProps {
   setShellModeActive: (value: boolean) => void;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
+}
+
+/**
+ * Applies visual styling to transformed text segments within a line of code points.
+ * Identifies streaks of duplicates in transformedToLogicalMaps and colors those transformed characters.
+ *
+ * @param codePoints - The entire display passed in as codepoints
+ * @param visualToLogicalEntry - The visual to logical entry for the current line.
+ *   The visual index maps to a tuple: [absoluteVisualIdx] -> [logicalLineIndex, startColumn]
+ * @param transformedToLogicalMaps - Each logical line has a Transformation map representing the Transformations in that line
+ *   A Transformation is denoted by a streak of duplicates in the map
+ *   When a Transformation is active, the map is the length of the Transformed text (shorter than the logical representation if the image path is long)
+ *   All indexes in the final line that are Transformed will map to the first index in the logical line where the Transformation begins
+ *   Example:
+ *     Logical Line: Hello @/very/long/path/to/image.png world [length 41, indices 0 to 40]
+ *     Transformed Line: Hello [Image image.png] world [length 29, indices 0 to 28]
+ *     When the cursor is outside (the Transformation is active):
+ *       transformedToLogicalMaps[i] -> [0,1,2,3,4,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,34,35,36,37,38,39,40]
+ *       The streak of duplicates is of the length of the Transformation, the end of the streak maps to the position in the logical line after the end of the raw text that was transformed.
+ *       This helps map the cursor back to the right place when the user enters and exits Transformations, here it helps us identify Transformations
+ * @param transformStyle - Function to return colored char for chars that are part of a transformation
+ * @returns The styled codepoints
+ */
+
+function applyTransformationColoring(
+  codePoints: string[],
+  visualToLogicalEntry: [number, number] | undefined,
+  transformedToLogicalMaps: number[][],
+  transformStyle: (char: string) => string,
+): string[] {
+  const outputChars: string[] = [];
+
+  for (let i = 0; i < codePoints.length; i++) {
+    const char = codePoints[i];
+    const [logicalLineIndex, startColInTransformedLine] =
+      visualToLogicalEntry ?? [];
+    let isTransform = false;
+
+    if (logicalLineIndex !== undefined) {
+      const transformedToLogMap = transformedToLogicalMaps[logicalLineIndex];
+      if (transformedToLogMap) {
+        const transformedMapIdx = (startColInTransformedLine ?? 0) + i;
+        const currentLogPos = transformedToLogMap[transformedMapIdx];
+        const nextLogPos = transformedToLogMap[transformedMapIdx + 1];
+        const prevLogPos = transformedToLogMap[transformedMapIdx - 1];
+
+        if (
+          (currentLogPos !== undefined && currentLogPos === nextLogPos) ||
+          (currentLogPos !== undefined && currentLogPos === prevLogPos)
+        ) {
+          isTransform = true;
+        }
+      }
+    }
+
+    outputChars.push(isTransform ? transformStyle(char) : char);
+  }
+
+  return outputChars;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -724,41 +783,57 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 const isOnCursorLine =
                   focus && visualIdxInRenderedSet === cursorVisualRow;
                 const currentLineGhost = isOnCursorLine ? inlineGhost : '';
-
                 const ghostWidth = stringWidth(currentLineGhost);
 
+                // Apply transformation coloring first
+                const codePoints = toCodePoints(display);
+                const outputChars = [];
+                const absoluteVisualIdx =
+                  visualIdxInRenderedSet + scrollVisualRow;
+
+                // Apply transformation coloring
+                if (
+                  buffer.visualToLogicalMap[absoluteVisualIdx] &&
+                  buffer.transformedToLogicalMaps
+                ) {
+                  const transformHighlighted = applyTransformationColoring(
+                    codePoints,
+                    buffer.visualToLogicalMap[absoluteVisualIdx],
+                    buffer.transformedToLogicalMaps,
+                    (char: string) => chalk.hex(theme.text.accent)(char),
+                  );
+                  outputChars.push(...transformHighlighted);
+                } else {
+                  outputChars.push(...codePoints);
+                }
+
+                // Apply cursor highlighting on the array of styled characters
                 if (focus && visualIdxInRenderedSet === cursorVisualRow) {
                   const relativeVisualColForHighlight = cursorVisualColAbsolute;
 
                   if (relativeVisualColForHighlight >= 0) {
-                    if (relativeVisualColForHighlight < cpLen(display)) {
-                      const charToHighlight =
-                        cpSlice(
-                          display,
-                          relativeVisualColForHighlight,
-                          relativeVisualColForHighlight + 1,
-                        ) || ' ';
-                      const highlighted = chalk.inverse(charToHighlight);
-                      display =
-                        cpSlice(display, 0, relativeVisualColForHighlight) +
-                        highlighted +
-                        cpSlice(display, relativeVisualColForHighlight + 1);
+                    if (relativeVisualColForHighlight < outputChars.length) {
+                      outputChars[relativeVisualColForHighlight] =
+                        chalk.inverse(
+                          outputChars[relativeVisualColForHighlight],
+                        );
                     } else if (
-                      relativeVisualColForHighlight === cpLen(display)
+                      relativeVisualColForHighlight === outputChars.length &&
+                      outputChars.length < inputWidth
                     ) {
-                      if (!currentLineGhost) {
-                        display = display + chalk.inverse(' ');
-                      }
+                      // Handle cursor at the end of the line
+                      outputChars.push(chalk.inverse(' '));
                     }
                   }
                 }
 
+                // Join the characters back into a string
+                display = outputChars.join('');
+
                 const showCursorBeforeGhost =
                   focus &&
                   visualIdxInRenderedSet === cursorVisualRow &&
-                  cursorVisualColAbsolute ===
-                    // eslint-disable-next-line no-control-regex
-                    cpLen(display.replace(/\x1b\[[0-9;]*m/g, '')) &&
+                  cursorVisualColAbsolute === outputChars.length &&
                   currentLineGhost;
 
                 const actualDisplayWidth = stringWidth(display);
