@@ -23,12 +23,14 @@ vi.mock('./ToolMessage.js', () => ({
     description,
     status,
     emphasis,
+    hideMcpToolResponse,
   }: {
     callId: string;
     name: string;
     description: string;
     status: ToolCallStatus;
     emphasis: string;
+    hideMcpToolResponse?: boolean;
   }) {
     // Use the same constants as the real component
     const statusSymbolMap: Record<ToolCallStatus, string> = {
@@ -63,7 +65,9 @@ vi.mock('./ToolConfirmationMessage.js', () => ({
 }));
 
 describe('<ToolGroupMessage />', () => {
-  const mockConfig: Config = {} as Config;
+  const mockConfig: Config = {
+    getHideMcpToolResponse: () => false,
+  } as unknown as Config;
 
   const createToolCall = (
     overrides: Partial<IndividualToolCallDisplay> = {},

@@ -30,6 +30,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   terminalWidth: number;
   emphasis?: TextEmphasis;
   renderOutputAsMarkdown?: boolean;
+  hideMcpToolResponse?: boolean;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -41,6 +42,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   terminalWidth,
   emphasis = 'medium',
   renderOutputAsMarkdown = true,
+  hideMcpToolResponse,
 }) => {
   const availableHeight = availableTerminalHeight
     ? Math.max(
@@ -76,7 +78,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         />
         {emphasis === 'high' && <TrailingIndicator />}
       </Box>
-      {resultDisplay && (
+      {resultDisplay && !hideMcpToolResponse && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
           <Box flexDirection="column">
             {typeof resultDisplay === 'string' && renderOutputAsMarkdown && (

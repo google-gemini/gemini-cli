@@ -80,6 +80,7 @@ export interface CliArgs {
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
   sessionSummary: string | undefined;
+  hideMcpToolResponse: boolean | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -232,6 +233,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('session-summary', {
           type: 'string',
           description: 'File to write session summary to.',
+        })
+        .option('hide-mcp-tool-response', {
+          type: 'boolean',
+          description: 'Hide MCP tool response from display.',
+          default: false,
         })
         .deprecateOption(
           'telemetry',
@@ -539,6 +545,10 @@ export async function loadCliConfig(
     argv.screenReader !== undefined
       ? argv.screenReader
       : (settings.ui?.accessibility?.screenReader ?? false);
+  const hideMcpToolResponse =
+    argv.hideMcpToolResponse !== undefined
+      ? argv.hideMcpToolResponse
+      : (settings.mcp?.hideMcpToolResponse ?? false);
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -623,6 +633,7 @@ export async function loadCliConfig(
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     eventEmitter: appEvents,
     useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
+    hideMcpToolResponse,
   });
 }
 
