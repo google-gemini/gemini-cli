@@ -11,11 +11,11 @@ exports[`<ToolStatsDisplay /> > should display stats for a single tool correctly
 │                                                                    │
 │  User Decision Summary                                             │
 │  Total Reviewed Suggestions:                                   1   │
-│   » Accepted:                                                  1   │
-│   » Rejected:                                                  0   │
-│   » Modified:                                                  0   │
+│  » Accepted:                                                   1   │
+│  » Rejected:                                                   0   │
+│  » Modified:                                                   0   │
 │  ────────────────────────────────────────────────────────────────  │
-│   Overall Agreement Rate:                                 100.0%   │
+│  Overall Agreement Rate:                                  100.0%   │
 │                                                                    │
 ╰────────────────────────────────────────────────────────────────────╯"
 `;
@@ -32,11 +32,11 @@ exports[`<ToolStatsDisplay /> > should display stats for multiple tools correctl
 │                                                                    │
 │  User Decision Summary                                             │
 │  Total Reviewed Suggestions:                                   3   │
-│   » Accepted:                                                  1   │
-│   » Rejected:                                                  1   │
-│   » Modified:                                                  1   │
+│  » Accepted:                                                   1   │
+│  » Rejected:                                                   1   │
+│  » Modified:                                                   1   │
 │  ────────────────────────────────────────────────────────────────  │
-│   Overall Agreement Rate:                                  33.3%   │
+│  Overall Agreement Rate:                                   33.3%   │
 │                                                                    │
 ╰────────────────────────────────────────────────────────────────────╯"
 `;
@@ -53,11 +53,11 @@ exports[`<ToolStatsDisplay /> > should handle large values without wrapping or o
 │                                                                    │
 │  User Decision Summary                                             │
 │  Total Reviewed Suggestions:                           222234566   │
-│   » Accepted:                                          123456789   │
-│   » Rejected:                                           98765432   │
-│   » Modified:                                              12345   │
+│  » Accepted:                                           123456789   │
+│  » Rejected:                                            98765432   │
+│  » Modified:                                               12345   │
 │  ────────────────────────────────────────────────────────────────  │
-│   Overall Agreement Rate:                                  55.6%   │
+│  Overall Agreement Rate:                                   55.6%   │
 │                                                                    │
 ╰────────────────────────────────────────────────────────────────────╯"
 `;
@@ -73,11 +73,11 @@ exports[`<ToolStatsDisplay /> > should handle zero decisions gracefully 1`] = `
 │                                                                    │
 │  User Decision Summary                                             │
 │  Total Reviewed Suggestions:                                   0   │
-│   » Accepted:                                                  0   │
-│   » Rejected:                                                  0   │
-│   » Modified:                                                  0   │
+│  » Accepted:                                                   0   │
+│  » Rejected:                                                   0   │
+│  » Modified:                                                   0   │
 │  ────────────────────────────────────────────────────────────────  │
-│   Overall Agreement Rate:                                     --   │
+│  Overall Agreement Rate:                                      --   │
 │                                                                    │
 ╰────────────────────────────────────────────────────────────────────╯"
 `;

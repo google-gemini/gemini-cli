@@ -6,6 +6,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import i18n from 'i18next';
 import {
   CommandContext,
   SlashCommand,
@@ -15,7 +16,9 @@ import {
 
 export const initCommand: SlashCommand = {
   name: 'init',
-  description: 'Analyzes the project and creates a tailored GEMINI.md file.',
+  get description() {
+    return i18n.t('commands.init.description', { ns: 'ui' });
+  },
   kind: CommandKind.BUILT_IN,
   action: async (
     context: CommandContext,
@@ -25,7 +28,7 @@ export const initCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Configuration not available.',
+        content: i18n.t('commands.init.configNotAvailable', { ns: 'ui' }),
       };
     }
     const targetDir = context.services.config.getTargetDir();
@@ -35,8 +38,7 @@ export const initCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content:
-          'A GEMINI.md file already exists in this directory. No changes were made.',
+        content: i18n.t('commands.init.fileExists', { ns: 'ui' }),
       };
     }
 
@@ -46,7 +48,7 @@ export const initCommand: SlashCommand = {
     context.ui.addItem(
       {
         type: 'info',
-        text: 'Empty GEMINI.md created. Now analyzing the project to populate it.',
+        text: i18n.t('commands.init.creatingFile', { ns: 'ui' }),
       },
       Date.now(),
     );

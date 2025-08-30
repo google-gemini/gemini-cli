@@ -49,7 +49,7 @@ describe('terminalSetupCommand', () => {
     expect(result).toEqual({
       type: 'message',
       content:
-        'Terminal configured successfully\n\nPlease restart your terminal for the changes to take effect.',
+        'Terminal configured successfully\\n\\nPlease restart your terminal for the changes to take effect.',
       messageType: 'info',
     });
   });

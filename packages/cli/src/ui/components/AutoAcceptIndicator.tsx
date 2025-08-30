@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { Colors } from '../colors.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
 
@@ -16,6 +17,7 @@ interface AutoAcceptIndicatorProps {
 export const AutoAcceptIndicator: React.FC<AutoAcceptIndicatorProps> = ({
   approvalMode,
 }) => {
+  const { t } = useTranslation('ui');
   let textColor = '';
   let textContent = '';
   let subText = '';
@@ -23,13 +25,13 @@ export const AutoAcceptIndicator: React.FC<AutoAcceptIndicatorProps> = ({
   switch (approvalMode) {
     case ApprovalMode.AUTO_EDIT:
       textColor = Colors.AccentGreen;
-      textContent = 'accepting edits';
-      subText = ' (shift + tab to toggle)';
+      textContent = t('autoAccept.acceptingEdits');
+      subText = t('autoAccept.shiftTabToggle');
       break;
     case ApprovalMode.YOLO:
       textColor = Colors.AccentRed;
-      textContent = 'YOLO mode';
-      subText = ' (ctrl + y to toggle)';
+      textContent = t('autoAccept.yoloMode');
+      subText = t('autoAccept.ctrlYToggle');
       break;
     case ApprovalMode.DEFAULT:
     default:

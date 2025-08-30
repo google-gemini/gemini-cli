@@ -10,6 +10,34 @@ import { StatsDisplay } from './StatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import { SessionMetrics } from '../contexts/SessionContext.js';
 
+// Mock react-i18next
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: any) => {
+      // Mock translations with interpolation support
+      const translations: Record<string, string> = {
+        'sessionSummary.interactionSummary': 'Interaction Summary',
+        'sessionSummary.performance': 'Performance',
+        'sessionSummary.sessionId': 'Session ID:',
+        'sessionSummary.toolCalls': 'Tool Calls:',
+        'sessionSummary.successRate': 'Success Rate:',
+        'sessionSummary.wallTime': 'Wall Time:',
+        'sessionSummary.agentActive': 'Agent Active:',
+        'sessionSummary.apiTime': 'API Time:',
+        'sessionSummary.toolTime': 'Tool Time:',
+        'sessionSummary.modelUsage': 'Model Usage',
+        'sessionSummary.reqs': 'Reqs',
+        'sessionSummary.inputTokens': 'Input Tokens',
+        'sessionSummary.outputTokens': 'Output Tokens',
+        'stats.savingsHighlight': 'Savings Highlight:',
+        'stats.cacheEfficiencyMessage': `${options?.cachedTokens || '{{cachedTokens}}'} (${options?.percentage || '{{percentage}}'}%) of input tokens were served from the cache, reducing costs.`,
+        'stats.tokenBredownTip': '» Tip: For a full token breakdown, run `/stats model`.'
+      };
+      return translations[key] || key;
+    },
+  }),
+}));
+
 // Mock the context to provide controlled data for testing
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
   const actual = await importOriginal<typeof SessionContext>();

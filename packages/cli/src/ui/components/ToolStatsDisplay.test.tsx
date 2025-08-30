@@ -10,6 +10,30 @@ import { ToolStatsDisplay } from './ToolStatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import { SessionMetrics } from '../contexts/SessionContext.js';
 
+// Mock react-i18next
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      // Mock translations
+      const translations: Record<string, string> = {
+        'stats.toolStatsTitle': 'Tool Stats For Nerds',
+        'stats.noToolCalls': 'No tool calls have been made in this session.',
+        'stats.toolName': 'Tool Name',
+        'stats.calls': 'Calls',
+        'stats.successRate': 'Success Rate',
+        'stats.avgDuration': 'Avg Duration',
+        'stats.userDecisionSummary': 'User Decision Summary',
+        'stats.totalReviewedSuggestions': 'Total Reviewed Suggestions:',
+        'stats.accepted': '» Accepted:',
+        'stats.rejected': '» Rejected:',
+        'stats.modified': '» Modified:',
+        'stats.overallAgreementRate': 'Overall Agreement Rate:'
+      };
+      return translations[key] || key;
+    },
+  }),
+}));
+
 // Mock the context to provide controlled data for testing
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
   const actual = await importOriginal<typeof SessionContext>();

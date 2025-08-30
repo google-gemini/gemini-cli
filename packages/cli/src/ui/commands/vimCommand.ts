@@ -5,17 +5,20 @@
  */
 
 import { CommandKind, SlashCommand } from './types.js';
+import i18n from 'i18next';
 
 export const vimCommand: SlashCommand = {
   name: 'vim',
-  description: 'toggle vim mode on/off',
+  get description() {
+    return i18n.t('commands.vim.description', { ns: 'ui' });
+  },
   kind: CommandKind.BUILT_IN,
   action: async (context, _args) => {
     const newVimState = await context.ui.toggleVimEnabled();
 
     const message = newVimState
-      ? 'Entered Vim mode. Run /vim again to exit.'
-      : 'Exited Vim mode.';
+      ? i18n.t('commands.vim.entered', { ns: 'ui' })
+      : i18n.t('commands.vim.exited', { ns: 'ui' });
     return {
       type: 'message',
       messageType: 'info',

@@ -6,13 +6,17 @@
 
 import React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { Colors } from '../colors.js';
 
-export const ShellModeIndicator: React.FC = () => (
-  <Box>
-    <Text color={Colors.AccentYellow}>
-      shell mode enabled
-      <Text color={Colors.Gray}> (esc to disable)</Text>
-    </Text>
-  </Box>
-);
+export const ShellModeIndicator: React.FC = () => {
+  const { t } = useTranslation('ui');
+  return (
+    <Box>
+      <Text color={Colors.AccentYellow}>
+        {t('shellMode.enabled')}
+        <Text color={Colors.Gray}>{t('shellMode.escToDisable')}</Text>
+      </Text>
+    </Box>
+  );
+};

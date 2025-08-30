@@ -233,6 +233,7 @@
     "noChangesDetected": "未检测到更改。"
   },
   "stats": {
+    "toolStatsTitle": "工具统计数据（极客版）",
     "noToolCalls": "本次会话中未进行任何工具调用。",
     "toolName": "工具名称",
     "calls": "调用次数",
@@ -244,7 +245,90 @@
     "rejected": "» 已拒绝:",
     "modified": "» 已修改:",
     "overallAgreementRate": "总体同意率:",
-    "savingsHighlight": "节省亮点:"
+    "savingsHighlight": "节省亮点:",
+    "cacheEfficiencyMessage": "{{cachedTokens}} ({{percentage}}%) 输入令牌通过缓存提供，降低了成本。",
+    "tokenBredownTip": "» 提示：要查看完整令牌分解，请运行 `/stats model`。"
+  },
+  "commands": {
+    "init": {
+      "description": "分析项目并创建定制的 GEMINI.md 文件。",
+      "configNotAvailable": "配置不可用。",
+      "fileExists": "此目录中已存在 GEMINI.md 文件。未进行任何更改。",
+      "creatingFile": "已创建空白 GEMINI.md 文件。现在正在分析项目以填充内容。"
+    },
+    "vim": {
+      "description": "切换 vim 模式开/关",
+      "entered": "已进入 Vim 模式。再次运行 /vim 退出。",
+      "exited": "已退出 Vim 模式。"
+    },
+    "terminalSetup": {
+      "description": "配置终端快捷键以支持多行输入 (VS Code, Cursor, Windsurf)",
+      "restartRequired": "\\n\\n请重启您的终端以使更改生效。",
+      "failed": "配置终端失败: {{error}}"
+    },
+    "editor": {
+      "description": "设置外部编辑器偏好"
+    },
+    "privacy": {
+      "description": "显示隐私声明"
+    },
+    "corgi": {
+      "description": "切换柯基模式。"
+    },
+    "theme": {
+      "description": "更改主题"
+    },
+    "bug": {
+      "description": "报告错误或问题"
+    },
+    "auth": {
+      "description": "使用 Gemini 进行身份验证"
+    },
+    "settings": {
+      "description": "配置 CLI 设置"
+    },
+    "docs": {
+      "description": "打开文档"
+    },
+    "help": {
+      "description": "显示可用命令"
+    },
+    "about": {
+      "description": "显示版本和系统信息"
+    },
+    "tools": {
+      "description": "显示可用工具"
+    },
+    "stats": {
+      "description": "显示会话统计"
+    },
+    "clear": {
+      "description": "清除对话历史"
+    },
+    "quit": {
+      "description": "退出 CLI"
+    }
+  },
+  "autoAccept": {
+    "acceptingEdits": "自动接受编辑",
+    "shiftTabToggle": " (按 shift + tab 切换)",
+    "yoloMode": "YOLO 模式", 
+    "ctrlYToggle": " (按 ctrl + y 切换)"
+  },
+  "shellMode": {
+    "enabled": "shell 模式已启用",
+    "escToDisable": "(按 esc 禁用)"
+  },
+  "loading": {
+    "escToCancel": "(按 esc 取消, "
+  },
+  "suggestions": {
+    "loadingSuggestions": "正在加载建议..."
+  },
+  "console": {
+    "error": " 个错误",
+    "errors": " 个错误",
+    "ctrlOForDetails": "(按 ctrl+o 查看详情)"
   },
   "tools": {
     "modifyInProgress": "正在修改中: ",

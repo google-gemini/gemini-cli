@@ -127,13 +127,15 @@ const ModelUsageTable: React.FC<{
       {cacheEfficiency > 0 && (
         <Box flexDirection="column" marginTop={1}>
           <Text>
-            <Text color={theme.status.success}>Savings Highlight:</Text>{' '}
-            {totalCachedTokens.toLocaleString()} ({cacheEfficiency.toFixed(1)}
-            %) of input tokens were served from the cache, reducing costs.
+            <Text color={theme.status.success}>{t('stats.savingsHighlight')}</Text>{' '}
+            {t('stats.cacheEfficiencyMessage', {
+              cachedTokens: totalCachedTokens.toLocaleString(),
+              percentage: cacheEfficiency.toFixed(1)
+            })}
           </Text>
           <Box height={1} />
           <Text color={theme.text.secondary}>
-            » Tip: For a full token breakdown, run `/stats model`.
+            {t('stats.tokenBredownTip')}
           </Text>
         </Box>
       )}

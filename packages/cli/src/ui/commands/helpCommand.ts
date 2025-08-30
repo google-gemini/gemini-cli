@@ -12,7 +12,9 @@ export const helpCommand: SlashCommand = {
   name: 'help',
   altNames: ['?'],
   kind: CommandKind.BUILT_IN,
-  description: 'for help on gemini-cli',
+  get description() {
+    return i18n.t('commands.help.description', { ns: 'ui' });
+  },
   action: async (context) => {
     const currentLanguage = i18n.language as 'en' | 'zh' | 'fr' | 'es';
     const helpItem: Omit<HistoryItemHelp, 'id'> = {

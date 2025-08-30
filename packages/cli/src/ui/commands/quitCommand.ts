@@ -5,12 +5,15 @@
  */
 
 import { formatDuration } from '../utils/formatters.js';
+import i18n from 'i18next';
 import { CommandKind, type SlashCommand } from './types.js';
 
 export const quitCommand: SlashCommand = {
   name: 'quit',
   altNames: ['exit'],
-  description: 'exit the cli',
+  get description() {
+    return i18n.t('commands.quit.description', { ns: 'ui' });
+  },
   kind: CommandKind.BUILT_IN,
   action: (context) => {
     const now = Date.now();

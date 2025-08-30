@@ -127,6 +127,7 @@
     "noChangesDetected": "No se detectaron cambios."
   },
   "stats": {
+    "toolStatsTitle": "Estadísticas de herramientas para nerds",
     "noToolCalls": "No se realizaron llamadas a herramientas en esta sesión.",
     "toolName": "Nombre de herramienta",
     "calls": "Llamadas",
@@ -138,7 +139,90 @@
     "rejected": "» Rechazadas:",
     "modified": "» Modificadas:",
     "overallAgreementRate": "Tasa de acuerdo general:",
-    "savingsHighlight": "Aspectos destacados de ahorros:"
+    "savingsHighlight": "Aspectos destacados de ahorros:",
+    "cacheEfficiencyMessage": "{{cachedTokens}} ({{percentage}}%) de los tokens de entrada fueron servidos desde la caché, reduciendo costos.",
+    "tokenBredownTip": "» Consejo: Para un desglose completo de tokens, ejecute `/stats model`."
+  },
+  "commands": {
+    "init": {
+      "description": "Analiza el proyecto y crea un archivo GEMINI.md personalizado.",
+      "configNotAvailable": "Configuración no disponible.",
+      "fileExists": "Ya existe un archivo GEMINI.md en este directorio. No se realizaron cambios.",
+      "creatingFile": "GEMINI.md vacío creado. Ahora analizando el proyecto para llenarlo."
+    },
+    "vim": {
+      "description": "activar/desactivar modo vim",
+      "entered": "Entrado en modo Vim. Ejecute /vim de nuevo para salir.",
+      "exited": "Salido del modo Vim."
+    },
+    "terminalSetup": {
+      "description": "Configurar atajos de terminal para entrada multilínea (VS Code, Cursor, Windsurf)",
+      "restartRequired": "\\n\\nPor favor reinicie su terminal para que los cambios surtan efecto.",
+      "failed": "Error al configurar terminal: {{error}}"
+    },
+    "editor": {
+      "description": "establecer preferencia de editor externo"
+    },
+    "privacy": {
+      "description": "mostrar el aviso de privacidad"
+    },
+    "corgi": {
+      "description": "Activa el modo corgi."
+    },
+    "theme": {
+      "description": "cambiar el tema"
+    },
+    "bug": {
+      "description": "reportar un error o problema"
+    },
+    "auth": {
+      "description": "autenticar con Gemini"
+    },
+    "settings": {
+      "description": "configurar ajustes del CLI"
+    },
+    "docs": {
+      "description": "abrir documentación"
+    },
+    "help": {
+      "description": "mostrar comandos disponibles"
+    },
+    "about": {
+      "description": "mostrar información de versión y sistema"
+    },
+    "tools": {
+      "description": "mostrar herramientas disponibles"
+    },
+    "stats": {
+      "description": "mostrar estadísticas de sesión"
+    },
+    "clear": {
+      "description": "limpiar historial de conversación"
+    },
+    "quit": {
+      "description": "salir del CLI"
+    }
+  },
+  "autoAccept": {
+    "acceptingEdits": "aceptando ediciones",
+    "shiftTabToggle": " (shift + tab para cambiar)",
+    "yoloMode": "modo YOLO", 
+    "ctrlYToggle": " (ctrl + y para cambiar)"
+  },
+  "shellMode": {
+    "enabled": "modo shell habilitado",
+    "escToDisable": "(esc para deshabilitar)"
+  },
+  "loading": {
+    "escToCancel": "(esc para cancelar, "
+  },
+  "suggestions": {
+    "loadingSuggestions": "Cargando sugerencias..."
+  },
+  "console": {
+    "error": " error",
+    "errors": " errores",
+    "ctrlOForDetails": "(ctrl+o para detalles)"
   },
   "tools": {
     "modifyInProgress": "Modificación en progreso: ",

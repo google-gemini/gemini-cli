@@ -233,6 +233,7 @@
     "noChangesDetected": "No changes detected."
   },
   "stats": {
+    "toolStatsTitle": "Tool Stats For Nerds",
     "noToolCalls": "No tool calls have been made in this session.",
     "toolName": "Tool Name",
     "calls": "Calls",
@@ -244,7 +245,90 @@
     "rejected": "» Rejected:",
     "modified": "» Modified:",
     "overallAgreementRate": "Overall Agreement Rate:",
-    "savingsHighlight": "Savings Highlight:"
+    "savingsHighlight": "Savings Highlight:",
+    "cacheEfficiencyMessage": "{{cachedTokens}} ({{percentage}}%) of input tokens were served from the cache, reducing costs.",
+    "tokenBredownTip": "» Tip: For a full token breakdown, run `/stats model`."
+  },
+  "commands": {
+    "init": {
+      "description": "Analyzes the project and creates a tailored GEMINI.md file.",
+      "configNotAvailable": "Configuration not available.",
+      "fileExists": "A GEMINI.md file already exists in this directory. No changes were made.",
+      "creatingFile": "Empty GEMINI.md created. Now analyzing the project to populate it."
+    },
+    "vim": {
+      "description": "toggle vim mode on/off",
+      "entered": "Entered Vim mode. Run /vim again to exit.",
+      "exited": "Exited Vim mode."
+    },
+    "terminalSetup": {
+      "description": "Configure terminal keybindings for multiline input (VS Code, Cursor, Windsurf)",
+      "restartRequired": "\\n\\nPlease restart your terminal for the changes to take effect.",
+      "failed": "Failed to configure terminal: {{error}}"
+    },
+    "editor": {
+      "description": "set external editor preference"
+    },
+    "privacy": {
+      "description": "display the privacy notice"
+    },
+    "corgi": {
+      "description": "Toggles corgi mode."
+    },
+    "theme": {
+      "description": "change the theme"
+    },
+    "bug": {
+      "description": "report a bug or issue"
+    },
+    "auth": {
+      "description": "authenticate with Gemini"
+    },
+    "settings": {
+      "description": "configure CLI settings"
+    },
+    "docs": {
+      "description": "open documentation"
+    },
+    "help": {
+      "description": "show available commands"
+    },
+    "about": {
+      "description": "show version and system information"
+    },
+    "tools": {
+      "description": "show available tools"
+    },
+    "stats": {
+      "description": "show session statistics"
+    },
+    "clear": {
+      "description": "clear the conversation history"
+    },
+    "quit": {
+      "description": "exit the CLI"
+    }
+  },
+  "autoAccept": {
+    "acceptingEdits": "accepting edits",
+    "shiftTabToggle": " (shift + tab to toggle)",
+    "yoloMode": "YOLO mode", 
+    "ctrlYToggle": " (ctrl + y to toggle)"
+  },
+  "shellMode": {
+    "enabled": "shell mode enabled",
+    "escToDisable": "(esc to disable)"
+  },
+  "loading": {
+    "escToCancel": "(esc to cancel, "
+  },
+  "suggestions": {
+    "loadingSuggestions": "Loading suggestions..."
+  },
+  "console": {
+    "error": " error",
+    "errors": " errors",
+    "ctrlOForDetails": "(ctrl+o for details)"
   },
   "tools": {
     "modifyInProgress": "Modify in progress: ",
