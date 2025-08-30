@@ -6,9 +6,11 @@
 
 import * as vscode from 'vscode';
 import { IDEServer } from './ide-server.js';
+import semver from 'semver';
 import { DiffContentProvider, DiffManager } from './diff-manager.js';
 import { createLogger } from './utils/logger.js';
 
+const CLI_IDE_COMPANION_IDENTIFIER = 'Google.gemini-cli-vscode-ide-companion';
 const INFO_MESSAGE_SHOWN_KEY = 'geminiCliInfoMessageShown';
 export const DIFF_SCHEME = 'gemini-diff';
 
@@ -17,10 +19,51 @@ let logger: vscode.OutputChannel;
 
 let log: (message: string) => void = () => {};
 
+async function checkForUpdates(
+  context: vscode.ExtensionContext,
+  log: (message: string) => void,
+) {
+  try {
+    const currentVersion = context.extension.packageJSON.version;
+
+    // Fetch package.json from the main branch of the repository.
+    // This is a simple way to get the latest version.
+    const response = await fetch(
+      'https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/vscode-ide-companion/package.json',
+    );
+    if (!response.ok) {
+      log(`Failed to fetch latest version info: ${response.statusText}`);
+      return;
+    }
+
+    const packageJson = await response.json();
+    const latestVersion = packageJson.version;
+
+    if (latestVersion && semver.gt(latestVersion, currentVersion)) {
+      const selection = await vscode.window.showInformationMessage(
+        `A new version (${latestVersion}) of the Gemini CLI Companion extension is available.`,
+        'Update to latest version',
+      );
+      if (selection === 'Update to latest version') {
+        // The install command will update the extension if a newer version is found.
+        await vscode.commands.executeCommand(
+          'workbench.extensions.installExtension',
+          CLI_IDE_COMPANION_IDENTIFIER,
+        );
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log(`Error checking for extension updates: ${message}`);
+  }
+}
+
 export async function activate(context: vscode.ExtensionContext) {
   logger = vscode.window.createOutputChannel('Gemini CLI IDE Companion');
   log = createLogger(context, logger);
   log('Extension activated');
+
+  await checkForUpdates(context, log);
 
   const diffContentProvider = new DiffContentProvider();
   const diffManager = new DiffManager(log, diffContentProvider);
