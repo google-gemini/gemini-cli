@@ -230,6 +230,25 @@ describe('CoreToolScheduler', () => {
         ' Did you mean one of: "list_files", "read_file", "write_file"?',
       );
     });
+
+    it('should return an empty string if no tools are available', () => {
+      const mockToolRegistry = {
+        getAllToolNames: () => [],
+      } as unknown as ToolRegistry;
+      const mockConfig = {
+        getToolRegistry: () => mockToolRegistry,
+      } as unknown as Config;
+
+      const scheduler = new CoreToolScheduler({
+        config: mockConfig,
+        getPreferredEditor: () => 'vscode',
+        onEditorClose: vi.fn(),
+      });
+
+      // @ts-expect-error accessing private method
+      const suggestion = scheduler.getToolSuggestion('unknown_tool');
+      expect(suggestion).toBe('');
+    });
   });
 });
 

@@ -1506,6 +1506,32 @@ describe('Settings Loading and Merging', () => {
       delete process.env['WORKSPACE_ENDPOINT'];
     });
 
+    it('should resolve environment variables in system default settings', () => {
+      process.env['SYSTEM_DEFAULT_ENDPOINT'] = 'default_endpoint_from_env';
+      const systemDefaultSettingsContent: TestSettings = {
+        endpoint: 'https://${SYSTEM_DEFAULT_ENDPOINT}',
+      };
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === getSystemDefaultsPath(),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemDefaultsPath())
+            return JSON.stringify(systemDefaultSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect((settings.systemDefaults.settings as TestSettings)['endpoint']).toBe(
+        'https://default_endpoint_from_env',
+      );
+      expect((settings.merged as TestSettings)['endpoint']).toBe(
+        'https://default_endpoint_from_env',
+      );
+      delete process.env['SYSTEM_DEFAULT_ENDPOINT'];
+    });
+
     it('should correctly resolve and merge env variables from different scopes', () => {
       process.env['SYSTEM_VAR'] = 'system_value';
       process.env['USER_VAR'] = 'user_value';
