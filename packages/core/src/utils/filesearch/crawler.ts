@@ -23,8 +23,58 @@ export interface CrawlOptions {
   cacheTtl: number;
 }
 
-function toPosixPath(p: string) {
-  return p.split(path.sep).join(path.posix.sep);
+// Helper function to configure the fdir API based on options
+function _configureFdirApi(
+  options: CrawlOptions,
+  dirFilter: (path: string) => boolean,
+  posixCwd: string,
+): fdir {
+  const api = new fdir().withDirs().withPathSeparator('/'); // Always use unix style paths
+
+  if (options.crawlDirectory === options.cwd) {
+    api.withRelativePaths();
+  } else {
+    api.withFullPaths();
+  }
+
+  if (options.maxDepth !== undefined) {
+    api.withMaxDepth(options.maxDepth);
+  }
+
+  api.exclude((_, dirPath) => {
+    // dirPath is absolute. We need to make it relative to the ignore directory
+    const pathRelativeToCwd = path.posix.relative(posixCwd, dirPath);
+    return dirFilter(`${pathRelativeToCwd}/`);
+  });
+  return api;
+}
+
+// Helper function to process the raw crawl results into final relative paths
+async function _processCrawlResults(
+  rawResults: string[],
+  options: CrawlOptions,
+  posixCwd: string,
+): Promise<string[]> {
+  // Drop the `.` entry.
+  rawResults = rawResults.slice(1);
+
+  if (options.crawlDirectory === options.cwd) {
+    return rawResults; // Already relative
+  } else {
+    const relativeToCwdResults: string[] = [];
+    for (const [i, p] of rawResults.entries()) {
+      if (i % 1000 === 0) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      let relativePath = path.posix.relative(posixCwd, p);
+      // If the original path was a directory (ended with '/'), ensure the relative path also ends with '/'
+      if (p.endsWith('/') && !relativePath.endsWith('/')) {
+        relativePath += '/';
+      }
+      relativeToCwdResults.push(relativePath);
+    }
+    return relativeToCwdResults;
+  }
 }
 
 export async function crawl(options: CrawlOptions): Promise<string[]> {
@@ -41,36 +91,19 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
     }
   }
 
-  const posixCwd = toPosixPath(options.cwd);
-  const posixCrawlDirectory = toPosixPath(options.crawlDirectory);
+  const posixCwd = options.cwd.split(path.sep).join(path.posix.sep);
+  const dirFilter = options.ignore.getDirectoryFilter();
+  let finalResults: string[];
 
-  let results: string[];
   try {
-    const dirFilter = options.ignore.getDirectoryFilter();
-    const api = new fdir()
-      .withRelativePaths()
-      .withDirs()
-      .withPathSeparator('/') // Always use unix style paths
-      .exclude((_, dirPath) => {
-        const relativePath = path.posix.relative(posixCrawlDirectory, dirPath);
-        return dirFilter(`${relativePath}/`);
-      });
+    const api = _configureFdirApi(options, dirFilter, posixCwd);
+    const rawResults = await api.crawl(options.crawlDirectory).withPromise();
 
-    if (options.maxDepth !== undefined) {
-      api.withMaxDepth(options.maxDepth);
-    }
-
-    results = await api.crawl(options.crawlDirectory).withPromise();
+    finalResults = await _processCrawlResults(rawResults, options, posixCwd);
   } catch (_e) {
     // The directory probably doesn't exist.
     return [];
   }
-
-  const relativeToCrawlDir = path.posix.relative(posixCwd, posixCrawlDirectory);
-
-  const relativeToCwdResults = results.map((p) =>
-    path.posix.join(relativeToCrawlDir, p),
-  );
 
   if (options.cache) {
     const cacheKey = cache.getCacheKey(
@@ -78,8 +111,8 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
       options.ignore.getFingerprint(),
       options.maxDepth,
     );
-    cache.write(cacheKey, relativeToCwdResults, options.cacheTtl * 1000);
+    cache.write(cacheKey, finalResults, options.cacheTtl * 1000);
   }
 
-  return relativeToCwdResults;
+  return finalResults;
 }
