@@ -113,6 +113,9 @@ import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 // Maximum number of queued messages to display in UI to prevent performance issues
 const MAX_DISPLAYED_QUEUED_MESSAGES = 3;
+const LARGE_PASTE_THRESHOLD_CHARS = 1000;
+const LARGE_PASTE_THRESHOLD_LINES = 50;
+
 
 interface AppProps {
   config: Config;
@@ -623,6 +626,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setRawMode,
     isValidPath,
     shellModeActive,
+    largePasteThresholdChars: LARGE_PASTE_THRESHOLD_CHARS,
+    largePasteThresholdLines: LARGE_PASTE_THRESHOLD_LINES,
   });
 
   // Independent input history management (unaffected by /clear)
