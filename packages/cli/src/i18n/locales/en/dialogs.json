@@ -7,7 +7,7 @@
     "termsUrl": "https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md",
     "options": {
       "google": "Login with Google",
-      "cloudShell": "Use Cloud Shell user credentials", 
+      "cloudShell": "Use Cloud Shell user credentials",
       "geminiKey": "Use Gemini API Key",
       "vertexAI": "Vertex AI"
     },
@@ -19,9 +19,10 @@
   },
   "settings": {
     "title": "Settings",
-    "applyTo": "Apply To",
-    "instructions": "(Use Enter to select, Tab to change focus)",
-    "restartPrompt": "To see changes, Gemini CLI must be restarted. Press r to exit and apply changes now."
+    "applyTo": "Apply to:",
+    "instructions": "Use ↑↓ navigate, ←→ for options, space toggle, numbers edit, Tab switch",
+    "restartPrompt": "Press r to exit and apply changes now, restart required for some changes.",
+    "selectLanguage": "Select Language"
   },
   "folderTrust": {
     "title": "Do you trust this folder?",

@@ -19,9 +19,10 @@
   },
   "settings": {
     "title": "设置",
-    "applyTo": "应用到",
-    "instructions": "(使用 Enter 选择，Tab 切换焦点)",
-    "restartPrompt": "要查看更改，必须重启 Gemini CLI。按 r 立即退出并应用更改。"
+    "applyTo": "应用到:",
+    "instructions": "使用 ↑↓ 导航，←→ 选择选项，空格切换，数字编辑，Tab 切换",
+    "restartPrompt": "按 r 立即退出并应用更改，某些更改需要重启。",
+    "selectLanguage": "选择语言"
   },
   "folderTrust": {
     "title": "您信任此文件夹吗？",

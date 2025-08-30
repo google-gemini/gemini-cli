@@ -318,12 +318,5 @@
     "authAndToolsSuccess": "已成功认证并刷新 '{{serverName}}' 的工具。",
     "authError": "MCP 服务器 '{{serverName}}' 认证失败。",
     "restartingServers": "正在重启 MCP 服务器..."
-  },
-  "settings": {
-    "title": "设置",
-    "applyTo": "应用到：",
-    "instructions": "↑↓导航，←→选项，空格切换，数字编辑，Tab切换",
-    "restartPrompt": "某些更改需要重启。",
-    "selectLanguage": "选择语言"
   }
 }

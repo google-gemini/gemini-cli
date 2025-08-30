@@ -52,7 +52,7 @@ export function SettingsDialog({
   onSelect,
   onRestartRequest,
 }: SettingsDialogProps): React.JSX.Element {
-  const { t: tUI } = useTranslation('ui');
+  const { t: tDiaglogs } = useTranslation('dialogs');
   
   // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
@@ -666,7 +666,7 @@ export function SettingsDialog({
     >
       <Box flexDirection="column" flexGrow={1}>
         <Text bold color={Colors.AccentBlue}>
-          {tUI('settings.title')}
+          {tDiaglogs('settings.title')}
         </Text>
         <Box height={1} />
         {showScrollUp && <Text color={Colors.Gray}>▲</Text>}
@@ -798,7 +798,7 @@ export function SettingsDialog({
 
         <Box marginTop={1} flexDirection="column">
           <Text bold={focusSection === 'scope'} wrap="truncate">
-            {focusSection === 'scope' ? '> ' : '  '}{tUI('settings.applyTo')}
+            {focusSection === 'scope' ? '> ' : '  '}{tDiaglogs('settings.applyTo')}
           </Text>
           <RadioButtonSelect
             items={scopeItems}
@@ -813,11 +813,11 @@ export function SettingsDialog({
 
         <Box height={1} />
         <Text color={Colors.Gray}>
-          {tUI('settings.instructions')}
+          {tDiaglogs('settings.instructions')}
         </Text>
         {showRestartPrompt && (
           <Text color={Colors.AccentYellow}>
-            {tUI('settings.restartPrompt')}
+            {tDiaglogs('settings.restartPrompt')}
           </Text>
         )}
       </Box>

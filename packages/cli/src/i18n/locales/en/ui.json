@@ -32,7 +32,7 @@
     "toolTime": "Tool Time:",
     "modelUsage": "Model Usage",
     "reqs": "Reqs",
-    "inputTokens": "Input Tokens", 
+    "inputTokens": "Input Tokens",
     "outputTokens": "Output Tokens"
   },
   "errors": {
@@ -318,12 +318,5 @@
     "authAndToolsSuccess": "Successfully authenticated and refreshed tools for '{{serverName}}'.",
     "authError": "Authentication failed for MCP server '{{serverName}}'.",
     "restartingServers": "Restarting MCP servers..."
-  },
-  "settings": {
-    "title": "Settings",
-    "applyTo": "Apply to:",
-    "instructions": "↑↓ navigate, ←→ for options, space toggle, numbers edit, Tab switch",
-    "restartPrompt": "Restart required for some changes.",
-    "selectLanguage": "Select Language"
   }
 }

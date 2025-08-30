@@ -212,12 +212,5 @@
     "authAndToolsSuccess": "Authentification réussie et outils actualisés pour '{{serverName}}'.",
     "authError": "Échec de l'authentification pour le serveur MCP '{{serverName}}'.",
     "restartingServers": "Redémarrage des serveurs MCP..."
-  },
-  "settings": {
-    "title": "Paramètres",
-    "applyTo": "Appliquer à:",
-    "instructions": "↑↓ naviguer, ←→ options, espace basculer, nombres éditer, Tab changer",
-    "restartPrompt": "Redémarrage requis pour certains changements.",
-    "selectLanguage": "Sélectionner la langue"
   }
 }

@@ -21,23 +21,10 @@
   },
   "settings": {
     "title": "Paramètres",
-    "subtitle": "Configurez vos préférences Gemini CLI",
-    "sections": {
-      "general": "Général",
-      "appearance": "Apparence",
-      "behavior": "Comportement"
-    },
-    "options": {
-      "theme": "Thème",
-      "language": "Langue",
-      "editor": "Éditeur",
-      "autoSave": "Sauvegarde automatique"
-    },
-    "buttons": {
-      "save": "Sauvegarder",
-      "cancel": "Annuler",
-      "reset": "Réinitialiser"
-    }
+    "applyTo": "Appliquer à:",
+    "instructions": "Utiliser ↑↓ naviguer, ←→ pour options, espace basculer, nombres éditer, Tab changer",
+    "restartPrompt": "Appuyez sur r pour quitter et appliquer les changements maintenant, redémarrage requis pour certains changements.",
+    "selectLanguage": "Sélectionner la langue"
   },
   "theme": {
     "title": "Sélectionner un thème",
