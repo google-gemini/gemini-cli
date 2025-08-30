@@ -180,7 +180,6 @@ describe('isWorkspaceTrusted', () => {
   const mockSettings: Settings = {
     security: {
       folderTrust: {
-        featureEnabled: true,
         enabled: true,
       },
     },

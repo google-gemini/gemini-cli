@@ -640,15 +640,6 @@ export const SETTINGS_SCHEMA = {
         description: 'Settings for folder trust.',
         showInDialog: false,
         properties: {
-          featureEnabled: {
-            type: 'boolean',
-            label: 'Folder Trust Feature',
-            category: 'Security',
-            requiresRestart: true,
-            default: false,
-            description: 'Enable folder trust feature for enhanced security.',
-            showInDialog: true,
-          },
           enabled: {
             type: 'boolean',
             label: 'Folder Trust',
