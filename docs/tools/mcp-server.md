@@ -161,6 +161,16 @@ When connecting to an OAuth-enabled server:
 - Open a web browser for authentication
 - Receive redirects on `http://localhost:7777/oauth/callback`
 
+#### OAuth Callback Port Requirement
+
+The Gemini CLI uses a dedicated OAuth callback server that listens on port 7777. This port is hardcoded in the CLI's implementation to ensure consistent OAuth flows across different environments.
+
+**For MCP Server Developers:**
+When configuring OAuth for your MCP server, please ensure your OAuth provider includes this redirect URI:
+```
+http://localhost:7777/oauth/callback
+```
+
 This feature will not work in:
 
 - Headless environments without browser access
@@ -190,7 +200,7 @@ Use the `/mcp auth` command to manage OAuth authentication:
 - **`authorizationUrl`** (string): OAuth authorization endpoint (auto-discovered if omitted)
 - **`tokenUrl`** (string): OAuth token endpoint (auto-discovered if omitted)
 - **`scopes`** (string[]): Required OAuth scopes
-- **`redirectUri`** (string): Custom redirect URI (defaults to `http://localhost:7777/oauth/callback`)
+- **`redirectUri`** (string): OAuth redirect URI. The Gemini CLI uses `http://localhost:7777/oauth/callback` by default and this cannot be customized.
 - **`tokenParamName`** (string): Query parameter name for tokens in SSE URLs
 - **`audiences`** (string[]): Audiences the token is valid for
 
