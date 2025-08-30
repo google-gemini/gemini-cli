@@ -47,6 +47,7 @@ import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
+import { useAutoSave } from './useAutoSave.js';
 import type {
   TrackedToolCall,
   TrackedCompletedToolCall,
@@ -102,6 +103,33 @@ export const useGeminiStream = (
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
+
+  // Auto-save functionality
+  const { triggerAutoSaveIfNeeded } = useAutoSave({
+    config,
+    history,
+    onAutoSave: useCallback(
+      async (tag: string) => {
+        if (!logger) return;
+        try {
+          const chat = await config?.getGeminiClient()?.getChat();
+          if (!chat) {
+            onDebugMessage('No chat client available for auto-save');
+            return;
+          }
+          const chatHistory = chat.getHistory();
+          if (chatHistory.length > 2) {
+            await logger.saveCheckpoint(chatHistory, tag);
+          }
+        } catch (error) {
+          onDebugMessage(
+            `Failed to auto-save conversation: ${getErrorMessage(error)}`,
+          );
+        }
+      },
+      [logger, config, onDebugMessage],
+    ),
+  });
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
       return;
@@ -272,6 +300,9 @@ export const useGeminiStream = (
         onDebugMessage(`User query: '${trimmedQuery}'`);
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 
+        // Trigger auto-save after user message
+        await triggerAutoSaveIfNeeded();
+
         // Handle UI-only commands first
         const slashCommandResult = isSlashCommand(trimmedQuery)
           ? await handleSlashCommand(trimmedQuery)
@@ -366,6 +397,7 @@ export const useGeminiStream = (
       logger,
       shellModeActive,
       scheduleToolCalls,
+      triggerAutoSaveIfNeeded,
     ],
   );
 
