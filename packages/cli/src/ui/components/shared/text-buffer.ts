@@ -1229,47 +1229,38 @@ export function textBufferReducer(
     case 'delete_word_left': {
       const { cursorRow, cursorCol } = state;
       if (cursorCol === 0 && cursorRow === 0) return state;
-      if (cursorCol === 0) {
+
+      const nextState = pushUndoLocal(state);
+      const newLines = [...nextState.lines];
+      let newCursorRow = cursorRow;
+      let newCursorCol = cursorCol;
+
+      if (newCursorCol > 0) {
+        const lineContent = currentLine(newCursorRow);
+        const prevWordStart = findPrevWordStartInLine(
+          lineContent,
+          newCursorCol,
+        );
+        const start = prevWordStart === null ? 0 : prevWordStart;
+        newLines[newCursorRow] =
+          cpSlice(lineContent, 0, start) + cpSlice(lineContent, newCursorCol);
+        newCursorCol = start;
+      } else {
         // Act as a backspace
-        const nextState = pushUndoLocal(state);
         const prevLineContent = currentLine(cursorRow - 1);
         const currentLineContentVal = currentLine(cursorRow);
         const newCol = cpLen(prevLineContent);
-        const newLines = [...nextState.lines];
         newLines[cursorRow - 1] = prevLineContent + currentLineContentVal;
         newLines.splice(cursorRow, 1);
-        return {
-          ...nextState,
-          lines: newLines,
-          cursorRow: cursorRow - 1,
-          cursorCol: newCol,
-          preferredCol: null,
-        };
+        newCursorRow--;
+        newCursorCol = newCol;
       }
-      const nextState = pushUndoLocal(state);
-      const lineContent = currentLine(cursorRow);
-      const arr = toCodePoints(lineContent);
-      let start = cursorCol;
-      let onlySpaces = true;
-      for (let i = 0; i < start; i++) {
-        if (isWordChar(arr[i])) {
-          onlySpaces = false;
-          break;
-        }
-      }
-      if (onlySpaces && start > 0) {
-        start--;
-      } else {
-        while (start > 0 && !isWordChar(arr[start - 1])) start--;
-        while (start > 0 && isWordChar(arr[start - 1])) start--;
-      }
-      const newLines = [...nextState.lines];
-      newLines[cursorRow] =
-        cpSlice(lineContent, 0, start) + cpSlice(lineContent, cursorCol);
+
       return {
         ...nextState,
         lines: newLines,
-        cursorCol: start,
+        cursorRow: newCursorRow,
+        cursorCol: newCursorCol,
         preferredCol: null,
       };
     }
@@ -1902,6 +1893,7 @@ export function useTextBuffer({
     moveToOffset,
     deleteWordLeft,
     deleteWordRight,
+
     killLineRight,
     killLineLeft,
     handleInput,
@@ -2011,6 +2003,7 @@ export interface TextBuffer {
    * follows the caret and the next contiguous run of word characters.
    */
   deleteWordRight: () => void;
+
   /**
    * Deletes text from the cursor to the end of the current line.
    */
