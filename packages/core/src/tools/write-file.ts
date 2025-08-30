@@ -318,7 +318,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       logFileOperation(
         this.config,
         new FileOperationEvent(
-          'WriteFile',
+          WriteFileTool.Name,
           operation,
           fileContent.split('\n').length,
           mimetype,

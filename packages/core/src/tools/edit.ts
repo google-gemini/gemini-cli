@@ -397,7 +397,9 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
 
       // Log file operation for telemetry (without diff_stat to avoid double-counting)
       const mimetype = getSpecificMimeType(this.params.file_path);
-      const programmingLanguage = getLanguageFromFilePath(this.params.file_path);
+      const programmingLanguage = getLanguageFromFilePath(
+        this.params.file_path,
+      );
       const extension = path.extname(this.params.file_path);
       const operation = editData.isNewFile
         ? FileOperation.CREATE
@@ -406,7 +408,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       logFileOperation(
         this.config,
         new FileOperationEvent(
-          'Edit',
+          EditTool.Name,
           operation,
           editData.newContent.split('\n').length,
           mimetype,

@@ -517,7 +517,6 @@ export class ClearcutLogger {
       });
     }
 
-
     const logEvent = this.createLogEvent(EventNames.FILE_OPERATION, data);
     this.enqueueLogEvent(logEvent);
     this.flushIfNeeded();
