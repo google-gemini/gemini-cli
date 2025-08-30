@@ -19,7 +19,6 @@ import { docsCommand } from '../ui/commands/docsCommand.js';
 import { directoryCommand } from '../ui/commands/directoryCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
-import { feedbackCommand } from '../ui/commands/feedbackCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
 import { initCommand } from '../ui/commands/initCommand.js';
@@ -64,7 +63,6 @@ export class BuiltinCommandLoader implements ICommandLoader {
       directoryCommand,
       editorCommand,
       extensionsCommand,
-      feedbackCommand,
       helpCommand,
       ideCommand(this.config),
       initCommand,
