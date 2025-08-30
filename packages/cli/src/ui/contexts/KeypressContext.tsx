@@ -39,9 +39,9 @@ export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
 export const MAC_DRAG_MODE_PREFIX = `${ESC}[I`;
 export const MAC_FOCUS_EVENT_OUT_OF_EDITOR = "'"; // When editor does NOT have focus (macOS Finder.app)
 
-export const DRAG_START_TIMEOUT_MS = 200;
-export const DRAG_COMPLETION_TIMEOUT_MS = 200;
-export const DRAG_COMPLETION_REVERSE_DELAY_BUDGET_MS = 100;
+export const DRAG_START_TIMEOUT_MS = 200; // Reset DragState after 200ms to avoid blocking other events like paste
+export const DRAG_COMPLETION_TIMEOUT_MS = 200; // Base debounce to broadcast full path
+export const DRAG_COMPLETION_REVERSE_DELAY_BUDGET_MS = 100; //longer path shorter delay, and be broadcasted last
 
 export interface Key {
   name: string;
@@ -273,7 +273,7 @@ export function KeypressProvider({
           Math.max(
             0,
             DRAG_COMPLETION_REVERSE_DELAY_BUDGET_MS - currentBufferLength,
-          );
+          ); // longest path (full path) wins and be broadcasted
 
         dragCompletionTimeoutRef.current = setTimeout(() => {
           if (pathSnapshot && !dragBroadcastedRef.current) {
