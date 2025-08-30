@@ -33,6 +33,7 @@ describe('ideCommand', () => {
         addItem: vi.fn(),
       },
       services: {
+        config: null, // Will be set per test
         settings: {
           setValue: vi.fn(),
         },
@@ -44,9 +45,11 @@ describe('ideCommand', () => {
       getIdeClient: vi.fn(() => ({
         reconnect: vi.fn(),
         disconnect: vi.fn(),
+        connect: vi.fn(),
         getCurrentIde: vi.fn(),
         getDetectedIdeDisplayName: vi.fn(),
         getConnectionStatus: vi.fn(),
+        getOpenFiles: vi.fn(),
       })),
       setIdeModeAndSyncConnection: vi.fn(),
       setIdeMode: vi.fn(),
@@ -59,132 +62,122 @@ describe('ideCommand', () => {
     vi.restoreAllMocks();
   });
 
-  it('should return null if config is not provided', () => {
-    const command = ideCommand(null);
-    expect(command).toBeNull();
+  describe('Command Structure', () => {
+    it('should have correct command metadata', () => {
+      expect(ideCommand.name).toBe('ide');
+      expect(ideCommand.description).toBe('Manage IDE integration');
+      expect(typeof ideCommand.action).toBe('function');
+    });
   });
 
-  it('should return the ide command', () => {
-    vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
-    vi.mocked(mockConfig.getIdeClient).mockReturnValue({
-      getCurrentIde: () => DetectedIde.VSCode,
-      getDetectedIdeDisplayName: () => 'VS Code',
-      getConnectionStatus: () => ({
-        status: core.IDEConnectionStatus.Disconnected,
-      }),
-    } as ReturnType<Config['getIdeClient']>);
-    const command = ideCommand(mockConfig);
-    expect(command).not.toBeNull();
-    expect(command?.name).toBe('ide');
-    expect(command?.subCommands).toHaveLength(3);
-    expect(command?.subCommands?.[0].name).toBe('enable');
-    expect(command?.subCommands?.[1].name).toBe('status');
-    expect(command?.subCommands?.[2].name).toBe('install');
-  });
-
-  it('should show disable command when connected', () => {
-    vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
-    vi.mocked(mockConfig.getIdeClient).mockReturnValue({
-      getCurrentIde: () => DetectedIde.VSCode,
-      getDetectedIdeDisplayName: () => 'VS Code',
-      getConnectionStatus: () => ({
-        status: core.IDEConnectionStatus.Connected,
-      }),
-    } as ReturnType<Config['getIdeClient']>);
-    const command = ideCommand(mockConfig);
-    expect(command).not.toBeNull();
-    const subCommandNames = command?.subCommands?.map((cmd) => cmd.name);
-    expect(subCommandNames).toContain('disable');
-    expect(subCommandNames).not.toContain('enable');
-  });
-
-  describe('status subcommand', () => {
-    const mockGetConnectionStatus = vi.fn();
+  describe('Status Action', () => {
     beforeEach(() => {
-      vi.mocked(mockConfig.getIdeClient).mockReturnValue({
-        getConnectionStatus: mockGetConnectionStatus,
-        getCurrentIde: () => DetectedIde.VSCode,
-        getDetectedIdeDisplayName: () => 'VS Code',
-      } as unknown as ReturnType<Config['getIdeClient']>);
+      mockContext.services.config = mockConfig;
     });
 
     it('should show connected status', async () => {
-      mockGetConnectionStatus.mockReturnValue({
-        status: core.IDEConnectionStatus.Connected,
-      });
-      const command = ideCommand(mockConfig);
-      const result = await command!.subCommands!.find(
-        (c) => c.name === 'status',
-      )!.action!(mockContext, '');
-      expect(mockGetConnectionStatus).toHaveBeenCalled();
+      vi.mocked(mockConfig.getIdeClient).mockReturnValue({
+        getCurrentIde: () => DetectedIde.VSCode,
+        getDetectedIdeDisplayName: () => 'VS Code',
+        getConnectionStatus: () => ({
+          status: core.IDEConnectionStatus.Connected,
+        }),
+        getOpenFiles: vi.fn().mockResolvedValue([]),
+      } as ReturnType<Config['getIdeClient']>);
+
+      const result = await ideCommand.action!(mockContext, 'status');
+
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: '🟢 Connected to VS Code',
+        content: expect.stringContaining('🟢 Connected to VS Code'),
       });
     });
 
     it('should show connecting status', async () => {
-      mockGetConnectionStatus.mockReturnValue({
-        status: core.IDEConnectionStatus.Connecting,
-      });
-      const command = ideCommand(mockConfig);
-      const result = await command!.subCommands!.find(
-        (c) => c.name === 'status',
-      )!.action!(mockContext, '');
-      expect(mockGetConnectionStatus).toHaveBeenCalled();
+      vi.mocked(mockConfig.getIdeClient).mockReturnValue({
+        getCurrentIde: () => DetectedIde.VSCode,
+        getDetectedIdeDisplayName: () => 'VS Code',
+        getConnectionStatus: () => ({
+          status: core.IDEConnectionStatus.Connecting,
+        }),
+        getOpenFiles: vi.fn().mockResolvedValue([]),
+      } as ReturnType<Config['getIdeClient']>);
+
+      const result = await ideCommand.action!(mockContext, 'status');
+
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: `🟡 Connecting...`,
+        content: '🟡 Connecting...',
       });
     });
+
     it('should show disconnected status', async () => {
-      mockGetConnectionStatus.mockReturnValue({
-        status: core.IDEConnectionStatus.Disconnected,
-      });
-      const command = ideCommand(mockConfig);
-      const result = await command!.subCommands!.find(
-        (c) => c.name === 'status',
-      )!.action!(mockContext, '');
-      expect(mockGetConnectionStatus).toHaveBeenCalled();
+      vi.mocked(mockConfig.getIdeClient).mockReturnValue({
+        getCurrentIde: () => DetectedIde.VSCode,
+        getDetectedIdeDisplayName: () => 'VS Code',
+        getConnectionStatus: () => ({
+          status: core.IDEConnectionStatus.Disconnected,
+        }),
+        getOpenFiles: vi.fn().mockResolvedValue([]),
+      } as ReturnType<Config['getIdeClient']>);
+
+      const result = await ideCommand.action!(mockContext, 'status');
+
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: `🔴 Disconnected`,
+        content: '🔴 Disconnected',
       });
     });
 
     it('should show disconnected status with details', async () => {
-      const details = 'Something went wrong';
-      mockGetConnectionStatus.mockReturnValue({
-        status: core.IDEConnectionStatus.Disconnected,
-        details,
-      });
-      const command = ideCommand(mockConfig);
-      const result = await command!.subCommands!.find(
-        (c) => c.name === 'status',
-      )!.action!(mockContext, '');
-      expect(mockGetConnectionStatus).toHaveBeenCalled();
+      const details = 'Connection failed';
+      vi.mocked(mockConfig.getIdeClient).mockReturnValue({
+        getCurrentIde: () => DetectedIde.VSCode,
+        getDetectedIdeDisplayName: () => 'VS Code',
+        getConnectionStatus: () => ({
+          status: core.IDEConnectionStatus.Disconnected,
+          details,
+        }),
+        getOpenFiles: vi.fn().mockResolvedValue([]),
+      } as ReturnType<Config['getIdeClient']>);
+
+      const result = await ideCommand.action!(mockContext, 'status');
+
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
         content: `🔴 Disconnected: ${details}`,
       });
     });
+
+    it('should handle config not available', async () => {
+      mockContext.services.config = null;
+
+      const result = await ideCommand.action!(mockContext, 'status');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Config not available.',
+      });
+    });
   });
 
-  describe('install subcommand', () => {
+  describe('Install Action', () => {
     const mockInstall = vi.fn();
+
     beforeEach(() => {
-      vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
+      mockContext.services.config = mockConfig;
       vi.mocked(mockConfig.getIdeClient).mockReturnValue({
         getCurrentIde: () => DetectedIde.VSCode,
+        getDetectedIdeDisplayName: () => 'VS Code',
         getConnectionStatus: () => ({
           status: core.IDEConnectionStatus.Disconnected,
         }),
-        getDetectedIdeDisplayName: () => 'VS Code',
-      } as unknown as ReturnType<Config['getIdeClient']>);
+      } as ReturnType<Config['getIdeClient']>);
       vi.mocked(core.getIdeInstaller).mockReturnValue({
         install: mockInstall,
         isInstalled: vi.fn(),
@@ -192,64 +185,129 @@ describe('ideCommand', () => {
       platformSpy.mockReturnValue('linux');
     });
 
-    it('should install the extension', async () => {
+    it('should install the extension successfully', async () => {
       mockInstall.mockResolvedValue({
         success: true,
         message: 'Successfully installed.',
       });
 
-      const command = ideCommand(mockConfig);
-      await command!.subCommands!.find((c) => c.name === 'install')!.action!(
-        mockContext,
-        '',
-      );
+      const result = await ideCommand.action!(mockContext, 'install');
 
       expect(core.getIdeInstaller).toHaveBeenCalledWith('vscode');
       expect(mockInstall).toHaveBeenCalled();
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'info',
-          text: `Installing IDE companion...`,
-        }),
-        expect.any(Number),
-      );
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'info',
-          text: 'Successfully installed.',
-        }),
-        expect.any(Number),
-      );
-    }, 10000);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: 'Successfully installed.',
+      });
+    });
 
-    it('should show an error if installation fails', async () => {
+    it('should handle installation failure', async () => {
       mockInstall.mockResolvedValue({
         success: false,
         message: 'Installation failed.',
       });
 
-      const command = ideCommand(mockConfig);
-      await command!.subCommands!.find((c) => c.name === 'install')!.action!(
-        mockContext,
-        '',
-      );
+      const result = await ideCommand.action!(mockContext, 'install');
 
       expect(core.getIdeInstaller).toHaveBeenCalledWith('vscode');
       expect(mockInstall).toHaveBeenCalled();
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'info',
-          text: `Installing IDE companion...`,
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: expect.stringContaining('Installation failed.'),
+      });
+    });
+
+    it('should handle no IDE detected', async () => {
+      vi.mocked(mockConfig.getIdeClient).mockReturnValue({
+        getCurrentIde: () => null,
+        getDetectedIdeDisplayName: () => 'Unknown',
+      } as ReturnType<Config['getIdeClient']>);
+
+      const result = await ideCommand.action!(mockContext, 'install');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content:
+          'No IDE detected. Please ensure VSCode or JetBrains IDE is running.',
+      });
+    });
+  });
+
+  describe('Connect Action', () => {
+    beforeEach(() => {
+      mockContext.services.config = mockConfig;
+      // Mock getIdeInstaller for connect tests
+      vi.mocked(core.getIdeInstaller).mockReturnValue({
+        install: vi.fn().mockResolvedValue({
+          success: false,
+          message: 'Mock install failed',
         }),
-        expect.any(Number),
-      );
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'error',
-          text: 'Installation failed.',
+        isInstalled: vi.fn(),
+      });
+    });
+
+    it('should connect to IDE successfully', async () => {
+      const mockConnect = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(mockConfig.getIdeClient).mockReturnValue({
+        getCurrentIde: () => DetectedIde.VSCode,
+        getDetectedIdeDisplayName: () => 'VS Code',
+        connect: mockConnect,
+        getConnectionStatus: () => ({
+          status: core.IDEConnectionStatus.Connected,
         }),
-        expect.any(Number),
-      );
+      } as ReturnType<Config['getIdeClient']>);
+
+      const result = await ideCommand.action!(mockContext, 'connect');
+
+      expect(mockConnect).toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: '🟢 Connected to VS Code',
+      });
+    });
+
+    it('should handle connection failure', async () => {
+      const mockConnect = vi
+        .fn()
+        .mockRejectedValue(new Error('Connection failed'));
+      vi.mocked(mockConfig.getIdeClient).mockReturnValue({
+        getCurrentIde: () => DetectedIde.VSCode,
+        connect: mockConnect,
+      } as ReturnType<Config['getIdeClient']>);
+
+      const result = await ideCommand.action!(mockContext, 'connect');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Failed to connect: Connection failed',
+      });
+    });
+  });
+
+  describe('Default Action (Status)', () => {
+    it('should show status when no action specified', async () => {
+      mockContext.services.config = mockConfig;
+      vi.mocked(mockConfig.getIdeClient).mockReturnValue({
+        getCurrentIde: () => DetectedIde.VSCode,
+        getDetectedIdeDisplayName: () => 'VS Code',
+        getConnectionStatus: () => ({
+          status: core.IDEConnectionStatus.Connected,
+        }),
+        getOpenFiles: vi.fn().mockResolvedValue([]),
+      } as ReturnType<Config['getIdeClient']>);
+
+      const result = await ideCommand.action!(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: expect.stringContaining('🟢 Connected to VS Code'),
+      });
     });
   });
 });

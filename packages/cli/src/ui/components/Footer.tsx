@@ -19,7 +19,7 @@ import { DebugProfiler } from './DebugProfiler.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 
-interface FooterProps {
+export interface FooterProps {
   model: string;
   targetDir: string;
   branchName?: string;
