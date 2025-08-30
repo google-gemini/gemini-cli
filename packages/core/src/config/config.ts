@@ -355,7 +355,7 @@ export class Config {
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
-    this.useRipgrep = params.useRipgrep ?? false;
+    this.useRipgrep = params.useRipgrep ?? true;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
     this.useSmartEdit = params.useSmartEdit ?? false;
