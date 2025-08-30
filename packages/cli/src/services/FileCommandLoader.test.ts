@@ -72,6 +72,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 describe('FileCommandLoader', () => {
   const signal: AbortSignal = new AbortController().signal;
+  const storage = new Storage(process.cwd());
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -105,7 +106,7 @@ describe('FileCommandLoader', () => {
   });
 
   it('loads a single command from a file', async () => {
-    const userCommandsDir = Storage.getUserCommandsDir();
+    const userCommandsDir = storage.getUserCommandsDir();
     mock({
       [userCommandsDir]: {
         'test.toml': 'prompt = "This is a test prompt"',
@@ -146,7 +147,7 @@ describe('FileCommandLoader', () => {
   itif(process.platform !== 'win32')(
     'loads commands from a symlinked directory',
     async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       const realCommandsDir = '/real/commands';
       mock({
         [realCommandsDir]: {
@@ -171,7 +172,7 @@ describe('FileCommandLoader', () => {
   itif(process.platform !== 'win32')(
     'loads commands from a symlinked subdirectory',
     async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       const realNamespacedDir = '/real/namespaced-commands';
       mock({
         [userCommandsDir]: {
@@ -195,7 +196,7 @@ describe('FileCommandLoader', () => {
   );
 
   it('loads multiple commands', async () => {
-    const userCommandsDir = Storage.getUserCommandsDir();
+    const userCommandsDir = storage.getUserCommandsDir();
     mock({
       [userCommandsDir]: {
         'test1.toml': 'prompt = "Prompt 1"',
@@ -210,7 +211,7 @@ describe('FileCommandLoader', () => {
   });
 
   it('creates deeply nested namespaces correctly', async () => {
-    const userCommandsDir = Storage.getUserCommandsDir();
+    const userCommandsDir = storage.getUserCommandsDir();
 
     mock({
       [userCommandsDir]: {
@@ -234,7 +235,7 @@ describe('FileCommandLoader', () => {
   });
 
   it('creates namespaces from nested directories', async () => {
-    const userCommandsDir = Storage.getUserCommandsDir();
+    const userCommandsDir = storage.getUserCommandsDir();
     mock({
       [userCommandsDir]: {
         git: {
@@ -253,7 +254,7 @@ describe('FileCommandLoader', () => {
   });
 
   it('returns both user and project commands in order', async () => {
-    const userCommandsDir = Storage.getUserCommandsDir();
+    const userCommandsDir = storage.getUserCommandsDir();
     const projectCommandsDir = new Storage(
       process.cwd(),
     ).getProjectCommandsDir();
@@ -309,7 +310,7 @@ describe('FileCommandLoader', () => {
   });
 
   it('ignores files with TOML syntax errors', async () => {
-    const userCommandsDir = Storage.getUserCommandsDir();
+    const userCommandsDir = storage.getUserCommandsDir();
     mock({
       [userCommandsDir]: {
         'invalid.toml': 'this is not valid toml',
@@ -325,7 +326,7 @@ describe('FileCommandLoader', () => {
   });
 
   it('ignores files that are semantically invalid (missing prompt)', async () => {
-    const userCommandsDir = Storage.getUserCommandsDir();
+    const userCommandsDir = storage.getUserCommandsDir();
     mock({
       [userCommandsDir]: {
         'no_prompt.toml': 'description = "This file is missing a prompt"',
@@ -341,7 +342,7 @@ describe('FileCommandLoader', () => {
   });
 
   it('handles filename edge cases correctly', async () => {
-    const userCommandsDir = Storage.getUserCommandsDir();
+    const userCommandsDir = storage.getUserCommandsDir();
     mock({
       [userCommandsDir]: {
         'test.v1.toml': 'prompt = "Test prompt"',
@@ -363,7 +364,7 @@ describe('FileCommandLoader', () => {
   });
 
   it('uses a default description if not provided', async () => {
-    const userCommandsDir = Storage.getUserCommandsDir();
+    const userCommandsDir = storage.getUserCommandsDir();
     mock({
       [userCommandsDir]: {
         'test.toml': 'prompt = "Test prompt"',
@@ -378,7 +379,7 @@ describe('FileCommandLoader', () => {
   });
 
   it('uses the provided description', async () => {
-    const userCommandsDir = Storage.getUserCommandsDir();
+    const userCommandsDir = storage.getUserCommandsDir();
     mock({
       [userCommandsDir]: {
         'test.toml': 'prompt = "Test prompt"\ndescription = "My test command"',
@@ -393,7 +394,7 @@ describe('FileCommandLoader', () => {
   });
 
   it('should sanitize colons in filenames to prevent namespace conflicts', async () => {
-    const userCommandsDir = Storage.getUserCommandsDir();
+    const userCommandsDir = storage.getUserCommandsDir();
     mock({
       [userCommandsDir]: {
         'legacy:command.toml': 'prompt = "This is a legacy command"',
@@ -413,7 +414,7 @@ describe('FileCommandLoader', () => {
 
   describe('Processor Instantiation Logic', () => {
     it('instantiates only DefaultArgumentProcessor if no {{args}} or !{} are present', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'simple.toml': `prompt = "Just a regular prompt"`,
@@ -428,7 +429,7 @@ describe('FileCommandLoader', () => {
     });
 
     it('instantiates only ShellProcessor if {{args}} is present (but not !{})', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'args.toml': `prompt = "Prompt with {{args}}"`,
@@ -443,7 +444,7 @@ describe('FileCommandLoader', () => {
     });
 
     it('instantiates ShellProcessor and DefaultArgumentProcessor if !{} is present (but not {{args}})', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'shell.toml': `prompt = "Prompt with !{cmd}"`,
@@ -458,7 +459,7 @@ describe('FileCommandLoader', () => {
     });
 
     it('instantiates only ShellProcessor if both {{args}} and !{} are present', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'both.toml': `prompt = "Prompt with {{args}} and !{cmd}"`,
@@ -473,7 +474,7 @@ describe('FileCommandLoader', () => {
     });
 
     it('instantiates AtFileProcessor and DefaultArgumentProcessor if @{} is present', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'at-file.toml': `prompt = "Context: @{./my-file.txt}"`,
@@ -489,7 +490,7 @@ describe('FileCommandLoader', () => {
     });
 
     it('instantiates ShellProcessor and AtFileProcessor if !{} and @{} are present', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'shell-and-at.toml': `prompt = "Run !{cmd} with @{file.txt}"`,
@@ -505,7 +506,7 @@ describe('FileCommandLoader', () => {
     });
 
     it('instantiates only ShellProcessor and AtFileProcessor if {{args}} and @{} are present', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'args-and-at.toml': `prompt = "Run {{args}} with @{file.txt}"`,
@@ -523,7 +524,7 @@ describe('FileCommandLoader', () => {
 
   describe('Extension Command Loading', () => {
     it('loads commands from active extensions', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       const projectCommandsDir = new Storage(
         process.cwd(),
       ).getProjectCommandsDir();
@@ -576,7 +577,7 @@ describe('FileCommandLoader', () => {
     });
 
     it('extension commands have extensionName metadata for conflict resolution', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       const projectCommandsDir = new Storage(
         process.cwd(),
       ).getProjectCommandsDir();
@@ -831,7 +832,7 @@ describe('FileCommandLoader', () => {
 
   describe('Argument Handling Integration (via ShellProcessor)', () => {
     it('correctly processes a command with {{args}}', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'shorthand.toml':
@@ -865,7 +866,7 @@ describe('FileCommandLoader', () => {
 
   describe('Default Argument Processor Integration', () => {
     it('correctly processes a command without {{args}}', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'model_led.toml':
@@ -899,7 +900,7 @@ describe('FileCommandLoader', () => {
 
   describe('Shell Processor Integration', () => {
     it('instantiates ShellProcessor if {{args}} is present (even without shell trigger)', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'args_only.toml': `prompt = "Hello {{args}}"`,
@@ -912,7 +913,7 @@ describe('FileCommandLoader', () => {
       expect(ShellProcessor).toHaveBeenCalledWith('args_only');
     });
     it('instantiates ShellProcessor if the trigger is present', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'shell.toml': `prompt = "Run this: ${SHELL_INJECTION_TRIGGER}echo hello}"`,
@@ -926,7 +927,7 @@ describe('FileCommandLoader', () => {
     });
 
     it('does not instantiate ShellProcessor if no triggers ({{args}} or !{}) are present', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'regular.toml': `prompt = "Just a regular prompt"`,
@@ -940,7 +941,7 @@ describe('FileCommandLoader', () => {
     });
 
     it('returns a "submit_prompt" action if shell processing succeeds', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'shell.toml': `prompt = "Run !{echo 'hello'}"`,
@@ -967,7 +968,7 @@ describe('FileCommandLoader', () => {
     });
 
     it('returns a "confirm_shell_commands" action if shell processing requires it', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       const rawInvocation = '/shell rm -rf /';
       mock({
         [userCommandsDir]: {
@@ -1001,7 +1002,7 @@ describe('FileCommandLoader', () => {
     });
 
     it('re-throws other errors from the processor', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'shell.toml': `prompt = "Run !{something}"`,
@@ -1026,7 +1027,7 @@ describe('FileCommandLoader', () => {
       ).rejects.toThrow('Something else went wrong');
     });
     it('assembles the processor pipeline in the correct order (AtFile -> Shell -> Default)', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           // This prompt uses !{}, @{}, but NOT {{args}}, so all processors should be active.
@@ -1128,7 +1129,7 @@ describe('FileCommandLoader', () => {
 
   describe('@-file Processor Integration', () => {
     it('correctly processes a command with @{file}', async () => {
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'at-file.toml':
@@ -1192,7 +1193,7 @@ describe('FileCommandLoader', () => {
         getFolderTrustFeature: vi.fn(() => true),
         getFolderTrust: vi.fn(() => true),
       } as unknown as Config;
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'test1.toml': 'prompt = "Prompt 1"',
@@ -1213,7 +1214,7 @@ describe('FileCommandLoader', () => {
         getFolderTrustFeature: vi.fn(() => true),
         getFolderTrust: vi.fn(() => false),
       } as unknown as Config;
-      const userCommandsDir = Storage.getUserCommandsDir();
+      const userCommandsDir = storage.getUserCommandsDir();
       mock({
         [userCommandsDir]: {
           'test1.toml': 'prompt = "Prompt 1"',

@@ -11,7 +11,8 @@ import { Storage } from '../config/storage.js';
 
 export class InstallationManager {
   private getInstallationIdPath(): string {
-    return Storage.getInstallationIdPath();
+    const storage = new Storage(process.cwd());
+    return storage.getInstallationIdPath();
   }
 
   private readInstallationIdFromFile(): string | null {

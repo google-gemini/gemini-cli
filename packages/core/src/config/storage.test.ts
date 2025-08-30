@@ -19,9 +19,11 @@ vi.mock('fs', async (importOriginal) => {
 import { Storage } from './storage.js';
 
 describe('Storage – getGlobalSettingsPath', () => {
+  const storage = new Storage('test');
+
   it('returns path to ~/.gemini/settings.json', () => {
     const expected = path.join(os.homedir(), '.gemini', 'settings.json');
-    expect(Storage.getGlobalSettingsPath()).toBe(expected);
+    expect(storage.getGlobalSettingsPath()).toBe(expected);
   });
 });
 
@@ -36,7 +38,7 @@ describe('Storage – additional helpers', () => {
 
   it('getUserCommandsDir returns ~/.gemini/commands', () => {
     const expected = path.join(os.homedir(), '.gemini', 'commands');
-    expect(Storage.getUserCommandsDir()).toBe(expected);
+    expect(storage.getUserCommandsDir()).toBe(expected);
   });
 
   it('getProjectCommandsDir returns project/.gemini/commands', () => {
@@ -50,6 +52,6 @@ describe('Storage – additional helpers', () => {
       '.gemini',
       'mcp-oauth-tokens.json',
     );
-    expect(Storage.getMcpOAuthTokensPath()).toBe(expected);
+    expect(storage.getMcpOAuthTokensPath()).toBe(expected);
   });
 });

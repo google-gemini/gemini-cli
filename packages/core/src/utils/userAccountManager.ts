@@ -15,7 +15,8 @@ interface UserAccounts {
 
 export class UserAccountManager {
   private getGoogleAccountsCachePath(): string {
-    return Storage.getGoogleAccountsPath();
+    const storage = new Storage(process.cwd());
+    return storage.getGoogleAccountsPath();
   }
 
   /**

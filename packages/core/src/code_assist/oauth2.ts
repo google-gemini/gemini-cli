@@ -348,8 +348,9 @@ export function getAvailablePort(): Promise<number> {
 }
 
 async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
+  const storage = new Storage(process.cwd());
   const pathsToTry = [
-    Storage.getOAuthCredsPath(),
+    storage.getOAuthCredsPath(),
     process.env['GOOGLE_APPLICATION_CREDENTIALS'],
   ].filter((p): p is string => !!p);
 
@@ -377,7 +378,8 @@ async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
 }
 
 async function cacheCredentials(credentials: Credentials) {
-  const filePath = Storage.getOAuthCredsPath();
+  const storage = new Storage(process.cwd());
+  const filePath = storage.getOAuthCredsPath();
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 
   const credString = JSON.stringify(credentials, null, 2);
@@ -395,7 +397,8 @@ export function clearOauthClientCache() {
 
 export async function clearCachedCredentialFile() {
   try {
-    await fs.rm(Storage.getOAuthCredsPath(), { force: true });
+    const storage = new Storage(process.cwd());
+    await fs.rm(storage.getOAuthCredsPath(), { force: true });
     // Clear the Google Account ID cache when credentials are cleared
     await userAccountManager.clearCachedGoogleAccount();
     // Clear the in-memory OAuth client cache to force re-authentication

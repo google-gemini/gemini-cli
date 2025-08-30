@@ -143,7 +143,7 @@ export class FileCommandLoader implements ICommandLoader {
     const storage = this.config?.storage ?? new Storage(this.projectRoot);
 
     // 1. User commands
-    dirs.push({ path: Storage.getUserCommandsDir() });
+    dirs.push({ path: storage.getUserCommandsDir() });
 
     // 2. Project commands (override user commands)
     dirs.push({ path: storage.getProjectCommandsDir() });
