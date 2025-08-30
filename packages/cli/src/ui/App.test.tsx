@@ -280,6 +280,16 @@ vi.mock('../hooks/useTerminalSize.js', () => ({
   useTerminalSize: vi.fn(),
 }));
 
+// Mock useStdout to capture terminal title writes
+let mockStdout: { write: ReturnType<typeof vi.fn> };
+vi.mock('ink', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ink')>();
+  return {
+    ...actual,
+    useStdout: () => ({ stdout: mockStdout }),
+  };
+});
+
 const mockedCheckForUpdates = vi.mocked(checkForUpdates);
 const { isGitRepository: mockedIsGitRepository } = vi.mocked(
   await import('@google/gemini-cli-core'),
@@ -328,6 +338,9 @@ describe('App UI', () => {
   };
 
   beforeEach(() => {
+    // Initialize mock stdout for terminal title tests
+    mockStdout = { write: vi.fn() };
+
     vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
       columns: 120,
       rows: 24,
@@ -1684,6 +1697,301 @@ describe('App UI', () => {
       await waitFor(() => {
         expect(lastFrame()).not.toContain('some text');
       });
+    });
+  });
+
+  describe('Terminal Title Update Feature', () => {
+    beforeEach(() => {
+      // Reset mock stdout for each test
+      mockStdout = { write: vi.fn() };
+    });
+
+    it('should not update terminal title when showStatusInTitle is false', () => {
+      const mockSettingsWithShowStatusFalse = createMockSettings({
+        workspace: {
+          showStatusInTitle: false,
+          hideWindowTitle: false,
+          theme: 'Default',
+        },
+      });
+
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettingsWithShowStatusFalse}
+          version={mockVersion}
+        />,
+      );
+
+      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+        call[0].includes('\x1b]2;'),
+      );
+      expect(titleWrites).toHaveLength(0);
+      unmount();
+    });
+
+    it('should not update terminal title when hideWindowTitle is true', () => {
+      const mockSettingsWithHideTitleTrue = createMockSettings({
+        workspace: {
+          showStatusInTitle: true,
+          hideWindowTitle: true,
+          theme: 'Default',
+        },
+      });
+
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettingsWithHideTitleTrue}
+          version={mockVersion}
+        />,
+      );
+
+      // Check that no title-related writes occurred (only bracketed paste mode writes)
+      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+        call[0].includes('\x1b]2;'),
+      );
+      expect(titleWrites).toHaveLength(0);
+      unmount();
+    });
+
+    it('should update terminal title with original title when in Idle state', () => {
+      const mockSettingsWithTitleEnabled = createMockSettings({
+        workspace: {
+          showStatusInTitle: true,
+          hideWindowTitle: false,
+          theme: 'Default',
+        },
+      });
+
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Idle,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+      });
+
+      const originalTitle = 'gemini-cli';
+      const originalProcessTitle = process.title;
+      process.title = originalTitle;
+
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettingsWithTitleEnabled}
+          version={mockVersion}
+        />,
+      );
+
+      // Find the title-related write (ignore bracketed paste mode writes)
+      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+        call[0].includes('\x1b]2;'),
+      );
+      expect(titleWrites).toHaveLength(1);
+      expect(titleWrites[0][0]).toBe(
+        `\x1b]2;${originalTitle.padEnd(80, ' ')}\x07`,
+      );
+
+      // Restore original process.title
+      process.title = originalProcessTitle;
+      unmount();
+    });
+
+    it('should update terminal title with thought subject when in active state', () => {
+      const mockSettingsWithTitleEnabled = createMockSettings({
+        workspace: {
+          showStatusInTitle: true,
+          hideWindowTitle: false,
+          theme: 'Default',
+        },
+      });
+
+      const thoughtSubject = 'Processing request';
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Responding,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: { subject: thoughtSubject },
+      });
+
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettingsWithTitleEnabled}
+          version={mockVersion}
+        />,
+      );
+
+      // Find title-related write (ignore bracketed paste mode writes)
+      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+        call[0].includes('\x1b]2;'),
+      );
+      expect(titleWrites).toHaveLength(1);
+      expect(titleWrites[0][0]).toBe(
+        `\x1b]2;${thoughtSubject.padEnd(80, ' ')}\x07`,
+      );
+      unmount();
+    });
+
+    it('should update terminal title with original title when thought has no subject', () => {
+      const mockSettingsWithTitleEnabled = createMockSettings({
+        workspace: {
+          showStatusInTitle: true,
+          hideWindowTitle: false,
+          theme: 'Default',
+        },
+      });
+
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Responding,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+      });
+
+      const originalTitle = 'gemini-cli';
+      const originalProcessTitle = process.title;
+      process.title = originalTitle;
+
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettingsWithTitleEnabled}
+          version={mockVersion}
+        />,
+      );
+
+      // Find title-related write (ignore bracketed paste mode writes)
+      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+        call[0].includes('\x1b]2;'),
+      );
+      expect(titleWrites).toHaveLength(1);
+      expect(titleWrites[0][0]).toBe(
+        `\x1b]2;${originalTitle.padEnd(80, ' ')}\x07`,
+      );
+
+      process.title = originalProcessTitle;
+      unmount();
+    });
+
+    it('should update terminal title when in WaitingForConfirmation state with thought subject', () => {
+      const mockSettingsWithTitleEnabled = createMockSettings({
+        workspace: {
+          showStatusInTitle: true,
+          hideWindowTitle: false,
+          theme: 'Default',
+        },
+      });
+
+      const thoughtSubject = 'Confirm tool execution';
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.WaitingForConfirmation,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: { subject: thoughtSubject },
+      });
+
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettingsWithTitleEnabled}
+          version={mockVersion}
+        />,
+      );
+
+      // Find title-related write (ignore bracketed paste mode writes)
+      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+        call[0].includes('\x1b]2;'),
+      );
+      expect(titleWrites).toHaveLength(1);
+      expect(titleWrites[0][0]).toBe(
+        `\x1b]2;${thoughtSubject.padEnd(80, ' ')}\x07`,
+      );
+      unmount();
+    });
+
+    it('should pad title to exactly 80 characters', () => {
+      const mockSettingsWithTitleEnabled = createMockSettings({
+        workspace: {
+          showStatusInTitle: true,
+          hideWindowTitle: false,
+          theme: 'Default',
+        },
+      });
+
+      const shortTitle = 'Short';
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Responding,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: { subject: shortTitle },
+      });
+
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettingsWithTitleEnabled}
+          version={mockVersion}
+        />,
+      );
+
+      // Find title-related write (ignore bracketed paste mode writes)
+      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+        call[0].includes('\x1b]2;'),
+      );
+      expect(titleWrites).toHaveLength(1);
+      const calledWith = titleWrites[0][0];
+      const expectedTitle = shortTitle.padEnd(80, ' ');
+
+      // Check that the string contains the title and has correct padding
+      expect(calledWith).toContain(shortTitle);
+      expect(calledWith).toContain('\x1b]2;');
+      expect(calledWith).toContain('\x07');
+
+      // Simple string checks to verify padding and structure
+      expect(calledWith).toBe('\x1b]2;' + expectedTitle + '\x07');
+      unmount();
+    });
+
+    it('should use correct ANSI escape code format', () => {
+      const mockSettingsWithTitleEnabled = createMockSettings({
+        workspace: {
+          showStatusInTitle: true,
+          hideWindowTitle: false,
+          theme: 'Default',
+        },
+      });
+
+      const title = 'Test Title';
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Responding,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: { subject: title },
+      });
+
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettingsWithTitleEnabled}
+          version={mockVersion}
+        />,
+      );
+
+      // Find title-related write (ignore bracketed paste mode writes)
+      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+        call[0].includes('\x1b]2;'),
+      );
+      expect(titleWrites).toHaveLength(1);
+      const expectedEscapeSequence = `\x1b]2;${title.padEnd(80, ' ')}\x07`;
+      expect(titleWrites[0][0]).toBe(expectedEscapeSequence);
+      unmount();
     });
   });
 });
