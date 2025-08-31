@@ -57,6 +57,32 @@ Test
 "
 `;
 
+exports[`<MarkdownDisplay /> > renders multiline table rows 1`] = `
+"
+┌──────────┬──────────┐
+│ Header 1 │ Header 2 │
+├──────────┼──────────┤
+│ Text in  │ Text in  │
+│ cell 1   │ cell 2   │
+│ Text in  │ Text in  │
+│ cell 3   │ cell 4   │
+└──────────┴──────────┘
+"
+`;
+
+exports[`<MarkdownDisplay /> > renders multiline table rows and truncates last line 1`] = `
+"
+┌──────────┬──────────┐
+│ Header 1 │ Header 2 │
+├──────────┼──────────┤
+│ Text in  │ Text in  │
+│ cell 1   │ cell 2   │
+│ This is  │ This is  │
+│ text ... │ text ... │
+└──────────┴──────────┘
+"
+`;
+
 exports[`<MarkdownDisplay /> > renders nested unordered lists 1`] = `
 " * Level 1
    * Level 2
@@ -69,19 +95,6 @@ exports[`<MarkdownDisplay /> > renders nothing for empty text 1`] = `""`;
 exports[`<MarkdownDisplay /> > renders ordered lists 1`] = `
 " 1. First item
  2. Second item
-"
-`;
-
-exports[`<MarkdownDisplay /> > renders table rows with long text into multiple lines 1`] = `
-"
-┌──────────┬──────────┐
-│ Header 1 │ Header 2 │
-├──────────┼──────────┤
-│ Text in  │ Text in  │
-│ cell 1   │ cell 2   │
-│ Text in  │ Text in  │
-│ cell 3   │ cell 4   │
-└──────────┴──────────┘
 "
 `;
 
@@ -104,16 +117,3 @@ exports[`<MarkdownDisplay /> > renders unordered lists with different markers 1`
 `;
 
 exports[`<MarkdownDisplay /> > shows line numbers in code blocks by default 1`] = `" 1 const x = 1;"`;
-
-exports[`<MarkdownDisplay /> > truncates last line multi line table rows above a set limit 1`] = `
-"
-┌──────────┬──────────┐
-│ Header 1 │ Header 2 │
-├──────────┼──────────┤
-│ Text in  │ Text in  │
-│ cell 1   │ cell 2   │
-│ This is  │ This is  │
-│ text ... │ text ... │
-└──────────┴──────────┘
-"
-`;

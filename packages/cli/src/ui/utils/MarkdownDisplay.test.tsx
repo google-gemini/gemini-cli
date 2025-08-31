@@ -179,7 +179,7 @@ Test
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders table rows with long text into multiple lines', () => {
+  it('renders multiline table rows', () => {
     const props = { ...baseProps, terminalWidth: 23 };
     const text = `
 | Header 1 | Header 2 |
@@ -195,7 +195,7 @@ Test
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('truncates last line multi line table rows above a set limit', () => {
+  it('renders multiline table rows and truncates last line', () => {
     const props = { ...baseProps, terminalWidth: 23 };
     const text = `
 | Header 1 | Header 2 |
