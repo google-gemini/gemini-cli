@@ -1,10 +1,13 @@
-import React, { useEffect } from 'react';
+import type React from 'react';
+import {useEffect} from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAppStore } from '@/stores/appStore';
 import { multiModelService } from '@/services/multiModelService';
+import type { ChatSession, ModelProviderType } from '@/types';
 
 export const App: React.FC = () => {
-  const { authConfig, currentProvider, currentModel, theme } = useAppStore();
+  const { currentProvider, currentModel, currentRole, theme } = useAppStore();
+  const { setBuiltinRoles } = useAppStore();
 
   useEffect(() => {
     // Apply theme to document
@@ -54,17 +57,96 @@ export const App: React.FC = () => {
           model: currentModel,
           cwd: workingDirectory,
           interactive: true,
-          telemetry: { enabled: false }
+          telemetry: { enabled: false },
+          approvalMode: 'yolo'  // Auto-approve all tool calls in GUI mode
         };
         
         await multiModelService.initialize(configParams);
+        
+        // Switch to the current provider and model after initialization
+        await multiModelService.switchProvider(currentProvider, currentModel);
+        
+        // Switch to the current role after initialization
+        await multiModelService.switchRole(currentRole);
+        
+        // Load builtin roles after initialization
+        try {
+          const roles = await multiModelService.getAllRolesAsync();
+          if (roles.length > 0) {
+            setBuiltinRoles(roles.filter(role => role.isBuiltin !== false));
+          }
+        } catch (error) {
+          console.error('Failed to load builtin roles:', error);
+        }
+
+        // Load sessions from backend (backend is the source of truth)
+        try {
+          const sessionsInfo = await multiModelService.getSessionsInfo();
+          console.log('Retrieved sessions from backend:', sessionsInfo);
+          
+          // Convert backend session info to frontend session format
+          const { setActiveSession } = useAppStore.getState();
+          
+          // Clear existing sessions and rebuild from backend
+          useAppStore.setState({ sessions: [] });
+          
+          for (const sessionInfo of sessionsInfo) {
+            const session: ChatSession = {
+              id: sessionInfo.id,
+              title: sessionInfo.title,
+              messages: [], // Will be loaded when session is selected
+              createdAt: sessionInfo.lastUpdated, // Using lastUpdated as approximation
+              updatedAt: sessionInfo.lastUpdated,
+              provider: 'lm_studio' as ModelProviderType,
+              model: currentModel,
+              roleId: currentRole
+            };
+            
+            useAppStore.getState().addSession(session);
+          }
+          
+          // Switch to the most recent session (first in sorted list) and load its messages
+          if (sessionsInfo.length > 0) {
+            const mostRecentSessionId = sessionsInfo[0].id;
+            await multiModelService.switchSession(mostRecentSessionId);
+            setActiveSession(mostRecentSessionId);
+            console.log('Switched to most recent session:', mostRecentSessionId);
+            
+            // Load messages for the initial session
+            try {
+              const messages = await multiModelService.getDisplayMessages(mostRecentSessionId);
+              console.log('Loaded', messages.length, 'messages for initial session:', mostRecentSessionId);
+              
+              // Convert and update the session with messages
+              const { updateSession } = useAppStore.getState();
+              const chatMessages = messages
+                .filter(msg => msg.role !== 'tool') // Filter out tool messages for UI
+                .map((msg, index) => ({
+                  id: `${mostRecentSessionId}-${index}`,
+                  role: msg.role as 'user' | 'assistant' | 'system', // Cast to allowed types
+                  content: msg.content,
+                  timestamp: new Date(),
+                  toolCalls: msg.toolCalls
+                }));
+              
+              updateSession(mostRecentSessionId, { messages: chatMessages });
+              
+            } catch (error) {
+              console.error('Failed to load initial session messages:', error);
+            }
+          }
+          
+        } catch (error) {
+          console.error('Failed to load sessions from backend:', error);
+        }
+        
       } catch (error) {
         console.error('Failed to initialize MultiModelService:', error);
       }
     };
 
     initializeService();
-  }, [authConfig, currentProvider, currentModel]);
+  }, []); // Only run once on mount
 
   return <AppLayout />;
 };

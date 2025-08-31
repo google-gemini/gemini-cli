@@ -28,7 +28,9 @@ export const useChatStore = create<ChatState>()((set) => ({
   
   setError: (error: string | null) => set({ error }),
   
-  setStreamingMessage: (message: string) => set({ streamingMessage: message }),
+  setStreamingMessage: (message: string) => {
+    set({ streamingMessage: message });
+  },
 
   addMessage: (_sessionId: string, _message: ChatMessage) => {
     // This will be handled by appStore for persistence

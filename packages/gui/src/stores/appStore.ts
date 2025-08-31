@@ -34,6 +34,7 @@ interface AppStore extends AppState {
   setCurrentRole: (roleId: string) => void;
   addCustomRole: (role: RoleDefinition) => void;
   removeCustomRole: (roleId: string) => void;
+  setBuiltinRoles: (roles: RoleDefinition[]) => void;
   
   addTemplate: (template: PresetTemplate) => void;
   removeTemplate: (templateId: string) => void;
@@ -45,10 +46,9 @@ export const useAppStore = create<AppStore>()(
       // Initial state
       sessions: [],
       activeSessionId: null,
-      currentProvider: ModelProviderType.GEMINI,
-      currentModel: 'gemini-1.5-pro-latest',
+      currentProvider: ModelProviderType.LM_STUDIO,
+      currentModel: 'openai/gpt-oss-20b',
       authConfig: {},
-      availableModels: {},
       currentWorkspace: null,
       workspaces: [],
       language: 'en',
@@ -132,6 +132,9 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           customRoles: state.customRoles.filter((role) => role.id !== roleId),
         })),
+
+      setBuiltinRoles: (roles: RoleDefinition[]) =>
+        set({ builtinRoles: roles }),
 
       addTemplate: (template: PresetTemplate) =>
         set((state) => ({

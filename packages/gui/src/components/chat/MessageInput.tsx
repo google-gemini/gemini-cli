@@ -72,15 +72,19 @@ export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) 
       const session = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
       if (!session) return;
 
-      const messages = [...session.messages, userMessage];
-      const universalMessages: UniversalMessage[] = messages.map(msg => ({
-        role: msg.role as 'user' | 'assistant' | 'system',
-        content: msg.content
-      }));
-      const stream = await multiModelService.sendMessage(
-        universalMessages,
-        session.roleId
-      );
+      // Ensure backend is on the same session before sending message
+      const currentBackendSessionId = await multiModelService.getCurrentSessionId();
+      if (currentBackendSessionId !== activeSessionId) {
+        console.warn(`Backend session (${currentBackendSessionId}) != frontend session (${activeSessionId}). Syncing...`);
+        await multiModelService.switchSession(activeSessionId);
+      }
+
+      // Send ONLY the new user message (MultiModelSystem manages history internally)
+      const newUserMessage: UniversalMessage = {
+        role: 'user',
+        content: userMessage.content
+      };
+      const stream = await multiModelService.sendMessage([newUserMessage]);
 
       let assistantContent = '';
       const assistantMessage: ChatMessage = {
@@ -102,11 +106,26 @@ export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) 
           if (currentSession) {
             updateSession(activeSessionId, {
               messages: [...currentSession.messages, assistantMessage],
-              updatedAt: new Date(),
-              title: currentSession.title === 'New Chat' ? 
-                userMessage.content.slice(0, 50) + (userMessage.content.length > 50 ? '...' : '') : 
-                currentSession.title
+              updatedAt: new Date()
             });
+
+            // Refresh session info to get updated title from backend
+            // Add a small delay to ensure backend title update is complete
+            setTimeout(async () => {
+              try {
+                const sessionsInfo = await multiModelService.getSessionsInfo();
+                const updatedSessionInfo = sessionsInfo.find(s => s.id === activeSessionId);
+                if (updatedSessionInfo && currentSession.title !== updatedSessionInfo.title) {
+                  updateSession(activeSessionId, {
+                    title: updatedSessionInfo.title,
+                    updatedAt: new Date()
+                  });
+                  console.log('Updated session title from backend:', updatedSessionInfo.title);
+                }
+              } catch (error) {
+                console.error('Failed to refresh session info:', error);
+              }
+            }, 100); // 100ms delay
           }
           break;
         } else if (event.type === 'error') {
