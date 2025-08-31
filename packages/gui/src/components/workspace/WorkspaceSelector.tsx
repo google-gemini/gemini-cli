@@ -140,9 +140,10 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ onClose })
               {directoriesLoading && <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
             </div>
             <div className="space-y-1 max-h-24 overflow-y-auto">
-              {workspaceDirectories.map((directory, index) => (
+              {/* Remove duplicates from workspaceDirectories */}
+              {[...new Set(workspaceDirectories)].map((directory, index) => (
                 <div
-                  key={index}
+                  key={`${directory}-${index}`}
                   className="flex items-center gap-2 px-2 py-1 bg-accent/50 rounded text-xs font-mono"
                 >
                   <FolderOpen size={12} />
@@ -162,7 +163,7 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ onClose })
                 key={workspace.id}
                 variant="ghost"
                 className={cn(
-                  "w-full justify-start h-auto p-3",
+                  "w-full justify-start h-auto p-3 group",
                   currentWorkspace?.id === workspace.id && "bg-accent"
                 )}
                 onClick={() => handleWorkspaceSelect(workspace)}
@@ -180,14 +181,12 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ onClose })
                     {currentWorkspace?.id === workspace.id && (
                       <Check size={14} className="text-primary" />
                     )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-destructive hover:text-destructive opacity-0 group-hover:opacity-100"
+                    <div
+                      className="h-6 w-6 text-destructive hover:text-destructive opacity-0 group-hover:opacity-100 rounded flex items-center justify-center hover:bg-destructive/10 transition-colors cursor-pointer"
                       onClick={(e) => handleRemoveWorkspace(workspace.id, e)}
                     >
                       <X size={12} />
-                    </Button>
+                    </div>
                   </div>
                 </div>
               </Button>

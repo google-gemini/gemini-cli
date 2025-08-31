@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, ChevronRight, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
@@ -15,13 +15,13 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onClose }) => {
   const {
     currentProvider,
     currentModel,
-    availableModels,
     setCurrentProvider,
     setCurrentModel
   } = useAppStore();
   
   const [selectedProvider, setSelectedProvider] = useState<ModelProviderType>(currentProvider);
   const [loading, setLoading] = useState(false);
+  const [availableModels, setAvailableModels] = useState<Record<string, string[]>>({});
 
   const providers = [
     { 
@@ -50,13 +50,46 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onClose }) => {
     }
   ];
 
+  // Load all available models when component mounts (lazy loading)
+  useEffect(() => {
+    let isMounted = true; // Prevent state updates if component is unmounted
+    
+    const loadAllModels = async () => {
+      try {
+        const models = await multiModelService.getAvailableModels();
+        if (isMounted) {
+          setAvailableModels(models);
+        }
+      } catch (error) {
+        console.error('Failed to load available models:', error);
+        if (isMounted) {
+          setAvailableModels({});
+        }
+      }
+    };
+
+    loadAllModels();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const handleProviderSelect = async (providerId: ModelProviderType) => {
     if (providerId === selectedProvider) return;
     
     setLoading(true);
     try {
-      const models = await multiModelService.getAvailableModels(providerId);
-      const providerModels = models[providerId];
+      // Use already loaded models if available, otherwise fetch for specific provider
+      let providerModels = availableModels[providerId];
+      
+      if (!providerModels || providerModels.length === 0) {
+        const models = await multiModelService.getAvailableModels(providerId);
+        providerModels = models[providerId];
+        // Update the availableModels state with the newly fetched models
+        setAvailableModels(prev => ({ ...prev, [providerId]: providerModels || [] }));
+      }
+      
       if (providerModels && providerModels.length > 0) {
         const firstModel = providerModels[0];
         await multiModelService.switchProvider(providerId, firstModel);

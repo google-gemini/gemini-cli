@@ -5,13 +5,12 @@ import {
   Bot, 
   Zap,
   Settings,
-  User,
-  Folder
+  User
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ModelSelector } from '@/components/chat/ModelSelector';
 import { RoleSelector } from '@/components/chat/RoleSelector';
-import { WorkspaceSelector } from '@/components/workspace/WorkspaceSelector';
+// Removed WorkspaceSelector import - now in Sidebar
 import { useAppStore } from '@/stores/appStore';
 
 export const Header: React.FC = () => {
@@ -26,7 +25,7 @@ export const Header: React.FC = () => {
 
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [showRoleSelector, setShowRoleSelector] = useState(false);
-  const [showWorkspaceSelector, setShowWorkspaceSelector] = useState(false);
+  // Removed showWorkspaceSelector state - now in Sidebar
 
   const getProviderIcon = () => {
     switch (currentProvider) {
@@ -98,26 +97,7 @@ export const Header: React.FC = () => {
 
         <div className="w-px h-6 bg-border" />
 
-        <div className="relative">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2 h-8"
-            onClick={() => setShowWorkspaceSelector(true)}
-          >
-            <Folder size={16} />
-            <span className="text-sm">Workspace</span>
-          </Button>
-        </div>
-
-        {showWorkspaceSelector && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/50" onClick={() => setShowWorkspaceSelector(false)} />
-            <div className="relative max-h-[80vh] overflow-auto">
-              <WorkspaceSelector onClose={() => setShowWorkspaceSelector(false)} />
-            </div>
-          </div>
-        )}
+        {/* Workspace moved to Sidebar for better UX */}
       </div>
 
       {/* Right Section - Controls */}
