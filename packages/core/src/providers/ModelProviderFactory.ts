@@ -11,6 +11,7 @@ import { OpenAIProvider } from './OpenAIProvider.js';
 import { LMStudioProvider } from './LMStudioProvider.js';
 import { GeminiProvider } from './GeminiProvider.js';
 import type { GeminiClient } from '../core/client.js';
+import type { Config } from '../config/config.js';
 
 export class ModelProviderFactory {
   private static providers: Map<string, BaseModelProvider> = new Map();
@@ -20,7 +21,7 @@ export class ModelProviderFactory {
     this.geminiClient = client;
   }
 
-  static create(config: ModelProviderConfig): BaseModelProvider {
+  static create(config: ModelProviderConfig, configInstance?: Config): BaseModelProvider {
     const key = `${config.type}-${config.model}-${config.baseUrl || 'default'}`;
     
     if (this.providers.has(key)) {
@@ -33,16 +34,16 @@ export class ModelProviderFactory {
 
     switch (config.type) {
       case ModelProviderType.OPENAI:
-        provider = new OpenAIProvider(config);
+        provider = new OpenAIProvider(config, configInstance);
         break;
       case ModelProviderType.LM_STUDIO:
-        provider = new LMStudioProvider(config);
+        provider = new LMStudioProvider(config, configInstance);
         break;
       case ModelProviderType.GEMINI:
         if (!this.geminiClient) {
           throw new Error('GeminiClient must be set before creating Gemini provider');
         }
-        provider = new GeminiProvider(config, this.geminiClient);
+        provider = new GeminiProvider(config, this.geminiClient, configInstance);
         break;
       case ModelProviderType.ANTHROPIC:
         throw new Error('Anthropic provider not yet implemented');
@@ -58,8 +59,8 @@ export class ModelProviderFactory {
     return provider;
   }
 
-  static async createAndInitialize(config: ModelProviderConfig): Promise<BaseModelProvider> {
-    const provider = this.create(config);
+  static async createAndInitialize(config: ModelProviderConfig, configInstance?: Config): Promise<BaseModelProvider> {
+    const provider = this.create(config, configInstance);
     await provider.initialize();
     return provider;
   }

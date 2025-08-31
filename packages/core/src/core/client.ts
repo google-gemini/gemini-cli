@@ -21,7 +21,8 @@ import { CompressionStatus } from './turn.js';
 import { Turn, GeminiEventType } from './turn.js';
 import type { Config } from '../config/config.js';
 import type { UserTierId } from '../code_assist/types.js';
-import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
+import { getCompressionPrompt } from './prompts.js';
+import { RoleManager } from '../roles/RoleManager.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
@@ -124,6 +125,8 @@ export class GeminiClient {
    */
   private hasFailedCompressionAttempt = false;
 
+  private readonly roleManager: RoleManager;
+
   constructor(private readonly config: Config) {
     if (config.getProxy()) {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
@@ -132,6 +135,9 @@ export class GeminiClient {
     this.embeddingModel = config.getEmbeddingModel();
     this.loopDetector = new LoopDetectionService(config);
     this.lastPromptId = this.config.getSessionId();
+    
+    // Initialize role management
+    this.roleManager = RoleManager.getInstance();
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
@@ -244,7 +250,8 @@ export class GeminiClient {
     ];
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const currentRoleId = this.roleManager.getCurrentRole().id;
+      const systemInstruction = this.roleManager.getCombinedSystemPrompt(userMemory, currentRoleId);
       const generateContentConfigWithThinking = isThinkingSupported(
         this.config.getModel(),
       )
@@ -524,7 +531,7 @@ export class GeminiClient {
       if (event.type === GeminiEventType.Error) {
         return turn;
       }
-    }
+    }    
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
       // Check if model was switched during the call (likely due to quota error)
       const currentModel = this.config.getModel();
@@ -579,7 +586,10 @@ export class GeminiClient {
       model || this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const currentRoleId = this.roleManager.getCurrentRole().id;
+      const systemInstruction = this.roleManager.getCombinedSystemPrompt(userMemory, currentRoleId);
+      await this.setTools();
+      
       const requestConfig = {
         abortSignal,
         ...this.generateContentConfig,
@@ -690,7 +700,9 @@ export class GeminiClient {
 
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const currentRoleId = this.roleManager.getCurrentRole().id;
+      const systemInstruction = this.roleManager.getCombinedSystemPrompt(userMemory, currentRoleId);
+      await this.setTools();
 
       const requestConfig: GenerateContentConfig = {
         abortSignal,

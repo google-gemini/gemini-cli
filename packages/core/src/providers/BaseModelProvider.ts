@@ -14,13 +14,18 @@ import type {
   ToolCall
 } from './types.js';
 import { ModelProviderType } from './types.js';
+import type { Config } from '../config/config.js';
+import type { FunctionDeclaration } from '@google/genai';
 
 export abstract class BaseModelProvider {
   protected config: ModelProviderConfig;
   protected capabilities: ProviderCapabilities;
+  protected toolDeclarations: FunctionDeclaration[] = [];
+  protected configInstance?: Config;
 
-  constructor(config: ModelProviderConfig) {
+  constructor(config: ModelProviderConfig, configInstance?: Config) {
     this.config = config;
+    this.configInstance = configInstance;
     this.capabilities = this.getCapabilities();
   }
 
@@ -41,6 +46,8 @@ export abstract class BaseModelProvider {
   ): AsyncGenerator<UniversalStreamEvent>;
 
   abstract getAvailableModels(): Promise<string[]>;
+
+  abstract setTools(): void;
 
   protected abstract getCapabilities(): ProviderCapabilities;
 

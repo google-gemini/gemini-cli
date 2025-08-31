@@ -19,5 +19,4 @@ export { OpenAIProvider } from './OpenAIProvider.js';
 export { LMStudioProvider } from './LMStudioProvider.js';
 export { GeminiProvider } from './GeminiProvider.js';
 export { ModelProviderFactory } from './ModelProviderFactory.js';
-export { UniversalModelClient } from './UniversalModelClient.js';
 export { ProviderConfigManager } from './ProviderConfigManager.js';

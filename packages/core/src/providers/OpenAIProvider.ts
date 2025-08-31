@@ -14,6 +14,7 @@ import type {
   ToolCall
 } from './types.js';
 import { BaseModelProvider } from './BaseModelProvider.js';
+import type { Config } from '../config/config.js';
 
 interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -57,6 +58,7 @@ interface OpenAIStreamChunk {
       tool_calls?: Array<{
         id?: string;
         type?: string;
+        index?: number;
         function?: {
           name?: string;
           arguments?: string;
@@ -67,12 +69,31 @@ interface OpenAIStreamChunk {
   }>;
 }
 
+interface OpenAITool {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: unknown;
+  };
+}
+
+interface OpenAIRequestBody {
+  model: string;
+  messages: OpenAIMessage[];
+  max_tokens: number;
+  temperature: number;
+  stream?: boolean;
+  tools?: OpenAITool[];
+  tool_choice?: 'auto' | 'none' | { type: 'function'; function: { name: string } };
+}
+
 export class OpenAIProvider extends BaseModelProvider {
   private apiKey: string;
   private baseUrl: string;
 
-  constructor(config: ModelProviderConfig) {
-    super(config);
+  constructor(config: ModelProviderConfig, configInstance?: Config) {
+    super(config, configInstance);
     this.apiKey = config.apiKey || '';
     this.baseUrl = config.baseUrl || 'https://api.openai.com/v1';
     this.validateConfig();
@@ -120,12 +141,27 @@ export class OpenAIProvider extends BaseModelProvider {
   ): Promise<UniversalResponse> {
     const openaiMessages = this.convertToOpenAIMessages(messages);
     
-    const requestBody = {
+    const requestBody: OpenAIRequestBody = {
       model: this.config.model,
       messages: openaiMessages,
       max_tokens: 4096,
       temperature: 0.7
     };
+
+    // Add tools if available
+    if (this.toolDeclarations && this.toolDeclarations.length > 0) {
+      requestBody.tools = this.toolDeclarations
+        .filter(tool => tool.name && tool.description)
+        .map(tool => ({
+          type: 'function',
+          function: {
+            name: tool.name!,
+            description: tool.description!,
+            parameters: tool.parametersJsonSchema
+          }
+        }));
+      requestBody.tool_choice = 'auto';
+    }
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -148,13 +184,28 @@ export class OpenAIProvider extends BaseModelProvider {
   ): AsyncGenerator<UniversalStreamEvent> {
     const openaiMessages = this.convertToOpenAIMessages(messages);
     
-    const requestBody = {
+    const requestBody: OpenAIRequestBody = {
       model: this.config.model,
       messages: openaiMessages,
       max_tokens: 4096,
       temperature: 0.7,
       stream: true
     };
+
+    // Add tools if available
+    if (this.toolDeclarations && this.toolDeclarations.length > 0) {
+      requestBody.tools = this.toolDeclarations
+        .filter(tool => tool.name && tool.description)
+        .map(tool => ({
+          type: 'function',
+          function: {
+            name: tool.name!,
+            description: tool.description!,
+            parameters: tool.parametersJsonSchema
+          }
+        }));
+      requestBody.tool_choice = 'auto';
+    }
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -183,7 +234,8 @@ export class OpenAIProvider extends BaseModelProvider {
     const decoder = new TextDecoder();
     let buffer = '';
     let fullContent = '';
-    let toolCalls: ToolCall[] = [];
+    const toolCalls: ToolCall[] = [];
+    const accumulatedToolCalls: Array<{ id?: string; type: 'function'; function: { name: string; arguments: string } }> = [];
 
     try {
       while (true) {
@@ -197,6 +249,36 @@ export class OpenAIProvider extends BaseModelProvider {
         for (const line of lines) {
           if (line.trim() === '') continue;
           if (line.trim() === 'data: [DONE]') {
+            // Process accumulated tool calls when stream is done
+            if (accumulatedToolCalls.length > 0) {
+              console.log('[OpenAIProvider] Processing accumulated tool calls:', accumulatedToolCalls.length);
+              for (const toolCall of accumulatedToolCalls) {
+                if (toolCall.function.name && toolCall.function.arguments) {
+                  let args: Record<string, unknown> = {};
+                  try {
+                    args = JSON.parse(toolCall.function.arguments);
+                  } catch (error) {
+                    console.error('[OpenAIProvider] Failed to parse tool arguments:', toolCall.function.arguments, error);
+                    args = {};
+                  }
+                  
+                  const universalToolCall: ToolCall = {
+                    id: toolCall.id || `call_${Date.now()}`,
+                    name: toolCall.function.name,
+                    arguments: args
+                  };
+                  toolCalls.push(universalToolCall);
+                  
+                  yield {
+                    type: 'tool_call',
+                    toolCall: universalToolCall
+                  };
+                  
+                  console.log('[OpenAIProvider] Processed tool call:', toolCall.function.name, args);
+                }
+              }
+            }
+            
             yield {
               type: 'done',
               response: {
@@ -224,21 +306,27 @@ export class OpenAIProvider extends BaseModelProvider {
 
               if (delta?.tool_calls) {
                 for (const toolCall of delta.tool_calls) {
-                  if (toolCall.function?.name && toolCall.function?.arguments) {
-                    const universalToolCall: ToolCall = {
-                      id: toolCall.id || `call_${Date.now()}`,
-                      name: toolCall.function.name,
-                      arguments: JSON.parse(toolCall.function.arguments)
-                    };
-                    toolCalls.push(universalToolCall);
-                    yield {
-                      type: 'tool_call',
-                      toolCall: universalToolCall
-                    };
+                  // Accumulate tool calls (they might come in chunks)
+                  if (toolCall.index !== undefined) {
+                    if (!accumulatedToolCalls[toolCall.index]) {
+                      accumulatedToolCalls[toolCall.index] = {
+                        id: toolCall.id,
+                        type: 'function',
+                        function: { name: '', arguments: '' }
+                      };
+                    }
+                    
+                    if (toolCall.function?.name) {
+                      accumulatedToolCalls[toolCall.index].function.name += toolCall.function.name;
+                    }
+                    if (toolCall.function?.arguments) {
+                      accumulatedToolCalls[toolCall.index].function.arguments += toolCall.function.arguments;
+                    }
                   }
                 }
               }
             } catch (parseError) {
+              console.error('Error parsing OpenAI stream chunk:', parseError);
               continue;
             }
           }
@@ -266,6 +354,16 @@ export class OpenAIProvider extends BaseModelProvider {
         .sort();
     } catch (error) {
       throw this.createError('Failed to get available models', error);
+    }
+  }
+
+  setTools(): void {
+    // OpenAI supports native tool calls, so we can store tool declarations for actual use
+    if (this.configInstance) {
+      const toolRegistry = this.configInstance.getToolRegistry();
+      this.toolDeclarations = toolRegistry.getFunctionDeclarations();
+      console.log(`[OpenAIProvider] Received ${this.toolDeclarations.length} tool declarations:`, 
+        this.toolDeclarations.map(tool => tool.name));
     }
   }
 

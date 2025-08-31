@@ -11,7 +11,7 @@ import type { Config } from '../config/config.js';
 export class ProviderConfigManager {
   private providerConfigs: Map<string, ModelProviderConfig> = new Map();
 
-  constructor(config: Config) {
+  constructor(private config: Config) {    
     this.loadProviderConfigs();
   }
 
@@ -57,10 +57,16 @@ export class ProviderConfigManager {
     return this.providerConfigs.delete(type);
   }
 
+  getConfig(): Config {
+    return this.config;
+  }
+
   private loadProviderConfigs(): void {
     // 设置 Gemini 配置（非默认）
+    const geminiApiKey = process.env['GEMINI_API_KEY'];
     const geminiConfig: ModelProviderConfig = {
       type: ModelProviderType.GEMINI,
+      apiKey: geminiApiKey,
       model: 'gemini-2.5-flash',
       isDefault: false,
       displayName: 'Google Gemini'

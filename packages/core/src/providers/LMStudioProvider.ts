@@ -10,20 +10,35 @@ import type {
   UniversalStreamEvent,
   ProviderCapabilities,
   ConnectionStatus,
-  ModelProviderConfig
+  ModelProviderConfig,
+  ToolCall
 } from './types.js';
 import { BaseModelProvider } from './BaseModelProvider.js';
+import type { Config } from '../config/config.js';
 
 interface LMStudioMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
+  tool_calls?: LMStudioToolCall[];
+  tool_call_id?: string;
+  name?: string;
+}
+
+interface LMStudioToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
 }
 
 interface LMStudioResponse {
   choices: Array<{
     message: {
       role: string;
-      content: string;
+      content: string | null;
+      tool_calls?: LMStudioToolCall[];
     };
     finish_reason: string;
   }>;
@@ -40,9 +55,37 @@ interface LMStudioStreamChunk {
     delta: {
       role?: string;
       content?: string;
+      tool_calls?: Array<{
+        id?: string;
+        type?: string;
+        index?: number;
+        function?: {
+          name?: string;
+          arguments?: string;
+        };
+      }>;
     };
     finish_reason?: string;
   }>;
+}
+
+interface LMStudioTool {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: unknown;
+  };
+}
+
+interface LMStudioRequestBody {
+  model: string;
+  messages: LMStudioMessage[];
+  max_tokens: number;
+  temperature: number;
+  stream: boolean;
+  tools?: LMStudioTool[];
+  tool_choice?: 'auto' | 'none' | { type: 'function'; function: { name: string } };
 }
 
 interface LMStudioModel {
@@ -55,8 +98,8 @@ interface LMStudioModel {
 export class LMStudioProvider extends BaseModelProvider {
   private baseUrl: string;
 
-  constructor(config: ModelProviderConfig) {
-    super(config);
+  constructor(config: ModelProviderConfig, configInstance?: Config) {
+    super(config, configInstance);
     this.baseUrl = config.baseUrl || 'http://127.0.0.1:1234/v1';
   }
 
@@ -103,13 +146,28 @@ export class LMStudioProvider extends BaseModelProvider {
   ): Promise<UniversalResponse> {
     const lmStudioMessages = this.convertToLMStudioMessages(messages);
     
-    const requestBody = {
+    const requestBody: LMStudioRequestBody = {
       model: this.config.model,
       messages: lmStudioMessages,
       max_tokens: 2048,
       temperature: 0.7,
       stream: false
     };
+
+    // Add tools if available
+    if (this.toolDeclarations && this.toolDeclarations.length > 0) {
+      requestBody.tools = this.toolDeclarations
+        .filter(tool => tool.name && tool.description)
+        .map(tool => ({
+          type: 'function',
+          function: {
+            name: tool.name!,
+            description: tool.description!,
+            parameters: tool.parametersJsonSchema
+          }
+        }));
+      requestBody.tool_choice = 'auto';
+    }
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -131,14 +189,34 @@ export class LMStudioProvider extends BaseModelProvider {
     signal: AbortSignal
   ): AsyncGenerator<UniversalStreamEvent> {
     const lmStudioMessages = this.convertToLMStudioMessages(messages);
+    // console.log('[sendMessageStream] LMStudio Messages:', lmStudioMessages);
+    // print tools information directly to console for debugging
+    // if (this.toolDeclarations && this.toolDeclarations.length > 0) 
+      // console.log(`[sendMessageStream] Using ${this.toolDeclarations.length} tools:`
+        // , this.toolDeclarations.map(tool => tool.name));
     
-    const requestBody = {
+    const requestBody: LMStudioRequestBody = {
       model: this.config.model,
       messages: lmStudioMessages,
-      max_tokens: 2048,
-      temperature: 0.7,
+      max_tokens: 10000,
+      temperature: 0.0,
       stream: true
     };
+
+    // Add tools if available
+    if (this.toolDeclarations && this.toolDeclarations.length > 0) {
+      requestBody.tools = this.toolDeclarations
+        .filter(tool => tool.name && tool.description)
+        .map(tool => ({
+          type: 'function',
+          function: {
+            name: tool.name!,
+            description: tool.description!,
+            parameters: tool.parametersJsonSchema
+          }
+        }));
+      requestBody.tool_choice = 'auto';
+    }
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -167,6 +245,8 @@ export class LMStudioProvider extends BaseModelProvider {
     const decoder = new TextDecoder();
     let buffer = '';
     let fullContent = '';
+    const toolCalls: ToolCall[] = [];
+    const accumulatedToolCalls: Array<{ id?: string; type: 'function'; function: { name: string; arguments: string } }> = [];
 
     try {
       while (true) {
@@ -180,6 +260,34 @@ export class LMStudioProvider extends BaseModelProvider {
         for (const line of lines) {
           if (line.trim() === '') continue;
           if (line.trim() === 'data: [DONE]') {
+            // Process accumulated tool calls when stream is done (same as OpenAIProvider)
+            if (accumulatedToolCalls.length > 0) {
+              // console.log('[LMStudioProvider] Processing accumulated tool calls at [DONE]:', accumulatedToolCalls.length);
+              for (const toolCall of accumulatedToolCalls) {
+                if (toolCall.function.name && toolCall.function.arguments) {
+                  let args: Record<string, unknown> = {};
+                  try {
+                    args = JSON.parse(toolCall.function.arguments);
+                  } catch (error) {
+                    console.error('[LMStudioProvider] Failed to parse tool arguments:', toolCall.function.arguments, error);
+                    args = {};
+                  }
+                  
+                  const universalToolCall: ToolCall = {
+                    id: toolCall.id || `call_${Date.now()}`,
+                    name: toolCall.function.name,
+                    arguments: args
+                  };
+                  toolCalls.push(universalToolCall);
+                  
+                  yield {
+                    type: 'tool_call',
+                    toolCall: universalToolCall
+                  };
+                }
+              }
+            }
+
             yield {
               type: 'done',
               response: {
@@ -204,11 +312,64 @@ export class LMStudioProvider extends BaseModelProvider {
                 };
               }
 
+              if (delta?.tool_calls) {
+                for (const toolCall of delta.tool_calls) {
+                  // Accumulate tool calls (they might come in chunks)
+                  if (toolCall.index !== undefined) {
+                    if (!accumulatedToolCalls[toolCall.index]) {
+                      accumulatedToolCalls[toolCall.index] = {
+                        id: toolCall.id,
+                        type: 'function',
+                        function: { name: '', arguments: '' }
+                      };
+                    }
+                    
+                    if (toolCall.function?.name) {
+                      accumulatedToolCalls[toolCall.index].function.name += toolCall.function.name;
+                    }
+                    if (toolCall.function?.arguments) {
+                      accumulatedToolCalls[toolCall.index].function.arguments += toolCall.function.arguments;
+                    }
+                  }
+                }
+              }
+
               if (chunk.choices[0]?.finish_reason) {
+                // Process accumulated tool calls when finish_reason is available
+                if (accumulatedToolCalls.length > 0) {
+                  console.log('[LMStudioProvider] Processing accumulated tool calls:', accumulatedToolCalls.length);
+                  for (const toolCall of accumulatedToolCalls) {
+                    if (toolCall.function.name && toolCall.function.arguments) {
+                      let args: Record<string, unknown> = {};
+                      try {
+                        args = JSON.parse(toolCall.function.arguments);
+                      } catch (error) {
+                        console.error('[LMStudioProvider] Failed to parse tool arguments:', toolCall.function.arguments, error);
+                        args = {};
+                      }
+                      
+                      const universalToolCall: ToolCall = {
+                        id: toolCall.id || `call_${Date.now()}`,
+                        name: toolCall.function.name,
+                        arguments: args
+                      };
+                      toolCalls.push(universalToolCall);
+                      
+                      yield {
+                        type: 'tool_call',
+                        toolCall: universalToolCall
+                      };
+                      
+                      console.log('[LMStudioProvider] Processed tool call:', toolCall.function.name, args);
+                    }
+                  }
+                }
+                
                 yield {
                   type: 'done',
                   response: {
                     content: fullContent,
+                    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
                     finishReason: this.mapFinishReason(chunk.choices[0].finish_reason),
                     model: this.config.model
                   }
@@ -216,6 +377,7 @@ export class LMStudioProvider extends BaseModelProvider {
                 return;
               }
             } catch (parseError) {
+              console.error('Error parsing LM Studio stream chunk:', parseError);
               continue;
             }
           }
@@ -244,10 +406,21 @@ export class LMStudioProvider extends BaseModelProvider {
     }
   }
 
+  setTools(): void {
+    // LM Studio doesn't support native tool calls, but we can store tool declarations
+    // for potential use in system prompts or other mechanisms
+    if (this.configInstance) {
+      const toolRegistry = this.configInstance.getToolRegistry();
+      this.toolDeclarations = toolRegistry.getFunctionDeclarations();
+      console.log(`[LMStudioProvider] Received ${this.toolDeclarations.length} tool declarations:`, 
+        this.toolDeclarations.map(tool => tool.name));
+    }
+  }
+
   protected getCapabilities(): ProviderCapabilities {
     return {
       supportsStreaming: true,
-      supportsToolCalls: false,
+      supportsToolCalls: true,
       supportsSystemMessages: true,
       supportsImages: false,
       maxTokens: 4096,
@@ -269,6 +442,11 @@ export class LMStudioProvider extends BaseModelProvider {
     
     return {
       content: choice.message.content || '',
+      toolCalls: choice.message.tool_calls?.map(tc => ({
+        id: tc.id,
+        name: tc.function.name,
+        arguments: JSON.parse(tc.function.arguments)
+      })),
       finishReason: this.mapFinishReason(choice.finish_reason),
       usage: response.usage ? {
         promptTokens: response.usage.prompt_tokens,
@@ -283,6 +461,7 @@ export class LMStudioProvider extends BaseModelProvider {
     switch (reason) {
       case 'stop': return 'stop';
       case 'length': return 'length';
+      case 'tool_calls': return 'tool_calls';
       default: return 'stop';
     }
   }
