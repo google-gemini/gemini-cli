@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "context_broker"
+version = "0.1.0"
+description = "MCP server for cross-workspace context sharing"
+authors = [{name = "Gemini CLI", email = "noreply@example.com"}]
+requires-python = ">=3.8"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov>=2.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["context_broker*"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=context_broker --cov-report=term-missing"
+testpaths = ["tests"]

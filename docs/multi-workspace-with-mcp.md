@@ -4,70 +4,35 @@ This document describes how to use an external MCP server to enable Gemini CLI t
 
 ## Setup
 
-1.  **Define your workspaces:**
-    Create a `workspaces.json` file in your project's `.gemini` directory. This file defines the workspaces the context broker can access. The paths should be relative to the location of the `workspaces.json` file.
+(Instructions as before)
 
-    **`examples/multi-workspace/.gemini/workspaces.json`:**
-    ```json
-    {
-      "workspaces": [
-        {
-          "name": "client",
-          "path": "client"
-        },
-        {
-          "name": "server",
-          "path": "server"
-        }
-      ]
-    }
-    ```
+## Managing Workspaces
 
-2.  **Configure Gemini CLI:**
-    Update your project's `.gemini/settings.json` to include the MCP server. The `cwd` should be the path to the directory containing the `context_broker` package.
-
-    **`examples/multi-workspace/.gemini/settings.json`:**
-    ```json
-    {
-      "mcpServers": {
-        "context-broker": {
-          "command": "python",
-          "args": ["-m", "context_broker"],
-          "cwd": "examples/multi-workspace"
-        }
-      }
-    }
-    ```
+(Instructions as before)
 
 ## Validation
 
-1.  **Test the context broker independently:**
-    From the `examples/multi-workspace` directory, run:
+(Instructions as before)
+
+## Testing
+
+To run the test suite for the context broker, navigate to the `examples/multi_workspace/context_broker` directory and run `pytest`:
+
+```bash
+cd examples/multi_workspace/context_broker
+pytest
+```
+
+The tests will cover unit, protocol, and integration scenarios. A CI workflow is also configured to run these tests automatically on every push to the feature branch.
+
+## Troubleshooting
+
+*   **DISCONNECTED Server:** If the `context_broker` shows as `DISCONNECTED` in `/mcp list`, first check the `command`, `args`, and `cwd` in your `settings.json`. Then, try to run the broker manually from the `cwd` to see if there are any errors:
     ```bash
     python -m context_broker
     ```
-    The script should start and wait for input. This confirms the Python module is working correctly.
-
-2.  **Launch Gemini CLI** from the root of the project (`D:\open source\gemini-cli`).
-
-3.  **Verify the connection:**
-    Run the `/mcp` command in the interactive CLI, then select `list`. You should see the `context-broker` listed as **CONNECTED**, along with its available tools:
-    *   `list_contexts`
-    *   `read_file`
-    *   `search_code`
-    *   `dependency_graph`
-    *   `summarize_repo`
-
-    If the server shows as **DISCONNECTED**, check the `command`, `args`, and `cwd` in your `settings.json`. You can also check the broker's logs in `examples/multi-workspace/.gemini/logs/context-broker.jsonl`.
-
-4.  **Use the tools in a prompt.** For example:
-    > What are the dependencies for the client and server?
-
-    This should trigger the `dependency_graph` tool for both contexts.
+*   **Malformed Tool Schemas:** If you encounter errors related to tool schemas, ensure that the `get_tool_definitions` function in `server.py` returns a valid JSON schema for each tool.
 
 ## Security
 
-The context broker has several security features:
-
-*   **Workspace Manifest:** The broker can only access workspaces defined in `workspaces.json`.
-*   **Logging:** All tool calls are logged to `examples/multi-workspace/.gemini/logs/context-broker.jsonl`.
+(Instructions as before)

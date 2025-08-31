@@ -1,0 +1,4 @@
+
+[dev]
+pytest>=6.0
+pytest-cov>=2.0

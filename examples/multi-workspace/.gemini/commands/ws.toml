@@ -1,8 +1,0 @@
-name = "ws:add"
-description = "Add a new workspace to the context broker."
-prompt = """Add a new workspace named '{{name}}' with path '{{path}}'"""
-tool = "context-broker.add_workspace"
-
-[args]
-name = "string"
-path = "string"

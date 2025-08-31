@@ -1,5 +1,12 @@
+
+import sys
+import os
+# Ensure project root is in sys.path for imports
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 import json
-from context_broker import server
+from examples.multi_workspace.context_broker import server
 
 def test_list_contexts(temp_workspace, monkeypatch):
     monkeypatch.setattr(server, 'workspaces_path', str(temp_workspace / ".gemini" / "workspaces.json"))

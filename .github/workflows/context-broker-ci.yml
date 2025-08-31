@@ -3,7 +3,7 @@ name: Context Broker CI
 on:
   push:
     branches:
-      - feature/multi-workspace-mcp
+      - feature/multi_workspace-mcp
 
 jobs:
   test:
@@ -20,5 +20,5 @@ jobs:
           pip install pytest pytest-cov
       - name: Run tests
         run: |
-          cd examples/multi-workspace/context-broker
+          cd examples/multi_workspace/context_broker
           pytest
