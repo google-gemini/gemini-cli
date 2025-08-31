@@ -170,7 +170,6 @@ export interface AppState {
   currentProvider: ModelProviderType;
   currentModel: string;
   authConfig: AuthConfig;
-  availableModels: Record<string, string[]>;
   
   // Workspace
   currentWorkspace: WorkspaceConfig | null;

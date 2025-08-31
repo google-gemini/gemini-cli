@@ -23,8 +23,8 @@ const electronAPI = {
     initialize: (config) => ipcRenderer.invoke('multimodel-initialize', config),
     switchProvider: (providerType, model) => ipcRenderer.invoke('multimodel-switch-provider', providerType, model),
     switchRole: (roleId) => ipcRenderer.invoke('multimodel-switch-role', roleId),
-    sendMessage: (messages, roleId) => ipcRenderer.invoke('multimodel-send-message', messages, roleId),
-    sendMessageStream: (messages, roleId) => {
+    sendMessage: (messages) => ipcRenderer.invoke('multimodel-send-message', messages),
+    sendMessageStream: (messages) => {
       const streamId = `stream-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       
       return {
@@ -65,7 +65,7 @@ const electronAPI = {
           }, 15000); // 15 second timeout
           
           // NOW start the streaming request after event handlers are set
-          ipcRenderer.invoke('multimodel-send-message-stream', messages, roleId, streamId)
+          ipcRenderer.invoke('multimodel-send-message-stream', messages, streamId)
             .catch((error) => {
               clearTimeout(timeout);
               cleanup();
@@ -89,9 +89,16 @@ const electronAPI = {
     getWorkspaceDirectories: () => ipcRenderer.invoke('multimodel-get-workspace-directories'),
     setWorkspaceDirectories: (directories) => ipcRenderer.invoke('multimodel-set-workspace-directories', directories),
     getCurrentToolset: () => ipcRenderer.invoke('multimodel-get-current-toolset'),
-    optimizeToolsetForCurrentRole: () => ipcRenderer.invoke('multimodel-optimize-toolset-for-current-role'),
     addCustomRole: (role) => ipcRenderer.invoke('multimodel-add-custom-role', role),
     addCustomTemplate: (template) => ipcRenderer.invoke('multimodel-add-custom-template', template),
+    // Session management
+    createSession: (sessionId, title) => ipcRenderer.invoke('multimodel-create-session', sessionId, title),
+    switchSession: (sessionId) => ipcRenderer.invoke('multimodel-switch-session', sessionId),
+    deleteSession: (sessionId) => ipcRenderer.invoke('multimodel-delete-session', sessionId),
+    getCurrentSessionId: () => ipcRenderer.invoke('multimodel-get-current-session-id'),
+    getDisplayMessages: (sessionId) => ipcRenderer.invoke('multimodel-get-display-messages', sessionId),
+    getSessionsInfo: () => ipcRenderer.invoke('multimodel-get-sessions-info'),
+    updateSessionTitle: (sessionId, newTitle) => ipcRenderer.invoke('multimodel-update-session-title', sessionId, newTitle),
   }
 }
 

@@ -4,6 +4,7 @@ import path from 'path';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  
   return {
     plugins: [react()],
     resolve: {
@@ -15,6 +16,9 @@ export default defineConfig(({ mode }) => {
     define: {
       global: 'globalThis',
       'process.env': env,
+    },
+    build: {
+      sourcemap: true, // Enable source maps for debugging
     },
     server: {
       port: 3000,
