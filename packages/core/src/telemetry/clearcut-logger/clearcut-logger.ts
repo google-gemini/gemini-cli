@@ -517,28 +517,6 @@ export class ClearcutLogger {
       });
     }
 
-    if (event.diff_stat) {
-      const metadataMapping: { [key: string]: EventMetadataKey } = {
-        ai_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
-        ai_removed_lines: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
-        user_added_lines: EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
-        user_removed_lines: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
-      };
-
-      for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {
-        if (
-          event.diff_stat[key as keyof typeof event.diff_stat] !== undefined
-        ) {
-          data.push({
-            gemini_cli_key,
-            value: JSON.stringify(
-              event.diff_stat[key as keyof typeof event.diff_stat],
-            ),
-          });
-        }
-      }
-    }
-
     const logEvent = this.createLogEvent(EventNames.FILE_OPERATION, data);
     this.enqueueLogEvent(logEvent);
     this.flushIfNeeded();
