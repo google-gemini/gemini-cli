@@ -136,6 +136,8 @@ export const WITTY_LOADING_PHRASES = [
   'Have you tried turning it off and on again? (The loading screen, not me.)',
   'Constructing additional pylons...',
   'New line? That’s Ctrl+J.',
+  'Connecting to AGI...',
+  'Done before the next GTA release...',
 ];
 
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
