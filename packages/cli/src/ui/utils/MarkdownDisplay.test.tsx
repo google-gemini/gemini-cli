@@ -209,7 +209,6 @@ Test
       </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
-
   });
 
   it('handles a table at the end of the input', () => {
