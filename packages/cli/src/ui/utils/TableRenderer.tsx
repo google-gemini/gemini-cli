@@ -144,7 +144,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       {rows.map((row, index) => (
         <React.Fragment key={index}>
           {renderRow(row)}
-          {index < row.length - 1 && renderBorder('middle')}
+          {index < rows.length - 1 && renderBorder('middle')}
         </React.Fragment>
       ))}
 
