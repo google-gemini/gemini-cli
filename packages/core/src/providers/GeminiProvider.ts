@@ -14,6 +14,7 @@ import type {
 } from './types.js';
 import { BaseModelProvider } from './BaseModelProvider.js';
 import type { GeminiClient } from '../core/client.js';
+import type { Config } from '../config/config.js';
 import type { PartListUnion, Content } from '@google/genai';
 import type { ServerGeminiStreamEvent } from '../core/turn.js';
 import { GeminiEventType } from '../core/turn.js';
@@ -21,8 +22,8 @@ import { GeminiEventType } from '../core/turn.js';
 export class GeminiProvider extends BaseModelProvider {
   private geminiClient: GeminiClient;
 
-  constructor(config: ModelProviderConfig, geminiClient: GeminiClient) {
-    super(config);
+  constructor(config: ModelProviderConfig, geminiClient: GeminiClient, configInstance?: Config) {
+    super(config, configInstance);
     this.geminiClient = geminiClient;
   }
 
@@ -74,7 +75,7 @@ export class GeminiProvider extends BaseModelProvider {
     const promptId = `provider_${Date.now()}`;
 
     let fullContent = '';
-    let finishReason: UniversalResponse['finishReason'] = 'stop';
+    const finishReason: UniversalResponse['finishReason'] = 'stop';
 
     try {
       const stream = this.geminiClient.sendMessageStream(geminiContent, signal, promptId);
@@ -138,12 +139,70 @@ export class GeminiProvider extends BaseModelProvider {
   }
 
   async getAvailableModels(): Promise<string[]> {
+    try {
+      // Use Google AI REST API to fetch available models dynamically
+      const apiKey = this.config.apiKey;
+      if (!apiKey || apiKey === '') {
+        console.warn('GeminiProvider: No API key available, using fallback models');
+        return this.getFallbackModels();
+      }
+
+      const response = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models',
+        {
+          headers: {
+            'x-goog-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const models = [];
+
+      if (data.models && Array.isArray(data.models)) {
+        for (const model of data.models) {
+          // Check if the model supports generateContent
+          if (model.supportedGenerationMethods?.includes('generateContent')) {
+            // Extract model name from full name (e.g., "models/gemini-1.5-pro" -> "gemini-1.5-pro")
+            const modelName = model.name.replace('models/', '');
+            models.push(modelName);
+          }
+        }
+      }
+
+      if (models.length === 0) {
+        console.warn('GeminiProvider: No models found from API, using fallback models');
+        return this.getFallbackModels();
+      }
+
+      console.log(`GeminiProvider: Retrieved ${models.length} models from API:`, models);
+      return models;
+    } catch (error) {
+      console.error('GeminiProvider: Failed to fetch models from API:', error);
+      console.warn('GeminiProvider: Using fallback models due to API error');
+      return this.getFallbackModels();
+    }
+  }
+
+  private getFallbackModels(): string[] {
     return [
-      'gemini-2.5-flash',
-      'gemini-2.0-flash-exp', 
+      'gemini-2.0-flash-exp',
       'gemini-1.5-pro',
-      'gemini-1.5-flash'
+      'gemini-1.5-flash',
+      'gemini-1.5-pro-002'
     ];
+  }
+
+  setTools(): void {
+    // GeminiClient already has its own setTools method that uses the config
+    // We delegate to the GeminiClient's setTools method
+    this.geminiClient.setTools();
+    console.log(`[GeminiProvider] Delegated setTools to GeminiClient`);
   }
 
   protected getCapabilities(): ProviderCapabilities {
