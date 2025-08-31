@@ -25,10 +25,13 @@ import type {
   AnyDeclarativeTool,
   AnyToolInvocation,
 } from '@google/gemini-cli-core';
-import { ToolConfirmationOutcome, ApprovalMode } from '@google/gemini-cli-core';
+import {
+  ToolConfirmationOutcome,
+  ApprovalMode,
+  MockTool,
+} from '@google/gemini-cli-core';
 import type { HistoryItemWithoutId, HistoryItemToolGroup } from '../types.js';
 import { ToolCallStatus } from '../types.js';
-import { MockTool } from '@google/gemini-cli-test-utils';
 
 // Mocks
 vi.mock('@google/gemini-cli-core', async () => {
@@ -58,7 +61,12 @@ const mockConfig = {
   }),
 } as unknown as Config;
 
-const mockTool = new MockTool({ name: 'mockTool', displayName: 'Mock Tool' });
+const mockTool = new MockTool({
+  name: 'mockTool',
+  displayName: 'Mock Tool',
+  execute: vi.fn(),
+  shouldConfirmExecute: vi.fn(),
+});
 const mockToolWithLiveOutput = new MockTool({
   name: 'mockToolWithLiveOutput',
   displayName: 'Mock Tool With Live Output',
@@ -66,11 +74,15 @@ const mockToolWithLiveOutput = new MockTool({
   params: {},
   isOutputMarkdown: true,
   canUpdateOutput: true,
+  execute: vi.fn(),
+  shouldConfirmExecute: vi.fn(),
 });
 let mockOnUserConfirmForToolConfirmation: Mock;
 const mockToolRequiresConfirmation = new MockTool({
   name: 'mockToolRequiresConfirmation',
   displayName: 'Mock Tool Requires Confirmation',
+  execute: vi.fn(),
+  shouldConfirmExecute: vi.fn(),
 });
 
 describe('useReactToolScheduler in YOLO Mode', () => {
@@ -142,9 +154,7 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     expect(mockToolRequiresConfirmation.execute).toHaveBeenCalledWith(
       request.args,
       expect.any(AbortSignal),
-      undefined,
-      undefined,
-      undefined,
+      undefined /*updateOutputFn*/,
     );
 
     // Check that onComplete was called with success
@@ -295,9 +305,7 @@ describe('useReactToolScheduler', () => {
     expect(mockTool.execute).toHaveBeenCalledWith(
       request.args,
       expect.any(AbortSignal),
-      undefined,
-      undefined,
-      undefined,
+      undefined /*updateOutputFn*/,
     );
     expect(onComplete).toHaveBeenCalledWith([
       expect.objectContaining({

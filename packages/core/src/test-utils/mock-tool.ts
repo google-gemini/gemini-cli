@@ -4,30 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
 import type {
   ToolCallConfirmationDetails,
   ToolInvocation,
   ToolResult,
-} from '@google/gemini-cli-core';
+} from '../tools/tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
-} from '@google/gemini-cli-core';
+} from '../tools/tools.js';
 
-type MockToolOptions = {
+interface MockToolOptions {
   name: string;
   displayName?: string;
   description?: string;
   canUpdateOutput?: boolean;
   isOutputMarkdown?: boolean;
   shouldConfirmExecute?: (
-    ...args: unknown[]
+    params: { [key: string]: unknown },
+    signal: AbortSignal,
   ) => Promise<ToolCallConfirmationDetails | false>;
-  execute?: (...args: unknown[]) => Promise<ToolResult>;
+  execute?: (
+    params: { [key: string]: unknown },
+    signal: AbortSignal,
+    updateOutput?: (output: string) => void,
+  ) => Promise<ToolResult>;
   params?: object;
-};
+}
 
 class MockToolInvocation extends BaseToolInvocation<
   { [key: string]: unknown },
@@ -43,16 +47,8 @@ class MockToolInvocation extends BaseToolInvocation<
   execute(
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
-    terminalColumns?: number,
-    terminalRows?: number,
   ): Promise<ToolResult> {
-    return this.tool.execute(
-      this.params,
-      signal,
-      updateOutput,
-      terminalColumns,
-      terminalRows,
-    );
+    return this.tool.execute(this.params, signal, updateOutput);
   }
 
   override shouldConfirmExecute(
@@ -73,10 +69,15 @@ export class MockTool extends BaseDeclarativeTool<
   { [key: string]: unknown },
   ToolResult
 > {
-  execute: (...args: unknown[]) => Promise<ToolResult>;
   shouldConfirmExecute: (
-    ...args: unknown[]
+    params: { [key: string]: unknown },
+    signal: AbortSignal,
   ) => Promise<ToolCallConfirmationDetails | false>;
+  execute: (
+    params: { [key: string]: unknown },
+    signal: AbortSignal,
+    updateOutput?: (output: string) => void,
+  ) => Promise<ToolResult>;
 
   constructor(options: MockToolOptions) {
     super(
@@ -92,13 +93,17 @@ export class MockTool extends BaseDeclarativeTool<
     if (options.shouldConfirmExecute) {
       this.shouldConfirmExecute = options.shouldConfirmExecute;
     } else {
-      this.shouldConfirmExecute = vi.fn().mockResolvedValue(false);
+      this.shouldConfirmExecute = () => Promise.resolve(false);
     }
 
     if (options.execute) {
       this.execute = options.execute;
     } else {
-      this.execute = vi.fn();
+      this.execute = () =>
+        Promise.resolve({
+          llmContent: `Tool ${this.name} executed successfully.`,
+          returnDisplay: `Tool ${this.name} executed successfully.`,
+        });
     }
   }
 

@@ -18,3 +18,4 @@ export {
   IdeConnectionType,
 } from './src/telemetry/types.js';
 export { makeFakeConfig } from './src/test-utils/config.js';
+export * from './src/utils/pathReader.js';
