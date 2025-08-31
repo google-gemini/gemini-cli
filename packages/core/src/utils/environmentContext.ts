@@ -6,7 +6,7 @@
 
 import type { Part } from '@google/genai';
 import type { Config } from '../config/config.js';
-import { getFolderStructure } from './getFolderStructure.js';
+// import { getFolderStructure } from './getFolderStructure.js';
 
 /**
  * Generates a string describing the current workspace directories and their structures.
@@ -19,15 +19,15 @@ export async function getDirectoryContextString(
   const workspaceContext = config.getWorkspaceContext();
   const workspaceDirectories = workspaceContext.getDirectories();
 
-  const folderStructures = await Promise.all(
-    workspaceDirectories.map((dir) =>
-      getFolderStructure(dir, {
-        fileService: config.getFileService(),
-      }),
-    ),
-  );
+  // const folderStructures = await Promise.all(
+  //   workspaceDirectories.map((dir) =>
+  //     getFolderStructure(dir, {
+  //       fileService: config.getFileService(),
+  //     }),
+  //   ),
+  // );
 
-  const folderStructure = folderStructures.join('\n');
+  // const folderStructure = folderStructures.join('\n');
 
   let workingDirPreamble: string;
   if (workspaceDirectories.length === 1) {
@@ -37,10 +37,10 @@ export async function getDirectoryContextString(
     workingDirPreamble = `I'm currently working in the following directories:\n${dirList}`;
   }
 
-  return `${workingDirPreamble}
-Here is the folder structure of the current working directories:
+  //Here is the folder structure of the current working directories:
+  // ${folderStructure}
 
-${folderStructure}`;
+  return `${workingDirPreamble}`;
 }
 
 /**
@@ -60,8 +60,14 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
   const platform = process.platform;
   const directoryContext = await getDirectoryContextString(config);
 
+//   const context = `
+// This is the Gemini CLI. We are setting up the context for our chat.
+// Today's date is ${today} (formatted according to the user's locale).
+// My operating system is: ${platform}
+// ${directoryContext}
+//         `.trim();
   const context = `
-This is the Gemini CLI. We are setting up the context for our chat.
+We are setting up the context for our chat.
 Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
 ${directoryContext}

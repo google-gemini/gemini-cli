@@ -10,6 +10,7 @@ export * from './config/config.js';
 // Export Core Logic
 export * from './core/client.js';
 export * from './core/contentGenerator.js';
+export { AuthType } from './core/contentGenerator.js';
 export * from './core/loggingContentGenerator.js';
 export * from './core/geminiChat.js';
 export * from './core/logger.js';
@@ -74,7 +75,6 @@ export * from './tools/tools.js';
 export * from './tools/tool-error.js';
 export * from './tools/tool-registry.js';
 export * from './tools/ToolsetManager.js';
-export * from './tools/ToolsetOptimizer.js';
 
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';
@@ -112,6 +112,10 @@ export { OAuthUtils } from './mcp/oauth-utils.js';
 // Export multi-model system
 export { MultiModelSystem } from './multimodel/index.js';
 
+// Export session system
+export type { SessionData, SessionInfo, SessionManagerOptions } from './sessions/index.js';
+export { SessionManager } from './sessions/index.js';
+
 // Export provider system
 export type {
   ModelProviderConfig,
@@ -128,7 +132,6 @@ export {
   LMStudioProvider,
   GeminiProvider,
   ModelProviderFactory,
-  UniversalModelClient,
   ProviderConfigManager
 } from './providers/index.js';
 

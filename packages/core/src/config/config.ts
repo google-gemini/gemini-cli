@@ -13,18 +13,20 @@ import {
 } from '../core/contentGenerator.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { LSTool } from '../tools/ls.js';
-import { ReadFileTool } from '../tools/read-file.js';
+// import { LSTool } from '../tools/ls.js';
+// import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
 import { RipGrepTool } from '../tools/ripGrep.js';
-import { GlobTool } from '../tools/glob.js';
-import { EditTool } from '../tools/edit.js';
-import { ShellTool } from '../tools/shell.js';
-import { WriteFileTool } from '../tools/write-file.js';
-import { WebFetchTool } from '../tools/web-fetch.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
+// import { GlobTool } from '../tools/glob.js';
+// import { EditTool } from '../tools/edit.js';
+// import { ShellTool } from '../tools/shell.js';
+// import { WriteFileTool } from '../tools/write-file.js';
+// import { WebFetchTool } from '../tools/web-fetch.js';
+// import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
-import { WebSearchTool } from '../tools/web-search.js';
+// import { WebSearchTool } from '../tools/web-search.js';
+// import { ExcelTool } from '../tools/excel.js';
+// import { PDFTool } from '../tools/pdf.js';
 import { GeminiClient } from '../core/client.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
@@ -54,6 +56,8 @@ import type { AnyToolInvocation } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
+import { RoleManager } from '../roles/RoleManager.js';
+import { ToolsetManager } from '../tools/ToolsetManager.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -210,7 +214,8 @@ export interface ConfigParameters {
 }
 
 export class Config {
-  private toolRegistry!: ToolRegistry;
+  // private toolRegistry!: ToolRegistry;
+  private roleToolRegistries: Map<string, ToolRegistry> = new Map();
   private promptRegistry!: PromptRegistry;
   private sessionId: string;
   private fileSystemService: FileSystemService;
@@ -386,8 +391,7 @@ export class Config {
       await this.getGitService();
     }
     this.promptRegistry = new PromptRegistry();
-    this.toolRegistry = await this.createToolRegistry();
-    logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
+    logCliConfiguration(this, new StartSessionEvent(this));
   }
 
   async refreshAuth(authMethod: AuthType) {
@@ -510,7 +514,27 @@ export class Config {
   }
 
   getToolRegistry(): ToolRegistry {
-    return this.toolRegistry;
+    // Get current role from RoleManager singleton
+    const currentRoleId = RoleManager.getInstance().getCurrentRole().id;
+    
+    // Check if we have a cached registry for this role
+    if (this.roleToolRegistries.has(currentRoleId)) {
+      const cachedRegistry = this.roleToolRegistries.get(currentRoleId)!;
+      // // Log tool names from cached registry
+      // const toolNames = cachedRegistry.getAllTools().map(tool => tool.name);
+      // console.log(`[getToolRegistry] Tool names for role '${currentRoleId}' (cached):`, toolNames);
+      return cachedRegistry;
+    }
+    
+    // If no cached registry, create one for this role using existing method
+    const registry = this.createToolRegistry(currentRoleId);
+    this.roleToolRegistries.set(currentRoleId, registry);
+    
+    // // Log tool names from newly created registry
+    // const toolNames = registry.getAllTools().map(tool => tool.name);
+    // console.log(`[getToolRegistry] Tool names for role '${currentRoleId}' (new):`, toolNames);
+    
+    return registry;
   }
 
   getPromptRegistry(): PromptRegistry {
@@ -814,60 +838,93 @@ export class Config {
     return this.fileExclusions;
   }
 
-  async createToolRegistry(): Promise<ToolRegistry> {
+  createToolRegistry(roleId: string): ToolRegistry {
     const registry = new ToolRegistry(this);
 
-    // helper to create & register core tools that are enabled
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
+    // Use ToolsetManager to get role-specific tools
+    const toolsetManager = new ToolsetManager();
+    const roleTools = toolsetManager.getToolsForRole(roleId);
+    
+    // Register tools based on role
+    for (const ToolClass of roleTools) {
       const className = ToolClass.name;
       const toolName = ToolClass.Name || className;
-      const coreTools = this.getCoreTools();
       const excludeTools = this.getExcludeTools() || [];
-
-      let isEnabled = true; // Enabled by default if coreTools is not set.
-      if (coreTools) {
-        isEnabled = coreTools.some(
-          (tool) =>
-            tool === className ||
-            tool === toolName ||
-            tool.startsWith(`${className}(`) ||
-            tool.startsWith(`${toolName}(`),
-        );
-      }
-
+      
+      // Check if tool is excluded
       const isExcluded = excludeTools.some(
         (tool) => tool === className || tool === toolName,
       );
-
-      if (isExcluded) {
-        isEnabled = false;
+      
+      if (!isExcluded) {
+        // Handle special cases for tool construction
+        if (ToolClass === MemoryTool) {
+          registry.registerTool(new ToolClass());
+        } else if (ToolClass === RipGrepTool && !this.getUseRipgrep()) {
+          // Skip RipGrepTool if ripgrep is disabled, use GrepTool instead
+          continue;
+        } else if (ToolClass === GrepTool && this.getUseRipgrep()) {
+          // Skip GrepTool if ripgrep is enabled, use RipGrepTool instead
+          continue;
+        } else {
+          registry.registerTool(new ToolClass(this));
+        }
       }
-
-      if (isEnabled) {
-        registry.registerTool(new ToolClass(...args));
-      }
-    };
-
-    registerCoreTool(LSTool, this);
-    registerCoreTool(ReadFileTool, this);
-
-    if (this.getUseRipgrep()) {
-      registerCoreTool(RipGrepTool, this);
-    } else {
-      registerCoreTool(GrepTool, this);
     }
 
-    registerCoreTool(GlobTool, this);
-    registerCoreTool(EditTool, this);
-    registerCoreTool(WriteFileTool, this);
-    registerCoreTool(WebFetchTool, this);
-    registerCoreTool(ReadManyFilesTool, this);
-    registerCoreTool(ShellTool, this);
-    registerCoreTool(MemoryTool);
-    registerCoreTool(WebSearchTool, this);
+    // // helper to create & register core tools that are enabled
+    // // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
+    //   const className = ToolClass.name;
+    //   const toolName = ToolClass.Name || className;
+    //   const coreTools = this.getCoreTools();
+    //   const excludeTools = this.getExcludeTools() || [];
 
-    await registry.discoverAllTools();
+    //   let isEnabled = true; // Enabled by default if coreTools is not set.
+    //   if (coreTools) {
+    //     isEnabled = coreTools.some(
+    //       (tool) =>
+    //         tool === className ||
+    //         tool === toolName ||
+    //         tool.startsWith(`${className}(`) ||
+    //         tool.startsWith(`${toolName}(`),
+    //     );
+    //   }
+
+    //   const isExcluded = excludeTools.some(
+    //     (tool) => tool === className || tool === toolName,
+    //   );
+
+    //   if (isExcluded) {
+    //     isEnabled = false;
+    //   }
+
+    //   if (isEnabled) {
+    //     registry.registerTool(new ToolClass(...args));
+    //   }
+    // };
+
+    // registerCoreTool(LSTool, this);
+    // registerCoreTool(ReadFileTool, this);
+
+    // if (this.getUseRipgrep()) {
+    //   registerCoreTool(RipGrepTool, this);
+    // } else {
+    //   registerCoreTool(GrepTool, this);
+    // }
+
+    // registerCoreTool(GlobTool, this);
+    // registerCoreTool(EditTool, this);
+    // registerCoreTool(WriteFileTool, this);
+    // registerCoreTool(WebFetchTool, this);
+    // registerCoreTool(ReadManyFilesTool, this);
+    // registerCoreTool(ShellTool, this);
+    // registerCoreTool(MemoryTool);
+    // registerCoreTool(WebSearchTool, this);
+    // registerCoreTool(ExcelTool, this);
+    // registerCoreTool(PDFTool, this);
+
+    // await registry.discoverAllTools();
     return registry;
   }
 }
