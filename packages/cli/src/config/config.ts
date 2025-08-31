@@ -78,6 +78,7 @@ export interface CliArgs {
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
+  useSmartEdit: boolean | undefined;
   sessionSummary: string | undefined;
 }
 
@@ -333,6 +334,7 @@ export async function loadHierarchicalGeminiMemory(
   fileService: FileDiscoveryService,
   settings: Settings,
   extensionContextFilePaths: string[] = [],
+  folderTrust: boolean,
   memoryImportFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
 ): Promise<{ memoryContent: string; fileCount: number }> {
@@ -358,6 +360,7 @@ export async function loadHierarchicalGeminiMemory(
     debugMode,
     fileService,
     extensionContextFilePaths,
+    folderTrust,
     memoryImportFormat,
     fileFilteringOptions,
     settings.context?.discoveryMaxDirs,
@@ -385,7 +388,7 @@ export async function loadCliConfig(
     settings.security?.folderTrust?.featureEnabled ?? false;
   const folderTrustSetting = settings.security?.folderTrust?.enabled ?? true;
   const folderTrust = folderTrustFeature && folderTrustSetting;
-  const trustedFolder = isWorkspaceTrusted(settings);
+  const trustedFolder = isWorkspaceTrusted(settings) ?? true;
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -433,6 +436,7 @@ export async function loadCliConfig(
     fileService,
     settings,
     extensionContextFilePaths,
+    trustedFolder,
     memoryImportFormat,
     fileFiltering,
   );
@@ -623,6 +627,7 @@ export async function loadCliConfig(
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     eventEmitter: appEvents,
+    useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
   });
 }
 
