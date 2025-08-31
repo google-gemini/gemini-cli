@@ -20,6 +20,84 @@
       "problemMatcher": [],
       "label": "npm: build: vscode-ide-companion",
       "detail": "npm run build -w packages/vscode-ide-companion"
+    },
+    {
+      "type": "npm",
+      "script": "build",
+      "path": "packages/gui",
+      "group": "build",
+      "problemMatcher": [],
+      "label": "Build GUI for Electron Debug",
+      "detail": "Build Vite app for Electron debugging",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "type": "npm",
+      "script": "dev",
+      "path": "packages/gui",
+      "group": "build",
+      "label": "Start GUI Dev Server",
+      "detail": "Start Vite dev server for GUI",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "problemMatcher": {
+        "pattern": [
+          {
+            "regexp": ".",
+            "file": 1,
+            "location": 2,
+            "message": 3
+          }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Local:.*http://localhost:3000"
+        }
+      }
+    },
+    // {
+    //   "type": "npm",
+    //   "script": "build",
+    //   "path": "packages/core",
+    //   "group": "build",
+    //   "problemMatcher": [],
+    //   "label": "Build Core Package",
+    //   "detail": "Build @google/gemini-cli-core package for debugging",
+    //   "presentation": {
+    //     "reveal": "silent",
+    //     "panel": "shared",
+    //     "clear": true
+    //   }
+    // },
+    {
+      "type": "npm",
+      "script": "build",
+      "group": "build",
+      "problemMatcher": [],
+      "label": "Build All Packages",
+      "detail": "Build all packages for Electron debugging",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "clear": true
+      }
+    },
+    {
+      "type": "npm",
+      "script": "build:electron",
+      "path": "packages/gui",
+      "group": "build",
+      "problemMatcher": [],
+      "label": "npm: build:electron - packages/gui",
+      "detail": "Build Electron app for production debugging"
     }
   ]
 }

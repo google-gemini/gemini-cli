@@ -88,6 +88,51 @@
       "env": {
         "GEMINI_SANDBOX": "false"
       }
+    },
+    {
+      "name": "Debug Electron GUI",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/packages/gui",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:electron"
+      ],
+      "env": {
+        "NODE_ENV": "development",
+        "ELECTRON_IS_DEV": "1",
+        "ELECTRON_ENABLE_LOGGING": "1"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**",
+        "**/node_modules/**"
+      ],
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/packages/gui/**",
+        "${workspaceFolder}/packages/core/**",
+        "http://localhost:3000/**",
+        "!**/node_modules/**"
+      ],
+      "outputCapture": "std",
+      "preLaunchTask": "Build All Packages"
+    },
+    {
+      "name": "Debug Electron GUI (Production Build)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/packages/gui",
+      "program": "${workspaceFolder}/packages/gui/dist-electron/main.js",
+      "env": {
+        "NODE_ENV": "production"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**",
+        "**/node_modules/**"
+      ],
+      "preLaunchTask": "npm: build:electron - packages/gui"
     }
   ],
   "inputs": [
