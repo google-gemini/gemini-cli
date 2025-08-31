@@ -7,7 +7,11 @@
 import React from 'react';
 import { Text, Box } from 'ink';
 import { Colors } from '../colors.js';
-import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
+import { getPlainTextLength, RenderInline } from './InlineMarkdownRenderer.js';
+import {
+  splitContentIntoEqualWidthLines,
+  MAX_LINES_IN_A_ROW,
+} from './tableRendererUtils.js';
 
 interface TableRendererProps {
   headers: string[];
@@ -25,13 +29,16 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   terminalWidth,
 }) => {
   // Calculate column widths using actual display width after markdown processing
-  const columnWidths = headers.map((header, index) => {
+  let columnWidths = headers.map((header, index) => {
     const headerWidth = getPlainTextLength(header);
     const maxRowWidth = Math.max(
       ...rows.map((row) => getPlainTextLength(row[index] || '')),
     );
     return Math.max(headerWidth, maxRowWidth) + 2; // Add padding
   });
+
+  const charSum = columnWidths.reduce((s, w) => s + w, 0);
+  columnWidths = columnWidths.map((w) => Math.max(w, charSum / 3));
 
   // Ensure table fits within terminal width
   const totalWidth = columnWidths.reduce((sum, width) => sum + width + 1, 1);
@@ -41,64 +48,18 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     Math.floor(width * scaleFactor),
   );
 
-  // Helper function to render a cell with proper width
-  const renderCell = (
-    content: string,
-    width: number,
-    isHeader = false,
-  ): React.ReactNode => {
-    const contentWidth = Math.max(0, width - 2);
-    const displayWidth = getPlainTextLength(content);
-
-    let cellContent = content;
-    if (displayWidth > contentWidth) {
-      if (contentWidth <= 3) {
-        // Just truncate by character count
-        cellContent = content.substring(
-          0,
-          Math.min(content.length, contentWidth),
-        );
-      } else {
-        // Truncate preserving markdown formatting using binary search
-        let left = 0;
-        let right = content.length;
-        let bestTruncated = content;
-
-        // Binary search to find the optimal truncation point
-        while (left <= right) {
-          const mid = Math.floor((left + right) / 2);
-          const candidate = content.substring(0, mid);
-          const candidateWidth = getPlainTextLength(candidate);
-
-          if (candidateWidth <= contentWidth - 3) {
-            bestTruncated = candidate;
-            left = mid + 1;
-          } else {
-            right = mid - 1;
-          }
-        }
-
-        cellContent = bestTruncated + '...';
-      }
-    }
-
-    // Calculate exact padding needed
-    const actualDisplayWidth = getPlainTextLength(cellContent);
-    const paddingNeeded = Math.max(0, contentWidth - actualDisplayWidth);
-
-    return (
-      <Text>
-        {isHeader ? (
-          <Text bold color={Colors.AccentCyan}>
-            <RenderInline text={cellContent} />
-          </Text>
-        ) : (
-          <RenderInline text={cellContent} />
-        )}
-        {' '.repeat(paddingNeeded)}
-      </Text>
-    );
-  };
+  // helper function to render a cell
+  const renderCell = (cellPart: string, isHeader: boolean) => (
+    <Text>
+      {isHeader ? (
+        <Text bold color={Colors.AccentCyan}>
+          <RenderInline text={cellPart} />
+        </Text>
+      ) : (
+        <RenderInline text={cellPart} />
+      )}
+    </Text>
+  );
 
   // Helper function to render border
   const renderBorder = (type: 'top' | 'middle' | 'bottom'): React.ReactNode => {
@@ -115,25 +76,54 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     return <Text>{border}</Text>;
   };
 
-  // Helper function to render a table row
-  const renderRow = (cells: string[], isHeader = false): React.ReactNode => {
-    const renderedCells = cells.map((cell, index) => {
-      const width = adjustedWidths[index] || 0;
-      return renderCell(cell || '', width, isHeader);
-    });
-
+  const renderLineInsideRow = (line: string[], isHeader: boolean) => {
+    const lineParts = line.map((txt) => renderCell(txt, isHeader));
     return (
       <Text>
         │{' '}
-        {renderedCells.map((cell, index) => (
+        {lineParts.map((cell, index) => (
           <React.Fragment key={index}>
             {cell}
-            {index < renderedCells.length - 1 ? ' │ ' : ''}
+            {index < lineParts.length - 1 ? ' │ ' : ''}
           </React.Fragment>
         ))}{' '}
         │
       </Text>
     );
+  };
+
+  function splitRowCellsIntoMultipleLines(
+    cells: string[],
+    lineCount: number,
+  ): string[][] {
+    const lines: string[][] = Array.from({ length: lineCount }, () => []);
+    for (const [colIdx, cell] of cells.entries()) {
+      const cellParts = splitContentIntoEqualWidthLines(
+        cell,
+        adjustedWidths[colIdx] - 2,
+        lineCount,
+      );
+      cellParts.forEach((part, lineIdx) => {
+        lines[lineIdx].push(part);
+      });
+    }
+
+    return lines;
+  }
+
+  // Helper function to render a table row
+  const renderRow = (cells: string[], isHeader = false): React.ReactNode => {
+    const textLines = cells.map((c, i) =>
+      Math.ceil(getPlainTextLength(c) / adjustedWidths[i]),
+    );
+    const linesInRow = Math.min(Math.max(...textLines), MAX_LINES_IN_A_ROW);
+    const lines = splitRowCellsIntoMultipleLines(cells, linesInRow);
+
+    return lines.map((line, idx) => (
+      <React.Fragment key={idx}>
+        {renderLineInsideRow(line, isHeader)}
+      </React.Fragment>
+    ));
   };
 
   return (
