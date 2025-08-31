@@ -236,12 +236,12 @@ export class IDEServer {
           this.log(`IDE server listening on port ${this.port}`);
 
           // Forwards the port programmatically in VS Code.
-	  vscode.commands.executeCommand('workbench.action.forwardPort', [
-            this.port,
-          ]).then(undefined, (err) => {
-            const message = err instanceof Error ? err.message : String(err);
-            this.log(`Failed to forward port programmatically: ${message}`);
-          });
+          // vscode.commands.executeCommand('workbench.action.forwardPort', [
+          //   this.port,
+          // ]).then(undefined, (err) => {
+          //   const message = err instanceof Error ? err.message : String(err);
+          //   this.log(`Failed to forward port programmatically: ${message}`);
+          // });
 
           await writePortAndWorkspace(
             context,
