@@ -32,14 +32,14 @@ export const useThemeCommand = (
     const loadThemesAndApply = async () => {
       try {
         // First, load custom themes from both settings and files
-        if (loadedSettings.merged.customThemes) {
+        if (loadedSettings.merged.ui?.customThemes) {
           await themeManager.loadCustomThemes(
-            loadedSettings.merged.customThemes,
+            loadedSettings.merged.ui?.customThemes,
           );
         }
 
         // Then, apply the configured theme if it exists and is valid
-        const effectiveTheme = loadedSettings.merged.theme;
+        const effectiveTheme = loadedSettings.merged.ui?.theme;
         if (effectiveTheme) {
           if (themeManager.findThemeByName(effectiveTheme)) {
             themeManager.setActiveTheme(effectiveTheme);
@@ -58,18 +58,11 @@ export const useThemeCommand = (
 
     loadThemesAndApply();
   }, [
-    loadedSettings.merged.customThemes,
-    loadedSettings.merged.theme,
+    loadedSettings.merged.ui?.customThemes,
+    loadedSettings.merged.ui?.theme,
     setThemeError,
   ]);
-    const effectiveTheme = loadedSettings.merged.ui?.theme;
-    if (effectiveTheme && !themeManager.findThemeByName(effectiveTheme)) {
-      setIsThemeDialogOpen(true);
-      setThemeError(`Theme "${effectiveTheme}" not found.`);
-    } else {
-      setThemeError(null);
-    }
-  }, [loadedSettings.merged.ui?.theme, setThemeError]);
+
   const openThemeDialog = useCallback(() => {
     if (process.env['NO_COLOR']) {
       addItem(
@@ -125,12 +118,12 @@ export const useThemeCommand = (
         loadedSettings.setValue(scope, 'theme', themeName);
 
         // Ensure themeManager has combined latest before applying (idempotent safe)
-        if (loadedSettings.merged.customThemes) {
+        if (loadedSettings.merged.ui?.customThemes) {
           await themeManager.loadCustomThemes(
-            loadedSettings.merged.customThemes,
+            loadedSettings.merged.ui?.customThemes,
           );
         }
-        applyTheme(loadedSettings.merged.theme);
+        applyTheme(loadedSettings.merged.ui?.theme);
         // Merge user and workspace custom themes (workspace takes precedence)
         const mergedCustomThemes = {
           ...(loadedSettings.user.settings.ui?.customThemes || {}),

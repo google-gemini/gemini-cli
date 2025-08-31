@@ -7,10 +7,10 @@
 
 import {
   CommandKind,
-  OpenDialogActionReturn,
-  SlashCommand,
-  SlashCommandActionReturn,
-  CommandContext,
+  type OpenDialogActionReturn,
+  type SlashCommand,
+  type SlashCommandActionReturn,
+  type CommandContext,
 } from './types.js';
 import { listThemeFiles } from '@google/gemini-cli-core';
 import { themeInstaller } from './installers/themeInstaller.js';
@@ -58,10 +58,6 @@ const installSubCommand: SlashCommand = {
     return themeInstaller.run(context, args);
   },
 };
-
-import type { OpenDialogActionReturn, SlashCommand } from './types.js';
-import { CommandKind } from './types.js';
-
 
 export const themeCommand: SlashCommand = {
   name: 'theme',

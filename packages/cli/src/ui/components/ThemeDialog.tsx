@@ -6,11 +6,6 @@
 
 import React, { useCallback, useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-
-
-import type React from 'react';
-import { useCallback, useState } from 'react';
-import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import {
@@ -70,7 +65,7 @@ export function ThemeDialog({
   useEffect(() => {
     const loadThemes = async () => {
       try {
-        const mergedSettingsThemes = settings.merged.customThemes || {};
+        const mergedSettingsThemes = settings.merged.ui?.customThemes || {};
         const fileThemes = await loadFileBasedThemes();
 
         const allThemes = {
@@ -88,7 +83,7 @@ export function ThemeDialog({
         await themeManager.loadCustomThemes(allThemes);
       } catch (error) {
         console.warn('Failed to load combined themes:', error);
-        const mergedSettingsThemes = settings.merged.customThemes || {};
+        const mergedSettingsThemes = settings.merged.ui?.customThemes || {};
         setCombinedThemes({
           settingsThemes: mergedSettingsThemes,
           fileThemes: {},
@@ -102,19 +97,24 @@ export function ThemeDialog({
     loadThemes();
     // Only reload when the custom theme collections actually change
   }, [
-    settings.user.settings.customThemes,
-    settings.workspace.settings.customThemes,
-    settings.system.settings.customThemes,
-    settings.merged.customThemes,
+    settings.user.settings.ui?.customThemes,
+    settings.workspace.settings.ui?.customThemes,
+    settings.system.settings.ui?.customThemes,
+    settings.merged.ui?.customThemes,
   ]);
 
   // Generate theme items from combined sources
-  const customThemes = combinedThemes?.allThemes || {};
+  const allCustomThemes = combinedThemes?.allThemes || {};
   // Generate theme items filtered by selected scope
+  // For User scope, show user settings + file-based themes
+  // For other scopes, show all themes (settings + file-based)
   const customThemes =
     selectedScope === SettingScope.User
-      ? settings.user.settings.ui?.customThemes || {}
-      : settings.merged.ui?.customThemes || {};
+      ? {
+        ...(settings.user.settings.ui?.customThemes || {}),
+        ...(combinedThemes?.fileThemes || {}),
+      }
+      : allCustomThemes;
   const builtInThemes = themeManager
     .getAvailableThemes()
     .filter((theme) => theme.type !== 'custom');
@@ -132,9 +132,9 @@ export function ThemeDialog({
     ...customThemeNames.map((name) => {
       // Determine granular source for display
       const fromFile = combinedThemes?.fileThemes[name] !== undefined;
-      const fromUser = !!settings.user.settings.customThemes?.[name];
-      const fromWorkspace = !!settings.workspace.settings.customThemes?.[name];
-      const fromSystem = !!settings.system.settings.customThemes?.[name];
+      const fromUser = !!settings.user.settings.ui?.customThemes?.[name];
+      const fromWorkspace = !!settings.workspace.settings.ui?.customThemes?.[name];
+      const fromSystem = !!settings.system.settings.ui?.customThemes?.[name];
 
       const sources: string[] = [];
       if (fromFile) sources.push('File');
@@ -233,8 +233,8 @@ export function ThemeDialog({
   const colorizeCodeWidth = Math.max(
     Math.floor(
       (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
-        PREVIEW_PANE_WIDTH_PERCENTAGE *
-        PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+      PREVIEW_PANE_WIDTH_PERCENTAGE *
+      PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
     ),
     1,
   );

@@ -11,7 +11,7 @@ import type {
 } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type { Config } from '../config/config.js';
-import { detectIde, getIdeInfo, DetectedIde } from '../ide/detect-ide.js';
+import { detectIdeFromEnv, getIdeInfo, DetectedIde } from '../ide/detect-ide.js';
 import { getIdeInstaller } from '../ide/ide-installer.js';
 
 export type InstallVSCodeCompanionParams = Record<string, never>;
@@ -34,7 +34,7 @@ class InstallVSCodeCompanionInvocation extends BaseToolInvocation<
   override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    const ide = detectIde();
+    const ide = detectIdeFromEnv();
     const ideName = ide ? getIdeInfo(ide).displayName : 'VS Code family';
     return {
       type: 'info',
@@ -45,7 +45,7 @@ class InstallVSCodeCompanionInvocation extends BaseToolInvocation<
   }
 
   async execute(): Promise<ToolResult> {
-    const ide = detectIde();
+    const ide = detectIdeFromEnv();
     const target = ide ?? DetectedIde.VSCode;
     const installer = getIdeInstaller(target);
     if (!installer) {
