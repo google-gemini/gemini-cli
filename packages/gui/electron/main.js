@@ -1,10 +1,11 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
-const { MultiModelSystem, Config } = require('@google/gemini-cli-core')
+const { MultiModelSystem, Config, RoleManager, WorkspaceManager, SessionManager, ModelProviderFactory, GeminiClient, AuthType } = require('@google/gemini-cli-core')
 
 // MultiModelSystem instance - we'll initialize this when needed
 let multiModelSystem = null
 let isInitialized = false
+let initializationPromise = null
 
 const createWindow = () => {
   // Create the browser window.
@@ -57,7 +58,23 @@ ipcMain.handle('get-app-version', () => {
 })
 
 ipcMain.handle('get-working-directory', () => {
-  return process.cwd()
+  // Return user's home directory or Documents folder instead of process.cwd()
+  const os = require('os')
+  const path = require('path')
+  
+  // Try to get Documents folder, fallback to home directory
+  try {
+    const documentsPath = path.join(os.homedir(), 'Documents')
+    const fs = require('fs')
+    if (fs.existsSync(documentsPath)) {
+      return documentsPath
+    }
+  } catch (error) {
+    console.warn('Failed to access Documents folder:', error)
+  }
+  
+  // Fallback to home directory
+  return os.homedir()
 })
 
 // Dialog API handlers
@@ -73,15 +90,41 @@ ipcMain.handle('dialog-show-open-dialog', async (_, options) => {
 
 // Helper function to ensure MultiModelSystem is initialized
 const ensureInitialized = async (configParams = {}) => {
-  if (!multiModelSystem || !isInitialized) {
+  // If already initialized, return immediately
+  if (multiModelSystem && isInitialized) {
+    return multiModelSystem
+  }
+  
+  // If initialization is in progress, wait for it
+  if (initializationPromise) {
+    await initializationPromise
+    return multiModelSystem
+  }
+  
+  // Start initialization
+  initializationPromise = (async () => {
     try {
       // Create a proper ConfigParameters object
+      // Get user's preferred working directory instead of process.cwd()
+      const os = require('os')
+      const path = require('path')
+      let workingDirectory = os.homedir()
+      
+      try {
+        const documentsPath = path.join(os.homedir(), 'Documents')
+        const fs = require('fs')
+        if (fs.existsSync(documentsPath)) {
+          workingDirectory = documentsPath
+        }
+      } catch (error) {
+        console.warn('Failed to access Documents folder, using home directory:', error)
+      }
+      
       const configParameters = {
         sessionId: `gui-session-${Date.now()}`,
-        targetDir: process.cwd(),
+        targetDir: workingDirectory,
         debugMode: false,
-        model: configParams.model || 'openai/gpt-oss-20b',
-        cwd: process.cwd(),
+        cwd: workingDirectory,
         interactive: true,
         ideMode: false, // 禁用 IDE 模式以避免 wmic 命令问题
         ...configParams
@@ -91,15 +134,44 @@ const ensureInitialized = async (configParams = {}) => {
       const config = new Config(configParameters)
       await config.initialize()
       
-      // Initialize MultiModelSystem with the proper Config instance
-      multiModelSystem = new MultiModelSystem(config)
+      // Initialize GeminiClient only if GEMINI_API_KEY is available
+      let geminiClient = null
+      if (process.env.GEMINI_API_KEY) {
+        try {
+          await config.refreshAuth(AuthType.USE_GEMINI)
+          geminiClient = config.getGeminiClient()
+          console.log('GeminiClient initialized successfully with API key')
+        } catch (error) {
+          console.warn('Failed to initialize GeminiClient:', error.message)
+        }
+      } else {
+        console.log('GEMINI_API_KEY not found, GeminiClient will not be available')
+      }
+      
+      // Initialize MultiModelSystem with the proper Config instance and optional GeminiClient
+      multiModelSystem = new MultiModelSystem(config, geminiClient)
+      
+      // Initialize SessionManager with config and ModelProviderFactory
+      await SessionManager.getInstance().initializeWithConfig({
+        config: config,
+        createModelProvider: ModelProviderFactory.create
+      })
+      
+      // Initialize WorkspaceManager with config to ensure proper setup
+      const workspaceManager = WorkspaceManager.getInstance(config)
+      await workspaceManager.ensureInitialized()
+      console.log('WorkspaceManager initialized with config and persisted directories loaded')
+      
       isInitialized = true
-      console.log('MultiModelSystem initialized with LM Studio default model')
+      console.log('MultiModelSystem, SessionManager and WorkspaceManager initialized with LM Studio default model')
     } catch (error) {
       console.error('Failed to initialize MultiModelSystem:', error)
+      initializationPromise = null // Reset on error
       throw error
     }
-  }
+  })()
+  
+  await initializationPromise
   return multiModelSystem
 }
 
@@ -129,8 +201,13 @@ ipcMain.handle('multimodel-get-available-models', async (_, providerType) => {
       }
     }
     
-    console.log('Retrieved models:', models)
-    return models
+    // Filter out empty provider arrays to avoid UI confusion
+    const filteredModels = Object.fromEntries(
+      Object.entries(models).filter(([provider, modelList]) => modelList && modelList.length > 0)
+    )
+    
+    console.log('Retrieved models:', filteredModels)
+    return filteredModels
   } catch (error) {
     console.error('Failed to get available models:', error)
     // 返回带有默认 LM Studio 模型的备用列表
@@ -144,18 +221,46 @@ ipcMain.handle('multimodel-get-available-models', async (_, providerType) => {
 
 ipcMain.handle('multimodel-get-all-roles', async () => {
   console.log('MultiModel getAllRoles called')
-  // TODO: Return actual roles
-  // For now, return mock data
-  return [
-    { id: 'software_engineer', name: 'Software Engineer', description: 'Helps with coding tasks' },
-    { id: 'data_analyst', name: 'Data Analyst', description: 'Helps with data analysis' },
-  ]
+  try {
+    const system = await ensureInitialized()
+    const roles = RoleManager.getInstance().getAllRoles()
+    console.log('Retrieved roles:', roles.length, 'roles')
+    return roles
+  } catch (error) {
+    console.error('Failed to get all roles:', error)
+    // Fallback to basic built-in roles if system is not available
+    return [
+      { 
+        id: 'software_engineer', 
+        name: 'Software Engineer', 
+        description: 'Professional software development and code analysis assistant',
+        category: 'development',
+        icon: '💻',
+        isBuiltin: true
+      }
+    ]
+  }
 })
 
 ipcMain.handle('multimodel-get-current-role', async () => {
   console.log('MultiModel getCurrentRole called')
-  // TODO: Return actual current role
-  return { id: 'software_engineer', name: 'Software Engineer', description: 'Helps with coding tasks' }
+  try {
+    const system = await ensureInitialized()
+    const currentRole = RoleManager.getInstance().getCurrentRole()
+    console.log('Retrieved current role:', currentRole.id)
+    return currentRole
+  } catch (error) {
+    console.error('Failed to get current role:', error)
+    // Fallback to default role if system is not available
+    return { 
+      id: 'software_engineer', 
+      name: 'Software Engineer', 
+      description: 'Professional software development and code analysis assistant',
+      category: 'development',
+      icon: '💻',
+      isBuiltin: true
+    }
+  }
 })
 
 // Add more handlers as needed...
@@ -190,7 +295,15 @@ ipcMain.handle('multimodel-switch-provider', async (_, providerType, model) => {
 
 ipcMain.handle('multimodel-switch-role', async (_, roleId) => {
   console.log('MultiModel switchRole called:', roleId)
-  return true
+  try {
+    const system = await ensureInitialized()
+    const success = await system.switchRole(roleId)
+    console.log('Role switched successfully:', success)
+    return success
+  } catch (error) {
+    console.error('Failed to switch role:', error)
+    return false
+  }
 })
 
 // Workspace directory management handlers
@@ -198,7 +311,7 @@ ipcMain.handle('multimodel-get-workspace-directories', async () => {
   try {
     console.log('MultiModel getWorkspaceDirectories called')
     const system = await ensureInitialized()
-    const directories = system.getWorkspaceDirectories()
+    const directories = WorkspaceManager.getInstance().getDirectories()
     console.log('Current workspace directories:', directories)
     return directories
   } catch (error) {
@@ -211,10 +324,10 @@ ipcMain.handle('multimodel-add-workspace-directory', async (event, directory, ba
   try {
     console.log('MultiModel addWorkspaceDirectory called:', directory, 'basePath:', basePath)
     const system = await ensureInitialized()
-    await system.addWorkspaceDirectory(directory, basePath)
+    await WorkspaceManager.getInstance().addWorkspaceDirectory(directory, basePath)
     
     // Notify all renderer processes about the workspace change
-    const updatedDirectories = system.getWorkspaceDirectories()
+    const updatedDirectories = WorkspaceManager.getInstance().getDirectories()
     BrowserWindow.getAllWindows().forEach(window => {
       window.webContents.send('workspace-directories-changed', {
         type: 'added',
@@ -235,10 +348,10 @@ ipcMain.handle('multimodel-set-workspace-directories', async (event, directories
   try {
     console.log('MultiModel setWorkspaceDirectories called:', directories)
     const system = await ensureInitialized()
-    await system.setWorkspaceDirectories(directories)
+    await WorkspaceManager.getInstance().setDirectories(directories)
     
     // Notify all renderer processes about the workspace change
-    const updatedDirectories = system.getWorkspaceDirectories()
+    const updatedDirectories = WorkspaceManager.getInstance().getDirectories()
     BrowserWindow.getAllWindows().forEach(window => {
       window.webContents.send('workspace-directories-changed', {
         type: 'set',
@@ -259,10 +372,128 @@ ipcMain.handle('multimodel-get-all-templates', async () => {
   return []
 })
 
-ipcMain.handle('multimodel-get-current-toolset', async () => {
-  console.log('MultiModel getCurrentToolset called')
-  return []
+// History management handlers
+ipcMain.handle('multimodel-get-history', async () => {
+  try {
+    const system = await ensureInitialized()
+    const history = SessionManager.getInstance().getHistory()
+    console.log('MultiModel getHistory called, returning', history.length, 'messages')
+    return history
+  } catch (error) {
+    console.error('Failed to get conversation history:', error)
+    return []
+  }
 })
+
+ipcMain.handle('multimodel-set-history', async (_, history) => {
+  try {
+    const system = await ensureInitialized()
+    SessionManager.getInstance().setHistory(history)
+    console.log('MultiModel setHistory called with', history.length, 'messages')
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to set conversation history:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('multimodel-clear-history', async () => {
+  try {
+    const system = await ensureInitialized()
+    SessionManager.getInstance().clearHistory()
+    console.log('MultiModel clearHistory called')
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to clear conversation history:', error)
+    throw error
+  }
+})
+
+// Session management handlers
+ipcMain.handle('multimodel-create-session', async (_, sessionId, title = 'New Chat') => {
+  try {
+    const system = await ensureInitialized()
+    SessionManager.getInstance().createSession(sessionId, title)
+    console.log('MultiModel createSession called:', sessionId, title)
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to create session:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('multimodel-switch-session', async (_, sessionId) => {
+  try {
+    const system = await ensureInitialized()
+    SessionManager.getInstance().switchSession(sessionId)
+    console.log('MultiModel switchSession called:', sessionId)
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to switch session:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('multimodel-delete-session', async (_, sessionId) => {
+  try {
+    const system = await ensureInitialized()
+    SessionManager.getInstance().deleteSession(sessionId)
+    console.log('MultiModel deleteSession called:', sessionId)
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to delete session:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('multimodel-get-current-session-id', async () => {
+  try {
+    const system = await ensureInitialized()
+    const sessionId = SessionManager.getInstance().getCurrentSessionId()
+    console.log('MultiModel getCurrentSessionId called, returning:', sessionId)
+    return sessionId
+  } catch (error) {
+    console.error('Failed to get current session ID:', error)
+    return null
+  }
+})
+
+ipcMain.handle('multimodel-get-display-messages', async (_, sessionId) => {
+  try {
+    const system = await ensureInitialized()
+    const messages = SessionManager.getInstance().getDisplayMessages(sessionId)
+    console.log('MultiModel getDisplayMessages called for session:', sessionId, 'returning', messages.length, 'messages')
+    return messages
+  } catch (error) {
+    console.error('Failed to get display messages:', error)
+    return []
+  }
+})
+
+ipcMain.handle('multimodel-get-sessions-info', async () => {
+  try {
+    const system = await ensureInitialized()
+    const sessionsInfo = SessionManager.getInstance().getSessionsInfo()
+    console.log('MultiModel getSessionsInfo called, returning', sessionsInfo.length, 'sessions')
+    return sessionsInfo
+  } catch (error) {
+    console.error('Failed to get sessions info:', error)
+    return []
+  }
+})
+
+ipcMain.handle('multimodel-update-session-title', async (_, sessionId, newTitle) => {
+  try {
+    const system = await ensureInitialized()
+    SessionManager.getInstance().updateSessionTitle(sessionId, newTitle)
+    console.log('MultiModel updateSessionTitle called:', sessionId, newTitle)
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to update session title:', error)
+    throw error
+  }
+})
+
 
 // Add message sending handler
 ipcMain.handle('multimodel-send-message', async (_, messages, signal) => {
@@ -293,9 +524,9 @@ ipcMain.handle('multimodel-send-message', async (_, messages, signal) => {
 })
 
 // Add streaming message handler using electron-ipc-stream
-ipcMain.handle('multimodel-send-message-stream', async (event, messages, roleId, streamId) => {
+ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamId) => {
   try {
-    console.log('MultiModel sendMessageStream called with:', messages?.length, 'messages', 'roleId:', roleId, 'streamId:', streamId)
+    console.log('MultiModel sendMessageStream called with:', messages?.length, 'messages', 'streamId:', streamId)
     const system = await ensureInitialized()
     
     // Convert messages to the format expected by MultiModelSystem
@@ -309,7 +540,7 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, roleId,
     
     try {
       // Use streaming approach
-      const streamGenerator = system.sendMessageStream(universalMessages, abortController.signal, roleId)
+      const streamGenerator = system.sendMessageStream(universalMessages, abortController.signal)
       
       let fullContent = ''
       
@@ -324,7 +555,6 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, roleId,
         }
         
         event.sender.send('multimodel-stream-chunk', chunkData)
-        console.log('Sent chunk:', chunkData.type, chunkData.content?.length, 'chars')
         
         // Accumulate content for final response
         if (chunk.content) {
@@ -342,9 +572,7 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, roleId,
       }
       
       event.sender.send('multimodel-stream-complete', completionData)
-      console.log('Sent completion:', completionData.content?.length, 'chars')
       
-      console.log('MultiModel sendMessageStream completed')
       return { success: true, totalContent: fullContent }
       
     } catch (streamError) {

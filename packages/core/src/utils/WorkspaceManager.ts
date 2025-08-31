@@ -8,6 +8,8 @@ import type { Config } from '../config/config.js';
 import type { WorkspaceContext, Unsubscribe } from './workspaceContext.js';
 import { getEnvironmentContext } from './environmentContext.js';
 import type { Part } from '@google/genai';
+import path from 'node:path';
+import fs from 'node:fs';
 
 export interface WorkspaceChangeEvent {
   readonly type: 'added' | 'removed' | 'set';
@@ -23,22 +25,57 @@ export type WorkspaceChangeListener = (event: WorkspaceChangeEvent) => void;
  * This class bridges the gap between frontend workspace operations and backend data flow.
  */
 export class WorkspaceManager {
+  private static instance: WorkspaceManager | null = null;
   private readonly config: Config;
   private readonly workspaceContext: WorkspaceContext;
   private readonly changeListeners = new Set<WorkspaceChangeListener>();
   private environmentContext: Part[] = [];
   private contextUpdatePromise: Promise<void> | null = null;
   private workspaceUnsubscribe: Unsubscribe;
+  private readonly persistenceFilePath: string;
+  private initializationPromise: Promise<void> | null = null;
 
-  constructor(config: Config) {
+  private constructor(config: Config) {
     this.config = config;
     this.workspaceContext = config.getWorkspaceContext();
     
+    // Setup persistence file path in project temp directory
+    const tempDir = this.config.storage.getProjectTempDir();
+    this.persistenceFilePath = path.join(tempDir, 'active-workspace-directories.json');
+    
     this.workspaceUnsubscribe = this.workspaceContext.onDirectoriesChanged(() => {
       this.scheduleContextUpdate();
+      this.persistDirectories(); // Auto-save when directories change
     });
 
     this.scheduleContextUpdate();
+    
+    // Start async initialization
+    this.initializationPromise = this.initialize();
+  }
+
+  private async initialize(): Promise<void> {
+    await this.loadPersistedDirectories(); // Load persisted directories on startup
+  }
+
+  static getInstance(config?: Config): WorkspaceManager {
+    if (!WorkspaceManager.instance) {
+      if (!config) {
+        throw new Error('WorkspaceManager not initialized. Call with config first.');
+      }
+      WorkspaceManager.instance = new WorkspaceManager(config);
+    }
+    return WorkspaceManager.instance;
+  }
+
+  /**
+   * Ensures the WorkspaceManager is fully initialized, including loading persisted directories.
+   * @returns Promise that resolves when initialization is complete
+   */
+  async ensureInitialized(): Promise<void> {
+    if (this.initializationPromise) {
+      await this.initializationPromise;
+    }
   }
 
   /**
@@ -58,7 +95,7 @@ export class WorkspaceManager {
    * @param directory The directory path to add
    * @param basePath Optional base path for resolving relative paths
    */
-  async addDirectory(directory: string, basePath?: string): Promise<void> {
+  async addWorkspaceDirectory(directory: string, basePath?: string): Promise<void> {
     const previousDirectories = this.getDirectories();
     
     try {
@@ -152,6 +189,69 @@ export class WorkspaceManager {
   dispose(): void {
     this.workspaceUnsubscribe();
     this.changeListeners.clear();
+  }
+
+  /**
+   * Persists the current active workspace directories to disk.
+   * This is called automatically when directories change.
+   */
+  private async persistDirectories(): Promise<void> {
+    try {
+      const directories = this.getDirectories();
+      const data = {
+        activeWorkspaceDirectories: directories,
+        savedAt: new Date().toISOString()
+      };
+      
+      // Ensure the temp directory exists
+      const tempDir = path.dirname(this.persistenceFilePath);
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      
+      await fs.promises.writeFile(this.persistenceFilePath, JSON.stringify(data, null, 2), 'utf8');
+      console.log(`Persisted ${directories.length} active workspace directories`);
+    } catch (error) {
+      console.error('Failed to persist workspace directories:', error);
+    }
+  }
+
+  /**
+   * Loads persisted workspace directories from disk and applies them.
+   * This is called automatically during initialization.
+   */
+  private async loadPersistedDirectories(): Promise<void> {
+    try {
+      if (!fs.existsSync(this.persistenceFilePath)) {
+        console.log('No persisted workspace directories found');
+        return;
+      }
+      
+      const data = await fs.promises.readFile(this.persistenceFilePath, 'utf8');
+      const parsed = JSON.parse(data);
+      
+      if (parsed.activeWorkspaceDirectories && Array.isArray(parsed.activeWorkspaceDirectories)) {
+        const directories = parsed.activeWorkspaceDirectories as string[];
+        
+        // Validate that directories still exist before restoring
+        const validDirectories = [];
+        for (const dir of directories) {
+          if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+            validDirectories.push(dir);
+          } else {
+            console.warn(`Skipping restored directory (no longer exists): ${dir}`);
+          }
+        }
+        
+        if (validDirectories.length > 0) {
+          // Don't trigger change notifications during initial load
+          this.workspaceContext.setDirectories(validDirectories);
+          console.log(`Restored ${validDirectories.length} active workspace directories from disk`);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load persisted workspace directories:', error);
+    }
   }
 
   private scheduleContextUpdate(): Promise<void> {
