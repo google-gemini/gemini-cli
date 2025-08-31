@@ -47,7 +47,9 @@ The following code can be added to your workspace (`.gemini/settings.json`) or u
     "enabled": true,
     "target": "gcp"
   },
-  "sandbox": false
+  "tools": {
+    "sandbox": false
+  }
 }
 ```
 
@@ -177,9 +179,10 @@ Logs are timestamped records of specific events. The following events are logged
 
 - `gemini_cli.user_prompt`: This event occurs when a user submits a prompt.
   - **Attributes**:
-    - `prompt_length`
-    - `prompt` (this attribute is excluded if `log_prompts_enabled` is configured to be `false`)
-    - `auth_type`
+    - `prompt_length` (int)
+    - `prompt_id` (string)
+    - `prompt` (string, this attribute is excluded if `log_prompts_enabled` is configured to be `false`)
+    - `auth_type` (string)
 
 - `gemini_cli.tool_call`: This event occurs for each function call.
   - **Attributes**:

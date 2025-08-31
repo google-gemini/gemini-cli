@@ -7,6 +7,10 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 
+
+import type React from 'react';
+import { useCallback, useState } from 'react';
+import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import {
@@ -16,7 +20,8 @@ import {
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
+import { SettingScope } from '../../config/settings.js';
 import {
   getScopeItems,
   getScopeMessageForSetting,
@@ -52,7 +57,8 @@ export function ThemeDialog({
   // Track the currently highlighted theme name
   const [highlightedThemeName, setHighlightedThemeName] = useState<
     string | undefined
-  >(settings.merged.theme || DEFAULT_THEME.name);
+  >(settings.merged.ui?.theme || DEFAULT_THEME.name);
+
 
   // State for combined themes (settings + file-based)
   const [combinedThemes, setCombinedThemes] = useState<CombinedThemes | null>(
@@ -104,6 +110,11 @@ export function ThemeDialog({
 
   // Generate theme items from combined sources
   const customThemes = combinedThemes?.allThemes || {};
+  // Generate theme items filtered by selected scope
+  const customThemes =
+    selectedScope === SettingScope.User
+      ? settings.user.settings.ui?.customThemes || {}
+      : settings.merged.ui?.customThemes || {};
   const builtInThemes = themeManager
     .getAvailableThemes()
     .filter((theme) => theme.type !== 'custom');
@@ -143,11 +154,13 @@ export function ThemeDialog({
     }),
   ];
 
-  // Calculate initial theme index after themes are loaded
-  const selectedThemeName = settings.merged.theme || DEFAULT_THEME.name;
-  const initialThemeIndex = combinedThemes
-    ? themeItems.findIndex((item) => item.value === selectedThemeName)
-    : -1;
+
+  // Find the index of the selected theme, but only if it exists in the list
+  const selectedThemeName = settings.merged.ui?.theme || DEFAULT_THEME.name;
+  const initialThemeIndex = themeItems.findIndex(
+    (item) => item.value === selectedThemeName,
+  );
+
   // If not found, fall back to the first theme
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
 
@@ -204,7 +217,7 @@ export function ThemeDialog({
 
   // Generate scope message for theme setting
   const otherScopeModifiedMessage = getScopeMessageForSetting(
-    'theme',
+    'ui.theme',
     selectedScope,
     settings,
   );

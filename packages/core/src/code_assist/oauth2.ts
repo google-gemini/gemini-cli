@@ -4,21 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Credentials } from 'google-auth-library';
 import {
   OAuth2Client,
-  Credentials,
   Compute,
   CodeChallengeMethod,
 } from 'google-auth-library';
-import * as http from 'http';
-import url from 'url';
-import crypto from 'crypto';
-import * as net from 'net';
+import * as http from 'node:http';
+import url from 'node:url';
+import crypto from 'node:crypto';
+import * as net from 'node:net';
 import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { Config } from '../config/config.js';
-import { getErrorMessage } from '../utils/errors.js';
+import type { Config } from '../config/config.js';
+import { getErrorMessage, FatalAuthenticationError } from '../utils/errors.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import { AuthType } from '../core/contentGenerator.js';
 import readline from 'node:readline';
@@ -142,7 +142,9 @@ async function initOauthClient(
       }
     }
     if (!success) {
-      process.exit(1);
+      throw new FatalAuthenticationError(
+        'Failed to authenticate with user code.',
+      );
     }
   } else {
     const webLogin = await authWithWeb(client);
@@ -166,7 +168,7 @@ async function initOauthClient(
         console.error(
           'Failed to open browser automatically. Please try running again with NO_BROWSER=true set.',
         );
-        process.exit(1);
+        throw new FatalAuthenticationError('Failed to open browser.');
       });
     } catch (err) {
       console.error(
@@ -174,7 +176,7 @@ async function initOauthClient(
         err,
         '\nPlease try running again with NO_BROWSER=true set.',
       );
-      process.exit(1);
+      throw new FatalAuthenticationError('Failed to open browser.');
     }
     console.log('Waiting for authentication...');
 
@@ -380,6 +382,11 @@ async function cacheCredentials(credentials: Credentials) {
 
   const credString = JSON.stringify(credentials, null, 2);
   await fs.writeFile(filePath, credString, { mode: 0o600 });
+  try {
+    await fs.chmod(filePath, 0o600);
+  } catch {
+    /* empty */
+  }
 }
 
 export function clearOauthClientCache() {

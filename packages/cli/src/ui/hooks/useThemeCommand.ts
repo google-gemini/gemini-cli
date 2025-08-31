@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { themeManager } from '../themes/theme-manager.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
+import type { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
 import { type HistoryItem, MessageType } from '../types.js';
 import process from 'node:process';
 
@@ -62,7 +62,14 @@ export const useThemeCommand = (
     loadedSettings.merged.theme,
     setThemeError,
   ]);
-
+    const effectiveTheme = loadedSettings.merged.ui?.theme;
+    if (effectiveTheme && !themeManager.findThemeByName(effectiveTheme)) {
+      setIsThemeDialogOpen(true);
+      setThemeError(`Theme "${effectiveTheme}" not found.`);
+    } else {
+      setThemeError(null);
+    }
+  }, [loadedSettings.merged.ui?.theme, setThemeError]);
   const openThemeDialog = useCallback(() => {
     if (process.env['NO_COLOR']) {
       addItem(
@@ -124,6 +131,24 @@ export const useThemeCommand = (
           );
         }
         applyTheme(loadedSettings.merged.theme);
+        // Merge user and workspace custom themes (workspace takes precedence)
+        const mergedCustomThemes = {
+          ...(loadedSettings.user.settings.ui?.customThemes || {}),
+          ...(loadedSettings.workspace.settings.ui?.customThemes || {}),
+        };
+        // Only allow selecting themes available in the merged custom themes or built-in themes
+        const isBuiltIn = themeManager.findThemeByName(themeName);
+        const isCustom = themeName && mergedCustomThemes[themeName];
+        if (!isBuiltIn && !isCustom) {
+          setThemeError(`Theme "${themeName}" not found in selected scope.`);
+          setIsThemeDialogOpen(true);
+          return;
+        }
+        loadedSettings.setValue(scope, 'ui.theme', themeName); // Update the merged settings
+        if (loadedSettings.merged.ui?.customThemes) {
+          themeManager.loadCustomThemes(loadedSettings.merged.ui?.customThemes);
+        }
+        applyTheme(loadedSettings.merged.ui?.theme); // Apply the current theme
         setThemeError(null);
       } catch (error) {
         console.warn('Failed to load custom themes:', error);

@@ -4,28 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../test-utils/render.js';
 import { AppWrapper as App } from './App.js';
-import {
-  Config as ServerConfig,
-  MCPServerConfig,
-  ApprovalMode,
-  ToolRegistry,
+import type {
   AccessibilitySettings,
+  MCPServerConfig,
+  ToolRegistry,
   SandboxConfig,
   GeminiClient,
-  ideContext,
-  type AuthType,
+  AuthType,
 } from '@google/gemini-cli-core';
-import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
+import {
+  ApprovalMode,
+  ideContext,
+  Config as ServerConfig,
+} from '@google/gemini-cli-core';
+import type { SettingsFile, Settings } from '../config/settings.js';
+import { LoadedSettings } from '../config/settings.js';
 import process from 'node:process';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
-import { StreamingState, ConsoleMessageItem } from './types.js';
+import type { ConsoleMessageItem } from './types.js';
+import { StreamingState } from './types.js';
 import { Tips } from './components/Tips.js';
-import { checkForUpdates, UpdateObject } from './utils/updateCheck.js';
-import { EventEmitter } from 'events';
+import type { UpdateObject } from './utils/updateCheck.js';
+import { checkForUpdates } from './utils/updateCheck.js';
+import { EventEmitter } from 'node:events';
 import { updateEventEmitter } from '../utils/updateEventEmitter.js';
 import * as auth from '../config/auth.js';
 import * as useTerminalSize from './hooks/useTerminalSize.js';
@@ -170,6 +177,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         })),
         isTrustedFolder: vi.fn(() => true),
         getScreenReader: vi.fn(() => false),
+        getFolderTrustFeature: vi.fn(() => false),
+        getFolderTrust: vi.fn(() => false),
       };
     });
 
@@ -221,6 +230,14 @@ vi.mock('./hooks/useFolderTrust', () => ({
 vi.mock('./hooks/useLogger', () => ({
   useLogger: vi.fn(() => ({
     getPreviousUserMessages: vi.fn().mockResolvedValue([]),
+  })),
+}));
+
+vi.mock('./hooks/useInputHistoryStore.js', () => ({
+  useInputHistoryStore: vi.fn(() => ({
+    inputHistory: [],
+    addInput: vi.fn(),
+    initializeFromLogger: vi.fn(),
   })),
 }));
 
@@ -306,6 +323,7 @@ describe('App UI', () => {
       workspaceSettingsFile,
       [],
       true,
+      new Set(),
     );
   };
 
@@ -393,9 +411,10 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(spawn).not.toHaveBeenCalled();
+      // Wait for any potential async operations to complete
+      await waitFor(() => {
+        expect(spawn).not.toHaveBeenCalled();
+      });
     });
 
     it('should show a success message when update succeeds', async () => {
@@ -421,11 +440,12 @@ describe('App UI', () => {
 
       updateEventEmitter.emit('update-success', info);
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(lastFrame()).toContain(
-        'Update successful! The new version will be used on your next run.',
-      );
+      // Wait for the success message to appear
+      await waitFor(() => {
+        expect(lastFrame()).toContain(
+          'Update successful! The new version will be used on your next run.',
+        );
+      });
     });
 
     it('should show an error message when update fails', async () => {
@@ -451,11 +471,12 @@ describe('App UI', () => {
 
       updateEventEmitter.emit('update-failed', info);
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(lastFrame()).toContain(
-        'Automatic update failed. Please try updating manually',
-      );
+      // Wait for the error message to appear
+      await waitFor(() => {
+        expect(lastFrame()).toContain(
+          'Automatic update failed. Please try updating manually',
+        );
+      });
     });
 
     it('should show an error message when spawn fails', async () => {
@@ -483,11 +504,12 @@ describe('App UI', () => {
       // which is what should be emitted when a spawn error occurs elsewhere.
       updateEventEmitter.emit('update-failed', info);
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(lastFrame()).toContain(
-        'Automatic update failed. Please try updating manually',
-      );
+      // Wait for the error message to appear
+      await waitFor(() => {
+        expect(lastFrame()).toContain(
+          'Automatic update failed. Please try updating manually',
+        );
+      });
     });
 
     it('should not auto-update if GEMINI_CLI_DISABLE_AUTOUPDATER is true', async () => {
@@ -513,9 +535,10 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(spawn).not.toHaveBeenCalled();
+      // Wait for any potential async operations to complete
+      await waitFor(() => {
+        expect(spawn).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -672,7 +695,10 @@ describe('App UI', () => {
 
   it('should display custom contextFileName in footer when set and count is 1', async () => {
     mockSettings = createMockSettings({
-      workspace: { contextFileName: 'AGENTS.md', theme: 'Default' },
+      workspace: {
+        context: { fileName: 'AGENTS.md' },
+        ui: { theme: 'Default' },
+      },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(1);
     mockConfig.getAllGeminiMdFilenames.mockReturnValue(['AGENTS.md']);
@@ -694,8 +720,8 @@ describe('App UI', () => {
   it('should display a generic message when multiple context files with different names are provided', async () => {
     mockSettings = createMockSettings({
       workspace: {
-        contextFileName: ['AGENTS.md', 'CONTEXT.md'],
-        theme: 'Default',
+        context: { fileName: ['AGENTS.md', 'CONTEXT.md'] },
+        ui: { theme: 'Default' },
       },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(2);
@@ -720,7 +746,10 @@ describe('App UI', () => {
 
   it('should display custom contextFileName with plural when set and count is > 1', async () => {
     mockSettings = createMockSettings({
-      workspace: { contextFileName: 'MY_NOTES.TXT', theme: 'Default' },
+      workspace: {
+        context: { fileName: 'MY_NOTES.TXT' },
+        ui: { theme: 'Default' },
+      },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(3);
     mockConfig.getAllGeminiMdFilenames.mockReturnValue([
@@ -745,7 +774,10 @@ describe('App UI', () => {
 
   it('should not display context file message if count is 0, even if contextFileName is set', async () => {
     mockSettings = createMockSettings({
-      workspace: { contextFileName: 'ANY_FILE.MD', theme: 'Default' },
+      workspace: {
+        context: { fileName: 'ANY_FILE.MD' },
+        ui: { theme: 'Default' },
+      },
     });
     mockConfig.getGeminiMdFileCount.mockReturnValue(0);
     mockConfig.getAllGeminiMdFilenames.mockReturnValue([]);
@@ -826,7 +858,7 @@ describe('App UI', () => {
   it('should not display Tips component when hideTips is true', async () => {
     mockSettings = createMockSettings({
       workspace: {
-        hideTips: true,
+        ui: { hideTips: true },
       },
     });
 
@@ -859,7 +891,7 @@ describe('App UI', () => {
   it('should not display Header component when hideBanner is true', async () => {
     const { Header } = await import('./components/Header.js');
     mockSettings = createMockSettings({
-      user: { hideBanner: true },
+      user: { ui: { hideBanner: true } },
     });
 
     const { unmount } = renderWithProviders(
@@ -890,7 +922,7 @@ describe('App UI', () => {
 
   it('should not display Footer component when hideFooter is true', async () => {
     mockSettings = createMockSettings({
-      user: { hideFooter: true },
+      user: { ui: { hideFooter: true } },
     });
 
     const { lastFrame, unmount } = renderWithProviders(
@@ -908,9 +940,9 @@ describe('App UI', () => {
 
   it('should show footer if system says show, but workspace and user settings say hide', async () => {
     mockSettings = createMockSettings({
-      system: { hideFooter: false },
-      user: { hideFooter: true },
-      workspace: { hideFooter: true },
+      system: { ui: { hideFooter: false } },
+      user: { ui: { hideFooter: true } },
+      workspace: { ui: { hideFooter: true } },
     });
 
     const { lastFrame, unmount } = renderWithProviders(
@@ -928,9 +960,9 @@ describe('App UI', () => {
 
   it('should show tips if system says show, but workspace and user settings say hide', async () => {
     mockSettings = createMockSettings({
-      system: { hideTips: false },
-      user: { hideTips: true },
-      workspace: { hideTips: true },
+      system: { ui: { hideTips: false } },
+      user: { ui: { hideTips: true } },
+      workspace: { ui: { hideTips: true } },
     });
 
     const { unmount } = renderWithProviders(
@@ -1105,9 +1137,13 @@ describe('App UI', () => {
       const validateAuthMethodSpy = vi.spyOn(auth, 'validateAuthMethod');
       mockSettings = createMockSettings({
         workspace: {
-          selectedAuthType: 'USE_GEMINI' as AuthType,
-          useExternalAuth: false,
-          theme: 'Default',
+          security: {
+            auth: {
+              selectedType: 'USE_GEMINI' as AuthType,
+              useExternal: false,
+            },
+          },
+          ui: { theme: 'Default' },
         },
       });
 
@@ -1127,9 +1163,13 @@ describe('App UI', () => {
       const validateAuthMethodSpy = vi.spyOn(auth, 'validateAuthMethod');
       mockSettings = createMockSettings({
         workspace: {
-          selectedAuthType: 'USE_GEMINI' as AuthType,
-          useExternalAuth: true,
-          theme: 'Default',
+          security: {
+            auth: {
+              selectedType: 'USE_GEMINI' as AuthType,
+              useExternal: true,
+            },
+          },
+          ui: { theme: 'Default' },
         },
       });
 
@@ -1524,8 +1564,8 @@ describe('App UI', () => {
     it('should pass debugKeystrokeLogging setting to KeypressProvider', () => {
       const mockSettingsWithDebug = createMockSettings({
         workspace: {
-          theme: 'Default',
-          debugKeystrokeLogging: true,
+          ui: { theme: 'Default' },
+          advanced: { debugKeystrokeLogging: true },
         },
       });
 
@@ -1541,7 +1581,9 @@ describe('App UI', () => {
       const output = lastFrame();
 
       expect(output).toBeDefined();
-      expect(mockSettingsWithDebug.merged.debugKeystrokeLogging).toBe(true);
+      expect(mockSettingsWithDebug.merged.advanced?.debugKeystrokeLogging).toBe(
+        true,
+      );
     });
 
     it('should use default false value when debugKeystrokeLogging is not set', () => {
@@ -1557,7 +1599,91 @@ describe('App UI', () => {
       const output = lastFrame();
 
       expect(output).toBeDefined();
-      expect(mockSettings.merged.debugKeystrokeLogging).toBeUndefined();
+      expect(
+        mockSettings.merged.advanced?.debugKeystrokeLogging,
+      ).toBeUndefined();
+    });
+  });
+
+  describe('Ctrl+C behavior', () => {
+    it('should call cancel but only clear the prompt when a tool is executing', async () => {
+      const mockCancel = vi.fn();
+      let onCancelSubmitCallback = () => {};
+
+      // Simulate a tool in the "Executing" state.
+      vi.mocked(useGeminiStream).mockImplementation(
+        (
+          _client,
+          _history,
+          _addItem,
+          _config,
+          _settings,
+          _onDebugMessage,
+          _handleSlashCommand,
+          _shellModeActive,
+          _getPreferredEditor,
+          _onAuthError,
+          _performMemoryRefresh,
+          _modelSwitchedFromQuotaError,
+          _setModelSwitchedFromQuotaError,
+          _onEditorClose,
+          onCancelSubmit, // Capture the cancel callback from App.tsx
+        ) => {
+          onCancelSubmitCallback = onCancelSubmit;
+          return {
+            streamingState: StreamingState.Responding,
+            submitQuery: vi.fn(),
+            initError: null,
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: [
+                  {
+                    name: 'test_tool',
+                    status: 'Executing',
+                    result: '',
+                    args: {},
+                  },
+                ],
+              },
+            ],
+            thought: null,
+            cancelOngoingRequest: () => {
+              mockCancel();
+              onCancelSubmitCallback(); // <--- This is the key change
+            },
+          };
+        },
+      );
+
+      const { stdin, lastFrame, unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Simulate user typing something into the prompt while a tool is running.
+      stdin.write('some text');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Verify the text is in the prompt.
+      expect(lastFrame()).toContain('some text');
+
+      // Simulate Ctrl+C.
+      stdin.write('\x03');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // The main cancellation handler SHOULD be called.
+      expect(mockCancel).toHaveBeenCalled();
+
+      // The prompt should now be empty as a result of the cancellation handler's logic.
+      // We can't directly test the buffer's state, but we can see the rendered output.
+      await waitFor(() => {
+        expect(lastFrame()).not.toContain('some text');
+      });
     });
   });
 });

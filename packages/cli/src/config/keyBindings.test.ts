@@ -5,11 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  Command,
-  KeyBindingConfig,
-  defaultKeyBindings,
-} from './keyBindings.js';
+import type { KeyBindingConfig } from './keyBindings.js';
+import { Command, defaultKeyBindings } from './keyBindings.js';
 
 describe('keyBindings config', () => {
   describe('defaultKeyBindings', () => {

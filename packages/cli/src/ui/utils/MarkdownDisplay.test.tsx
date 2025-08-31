@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MarkdownDisplay } from './MarkdownDisplay.js';
 import { LoadedSettings } from '../../config/settings.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
-import { EOL } from 'os';
+import { EOL } from 'node:os';
 
 describe('<MarkdownDisplay />', () => {
   const baseProps = {
@@ -25,6 +25,7 @@ describe('<MarkdownDisplay />', () => {
     { path: '', settings: {} },
     [],
     true,
+    new Set(),
   );
 
   beforeEach(() => {
@@ -224,10 +225,11 @@ Another paragraph.
     const settings = new LoadedSettings(
       { path: '', settings: {} },
       { path: '', settings: {} },
-      { path: '', settings: { showLineNumbers: false } },
+      { path: '', settings: { ui: { showLineNumbers: false } } },
       { path: '', settings: {} },
       [],
       true,
+      new Set(),
     );
 
     const { lastFrame } = render(
