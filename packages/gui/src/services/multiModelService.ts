@@ -12,8 +12,8 @@ interface ElectronAPI {
     initialize: (config: Record<string, unknown>) => Promise<void>;
     switchProvider: (providerType: string, model: string) => Promise<void>;
     switchRole: (roleId: string) => Promise<boolean>;
-    sendMessage: (messages: UniversalMessage[], roleId?: string) => Promise<UniversalStreamEvent[]>;
-    sendMessageStream: (messages: UniversalMessage[], roleId?: string) => {
+    sendMessage: (messages: UniversalMessage[]) => Promise<UniversalStreamEvent[]>;
+    sendMessageStream: (messages: UniversalMessage[]) => {
       streamId: string;
       startStream: (
         onChunk: (chunk: { type: string; content: string; role: string; timestamp: number }) => void,
@@ -30,9 +30,16 @@ interface ElectronAPI {
     getWorkspaceDirectories: () => Promise<readonly string[]>;
     setWorkspaceDirectories: (directories: readonly string[]) => Promise<void>;
     getCurrentToolset: () => Promise<string[]>;
-    optimizeToolsetForCurrentRole: () => Promise<void>;
     addCustomRole: (role: RoleDefinition) => Promise<void>;
     addCustomTemplate: (template: Omit<PresetTemplate, 'isBuiltin'>) => Promise<void>;
+    // Session management
+    createSession: (sessionId: string, title?: string) => Promise<void>;
+    switchSession: (sessionId: string) => Promise<void>;
+    deleteSession: (sessionId: string) => Promise<void>;
+    getCurrentSessionId: () => Promise<string | null>;
+    getDisplayMessages: (sessionId?: string) => Promise<UniversalMessage[]>;
+    getSessionsInfo: () => Promise<Array<{id: string, title: string, messageCount: number, lastUpdated: Date}>>;
+    updateSessionTitle: (sessionId: string, newTitle: string) => Promise<void>;
   };
 }
 
@@ -44,6 +51,11 @@ declare global {
 
 class MultiModelService {
   private initialized = false;
+  private switchingRole = false;
+  private lastRoleSwitch: { roleId: string; timestamp: number } | null = null;
+  private modelsCache: Record<string, string[]> | null = null;
+  private modelsCacheTimestamp: number = 0;
+  private readonly MODELS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   private get api() {
     const electronAPI = (globalThis as GlobalThis).electronAPI;
@@ -71,18 +83,44 @@ class MultiModelService {
       throw new Error('MultiModelService not initialized');
     }
 
-    return await this.api.switchRole(roleId);
+    // Prevent duplicate calls within 1 second
+    const now = Date.now();
+    if (this.lastRoleSwitch && 
+        this.lastRoleSwitch.roleId === roleId && 
+        now - this.lastRoleSwitch.timestamp < 1000) {
+      console.log(`Ignoring duplicate switchRole call for ${roleId} (within 1s)`);
+      return true;
+    }
+
+    // Prevent concurrent calls
+    if (this.switchingRole) {
+      console.log(`Role switch already in progress, ignoring call for ${roleId}`);
+      return false;
+    }
+
+    this.switchingRole = true;
+    try {
+      console.log(`Switching to role: ${roleId}`);
+      const result = await this.api.switchRole(roleId);
+      
+      if (result) {
+        this.lastRoleSwitch = { roleId, timestamp: now };
+      }
+      
+      return result;
+    } finally {
+      this.switchingRole = false;
+    }
   }
 
   async sendMessage(
-    messages: UniversalMessage[],
-    roleId?: string
+    messages: UniversalMessage[]
   ): Promise<AsyncGenerator<UniversalStreamEvent>> {
     if (!this.initialized) {
       throw new Error('MultiModelService not initialized');
     }
 
-    const streamResponse = this.api.sendMessageStream(messages, roleId);
+    const streamResponse = this.api.sendMessageStream(messages);
     
     // Create our own async generator using real-time callbacks
     async function* eventGenerator(): AsyncGenerator<UniversalStreamEvent> {
@@ -159,7 +197,24 @@ class MultiModelService {
       throw new Error('MultiModelService not initialized');
     }
 
-    return await this.api.getAvailableModels(providerType);
+    // Check cache if no specific provider is requested and cache is still valid
+    const now = Date.now();
+    if (!providerType && this.modelsCache && (now - this.modelsCacheTimestamp) < this.MODELS_CACHE_TTL) {
+      console.log('MultiModelService: Using cached models');
+      return this.modelsCache;
+    }
+
+    console.log('MultiModelService: Fetching models from API', providerType ? `for provider: ${providerType}` : 'for all providers');
+    const models = await this.api.getAvailableModels(providerType);
+    
+    // Cache the full model list if no specific provider was requested
+    if (!providerType) {
+      this.modelsCache = models;
+      this.modelsCacheTimestamp = now;
+      console.log('MultiModelService: Cached models for future use');
+    }
+
+    return models;
   }
 
   getAllRoles(): RoleDefinition[] {
@@ -256,13 +311,6 @@ class MultiModelService {
     return await this.api.getCurrentToolset();
   }
 
-  async optimizeToolsetForCurrentRole(): Promise<void> {
-    if (!this.initialized) {
-      throw new Error('MultiModelService not initialized');
-    }
-
-    await this.api.optimizeToolsetForCurrentRole();
-  }
 
   async addCustomRole(role: RoleDefinition): Promise<void> {
     if (!this.initialized) {
@@ -278,6 +326,63 @@ class MultiModelService {
     }
 
     await this.api.addCustomTemplate(template);
+  }
+
+  // Session management methods
+  async createSession(sessionId: string, title?: string): Promise<void> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    await this.api.createSession(sessionId, title);
+  }
+
+  async switchSession(sessionId: string): Promise<void> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    await this.api.switchSession(sessionId);
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    await this.api.deleteSession(sessionId);
+  }
+
+  async getCurrentSessionId(): Promise<string | null> {
+    if (!this.initialized) {
+      return null;
+    }
+
+    return await this.api.getCurrentSessionId();
+  }
+
+  async getDisplayMessages(sessionId?: string): Promise<UniversalMessage[]> {
+    if (!this.initialized) {
+      return [];
+    }
+
+    return await this.api.getDisplayMessages(sessionId);
+  }
+
+  async getSessionsInfo(): Promise<Array<{id: string, title: string, messageCount: number, lastUpdated: Date}>> {
+    if (!this.initialized) {
+      return [];
+    }
+
+    return await this.api.getSessionsInfo();
+  }
+
+  async updateSessionTitle(sessionId: string, newTitle: string): Promise<void> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    await this.api.updateSessionTitle(sessionId, newTitle);
   }
 }
 
