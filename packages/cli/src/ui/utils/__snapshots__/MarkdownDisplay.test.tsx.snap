@@ -64,6 +64,7 @@ exports[`<MarkdownDisplay /> > renders multiline table rows 1`] = `
 ├──────────┼──────────┤
 │ Text in  │ Text in  │
 │ cell 1   │ cell 2   │
+├──────────┼──────────┤
 │ Text in  │ Text in  │
 │ cell 3   │ cell 4   │
 └──────────┴──────────┘
@@ -77,6 +78,7 @@ exports[`<MarkdownDisplay /> > renders multiline table rows and truncates last l
 ├──────────┼──────────┤
 │ Text in  │ Text in  │
 │ cell 1   │ cell 2   │
+├──────────┼──────────┤
 │ This is  │ This is  │
 │ text ... │ text ... │
 └──────────┴──────────┘
@@ -104,6 +106,7 @@ exports[`<MarkdownDisplay /> > renders tables correctly 1`] = `
 │ Header 1 │ Header 2 │
 ├──────────┼──────────┤
 │ Cell 1   │ Cell 2   │
+├──────────┼──────────┤
 │ Cell 3   │ Cell 4   │
 └──────────┴──────────┘
 "

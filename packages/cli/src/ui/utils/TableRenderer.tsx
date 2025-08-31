@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Text, Box } from 'ink';
 import { Colors } from '../colors.js';
 import { getPlainTextLength, RenderInline } from './InlineMarkdownRenderer.js';
@@ -29,16 +29,13 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   terminalWidth,
 }) => {
   // Calculate column widths using actual display width after markdown processing
-  let columnWidths = headers.map((header, index) => {
+  const columnWidths = headers.map((header, index) => {
     const headerWidth = getPlainTextLength(header);
     const maxRowWidth = Math.max(
       ...rows.map((row) => getPlainTextLength(row[index] || '')),
     );
     return Math.max(headerWidth, maxRowWidth) + 2; // Add padding
   });
-
-  const charSum = columnWidths.reduce((s, w) => s + w, 0);
-  columnWidths = columnWidths.map((w) => Math.max(w, charSum / 3));
 
   // Ensure table fits within terminal width
   const totalWidth = columnWidths.reduce((sum, width) => sum + width + 1, 1);
@@ -49,16 +46,19 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   );
 
   // helper function to render a cell
-  const renderCell = (cellPart: string, isHeader: boolean) => (
-    <Text>
-      {isHeader ? (
-        <Text bold color={Colors.AccentCyan}>
+  const renderCell = useCallback(
+    (cellPart: string, isHeader: boolean) => (
+      <Text>
+        {isHeader ? (
+          <Text bold color={Colors.AccentCyan}>
+            <RenderInline text={cellPart} />
+          </Text>
+        ) : (
           <RenderInline text={cellPart} />
-        </Text>
-      ) : (
-        <RenderInline text={cellPart} />
-      )}
-    </Text>
+        )}
+      </Text>
+    ),
+    [],
   );
 
   // Helper function to render border
@@ -76,21 +76,24 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     return <Text>{border}</Text>;
   };
 
-  const renderLineInsideRow = (line: string[], isHeader: boolean) => {
-    const lineParts = line.map((txt) => renderCell(txt, isHeader));
-    return (
-      <Text>
-        │{' '}
-        {lineParts.map((cell, index) => (
-          <React.Fragment key={index}>
-            {cell}
-            {index < lineParts.length - 1 ? ' │ ' : ''}
-          </React.Fragment>
-        ))}{' '}
-        │
-      </Text>
-    );
-  };
+  const renderLineInsideRow = useCallback(
+    (line: string[], isHeader: boolean) => {
+      const lineParts = line.map((txt) => renderCell(txt, isHeader));
+      return (
+        <Text>
+          │{' '}
+          {lineParts.map((cell, index) => (
+            <React.Fragment key={index}>
+              {cell}
+              {index < lineParts.length - 1 ? ' │ ' : ''}
+            </React.Fragment>
+          ))}{' '}
+          │
+        </Text>
+      );
+    },
+    [renderCell],
+  );
 
   function splitRowCellsIntoMultipleLines(
     cells: string[],
@@ -139,7 +142,10 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
       {/* Data rows */}
       {rows.map((row, index) => (
-        <React.Fragment key={index}>{renderRow(row)}</React.Fragment>
+        <React.Fragment key={index}>
+          {renderRow(row)}
+          {index < row.length - 1 && renderBorder('middle')}
+        </React.Fragment>
       ))}
 
       {/* Bottom border */}

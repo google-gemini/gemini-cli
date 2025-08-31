@@ -34,7 +34,7 @@ describe('splitContentIntoEqualWidthLines', () => {
   it('should split content into provided no of lines with each string having provided width', () => {
     const text = 'This is a sample content';
     let lines = splitContentIntoEqualWidthLines(text, 5, 5);
-    expect(lines).toEqual(['This ', 'is a ', 'sampl', 'e con', 'te...']);
+    expect(lines).toEqual(['This ', 'is a ', 'sampl', 'e con', 'tent ']);
     lines = splitContentIntoEqualWidthLines(text, 10, 5);
     expect(lines).toEqual([
       'This is a ',
