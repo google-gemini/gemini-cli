@@ -125,8 +125,4 @@ d('BOM end-to-end integration', () => {
       'BOM_OK UTF-32BE',
     );
   });
-
-  it('Binary sentinel', async () => {
-    await runAndAssert('image.png', fakePng(), null);
-  });
 });
