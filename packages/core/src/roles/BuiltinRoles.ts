@@ -5,7 +5,6 @@
  */
 
 import type { RoleDefinition } from './types.js';
-import { ModelProviderType } from '../providers/types.js';
 
 export const BUILTIN_ROLES: Record<string, RoleDefinition> = {
   software_engineer: {
@@ -32,10 +31,7 @@ export const BUILTIN_ROLES: Record<string, RoleDefinition> = {
 # Tool Usage
 You have access to file operations, shell commands, and code analysis tools. Use them to understand the project structure and provide accurate assistance.`,
     tools: ['read-file', 'write-file', 'edit', 'shell', 'ripGrep', 'glob', 'ls'],
-    modelPreferences: {
-      preferred: [ModelProviderType.GEMINI, ModelProviderType.OPENAI],
-      fallback: ModelProviderType.GEMINI
-    }
+    // tools: ['read_file', 'write_file', 'replace', 'run_shell_command', 'search_file_content', 'glob', 'list_directory']
   },
 
   office_assistant: {
@@ -63,11 +59,8 @@ You have access to file operations, shell commands, and code analysis tools. Use
 
 # Available Tools
 Use file tools for document operations and web tools for research and data gathering.`,
-    tools: ['read-file', 'write-file', 'edit', 'web-fetch', 'web-search'],
-    modelPreferences: {
-      preferred: [ModelProviderType.OPENAI, ModelProviderType.GEMINI],
-      fallback: ModelProviderType.OPENAI
-    }
+    // tools: ['read-file', 'write-file', 'edit', 'web-fetch', 'web-search'],
+    // tools: ['read_file', 'write_file', 'replace', 'web_fetch', 'google_web_search']
   },
 
   translator: {
@@ -97,12 +90,9 @@ Use file tools for document operations and web tools for research and data gathe
 - Accuracy over literal translation
 - Natural flow in target language
 - Consistent terminology throughout
-- Cultural appropriateness`,
-    tools: ['read-file', 'write-file', 'edit', 'web-search'],
-    modelPreferences: {
-      preferred: [ModelProviderType.GEMINI, ModelProviderType.OPENAI],
-      fallback: ModelProviderType.GEMINI
-    }
+- Cultural appropriateness`
+    // tools: ['read-file', 'write-file', 'edit', 'web-search'],
+    // tools: ['read_file', 'write_file', 'replace', 'google_web_search']
   },
 
   creative_writer: {
@@ -134,10 +124,7 @@ Use file tools for document operations and web tools for research and data gathe
 - Scripts and screenplays
 - Marketing and promotional content`,
     tools: ['read-file', 'write-file', 'edit', 'web-search'],
-    modelPreferences: {
-      preferred: [ModelProviderType.OPENAI, ModelProviderType.GEMINI],
-      fallback: ModelProviderType.OPENAI
-    }
+    // tools: ['read_file', 'write_file', 'replace', 'google_web_search']
   },
 
   data_analyst: {
@@ -169,9 +156,6 @@ Use file tools for document operations and web tools for research and data gathe
 - Data visualization libraries
 - Spreadsheet analysis and automation`,
     tools: ['read-file', 'write-file', 'edit', 'shell', 'ripGrep', 'web-search'],
-    modelPreferences: {
-      preferred: [ModelProviderType.GEMINI, ModelProviderType.OPENAI],
-      fallback: ModelProviderType.GEMINI
-    }
+    // tools: ['read_file', 'write_file', 'replace', 'run_shell_command', 'search_file_content', 'google_web_search']
   }
 };

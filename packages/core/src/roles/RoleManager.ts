@@ -6,19 +6,23 @@
 
 import type { RoleDefinition, RoleContext, RoleCategory } from './types.js';
 import { BUILTIN_ROLES } from './BuiltinRoles.js';
-import type { ToolsetManager, ToolsetChangeListener } from '../tools/ToolsetManager.js';
+import { getCoreSystemPrompt } from '../core/prompts.js';
 
 export class RoleManager {
+  private static instance: RoleManager | null = null;
   private roles: Map<string, RoleDefinition> = new Map();
   private currentRole: RoleDefinition;
-  private toolsetManager: ToolsetManager | null = null;
 
-  constructor(toolsetManager?: ToolsetManager) {
+  private constructor() {
     this.loadBuiltinRoles();
     this.currentRole = this.roles.get('software_engineer')!;
-    if (toolsetManager) {
-      this.setToolsetManager(toolsetManager);
+  }
+
+  static getInstance(): RoleManager {
+    if (!RoleManager.instance) {
+      RoleManager.instance = new RoleManager();
     }
+    return RoleManager.instance;
   }
 
   getAllRoles(): RoleDefinition[] {
@@ -42,11 +46,6 @@ export class RoleManager {
     if (!role) return false;
     
     this.currentRole = role;
-    
-    // Switch toolset if toolset manager is available
-    if (this.toolsetManager) {
-      await this.toolsetManager.switchToRoleToolset(role);
-    }
     
     return true;
   }
@@ -102,34 +101,48 @@ export class RoleManager {
     return prompt;
   }
 
-  setToolsetManager(toolsetManager: ToolsetManager): void {
-    this.toolsetManager = toolsetManager;
-  }
-
-  getActiveToolset(): string[] {
-    if (this.toolsetManager) {
-      return this.toolsetManager.getCurrentToolset();
-    }
-    return this.currentRole.tools || [];
-  }
-
-  onToolsetChange(listener: ToolsetChangeListener): (() => void) | null {
-    if (this.toolsetManager) {
-      return this.toolsetManager.onToolsetChange(listener);
-    }
-    return null;
-  }
-
-  getToolsetOptimizationStats() {
-    if (this.toolsetManager) {
-      return this.toolsetManager.getOptimizationStats();
-    }
-    return null;
-  }
-
   private loadBuiltinRoles(): void {
     Object.values(BUILTIN_ROLES).forEach(role => {
       this.roles.set(role.id, role);
     });
+  }
+
+  /**
+   * Generates a role-aware system prompt
+   */
+  getRoleAwareSystemPrompt(
+    userMemory?: string,
+    roleId?: string,
+    additionalInstructions?: string
+  ): string {
+    try {
+      const context = this.createRoleContext(roleId, userMemory, additionalInstructions);
+      return this.generateSystemPrompt(context);
+    } catch {
+      // Fallback to original system prompt if role system fails
+      return getCoreSystemPrompt(userMemory);
+    }
+  }
+
+  /**
+   * Checks if the role system is enabled via environment variable
+   */
+  isRoleSystemEnabled(): boolean {
+    return process.env['GEMINI_ROLE_SYSTEM'] !== '0' && 
+           process.env['GEMINI_ROLE_SYSTEM'] !== 'false';
+  }
+
+  /**
+   * Gets the combined system prompt, using role system if enabled
+   */
+  getCombinedSystemPrompt(
+    userMemory?: string,
+    roleId?: string,
+    additionalInstructions?: string
+  ): string {
+    if (this.isRoleSystemEnabled()) {
+      return this.getRoleAwareSystemPrompt(userMemory, roleId, additionalInstructions);
+    }
+    return getCoreSystemPrompt(userMemory);
   }
 }

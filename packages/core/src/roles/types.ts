@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ModelProviderType } from '../providers/types.js';
 
 export interface RoleDefinition {
   id: string;
@@ -14,10 +13,6 @@ export interface RoleDefinition {
   category: RoleCategory;
   icon?: string;
   tools?: string[];
-  modelPreferences?: {
-    preferred: ModelProviderType[];
-    fallback: ModelProviderType;
-  };
 }
 
 export interface RoleContext {
