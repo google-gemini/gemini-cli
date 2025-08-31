@@ -11,6 +11,14 @@ import { LoadedSettings } from '../../config/settings.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
 import { EOL } from 'node:os';
 
+vi.mock('./tableRendererUtils.js', async () => {
+  const actual = await vi.importActual('./tableRendererUtils.js');
+  return {
+    ...actual,
+    MAX_LINES_IN_A_ROW: 2,
+  };
+});
+
 describe('<MarkdownDisplay />', () => {
   const baseProps = {
     isPending: false,
@@ -169,6 +177,39 @@ Test
       </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders table rows with long text into multiple lines', () => {
+    const props = { ...baseProps, terminalWidth: 23 };
+    const text = `
+| Header 1 | Header 2 |
+|----------|:--------:|
+| Text in cell 1   | Text in cell 2  |
+| Text in cell 3   | Text in cell 4   |
+`.replace(/\n/g, EOL);
+    const { lastFrame } = render(
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...props} text={text} />
+      </SettingsContext.Provider>,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('truncates last line multi line table rows above a set limit', () => {
+    const props = { ...baseProps, terminalWidth: 23 };
+    const text = `
+| Header 1 | Header 2 |
+|----------|:--------:|
+| Text in cell 1   | Text in cell 2  |
+| This is text in cell 3   | This is text in cell 4   |
+`.replace(/\n/g, EOL);
+    const { lastFrame } = render(
+      <SettingsContext.Provider value={mockSettings}>
+        <MarkdownDisplay {...props} text={text} />
+      </SettingsContext.Provider>,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+
   });
 
   it('handles a table at the end of the input', () => {
