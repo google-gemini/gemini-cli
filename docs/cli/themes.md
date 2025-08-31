@@ -34,6 +34,14 @@ Gemini CLI comes with a selection of pre-defined themes, which you can list usin
 
 Selected themes are saved in Gemini CLI's [configuration](./configuration.md) so your preference is remembered across sessions.
 
+### Theme Sub-commands
+
+The `/theme` command supports several sub-commands for advanced theme management:
+
+- **`/theme install <marketplace-url>`**: Install a VS Code theme from the Visual Studio Code marketplace. This allows you to use any published VS Code theme in Gemini CLI.
+  - **Example:** `/theme install https://marketplace.visualstudio.com/items?itemName=arcticicestudio.nord-visual-studio-code`
+- **`/theme list`**: List all installed custom themes that were installed from files or marketplace URLs.
+
 ---
 
 ## Custom Color Themes
