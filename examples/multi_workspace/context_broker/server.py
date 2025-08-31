@@ -3,6 +3,8 @@ import json
 import os
 import logging
 from logging.handlers import RotatingFileHandler
+from filelock import FileLock
+import platform
 
 # Setup logging
 log_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".gemini", "logs"))
@@ -20,11 +22,22 @@ logger.addHandler(handler)
 # Workspaces file path
 workspaces_path = os.path.join(os.path.dirname(__file__), "..", ".gemini", "workspaces.json")
 
+
+
+
 def load_workspaces():
-    with open(workspaces_path, "r") as f:
-        workspaces_config = json.load(f)["workspaces"]
+    try:
+        with open(workspaces_path, "r") as f:
+            data = json.load(f)
+            workspaces_config = data.get("workspaces", [])
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logger.error(f"Failed to load workspaces.json: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error loading workspaces.json: {e}")
+        return []
     return [
-        {"name": ws["name"], "path": os.path.abspath(os.path.join(os.path.dirname(workspaces_path), "..", ws["path"]))}
+        {"name": ws["name"], "path": os.path.realpath(os.path.join(os.path.dirname(workspaces_path), "..", ws["path"]))}
         for ws in workspaces_config
     ]
 
@@ -91,44 +104,76 @@ def get_tool_definitions():
         },
     }
 
+
+def _lock_file(f):
+    if platform.system() == "Windows":
+        import msvcrt
+        msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
+    else:
+        import fcntl  # type: ignore
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)  # type: ignore
+
+def _unlock_file(f):
+    if platform.system() == "Windows":
+        import msvcrt
+        msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl  # type: ignore
+        fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # type: ignore
+
 def add_workspace(request):
     global ALLOWED_WORKSPACES
     log_event = {"tool": "add_workspace", "request": request}
     logger.info(json.dumps(log_event))
 
-    name = request["params"]["name"]
-    path = request["params"]["path"]
+    name = request["params"].get("name")
+    path = request["params"].get("path")
 
     # Validate name and path
     if not name or not path:
         return {"id": request["id"], "error": "Name and path are required."}
-    
+
     # Check for duplicate names
     if any(ws["name"] == name for ws in ALLOWED_WORKSPACES):
         return {"id": request["id"], "error": f"Workspace with name '{name}' already exists."}
-    
+
     # Security: ensure the path is within the project directory
-    project_root = os.path.abspath(os.path.join(os.path.dirname(workspaces_path), ".."))
-    new_path = os.path.abspath(os.path.join(project_root, path))
+    project_root = os.path.realpath(os.path.join(os.path.dirname(workspaces_path), ".."))
+    new_path = os.path.realpath(os.path.join(project_root, path))
     if not new_path.startswith(project_root):
         return {"id": request["id"], "error": "Cannot add a workspace outside the project directory."}
-    
+
     # Check if directory exists
-    if not os.path.exists(new_path):
+    if not os.path.isdir(new_path):
         return {"id": request["id"], "error": f"Directory '{path}' does not exist."}
-    
-    # Check for duplicate paths
-    if any(os.path.abspath(os.path.join(project_root, ws["path"])) == new_path for ws in ALLOWED_WORKSPACES):
+
+    # Check for duplicate paths (realpath, compare to loaded workspace real paths)
+    if any(os.path.realpath(ws["path"]) == new_path for ws in ALLOWED_WORKSPACES):
         return {"id": request["id"], "error": f"Workspace with path '{path}' already exists."}
 
-    with open(workspaces_path, "r+") as f:
-        data = json.load(f)
-        data["workspaces"].append({"name": name, "path": path})
-        f.seek(0)
-        json.dump(data, f, indent=2)
-        f.truncate()
+    # File-based lock for cross-process safety
+    lock_path = workspaces_path + ".lock"
+    with FileLock(lock_path):
+        try:
+            with open(workspaces_path, "r+") as f:
+                _lock_file(f)
+                try:
+                    data = json.load(f)
+                except Exception as e:
+                    logger.error(f"Malformed workspaces.json during add: {e}")
+                    return {"id": request["id"], "error": "Internal error updating workspaces."}
+                data.setdefault("workspaces", []).append({"name": name, "path": path})
+                f.seek(0)
+                json.dump(data, f, indent=2)
+                f.truncate()
+                _unlock_file(f)
+        except PermissionError as e:
+            logger.error(f"Permission denied when writing to workspaces.json: {e}")
+            return {"id": request["id"], "error": "Permission denied: cannot write to workspaces.json. Please check file and directory permissions."}
+        except Exception as e:
+            logger.error(f"Error writing to workspaces.json: {e}")
+            return {"id": request["id"], "error": "Internal error updating workspaces."}
     ALLOWED_WORKSPACES = load_workspaces()
-
     return {"id": request["id"], "result": {"status": "success"}}
 
 def list_contexts(request):
@@ -141,20 +186,22 @@ def list_contexts(request):
         },
     }
 
+
 def read_file(request):
     log_event = {"tool": "read_file", "request": request}
     logger.info(json.dumps(log_event))
 
-    context_name = request["params"]["context"]
-    path = request["params"]["path"]
-    
+    context_name = request["params"].get("context")
+    path = request["params"].get("path")
+
     context = next((ws for ws in ALLOWED_WORKSPACES if ws["name"] == context_name), None)
     if not context:
         return {"id": request["id"], "error": "Invalid context."}
 
-    full_path = os.path.abspath(os.path.join(context["path"], path))
+    full_path = os.path.realpath(os.path.join(context["path"], path))
 
-    if not any(full_path.startswith(ws["path"]) for ws in ALLOWED_WORKSPACES):
+    # Ensure file is within allowed workspace
+    if not any(full_path.startswith(os.path.realpath(ws["path"])) for ws in ALLOWED_WORKSPACES):
         return {"id": request["id"], "error": "File access outside of allowed directories is not permitted."}
 
     try:
@@ -164,7 +211,8 @@ def read_file(request):
     except FileNotFoundError:
         return {"id": request["id"], "error": "File not found."}
     except Exception as e:
-        return {"id": request["id"], "error": str(e)}
+        logger.error(f"Error reading file {full_path}: {e}")
+        return {"id": request["id"], "error": "Internal error reading file."}
 
 def search_code(request):
     log_event = {"tool": "search_code", "request": request}
@@ -178,9 +226,14 @@ def search_code(request):
         return {"id": request["id"], "error": "Invalid context."}
 
     results = []
+
     for root, _, files in os.walk(context["path"]):
         for file in files:
-            file_path = os.path.join(root, file)
+            file_path = os.path.realpath(os.path.join(root, file))
+            # Ensure file is within allowed workspace
+            if not file_path.startswith(os.path.realpath(context["path"])):
+                logger.warning(f"Blocked path traversal attempt: {file_path}")
+                continue
             try:
                 with open(file_path, "r") as f:
                     for i, line in enumerate(f):
@@ -190,8 +243,8 @@ def search_code(request):
                                 "line": i + 1,
                                 "content": line.strip(),
                             })
-            except Exception:
-                pass
+            except (OSError, IOError, UnicodeDecodeError) as e:
+                logger.debug(f"Error searching file {file_path}: {e}")
 
     return {"id": request["id"], "result": {"matches": results}}
 
@@ -278,10 +331,13 @@ def main():
             else:
                 response = {"id": request["id"], "error": "Unknown method."}
 
+
         except json.JSONDecodeError:
+            logger.error("Invalid JSON received on stdin.")
             response = {"error": "Invalid JSON."}
         except Exception as e:
-            response = {"error": str(e)}
+            logger.error(f"Internal server error: {e}")
+            response = {"error": "Internal server error."}
 
         print(json.dumps(response))
         sys.stdout.flush()
