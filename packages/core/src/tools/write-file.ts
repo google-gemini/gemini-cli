@@ -17,6 +17,7 @@ import type {
   ToolLocation,
   ToolResult,
 } from './tools.js';
+import type { DiffUpdateResult } from '../ide/ideContext.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -193,12 +194,20 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       DEFAULT_DIFF_OPTIONS,
     );
 
-    const ideClient = this.config.getIdeClient();
-    const ideConfirmation =
-      this.config.getIdeMode() &&
-      ideClient.getConnectionStatus().status === IDEConnectionStatus.Connected
-        ? ideClient.openDiff(this.params.file_path, correctedContent)
-        : undefined;
+    let ideConfirmation: Promise<DiffUpdateResult> | undefined = undefined;
+    
+    // Only attempt IDE operations if IDE mode is enabled and client is available
+    if (this.config.getIdeMode()) {
+      try {
+        const ideClient = this.config.getIdeClient();
+        if (ideClient.getConnectionStatus().status === IDEConnectionStatus.Connected) {
+          ideConfirmation = ideClient.openDiff(this.params.file_path, correctedContent);
+        }
+      } catch (error) {
+        // IDE client not available or not connected - continue without IDE confirmation
+        console.log('[WriteFile] IDE client not available, continuing without IDE confirmation');
+      }
+    }
 
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',

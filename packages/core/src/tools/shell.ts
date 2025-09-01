@@ -126,10 +126,22 @@ class ShellToolInvocation extends BaseToolInvocation<
             return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
           })();
 
-      const cwd = path.resolve(
-        this.config.getTargetDir(),
-        this.params.directory || '',
-      );
+      // Determine working directory
+      let cwd: string;
+      if (this.params.directory) {
+        // Use specified directory relative to target dir
+        cwd = path.resolve(this.config.getTargetDir(), this.params.directory);
+      } else {
+        // For commands with absolute paths, use the first available workspace directory
+        // to avoid workspace validation issues
+        const hasAbsolutePath = /[A-Z]:\\|^\//.test(strippedCommand);
+        if (hasAbsolutePath) {
+          const workspaceDirectories = this.config.getWorkspaceContext().getDirectories();
+          cwd = workspaceDirectories.length > 0 ? workspaceDirectories[0] : this.config.getTargetDir();
+        } else {
+          cwd = this.config.getTargetDir();
+        }
+      }
 
       // Security Check: Ensure the resolved directory is within workspace boundaries
       const workspaceContext = this.config.getWorkspaceContext();
