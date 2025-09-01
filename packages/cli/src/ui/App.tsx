@@ -802,6 +802,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         if (!ctrlCPressedOnce) {
           cancelOngoingRequest?.();
         }
+        // Only show the exit tip if the input is empty and we are not streaming.
+        if (buffer.text.length > 0 || streamingState !== StreamingState.Idle) {
+          return;
+        }
         handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
       } else if (keyMatchers[Command.EXIT](key)) {
         if (buffer.text.length > 0) {
@@ -835,6 +839,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       isAuthenticating,
       cancelOngoingRequest,
       settings.merged.general?.debugKeystrokeLogging,
+      streamingState,
     ],
   );
 
