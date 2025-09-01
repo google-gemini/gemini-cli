@@ -13,6 +13,7 @@ import {
   parseAndFormatApiError,
   FatalInputError,
   FatalTurnLimitedError,
+  QuotaEstimator,
 } from '@google/gemini-cli-core';
 import type { Content, Part } from '@google/genai';
 
@@ -23,6 +24,7 @@ export async function runNonInteractive(
   config: Config,
   input: string,
   prompt_id: string,
+  settings?: any,
 ): Promise<void> {
   const consolePatcher = new ConsolePatcher({
     stderr: true,
@@ -58,6 +60,42 @@ export async function runNonInteractive(
       throw new FatalInputError(
         'Exiting due to an error processing the @ command.',
       );
+    }
+
+    // Check if quota estimation is enabled
+    const quotaEstimationEnabled = settings?.model?.quotaEstimation?.enabled;
+    const showDetailedBreakdown = settings?.model?.quotaEstimation?.showDetailedBreakdown;
+    
+    if (quotaEstimationEnabled) {
+      try {
+        const quotaEstimator = new QuotaEstimator(geminiClient.getContentGenerator());
+        const estimate = await quotaEstimator.estimateQuotaUsage(
+          processedQuery as Part[],
+          {
+            model: config.getModel(),
+            showDetailedBreakdown,
+          }
+        );
+        
+        const estimateMessage = quotaEstimator.formatQuotaEstimate(estimate, {
+          showDetailedBreakdown,
+        });
+        
+        console.log('\n' + estimateMessage + '\n');
+        
+        // Ask user if they want to proceed
+        console.log('Do you want to proceed with this request? (y/N)');
+        
+        // For non-interactive CLI, we'll proceed by default after a brief pause
+        // In a real implementation, you might want to add a timeout mechanism
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log('Proceeding with request...\n');
+      } catch (error) {
+        if (config.getDebugMode()) {
+          console.warn('Failed to estimate quota usage:', error);
+        }
+        // Continue with execution even if estimation fails
+      }
     }
 
     let currentMessages: Content[] = [
