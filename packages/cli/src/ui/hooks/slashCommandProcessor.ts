@@ -320,6 +320,20 @@ export const useSlashCommandProcessor = (
           const args = parts.slice(pathIndex).join(' ');
 
           if (commandToExecute.action) {
+            // Show a tip if the user provides extra text after a command that doesn't take arguments.
+            if (
+              args.trim().length > 0 &&
+              !commandToExecute.subCommands &&
+              commandToExecute.action !== undefined
+            ) {
+              addItem(
+                {
+                  type: MessageType.INFO,
+                  text: 'Tip: Prompts starting with / are treated as commands. Any text following the command is ignored.',
+                },
+                Date.now(),
+              );
+            }
             const fullCommandContext: CommandContext = {
               ...commandContext,
               invocation: {
