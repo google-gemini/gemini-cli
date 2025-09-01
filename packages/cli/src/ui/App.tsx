@@ -799,12 +799,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         if (isAuthenticating) {
           return;
         }
+
         if (!ctrlCPressedOnce) {
+          const hadText = buffer.text.length > 0;
           cancelOngoingRequest?.();
-        }
-        // Only show the exit tip if the input is empty and we are not streaming.
-        if (buffer.text.length > 0 || streamingState !== StreamingState.Idle) {
-          return;
+          if (hadText) {
+            return; // Don't show tip if buffer had text before cancelling.
+          }
         }
         handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
       } else if (keyMatchers[Command.EXIT](key)) {
@@ -831,7 +832,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       ctrlCPressedOnce,
       setCtrlCPressedOnce,
       ctrlCTimerRef,
-      buffer.text.length,
       ctrlDPressedOnce,
       setCtrlDPressedOnce,
       ctrlDTimerRef,
@@ -839,7 +839,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       isAuthenticating,
       cancelOngoingRequest,
       settings.merged.general?.debugKeystrokeLogging,
-      streamingState,
+      buffer,
     ],
   );
 
