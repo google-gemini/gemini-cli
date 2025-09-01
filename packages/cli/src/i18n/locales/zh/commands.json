@@ -93,6 +93,63 @@
     "alreadyInProgress": "正在压缩中，请等待上一个请求完成"
   },
   "mcp": {
-    "authFailed": "与 MCP 服务器 '{{serverName}}' 认证失败：{{error}}"
+    "description": "列出已配置的 MCP 服务器和工具，或与支持 OAuth 的服务器进行身份验证",
+    "list": "列出已配置的 MCP 服务器和工具",
+    "authFailed": "与 MCP 服务器 '{{serverName}}' 认证失败：{{error}}",
+    "configNotLoaded": "配置未加载。",
+    "toolRegistryError": "无法获取工具注册表。",
+    "noServersConfigured": "未配置 MCP 服务器。请在浏览器中查看 MCP 文档：{{docsUrl}} 或使用 /docs 命令",
+    "serversStartingUp": "MCP 服务器正在启动中（{{count}} 个正在初始化）...",
+    "firstStartupNote": "注意：首次启动可能需要更长时间。工具可用性将自动更新。",
+    "configuredServers": "已配置的 MCP 服务器：",
+    "serverStatus": {
+      "ready": "就绪",
+      "starting": "启动中...（首次启动可能需要更长时间）",
+      "disconnected": "已断开连接"
+    },
+    "oauthStatus": {
+      "tokenExpired": "（OAuth 令牌已过期）",
+      "authenticated": "（OAuth 已认证）",
+      "notAuthenticated": "（OAuth 未认证）"
+    },
+    "serverExtension": "（来自 {{extensionName}}）",
+    "serverBlocked": "已屏蔽",
+    "toolCount": "{{count}} 个工具",
+    "promptCount": "{{count}} 个提示",
+    "noTools": "0 个工具",
+    "toolsWillAppear": "工具和提示就绪后将显示",
+    "toolsCached": "{{count}} 个工具已缓存",
+    "sections": {
+      "tools": "工具：",
+      "prompts": "提示：",
+      "parameters": "参数："
+    },
+    "noToolsOrPrompts": "没有可用的工具或提示",
+    "noToolsAvailable": "没有可用的工具",
+    "authHint": "（输入：\"/mcp auth {{serverName}}\" 来认证此服务器）",
+    "tips": {
+      "title": "💡 小贴士：",
+      "showDescriptions": "使用 {{command}} 显示服务器和工具描述",
+      "showSchema": "使用 {{command}} 显示工具参数架构",
+      "hideDescriptions": "使用 {{command}} 隐藏描述",
+      "authenticate": "使用 {{command}} 与支持 OAuth 的服务器进行认证",
+      "toggleDescriptions": "按 {{key}} 切换工具描述的显示/隐藏"
+    },
+    "auth": "使用支持 OAuth 的 MCP 服务器进行身份验证",
+    "authDetails": {
+      "description": "使用支持 OAuth 的 MCP 服务器进行身份验证",
+      "serverNotFound": "未找到 MCP 服务器 '{{serverName}}'。",
+      "noOAuthServers": "没有配置 OAuth 身份验证的 MCP 服务器。",
+      "oauthServersList": "支持 OAuth 身份验证的 MCP 服务器：\n{{servers}}\n\n使用 /mcp auth <服务器名称> 进行身份验证。",
+      "startingAuth": "正在为 MCP 服务器 '{{serverName}}' 启动 OAuth 身份验证...",
+      "authSuccess": "✅ 成功与 MCP 服务器 '{{serverName}}' 进行身份验证！",
+      "rediscoveringTools": "正在重新发现来自 '{{serverName}}' 的工具...",
+      "refreshSuccess": "成功认证并刷新了 '{{serverName}}' 的工具。"
+    },
+    "refresh": "重启 MCP 服务器。",
+    "refreshDetails": {
+      "description": "重启 MCP 服务器。",
+      "restarting": "正在重启 MCP 服务器..."
+    }
   }
 }

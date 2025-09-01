@@ -24,5 +24,8 @@
     "upDown": "Up/Down - Cycle through your prompt history"
   },
   "shellCommand": "shell command",
-  "fullShortcutsDocs": "For a full list of shortcuts, see {{docsPath}}"
+  "fullShortcutsDocs": "For a full list of shortcuts, see {{docsPath}}",
+  "stats": {
+    "cacheEfficiencyMessage": "Cache efficiency: {{efficiency}}% ({{hits}} hits out of {{total}} requests)"
+  }
 }

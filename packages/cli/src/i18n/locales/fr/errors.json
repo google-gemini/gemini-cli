@@ -1,29 +1,19 @@
 {
-  "network": {
-    "connectionFailed": "Échec de la connexion réseau",
-    "timeout": "Délai d'attente dépassé",
-    "serverError": "Erreur du serveur: {{status}}"
+  "api": {
+    "prefix": "[Erreur API : {{message}}]",
+    "prefixWithStatus": "[Erreur API : {{message}} (Statut : {{status}})]",
+    "unknownError": "Une erreur inconnue s'est produite.",
+    "requestCancelled": "Requête annulée."
   },
-  "auth": {
-    "authenticationRequired": "Authentification requise",
-    "invalidCredentials": "Identifiants invalides",
-    "tokenExpired": "Token expiré",
-    "permissionDenied": "Permission refusée"
-  },
-  "file": {
-    "fileNotFound": "Fichier non trouvé: {{path}}",
-    "cannotRead": "Impossible de lire le fichier: {{path}}",
-    "cannotWrite": "Impossible d'écrire le fichier: {{path}}",
-    "invalidPath": "Chemin invalide: {{path}}"
-  },
-  "command": {
-    "unknownCommand": "Commande inconnue: {{command}}",
-    "invalidArguments": "Arguments invalides pour {{command}}",
-    "executionFailed": "Échec de l'exécution de la commande: {{command}}"
-  },
-  "general": {
-    "unexpectedError": "Une erreur inattendue s'est produite",
-    "operationCancelled": "Opération annulée",
-    "notSupported": "Opération non supportée"
+  "quota": {
+    "rateLimitDetected": "Limitations de quota possibles ou temps de réponse lents détectés. Basculement vers le modèle {{fallbackModel}} pour le reste de cette session.",
+    "rateLimitDetectedPaid": "Limitations de quota possibles ou temps de réponse lents détectés. Basculement vers le modèle {{fallbackModel}} pour le reste de cette session. Nous vous remercions d'avoir choisi Gemini Code Assist et le Gemini CLI.",
+    "dailyQuotaReached": "Vous avez atteint votre limite de quota quotidien. Pour augmenter vos limites, passez à un plan Gemini Code Assist Standard ou Enterprise avec des limites plus élevées sur https://goo.gle/set-up-gemini-code-assist, ou utilisez /auth pour passer à une clé API payante d'AI Studio sur https://aistudio.google.com/apikey",
+    "dailyQuotaReachedPaid": "Vous avez atteint votre limite de quota quotidien. Nous vous remercions d'avoir choisi Gemini Code Assist et le Gemini CLI. Pour continuer à accéder au modèle {{currentModel}} aujourd'hui, envisagez d'utiliser /auth pour passer à une clé API payante d'AI Studio sur https://aistudio.google.com/apikey",
+    "modelQuotaReached": "Vous avez atteint votre limite de quota quotidien {{currentModel}}. Vous serez basculé vers le modèle {{fallbackModel}} pour le reste de cette session. Pour augmenter vos limites, passez à un plan Gemini Code Assist Standard ou Enterprise avec des limites plus élevées sur https://goo.gle/set-up-gemini-code-assist, ou utilisez /auth pour passer à une clé API payante d'AI Studio sur https://aistudio.google.com/apikey",
+    "modelQuotaReachedPaid": "Vous avez atteint votre limite de quota quotidien {{currentModel}}. Vous serez basculé vers le modèle {{fallbackModel}} pour le reste de cette session. Nous vous remercions d'avoir choisi Gemini Code Assist et le Gemini CLI. Pour continuer à accéder au modèle {{currentModel}} aujourd'hui, envisagez d'utiliser /auth pour passer à une clé API payante d'AI Studio sur https://aistudio.google.com/apikey",
+    "waitAndRetryGemini": "Veuillez patienter et réessayer plus tard. Pour augmenter vos limites, demandez une augmentation de quota via AI Studio, ou passez à une autre méthode /auth",
+    "waitAndRetryVertex": "Veuillez patienter et réessayer plus tard. Pour augmenter vos limites, demandez une augmentation de quota via Vertex, ou passez à une autre méthode /auth",
+    "rateLimitDefault": "Limitations de quota possibles ou temps de réponse lents détectés. Basculement vers le modèle {{fallbackModel}} pour le reste de cette session."
   }
 }

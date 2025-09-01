@@ -931,8 +931,8 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
   // enough but not too large to make the terminal hard to use.
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
   const placeholder = vimModeEnabled
-    ? t('input.vimPlaceholder')
-    : t('input.defaultPlaceholder');
+    ? t('ui:input.vimPlaceholder')
+    : t('ui:input.defaultPlaceholder');
 
   return (
     <StreamingContext.Provider value={streamingState}>

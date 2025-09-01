@@ -1,36 +1,31 @@
 {
-  "title": "Aide Gemini CLI",
+  "sections": {
+    "basics": "Bases :",
+    "commands": "Commandes :",
+    "shortcuts": "Raccourcis clavier :"
+  },
   "basics": {
-    "title": "Bases",
-    "addContext": "Ajouter du contexte : Utilisez @ pour spécifier des fichiers pour le contexte",
-    "commands": "Commandes : /help, /auth, /quit, /theme, /settings, /stats, /tools, /extensions, /mcp, /memory, /chat, /copy, /compress, /clear, /about, /docs, /bug",
-    "commandsShort": "Commandes : /help, /auth, /quit..."
+    "addContext": "Ajouter du contexte",
+    "addContextDesc": "Utilisez @ pour spécifier des fichiers pour le contexte (ex. @src/monFichier.ts) pour cibler des fichiers ou dossiers spécifiques.",
+    "shellMode": "Mode shell",
+    "shellModeDesc": "Exécutez des commandes shell via ! (ex. !npm run start) ou utilisez le langage naturel (ex. démarrer le serveur)."
   },
   "shortcuts": {
-    "title": "Raccourcis clavier",
-    "multiline": "Entrée multiligne : {{shortcut}}",
-    "cancel": "Annuler : Ctrl+C",
-    "quit": "Quitter : {{shortcut}}",
-    "clearScreen": "Effacer l'écran : Ctrl+L",
-    "toggleStats": "Basculer les stats : {{shortcut}}",
-    "showContext": "Afficher le contexte : Ctrl+G"
+    "altLeftRight": "Alt+Gauche/Droite - Naviguer par mots dans l'entrée",
+    "ctrlC": "Ctrl+C - Quitter l'application",
+    "ctrlJ": "{{key}} - Nouvelle ligne",
+    "ctrlJLinux": "{{key}} - Nouvelle ligne (Alt+Entrée fonctionne pour certaines distributions Linux)",
+    "ctrlL": "Ctrl+L - Effacer l'écran",
+    "ctrlX": "{{key}} - Ouvrir l'entrée dans un éditeur externe",
+    "ctrlY": "Ctrl+Y - Basculer le mode YOLO",
+    "enter": "Entrée - Envoyer le message",
+    "esc": "Échap - Annuler l'opération",
+    "shiftTab": "Shift+Tab - Basculer l'acceptation automatique des modifications",
+    "upDown": "Haut/Bas - Parcourir votre historique de prompts"
   },
-  "examples": {
-    "title": "Exemples",
-    "askAboutCode": "Poser des questions sur votre code :",
-    "modifyCode": "Modifier votre code :",
-    "runCommands": "Exécuter des commandes :",
-    "workWithGit": "Travailler avec git :"
-  },
-  "keyboardShortcuts": {
-    "multilineMac": "Cmd+Entrée",
-    "multilineOther": "Ctrl+Entrée", 
-    "quitMac": "Cmd+D",
-    "quitOther": "Ctrl+D",
-    "toggleStatsMac": "Cmd+K",
-    "toggleStatsOther": "Ctrl+K"
-  },
-  "footer": {
-    "moreInfo": "pour plus d'informations."
+  "shellCommand": "commande shell",
+  "fullShortcutsDocs": "Pour une liste complète des raccourcis, voir {{docsPath}}",
+  "stats": {
+    "cacheEfficiencyMessage": "Efficacité du cache : {{efficiency}}% ({{hits}} hits sur {{total}} requêtes)"
   }
 }

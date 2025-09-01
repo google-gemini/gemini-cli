@@ -1,36 +1,31 @@
 {
-  "title": "Ayuda de Gemini CLI",
+  "sections": {
+    "basics": "Básicos:",
+    "commands": "Comandos:",
+    "shortcuts": "Atajos de teclado:"
+  },
   "basics": {
-    "title": "Básicos",
-    "addContext": "Agregar contexto: Usa @ para especificar archivos para el contexto",
-    "commands": "Comandos: /help, /auth, /quit, /theme, /settings, /stats, /tools, /extensions, /mcp, /memory, /chat, /copy, /compress, /clear, /about, /docs, /bug",
-    "commandsShort": "Comandos: /help, /auth, /quit..."
+    "addContext": "Agregar contexto",
+    "addContextDesc": "Usa @ para especificar archivos para el contexto (ej. @src/miArchivo.ts) para dirigirse a archivos o carpetas específicas.",
+    "shellMode": "Modo shell",
+    "shellModeDesc": "Ejecuta comandos shell vía ! (ej. !npm run start) o usa lenguaje natural (ej. iniciar servidor)."
   },
   "shortcuts": {
-    "title": "Atajos de teclado",
-    "multiline": "Entrada multilínea: {{shortcut}}",
-    "cancel": "Cancelar: Ctrl+C",
-    "quit": "Salir: {{shortcut}}",
-    "clearScreen": "Limpiar pantalla: Ctrl+L",
-    "toggleStats": "Alternar estadísticas: {{shortcut}}",
-    "showContext": "Mostrar contexto: Ctrl+G"
+    "altLeftRight": "Alt+Izquierda/Derecha - Saltar por palabras en la entrada",
+    "ctrlC": "Ctrl+C - Salir de la aplicación",
+    "ctrlJ": "{{key}} - Nueva línea",
+    "ctrlJLinux": "{{key}} - Nueva línea (Alt+Enter funciona para ciertas distribuciones de Linux)",
+    "ctrlL": "Ctrl+L - Limpiar la pantalla",
+    "ctrlX": "{{key}} - Abrir entrada en editor externo",
+    "ctrlY": "Ctrl+Y - Alternar modo YOLO",
+    "enter": "Enter - Enviar mensaje",
+    "esc": "Esc - Cancelar operación",
+    "shiftTab": "Shift+Tab - Alternar aceptación automática de ediciones",
+    "upDown": "Arriba/Abajo - Recorrer tu historial de prompts"
   },
-  "examples": {
-    "title": "Ejemplos",
-    "askAboutCode": "Hacer preguntas sobre tu código:",
-    "modifyCode": "Modificar tu código:",
-    "runCommands": "Ejecutar comandos:",
-    "workWithGit": "Trabajar con git:"
-  },
-  "keyboardShortcuts": {
-    "multilineMac": "Cmd+Enter",
-    "multilineOther": "Ctrl+Enter", 
-    "quitMac": "Cmd+D",
-    "quitOther": "Ctrl+D",
-    "toggleStatsMac": "Cmd+K",
-    "toggleStatsOther": "Ctrl+K"
-  },
-  "footer": {
-    "moreInfo": "para más información."
+  "shellCommand": "comando shell",
+  "fullShortcutsDocs": "Para una lista completa de atajos, ver {{docsPath}}",
+  "stats": {
+    "cacheEfficiencyMessage": "Eficiencia de caché: {{efficiency}}% ({{hits}} aciertos de {{total}} solicitudes)"
   }
 }

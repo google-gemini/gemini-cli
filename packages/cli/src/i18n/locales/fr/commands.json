@@ -95,6 +95,63 @@
     "alreadyInProgress": "Compression déjà en cours, attendez que la requête précédente se termine"
   },
   "mcp": {
-    "authFailed": "Échec de l'authentification avec le serveur MCP '{{serverName}}': {{error}}"
+    "description": "lister les serveurs MCP configurés et les outils, ou s'authentifier avec les serveurs compatibles OAuth",
+    "list": "Lister les serveurs MCP configurés et les outils",
+    "authFailed": "Échec de l'authentification avec le serveur MCP '{{serverName}}': {{error}}",
+    "configNotLoaded": "Configuration non chargée.",
+    "toolRegistryError": "Impossible de récupérer le registre des outils.",
+    "noServersConfigured": "Aucun serveur MCP configuré. Veuillez consulter la documentation MCP dans votre navigateur: {{docsUrl}} ou utilisez la commande /docs",
+    "serversStartingUp": "Les serveurs MCP démarrent ({{count}} en cours d'initialisation)...",
+    "firstStartupNote": "Note: Le premier démarrage peut prendre plus de temps. La disponibilité des outils se mettra à jour automatiquement.",
+    "configuredServers": "Serveurs MCP configurés:",
+    "serverStatus": {
+      "ready": "Prêt",
+      "starting": "Démarrage... (le premier démarrage peut prendre plus de temps)",
+      "disconnected": "Déconnecté"
+    },
+    "oauthStatus": {
+      "tokenExpired": "(Jeton OAuth expiré)",
+      "authenticated": "(OAuth authentifié)",
+      "notAuthenticated": "(OAuth non authentifié)"
+    },
+    "serverExtension": "(depuis {{extensionName}})",
+    "serverBlocked": "Bloqué",
+    "toolCount": "{{count}} outils",
+    "promptCount": "{{count}} prompts",
+    "noTools": "0 outil",
+    "toolsWillAppear": "les outils et prompts apparaîtront quand ils seront prêts",
+    "toolsCached": "{{count}} outils en cache",
+    "sections": {
+      "tools": "Outils:",
+      "prompts": "Prompts:",
+      "parameters": "Paramètres:"
+    },
+    "noToolsOrPrompts": "Aucun outil ou prompt disponible",
+    "noToolsAvailable": "Aucun outil disponible",
+    "authHint": "(tapez: \"/mcp auth {{serverName}}\" pour authentifier ce serveur)",
+    "tips": {
+      "title": "💡 Conseils:",
+      "showDescriptions": "Utilisez {{command}} pour afficher les descriptions des serveurs et outils",
+      "showSchema": "Utilisez {{command}} pour afficher les schémas de paramètres des outils",
+      "hideDescriptions": "Utilisez {{command}} pour masquer les descriptions",
+      "authenticate": "Utilisez {{command}} pour s'authentifier avec les serveurs OAuth",
+      "toggleDescriptions": "Appuyez sur {{key}} pour basculer l'affichage des descriptions d'outils"
+    },
+    "auth": "S'authentifier avec un serveur MCP compatible OAuth",
+    "authDetails": {
+      "description": "S'authentifier avec un serveur MCP compatible OAuth",
+      "serverNotFound": "Serveur MCP '{{serverName}}' non trouvé.",
+      "noOAuthServers": "Aucun serveur MCP configuré avec l'authentification OAuth.",
+      "oauthServersList": "Serveurs MCP avec authentification OAuth:\n{{servers}}\n\nUtilisez /mcp auth <nom-serveur> pour vous authentifier.",
+      "startingAuth": "Démarrage de l'authentification OAuth pour le serveur MCP '{{serverName}}'...",
+      "authSuccess": "✅ Authentification réussie avec le serveur MCP '{{serverName}}'!",
+      "rediscoveringTools": "Redécouverte des outils de '{{serverName}}'...",
+      "refreshSuccess": "Authentification réussie et outils mis à jour pour '{{serverName}}'."
+    },
+    "refresh": "Redémarre les serveurs MCP.",
+    "refreshDetails": {
+      "description": "Redémarre les serveurs MCP.",
+      "restarting": "Redémarrage des serveurs MCP..."
+    }
   }
 }

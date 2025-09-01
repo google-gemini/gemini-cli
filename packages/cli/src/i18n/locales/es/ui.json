@@ -40,6 +40,7 @@
   },
   "loading": {
     "waitingForConfirmation": "Esperando confirmación del usuario...",
+    "escToCancel": "(presiona esc para cancelar, ",
     "phrases": [
       "Sintiéndome con suerte",
       "Enviando excelencia...",
@@ -212,9 +213,6 @@
   "shellMode": {
     "enabled": "modo shell habilitado",
     "escToDisable": "(esc para deshabilitar)"
-  },
-  "loading": {
-    "escToCancel": "(esc para cancelar, "
   },
   "suggestions": {
     "loadingSuggestions": "Cargando sugerencias..."

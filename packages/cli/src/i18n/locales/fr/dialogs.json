@@ -1,22 +1,20 @@
 {
   "auth": {
     "title": "Commencer",
-    "subtitle": "Authentifiez-vous pour utiliser Gemini CLI",
-    "description": "Choisissez votre méthode d'authentification préférée :",
-    "methods": {
-      "adc": "Identifiants par défaut de l'application (ADC)",
-      "serviceAccount": "Clé de compte de service",
-      "oauth": "Flux OAuth",
-      "apiKey": "Clé API"
+    "description": "Comment souhaitez-vous vous authentifier pour ce projet ?",
+    "instructions": "(Utiliser Entrée pour sélectionner)",
+    "terms": "Conditions d'utilisation et Avis de confidentialité pour Gemini CLI",
+    "termsUrl": "https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md",
+    "options": {
+      "google": "Se connecter avec Google",
+      "cloudShell": "Utiliser les identifiants utilisateur Cloud Shell",
+      "geminiKey": "Utiliser la clé API Gemini",
+      "vertexAI": "Vertex AI"
     },
-    "buttons": {
-      "selectMethod": "Sélectionner cette méthode",
-      "cancel": "Annuler",
-      "close": "Fermer"
-    },
-    "status": {
-      "authenticated": "Authentifié",
-      "notAuthenticated": "Non authentifié"
+    "errors": {
+      "invalidAuthType": "Valeur invalide pour GEMINI_DEFAULT_AUTH_TYPE : \"{{value}}\". Les valeurs valides sont : {{validValues}}.",
+      "existingApiKey": "Clé API existante détectée (GEMINI_API_KEY). Sélectionnez l'option \"Clé API Gemini\" pour l'utiliser.",
+      "authRequired": "Vous devez sélectionner une méthode d'authentification pour continuer. Appuyez sur Ctrl+C deux fois pour quitter."
     }
   },
   "settings": {
@@ -35,26 +33,38 @@
   },
   "editor": {
     "title": "Sélectionner un éditeur",
+    "applyTo": "Appliquer à",
     "preference": "Préférence d'éditeur",
-    "description": "Choisissez votre éditeur préféré pour modifier les fichiers",
-    "currentPreference": "Préférence actuelle: {{editor}}"
+    "instructions": "(Utiliser Entrée pour sélectionner, Tab pour changer de focus)",
+    "description": "Ces éditeurs sont actuellement supportés. Veuillez noter que certains éditeurs ne peuvent pas être utilisés en mode sandbox.",
+    "currentPreference": "Votre éditeur préféré est : {{editor}}.",
+    "scopeMessages": {
+      "alsoModified": "(Également modifié dans {{scope}})",
+      "modified": "(Modifié dans {{scope}})"
+    },
+    "scopes": {
+      "user": "Paramètres utilisateur",
+      "workspace": "Paramètres de l'espace de travail"
+    },
+    "none": "Aucun"
   },
   "folderTrust": {
-    "title": "Dossier non fiable",
-    "message": "Ce dossier n'est pas dans votre liste de dossiers fiables.",
-    "question": "Voulez-vous faire confiance à ce dossier ?",
-    "buttons": {
-      "trust": "Faire confiance",
-      "dontTrust": "Ne pas faire confiance"
+    "title": "Faites-vous confiance à ce dossier ?",
+    "description": "Faire confiance à un dossier permet à Gemini d'exécuter les commandes qu'il suggère. Il s'agit d'une fonctionnalité de sécurité pour éviter l'exécution accidentelle dans des répertoires non fiables.",
+    "options": {
+      "trustFolder": "Faire confiance au dossier",
+      "trustParent": "Faire confiance au dossier parent",
+      "dontTrust": "Ne pas faire confiance (esc)"
     }
   },
-  "shellConfirmation": {
-    "title": "Confirmation d'exécution de commande",
-    "message": "Voulez-vous exécuter cette commande ?",
-    "command": "Commande:",
-    "buttons": {
-      "execute": "Exécuter",
-      "cancel": "Annuler"
+  "shellConfirm": {
+    "title": "Exécution de commande shell",
+    "description": "Une commande personnalisée souhaite exécuter les commandes shell suivantes :",
+    "question": "Voulez-vous continuer ?",
+    "options": {
+      "allowOnce": "Oui, autoriser une fois",
+      "allowAlways": "Oui, autoriser toujours pour cette session",
+      "cancel": "Non (esc)"
     }
   }
 }

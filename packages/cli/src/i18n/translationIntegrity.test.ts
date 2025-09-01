@@ -314,4 +314,374 @@ describe('Translation Integrity Tests', () => {
       });
     });
   });
+
+  describe('Code Usage Validation', () => {
+    // Use the same helper function from above
+    function getTranslationKeysLocal(obj: any, prefix = ''): string[] {
+      const keys: string[] = [];
+
+      for (const key in obj) {
+        const fullKey = prefix ? `${prefix}.${key}` : key;
+
+        if (
+          typeof obj[key] === 'object' &&
+          obj[key] !== null &&
+          !Array.isArray(obj[key])
+        ) {
+          keys.push(...getTranslationKeysLocal(obj[key], fullKey));
+        } else {
+          keys.push(fullKey);
+        }
+      }
+
+      return keys;
+    }
+
+    function extractTranslationKeys(fileContent: string): Array<{key: string, namespace: string, file: string}> {
+      const keys: Array<{key: string, namespace: string, file: string}> = [];
+      
+      // Pattern 1: i18n.t('key', { ns: 'namespace' }) - improved to handle nested braces
+      const pattern1 = /i18n\.t\(\s*['"`]([^'"`]+)['"`]\s*,\s*\{((?:[^{}]*\{[^}]*\})*[^{}]*)\}/g;
+      let match;
+      while ((match = pattern1.exec(fileContent)) !== null) {
+        let key = match[1];
+        const options = match[2];
+        
+        // Skip if no ns: property (should be handled by Pattern 4b)
+        if (!options.includes('ns:')) {
+          continue;
+        }
+        
+        // Skip dynamic keys (containing variables like ${variable} or template literal constructions)
+        if (key.includes('${') || key.includes('`') || key.includes('commandName') || key.includes('variable')) {
+          continue;
+        }
+        
+        // Handle namespace:key format in Pattern 1
+        let namespace;
+        if (key.includes(':')) {
+          const [keyNamespace, keyPart] = key.split(':');
+          namespace = keyNamespace;
+          key = keyPart;
+        } else {
+          // Extract namespace from options
+          const nsMatch = options.match(/ns:\s*['"`]([^'"`]+)['"`]/);
+          namespace = nsMatch ? nsMatch[1] : 'help'; // default namespace
+        }
+        
+        keys.push({ key, namespace, file: '' });
+      }
+      
+      // Pattern 2: i18n.t('namespace:key')
+      const pattern2 = /i18n\.t\(\s*['"`]([^'"`]+):([^'"`]+)['"`]/g;
+      while ((match = pattern2.exec(fileContent)) !== null) {
+        const namespace = match[1];
+        const key = match[2];
+        
+        // Skip dynamic keys and test placeholders
+        if (key.includes('${') || key.includes('`') || key.includes('commandName') || key.includes('variable') || 
+            key === 'key') {
+          continue;
+        }
+        
+        keys.push({ key, namespace, file: '' });
+      }
+      
+      // Pattern 3: t('key', { ns: 'namespace' }) - improved to handle nested braces
+      const pattern3 = /\bt\(\s*['"`]([^'"`]+)['"`]\s*,\s*\{((?:[^{}]*\{[^}]*\})*[^{}]*)\}/g;
+      while ((match = pattern3.exec(fileContent)) !== null) {
+        let key = match[1];
+        const options = match[2];
+        
+        // Skip if no ns: property (should be handled by Pattern 4b)
+        if (!options.includes('ns:')) {
+          continue;
+        }
+        
+        // Skip dynamic keys and test placeholders
+        if (key.includes('${') || key.includes('`') || key.includes('commandName') || key.includes('variable') || 
+            key === 'key') {
+          continue;
+        }
+        
+        // Handle namespace:key format in Pattern 3
+        let namespace;
+        if (key.includes(':')) {
+          const [keyNamespace, keyPart] = key.split(':');
+          namespace = keyNamespace;
+          key = keyPart;
+        } else {
+          // Extract namespace from options
+          const nsMatch = options.match(/ns:\s*['"`]([^'"`]+)['"`]/);
+          namespace = nsMatch ? nsMatch[1] : 'help'; // default namespace
+        }
+        
+        keys.push({ key, namespace, file: '' });
+      }
+      
+      // Pattern 4a: t('namespace:key') - useTranslation hook with namespace prefix
+      const pattern4a = /\bt\(\s*['"`]([^'"`]+):([^'"`]+)['"`]/g;
+      while ((match = pattern4a.exec(fileContent)) !== null) {
+        const namespace = match[1];
+        const key = match[2];
+        
+        // Skip dynamic keys and test placeholders
+        if (key.includes('${') || key.includes('`') || key.includes('commandName') || key.includes('variable') || 
+            key === 'key') {
+          continue;
+        }
+        
+        keys.push({ key, namespace, file: '' });
+      }
+      
+      // Pattern 4b: t('key') - simple t() calls (from useTranslation hook)
+      const pattern4b = /\bt\(\s*['"`]([^'"`]+)['"`]\s*\)/g;
+      while ((match = pattern4b.exec(fileContent)) !== null) {
+        const key = match[1];
+        
+        // Skip if this matches the namespace:key pattern (already handled above)
+        if (key.includes(':')) {
+          continue;
+        }
+        
+        // Skip dynamic keys and test placeholders
+        if (key.includes('${') || key.includes('`') || key.includes('commandName') || key.includes('variable') || 
+            key === 'key') {
+          continue;
+        }
+        
+        // For simple t() calls, we need to infer namespace from useTranslation() call in same file
+        // Look for useTranslation('namespace') pattern
+        const useTranslationMatch = fileContent.match(/useTranslation\(\s*['"`]([^'"`]+)['"`]\s*\)/);
+        const namespace = useTranslationMatch ? useTranslationMatch[1] : 'help';
+        
+        keys.push({ key, namespace, file: '' });
+      }
+      
+      // Pattern 5: getTranslatedErrorMessage('key', fallback, params)
+      const pattern5 = /getTranslatedErrorMessage\(\s*['"`]([^'"`]+)['"`]/g;
+      while ((match = pattern5.exec(fileContent)) !== null) {
+        const key = match[1];
+        
+        // Skip dynamic keys and test placeholders
+        if (key.includes('${') || key.includes('`') || key.includes('commandName') || key.includes('variable') || 
+            key === 'key') {
+          continue;
+        }
+        
+        // getTranslatedErrorMessage uses 'errors' namespace by default
+        keys.push({ key, namespace: 'errors', file: '' });
+      }
+      
+      // Pattern 6: tNamespace('key') - renamed translation functions like tDialogs, tUI, etc.
+      const pattern6 = /\bt[A-Z][a-zA-Z]*\(\s*['"`]([^'"`]+)['"`]/g;
+      while ((match = pattern6.exec(fileContent)) !== null) {
+        const key = match[1];
+        
+        // Skip dynamic keys and test placeholders
+        if (key.includes('${') || key.includes('`') || key.includes('commandName') || key.includes('variable') || 
+            key === 'key') {
+          continue;
+        }
+        
+        // Extract the namespace from the function name (tDialogs -> dialogs)
+        const fullMatch = fileContent.match(new RegExp(`\\bt([A-Z][a-zA-Z]*)\\(\\s*['"\`]${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"\`]`));
+        if (fullMatch) {
+          const namespacePart = fullMatch[1].toLowerCase(); // Dialogs -> dialogs
+          // Map common patterns
+          const namespace = namespacePart === 'diaglogs' || namespacePart === 'dialogs' ? 'dialogs' :
+                           namespacePart === 'ui' ? 'ui' :
+                           namespacePart === 'commands' ? 'commands' :
+                           namespacePart === 'messages' ? 'messages' :
+                           namespacePart === 'errors' ? 'errors' :
+                           'help'; // default fallback
+          keys.push({ key, namespace, file: '' });
+        }
+      }
+      
+      return keys;
+    }
+
+    function scanSourceFiles(): Array<{key: string, namespace: string, file: string}> {
+      const allKeys: Array<{key: string, namespace: string, file: string}> = [];
+      
+      // Directories to scan
+      const scanDirs = [
+        { dir: path.join(__dirname, '../..'), label: 'cli' },
+        { dir: path.join(__dirname, '../../../core/src'), label: 'core' }
+      ];
+      
+      function scanDirectory(dir: string, relativePath = '', packageLabel = ''): void {
+        try {
+          const items = fs.readdirSync(dir);
+          
+          for (const item of items) {
+            const fullPath = path.join(dir, item);
+            const itemRelativePath = packageLabel 
+              ? path.join(packageLabel, relativePath, item)
+              : path.join(relativePath, item);
+            
+            if (fs.statSync(fullPath).isDirectory()) {
+              // Skip node_modules, dist, and test directories
+              if (!['node_modules', 'dist', '__snapshots__'].includes(item)) {
+                scanDirectory(fullPath, path.join(relativePath, item), packageLabel);
+              }
+            } else if ((item.endsWith('.ts') || item.endsWith('.tsx')) && !item.includes('.test.') && !item.includes('.spec.')) {
+              try {
+                const content = fs.readFileSync(fullPath, 'utf8');
+                const keysInFile = extractTranslationKeys(content);
+                keysInFile.forEach(keyInfo => {
+                  allKeys.push({
+                    ...keyInfo,
+                    file: itemRelativePath
+                  });
+                });
+              } catch (_error) {
+                // Skip files that can't be read
+              }
+            }
+          }
+        } catch (_error) {
+          console.warn(`Could not scan directory: ${dir}`);
+        }
+      }
+      
+      // Scan all directories
+      scanDirs.forEach(({ dir, label }) => {
+        scanDirectory(dir, '', label);
+      });
+      return allKeys;
+    }
+
+    it('should scan and debug translation usage', () => {
+      // Test the extraction function first
+      const testContent = `
+        i18n.t('mcp.configNotLoaded', { ns: 'commands' })
+        i18n.t('ui:chat.noCheckpoints')
+        i18n.t('messages:memory.currentContent', { interpolation: 'ignore' })
+      `;
+      
+      const extractedKeys = extractTranslationKeys(testContent);
+      console.log('Test extraction results:', extractedKeys);
+      
+      // Expect specific keys
+      expect(extractedKeys).toContainEqual({
+        key: 'mcp.configNotLoaded',
+        namespace: 'commands',
+        file: ''
+      });
+      
+      expect(extractedKeys).toContainEqual({
+        key: 'chat.noCheckpoints',
+        namespace: 'ui',
+        file: ''
+      });
+    });
+
+    it('should have all translation keys used in code available in all languages', () => {
+      const usedKeys = scanSourceFiles();
+      
+      // Group keys by namespace
+      const keysByNamespace: Record<string, Array<{key: string, file: string}>> = {};
+      usedKeys.forEach(({key, namespace, file}) => {
+        if (!keysByNamespace[namespace]) {
+          keysByNamespace[namespace] = [];
+        }
+        keysByNamespace[namespace].push({key, file});
+      });
+      
+      console.log('\\n=== Translation Usage Scan ===');
+      console.log('Found namespaces:', Object.keys(keysByNamespace));
+      Object.keys(keysByNamespace).forEach(ns => {
+        console.log(`${ns}: ${keysByNamespace[ns].length} keys`);
+        if (keysByNamespace[ns].length > 0) {
+          const sampleKeys = keysByNamespace[ns].slice(0, 3);
+          console.log('  Sample keys:', sampleKeys.map(k => `${k.key} (${k.file})`));
+        }
+      });
+      
+      // Check each namespace
+      Object.entries(keysByNamespace).forEach(([namespace, keys]) => {
+        // Skip invalid namespaces
+        if (!requiredNamespaces.includes(namespace)) {
+          console.warn(`⚠️  Skipping unknown namespace: ${namespace}`);
+          return;
+        }
+        
+        supportedLanguages.forEach((lang) => {
+          const translationFile = path.join(localesDir, lang, namespace + '.json');
+          
+          if (!fs.existsSync(translationFile)) {
+            throw new Error(`Translation file missing: ${lang}/${namespace}.json`);
+          }
+          
+          const translations = JSON.parse(fs.readFileSync(translationFile, 'utf8'));
+          
+          // Check each key used in code
+          keys.forEach(({key, file}) => {
+            const keyParts = key.split('.');
+            let current = translations;
+            let keyExists = true;
+            
+            for (const part of keyParts) {
+              if (current && typeof current === 'object' && part in current) {
+                current = current[part];
+              } else {
+                keyExists = false;
+                break;
+              }
+            }
+            
+            expect(
+              keyExists,
+              `Missing translation key "${key}" in ${lang}/${namespace}.json (used in ${file})`
+            ).toBe(true);
+            
+            if (keyExists) {
+              // Check if the translation value is valid (string or non-empty array)
+              const isValidString = typeof current === 'string' && current.trim() !== '';
+              const isValidArray = Array.isArray(current) && current.length > 0;
+              
+              expect(
+                isValidString || isValidArray,
+                `Empty or invalid translation for "${key}" in ${lang}/${namespace}.json (got ${typeof current})`
+              ).toBe(true);
+            }
+          });
+        });
+      });
+    });
+
+    it('should identify unused translation keys', () => {
+      const usedKeys = scanSourceFiles();
+      const usedKeySet = new Set(usedKeys.map(k => k.namespace + '.' + k.key));
+      
+      // Get all available keys from English (reference)
+      const allAvailableKeys: string[] = [];
+      
+      requiredNamespaces.forEach(namespace => {
+        const filePath = path.join(localesDir, 'en', namespace + '.json');
+        if (fs.existsSync(filePath)) {
+          const translations = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          const keys = getTranslationKeysLocal(translations);
+          keys.forEach((key: string) => {
+            allAvailableKeys.push(namespace + '.' + key);
+          });
+        }
+      });
+      
+      const unusedKeys = allAvailableKeys.filter(key => !usedKeySet.has(key));
+      
+      console.log(`\\n=== Unused Translation Keys (${unusedKeys.length} total) ===`);
+      if (unusedKeys.length > 0) {
+        console.log(unusedKeys.slice(0, 10).join('\\n'));
+        if (unusedKeys.length > 10) {
+          console.log(`... and ${unusedKeys.length - 10} more`);
+        }
+      }
+      
+      // This is informational only - we don't fail the test for unused keys
+      // expect(unusedKeys.length).toBe(0); // Uncomment to enforce no unused keys
+    });
+  });
 });

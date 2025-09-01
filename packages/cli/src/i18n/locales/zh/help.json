@@ -24,5 +24,8 @@
     "upDown": "上/下箭头 - 浏览提示历史"
   },
   "shellCommand": "shell 命令",
-  "fullShortcutsDocs": "完整快捷键列表请参阅 {{docsPath}}"
+  "fullShortcutsDocs": "完整快捷键列表请参阅 {{docsPath}}",
+  "stats": {
+    "cacheEfficiencyMessage": "缓存效率：{{efficiency}}%（{{hits}} 次命中，共 {{total}} 次请求）"
+  }
 }

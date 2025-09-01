@@ -33,26 +33,38 @@
   },
   "editor": {
     "title": "Seleccionar editor",
+    "applyTo": "Aplicar a",
     "preference": "Preferencia de editor",
-    "description": "Elige tu editor preferido para editar archivos",
-    "currentPreference": "Preferencia actual: {{editor}}"
+    "instructions": "(Usar Enter para seleccionar, Tab para cambiar el foco)",
+    "description": "Estos editores están actualmente soportados. Ten en cuenta que algunos editores no pueden ser usados en modo sandbox.",
+    "currentPreference": "Tu editor preferido es: {{editor}}.",
+    "scopeMessages": {
+      "alsoModified": "(También modificado en {{scope}})",
+      "modified": "(Modificado en {{scope}})"
+    },
+    "scopes": {
+      "user": "Configuración de usuario",
+      "workspace": "Configuración del espacio de trabajo"
+    },
+    "none": "Ninguno"
   },
   "folderTrust": {
-    "title": "Carpeta no confiable",
-    "message": "Esta carpeta no está en tu lista de carpetas confiables.",
-    "question": "¿Quieres confiar en esta carpeta?",
-    "buttons": {
-      "trust": "Confiar",
-      "dontTrust": "No confiar"
+    "title": "¿Confías en esta carpeta?",
+    "description": "Confiar en una carpeta permite a Gemini ejecutar comandos que sugiere. Esta es una característica de seguridad para prevenir la ejecución accidental en directorios no confiables.",
+    "options": {
+      "trustFolder": "Confiar en la carpeta",
+      "trustParent": "Confiar en la carpeta padre",
+      "dontTrust": "No confiar (esc)"
     }
   },
-  "shellConfirmation": {
-    "title": "Confirmación de ejecución de comando",
-    "message": "¿Quieres ejecutar este comando?",
-    "command": "Comando:",
-    "buttons": {
-      "execute": "Ejecutar",
-      "cancel": "Cancelar"
+  "shellConfirm": {
+    "title": "Ejecución de comando shell",
+    "description": "Un comando personalizado quiere ejecutar los siguientes comandos shell:",
+    "question": "¿Quieres continuar?",
+    "options": {
+      "allowOnce": "Sí, permitir una vez",
+      "allowAlways": "Sí, permitir siempre para esta sesión",
+      "cancel": "No (esc)"
     }
   }
 }

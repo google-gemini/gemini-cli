@@ -95,6 +95,63 @@
     "alreadyInProgress": "Compresión ya en progreso, espere a que termine la solicitud anterior"
   },
   "mcp": {
-    "authFailed": "Error al autenticarse con el servidor MCP '{{serverName}}': {{error}}"
+    "description": "listar servidores MCP configurados y herramientas, o autenticarse con servidores habilitados para OAuth",
+    "list": "Listar servidores MCP configurados y herramientas",
+    "authFailed": "Error al autenticarse con el servidor MCP '{{serverName}}': {{error}}",
+    "configNotLoaded": "Configuración no cargada.",
+    "toolRegistryError": "No se pudo obtener el registro de herramientas.",
+    "noServersConfigured": "No hay servidores MCP configurados. Por favor, consulte la documentación MCP en su navegador: {{docsUrl}} o use el comando /docs",
+    "serversStartingUp": "Los servidores MCP se están iniciando ({{count}} inicializando)...",
+    "firstStartupNote": "Nota: El primer inicio puede tomar más tiempo. La disponibilidad de herramientas se actualizará automáticamente.",
+    "configuredServers": "Servidores MCP configurados:",
+    "serverStatus": {
+      "ready": "Listo",
+      "starting": "Iniciando... (el primer inicio puede tomar más tiempo)",
+      "disconnected": "Desconectado"
+    },
+    "oauthStatus": {
+      "tokenExpired": "(Token OAuth expirado)",
+      "authenticated": "(OAuth autenticado)",
+      "notAuthenticated": "(OAuth no autenticado)"
+    },
+    "serverExtension": "(desde {{extensionName}})",
+    "serverBlocked": "Bloqueado",
+    "toolCount": "{{count}} herramientas",
+    "promptCount": "{{count}} prompts",
+    "noTools": "0 herramientas",
+    "toolsWillAppear": "las herramientas y prompts aparecerán cuando estén listos",
+    "toolsCached": "{{count}} herramientas en caché",
+    "sections": {
+      "tools": "Herramientas:",
+      "prompts": "Prompts:",
+      "parameters": "Parámetros:"
+    },
+    "noToolsOrPrompts": "No hay herramientas o prompts disponibles",
+    "noToolsAvailable": "No hay herramientas disponibles",
+    "authHint": "(escriba: \"/mcp auth {{serverName}}\" para autenticar este servidor)",
+    "tips": {
+      "title": "💡 Consejos:",
+      "showDescriptions": "Use {{command}} para mostrar descripciones de servidores y herramientas",
+      "showSchema": "Use {{command}} para mostrar esquemas de parámetros de herramientas",
+      "hideDescriptions": "Use {{command}} para ocultar descripciones",
+      "authenticate": "Use {{command}} para autenticarse con servidores OAuth",
+      "toggleDescriptions": "Presione {{key}} para alternar descripciones de herramientas"
+    },
+    "auth": "Autenticarse con un servidor MCP habilitado para OAuth",
+    "authDetails": {
+      "description": "Autenticarse con un servidor MCP habilitado para OAuth",
+      "serverNotFound": "Servidor MCP '{{serverName}}' no encontrado.",
+      "noOAuthServers": "No hay servidores MCP configurados con autenticación OAuth.",
+      "oauthServersList": "Servidores MCP con autenticación OAuth:\n{{servers}}\n\nUse /mcp auth <nombre-servidor> para autenticarse.",
+      "startingAuth": "Iniciando autenticación OAuth para el servidor MCP '{{serverName}}'...",
+      "authSuccess": "✅ ¡Autenticación exitosa con el servidor MCP '{{serverName}}'!",
+      "rediscoveringTools": "Redescubriendo herramientas de '{{serverName}}'...",
+      "refreshSuccess": "Autenticación exitosa y herramientas actualizadas para '{{serverName}}'."
+    },
+    "refresh": "Reinicia los servidores MCP.",
+    "refreshDetails": {
+      "description": "Reinicia los servidores MCP.",
+      "restarting": "Reiniciando servidores MCP..."
+    }
   }
 }

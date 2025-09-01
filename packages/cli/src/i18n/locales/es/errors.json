@@ -1,29 +1,19 @@
 {
-  "network": {
-    "connectionFailed": "Error de conexión de red",
-    "timeout": "Tiempo de espera agotado",
-    "serverError": "Error del servidor: {{status}}"
+  "api": {
+    "prefix": "[Error de API: {{message}}]",
+    "prefixWithStatus": "[Error de API: {{message}} (Estado: {{status}})]",
+    "unknownError": "Ocurrió un error desconocido.",
+    "requestCancelled": "Solicitud cancelada."
   },
-  "auth": {
-    "authenticationRequired": "Autenticación requerida",
-    "invalidCredentials": "Credenciales inválidas",
-    "tokenExpired": "Token expirado",
-    "permissionDenied": "Permiso denegado"
-  },
-  "file": {
-    "fileNotFound": "Archivo no encontrado: {{path}}",
-    "cannotRead": "No se puede leer el archivo: {{path}}",
-    "cannotWrite": "No se puede escribir el archivo: {{path}}",
-    "invalidPath": "Ruta inválida: {{path}}"
-  },
-  "command": {
-    "unknownCommand": "Comando desconocido: {{command}}",
-    "invalidArguments": "Argumentos inválidos para {{command}}",
-    "executionFailed": "Error al ejecutar el comando: {{command}}"
-  },
-  "general": {
-    "unexpectedError": "Ocurrió un error inesperado",
-    "operationCancelled": "Operación cancelada",
-    "notSupported": "Operación no soportada"
+  "quota": {
+    "rateLimitDetected": "Posibles limitaciones de cuota o tiempos de respuesta lentos detectados. Cambiando al modelo {{fallbackModel}} para el resto de esta sesión.",
+    "rateLimitDetectedPaid": "Posibles limitaciones de cuota o tiempos de respuesta lentos detectados. Cambiando al modelo {{fallbackModel}} para el resto de esta sesión. Te agradecemos por elegir Gemini Code Assist y el Gemini CLI.",
+    "dailyQuotaReached": "Has alcanzado tu límite de cuota diaria. Para aumentar tus límites, actualiza a un plan Gemini Code Assist Standard o Enterprise con límites más altos en https://goo.gle/set-up-gemini-code-assist, o usa /auth para cambiar a usar una clave API de pago de AI Studio en https://aistudio.google.com/apikey",
+    "dailyQuotaReachedPaid": "Has alcanzado tu límite de cuota diaria. Te agradecemos por elegir Gemini Code Assist y el Gemini CLI. Para continuar accediendo al modelo {{currentModel}} hoy, considera usar /auth para cambiar a usar una clave API de pago de AI Studio en https://aistudio.google.com/apikey",
+    "modelQuotaReached": "Has alcanzado tu límite de cuota diaria de {{currentModel}}. Serás cambiado al modelo {{fallbackModel}} para el resto de esta sesión. Para aumentar tus límites, actualiza a un plan Gemini Code Assist Standard o Enterprise con límites más altos en https://goo.gle/set-up-gemini-code-assist, o usa /auth para cambiar a usar una clave API de pago de AI Studio en https://aistudio.google.com/apikey",
+    "modelQuotaReachedPaid": "Has alcanzado tu límite de cuota diaria de {{currentModel}}. Serás cambiado al modelo {{fallbackModel}} para el resto de esta sesión. Te agradecemos por elegir Gemini Code Assist y el Gemini CLI. Para continuar accediendo al modelo {{currentModel}} hoy, considera usar /auth para cambiar a usar una clave API de pago de AI Studio en https://aistudio.google.com/apikey",
+    "waitAndRetryGemini": "Por favor espera e inténtalo de nuevo más tarde. Para aumentar tus límites, solicita un aumento de cuota a través de AI Studio, o cambia a otro método /auth",
+    "waitAndRetryVertex": "Por favor espera e inténtalo de nuevo más tarde. Para aumentar tus límites, solicita un aumento de cuota a través de Vertex, o cambia a otro método /auth",
+    "rateLimitDefault": "Posibles limitaciones de cuota o tiempos de respuesta lentos detectados. Cambiando al modelo {{fallbackModel}} para el resto de esta sesión."
   }
 }

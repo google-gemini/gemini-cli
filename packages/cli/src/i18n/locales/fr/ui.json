@@ -40,6 +40,7 @@
   },
   "loading": {
     "waitingForConfirmation": "En attente de la confirmation de l'utilisateur...",
+    "escToCancel": "(appuyez sur esc pour annuler, ",
     "phrases": [
       "Je me sens chanceux",
       "Expédition de l'excellence...",
@@ -212,9 +213,6 @@
   "shellMode": {
     "enabled": "mode shell activé",
     "escToDisable": "(échap pour désactiver)"
-  },
-  "loading": {
-    "escToCancel": "(échap pour annuler, "
   },
   "suggestions": {
     "loadingSuggestions": "Chargement des suggestions..."

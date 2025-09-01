@@ -95,6 +95,63 @@
     "alreadyInProgress": "Already compressing, wait for previous request to complete"
   },
   "mcp": {
-    "authFailed": "Failed to authenticate with MCP server '{{serverName}}': {{error}}"
+    "description": "list configured MCP servers and tools, or authenticate with OAuth-enabled servers",
+    "list": "List configured MCP servers and tools",
+    "authFailed": "Failed to authenticate with MCP server '{{serverName}}': {{error}}",
+    "configNotLoaded": "Config not loaded.",
+    "toolRegistryError": "Could not retrieve tool registry.",
+    "noServersConfigured": "No MCP servers configured. Please view MCP documentation in your browser: {{docsUrl}} or use the cli /docs command",
+    "serversStartingUp": "MCP servers are starting up ({{count}} initializing)...",
+    "firstStartupNote": "Note: First startup may take longer. Tool availability will update automatically.",
+    "configuredServers": "Configured MCP servers:",
+    "serverStatus": {
+      "ready": "Ready",
+      "starting": "Starting... (first startup may take longer)",
+      "disconnected": "Disconnected"
+    },
+    "oauthStatus": {
+      "tokenExpired": "(OAuth token expired)",
+      "authenticated": "(OAuth authenticated)",
+      "notAuthenticated": "(OAuth not authenticated)"
+    },
+    "serverExtension": "(from {{extensionName}})",
+    "serverBlocked": "Blocked",
+    "toolCount": "{{count}} tools",
+    "promptCount": "{{count}} prompts",
+    "noTools": "0 tools",
+    "toolsWillAppear": "tools and prompts will appear when ready",
+    "toolsCached": "{{count}} tools cached",
+    "sections": {
+      "tools": "Tools:",
+      "prompts": "Prompts:",
+      "parameters": "Parameters:"
+    },
+    "noToolsOrPrompts": "No tools or prompts available",
+    "noToolsAvailable": "No tools available",
+    "authHint": "(type: \"/mcp auth {{serverName}}\" to authenticate this server)",
+    "tips": {
+      "title": "💡 Tips:",
+      "showDescriptions": "Use {{command}} to show server and tool descriptions",
+      "showSchema": "Use {{command}} to show tool parameter schemas", 
+      "hideDescriptions": "Use {{command}} to hide descriptions",
+      "authenticate": "Use {{command}} to authenticate with OAuth-enabled servers",
+      "toggleDescriptions": "Press {{key}} to toggle tool descriptions on/off"
+    },
+    "auth": "Authenticate with an OAuth-enabled MCP server",
+    "authDetails": {
+      "description": "Authenticate with an OAuth-enabled MCP server",
+      "serverNotFound": "MCP server '{{serverName}}' not found.",
+      "noOAuthServers": "No MCP servers configured with OAuth authentication.",
+      "oauthServersList": "MCP servers with OAuth authentication:\n{{servers}}\n\nUse /mcp auth <server-name> to authenticate.",
+      "startingAuth": "Starting OAuth authentication for MCP server '{{serverName}}'...",
+      "authSuccess": "✅ Successfully authenticated with MCP server '{{serverName}}'!",
+      "rediscoveringTools": "Re-discovering tools from '{{serverName}}'...",
+      "refreshSuccess": "Successfully authenticated and refreshed tools for '{{serverName}}'."
+    },
+    "refresh": "Restarts MCP servers.",
+    "refreshDetails": {
+      "description": "Restarts MCP servers.",
+      "restarting": "Restarting MCP servers..."
+    }
   }
 }

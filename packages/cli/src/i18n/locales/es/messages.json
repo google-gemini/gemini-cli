@@ -6,7 +6,8 @@
     "refreshError": "Error al actualizar la memoria: {{error}}",
     "empty": "La memoria está actualmente vacía.",
     "saveAttempt": "Intentando guardar en memoria: \"{{content}}\"",
-    "refreshingFromFiles": "Actualizando memoria desde archivos fuente..."
+    "refreshingFromFiles": "Actualizando memoria desde archivos fuente...",
+    "currentContent": "Contenido actual de la memoria desde {{fileCount}} archivo(s):\n\n---\n{{content}}\n---"
   },
   "configuration": {
     "notAvailable": "La configuración no está disponible.",

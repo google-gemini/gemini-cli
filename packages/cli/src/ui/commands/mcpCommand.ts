@@ -41,7 +41,7 @@ const getMcpStatus = async (
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Config not loaded.',
+      content: i18n.t('mcp.configNotLoaded', { ns: 'commands' }),
     };
   }
 
@@ -50,7 +50,7 @@ const getMcpStatus = async (
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Could not retrieve tool registry.',
+      content: i18n.t('mcp.toolRegistryError', { ns: 'commands' }),
     };
   }
 
@@ -63,7 +63,7 @@ const getMcpStatus = async (
     return {
       type: 'message',
       messageType: 'info',
-      content: `No MCP servers configured. Please view MCP documentation in your browser: ${docsUrl} or use the cli /docs command`,
+      content: i18n.t('mcp.noServersConfigured', { docsUrl, ns: 'commands' }),
     };
   }
 
@@ -80,11 +80,11 @@ const getMcpStatus = async (
     discoveryState === MCPDiscoveryState.IN_PROGRESS ||
     connectingServers.length > 0
   ) {
-    message += `${COLOR_YELLOW}⏳ MCP servers are starting up (${connectingServers.length} initializing)...${RESET_COLOR}\n`;
-    message += `${COLOR_CYAN}Note: First startup may take longer. Tool availability will update automatically.${RESET_COLOR}\n\n`;
+    message += `${COLOR_YELLOW}⏳ ${i18n.t('mcp.serversStartingUp', { count: connectingServers.length, ns: 'commands' })}${RESET_COLOR}\n`;
+    message += `${COLOR_CYAN}${i18n.t('mcp.firstStartupNote', { ns: 'commands' })}${RESET_COLOR}\n\n`;
   }
 
-  message += 'Configured MCP servers:\n\n';
+  message += `${i18n.t('mcp.configuredServers', { ns: 'commands' })}\n\n`;
 
   const allTools = toolRegistry.getAllTools();
   for (const serverName of serverNames) {
@@ -111,16 +111,16 @@ const getMcpStatus = async (
     switch (status) {
       case MCPServerStatus.CONNECTED:
         statusIndicator = '🟢';
-        statusText = 'Ready';
+        statusText = i18n.t('mcp.serverStatus.ready', { ns: 'commands' });
         break;
       case MCPServerStatus.CONNECTING:
         statusIndicator = '🔄';
-        statusText = 'Starting... (first startup may take longer)';
+        statusText = i18n.t('mcp.serverStatus.starting', { ns: 'commands' });
         break;
       case MCPServerStatus.DISCONNECTED:
       default:
         statusIndicator = '🔴';
-        statusText = 'Disconnected';
+        statusText = i18n.t('mcp.serverStatus.disconnected', { ns: 'commands' });
         break;
     }
 
@@ -128,7 +128,7 @@ const getMcpStatus = async (
     const server = mcpServers[serverName];
     let serverDisplayName = serverName;
     if (server.extensionName) {
-      serverDisplayName += ` (from ${server.extensionName})`;
+      serverDisplayName += ` ${i18n.t('mcp.serverExtension', { extensionName: server.extensionName, ns: 'commands' })}`;
     }
 
     // Format server header with bold formatting and status
@@ -146,13 +146,13 @@ const getMcpStatus = async (
         if (hasToken) {
           const isExpired = MCPOAuthTokenStorage.isTokenExpired(hasToken.token);
           if (isExpired) {
-            message += ` ${COLOR_YELLOW}(OAuth token expired)${RESET_COLOR}`;
+            message += ` ${COLOR_YELLOW}${i18n.t('mcp.oauthStatus.tokenExpired', { ns: 'commands' })}${RESET_COLOR}`;
           } else {
-            message += ` ${COLOR_GREEN}(OAuth authenticated)${RESET_COLOR}`;
+            message += ` ${COLOR_GREEN}${i18n.t('mcp.oauthStatus.authenticated', { ns: 'commands' })}${RESET_COLOR}`;
             needsAuthHint = false;
           }
         } else {
-          message += ` ${COLOR_RED}(OAuth not authenticated)${RESET_COLOR}`;
+          message += ` ${COLOR_RED}${i18n.t('mcp.oauthStatus.notAuthenticated', { ns: 'commands' })}${RESET_COLOR}`;
         }
       } catch (_err) {
         // If we can't check OAuth status, just continue
@@ -164,25 +164,23 @@ const getMcpStatus = async (
       const parts = [];
       if (serverTools.length > 0) {
         parts.push(
-          `${serverTools.length} ${serverTools.length === 1 ? 'tool' : 'tools'}`,
+          i18n.t('mcp.toolCount', { count: serverTools.length, ns: 'commands' }),
         );
       }
       if (serverPrompts.length > 0) {
         parts.push(
-          `${serverPrompts.length} ${
-            serverPrompts.length === 1 ? 'prompt' : 'prompts'
-          }`,
+          i18n.t('mcp.promptCount', { count: serverPrompts.length, ns: 'commands' }),
         );
       }
       if (parts.length > 0) {
         message += ` (${parts.join(', ')})`;
       } else {
-        message += ` (0 tools)`;
+        message += ` (${i18n.t('mcp.noTools', { ns: 'commands' })})`;
       }
     } else if (status === MCPServerStatus.CONNECTING) {
-      message += ` (tools and prompts will appear when ready)`;
+      message += ` (${i18n.t('mcp.toolsWillAppear', { ns: 'commands' })})`;
     } else {
-      message += ` (${serverTools.length} tools cached)`;
+      message += ` (${i18n.t('mcp.toolsCached', { count: serverTools.length, ns: 'commands' })})`;
     }
 
     // Add server description with proper handling of multi-line descriptions
@@ -204,7 +202,7 @@ const getMcpStatus = async (
     message += RESET_COLOR;
 
     if (serverTools.length > 0) {
-      message += `  ${COLOR_CYAN}Tools:${RESET_COLOR}\n`;
+      message += `  ${COLOR_CYAN}${i18n.t('mcp.sections.tools', { ns: 'commands' })}${RESET_COLOR}\n`;
       serverTools.forEach((tool) => {
         if (showDescriptions && tool.description) {
           // Format tool name in cyan using simple ANSI cyan color
@@ -229,7 +227,7 @@ const getMcpStatus = async (
           tool.schema.parametersJsonSchema ?? tool.schema.parameters;
         if (showSchema && parameters) {
           // Prefix the parameters in cyan
-          message += `    ${COLOR_CYAN}Parameters:${RESET_COLOR}\n`;
+          message += `    ${COLOR_CYAN}${i18n.t('mcp.sections.parameters', { ns: 'commands' })}${RESET_COLOR}\n`;
 
           const paramsLines = JSON.stringify(parameters, null, 2)
             .trim()
@@ -246,7 +244,7 @@ const getMcpStatus = async (
       if (serverTools.length > 0) {
         message += '\n';
       }
-      message += `  ${COLOR_CYAN}Prompts:${RESET_COLOR}\n`;
+      message += `  ${COLOR_CYAN}${i18n.t('mcp.sections.prompts', { ns: 'commands' })}${RESET_COLOR}\n`;
       serverPrompts.forEach((prompt: DiscoveredMCPPrompt) => {
         if (showDescriptions && prompt.description) {
           message += `  - ${COLOR_CYAN}${prompt.name}${RESET_COLOR}`;
@@ -266,11 +264,11 @@ const getMcpStatus = async (
     }
 
     if (serverTools.length === 0 && serverPrompts.length === 0) {
-      message += '  No tools or prompts available\n';
+      message += `  ${i18n.t('mcp.noToolsOrPrompts', { ns: 'commands' })}\n`;
     } else if (serverTools.length === 0) {
-      message += '  No tools available';
+      message += `  ${i18n.t('mcp.noToolsAvailable', { ns: 'commands' })}`;
       if (originalStatus === MCPServerStatus.DISCONNECTED && needsAuthHint) {
-        message += ` ${COLOR_GREY}(type: "/mcp auth ${serverName}" to authenticate this server)${RESET_COLOR}`;
+        message += ` ${COLOR_GREY}${i18n.t('mcp.authHint', { serverName, ns: 'commands' })}${RESET_COLOR}`;
       }
       message += '\n';
     } else if (
@@ -278,7 +276,7 @@ const getMcpStatus = async (
       needsAuthHint
     ) {
       // This case is for when serverTools.length > 0
-      message += `  ${COLOR_GREY}(type: "/mcp auth ${serverName}" to authenticate this server)${RESET_COLOR}\n`;
+      message += `  ${COLOR_GREY}${i18n.t('mcp.authHint', { serverName, ns: 'commands' })}${RESET_COLOR}\n`;
     }
     message += '\n';
   }
@@ -286,20 +284,20 @@ const getMcpStatus = async (
   for (const server of blockedMcpServers) {
     let serverDisplayName = server.name;
     if (server.extensionName) {
-      serverDisplayName += ` (from ${server.extensionName})`;
+      serverDisplayName += ` ${i18n.t('mcp.serverExtension', { extensionName: server.extensionName, ns: 'commands' })}`;
     }
-    message += `🔴 \u001b[1m${serverDisplayName}\u001b[0m - Blocked\n\n`;
+    message += `🔴 \u001b[1m${serverDisplayName}\u001b[0m - ${i18n.t('mcp.serverBlocked', { ns: 'commands' })}\n\n`;
   }
 
   // Add helpful tips when no arguments are provided
   if (showTips) {
     message += '\n';
-    message += `${COLOR_CYAN}💡 Tips:${RESET_COLOR}\n`;
-    message += `  • Use ${COLOR_CYAN}/mcp desc${RESET_COLOR} to show server and tool descriptions\n`;
-    message += `  • Use ${COLOR_CYAN}/mcp schema${RESET_COLOR} to show tool parameter schemas\n`;
-    message += `  • Use ${COLOR_CYAN}/mcp nodesc${RESET_COLOR} to hide descriptions\n`;
-    message += `  • Use ${COLOR_CYAN}/mcp auth <server-name>${RESET_COLOR} to authenticate with OAuth-enabled servers\n`;
-    message += `  • Press ${COLOR_CYAN}Ctrl+T${RESET_COLOR} to toggle tool descriptions on/off\n`;
+    message += `${COLOR_CYAN}${i18n.t('mcp.tips.title', { ns: 'commands' })}${RESET_COLOR}\n`;
+    message += `  • ${i18n.t('mcp.tips.showDescriptions', { command: `${COLOR_CYAN}/mcp desc${RESET_COLOR}`, ns: 'commands' })}\n`;
+    message += `  • ${i18n.t('mcp.tips.showSchema', { command: `${COLOR_CYAN}/mcp schema${RESET_COLOR}`, ns: 'commands' })}\n`;
+    message += `  • ${i18n.t('mcp.tips.hideDescriptions', { command: `${COLOR_CYAN}/mcp nodesc${RESET_COLOR}`, ns: 'commands' })}\n`;
+    message += `  • ${i18n.t('mcp.tips.authenticate', { command: `${COLOR_CYAN}/mcp auth <server-name>${RESET_COLOR}`, ns: 'commands' })}\n`;
+    message += `  • ${i18n.t('mcp.tips.toggleDescriptions', { key: `${COLOR_CYAN}Ctrl+T${RESET_COLOR}`, ns: 'commands' })}\n`;
     message += '\n';
   }
 
@@ -315,7 +313,9 @@ const getMcpStatus = async (
 
 const authCommand: SlashCommand = {
   name: 'auth',
-  description: 'Authenticate with an OAuth-enabled MCP server',
+  get description() {
+    return i18n.t('mcp.auth', { ns: 'commands' });
+  },
   kind: CommandKind.BUILT_IN,
   action: async (
     context: CommandContext,
@@ -328,7 +328,7 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Config not loaded.',
+        content: i18n.t('mcp.configNotLoaded', { ns: 'commands' }),
       };
     }
 
@@ -344,14 +344,15 @@ const authCommand: SlashCommand = {
         return {
           type: 'message',
           messageType: 'info',
-          content: 'No MCP servers configured with OAuth authentication.',
+          content: i18n.t('mcp.authDetails.noOAuthServers', { ns: 'commands' }),
         };
       }
 
+      const serverList = oauthServers.map((s) => `  - ${s}`).join('\n');
       return {
         type: 'message',
         messageType: 'info',
-        content: `MCP servers with OAuth authentication:\n${oauthServers.map((s) => `  - ${s}`).join('\n')}\n\nUse /mcp auth <server-name> to authenticate.`,
+        content: i18n.t('mcp.authDetails.oauthServersList', { servers: serverList, ns: 'commands' }),
       };
     }
 
@@ -360,7 +361,7 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: `MCP server '${serverName}' not found.`,
+        content: i18n.t('mcp.authDetails.serverNotFound', { serverName, ns: 'commands' }),
       };
     }
 
@@ -371,7 +372,7 @@ const authCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: 'info',
-          text: `Starting OAuth authentication for MCP server '${serverName}'...`,
+          text: i18n.t('mcp.authDetails.startingAuth', { serverName, ns: 'commands' }),
         },
         Date.now(),
       );
@@ -395,7 +396,7 @@ const authCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: 'info',
-          text: `✅ Successfully authenticated with MCP server '${serverName}'!`,
+          text: i18n.t('mcp.authDetails.authSuccess', { serverName, ns: 'commands' }),
         },
         Date.now(),
       );
@@ -406,7 +407,7 @@ const authCommand: SlashCommand = {
         context.ui.addItem(
           {
             type: 'info',
-            text: `Re-discovering tools from '${serverName}'...`,
+            text: i18n.t('mcp.authDetails.rediscoveringTools', { serverName, ns: 'commands' }),
           },
           Date.now(),
         );
@@ -424,7 +425,7 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Successfully authenticated and refreshed tools for '${serverName}'.`,
+        content: i18n.t('mcp.authDetails.refreshSuccess', { serverName, ns: 'commands' }),
       };
     } catch (error) {
       return {
@@ -447,7 +448,9 @@ const authCommand: SlashCommand = {
 
 const listCommand: SlashCommand = {
   name: 'list',
-  description: 'List configured MCP servers and tools',
+  get description() {
+    return i18n.t('mcp.list', { ns: 'commands' });
+  },
   kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext, args: string) => {
     const lowerCaseArgs = args.toLowerCase().split(/\s+/).filter(Boolean);
@@ -472,7 +475,9 @@ const listCommand: SlashCommand = {
 
 const refreshCommand: SlashCommand = {
   name: 'refresh',
-  description: 'Restarts MCP servers.',
+  get description() {
+    return i18n.t('mcp.refresh', { ns: 'commands' });
+  },
   kind: CommandKind.BUILT_IN,
   action: async (
     context: CommandContext,
@@ -482,7 +487,7 @@ const refreshCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Config not loaded.',
+        content: i18n.t('mcp.configNotLoaded', { ns: 'commands' }),
       };
     }
 
@@ -491,14 +496,14 @@ const refreshCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Could not retrieve tool registry.',
+        content: i18n.t('mcp.toolRegistryError', { ns: 'commands' }),
       };
     }
 
     context.ui.addItem(
       {
         type: 'info',
-        text: 'Restarting MCP servers...',
+        text: i18n.t('mcp.refreshDetails.restarting', { ns: 'commands' }),
       },
       Date.now(),
     );
@@ -520,8 +525,9 @@ const refreshCommand: SlashCommand = {
 
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
-  description:
-    'list configured MCP servers and tools, or authenticate with OAuth-enabled servers',
+  get description() {
+    return i18n.t('mcp.description', { ns: 'commands' });
+  },
   kind: CommandKind.BUILT_IN,
   subCommands: [listCommand, authCommand, refreshCommand],
   // Default action when no subcommand is provided

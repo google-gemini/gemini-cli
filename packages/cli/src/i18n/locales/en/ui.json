@@ -40,6 +40,7 @@
   },
   "loading": {
     "waitingForConfirmation": "Waiting for user confirmation...",
+    "escToCancel": "(esc to cancel, ",
     "phrases": [
       "I'm Feeling Lucky",
       "Shipping awesomeness... ",
@@ -318,9 +319,6 @@
   "shellMode": {
     "enabled": "shell mode enabled",
     "escToDisable": "(esc to disable)"
-  },
-  "loading": {
-    "escToCancel": "(esc to cancel, "
   },
   "suggestions": {
     "loadingSuggestions": "Loading suggestions..."
