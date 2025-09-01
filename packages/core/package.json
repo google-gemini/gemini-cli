@@ -39,6 +39,8 @@
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.0",
     "chardet": "^2.1.0",
+    "csv-parse": "^5.6.0",
+    "csv-stringify": "^6.6.0",
     "diff": "^7.0.0",
     "dotenv": "^17.1.0",
     "exceljs": "^4.4.0",
