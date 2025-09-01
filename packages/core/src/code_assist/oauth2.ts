@@ -178,7 +178,9 @@ async function initOauthClient(
         '\nThis might be due to browser compatibility issues or system configuration.',
         '\nPlease try running again with NO_BROWSER=true set for manual authentication.',
       );
-      throw new FatalAuthenticationError(`Failed to open browser: ${getErrorMessage(err)}`);
+      throw new FatalAuthenticationError(
+        `Failed to open browser: ${getErrorMessage(err)}`,
+      );
     }
     console.log('Waiting for authentication...');
 
@@ -186,10 +188,12 @@ async function initOauthClient(
     const authTimeout = 5 * 60 * 1000; // 5 minutes timeout
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
-        reject(new FatalAuthenticationError(
-          'Authentication timed out after 5 minutes. The browser tab may have gotten stuck in a loading state. ' +
-          'Please try again or use NO_BROWSER=true for manual authentication.'
-        ));
+        reject(
+          new FatalAuthenticationError(
+            'Authentication timed out after 5 minutes. The browser tab may have gotten stuck in a loading state. ' +
+              'Please try again or use NO_BROWSER=true for manual authentication.',
+          ),
+        );
       }, authTimeout);
     });
 
@@ -250,7 +254,10 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
     });
     client.setCredentials(tokens);
   } catch (error) {
-    console.error('Failed to authenticate with authorization code:', getErrorMessage(error));
+    console.error(
+      'Failed to authenticate with authorization code:',
+      getErrorMessage(error),
+    );
     return false;
   }
   return true;
@@ -279,7 +286,11 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
         if (req.url!.indexOf('/oauth2callback') === -1) {
           res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
           res.end();
-          reject(new FatalAuthenticationError('OAuth callback not received. Unexpected request: ' + req.url));
+          reject(
+            new FatalAuthenticationError(
+              'OAuth callback not received. Unexpected request: ' + req.url,
+            ),
+          );
         }
         // acquire the code from the querystring, and close the web server.
         const qs = new url.URL(req.url!, 'http://localhost:3000').searchParams;
@@ -288,12 +299,21 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
           res.end();
 
           const errorCode = qs.get('error');
-          const errorDescription = qs.get('error_description') || 'No additional details provided';
-          reject(new FatalAuthenticationError(`Google OAuth error: ${errorCode}. ${errorDescription}`));
+          const errorDescription =
+            qs.get('error_description') || 'No additional details provided';
+          reject(
+            new FatalAuthenticationError(
+              `Google OAuth error: ${errorCode}. ${errorDescription}`,
+            ),
+          );
         } else if (qs.get('state') !== state) {
           res.end('State mismatch. Possible CSRF attack');
 
-          reject(new FatalAuthenticationError('OAuth state mismatch. Possible CSRF attack or browser session issue.'));
+          reject(
+            new FatalAuthenticationError(
+              'OAuth state mismatch. Possible CSRF attack or browser session issue.',
+            ),
+          );
         } else if (qs.get('code')) {
           try {
             const { tokens } = await client.getToken({
@@ -301,7 +321,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
               redirect_uri: redirectUri,
             });
             client.setCredentials(tokens);
-            
+
             // Retrieve and cache Google Account ID during authentication
             try {
               await fetchAndCacheUserInfo(client);
@@ -319,29 +339,45 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
           } catch (error) {
             res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
             res.end();
-            reject(new FatalAuthenticationError(`Failed to exchange authorization code for tokens: ${getErrorMessage(error)}`));
+            reject(
+              new FatalAuthenticationError(
+                `Failed to exchange authorization code for tokens: ${getErrorMessage(error)}`,
+              ),
+            );
           }
         } else {
-          reject(new FatalAuthenticationError('No authorization code received from Google OAuth. Please try authenticating again.'));
+          reject(
+            new FatalAuthenticationError(
+              'No authorization code received from Google OAuth. Please try authenticating again.',
+            ),
+          );
         }
       } catch (e) {
         // Provide more specific error message for unexpected errors during OAuth flow
         if (e instanceof FatalAuthenticationError) {
           reject(e);
         } else {
-          reject(new FatalAuthenticationError(`Unexpected error during OAuth authentication: ${getErrorMessage(e)}`));
+          reject(
+            new FatalAuthenticationError(
+              `Unexpected error during OAuth authentication: ${getErrorMessage(e)}`,
+            ),
+          );
         }
       } finally {
         server.close();
       }
     });
-    
+
     server.listen(port, host, () => {
       // Server started successfully
     });
-    
+
     server.on('error', (err) => {
-      reject(new FatalAuthenticationError(`OAuth callback server error: ${getErrorMessage(err)}`));
+      reject(
+        new FatalAuthenticationError(
+          `OAuth callback server error: ${getErrorMessage(err)}`,
+        ),
+      );
     });
   });
 
@@ -405,7 +441,10 @@ async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
       return true;
     } catch (error) {
       // Log specific error for debugging, but continue trying other paths
-      console.debug(`Failed to load credentials from ${keyFile}:`, getErrorMessage(error));
+      console.debug(
+        `Failed to load credentials from ${keyFile}:`,
+        getErrorMessage(error),
+      );
     }
   }
 
@@ -460,12 +499,16 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
     if (!response.ok) {
       const errorDetails = `HTTP ${response.status} ${response.statusText}`;
       console.error('Failed to fetch user info:', errorDetails);
-      
+
       // Provide specific guidance for common authentication issues
       if (response.status === 401) {
-        throw new Error('Authentication token expired or invalid. Please try logging in again.');
+        throw new Error(
+          'Authentication token expired or invalid. Please try logging in again.',
+        );
       } else if (response.status === 403) {
-        throw new Error('Access denied when fetching user information. This might indicate a permission issue with your Google account.');
+        throw new Error(
+          'Access denied when fetching user information. This might indicate a permission issue with your Google account.',
+        );
       }
       throw new Error(`Failed to fetch user info: ${errorDetails}`);
     }
