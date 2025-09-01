@@ -434,7 +434,7 @@ describe('Gemini Client (client.ts)', () => {
 
       expect(mockGenerateContentFn).toHaveBeenCalledWith(
         {
-          model: 'test-model', // Should use current model from config
+          model: DEFAULT_GEMINI_FLASH_MODEL,
           config: {
             abortSignal,
             systemInstruction: getCoreSystemPrompt(''),
@@ -2320,7 +2320,7 @@ ${JSON.stringify(
 
       expect(mockGenerateContentFn).toHaveBeenCalledWith(
         {
-          model: 'test-model',
+          model: DEFAULT_GEMINI_FLASH_MODEL,
           config: {
             abortSignal,
             systemInstruction: getCoreSystemPrompt(''),
@@ -2360,7 +2360,7 @@ ${JSON.stringify(
       });
       expect(mockGenerateContentFn).toHaveBeenCalledWith(
         {
-          model: currentModel,
+          model: DEFAULT_GEMINI_FLASH_MODEL,
           config: expect.any(Object),
           contents,
         },
