@@ -9,9 +9,22 @@ if (process.env['NO_COLOR'] !== undefined) {
   delete process.env['NO_COLOR'];
 }
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { themeManager, DEFAULT_THEME } from './theme-manager.js';
-import { CustomTheme } from './theme.js';
+import type { CustomTheme } from './theme.js';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import type * as osActual from 'node:os';
+
+vi.mock('node:fs');
+vi.mock('node:os', async (importOriginal) => {
+  const actualOs = await importOriginal<typeof osActual>();
+  return {
+    ...actualOs,
+    homedir: vi.fn(),
+    platform: vi.fn(() => 'linux'),
+  };
+});
 
 const validCustomTheme: CustomTheme = {
   type: 'custom',
@@ -36,6 +49,10 @@ describe('ThemeManager', () => {
     // Reset themeManager state
     themeManager.loadCustomThemes({});
     themeManager.setActiveTheme(DEFAULT_THEME.name);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('should load valid custom themes', () => {
@@ -95,5 +112,70 @@ describe('ThemeManager', () => {
     } else {
       process.env['NO_COLOR'] = original;
     }
+  });
+
+  describe('when loading a theme from a file', () => {
+    const mockThemePath = './my-theme.json';
+    const mockTheme: CustomTheme = {
+      ...validCustomTheme,
+      name: 'My File Theme',
+    };
+
+    beforeEach(() => {
+      vi.mocked(os.homedir).mockReturnValue('/home/user');
+      vi.spyOn(fs, 'realpathSync').mockImplementation((p) => p as string);
+    });
+
+    it('should load a theme from a valid file path', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockTheme));
+
+      const result = themeManager.setActiveTheme('/home/user/my-theme.json');
+
+      expect(result).toBe(true);
+      const activeTheme = themeManager.getActiveTheme();
+      expect(activeTheme.name).toBe('My File Theme');
+      expect(fs.readFileSync).toHaveBeenCalledWith(
+        expect.stringContaining('my-theme.json'),
+        'utf-8',
+      );
+    });
+
+    it('should not load a theme if the file does not exist', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+
+      const result = themeManager.setActiveTheme(mockThemePath);
+
+      expect(result).toBe(false);
+      expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
+    });
+
+    it('should not load a theme from a file with invalid JSON', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue('invalid json');
+
+      const result = themeManager.setActiveTheme(mockThemePath);
+
+      expect(result).toBe(false);
+      expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
+    });
+
+    it('should not load a theme from an untrusted file path and log a message', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(mockTheme));
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+
+      const result = themeManager.setActiveTheme('/untrusted/my-theme.json');
+
+      expect(result).toBe(false);
+      expect(themeManager.getActiveTheme().name).toBe(DEFAULT_THEME.name);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('is outside your home directory'),
+      );
+
+      consoleWarnSpy.mockRestore();
+    });
   });
 });

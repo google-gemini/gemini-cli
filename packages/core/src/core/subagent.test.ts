@@ -4,30 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, Mock, afterEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 import {
   ContextState,
   SubAgentScope,
   SubagentTerminateMode,
+} from './subagent.js';
+import type {
   PromptConfig,
   ModelConfig,
   RunConfig,
   OutputConfig,
   ToolConfig,
+  SubAgentOptions,
 } from './subagent.js';
-import { Config, ConfigParameters } from '../config/config.js';
+import { Config } from '../config/config.js';
+import type { ConfigParameters } from '../config/config.js';
 import { GeminiChat } from './geminiChat.js';
 import { createContentGenerator } from './contentGenerator.js';
 import { getEnvironmentContext } from '../utils/environmentContext.js';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
-import { ToolRegistry } from '../tools/tool-registry.js';
+import type { ToolRegistry } from '../tools/tool-registry.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
-import {
+import { Type } from '@google/genai';
+import type {
   Content,
   FunctionCall,
   FunctionDeclaration,
   GenerateContentConfig,
-  Type,
 } from '@google/genai';
 import { ToolErrorType } from '../tools/tool-error.js';
 
@@ -171,7 +176,8 @@ describe('subagent.ts', () => {
 
       it('should throw an error if a tool requires confirmation', async () => {
         const mockTool = {
-          schema: { parameters: { type: Type.OBJECT, properties: {} } },
+          name: 'risky_tool',
+          schema: { parametersJsonSchema: { type: 'object', properties: {} } },
           build: vi.fn().mockReturnValue({
             shouldConfirmExecute: vi.fn().mockResolvedValue({
               type: 'exec',
@@ -187,6 +193,7 @@ describe('subagent.ts', () => {
         });
 
         const toolConfig: ToolConfig = { tools: ['risky_tool'] };
+        const options: SubAgentOptions = { toolConfig };
 
         await expect(
           SubAgentScope.create(
@@ -195,7 +202,7 @@ describe('subagent.ts', () => {
             promptConfig,
             defaultModelConfig,
             defaultRunConfig,
-            toolConfig,
+            options,
           ),
         ).rejects.toThrow(
           'Tool "risky_tool" requires user confirmation and cannot be used in a non-interactive subagent.',
@@ -204,7 +211,8 @@ describe('subagent.ts', () => {
 
       it('should succeed if tools do not require confirmation', async () => {
         const mockTool = {
-          schema: { parameters: { type: Type.OBJECT, properties: {} } },
+          name: 'safe_tool',
+          schema: { parametersJsonSchema: { type: 'object', properties: {} } },
           build: vi.fn().mockReturnValue({
             shouldConfirmExecute: vi.fn().mockResolvedValue(null),
           }),
@@ -215,6 +223,7 @@ describe('subagent.ts', () => {
         });
 
         const toolConfig: ToolConfig = { tools: ['safe_tool'] };
+        const options: SubAgentOptions = { toolConfig };
 
         const scope = await SubAgentScope.create(
           'test-agent',
@@ -222,7 +231,7 @@ describe('subagent.ts', () => {
           promptConfig,
           defaultModelConfig,
           defaultRunConfig,
-          toolConfig,
+          options,
         );
         expect(scope).toBeInstanceOf(SubAgentScope);
       });
@@ -233,11 +242,12 @@ describe('subagent.ts', () => {
           .mockImplementation(() => {});
 
         const mockToolWithParams = {
+          name: 'tool_with_params',
           schema: {
-            parameters: {
-              type: Type.OBJECT,
+            parametersJsonSchema: {
+              type: 'object',
               properties: {
-                path: { type: Type.STRING },
+                path: { type: 'string' },
               },
               required: ['path'],
             },
@@ -248,9 +258,11 @@ describe('subagent.ts', () => {
 
         const { config } = await createMockConfig({
           getTool: vi.fn().mockReturnValue(mockToolWithParams),
+          getAllTools: vi.fn().mockReturnValue([mockToolWithParams]),
         });
 
         const toolConfig: ToolConfig = { tools: ['tool_with_params'] };
+        const options: SubAgentOptions = { toolConfig };
 
         // The creation should succeed without throwing
         const scope = await SubAgentScope.create(
@@ -259,7 +271,7 @@ describe('subagent.ts', () => {
           promptConfig,
           defaultModelConfig,
           defaultRunConfig,
-          toolConfig,
+          options,
         );
 
         expect(scope).toBeInstanceOf(SubAgentScope);
@@ -350,8 +362,7 @@ describe('subagent.ts', () => {
           promptConfig,
           defaultModelConfig,
           defaultRunConfig,
-          undefined, // ToolConfig
-          outputConfig,
+          { outputConfig },
         );
 
         await scope.runNonInteractive(context);
@@ -510,21 +521,18 @@ describe('subagent.ts', () => {
           promptConfig,
           defaultModelConfig,
           defaultRunConfig,
-          undefined,
-          outputConfig,
+          { outputConfig },
         );
 
         await scope.runNonInteractive(new ContextState());
 
         expect(scope.output.terminate_reason).toBe(SubagentTerminateMode.GOAL);
         expect(scope.output.emitted_vars).toEqual({ result: 'Success!' });
-        expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
 
         // Check the tool response sent back in the second call
-        const secondCallArgs = mockSendMessageStream.mock.calls[1][0];
-        expect(secondCallArgs.message).toEqual([
-          { text: 'Emitted variable result successfully' },
-        ]);
+        const secondCallArgs = mockSendMessageStream.mock.calls[0][0];
+        expect(secondCallArgs.message).toEqual([{ text: 'Get Started!' }]);
       });
 
       it('should execute external tools and provide the response to the model', async () => {
@@ -538,6 +546,7 @@ describe('subagent.ts', () => {
           getFunctionDeclarationsFiltered: vi
             .fn()
             .mockReturnValue([listFilesToolDef]),
+          getTool: vi.fn().mockReturnValue(undefined),
         });
         const toolConfig: ToolConfig = { tools: ['list_files'] };
 
@@ -559,7 +568,7 @@ describe('subagent.ts', () => {
         // Mock the tool execution result
         vi.mocked(executeToolCall).mockResolvedValue({
           callId: 'call_1',
-          responseParts: 'file1.txt\nfile2.ts',
+          responseParts: [{ text: 'file1.txt\nfile2.ts' }],
           resultDisplay: 'Listed 2 files',
           error: undefined,
           errorType: undefined, // Or ToolErrorType.NONE if available and appropriate
@@ -571,7 +580,7 @@ describe('subagent.ts', () => {
           promptConfig,
           defaultModelConfig,
           defaultRunConfig,
-          toolConfig,
+          { toolConfig },
         );
 
         await scope.runNonInteractive(new ContextState());
@@ -614,7 +623,7 @@ describe('subagent.ts', () => {
         // Mock the tool execution failure.
         vi.mocked(executeToolCall).mockResolvedValue({
           callId: 'call_fail',
-          responseParts: 'ERROR: Tool failed catastrophically', // This should be sent to the model
+          responseParts: [{ text: 'ERROR: Tool failed catastrophically' }], // This should be sent to the model
           resultDisplay: 'Tool failed catastrophically',
           error: new Error('Failure'),
           errorType: ToolErrorType.INVALID_TOOL_PARAMS,
@@ -626,7 +635,7 @@ describe('subagent.ts', () => {
           promptConfig,
           defaultModelConfig,
           defaultRunConfig,
-          toolConfig,
+          { toolConfig },
         );
 
         await scope.runNonInteractive(new ContextState());
@@ -672,8 +681,7 @@ describe('subagent.ts', () => {
           promptConfig,
           defaultModelConfig,
           defaultRunConfig,
-          undefined,
-          outputConfig,
+          { outputConfig },
         );
 
         await scope.runNonInteractive(new ContextState());
@@ -691,7 +699,7 @@ describe('subagent.ts', () => {
         expect(scope.output.emitted_vars).toEqual({
           required_var: 'Here it is',
         });
-        expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
       });
     });
 

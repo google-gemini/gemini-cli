@@ -5,38 +5,41 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import {
-  SSEClientTransport,
-  SSEClientTransportOptions,
-} from '@modelcontextprotocol/sdk/client/sse.js';
-import {
-  StreamableHTTPClientTransport,
-  StreamableHTTPClientTransportOptions,
-} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import {
+import type { SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import type { StreamableHTTPClientTransportOptions } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type {
   Prompt,
-  ListPromptsResultSchema,
   GetPromptResult,
+} from '@modelcontextprotocol/sdk/types.js';
+import {
+  ListPromptsResultSchema,
   GetPromptResultSchema,
   ListRootsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
-import { AuthProviderType, MCPServerConfig } from '../config/config.js';
+import type { Config, MCPServerConfig } from '../config/config.js';
+import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 
-import { FunctionDeclaration, mcpToTool } from '@google/genai';
-import { ToolRegistry } from './tool-registry.js';
-import { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { FunctionDeclaration } from '@google/genai';
+import { mcpToTool } from '@google/genai';
+import type { ToolRegistry } from './tool-registry.js';
+import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { Unsubscribe, WorkspaceContext } from '../utils/workspaceContext.js';
+import type {
+  Unsubscribe,
+  WorkspaceContext,
+} from '../utils/workspaceContext.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -143,13 +146,13 @@ export class McpClient {
   /**
    * Discovers tools and prompts from the MCP server.
    */
-  async discover(): Promise<void> {
+  async discover(cliConfig: Config): Promise<void> {
     if (this.status !== MCPServerStatus.CONNECTED) {
       throw new Error('Client is not connected.');
     }
 
     const prompts = await this.discoverPrompts();
-    const tools = await this.discoverTools();
+    const tools = await this.discoverTools(cliConfig);
 
     if (prompts.length === 0 && tools.length === 0) {
       throw new Error('No prompts or tools found on the server.');
@@ -188,8 +191,13 @@ export class McpClient {
     return createTransport(this.serverName, this.serverConfig, this.debugMode);
   }
 
-  private async discoverTools(): Promise<DiscoveredMCPTool[]> {
-    return discoverTools(this.serverName, this.serverConfig, this.client);
+  private async discoverTools(cliConfig: Config): Promise<DiscoveredMCPTool[]> {
+    return discoverTools(
+      this.serverName,
+      this.serverConfig,
+      this.client,
+      cliConfig,
+    );
   }
 
   private async discoverPrompts(): Promise<Prompt[]> {
@@ -442,6 +450,7 @@ export async function discoverMcpTools(
   promptRegistry: PromptRegistry,
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
+  cliConfig: Config,
 ): Promise<void> {
   mcpDiscoveryState = MCPDiscoveryState.IN_PROGRESS;
   try {
@@ -456,6 +465,7 @@ export async function discoverMcpTools(
           promptRegistry,
           debugMode,
           workspaceContext,
+          cliConfig,
         ),
     );
     await Promise.all(discoveryPromises);
@@ -501,6 +511,7 @@ export async function connectAndDiscover(
   promptRegistry: PromptRegistry,
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
+  cliConfig: Config,
 ): Promise<void> {
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
@@ -528,6 +539,7 @@ export async function connectAndDiscover(
       mcpServerName,
       mcpServerConfig,
       mcpClient,
+      cliConfig,
     );
 
     // If we have neither prompts nor tools, it's a failed discovery
@@ -629,6 +641,7 @@ export async function discoverTools(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   mcpClient: Client,
+  cliConfig: Config,
 ): Promise<DiscoveredMCPTool[]> {
   try {
     const mcpCallableTool = mcpToTool(mcpClient);
@@ -664,6 +677,8 @@ export async function discoverTools(
             funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
             mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
             mcpServerConfig.trust,
+            undefined,
+            cliConfig,
           ),
         );
       } catch (error) {

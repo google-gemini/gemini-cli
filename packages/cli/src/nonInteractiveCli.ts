@@ -4,16 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Config, ToolCallRequestInfo } from '@google/gemini-cli-core';
 import {
-  Config,
-  ToolCallRequestInfo,
   executeToolCall,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   GeminiEventType,
   parseAndFormatApiError,
+  FatalInputError,
+  FatalTurnLimitedError,
 } from '@google/gemini-cli-core';
-import { Content, Part } from '@google/genai';
+import type { Content, Part } from '@google/genai';
 
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
@@ -54,8 +55,9 @@ export async function runNonInteractive(
     if (!shouldProceed || !processedQuery) {
       // An error occurred during @include processing (e.g., file not found).
       // The error message is already logged by handleAtCommand.
-      console.error('Exiting due to an error processing the @ command.');
-      process.exit(1);
+      throw new FatalInputError(
+        'Exiting due to an error processing the @ command.',
+      );
     }
 
     let currentMessages: Content[] = [
@@ -69,10 +71,9 @@ export async function runNonInteractive(
         config.getMaxSessionTurns() >= 0 &&
         turnCount > config.getMaxSessionTurns()
       ) {
-        console.error(
-          '\n Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
+        throw new FatalTurnLimitedError(
+          'Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
         );
-        return;
       }
       const toolCallRequests: ToolCallRequestInfo[] = [];
 
@@ -111,16 +112,7 @@ export async function runNonInteractive(
           }
 
           if (toolResponse.responseParts) {
-            const parts = Array.isArray(toolResponse.responseParts)
-              ? toolResponse.responseParts
-              : [toolResponse.responseParts];
-            for (const part of parts) {
-              if (typeof part === 'string') {
-                toolResponseParts.push({ text: part });
-              } else if (part) {
-                toolResponseParts.push(part);
-              }
-            }
+            toolResponseParts.push(...toolResponse.responseParts);
           }
         }
         currentMessages = [{ role: 'user', parts: toolResponseParts }];
@@ -136,7 +128,7 @@ export async function runNonInteractive(
         config.getContentGeneratorConfig()?.authType,
       ),
     );
-    process.exit(1);
+    throw error;
   } finally {
     consolePatcher.cleanup();
     if (isTelemetrySdkInitialized()) {

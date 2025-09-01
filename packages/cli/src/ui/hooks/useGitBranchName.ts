@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { exec } from 'node:child_process';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
-import path from 'path';
+import path from 'node:path';
 
 export function useGitBranchName(cwd: string): string | undefined {
   const [branchName, setBranchName] = useState<string | undefined>(undefined);

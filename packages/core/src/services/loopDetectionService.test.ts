@@ -5,14 +5,14 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Config } from '../config/config.js';
-import { GeminiClient } from '../core/client.js';
-import {
-  GeminiEventType,
+import type { Config } from '../config/config.js';
+import type { GeminiClient } from '../core/client.js';
+import type {
   ServerGeminiContentEvent,
   ServerGeminiStreamEvent,
   ServerGeminiToolCallRequestEvent,
 } from '../core/turn.js';
+import { GeminiEventType } from '../core/turn.js';
 import * as loggers from '../telemetry/loggers.js';
 import { LoopType } from '../telemetry/types.js';
 import { LoopDetectionService } from './loopDetectionService.js';
@@ -555,6 +555,30 @@ describe('LoopDetectionService', () => {
     it('should handle empty content', () => {
       const event = createContentEvent('');
       expect(service.addAndCheck(event)).toBe(false);
+    });
+  });
+
+  describe('Divider Content Detection', () => {
+    it('should not detect a loop for repeating divider-like content', () => {
+      service.reset('');
+      const dividerContent = '-'.repeat(CONTENT_CHUNK_SIZE);
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 5; i++) {
+        isLoop = service.addAndCheck(createContentEvent(dividerContent));
+        expect(isLoop).toBe(false);
+      }
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should not detect a loop for repeating complex box-drawing dividers', () => {
+      service.reset('');
+      const dividerContent = '╭─'.repeat(CONTENT_CHUNK_SIZE / 2);
+      let isLoop = false;
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 5; i++) {
+        isLoop = service.addAndCheck(createContentEvent(dividerContent));
+        expect(isLoop).toBe(false);
+      }
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
   });
 

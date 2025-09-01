@@ -4,24 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Config, IdeClient, File } from '@google/gemini-cli-core';
 import {
-  Config,
-  DetectedIde,
-  GEMINI_CLI_COMPANION_EXTENSION_NAME,
-  IDEConnectionStatus,
-  getIdeInfo,
   getIdeInstaller,
-  IdeClient,
-  type File,
+  IDEConnectionStatus,
   ideContext,
+  GEMINI_CLI_COMPANION_EXTENSION_NAME,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
-import {
+import type {
   CommandContext,
   SlashCommand,
   SlashCommandActionReturn,
-  CommandKind,
 } from './types.js';
+import { CommandKind } from './types.js';
 import { SettingScope } from '../../config/settings.js';
 
 function getIdeStatusMessage(ideClient: IdeClient): {
@@ -130,11 +126,7 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         ({
           type: 'message',
           messageType: 'error',
-          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: ${Object.values(
-            DetectedIde,
-          )
-            .map((ide) => getIdeInfo(ide).displayName)
-            .join(', ')}`,
+          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks.`,
         }) as const,
     };
   }
@@ -195,7 +187,11 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
         Date.now(),
       );
       if (result.success) {
-        context.services.settings.setValue(SettingScope.User, 'ideMode', true);
+        context.services.settings.setValue(
+          SettingScope.User,
+          'ide.enabled',
+          true,
+        );
         // Poll for up to 5 seconds for the extension to activate.
         for (let i = 0; i < 10; i++) {
           await config.setIdeModeAndSyncConnection(true);
@@ -235,7 +231,11 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
     description: 'enable IDE integration',
     kind: CommandKind.BUILT_IN,
     action: async (context: CommandContext) => {
-      context.services.settings.setValue(SettingScope.User, 'ideMode', true);
+      context.services.settings.setValue(
+        SettingScope.User,
+        'ide.enabled',
+        true,
+      );
       await config.setIdeModeAndSyncConnection(true);
       const { messageType, content } = getIdeStatusMessage(ideClient);
       context.ui.addItem(
@@ -253,7 +253,11 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
     description: 'disable IDE integration',
     kind: CommandKind.BUILT_IN,
     action: async (context: CommandContext) => {
-      context.services.settings.setValue(SettingScope.User, 'ideMode', false);
+      context.services.settings.setValue(
+        SettingScope.User,
+        'ide.enabled',
+        false,
+      );
       await config.setIdeModeAndSyncConnection(false);
       const { messageType, content } = getIdeStatusMessage(ideClient);
       context.ui.addItem(
