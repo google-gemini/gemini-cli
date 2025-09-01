@@ -199,7 +199,6 @@ export function logFileOperation(
     event.lines,
     event.mimetype,
     event.extension,
-    event.diff_stat,
     event.programming_language,
   );
 }
