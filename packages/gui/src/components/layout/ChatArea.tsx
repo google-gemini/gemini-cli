@@ -7,7 +7,7 @@ import { useChatStore } from '@/stores/chatStore';
 
 export const ChatArea: React.FC = () => {
   const { sessions, activeSessionId } = useAppStore();
-  const { isStreaming, streamingMessage } = useChatStore();
+  const { isStreaming, isThinking, streamingMessage } = useChatStore();
 
   const activeSession = sessions.find(session => session.id === activeSessionId);
 
@@ -25,9 +25,10 @@ export const ChatArea: React.FC = () => {
       <MessageList
         messages={activeSession.messages}
         isStreaming={isStreaming}
+        isThinking={isThinking}
         streamingContent={streamingMessage}
       />
       <MessageInput />
-    </div>
+    </div>    
   );
 };
