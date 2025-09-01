@@ -306,11 +306,21 @@ In addition to a project settings file, a project's `.gemini` directory can cont
     "showLineNumbers": false
     ```
 
+- **`language`** (string):
+  - **Description:** Sets the interface language for Gemini CLI. When set, all UI elements, commands, help text, and messages will be displayed in the selected language. The language setting is persisted across sessions and can be changed through the `/settings` command.
+  - **Default:** `"en"` (English)
+  - **Supported languages:** `"en"` (English), `"zh"` (Chinese Simplified), `"fr"` (French), `"es"` (Spanish)
+  - **Example:**
+    ```json
+    "language": "zh"
+    ```
+
 ### Example `settings.json`:
 
 ```json
 {
   "theme": "GitHub",
+  "language": "en",
   "sandbox": "docker",
   "toolDiscoveryCommand": "bin/get_tools",
   "toolCallCommand": "bin/call_tool",
