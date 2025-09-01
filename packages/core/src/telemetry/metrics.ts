@@ -21,7 +21,6 @@ import {
   METRIC_CONTENT_RETRY_FAILURE_COUNT,
 } from './constants.js';
 import type { Config } from '../config/config.js';
-import type { DiffStat } from '../tools/tools.js';
 
 export enum FileOperation {
   CREATE = 'create',
@@ -227,7 +226,6 @@ export function recordFileOperationMetric(
   lines?: number,
   mimetype?: string,
   extension?: string,
-  diffStat?: DiffStat,
   programming_language?: string,
 ): void {
   if (!fileOperationCounter || !isMetricsInitialized) return;
@@ -238,12 +236,6 @@ export function recordFileOperationMetric(
   if (lines !== undefined) attributes['lines'] = lines;
   if (mimetype !== undefined) attributes['mimetype'] = mimetype;
   if (extension !== undefined) attributes['extension'] = extension;
-  if (diffStat !== undefined) {
-    attributes['ai_added_lines'] = diffStat.ai_added_lines;
-    attributes['ai_removed_lines'] = diffStat.ai_removed_lines;
-    attributes['user_added_lines'] = diffStat.user_added_lines;
-    attributes['user_removed_lines'] = diffStat.user_removed_lines;
-  }
   if (programming_language !== undefined) {
     attributes['programming_language'] = programming_language;
   }
