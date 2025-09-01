@@ -53,6 +53,7 @@ const electronAPI = {
           
           ipcRenderer.on('multimodel-stream-error', (event, data) => {
             if (data.streamId === streamId) {
+              console.error('IPC stream error received:', data.error);
               cleanup();
               onError({ type: 'error', error: data.error });
             }
@@ -60,13 +61,15 @@ const electronAPI = {
           
           // Set up timeout
           const timeout = setTimeout(() => {
+            console.error('Stream timeout after 15 minutes');
             cleanup();
             onError({ type: 'error', error: 'Stream timeout' });
-          }, 15000); // 15 second timeout
+          }, 15 * 60 * 1000); // 15 minute timeout
           
           // NOW start the streaming request after event handlers are set
           ipcRenderer.invoke('multimodel-send-message-stream', messages, streamId)
             .catch((error) => {
+              console.error('IPC invoke failed:', error.message, error);
               clearTimeout(timeout);
               cleanup();
               onError({ type: 'error', error: error.message });
