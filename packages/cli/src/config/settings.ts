@@ -303,6 +303,12 @@ function mergeSettings(
     ...user,
     ...safeWorkspaceWithoutFolderTrust,
     ...system,
+    general: {
+      ...(systemDefaults.general || {}),
+      ...(user.general || {}),
+      ...(safeWorkspaceWithoutFolderTrust.general || {}),
+      ...(system.general || {}),
+    },
     ui: {
       ...(systemDefaults.ui || {}),
       ...(user.ui || {}),
