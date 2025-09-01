@@ -425,7 +425,12 @@ describe('Gemini Client (client.ts)', () => {
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 
-      await client.generateJson(contents, schema, abortSignal);
+      await client.generateJson(
+        contents,
+        schema,
+        abortSignal,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
 
       expect(mockGenerateContentFn).toHaveBeenCalledWith(
         {
@@ -2306,7 +2311,12 @@ ${JSON.stringify(
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 
-      await client.generateContent(contents, generationConfig, abortSignal);
+      await client.generateContent(
+        contents,
+        generationConfig,
+        abortSignal,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
 
       expect(mockGenerateContentFn).toHaveBeenCalledWith(
         {
@@ -2336,7 +2346,12 @@ ${JSON.stringify(
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 
-      await client.generateContent(contents, {}, new AbortController().signal);
+      await client.generateContent(
+        contents,
+        {},
+        new AbortController().signal,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
 
       expect(mockGenerateContentFn).not.toHaveBeenCalledWith({
         model: initialModel,
