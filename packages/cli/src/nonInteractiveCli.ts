@@ -83,13 +83,30 @@ export async function runNonInteractive(
         
         console.log('\n' + estimateMessage + '\n');
         
-        // Ask user if they want to proceed
-        console.log('Do you want to proceed with this request? (y/N)');
-        
-        // For non-interactive CLI, we'll proceed by default after a brief pause
-        // In a real implementation, you might want to add a timeout mechanism
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        console.log('Proceeding with request...\n');
+        // Handle user confirmation for quota estimation
+        if (process.stdin.isTTY) {
+          // Only ask for confirmation if we have an interactive terminal
+          const readline = await import('node:readline');
+          const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+          });
+
+          const answer = await new Promise<string>(resolve => {
+            rl.question('Do you want to proceed with this request? (y/N) ', answer => {
+              rl.close();
+              resolve(answer);
+            });
+          });
+
+          if (answer.toLowerCase() !== 'y') {
+            console.log('\nRequest cancelled.');
+            return;
+          }
+        } else {
+          // In non-interactive mode (piped input), proceed automatically
+          console.log('Proceeding with request automatically (non-interactive mode)...\n');
+        }
       } catch (error) {
         if (config.getDebugMode()) {
           console.warn('Failed to estimate quota usage:', error);

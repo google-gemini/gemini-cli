@@ -118,6 +118,49 @@ describe('QuotaEstimator', () => {
 
       expect(result.inputTokens).toBeGreaterThan(0);
     });
+
+    it('should handle multimodal content with images', async () => {
+      mockContentGenerator.countTokens.mockRejectedValue(new Error('API Error'));
+
+      const result = await quotaEstimator.estimateQuotaUsage(
+        [
+          { text: 'Describe this image' },
+          { inlineData: { data: 'base64encodedimagedata', mimeType: 'image/jpeg' } }
+        ],
+        { model: 'gemini-2.5-flash' }
+      );
+
+      expect(result.inputTokens).toBeGreaterThan(250); // Should account for image data
+    });
+
+    it('should handle function calls in content', async () => {
+      mockContentGenerator.countTokens.mockRejectedValue(new Error('API Error'));
+
+      const result = await quotaEstimator.estimateQuotaUsage(
+        [
+          { text: 'Call this function' },
+          { functionCall: { name: 'testFunction', args: { param: 'value' } } }
+        ],
+        { model: 'gemini-2.5-flash' }
+      );
+
+      expect(result.inputTokens).toBeGreaterThan(250); // Should account for function call
+    });
+
+    it('should handle mixed content types', async () => {
+      mockContentGenerator.countTokens.mockRejectedValue(new Error('API Error'));
+
+      const result = await quotaEstimator.estimateQuotaUsage(
+        [
+          { text: 'Process this data' },
+          { fileData: { mimeType: 'text/plain', data: 'file content' } },
+          { inlineData: { data: 'image', mimeType: 'image/png' } }
+        ],
+        { model: 'gemini-2.5-flash' }
+      );
+
+      expect(result.inputTokens).toBeGreaterThan(500); // Should account for all content types (expected ~509)
+    });
   });
 
   describe('formatQuotaEstimate', () => {

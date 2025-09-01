@@ -110,23 +110,43 @@ export class QuotaEstimator {
 
   /**
    * Fallback token estimation when the API call fails.
-   * Uses character count as a rough approximation.
+   * Uses character count as a rough approximation for text and estimates for other content types.
    */
   private fallbackTokenEstimate(contents: PartListUnion): number {
     let totalCharacters = 0;
     
-    if (Array.isArray(contents)) {
-      for (const content of contents) {
-        if (typeof content === 'string') {
-          totalCharacters += content.length;
-        } else if (content && typeof content === 'object' && 'text' in content) {
-          totalCharacters += (content as { text: string }).text.length;
+    // A rough estimate for non-text parts like images, function calls, or file data
+    const NON_TEXT_PART_CHAR_ESTIMATE = 1000;
+    
+    const parts = Array.isArray(contents) ? contents : [contents];
+    
+    for (const part of parts) {
+      if (typeof part === 'string') {
+        totalCharacters += part.length;
+      } else if (part && typeof part === 'object') {
+        if ('text' in part && typeof part.text === 'string') {
+          totalCharacters += part.text.length;
+        } else if ('inlineData' in part) {
+          // Image or binary data - estimate based on size
+          const data = part.inlineData;
+          if (data && 'data' in data && typeof data.data === 'string') {
+            // Base64 encoded data - estimate tokens based on decoded size
+            const decodedSize = Math.ceil((data.data.length * 3) / 4);
+            totalCharacters += Math.max(decodedSize, NON_TEXT_PART_CHAR_ESTIMATE);
+          } else {
+            totalCharacters += NON_TEXT_PART_CHAR_ESTIMATE;
+          }
+        } else if ('functionCall' in part || 'functionResponse' in part) {
+          // Function calls/responses - estimate based on complexity
+          totalCharacters += NON_TEXT_PART_CHAR_ESTIMATE;
+        } else if ('fileData' in part) {
+          // File data - estimate based on file size or content
+          totalCharacters += NON_TEXT_PART_CHAR_ESTIMATE;
+        } else {
+          // Any other unknown part type - use default estimate
+          totalCharacters += NON_TEXT_PART_CHAR_ESTIMATE;
         }
       }
-    } else if (typeof contents === 'string') {
-      totalCharacters = contents.length;
-    } else if (contents && typeof contents === 'object' && 'text' in contents) {
-      totalCharacters = (contents as { text: string }).text.length;
     }
 
     // Rough approximation: 1 token ≈ 4 characters for English text
