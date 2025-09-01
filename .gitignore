@@ -42,6 +42,7 @@ bundle
 # Test report files
 junit.xml
 packages/*/coverage/
+__snapshots__/
 
 # Generated files
 packages/cli/src/generated/
@@ -67,6 +68,8 @@ i18n-demo-*.js
 I18N_*.md
 *_I18N_*.md
 i18n-visual-test-report.html
+find-hardcoded-strings.ts
+i18n-hardcoded-strings-report.md
 
 # PR feedback tracking and documentation files (local use only)
 jacob314-feedback-tracking.md
