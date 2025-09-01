@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "@google/gemini-cli-core": "file:../core",
-    "@google/genai": "1.13.0",
+    "@google/genai": "1.16.0",
     "@iarna/toml": "^2.2.5",
     "@modelcontextprotocol/sdk": "^1.15.1",
     "@types/update-notifier": "^6.0.8",
