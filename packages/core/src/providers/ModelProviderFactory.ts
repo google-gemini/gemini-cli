@@ -24,6 +24,11 @@ export class ModelProviderFactory {
   static create(config: ModelProviderConfig, configInstance?: Config): BaseModelProvider {
     const key = `${config.type}-${config.model}-${config.baseUrl || 'default'}`;
     
+    // Defensive check to ensure providers Map is initialized
+    if (!this.providers) {
+      this.providers = new Map();
+    }
+    
     if (this.providers.has(key)) {
       const existingProvider = this.providers.get(key)!;
       existingProvider.updateConfig(config);

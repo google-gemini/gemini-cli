@@ -97,8 +97,10 @@ export class MultiModelSystem {
       // NEW: Get fresh history from SessionManager and apply context limiting each time
       const fullHistory = sessionManager.getHistory();
       const limitedMessages = this.limitContextSize(fullHistory);
-      console.log('[MultiModelSystem] Using limited conversation history:', limitedMessages.length, '/', fullHistory.length, 'messages');
-      
+      // console.log('[MultiModelSystem] Using limited conversation history:', limitedMessages.length, '/', fullHistory.length, 'messages');
+      // print limitedMessages for debugging
+      console.log('[MultiModelSystem] Limited Messages:', limitedMessages);
+
       // Enhance messages with system prompt, role and workspace context
       const enhancedMessages = await this.enhanceMessagesWithRole(limitedMessages, roleId);
       
@@ -296,6 +298,9 @@ export class MultiModelSystem {
     ModelProviderFactory.validateConfig(config);
     this.configManager.setProviderConfig(config);
     this.currentProvider = config;
+    
+    // Set tools for the new provider
+    await this.setProviderTools();
   }
 
   async switchRole(roleId: string): Promise<boolean> {
