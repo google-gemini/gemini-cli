@@ -142,6 +142,11 @@ describe('Settings Loading and Merging', () => {
           workspacesWithMigrationNudge: [],
         },
         security: {},
+        general: {},
+        privacy: {},
+        telemetry: {},
+        tools: {},
+        ide: {},
       });
       expect(settings.errors.length).toBe(0);
     });
@@ -197,6 +202,13 @@ describe('Settings Loading and Merging', () => {
           workspacesWithMigrationNudge: [],
         },
         security: {},
+        general: {},
+        privacy: {},
+        telemetry: {},
+        tools: {
+          sandbox: false,
+        },
+        ide: {},
       });
     });
 
@@ -253,6 +265,11 @@ describe('Settings Loading and Merging', () => {
           workspacesWithMigrationNudge: [],
         },
         security: {},
+        general: {},
+        privacy: {},
+        telemetry: {},
+        tools: {},
+        ide: {},
       });
     });
 
@@ -308,6 +325,10 @@ describe('Settings Loading and Merging', () => {
           workspacesWithMigrationNudge: [],
         },
         security: {},
+        general: {},
+        privacy: {},
+        telemetry: {},
+        ide: {},
       });
     });
 
@@ -374,6 +395,10 @@ describe('Settings Loading and Merging', () => {
           chatCompression: {},
         },
         security: {},
+        general: {},
+        privacy: {},
+        telemetry: {},
+        ide: {},
       });
     });
 
@@ -439,6 +464,7 @@ describe('Settings Loading and Merging', () => {
         },
         tools: {
           sandbox: false,
+          core: ['tool1'],
         },
         telemetry: { enabled: false },
         context: {
@@ -460,6 +486,9 @@ describe('Settings Loading and Merging', () => {
           chatCompression: {},
         },
         security: {},
+        general: {},
+        privacy: {},
+        ide: {},
       });
     });
 
@@ -538,6 +567,10 @@ describe('Settings Loading and Merging', () => {
           workspacesWithMigrationNudge: [],
         },
         security: {},
+        privacy: {},
+        telemetry: {},
+        tools: {},
+        ide: {},
       });
     });
 
@@ -668,7 +701,7 @@ describe('Settings Loading and Merging', () => {
           chatCompression: {},
         },
         security: {},
-        telemetry: false,
+        telemetry: {},
         tools: {
           sandbox: false,
         },
@@ -676,6 +709,9 @@ describe('Settings Loading and Merging', () => {
           customThemes: {},
           theme: 'system-theme',
         },
+        general: {},
+        privacy: {},
+        ide: {},
       });
     });
 
@@ -901,7 +937,7 @@ describe('Settings Loading and Merging', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
       );
-      const userSettingsContent = { telemetry: true };
+      const userSettingsContent = { telemetry: { enabled: true } };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
           if (p === USER_SETTINGS_PATH)
@@ -910,14 +946,14 @@ describe('Settings Loading and Merging', () => {
         },
       );
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.telemetry).toBe(true);
+      expect(settings.merged.telemetry?.enabled).toBe(true);
     });
 
     it('should load telemetry setting from workspace settings', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === MOCK_WORKSPACE_SETTINGS_PATH,
       );
-      const workspaceSettingsContent = { telemetry: false };
+      const workspaceSettingsContent = { telemetry: { enabled: false } };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
           if (p === MOCK_WORKSPACE_SETTINGS_PATH)
@@ -926,13 +962,13 @@ describe('Settings Loading and Merging', () => {
         },
       );
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.telemetry).toBe(false);
+      expect(settings.merged.telemetry?.enabled).toBe(false);
     });
 
     it('should prioritize workspace telemetry setting over user setting', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
-      const userSettingsContent = { telemetry: true };
-      const workspaceSettingsContent = { telemetry: false };
+      const userSettingsContent = { telemetry: { enabled: true } };
+      const workspaceSettingsContent = { telemetry: { enabled: false } };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
           if (p === USER_SETTINGS_PATH)
@@ -943,14 +979,14 @@ describe('Settings Loading and Merging', () => {
         },
       );
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.telemetry).toBe(false);
+      expect(settings.merged.telemetry?.enabled).toBe(false);
     });
 
     it('should have telemetry as undefined if not in any settings file', () => {
       (mockFsExistsSync as Mock).mockReturnValue(false); // No settings files exist
       (fs.readFileSync as Mock).mockReturnValue('{}');
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.telemetry).toBeUndefined();
+      expect(settings.merged.telemetry).toEqual({});
       expect(settings.merged.ui?.customThemes).toEqual({});
       expect(settings.merged.mcpServers).toEqual({});
     });
@@ -1400,6 +1436,11 @@ describe('Settings Loading and Merging', () => {
           workspacesWithMigrationNudge: [],
         },
         security: {},
+        general: {},
+        privacy: {},
+        tools: {},
+        telemetry: {},
+        ide: {},
       });
 
       // Check that error objects are populated in settings.errors
@@ -1828,6 +1869,10 @@ describe('Settings Loading and Merging', () => {
             workspacesWithMigrationNudge: [],
           },
           security: {},
+          general: {},
+          privacy: {},
+          telemetry: {},
+          ide: {},
         });
       });
     });

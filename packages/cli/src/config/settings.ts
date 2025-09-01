@@ -30,7 +30,6 @@ export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
 const MIGRATE_V2_OVERWRITE = false;
 
-// As defined in spec.md
 const MIGRATION_MAP: Record<string, string> = {
   preferredEditor: 'general.preferredEditor',
   vimMode: 'general.vimMode',
@@ -63,6 +62,7 @@ const MIGRATION_MAP: Record<string, string> = {
   fileFiltering: 'context.fileFiltering',
   sandbox: 'tools.sandbox',
   shouldUseNodePtyShell: 'tools.usePty',
+  allowedTools: 'tools.allowed',
   coreTools: 'tools.core',
   excludeTools: 'tools.exclude',
   toolDiscoveryCommand: 'tools.discoveryCommand',
@@ -299,6 +299,12 @@ function mergeSettings(
     ...user,
     ...safeWorkspaceWithoutFolderTrust,
     ...system,
+    general: {
+      ...(systemDefaults.general || {}),
+      ...(user.general || {}),
+      ...(safeWorkspaceWithoutFolderTrust.general || {}),
+      ...(system.general || {}),
+    },
     ui: {
       ...(systemDefaults.ui || {}),
       ...(user.ui || {}),
@@ -310,6 +316,24 @@ function mergeSettings(
         ...(safeWorkspaceWithoutFolderTrust.ui?.customThemes || {}),
         ...(system.ui?.customThemes || {}),
       },
+    },
+    ide: {
+      ...(systemDefaults.ide || {}),
+      ...(user.ide || {}),
+      ...(safeWorkspaceWithoutFolderTrust.ide || {}),
+      ...(system.ide || {}),
+    },
+    privacy: {
+      ...(systemDefaults.privacy || {}),
+      ...(user.privacy || {}),
+      ...(safeWorkspaceWithoutFolderTrust.privacy || {}),
+      ...(system.privacy || {}),
+    },
+    telemetry: {
+      ...(systemDefaults.telemetry || {}),
+      ...(user.telemetry || {}),
+      ...(safeWorkspaceWithoutFolderTrust.telemetry || {}),
+      ...(system.telemetry || {}),
     },
     security: {
       ...(systemDefaults.security || {}),
@@ -328,6 +352,12 @@ function mergeSettings(
       ...(user.mcpServers || {}),
       ...(safeWorkspaceWithoutFolderTrust.mcpServers || {}),
       ...(system.mcpServers || {}),
+    },
+    tools: {
+      ...(systemDefaults.tools || {}),
+      ...(user.tools || {}),
+      ...(safeWorkspaceWithoutFolderTrust.tools || {}),
+      ...(system.tools || {}),
     },
     context: {
       ...(systemDefaults.context || {}),
@@ -667,7 +697,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
 
         let settingsObject = rawSettings as Record<string, unknown>;
         if (needsMigration(settingsObject)) {
-          console.error(`Legacy settings file detected at: ${filePath}`);
           const migratedSettings = migrateSettingsToV2(settingsObject);
           if (migratedSettings) {
             if (MIGRATE_V2_OVERWRITE) {
@@ -678,9 +707,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
                   JSON.stringify(migratedSettings, null, 2),
                   'utf-8',
                 );
-                console.log(
-                  `Successfully migrated and saved settings file: ${filePath}`,
-                );
               } catch (e) {
                 console.error(
                   `Error migrating settings file on disk: ${getErrorMessage(
@@ -689,9 +715,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
                 );
               }
             } else {
-              console.log(
-                `Successfully migrated settings for ${filePath} in-memory for the current session.`,
-              );
               migratedInMemorScopes.add(scope);
             }
             settingsObject = migratedSettings;
