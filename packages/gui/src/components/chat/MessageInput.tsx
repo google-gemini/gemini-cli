@@ -17,7 +17,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   const { activeSessionId, updateSession } = useAppStore();
-  const { isStreaming, setStreaming, setStreamingMessage, setError } = useChatStore();
+  const { isStreaming, isThinking, setStreaming, setThinking, setStreamingMessage, setError } = useChatStore();
 
   const adjustTextareaHeight = useCallback(() => {
     const textarea = textareaRef.current;
@@ -42,7 +42,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) 
   };
 
   const handleSendMessage = async () => {
-    if (!message.trim() || !activeSessionId || isStreaming) return;
+    if (!message.trim() || !activeSessionId || isStreaming || isThinking) return;
 
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -63,8 +63,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) 
       textareaRef.current.style.height = 'auto';
     }
 
-    // Start streaming
-    setStreaming(true);
+    // Start thinking state first
+    setThinking(true);
     setStreamingMessage('');
     setError(null);
 
@@ -96,6 +96,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) 
 
       for await (const event of stream) {
         if (event.type === 'content' || event.type === 'content_delta') {
+          // Switch from thinking to streaming on first content
+          if (isThinking) {
+            setThinking(false);
+            setStreaming(true);
+          }
           assistantContent += event.content;
           setStreamingMessage(assistantContent);
         } else if (event.type === 'done' || event.type === 'message_complete') {
@@ -129,19 +134,25 @@ export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) 
           }
           break;
         } else if (event.type === 'error') {
-          setError(event.error instanceof Error ? event.error.message : (event.error || 'An error occurred'));
+          const errorMessage = event.error instanceof Error ? event.error.message : (event.error || 'An error occurred');
+          console.error('Stream error:', errorMessage, event);
+          setError(errorMessage);
           break;
         }
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'An error occurred');
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      console.error('Message sending failed:', errorMessage, error);
+      setError(errorMessage);
     } finally {
+      setThinking(false);
       setStreaming(false);
       setStreamingMessage('');
     }
   };
 
   const handleStopGeneration = () => {
+    setThinking(false);
     setStreaming(false);
     setStreamingMessage('');
   };
@@ -166,7 +177,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) 
               value={message}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              disabled={disabled || isStreaming}
+              disabled={disabled || isStreaming || isThinking}
               className={cn(
                 "min-h-[44px] max-h-[200px] resize-none pr-12",
                 "focus:ring-1 focus:ring-primary/50"
@@ -184,7 +195,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) 
             <Mic size={16} />
           </Button>
 
-          {isStreaming ? (
+          {isStreaming || isThinking ? (
             <Button
               variant="destructive"
               size="icon"

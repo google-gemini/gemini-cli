@@ -73,7 +73,7 @@ export const useWorkspaceDirectories = (): WorkspaceDirectoriesState & Workspace
       
       // Then sync to backend
       await multiModelService.setWorkspaceDirectories(newDirectories);
-      console.log('Set workspace directories in localStorage and backend:', newDirectories);
+      // console.log('Set workspace directories in localStorage and backend:', newDirectories);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to set workspace directories';
       setError(errorMessage);
@@ -93,7 +93,7 @@ export const useWorkspaceDirectories = (): WorkspaceDirectoriesState & Workspace
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
-            console.log('Loaded workspace directories from localStorage:', parsed);
+            // console.log('Loaded workspace directories from localStorage:', parsed);
             setDirectories(parsed);
             setError(null);
           }
@@ -117,7 +117,7 @@ export const useWorkspaceDirectories = (): WorkspaceDirectoriesState & Workspace
             setTimeout(async () => {
               try {
                 await multiModelService.setWorkspaceDirectories(parsed);
-                console.log('Synced localStorage directories to backend:', parsed);
+                // console.log('Synced localStorage directories to backend:', parsed);
               } catch (error) {
                 console.warn('Failed to sync localStorage directories to backend (will retry):', error);
                 

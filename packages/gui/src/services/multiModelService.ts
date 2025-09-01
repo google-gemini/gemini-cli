@@ -5,6 +5,7 @@ import type {
   PresetTemplate,
   ModelProviderType 
 } from '@/types';
+import type { ToolCallConfirmationDetails, ToolConfirmationOutcome } from '@google/gemini-cli-core';
 
 // Define Electron API interface
 interface ElectronAPI {
@@ -40,6 +41,9 @@ interface ElectronAPI {
     getDisplayMessages: (sessionId?: string) => Promise<UniversalMessage[]>;
     getSessionsInfo: () => Promise<Array<{id: string, title: string, messageCount: number, lastUpdated: Date}>>;
     updateSessionTitle: (sessionId: string, newTitle: string) => Promise<void>;
+    // Tool confirmation
+    onToolConfirmationRequest: (callback: (event: any, details: ToolCallConfirmationDetails) => void) => () => void;
+    sendToolConfirmationResponse: (outcome: string) => Promise<{ success: boolean }>;
   };
 }
 
@@ -56,6 +60,11 @@ class MultiModelService {
   private modelsCache: Record<string, string[]> | null = null;
   private modelsCacheTimestamp: number = 0;
   private readonly MODELS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  
+  // Tool confirmation callback
+  private confirmationCallback?: (
+    details: ToolCallConfirmationDetails
+  ) => Promise<ToolConfirmationOutcome>;
 
   private get api() {
     const electronAPI = (globalThis as GlobalThis).electronAPI;
@@ -68,6 +77,43 @@ class MultiModelService {
   async initialize(config: Record<string, unknown>): Promise<void> {
     await this.api.initialize(config);
     this.initialized = true;
+    
+    // Set up tool confirmation listener
+    this.setupConfirmationListener();
+  }
+
+  // Set the confirmation callback for tool approvals
+  setConfirmationCallback(
+    callback: (details: ToolCallConfirmationDetails) => Promise<ToolConfirmationOutcome>
+  ): void {
+    this.confirmationCallback = callback;
+  }
+
+  // Set up the confirmation request listener from main process
+  private setupConfirmationListener(): void {
+    if (this.api.onToolConfirmationRequest) {
+      this.api.onToolConfirmationRequest(async (_, confirmationDetails) => {
+        console.log('Received tool confirmation request from main process:', confirmationDetails);
+        
+        if (this.confirmationCallback) {
+          try {
+            // Call the registered callback to handle confirmation in GUI
+            const outcome = await this.confirmationCallback(confirmationDetails);
+            console.log('Sending confirmation response:', outcome);
+            
+            // Send the response back to main process
+            await this.api.sendToolConfirmationResponse(outcome);
+          } catch (error) {
+            console.error('Error handling tool confirmation:', error);
+            // Send cancel as fallback
+            await this.api.sendToolConfirmationResponse('cancel');
+          }
+        } else {
+          console.warn('No confirmation callback registered, auto-cancelling');
+          await this.api.sendToolConfirmationResponse('cancel');
+        }
+      });
+    }
   }
 
   async switchProvider(providerType: ModelProviderType, model: string): Promise<void> {
@@ -128,6 +174,7 @@ class MultiModelService {
       let isComplete = false;
       let hasError = false;
       let eventIndex = 0;
+      let resolveNext: (() => void) | null = null;
       
       // Set up real-time callbacks
       const cleanup = streamResponse.startStream(
@@ -140,6 +187,11 @@ class MultiModelService {
               role: chunk.role as 'assistant',
               timestamp: chunk.timestamp
             });
+            // Immediately wake up the generator
+            if (resolveNext) {
+              resolveNext();
+              resolveNext = null;
+            }
           }
         },
         // onComplete callback
@@ -151,6 +203,11 @@ class MultiModelService {
             timestamp: data.timestamp
           });
           isComplete = true;
+          // Wake up the generator for completion
+          if (resolveNext) {
+            resolveNext();
+            resolveNext = null;
+          }
         },
         // onError callback
         (error) => {
@@ -160,6 +217,11 @@ class MultiModelService {
             timestamp: Date.now()
           });
           hasError = true;
+          // Wake up the generator for error
+          if (resolveNext) {
+            resolveNext();
+            resolveNext = null;
+          }
         }
       );
       
@@ -173,8 +235,19 @@ class MultiModelService {
             eventIndex++;
           }
           
-          // Short delay to allow new events to arrive
-          await new Promise(resolve => setTimeout(resolve, 10));
+          // Wait for the next event to arrive (event-driven instead of polling)
+          if (!isComplete && !hasError && eventIndex >= events.length) {
+            await new Promise<void>(resolve => {
+              resolveNext = resolve;
+              // Fallback timeout to prevent infinite waiting
+              setTimeout(() => {
+                if (resolveNext === resolve) {
+                  resolveNext = null;
+                  resolve();
+                }
+              }, 100);
+            });
+          }
         }
         
         // Yield any remaining events

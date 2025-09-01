@@ -9,18 +9,21 @@ import { format } from 'date-fns';
 import { Bot, User, AlertCircle } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Card, CardContent } from '@/components/ui/Card';
+import { TypingIndicator } from './TypingIndicator';
 import type { ChatMessage } from '@/types';
 import 'katex/dist/katex.min.css';
 
 interface MessageListProps {
   messages: ChatMessage[];
   isStreaming?: boolean;
+  isThinking?: boolean;
   streamingContent?: string;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
   isStreaming,
+  isThinking,
   streamingContent,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -31,7 +34,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, streamingContent]);
+  }, [messages, streamingContent, isThinking]);
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -39,6 +42,10 @@ export const MessageList: React.FC<MessageListProps> = ({
         <MessageBubble key={message.id} message={message} />
       ))}
       
+      {/* Show thinking indicator when AI is processing */}
+      {isThinking && <TypingIndicator />}
+      
+      {/* Show streaming content when AI is responding */}
       {isStreaming && streamingContent && (
         <MessageBubble
           message={{
