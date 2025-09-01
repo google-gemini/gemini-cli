@@ -497,20 +497,12 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
     );
 
     if (!response.ok) {
-      const errorDetails = `HTTP ${response.status} ${response.statusText}`;
-      console.error('Failed to fetch user info:', errorDetails);
-
-      // Provide specific guidance for common authentication issues
-      if (response.status === 401) {
-        throw new Error(
-          'Authentication token expired or invalid. Please try logging in again.',
-        );
-      } else if (response.status === 403) {
-        throw new Error(
-          'Access denied when fetching user information. This might indicate a permission issue with your Google account.',
-        );
-      }
-      throw new Error(`Failed to fetch user info: ${errorDetails}`);
+      console.error(
+        'Failed to fetch user info:',
+        response.status,
+        response.statusText,
+      );
+      return;
     }
 
     const userInfo = await response.json();
