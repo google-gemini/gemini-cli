@@ -368,8 +368,11 @@ async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
       await client.getTokenInfo(token);
 
       return true;
-    } catch (_) {
-      // Ignore and try next path.
+    } catch (e) {
+      console.debug(
+        `Failed to load credentials from ${keyFile}:`,
+        e instanceof Error ? { message: e.message, stack: e.stack } : e,
+      );
     }
   }
 
