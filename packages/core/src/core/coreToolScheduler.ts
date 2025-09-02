@@ -824,11 +824,7 @@ export class CoreToolScheduler {
         'User did not allow tool call',
       );
     } else if (outcome === ToolConfirmationOutcome.Skip) {
-      this.setStatusInternal(
-        callId,
-        'skipped',
-        'Tool call skipped by user',
-      );
+      this.setStatusInternal(callId, 'skipped', 'Tool call skipped by user');
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
       if (isModifiableDeclarativeTool(waitingToolCall.tool)) {
