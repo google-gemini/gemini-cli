@@ -111,7 +111,9 @@ describe('HybridTokenStorage', () => {
       expect(mockFileStorage.getCredentials).toHaveBeenCalledWith(
         'test-server',
       );
-      expect(await storage.getStorageType()).toBe(TokenStorageType.FILE);
+      expect(await storage.getStorageType()).toBe(
+        TokenStorageType.ENCRYPTED_FILE,
+      );
     });
 
     it('should fall back to file storage when keychain is unavailable', async () => {
