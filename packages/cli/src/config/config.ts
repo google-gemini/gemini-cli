@@ -38,6 +38,7 @@ import { annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
+import { appEvents } from '../utils/events.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
@@ -77,6 +78,8 @@ export interface CliArgs {
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
+  useSmartEdit: boolean | undefined;
+  sessionSummary: string | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -226,7 +229,54 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description: 'Enable screen reader mode for accessibility.',
           default: false,
         })
-
+        .option('session-summary', {
+          type: 'string',
+          description: 'File to write session summary to.',
+        })
+        .deprecateOption(
+          'telemetry',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-target',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-otlp-endpoint',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-otlp-protocol',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-log-prompts',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-outfile',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'show-memory-usage',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'sandbox-image',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'proxy',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'checkpointing',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'all-files',
+          'Use @ includes in the application instead. This flag will be removed in a future version.',
+        )
         .check((argv) => {
           if (argv.prompt && argv['promptInteractive']) {
             throw new Error(
@@ -284,6 +334,7 @@ export async function loadHierarchicalGeminiMemory(
   fileService: FileDiscoveryService,
   settings: Settings,
   extensionContextFilePaths: string[] = [],
+  folderTrust: boolean,
   memoryImportFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
 ): Promise<{ memoryContent: string; fileCount: number }> {
@@ -309,6 +360,7 @@ export async function loadHierarchicalGeminiMemory(
     debugMode,
     fileService,
     extensionContextFilePaths,
+    folderTrust,
     memoryImportFormat,
     fileFilteringOptions,
     settings.context?.discoveryMaxDirs,
@@ -336,7 +388,7 @@ export async function loadCliConfig(
     settings.security?.folderTrust?.featureEnabled ?? false;
   const folderTrustSetting = settings.security?.folderTrust?.enabled ?? true;
   const folderTrust = folderTrustFeature && folderTrustSetting;
-  const trustedFolder = isWorkspaceTrusted(settings);
+  const trustedFolder = isWorkspaceTrusted(settings) ?? true;
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -384,6 +436,7 @@ export async function loadCliConfig(
     fileService,
     settings,
     extensionContextFilePaths,
+    trustedFolder,
     memoryImportFormat,
     fileFiltering,
   );
@@ -482,10 +535,10 @@ export async function loadCliConfig(
   }
 
   const sandboxConfig = await loadSandboxConfig(settings, argv);
-
-  // The screen reader argument takes precedence over the accessibility setting.
   const screenReader =
-    argv.screenReader ?? settings.ui?.accessibility?.screenReader ?? false;
+    argv.screenReader !== undefined
+      ? argv.screenReader
+      : (settings.ui?.accessibility?.screenReader ?? false);
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -568,6 +621,8 @@ export async function loadCliConfig(
     shouldUseNodePtyShell: settings.tools?.usePty,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
+    eventEmitter: appEvents,
+    useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
   });
 }
 

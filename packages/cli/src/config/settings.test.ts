@@ -34,7 +34,7 @@ vi.mock('./trustedFolders.js', () => ({
 }));
 
 // NOW import everything else, including the (now effectively re-exported) settings.js
-import * as pathActual from 'node:path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
+import path, * as pathActual from 'node:path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
 import {
   describe,
   it,
@@ -58,7 +58,9 @@ import {
   SETTINGS_DIRECTORY_NAME, // This is from the original module, but used by the mock.
   migrateSettingsToV1,
   type Settings,
+  loadEnvironment,
 } from './settings.js';
+import { GEMINI_DIR } from '@google/gemini-cli-core';
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
 // Use the (mocked) SETTINGS_DIRECTORY_NAME for consistency
@@ -123,6 +125,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           customThemes: {},
         },
@@ -177,6 +180,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...systemSettingsContent,
+        general: {},
         ui: {
           ...systemSettingsContent.ui,
           customThemes: {},
@@ -232,6 +236,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...userSettingsContent,
+        general: {},
         ui: {
           ...userSettingsContent.ui,
           customThemes: {},
@@ -292,6 +297,7 @@ describe('Settings Loading and Merging', () => {
           fileName: 'WORKSPACE_CONTEXT.md',
           includeDirectories: [],
         },
+        general: {},
         ui: {
           customThemes: {},
         },
@@ -349,6 +355,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           theme: 'dark',
           customThemes: {},
@@ -433,6 +440,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           theme: 'system-theme',
           customThemes: {},
@@ -539,6 +547,27 @@ describe('Settings Loading and Merging', () => {
         },
         security: {},
       });
+    });
+
+    it('should rewrite allowedTools to tools.allowed during migration', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const legacySettingsContent = {
+        allowedTools: ['fs', 'shell'],
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(legacySettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.tools?.allowed).toEqual(['fs', 'shell']);
+      expect((settings.merged as TestSettings)['allowedTools']).toBeUndefined();
     });
 
     it('should correctly merge and migrate legacy array properties from multiple scopes', () => {
@@ -672,6 +701,7 @@ describe('Settings Loading and Merging', () => {
         tools: {
           sandbox: false,
         },
+        general: {},
         ui: {
           customThemes: {},
           theme: 'system-theme',
@@ -1381,6 +1411,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           customThemes: {},
         },
@@ -1808,6 +1839,7 @@ describe('Settings Loading and Merging', () => {
         expect(settings.system.settings).toEqual(systemSettingsContent);
         expect(settings.merged).toEqual({
           ...systemSettingsContent,
+          general: {},
           ui: {
             ...systemSettingsContent.ui,
             customThemes: {},
@@ -2361,6 +2393,56 @@ describe('Settings Loading and Merging', () => {
         },
         allowMCPServers: ['serverA'],
       });
+    });
+  });
+
+  describe('loadEnvironment', () => {
+    function setup({
+      isFolderTrustEnabled = true,
+      isWorkspaceTrustedValue = true,
+    }) {
+      delete process.env['TESTTEST']; // reset
+      const geminiEnvPath = path.resolve(path.join(GEMINI_DIR, '.env'));
+
+      vi.mocked(isWorkspaceTrusted).mockReturnValue(isWorkspaceTrustedValue);
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) =>
+        [USER_SETTINGS_PATH, geminiEnvPath].includes(p.toString()),
+      );
+      const userSettingsContent: Settings = {
+        ui: {
+          theme: 'dark',
+        },
+        security: {
+          folderTrust: {
+            enabled: isFolderTrustEnabled,
+          },
+        },
+        context: {
+          fileName: 'USER_CONTEXT.md',
+        },
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === geminiEnvPath) return 'TESTTEST=1234';
+          return '{}';
+        },
+      );
+    }
+
+    it('sets environment variables from .env files', () => {
+      setup({ isFolderTrustEnabled: false, isWorkspaceTrustedValue: true });
+      loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+
+      expect(process.env['TESTTEST']).toEqual('1234');
+    });
+
+    it('does not load env files from untrusted spaces', () => {
+      setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
+      loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+
+      expect(process.env['TESTTEST']).not.toEqual('1234');
     });
   });
 });

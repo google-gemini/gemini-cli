@@ -22,7 +22,12 @@ import type {
   Part,
 } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
-import { findIndexAfterFraction, GeminiClient } from './client.js';
+import {
+  findIndexAfterFraction,
+  isThinkingDefault,
+  isThinkingSupported,
+  GeminiClient,
+} from './client.js';
 import {
   AuthType,
   type ContentGenerator,
@@ -159,6 +164,40 @@ describe('findIndexAfterFraction', () => {
       { role: 'user', parts: [{ text: 'Message 2' }] },
     ];
     expect(findIndexAfterFraction(historyWithEmptyParts, 0.5)).toBe(1);
+  });
+});
+
+describe('isThinkingSupported', () => {
+  it('should return true for gemini-2.5', () => {
+    expect(isThinkingSupported('gemini-2.5')).toBe(true);
+  });
+
+  it('should return true for gemini-2.5-pro', () => {
+    expect(isThinkingSupported('gemini-2.5-pro')).toBe(true);
+  });
+
+  it('should return false for other models', () => {
+    expect(isThinkingSupported('gemini-1.5-flash')).toBe(false);
+    expect(isThinkingSupported('some-other-model')).toBe(false);
+  });
+});
+
+describe('isThinkingDefault', () => {
+  it('should return false for gemini-2.5-flash-lite', () => {
+    expect(isThinkingDefault('gemini-2.5-flash-lite')).toBe(false);
+  });
+
+  it('should return true for gemini-2.5', () => {
+    expect(isThinkingDefault('gemini-2.5')).toBe(true);
+  });
+
+  it('should return true for gemini-2.5-pro', () => {
+    expect(isThinkingDefault('gemini-2.5-pro')).toBe(true);
+  });
+
+  it('should return false for other models', () => {
+    expect(isThinkingDefault('gemini-1.5-flash')).toBe(false);
+    expect(isThinkingDefault('some-other-model')).toBe(false);
   });
 });
 
@@ -386,11 +425,16 @@ describe('Gemini Client (client.ts)', () => {
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 
-      await client.generateJson(contents, schema, abortSignal);
+      await client.generateJson(
+        contents,
+        schema,
+        abortSignal,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
 
       expect(mockGenerateContentFn).toHaveBeenCalledWith(
         {
-          model: 'test-model', // Should use current model from config
+          model: DEFAULT_GEMINI_FLASH_MODEL,
           config: {
             abortSignal,
             systemInstruction: getCoreSystemPrompt(''),
@@ -2267,11 +2311,16 @@ ${JSON.stringify(
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 
-      await client.generateContent(contents, generationConfig, abortSignal);
+      await client.generateContent(
+        contents,
+        generationConfig,
+        abortSignal,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
 
       expect(mockGenerateContentFn).toHaveBeenCalledWith(
         {
-          model: 'test-model',
+          model: DEFAULT_GEMINI_FLASH_MODEL,
           config: {
             abortSignal,
             systemInstruction: getCoreSystemPrompt(''),
@@ -2297,7 +2346,12 @@ ${JSON.stringify(
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 
-      await client.generateContent(contents, {}, new AbortController().signal);
+      await client.generateContent(
+        contents,
+        {},
+        new AbortController().signal,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
 
       expect(mockGenerateContentFn).not.toHaveBeenCalledWith({
         model: initialModel,
@@ -2306,7 +2360,7 @@ ${JSON.stringify(
       });
       expect(mockGenerateContentFn).toHaveBeenCalledWith(
         {
-          model: currentModel,
+          model: DEFAULT_GEMINI_FLASH_MODEL,
           config: expect.any(Object),
           contents,
         },
