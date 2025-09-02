@@ -8,14 +8,14 @@ import type {
   ModelProviderConfig,
   UniversalMessage,
   UniversalStreamEvent,
-  ConnectionStatus
+  ConnectionStatus,
+  ToolCall
 } from '../providers/types.js';
 import type { ModelProviderType } from '../providers/types.js';
 import { ModelProviderFactory } from '../providers/ModelProviderFactory.js';
 import { ProviderConfigManager } from '../providers/ProviderConfigManager.js';
 import { RoleManager } from '../roles/RoleManager.js';
 import type { Config } from '../config/config.js';
-import type { GeminiClient } from '../core/client.js';
 import { WorkspaceManager } from '../utils/WorkspaceManager.js';
 import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import type { ToolCallRequestInfo } from '../core/turn.js';
@@ -121,19 +121,17 @@ export class MultiModelSystem {
       };
     } else if (format === 'gemini') {
       // Gemini format with functionResponse structure
-      const geminiContent = JSON.stringify({
-        functionResponse: {
-          name: toolName,
-          response: {
-            tool_call_id: toolCallId,
-            result: content
-          }
-        }
-      });
+      // For Gemini, we'll encode the functionResponse into the content as JSON
+      // The GeminiProvider will parse this and convert to proper functionResponse
+      const functionResponseData = {
+        id: toolCallId,
+        name: toolName,
+        response: { output: content }
+      };
       
       return {
         role: 'tool',
-        content: geminiContent,
+        content: JSON.stringify({ __gemini_function_response: functionResponseData }),
         tool_call_id: toolCallId,
         name: toolName,
         timestamp: new Date()
@@ -151,14 +149,10 @@ export class MultiModelSystem {
   }
   // private readonly DEFAULT_MAX_TURNS = 10;
 
-  constructor(config: Config, geminiClient?: GeminiClient) {
+  constructor(config: Config) {
     this.config = config;
     this.configManager = new ProviderConfigManager(config);
     this.workspaceManager = WorkspaceManager.getInstance(config);
-    
-    if (geminiClient) {
-      ModelProviderFactory.setGeminiClient(geminiClient);
-    }
     
     this.currentProvider = this.configManager.getDefaultProviderConfig() || null;
   }
@@ -233,6 +227,7 @@ export class MultiModelSystem {
       
       const responseStream = provider.sendMessageStream(enhancedMessages, signal);
       const toolCallRequests: ToolCallRequestInfo[] = [];
+      const assistantToolCalls: ToolCall[] = [];  // Collect tool calls for history
       let assistantContent = '';
       
       // Collect tool call requests and pass through other events
@@ -256,21 +251,60 @@ export class MultiModelSystem {
             prompt_id: `multimodel_${Date.now()}`
           };
           
+          // Also collect for assistant history
+          assistantToolCalls.push({
+            id: event.toolCall.id,
+            name: event.toolCall.name,
+            arguments: event.toolCall.arguments
+          });
+          
           toolCallRequests.push(toolCallRequest);
           console.log(`[MultiModelSystem] Collected tool call: ${event.toolCall.name}`);
         } else if (event.type === 'done') {
           // Save assistant response to history when stream completes
-          if (assistantContent.trim()) {
-            SessionManager.getInstance().addHistory({
+          if (assistantContent.trim() || assistantToolCalls.length > 0) {
+            const assistantMessage: UniversalMessage = {
               role: 'assistant',
               content: assistantContent,
               timestamp: new Date()
-            });
-            console.log(`[MultiModelSystem] Saved assistant response to history (${assistantContent.length} chars)`);
+            };
+            
+            // Include tool calls if any were made
+            if (assistantToolCalls.length > 0) {
+              assistantMessage.toolCalls = assistantToolCalls;
+            }
+            
+            SessionManager.getInstance().addHistory(assistantMessage);
+            console.log(`[MultiModelSystem] Saved assistant response to history (${assistantContent.length} chars, ${assistantToolCalls.length} tool calls)`);
           }
           yield event;
+        } else if (event.type === 'error') {
+          // Log error and clean up collected data
+          const errorMessage = event.error?.message || 'Unknown error';
+          console.error(`[MultiModelSystem] Provider error: ${errorMessage}`);
+          if (event.error?.stack) {
+            console.error(`[MultiModelSystem] Error stack: ${event.error.stack}`);
+          }
+          
+          // Clear collected data since stream failed
+          if (toolCallRequests.length > 0) {
+            console.warn(`[MultiModelSystem] Discarding ${toolCallRequests.length} tool call(s) due to error`);
+            toolCallRequests.length = 0;
+          }
+          if (assistantToolCalls.length > 0) {
+            console.warn(`[MultiModelSystem] Discarding ${assistantToolCalls.length} assistant tool call(s) due to error`);
+            assistantToolCalls.length = 0;
+          }
+          if (assistantContent.trim()) {
+            console.warn(`[MultiModelSystem] Discarding ${assistantContent.length} chars of assistant content due to error`);
+            assistantContent = '';
+          }
+          
+          yield event;
+          return; // Don't continue with tool execution after error
         } else {
-          // Pass through other events (error)
+          // Pass through any other unknown event types
+          console.warn(`[MultiModelSystem] Unknown event type: ${event.type}`);
           yield event;
         }
       }
