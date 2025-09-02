@@ -217,6 +217,36 @@ describe('loadExtensions', () => {
     expect(loadedConfig.mcpServers?.['test-server'].cwd).toBe(expectedCwd);
   });
 
+  it('should load a linked extension correctly', async () => {
+    const sourceExtDir = createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'my-linked-extension',
+      version: '1.0.0',
+      contextFileName: 'context.md',
+    });
+    fs.writeFileSync(path.join(sourceExtDir, 'context.md'), 'linked context');
+
+    const extensionName = await installExtension({
+      source: sourceExtDir,
+      type: 'link',
+    });
+    expect(extensionName).toEqual('my-linked-extension');
+    const extensions = loadExtensions(tempHomeDir);
+    expect(extensions).toHaveLength(1);
+
+    const linkedExt = extensions[0];
+    expect(linkedExt.config.name).toBe('my-linked-extension');
+
+    expect(linkedExt.path).toBe(sourceExtDir);
+    expect(linkedExt.installMetadata).toEqual({
+      source: sourceExtDir,
+      type: 'link',
+    });
+    expect(linkedExt.contextFiles).toEqual([
+      path.join(sourceExtDir, 'context.md'),
+    ]);
+  });
+
   it('should resolve environment variables in extension configuration', () => {
     process.env.TEST_API_KEY = 'test-api-key-123';
     process.env.TEST_DB_URL = 'postgresql://localhost:5432/testdb';
@@ -402,12 +432,12 @@ describe('installExtension', () => {
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
     fs.mkdirSync(userExtensionsDir, { recursive: true });
     vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
-
     vi.mocked(execSync).mockClear();
   });
 
   afterEach(() => {
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    fs.rmSync(userExtensionsDir, { recursive: true, force: true });
   });
 
   it('should install an extension from a local path', async () => {
@@ -484,6 +514,31 @@ describe('installExtension', () => {
     expect(metadata).toEqual({
       source: gitUrl,
       type: 'git',
+    });
+    fs.rmSync(targetExtDir, { recursive: true, force: true });
+  });
+
+  it('should install a linked extension', async () => {
+    const sourceExtDir = createExtension({
+      extensionsDir: tempHomeDir,
+      name: 'my-linked-extension',
+      version: '1.0.0',
+    });
+    const targetExtDir = path.join(userExtensionsDir, 'my-linked-extension');
+    const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
+    const configPath = path.join(targetExtDir, EXTENSIONS_CONFIG_FILENAME);
+
+    await installExtension({ source: sourceExtDir, type: 'link' });
+
+    expect(fs.existsSync(targetExtDir)).toBe(true);
+    expect(fs.existsSync(metadataPath)).toBe(true);
+
+    expect(fs.existsSync(configPath)).toBe(false);
+
+    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+    expect(metadata).toEqual({
+      source: sourceExtDir,
+      type: 'link',
     });
     fs.rmSync(targetExtDir, { recursive: true, force: true });
   });
@@ -701,7 +756,9 @@ function createExtension({
   }
 
   if (contextFileName) {
-    fs.writeFileSync(path.join(extDir, contextFileName), 'context');
+    const contextPath = path.join(extDir, contextFileName);
+    fs.mkdirSync(path.dirname(contextPath), { recursive: true });
+    fs.writeFileSync(contextPath, 'context');
   }
   return extDir;
 }
