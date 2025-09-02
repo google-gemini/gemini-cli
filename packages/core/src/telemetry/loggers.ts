@@ -122,7 +122,12 @@ export function logUserPrompt(config: Config, event: UserPromptEvent): void {
     'event.name': EVENT_USER_PROMPT,
     'event.timestamp': new Date().toISOString(),
     prompt_length: event.prompt_length,
+    prompt_id: event.prompt_id,
   };
+
+  if (event.auth_type) {
+    attributes['auth_type'] = event.auth_type;
+  }
 
   if (shouldLogUserPrompts(config)) {
     attributes['prompt'] = event.prompt;
@@ -189,7 +194,6 @@ export function logFileOperation(
     event.lines,
     event.mimetype,
     event.extension,
-    event.diff_stat,
     event.programming_language,
   );
 }
