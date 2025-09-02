@@ -218,21 +218,20 @@ describe('loadExtensions', () => {
   });
 
   it('should load a linked extension correctly', async () => {
-    const sourceExtDir = createExtension(
-      tempHomeDir,
-      'my-linked-extension',
-      '1.0.0',
-      false,
-      'docs/context.md',
-    );
-    fs.writeFileSync(
-      path.join(sourceExtDir, 'docs', 'context.md'),
-      'linked context',
-    );
+    const sourceExtDir = createExtension({
+      extensionsDir: tempWorkspaceDir,
+      name: 'my-linked-extension',
+      version: '1.0.0',
+      contextFileName: 'context.md',
+    });
+    fs.writeFileSync(path.join(sourceExtDir, 'context.md'), 'linked context');
 
-    await installExtension({ source: sourceExtDir, type: 'link' });
-
-    const extensions = loadExtensions(tempWorkspaceDir);
+    const extensionName = await installExtension({
+      source: sourceExtDir,
+      type: 'link',
+    });
+    expect(extensionName).toEqual('my-linked-extension');
+    const extensions = loadExtensions(tempHomeDir);
     expect(extensions).toHaveLength(1);
 
     const linkedExt = extensions[0];
@@ -244,7 +243,7 @@ describe('loadExtensions', () => {
       type: 'link',
     });
     expect(linkedExt.contextFiles).toEqual([
-      path.join(sourceExtDir, 'docs', 'context.md'),
+      path.join(sourceExtDir, 'context.md'),
     ]);
   });
 
@@ -433,12 +432,12 @@ describe('installExtension', () => {
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
     fs.mkdirSync(userExtensionsDir, { recursive: true });
     vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
-
     vi.mocked(execSync).mockClear();
   });
 
   afterEach(() => {
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    fs.rmSync(userExtensionsDir, { recursive: true, force: true });
   });
 
   it('should install an extension from a local path', async () => {
@@ -520,11 +519,11 @@ describe('installExtension', () => {
   });
 
   it('should install a linked extension', async () => {
-    const sourceExtDir = createExtension(
-      tempHomeDir,
-      'my-linked-extension',
-      '1.0.0',
-    );
+    const sourceExtDir = createExtension({
+      extensionsDir: tempHomeDir,
+      name: 'my-linked-extension',
+      version: '1.0.0',
+    });
     const targetExtDir = path.join(userExtensionsDir, 'my-linked-extension');
     const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
     const configPath = path.join(targetExtDir, EXTENSIONS_CONFIG_FILENAME);

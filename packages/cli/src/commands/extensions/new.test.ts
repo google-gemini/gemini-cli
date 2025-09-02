@@ -17,11 +17,13 @@ describe('extensions new command', () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
-    mockedFs.readdir.mockResolvedValue([
+    const fakeFiles = [
       { name: 'context', isDirectory: () => true },
       { name: 'custom-commands', isDirectory: () => true },
       { name: 'mcp-server', isDirectory: () => true },
-    ] as any);
+    ];
+
+    mockedFs.readdir.mockResolvedValue(fakeFiles);
   });
 
   it('should fail if no path is provided', async () => {

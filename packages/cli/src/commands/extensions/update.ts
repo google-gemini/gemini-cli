@@ -32,11 +32,6 @@ export async function handleUpdate(args: UpdateArgs) {
     } catch (error) {
       console.error(getErrorMessage(error));
     }
-    console.log(
-      `Extension "${args.name}" successfully updated: ${updatedExtensionInfo.originalVersion} → ${updatedExtensionInfo.updatedVersion}.`,
-    );
-  } catch (error) {
-    console.error(getErrorMessage(error));
   }
   if (args.name)
     try {
