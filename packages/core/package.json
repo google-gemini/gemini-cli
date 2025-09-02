@@ -20,7 +20,7 @@
     "dist"
   ],
   "dependencies": {
-    "@google/genai": "1.13.0",
+    "@google/genai": "1.16.0",
     "@lvce-editor/ripgrep": "^1.6.0",
     "@modelcontextprotocol/sdk": "^1.11.0",
     "@opentelemetry/api": "^1.9.0",

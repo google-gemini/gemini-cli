@@ -125,6 +125,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           customThemes: {},
         },
@@ -179,6 +180,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...systemSettingsContent,
+        general: {},
         ui: {
           ...systemSettingsContent.ui,
           customThemes: {},
@@ -234,6 +236,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...userSettingsContent,
+        general: {},
         ui: {
           ...userSettingsContent.ui,
           customThemes: {},
@@ -294,6 +297,7 @@ describe('Settings Loading and Merging', () => {
           fileName: 'WORKSPACE_CONTEXT.md',
           includeDirectories: [],
         },
+        general: {},
         ui: {
           customThemes: {},
         },
@@ -351,6 +355,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           theme: 'dark',
           customThemes: {},
@@ -435,6 +440,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           theme: 'system-theme',
           customThemes: {},
@@ -695,6 +701,7 @@ describe('Settings Loading and Merging', () => {
         tools: {
           sandbox: false,
         },
+        general: {},
         ui: {
           customThemes: {},
           theme: 'system-theme',
@@ -1404,6 +1411,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           customThemes: {},
         },
@@ -1831,6 +1839,7 @@ describe('Settings Loading and Merging', () => {
         expect(settings.system.settings).toEqual(systemSettingsContent);
         expect(settings.merged).toEqual({
           ...systemSettingsContent,
+          general: {},
           ui: {
             ...systemSettingsContent.ui,
             customThemes: {},
