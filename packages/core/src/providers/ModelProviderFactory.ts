@@ -33,14 +33,14 @@ export class ModelProviderFactory {
 
     switch (config.type) {
       case ModelProviderType.OPENAI:
-        config.apiKey = process.env['GEMINI_API_KEY']
+        config.apiKey = process.env['OPENAI_API_KEY']
         provider = new OpenAIProvider(config, configInstance);
         break;
       case ModelProviderType.LM_STUDIO:
         provider = new LMStudioProvider(config, configInstance);
         break;
         case ModelProviderType.GEMINI:
-        config.apiKey = process.env['OPENAI_API_KEY']
+        config.apiKey = process.env['GEMINI_API_KEY']
         provider = new GeminiProvider(config, configInstance);
         break;
       case ModelProviderType.ANTHROPIC:
@@ -89,27 +89,27 @@ export class ModelProviderFactory {
       throw new Error('Model is required');
     }
 
-    switch (config.type) {
-      case ModelProviderType.OPENAI:
-        if (!config.apiKey) {
-          throw new Error('API key is required for OpenAI provider');
-        }
-        break;
-      case ModelProviderType.LM_STUDIO:
-        if (!config.baseUrl) {
-          throw new Error('Base URL is required for LM Studio provider');
-        }
-        break;
-      case ModelProviderType.GEMINI:
-        // Gemini validation handled by GeminiClient
-        break;
-      case ModelProviderType.ANTHROPIC:
-      case ModelProviderType.CUSTOM:
-        throw new Error(`Provider ${config.type} is not yet supported`);
-      default: {
-        const exhaustiveCheck: never = config.type;
-        throw new Error(`Unknown provider type: ${exhaustiveCheck}`);
-      }
-    }
+    // switch (config.type) {
+    //   case ModelProviderType.OPENAI:
+    //     if (!config.apiKey) {
+    //       throw new Error('API key is required for OpenAI provider');
+    //     }
+    //     break;
+    //   case ModelProviderType.LM_STUDIO:
+    //     if (!config.baseUrl) {
+    //       throw new Error('Base URL is required for LM Studio provider');
+    //     }
+    //     break;
+    //   case ModelProviderType.GEMINI:
+    //     // Gemini validation handled by GeminiClient
+    //     break;
+    //   case ModelProviderType.ANTHROPIC:
+    //   case ModelProviderType.CUSTOM:
+    //     throw new Error(`Provider ${config.type} is not yet supported`);
+    //   default: {
+    //     const exhaustiveCheck: never = config.type;
+    //     throw new Error(`Unknown provider type: ${exhaustiveCheck}`);
+    //   }
+    // }
   }
 }
