@@ -21,6 +21,8 @@ interface Keytar {
   ): Promise<Array<{ account: string; password: string }>>;
 }
 
+const KEYCHAIN_TEST_PREFIX = "__keychain_test__";
+
 export class KeychainTokenStorage extends BaseTokenStorage {
   private keychainAvailable: boolean | null = null;
   private keytarModule: Keytar | null = null;
@@ -133,7 +135,9 @@ export class KeychainTokenStorage extends BaseTokenStorage {
 
     try {
       const credentials = await keytar.findCredentials(this.serviceName);
-      return credentials.map((cred: { account: string }) => cred.account);
+      return credentials
+        .filter((cred) => !cred.account.startsWith(KEYCHAIN_TEST_PREFIX))
+        .map((cred: { account: string }) => cred.account);
     } catch (error) {
       console.error('Failed to list servers from keychain:', error);
       return [];
@@ -153,7 +157,9 @@ export class KeychainTokenStorage extends BaseTokenStorage {
     }
 
     try {
-      const credentials = await keytar.findCredentials(this.serviceName);
+      const credentials = (
+        await keytar.findCredentials(this.serviceName)
+      ).filter((c) => !c.account.startsWith(KEYCHAIN_TEST_PREFIX));
 
       for (const cred of credentials) {
         try {
@@ -198,6 +204,8 @@ export class KeychainTokenStorage extends BaseTokenStorage {
     }
   }
 
+  // Checks whether or not a set-get-delete cycle with the keychain works.
+  // Returns false if any operation fails.
   async checkKeychainAvailability(): Promise<boolean> {
     if (this.keychainAvailable !== null) {
       return this.keychainAvailable;
@@ -210,14 +218,14 @@ export class KeychainTokenStorage extends BaseTokenStorage {
         return false;
       }
 
-      const testAccount = `__keychain_test__${crypto.randomBytes(8).toString('hex')}`;
+      const testAccount = `${KEYCHAIN_TEST_PREFIX}${crypto.randomBytes(8).toString('hex')}`;
       const testPassword = 'test';
 
       await keytar.setPassword(this.serviceName, testAccount, testPassword);
       const retrieved = await keytar.getPassword(this.serviceName, testAccount);
-      await keytar.deletePassword(this.serviceName, testAccount);
+      const deleted = await keytar.deletePassword(this.serviceName, testAccount);
 
-      const success = retrieved === testPassword;
+      const success = deleted && retrieved === testPassword;
       this.keychainAvailable = success;
       return success;
     } catch (_error) {
