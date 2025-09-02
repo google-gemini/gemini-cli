@@ -10,38 +10,56 @@ import type {
   UniversalStreamEvent,
   ProviderCapabilities,
   ConnectionStatus,
-  ModelProviderConfig
+  ModelProviderConfig,
+  ToolCall
 } from './types.js';
 import { BaseModelProvider } from './BaseModelProvider.js';
-import type { GeminiClient } from '../core/client.js';
 import type { Config } from '../config/config.js';
-import type { PartListUnion, Content } from '@google/genai';
-import type { ServerGeminiStreamEvent } from '../core/turn.js';
-import { GeminiEventType } from '../core/turn.js';
+import { GoogleGenAI } from '@google/genai';
+import type { 
+  Content,
+  GenerateContentResponse,
+  GenerateContentParameters,
+  Models,
+  GenerateContentConfig
+} from '@google/genai';
+
 
 export class GeminiProvider extends BaseModelProvider {
-  private geminiClient: GeminiClient;
+  private googleAI: GoogleGenAI;
+  private generativeModel: Models;
 
-  constructor(config: ModelProviderConfig, geminiClient: GeminiClient, configInstance?: Config) {
+  constructor(config: ModelProviderConfig, configInstance?: Config) {
     super(config, configInstance);
-    this.geminiClient = geminiClient;
+    
+    if (!config.apiKey) {
+      throw new Error('API key is required for Gemini provider');
+    }
+    
+    // Initialize Google AI client - following contentGenerator.ts pattern
+    this.googleAI = new GoogleGenAI({ apiKey: config.apiKey });
+    this.generativeModel = this.googleAI.models;
   }
 
   async initialize(): Promise<void> {
-    // GeminiClient is already initialized
+    // Initialize tools if available
+    if (this.configInstance) {
+      this.setTools();
+    }
     return Promise.resolve();
   }
 
   async testConnection(): Promise<boolean> {
     try {
-      // Test with a minimal message
-      const testMessages: UniversalMessage[] = [
-        { role: 'user', content: 'test' }
-      ];
-      const signal = new AbortController().signal;
-      await this.sendMessage(testMessages, signal);
-      return true;
-    } catch {
+      // Test with a minimal message using the generative model
+      const result = await this.generativeModel.generateContent({
+        model: this.config.model,
+        contents: [{ role: 'user', parts: [{ text: 'test' }] }],
+        config: {}
+      });
+      return !!result;
+    } catch (error) {
+      console.error('Gemini connection test failed:', error);
       return false;
     }
   }
@@ -71,29 +89,51 @@ export class GeminiProvider extends BaseModelProvider {
     messages: UniversalMessage[],
     signal: AbortSignal
   ): Promise<UniversalResponse> {
-    const geminiContent = this.convertToGeminiContent(messages);
-    const promptId = `provider_${Date.now()}`;
-
-    let fullContent = '';
-    const finishReason: UniversalResponse['finishReason'] = 'stop';
-
     try {
-      const stream = this.geminiClient.sendMessageStream(geminiContent, signal, promptId);
+      const geminiData = this.convertToGeminiMessages(messages);
+      const request = this.buildGenerateContentRequest(geminiData);
       
-      for await (const event of stream) {
-        if (event.type === GeminiEventType.Content) {
-          fullContent += event.value;
-        } else if (event.type === GeminiEventType.Error) {
-          throw new Error(event.value?.error?.message || 'Gemini stream error');
+      // Generate content with abort signal support
+      const result = await this.generateContentWithSignal(request, signal);
+      
+      let fullContent = '';
+      const toolCalls: ToolCall[] = [];
+      
+      // Process response parts
+      if (result.candidates?.[0]?.content?.parts) {
+        for (const part of result.candidates[0].content.parts) {
+          if (part.text) {
+            fullContent += part.text;
+          } else if (part.functionCall) {
+            toolCalls.push({
+              id: `gemini_call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              name: part.functionCall.name!,
+              arguments: part.functionCall.args || {}
+            });
+          }
         }
       }
       
       return {
         content: fullContent,
-        finishReason,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        finishReason: this.mapFinishReason(result.candidates?.[0]?.finishReason),
         model: this.config.model
       };
     } catch (error) {
+      // Log detailed error information for debugging
+      console.error(`[GeminiProvider] sendMessage failed:`, error);
+      
+      // If it's a 400 error related to function calls, log the request details
+      if (error instanceof Error && error.message.includes('function response parts') || 
+          error instanceof Error && error.message.includes('function call parts')) {
+        console.error(`[GeminiProvider] Function call/response mismatch error detected`);
+        console.error(`[GeminiProvider] Original messages count: ${messages.length}`);
+        messages.forEach((msg, index) => {
+          console.error(`  Message[${index}]: role=${msg.role}, hasToolCalls=${!!msg.toolCalls}, toolCallsCount=${msg.toolCalls?.length || 0}, tool_call_id=${msg.tool_call_id || 'none'}`);
+        });
+      }
+      
       throw this.createError('Failed to send message to Gemini', error);
     }
   }
@@ -102,35 +142,73 @@ export class GeminiProvider extends BaseModelProvider {
     messages: UniversalMessage[],
     signal: AbortSignal
   ): AsyncGenerator<UniversalStreamEvent> {
-    const geminiContent = this.convertToGeminiContent(messages);
-    const promptId = `provider_stream_${Date.now()}`;
-
     try {
-      const stream = this.geminiClient.sendMessageStream(geminiContent, signal, promptId);
-      let fullContent = '';
+      const geminiData = this.convertToGeminiMessages(messages);
+      const request = this.buildGenerateContentRequest(geminiData);
       
-      for await (const event of stream) {
-        const universalEvent = this.convertGeminiEventToUniversal(event);
-        
-        if (universalEvent.type === 'content' && universalEvent.content) {
-          fullContent += universalEvent.content;
-        }
-        
-        yield universalEvent;
-        
-        if (universalEvent.type === 'done') {
-          yield {
-            type: 'done',
-            response: {
-              content: fullContent,
-              finishReason: 'stop',
-              model: this.config.model
-            }
-          };
+      // Generate content stream with abort signal support
+      const streamResult = await this.generateContentStreamWithSignal(request, signal);
+      
+      let fullContent = '';
+      const toolCalls: ToolCall[] = [];
+      
+      // Process stream
+      for await (const chunk of streamResult) {
+        if (signal.aborted) {
+          yield { type: 'error', error: new Error('Request aborted') };
           return;
         }
+        
+        const candidate = chunk.candidates?.[0];
+        if (!candidate?.content?.parts) continue;
+        
+        for (const part of candidate.content.parts) {
+          if (part.text) {
+            fullContent += part.text;
+            yield {
+              type: 'content',
+              content: part.text
+            };
+          } else if (part.functionCall) {
+            const toolCall: ToolCall = {
+              id: `gemini_call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              name: part.functionCall.name!,
+              arguments: part.functionCall.args || {}
+            };
+            toolCalls.push(toolCall);
+            
+            yield {
+              type: 'tool_call',
+              toolCall
+            };
+          }
+        }
       }
+      
+      // Final response - stream is done, yield final response
+      yield {
+        type: 'done',
+        response: {
+          content: fullContent,
+          toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+          finishReason: 'stop',
+          model: this.config.model
+        }
+      };
     } catch (error) {
+      // Log detailed error information for debugging
+      console.error(`[GeminiProvider] sendMessageStream failed:`, error);
+      
+      // If it's a 400 error related to function calls, log the request details
+      if (error instanceof Error && error.message.includes('function response parts') || 
+          error instanceof Error && error.message.includes('function call parts')) {
+        console.error(`[GeminiProvider] Function call/response mismatch error detected in stream`);
+        console.error(`[GeminiProvider] Original messages count: ${messages.length}`);
+        messages.forEach((msg, index) => {
+          console.error(`  Message[${index}]: role=${msg.role}, hasToolCalls=${!!msg.toolCalls}, toolCallsCount=${msg.toolCalls?.length || 0}, tool_call_id=${msg.tool_call_id || 'none'}`);
+        });
+      }
+      
       yield {
         type: 'error',
         error: this.createError('Gemini stream error', error)
@@ -199,10 +277,26 @@ export class GeminiProvider extends BaseModelProvider {
   }
 
   setTools(): void {
-    // GeminiClient already has its own setTools method that uses the config
-    // We delegate to the GeminiClient's setTools method
-    this.geminiClient.setTools();
-    console.log(`[GeminiProvider] Delegated setTools to GeminiClient`);
+    if (!this.configInstance) return;
+    
+    const toolRegistry = this.configInstance.getToolRegistry();
+    this.toolDeclarations = toolRegistry.getFunctionDeclarations();
+    console.log(`[GeminiProvider] Loaded ${this.toolDeclarations.length} tool declarations:`, 
+      this.toolDeclarations.map(tool => tool.name));
+  }
+
+  override updateConfig(config: ModelProviderConfig): void {
+    super.updateConfig(config);
+    
+    // Reinitialize GoogleGenAI client if API key changed
+    if (config.apiKey !== this.config.apiKey) {
+      this.googleAI = new GoogleGenAI({ apiKey: config.apiKey });
+    }
+    
+    // Update generative model if model changed
+    if (config.model !== this.config.model || config.apiKey !== this.config.apiKey) {
+      this.generativeModel = this.googleAI.models;
+    }
   }
 
   protected getCapabilities(): ProviderCapabilities {
@@ -216,83 +310,6 @@ export class GeminiProvider extends BaseModelProvider {
     };
   }
 
-  private convertToGeminiContent(messages: UniversalMessage[]): PartListUnion {
-    const systemMessages = messages.filter(m => m.role === 'system');
-    const conversationMessages = messages.filter(m => m.role !== 'system');
-
-    let systemPrompt = '';
-    if (systemMessages.length > 0) {
-      systemPrompt = systemMessages.map(m => m.content).join('\n\n');
-    }
-
-    const geminiContent: Content[] = conversationMessages.map(msg => ({
-      role: msg.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
-
-    if (systemPrompt && geminiContent.length > 0 && geminiContent[0].role === 'user') {
-      geminiContent[0].parts = [
-        { text: systemPrompt + '\n\n' + (geminiContent[0].parts?.[0]?.text || '') }
-      ];
-    }
-
-    return geminiContent as PartListUnion;
-  }
-
-  private convertGeminiEventToUniversal(event: ServerGeminiStreamEvent): UniversalStreamEvent {
-    switch (event.type) {
-      case GeminiEventType.Content:
-        return {
-          type: 'content',
-          content: event.value
-        };
-      case GeminiEventType.Finished:
-        return {
-          type: 'done',
-          response: {
-            content: '',
-            finishReason: this.convertFinishReason(event.value),
-            model: this.config.model
-          }
-        };
-      case GeminiEventType.Error:
-        return {
-          type: 'error',
-          error: new Error(event.value?.error?.message || 'Gemini stream error')
-        };
-      case GeminiEventType.ToolCallRequest:
-        return {
-          type: 'tool_call',
-          toolCall: {
-            id: `gemini_call_${Date.now()}`,
-            name: event.value?.name || 'unknown',
-            arguments: event.value?.args || {}
-          }
-        };
-      default:
-        return {
-          type: 'content',
-          content: ''
-        };
-    }
-  }
-
-  private convertFinishReason(reason?: import('@google/genai').FinishReason): 'stop' | 'length' | 'tool_calls' | 'content_filter' {
-    if (!reason) return 'stop';
-    
-    switch (reason) {
-      case 'STOP':
-        return 'stop';
-      case 'MAX_TOKENS':
-        return 'length';
-      case 'SAFETY':
-        return 'content_filter';
-      case 'RECITATION':
-        return 'content_filter';
-      default:
-        return 'stop';
-    }
-  }
 
   private getMaxTokensForModel(): number {
     const model = this.config.model.toLowerCase();
@@ -303,4 +320,305 @@ export class GeminiProvider extends BaseModelProvider {
     
     return 32768;
   }
+
+  // New helper methods for independent functionality
+  
+  private convertToGeminiMessages(messages: UniversalMessage[]): { contents: Content[], systemInstruction?: string } {
+    const contents: Content[] = [];
+    let systemInstruction = '';
+    
+    // Extract system messages
+    const systemMessages = messages.filter(m => m.role === 'system');
+    if (systemMessages.length > 0) {
+      systemInstruction = systemMessages.map(m => m.content).join('\n\n');
+    }
+    
+    // Convert conversation messages
+    for (const msg of messages.filter(m => m.role !== 'system')) {
+      if (msg.role === 'user') {
+        contents.push({
+          role: 'user',
+          parts: [{ text: msg.content }]
+        });
+      } else if (msg.role === 'assistant') {
+        const parts: any[] = [];
+        
+        // Add text content if present
+        if (msg.content && msg.content.trim()) {
+          parts.push({ text: msg.content });
+        }
+        
+        // Add tool calls as function calls if present
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          for (const toolCall of msg.toolCalls) {
+            parts.push({
+              functionCall: {
+                id: toolCall.id,
+                name: toolCall.name,
+                args: toolCall.arguments
+              }
+            });
+          }
+        }
+        
+        // Only add the message if we have parts
+        if (parts.length > 0) {
+          contents.push({
+            role: 'model',
+            parts: parts
+          });
+        }
+      } else if (msg.role === 'tool') {
+        // Tool responses should be handled as function responses from user role
+        // Check if this is a Gemini-formatted function response
+        try {
+          const parsedContent = JSON.parse(msg.content);
+          if (parsedContent.__gemini_function_response) {
+            contents.push({
+              role: 'user',
+              parts: [{
+                functionResponse: parsedContent.__gemini_function_response
+              }]
+            });
+          } else {
+            // Standard tool response
+            contents.push({
+              role: 'user',
+              parts: [{
+                functionResponse: {
+                  id: msg.tool_call_id || 'unknown_id',
+                  name: msg.name || 'unknown',
+                  response: parsedContent
+                }
+              }]
+            });
+          }
+        } catch {
+          // Not JSON, treat as plain text response
+          contents.push({
+            role: 'user',
+            parts: [{
+              functionResponse: {
+                id: msg.tool_call_id || 'unknown_id',
+                name: msg.name || 'unknown',
+                response: { result: msg.content }
+              }
+            }]
+          });
+        }
+      }
+    }
+    
+    // Debug logging for function call/response matching
+    console.log(`[GeminiProvider] Generated ${contents.length} contents for API request`);
+    
+    let functionCallCount = 0;
+    let functionResponseCount = 0;
+    
+    contents.forEach((content, index) => {
+      const functionCalls = content.parts?.filter(part => part.functionCall) || [];
+      const functionResponses = content.parts?.filter(part => part.functionResponse) || [];
+      
+      if (functionCalls.length > 0) {
+        functionCallCount += functionCalls.length;
+        console.log(`[GeminiProvider] Content[${index}] (role: ${content.role}) has ${functionCalls.length} functionCall(s):`);
+        functionCalls.forEach((part, partIndex) => {
+          console.log(`  - functionCall[${partIndex}]: name="${part.functionCall?.name}", id="${part.functionCall?.id}"`);
+        });
+      }
+      
+      if (functionResponses.length > 0) {
+        functionResponseCount += functionResponses.length;
+        console.log(`[GeminiProvider] Content[${index}] (role: ${content.role}) has ${functionResponses.length} functionResponse(s):`);
+        functionResponses.forEach((part, partIndex) => {
+          console.log(`  - functionResponse[${partIndex}]: name="${part.functionResponse?.name}", id="${part.functionResponse?.id}"`);
+        });
+      }
+      
+      if (content.parts && content.parts.length > 0) {
+        const partTypes = content.parts.map(part => {
+          if (part.text) return 'text';
+          if (part.functionCall) return 'functionCall';
+          if (part.functionResponse) return 'functionResponse';
+          return 'other';
+        }).join(', ');
+        console.log(`[GeminiProvider] Content[${index}] (role: ${content.role}) parts: [${partTypes}]`);
+      }
+    });
+    
+    console.log(`[GeminiProvider] Total function calls: ${functionCallCount}, Total function responses: ${functionResponseCount}`);
+    
+    if (functionCallCount !== functionResponseCount && (functionCallCount > 0 || functionResponseCount > 0)) {
+      console.warn(`[GeminiProvider] ⚠️  Function call/response count mismatch! Calls: ${functionCallCount}, Responses: ${functionResponseCount}`);
+      console.warn(`[GeminiProvider] This may cause the 400 error from Gemini API`);
+    }
+    
+    return { contents, systemInstruction: systemInstruction || undefined };
+  }
+  
+  private buildGenerateContentRequest(geminiData: { contents: Content[], systemInstruction?: string }): GenerateContentParameters {
+    const config: GenerateContentConfig = {
+      temperature: 0.7,
+      topP: 0.8,
+      topK: 40,
+      maxOutputTokens: 4096
+    };
+    
+    // Add system instruction
+    if (geminiData.systemInstruction) {
+      config.systemInstruction = {
+        role: 'user',
+        parts: [{ text: geminiData.systemInstruction }]
+      };
+    }
+    
+    // Add tools if available
+    if (this.toolDeclarations && this.toolDeclarations.length > 0) {
+      config.tools = [{
+        functionDeclarations: this.toolDeclarations
+          .filter(tool => tool.name && tool.description) // Filter out invalid tools
+          .map(tool => {
+            // Clean and validate parameters schema for Gemini API
+            const params = this.sanitizeParametersSchema(tool.parametersJsonSchema || {});
+            return {
+              name: tool.name!,
+              description: tool.description!,
+              parameters: params
+            };
+          })
+      }];
+    }
+    
+    return {
+      model: this.config.model,
+      contents: geminiData.contents,
+      config
+    };
+  }
+  
+  private async generateContentWithSignal(
+    request: GenerateContentParameters, 
+    signal: AbortSignal
+  ): Promise<GenerateContentResponse> {
+    // Create a promise that rejects when the signal is aborted
+    const abortPromise = new Promise<never>((_, reject) => {
+      if (signal.aborted) {
+        reject(new Error('Request aborted'));
+        return;
+      }
+      signal.addEventListener('abort', () => reject(new Error('Request aborted')));
+    });
+    
+    // Add abort signal to config
+    const requestWithSignal: GenerateContentParameters = {
+      ...request,
+      config: {
+        ...request.config,
+        abortSignal: signal
+      }
+    };
+    
+    // Race the generation against the abort signal
+    return Promise.race([
+      this.generativeModel.generateContent(requestWithSignal),
+      abortPromise
+    ]);
+  }
+  
+  private async generateContentStreamWithSignal(
+    request: GenerateContentParameters, 
+    signal: AbortSignal
+  ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    // Create a promise that rejects when the signal is aborted
+    const abortPromise = new Promise<never>((_, reject) => {
+      if (signal.aborted) {
+        reject(new Error('Request aborted'));
+        return;
+      }
+      signal.addEventListener('abort', () => reject(new Error('Request aborted')));
+    });
+    
+    // Add abort signal to config
+    const requestWithSignal: GenerateContentParameters = {
+      ...request,
+      config: {
+        ...request.config,
+        abortSignal: signal
+      }
+    };
+    
+    // Race the generation against the abort signal
+    return Promise.race([
+      this.generativeModel.generateContentStream(requestWithSignal),
+      abortPromise
+    ]);
+  }
+  
+  private mapFinishReason(reason?: string): UniversalResponse['finishReason'] {
+    switch (reason) {
+      case 'STOP':
+        return 'stop';
+      case 'MAX_TOKENS':
+        return 'length';
+      case 'SAFETY':
+      case 'RECITATION':
+        return 'content_filter';
+      case 'OTHER':
+      default:
+        return 'stop';
+    }
+  }
+
+  /**
+   * Sanitize parameters schema for Gemini API compatibility
+   * Gemini API has stricter requirements for nested array schemas
+   */
+  private sanitizeParametersSchema(schema: unknown): Record<string, unknown> {
+    if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+      return { type: 'object', properties: {} };
+    }
+
+    const sanitized = JSON.parse(JSON.stringify(schema));
+
+    // Recursively fix array schemas that might have missing 'items' fields
+    const fixArraySchema = (obj: any): void => {
+      if (typeof obj !== 'object' || !obj) return;
+
+      if (Array.isArray(obj)) {
+        obj.forEach(fixArraySchema);
+        return;
+      }
+
+      for (const [, value] of Object.entries(obj)) {
+        if (typeof value === 'object' && value) {
+          const schemaValue = value as any;
+          
+          // If it's an array type but missing items, add empty items schema
+          if (schemaValue.type === 'array' && !schemaValue.items) {
+            schemaValue.items = { type: 'string' }; // Default to string type
+          }
+          
+          // If items itself is an array type but missing nested items, fix it
+          if (schemaValue.items && schemaValue.items.type === 'array' && !schemaValue.items.items) {
+            schemaValue.items.items = { type: 'string' }; // Default nested items
+          }
+          
+          fixArraySchema(schemaValue);
+        }
+      }
+    };
+
+    fixArraySchema(sanitized);
+
+    // Ensure the root is always an object schema
+    if (!sanitized.type) {
+      sanitized.type = 'object';
+    }
+    if (sanitized.type === 'object' && !sanitized.properties) {
+      sanitized.properties = {};
+    }
+
+    return sanitized as Record<string, unknown>;
+  }
+  
 }
