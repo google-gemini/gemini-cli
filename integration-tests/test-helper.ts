@@ -5,11 +5,11 @@
  */
 
 import { execSync, spawn } from 'node:child_process';
-import { parse } from 'shell-quote';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
+import { EOL } from 'node:os';
 import fs from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -173,7 +173,17 @@ export class TestRig {
 
   sync() {
     // ensure file system is done before spawning
-    execSync('sync', { cwd: this.testDir! });
+    // Note: 'sync' command doesn't exist on Windows, so skip it there
+    if (process.platform !== 'win32') {
+      try {
+        execSync('sync', { cwd: this.testDir! });
+      } catch (error) {
+        // Ignore sync errors - it's just a best-effort filesystem flush
+        if (env['VERBOSE'] === 'true') {
+          console.warn('Sync command failed:', (error as Error).message);
+        }
+      }
+    }
   }
 
   run(
@@ -182,36 +192,35 @@ export class TestRig {
       | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
     ...args: string[]
   ): Promise<string> {
-    let command = `node ${this.bundlePath} --yolo`;
-    const execOptions: {
-      cwd: string;
-      encoding: 'utf-8';
-      input?: string;
-    } = {
-      cwd: this.testDir!,
-      encoding: 'utf-8',
-    };
+    // Pre-spawn existence check for clearer error messages
+    if (!fs.existsSync(this.bundlePath)) {
+      throw new Error(`CLI bundle not found: ${this.bundlePath}`);
+    }
+
+    // Build argv array directly instead of command string to avoid shell parsing issues on Windows
+    const argv: string[] = [this.bundlePath, '--yolo'];
+    
+    let stdinInput: string | undefined;
 
     if (typeof promptOrOptions === 'string') {
-      command += ` --prompt ${JSON.stringify(promptOrOptions)}`;
+      argv.push('--prompt', promptOrOptions);
     } else if (
       typeof promptOrOptions === 'object' &&
       promptOrOptions !== null
     ) {
       if (promptOrOptions.prompt) {
-        command += ` --prompt ${JSON.stringify(promptOrOptions.prompt)}`;
+        argv.push('--prompt', promptOrOptions.prompt);
       }
       if (promptOrOptions.stdin) {
-        execOptions.input = promptOrOptions.stdin;
+        stdinInput = promptOrOptions.stdin;
       }
     }
 
-    command += ` ${args.join(' ')}`;
+    // Add any additional arguments
+    argv.push(...args);
 
-    const commandArgs = parse(command);
-    const node = commandArgs.shift() as string;
-
-    const child = spawn(node, commandArgs as string[], {
+    // Spawn the process directly with argument array (avoids shell parsing on Windows)
+    const child = spawn(process.execPath, argv, {
       cwd: this.testDir!,
       stdio: 'pipe',
     });
@@ -220,13 +229,13 @@ export class TestRig {
     let stderr = '';
 
     // Handle stdin if provided
-    if (execOptions.input) {
-      child.stdin!.write(execOptions.input);
+    if (stdinInput) {
+      child.stdin!.write(stdinInput);
     }
 
     if (
       typeof promptOrOptions === 'object' &&
-      !promptOrOptions.stdinDoesNotEnd
+      !promptOrOptions?.stdinDoesNotEnd
     ) {
       child.stdin!.end();
     }
