@@ -21,7 +21,7 @@ interface Keytar {
   ): Promise<Array<{ account: string; password: string }>>;
 }
 
-const KEYCHAIN_TEST_PREFIX = "__keychain_test__";
+const KEYCHAIN_TEST_PREFIX = '__keychain_test__';
 
 export class KeychainTokenStorage extends BaseTokenStorage {
   private keychainAvailable: boolean | null = null;
@@ -223,7 +223,10 @@ export class KeychainTokenStorage extends BaseTokenStorage {
 
       await keytar.setPassword(this.serviceName, testAccount, testPassword);
       const retrieved = await keytar.getPassword(this.serviceName, testAccount);
-      const deleted = await keytar.deletePassword(this.serviceName, testAccount);
+      const deleted = await keytar.deletePassword(
+        this.serviceName,
+        testAccount,
+      );
 
       const success = deleted && retrieved === testPassword;
       this.keychainAvailable = success;
