@@ -26,6 +26,31 @@ export const KITTY_KEYCODE_TAB = 9;
 export const KITTY_KEYCODE_BACKSPACE = 127;
 
 /**
+ * Kitty modifier decoding constants
+ *
+ * In Kitty/Ghostty, the modifier parameter is encoded as (1 + bitmask).
+ * Some terminals also set bit 7 (i.e., add 128) when reporting event types.
+ */
+export const KITTY_MODIFIER_BASE = 1; // Base value per spec before bitmask decode
+export const KITTY_MODIFIER_EVENT_TYPES_OFFSET = 128; // Added when event types are included
+
+/**
+ * Modifier bit flags for Kitty/Xterm-style parameters.
+ *
+ * Per spec, the modifiers parameter encodes (1 + bitmask) where:
+ * - 1: no modifiers
+ * - bit 0 (1): Shift
+ * - bit 1 (2): Alt/Option (reported as "alt" in spec; we map to meta)
+ * - bit 2 (4): Ctrl
+ *
+ * Some terminals add 128 to the entire modifiers field when reporting event types.
+ * See: https://sw.kovidgoyal.net/kitty/keyboard-protocol/#modifiers
+ */
+export const MODIFIER_SHIFT_BIT = 1;
+export const MODIFIER_ALT_BIT = 2;
+export const MODIFIER_CTRL_BIT = 4;
+
+/**
  * Timing constants for terminal interactions
  */
 export const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
@@ -49,7 +74,9 @@ export const BACKSLASH_ENTER_DETECTION_WINDOW_MS = 5;
  * Longest reasonable: \x1b[127;15~ = 11 chars (Del with all modifiers)
  * We use 12 to provide a small buffer.
  */
-export const MAX_KITTY_SEQUENCE_LENGTH = 12;
+// Increased to accommodate parameterized forms and occasional colon subfields
+// while still being small enough to avoid pathological buffering.
+export const MAX_KITTY_SEQUENCE_LENGTH = 32;
 
 /**
  * Character codes for common escape sequences
