@@ -12,9 +12,10 @@ import { CommandKind } from './types.js';
 export const compressCommand: SlashCommand = {
   name: 'compress',
   altNames: ['summarize'],
-  description: 'Compresses the context by replacing it with a summary.',
+  description:
+    'Compresses the context by replacing it with a summary. Optional: /compress [instruction for compression]',
   kind: CommandKind.BUILT_IN,
-  action: async (context) => {
+  action: async (context, instructions) => {
     const { ui } = context;
     if (ui.pendingItem) {
       ui.addItem(
@@ -42,7 +43,7 @@ export const compressCommand: SlashCommand = {
       const promptId = `compress-${Date.now()}`;
       const compressed = await context.services.config
         ?.getGeminiClient()
-        ?.tryCompressChat(promptId, true);
+        ?.tryCompressChat(promptId, true, { instructions });
       if (compressed) {
         ui.addItem(
           {

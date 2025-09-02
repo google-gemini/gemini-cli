@@ -779,6 +779,7 @@ export class GeminiClient {
   async tryCompressChat(
     prompt_id: string,
     force: boolean = false,
+    { instructions }: { instructions?: string } = {},
   ): Promise<ChatCompressionInfo> {
     const curatedHistory = this.getChat().getHistory(true);
 
@@ -852,7 +853,7 @@ export class GeminiClient {
           text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
         },
         config: {
-          systemInstruction: { text: getCompressionPrompt() },
+          systemInstruction: { text: getCompressionPrompt(instructions) },
           maxOutputTokens: originalTokenCount,
         },
       },

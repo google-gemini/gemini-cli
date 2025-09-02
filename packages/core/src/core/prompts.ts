@@ -300,7 +300,8 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
  * This prompt instructs the model to act as a specialized state manager,
  * think in a scratchpad, and produce a structured XML summary.
  */
-export function getCompressionPrompt(): string {
+export function getCompressionPrompt(compressionInstructions?: string): string {
+  const instructions = compressionInstructions?.trim();
   return `
 You are the component that summarizes internal chat history into a given structure.
 
@@ -309,7 +310,15 @@ When the conversation history grows too large, you will be invoked to distill th
 First, you will think through the entire history in a private <scratchpad>. Review the user's overall goal, the agent's actions, tool outputs, file modifications, and any unresolved questions. Identify every piece of information that is essential for future actions.
 
 After your reasoning is complete, generate the final <state_snapshot> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.
-
+${
+  instructions
+    ? `When summarizing, you MUST adhere to the following custom instructions provided by the user.
+<user_instruction>
+    ${instructions}
+</user_instruction>
+`
+    : ''
+}
 The structure MUST be as follows:
 
 <state_snapshot>
