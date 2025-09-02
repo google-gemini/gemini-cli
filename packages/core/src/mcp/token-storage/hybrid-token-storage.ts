@@ -6,10 +6,7 @@
 
 import { BaseTokenStorage } from './base-token-storage.js';
 import { FileTokenStorage } from './file-token-storage.js';
-import type {
-  TokenStorage,
-  OAuthCredentials,
-} from './types.js';
+import type { TokenStorage, OAuthCredentials } from './types.js';
 import { TokenStorageType } from './types.js';
 
 export class HybridTokenStorage extends BaseTokenStorage {
@@ -46,7 +43,9 @@ export class HybridTokenStorage extends BaseTokenStorage {
 
     try {
       // Dynamically import KeychainTokenStorage to avoid initialization issues
-      const { KeychainTokenStorage } = await import('./keychain-token-storage.js');
+      const { KeychainTokenStorage } = await import(
+        './keychain-token-storage.js'
+      );
       const keychainStorage = new KeychainTokenStorage(this.serviceName);
 
       const isAvailable = await keychainStorage.isAvailable();
@@ -100,9 +99,7 @@ export class HybridTokenStorage extends BaseTokenStorage {
     return storage;
   }
 
-  async getCredentials(
-    serverName: string,
-  ): Promise<OAuthCredentials | null> {
+  async getCredentials(serverName: string): Promise<OAuthCredentials | null> {
     const storage = await this.getStorage();
     return storage.getCredentials(serverName);
   }
