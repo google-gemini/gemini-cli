@@ -267,11 +267,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
     };
     
     const formatLabels = {
-      harmony: 'Harmony Tool',
-      openai: 'OpenAI Tool',
-      gemini: 'Gemini Tool',
-      qwen: 'Qwen Tool',
-      unknown: 'Tool Response'
+      harmony: 'Tool',
+      openai: 'Tool',
+      gemini: 'Tool',
+      qwen: 'Tool',
+      unknown: 'Tool'
     };
 
     return (
@@ -406,18 +406,38 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
             {message.toolCalls && message.toolCalls.length > 0 && (
               <div className="mt-3 pt-3 border-t border-border/50">
                 <div className="text-xs text-muted-foreground mb-2">Tool Calls:</div>
-                {message.toolCalls.map((toolCall, index) => (
-                  <div key={index} className="mb-2 last:mb-0">
-                    <div className="text-xs font-mono bg-muted rounded px-2 py-1">
-                      {toolCall.name}({JSON.stringify(toolCall.arguments)})
-                    </div>
-                    {toolCall.result && (
-                      <div className="text-xs mt-1 pl-2 border-l-2 border-border">
-                        {toolCall.result}
+                {message.toolCalls.map((toolCall, index) => {
+                  const formatArguments = (args: any) => {
+                    if (!args || typeof args !== 'object') return '';
+                    
+                    // Show key parameters in a readable format
+                    const entries = Object.entries(args).slice(0, 3); // Show first 3 params
+                    if (entries.length === 0) return '';
+                    
+                    const formatted = entries.map(([key, value]) => {
+                      if (typeof value === 'string' && value.length > 30) {
+                        return `${key}: "${value.slice(0, 27)}..."`;
+                      }
+                      return `${key}: ${JSON.stringify(value)}`;
+                    }).join(', ');
+                    
+                    const hasMore = Object.keys(args).length > 3;
+                    return hasMore ? `${formatted}, ...` : formatted;
+                  };
+                  
+                  return (
+                    <div key={index} className="mb-2 last:mb-0">
+                      <div className="text-xs font-mono bg-muted rounded px-2 py-1">
+                        {toolCall.name}({formatArguments(toolCall.arguments)})
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {toolCall.result && (
+                        <div className="text-xs mt-1 pl-2 border-l-2 border-border">
+                          {toolCall.result}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
