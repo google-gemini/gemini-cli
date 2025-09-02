@@ -65,6 +65,34 @@ npx tsx packages/cli/src/i18n/find-hardcoded-strings.ts
 - Regular audits to ensure consistent i18n coverage
 - Onboarding new contributors to understand i18n patterns
 
+#### `find-unused-translations.ts`
+A utility script to identify unused translation keys that can be safely removed from translation files.
+
+**Usage:**
+```bash
+# From project root directory
+npx tsx packages/cli/src/i18n/find-unused-translations.ts
+```
+
+**Features:**
+- Analyzes all English translation files to extract keys
+- Scans TypeScript/TSX files for translation usage patterns
+- Supports multiple usage formats: `t('namespace:key')` and `t('key', { ns: 'namespace' })`
+- Detects dynamic key usage and namespace-only patterns
+- Generates comprehensive usage statistics and cleanup recommendations
+
+**Output:**
+- Generates `unused-translations-report.md` in the project root
+- Shows unused keys grouped by namespace with full context
+- Provides potential orphan identification for manual review
+- Includes cleanup recommendations and safety notes
+
+**Use Cases:**
+- Regular maintenance to keep translation files clean
+- Bundle size optimization by removing unused strings
+- Identifying orphaned translations after code refactoring
+- Quality assurance for translation key management
+
 #### `translationIntegrity.test.ts`
 A comprehensive test suite that validates the integrity and consistency of translation files.
 
@@ -146,7 +174,13 @@ npm test -- --testPathPattern=translationIntegrity
 npm test -- src/i18n/translationIntegrity.test.ts
 ```
 
-#### 3. Complete Validation Workflow
+#### 3. Check for Unused Translations
+Identify unused translation keys for cleanup:
+```bash
+npx tsx packages/cli/src/i18n/find-unused-translations.ts
+```
+
+#### 4. Complete Validation Workflow
 For comprehensive testing, run both tools:
 ```bash
 # 1. Check for new hardcoded strings

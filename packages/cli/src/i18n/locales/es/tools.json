@@ -1,12 +1,4 @@
 {
-  "processors": {
-    "contentFromFiles": "\n--- Contenido de archivos referenciados ---",
-    "contentFromFile": "\nContenido de @{{filePath}}:\n",
-    "endOfContent": "\n--- Fin del contenido ---"
-  },
-  "restore": {
-    "availableToolCalls": "Llamadas de herramienta disponibles para restaurar:\n\n{{toolCalls}}"
-  },
   "memory": {
     "description": "Guarda una pieza específica de información o hecho en tu memoria a largo plazo. Úsalo cuando el usuario explícitamente te pida recordar algo, o cuando declare un hecho claro y conciso que parezca importante retener para interacciones futuras.",
     "shouldIRemember": "¿Debería recordar eso por ti?"
@@ -17,13 +9,5 @@
   "shell": {
     "commandDescription": "Comando bash exacto a ejecutar como `bash -c <comando>`",
     "briefDescription": "Descripción breve del comando para el usuario. Sé específico y conciso. Idealmente una oración. Puede ser hasta 3 oraciones para mayor claridad. Sin saltos de línea."
-  },
-  "edit_corrector": {
-    "correctedSnippet": "La versión corregida del fragmento objetivo que coincide exacta y únicamente con un segmento dentro del contenido del archivo proporcionado.",
-    "adjustedReplacement": "El original_new_string ajustado para ser un reemplazo adecuado para el corrected_old_string, manteniendo la intención original del cambio."
-  },
-  "ui": {
-    "textElementsWrapping": "Los elementos de texto sin envoltura no pueden aparecer después de elementos con envoltura en la misma fila.",
-    "childrenMustBeText": "Los hijos de un Box de fila deben ser elementos <Text>."
   }
 }

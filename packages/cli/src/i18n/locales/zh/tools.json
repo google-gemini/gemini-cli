@@ -1,12 +1,4 @@
 {
-  "processors": {
-    "contentFromFiles": "\n--- 引用文件的内容 ---",
-    "contentFromFile": "\n来自 @{{filePath}} 的内容：\n",
-    "endOfContent": "\n--- 内容结束 ---"
-  },
-  "restore": {
-    "availableToolCalls": "可恢复的工具调用：\n\n{{toolCalls}}"
-  },
   "memory": {
     "description": "保存特定信息或事实到长期记忆中。当用户明确要求记住某些内容，或者他们陈述了对未来互动很重要的清晰、简洁的事实时使用。",
     "shouldIRemember": "需要我为您记住这个吗？"
@@ -17,13 +9,5 @@
   "shell": {
     "commandDescription": "要执行的确切 bash 命令，格式为 `bash -c <命令>`",
     "briefDescription": "为用户简要描述命令。要具体且简洁。理想情况下一句话。为了清晰可以使用最多 3 句话。不要换行。"
-  },
-  "edit_corrector": {
-    "correctedSnippet": "目标代码片段的修正版本，能够准确且唯一地匹配提供的文件内容中的一段。",
-    "adjustedReplacement": "经过调整的 original_new_string，适合替换 corrected_old_string，同时保持更改的原始意图。"
-  },
-  "ui": {
-    "textElementsWrapping": "没有换行的文本元素不能出现在同一行中带有换行的元素之后。",
-    "childrenMustBeText": "行 Box 的子元素必须是 <Text> 元素。"
   }
 }
