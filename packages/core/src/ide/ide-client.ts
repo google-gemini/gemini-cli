@@ -230,15 +230,21 @@ export class IdeClient {
   // Closes the diff. Instead of waiting for a notification,
   // manually resolves the diff resolver as the desired outcome.
   async resolveDiffFromCli(filePath: string, outcome: 'accepted' | 'rejected') {
-    const content = await this.closeDiff(filePath);
     const resolver = this.diffResponses.get(filePath);
+    // Delete the pending response early in case closeDiff makes the IDE emit a
+    // closed diff notification early (which normally rejects the diff).
+    if (resolver) {
+      this.diffResponses.delete(filePath);
+    }
+
+    const content = await this.closeDiff(filePath);
+
     if (resolver) {
       if (outcome === 'accepted') {
         resolver({ status: 'accepted', content });
       } else {
         resolver({ status: 'rejected', content: undefined });
       }
-      this.diffResponses.delete(filePath);
     }
   }
 
