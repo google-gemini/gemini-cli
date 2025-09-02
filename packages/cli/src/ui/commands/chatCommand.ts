@@ -105,8 +105,8 @@ const saveCommand: SlashCommand = {
     'Save the current conversation as a checkpoint. Usage: /chat save <tag> [--with-thoughts]',
   kind: CommandKind.BUILT_IN,
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
-    const [tag, ...rest] = args.split(' ');
-    const withThoughts = rest.includes('--with-thoughts');
+    const withThoughts = args.includes('--with-thoughts');
+    const tag = args.replace('--with-thoughts', '').trim();
 
     if (!tag) {
       return {

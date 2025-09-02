@@ -500,19 +500,23 @@ export class GeminiChat {
    * chat session.
    */
   getHistory(curated?: boolean): Content[];
-  getHistory(options?: { curated?: boolean; stripThoughts?: boolean }): Content[];
+  getHistory(options?: {
+    curated?: boolean;
+    stripThoughts?: boolean;
+  }): Content[];
   getHistory(
-    optionsOrCurated?:
-      | boolean
-      | { curated?: boolean; stripThoughts?: boolean },
+    optionsOrCurated?: boolean | { curated?: boolean; stripThoughts?: boolean },
   ): Content[] {
-    const defaultOptions = { curated: false, stripThoughts: false };
+    const defaultOptions = { curated: false, stripThoughts: true };
 
     let finalOptions;
 
     if (typeof optionsOrCurated === 'boolean') {
       finalOptions = { ...defaultOptions, curated: optionsOrCurated };
-    } else if (typeof optionsOrCurated === 'object' && optionsOrCurated !== null) {
+    } else if (
+      typeof optionsOrCurated === 'object' &&
+      optionsOrCurated !== null
+    ) {
       finalOptions = { ...defaultOptions, ...optionsOrCurated };
     } else {
       finalOptions = defaultOptions;
@@ -520,9 +524,7 @@ export class GeminiChat {
 
     const { curated, stripThoughts } = finalOptions;
 
-    let history = curated
-      ? extractCuratedHistory(this.history)
-      : this.history;
+    let history = curated ? extractCuratedHistory(this.history) : this.history;
 
     if (stripThoughts) {
       history = history.map((content) => {

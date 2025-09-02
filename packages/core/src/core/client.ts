@@ -780,7 +780,7 @@ export class GeminiClient {
     prompt_id: string,
     force: boolean = false,
   ): Promise<ChatCompressionInfo> {
-    const curatedHistory = this.getChat().getHistory(true);
+    const curatedHistory = this.getChat().getHistory({ curated: true });
 
     // Regardless of `force`, don't do anything if the history is empty.
     if (
