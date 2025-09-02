@@ -110,6 +110,10 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Show line numbers in the chat.
   - **Default:** `false`
 
+- **`ui.showCitations`** (boolean):
+  - **Description:** Show citations for generated text in the chat.
+  - **Default:** `false`
+
 - **`ui.accessibility.disableLoadingPhrases`** (boolean):
   - **Description:** Disable loading phrases for accessibility.
   - **Default:** `false`
@@ -227,10 +231,6 @@ Settings are organized into categories. All settings should be placed within the
   - **Default:** `undefined`
 
 #### `security`
-
-- **`security.folderTrust.featureEnabled`** (boolean):
-  - **Description:** Enable folder trust feature for enhanced security.
-  - **Default:** `false`
 
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
