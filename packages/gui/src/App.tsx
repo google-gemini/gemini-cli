@@ -120,12 +120,11 @@ export const App: React.FC = () => {
               // Convert and update the session with messages
               const { updateSession } = useAppStore.getState();
               const chatMessages = messages
-                .filter(msg => msg.role !== 'tool') // Filter out tool messages for UI
                 .map((msg, index) => ({
                   id: `${mostRecentSessionId}-${index}`,
-                  role: msg.role as 'user' | 'assistant' | 'system', // Cast to allowed types
+                  role: msg.role as 'user' | 'assistant' | 'system' | 'tool', // Cast to allowed types
                   content: msg.content,
-                  timestamp: new Date(),
+                  timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(), // Convert to Date object
                   toolCalls: msg.toolCalls
                 }));
               

@@ -5,7 +5,10 @@
  */
 
 import ExcelJS from 'exceljs';
-import { existsSync } from 'node:fs';
+import { existsSync, promises as fs } from 'node:fs';
+import path from 'node:path';
+import { parse } from 'csv-parse';
+import { stringify } from 'csv-stringify';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -63,17 +66,15 @@ interface ExcelParams {
   /** Excel file path */
   file: string;
   /** Operation type */
-  op: 'read' | 'write' | 'create' | 'listSheets' | 'copySheet' | 'formula' | 'style' | 'validate' | 'rows' | 'cols' | 'merge' | 'addSheet' | 'editSheet' | 'deleteSheet' | 'comment';
+  op: 'read' | 'write' | 'create' | 'listSheets' | 'copySheet' | 'style' | 'validate' | 'rows' | 'cols' | 'merge' | 'addSheet' | 'editSheet' | 'deleteSheet' | 'comment' | 'csvRead' | 'csvExport' | 'csvImport';
   // Less common operations (commented to save tokens):
   // | 'format' | 'protect'
   /** Sheet name */
   sheet?: string;
   /** Cell range (A1, A1:C5) */
   range?: string;
-  /** Data for write operations */
+  /** Data for write operations (use strings starting with = for formulas) */
   data?: unknown[][];
-  /** Formula (include = sign) */
-  formula?: string;
   /** Cell styling */
   style?: CellStyle;
   /** Data validation rules */
@@ -118,7 +119,15 @@ interface ExcelParams {
   comment?: string;
   /** Comment author */
   author?: string;
-  /** Source Excel file path for copySheet operation */
+  /** CSV delimiter (default: ,) */
+  delimiter?: string;
+  /** CSV encoding (default: utf8) */
+  encoding?: BufferEncoding;
+  /** Include headers in CSV output */
+  headers?: boolean;
+  /** CSV quote character (default: ") */
+  quote?: string;
+  /** Source CSV file path for csvImport operation */
   sourceFile?: string;
   /** Target Excel file path for copySheet operation */
   targetFile?: string;
@@ -139,6 +148,8 @@ interface ExcelResult extends ToolResult {
   colCount?: number;
   /** Used range information (e.g., "A1:D25") */
   usedRange?: string;
+  /** Formula information for cells */
+  formulas?: Array<{ cell: string; formula: string; value?: unknown }>;
 }
 
 class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
@@ -157,18 +168,18 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
       create: 'Creating',
       listSheets: 'Listing sheets in',
       copySheet: 'Copying sheet in',
-      formula: 'Setting formula in',
       style: 'Styling cells in',
       validate: 'Adding data validation to',
-      // format: 'Adding conditional formatting to', // Commented to save tokens
       rows: 'Managing rows in',
       cols: 'Managing columns in', 
       merge: 'Merging cells in',
-      // protect: 'Protecting', // Commented to save tokens
       addSheet: 'Adding sheet to',
       editSheet: 'Editing sheet in',
       deleteSheet: 'Deleting sheet from',
-      comment: 'Adding comment to'
+      comment: 'Adding comment to',
+      csvRead: 'Reading CSV file',
+      csvExport: 'Exporting Excel to CSV',
+      csvImport: 'Importing CSV to Excel'
     };
     
     return `${actions[op] || 'Operating on'} ${fileName}${sheetInfo}`;
@@ -184,18 +195,18 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
         case 'create': return await this.createFile();
         case 'listSheets': return await this.listSheets();
         case 'copySheet': return await this.copySheet();
-        case 'formula': return await this.setFormula();
         case 'style': return await this.styleRange();
         case 'validate': return await this.addValidation();
-        // case 'format': return await this.conditionalFormat(); // Commented to save tokens
         case 'rows': return await this.manageRows();
         case 'cols': return await this.manageCols();
         case 'merge': return await this.mergeCells();
-        // case 'protect': return await this.protectSheet(); // Commented to save tokens
         case 'addSheet': return await this.addWorksheet();
         case 'editSheet': return await this.editWorksheet();
         case 'deleteSheet': return await this.deleteWorksheet();
         case 'comment': return await this.addComment();
+        case 'csvRead': return await this.readCSV();
+        case 'csvExport': return await this.csvExport();
+        case 'csvImport': return await this.csvImport();
         default: throw new Error(`Unknown operation: ${op}`);
       }
     } catch (error) {
@@ -279,7 +290,9 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
         };
       }
       
-      const sheetData = await this.readSingleSheet(worksheet, range);
+      const result = await this.readSingleSheet(worksheet, range);
+      const sheetData = result.data;
+      const formulas = result.formulas;
       const limitMessage = !range && sheetData.length === 20 ? ' (limited to first 20 rows)' : '';
       
       // Get used range information
@@ -287,16 +300,23 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
       const actualRowCount = worksheet.actualRowCount || 0;
       const actualColCount = worksheet.actualColumnCount || 0;
       
-      // Format data for LLM consumption with clear status and range info
+      // Format data for LLM consumption with clear status and range info  
       const rangeInfo = `Sheet used range: ${usedRange} (${actualRowCount} rows × ${actualColCount} cols total)`;
-      const readInfo = !range && sheetData.length === 20 && actualRowCount > 20 
-        ? `\nWARNING: Only showing first 20 rows. Use range parameter or copySheet operation to access all ${actualRowCount} rows.`
+      
+      // Add formula information if any formulas are present
+      const formulaInfo = formulas.length > 0 
+        ? `\n\nFORMULAS DETECTED (${formulas.length}):\n` +
+          formulas.map(f => `${f.cell}: ${f.formula}`).join('\n')
         : '';
       
+      // Simplified output to avoid duplications
+      const dataPreview = sheetData.length > 3 
+        ? sheetData.slice(0, 3).map(row => row.join('\t')).join('\n') + '\n...(truncated for brevity)'
+        : sheetData.map(row => row.join('\t')).join('\n');
+      
       const dataDisplay = sheetData.length > 0 
-        ? `${rangeInfo}${readInfo}\n\nData preview from ${worksheet.name}:\n` + 
-          sheetData.map(row => row.join('\t')).join('\n')
-        : `${rangeInfo}\n\nNo data found in sheet "${worksheet.name}". The sheet exists but contains no data or all cells are empty.`;
+        ? `excel(read): ${rangeInfo}${formulaInfo}\nData preview:\n${dataPreview}`
+        : `excel(read): ${rangeInfo}${formulaInfo}\nNo data found in sheet "${worksheet.name}"`;
 
       return {
         success: true,
@@ -307,8 +327,9 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
         rowCount: sheetData.length,
         colCount: sheetData[0]?.length || 0,
         usedRange,
+        formulas: formulas.length > 0 ? formulas : undefined,
         llmContent: dataDisplay,
-        returnDisplay: `Read ${sheetData.length} rows from ${worksheet.name}${limitMessage}`,
+        returnDisplay: `excel(read): Read ${sheetData.length} rows from ${worksheet.name}${limitMessage}${formulas.length > 0 ? ` (${formulas.length} formulas)` : ''}`,
       };
     }
     
@@ -331,26 +352,39 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
     }
     
     const allData: unknown[][] = [];
+    const allFormulas: Array<{ cell: string; formula: string; value?: unknown; sheet: string }> = [];
     const sheetSummaries: string[] = [];
     const sheetDataDetails: string[] = [];
     
     for (const worksheet of worksheets) {
-      const sheetData = await this.readSingleSheet(worksheet, range);
+      const result = await this.readSingleSheet(worksheet, range);
+      const sheetData = result.data;
+      const formulas = result.formulas;
+      
       allData.push(...sheetData);
       
+      // Add sheet prefix to formula cell addresses
+      formulas.forEach(f => {
+        allFormulas.push({ ...f, sheet: worksheet.name });
+      });
+      
       const limitMessage = !range && sheetData.length === 20 ? ' (limited to first 20 rows)' : '';
-      sheetSummaries.push(`${worksheet.name}: ${sheetData.length} rows${limitMessage}`);
+      const formulaMessage = formulas.length > 0 ? ` (${formulas.length} formulas)` : '';
+      sheetSummaries.push(`${worksheet.name}: ${sheetData.length} rows${limitMessage}${formulaMessage}`);
       
       // Add actual data for LLM with clear status
       if (sheetData.length > 0) {
         const dataStr = sheetData.map(row => row.join('\t')).join('\n');
-        sheetDataDetails.push(`\n=== ${worksheet.name} (${sheetData.length} rows) ===\n${dataStr}`);
+        const formulaStr = formulas.length > 0 
+          ? `\n📊 Formulas: ${formulas.map(f => `${f.cell}: ${f.formula}`).join(', ')}\n`
+          : '';
+        sheetDataDetails.push(`\n=== ${worksheet.name} (${sheetData.length} rows) ===${formulaStr}${dataStr}`);
       } else {
         sheetDataDetails.push(`\n=== ${worksheet.name} ===\nNo data (sheet is empty)`);
       }
     }
     
-    const summaryMessage = `Read from ${worksheets.length} sheets: ${sheetSummaries.join(', ')}`;
+    const summaryMessage = `excel(read): Read from ${worksheets.length} sheets: ${sheetSummaries.join(', ')}`;
     const llmDataContent = sheetDataDetails.length > 0 
       ? `${summaryMessage}${sheetDataDetails.join('\n')}`
       : `${summaryMessage}\nAll sheets are empty - no data found in any of the ${worksheets.length} sheets.`;
@@ -363,13 +397,15 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
       data: allData,
       rowCount: allData.length,
       colCount: allData[0]?.length || 0,
+      formulas: allFormulas.length > 0 ? allFormulas : undefined,
       llmContent: llmDataContent,
       returnDisplay: summaryMessage,
     };
   }
 
-  private async readSingleSheet(worksheet: ExcelJS.Worksheet, range?: string): Promise<unknown[][]> {
+  private async readSingleSheet(worksheet: ExcelJS.Worksheet, range?: string): Promise<{ data: unknown[][]; formulas: Array<{ cell: string; formula: string; value?: unknown }> }> {
     const data: unknown[][] = [];
+    const formulas: Array<{ cell: string; formula: string; value?: unknown }> = [];
     
     if (range) {
       const rangeObj = worksheet.getCell(range);
@@ -381,12 +417,31 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
         for (let row = Number(startCell.row); row <= Number(endCell.row); row++) {
           const rowData: unknown[] = [];
           for (let col = Number(startCell.col); col <= Number(endCell.col); col++) {
-            rowData.push(this.getCellValue(worksheet.getCell(row, col)));
+            const cell = worksheet.getCell(row, col);
+            const cellInfo = this.getCellInfo(cell, cell.address);
+            rowData.push(cellInfo.value);
+            
+            if (cellInfo.isFormula) {
+              formulas.push({
+                cell: cell.address,
+                formula: cellInfo.formula!,
+                value: cellInfo.calculatedValue
+              });
+            }
           }
           data.push(rowData);
         }
       } else {
-        data.push([this.getCellValue(rangeObj)]);
+        const cellInfo = this.getCellInfo(rangeObj, rangeObj.address);
+        data.push([cellInfo.value]);
+        
+        if (cellInfo.isFormula) {
+          formulas.push({
+            cell: rangeObj.address,
+            formula: cellInfo.formula!,
+            value: cellInfo.calculatedValue
+          });
+        }
       }
     } else {
       // When no range is specified, limit to first 20 rows for performance
@@ -400,7 +455,16 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
         
         const rowData: unknown[] = [];
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          rowData.push(this.getCellValue(cell));
+          const cellInfo = this.getCellInfo(cell, cell.address);
+          rowData.push(cellInfo.value);
+          
+          if (cellInfo.isFormula) {
+            formulas.push({
+              cell: cell.address,
+              formula: cellInfo.formula!,
+              value: cellInfo.calculatedValue
+            });
+          }
         });
         if (rowData.some(cell => cell !== null && cell !== undefined && cell !== '')) {
           data.push(rowData);
@@ -411,7 +475,7 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
       });
     }
     
-    return data;
+    return { data, formulas };
   }
 
   private async writeData(): Promise<ExcelResult> {
@@ -435,7 +499,12 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
     data.forEach((rowData, rowIndex) => {
       rowData.forEach((cellValue, colIndex) => {
         const cell = worksheet.getCell(startRow + rowIndex, startCol + colIndex);
-        cell.value = cellValue as ExcelJS.CellValue;
+        // Check if cellValue is a formula (starts with =)
+        if (typeof cellValue === 'string' && cellValue.startsWith('=')) {
+          cell.value = { formula: cellValue.substring(1) }; // Remove = prefix
+        } else {
+          cell.value = cellValue as ExcelJS.CellValue;
+        }
       });
     });
 
@@ -448,8 +517,8 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
       sheet: worksheet.name,
       rowCount: data.length,
       colCount: data[0]?.length || 0,
-      llmContent: `Wrote ${data.length} rows to ${worksheet.name}`,
-      returnDisplay: `Wrote ${data.length} rows to ${worksheet.name}`,
+      llmContent: `excel(write): Wrote ${data.length} rows to ${worksheet.name}`,
+      returnDisplay: `excel(write): Wrote ${data.length} rows to ${worksheet.name}`,
     };
   }
 
@@ -514,7 +583,7 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
       sheetsInfo.push(`${ws.name} (${usedRange}, ${rowCount} rows × ${colCount} cols)`);
     });
 
-    const summary = `Found ${sheetNames.length} sheets: ${sheetNames.join(', ')}`;
+    const summary = `excel(listSheets): Found ${sheetNames.length} sheets: ${sheetNames.join(', ')}`;
     const detailed = `Sheet details:\n${sheetsInfo.join('\n')}`;
 
     return {
@@ -527,40 +596,6 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
     };
   }
 
-  private async setFormula(): Promise<ExcelResult> {
-    const { file, formula, range } = this.params;
-    const workbook = await this.getWorkbook();
-    const worksheet = this.getWorksheet(workbook);
-    
-    if (!formula || !range) {
-      throw new Error('Formula and range required');
-    }
-
-    if (range.includes(':')) {
-      const [start, end] = range.split(':');
-      const startCell = worksheet.getCell(start);
-      const endCell = worksheet.getCell(end);
-      
-      for (let row = Number(startCell.row); row <= Number(endCell.row); row++) {
-        for (let col = Number(startCell.col); col <= Number(endCell.col); col++) {
-          worksheet.getCell(row, col).value = { formula };
-        }
-      }
-    } else {
-      worksheet.getCell(range).value = { formula };
-    }
-
-    await workbook.xlsx.writeFile(file);
-
-    return {
-      success: true,
-      file,
-      op: 'formula',
-      sheet: worksheet.name,
-      llmContent: `Set formula ${formula} in ${range}`,
-      returnDisplay: `Set formula ${formula} in ${range}`,
-    };
-  }
 
   private async styleRange(): Promise<ExcelResult> {
     const { file, range, style } = this.params;
@@ -810,10 +845,35 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
   //   };
   // }
 
-  private getCellValue(cell: ExcelJS.Cell): unknown {
-    if (cell.formula) return `=${cell.formula}`;
-    if (cell.value === null || cell.value === undefined) return null;
-    return cell.value;
+
+  private getCellInfo(cell: ExcelJS.Cell, address: string): { value: unknown; isFormula: boolean; formula?: string; calculatedValue?: unknown } {
+    const isFormula = !!cell.formula;
+    
+    if (isFormula) {
+      // Extract calculated value properly
+      let calculatedValue: unknown = undefined;
+      if (cell.result !== undefined && cell.result !== null) {
+        calculatedValue = typeof cell.result === 'object' && 'result' in cell.result 
+          ? (cell.result as any).result 
+          : cell.result;
+      } else if (cell.value !== undefined && cell.value !== null) {
+        calculatedValue = typeof cell.value === 'object' && 'result' in cell.value 
+          ? (cell.value as any).result 
+          : cell.value;
+      }
+      
+      return {
+        value: `=${cell.formula}`,
+        isFormula: true,
+        formula: cell.formula,
+        calculatedValue
+      };
+    }
+    
+    return {
+      value: cell.value === null || cell.value === undefined ? null : cell.value,
+      isFormula: false
+    };
   }
 
   private getUsedRange(worksheet: ExcelJS.Worksheet): string {
@@ -1072,23 +1132,326 @@ class ExcelInvocation extends BaseToolInvocation<ExcelParams, ExcelResult> {
       returnDisplay: `Added comment to ${cellCount} cell(s) in ${range}${authorInfo}`,
     };
   }
+
+  private async readCSV(): Promise<ExcelResult> {
+    const { file, delimiter = ',', encoding = 'utf8' } = this.params;
+    
+    if (!existsSync(file)) {
+      return {
+        success: false,
+        file,
+        op: 'csvRead',
+        data: [],
+        rowCount: 0,
+        colCount: 0,
+        llmContent: `excel(csvRead): CSV file "${file}" does not exist. Please check the file path and try again.`,
+        returnDisplay: `excel(csvRead): File not found: ${file}`,
+      };
+    }
+    
+    try {
+      const csvContent = await fs.readFile(file, { encoding });
+      
+      // Use callback-based parse function wrapped in Promise
+      const records = await new Promise<unknown[][]>((resolve, reject) => {
+        parse(csvContent, {
+          delimiter,
+          skip_empty_lines: true,
+          trim: true,
+          columns: false, // Return as array of arrays
+        }, (err, data) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(data as unknown[][]);
+          }
+        });
+      });
+      
+      const rowCount = records.length;
+      const colCount = records.length > 0 ? Math.max(...records.map(row => row.length)) : 0;
+      
+      // Create preview for LLM
+      const dataPreview = records.length > 3 
+        ? records.slice(0, 3).map(row => row.join('\t')).join('\n') + '\n...(truncated for brevity)'
+        : records.map(row => row.join('\t')).join('\n');
+      
+      const dataDisplay = records.length > 0 
+        ? `excel(csvRead): Read ${rowCount} rows × ${colCount} columns\nData preview:\n${dataPreview}`
+        : `excel(csvRead): CSV file "${file}" is empty`;
+
+      return {
+        success: true,
+        file,
+        op: 'csvRead',
+        data: records,
+        rowCount,
+        colCount,
+        llmContent: dataDisplay,
+        returnDisplay: `excel(csvRead): Read ${rowCount} rows from ${file.split(/[/\\]/).pop()}`,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        file,
+        op: 'csvRead',
+        data: [],
+        rowCount: 0,
+        colCount: 0,
+        llmContent: `excel(csvRead): Failed to read CSV file "${file}": ${message}`,
+        returnDisplay: `excel(csvRead): Failed to read CSV: ${message}`,
+      };
+    }
+  }
+
+  private async csvExport(): Promise<ExcelResult> {
+    const { file, data, delimiter = ',', headers = true, quote = '"', encoding = 'utf8', sheet, range } = this.params;
+    
+    let csvData = data;
+    let csvFilePath: string;
+    let actualSheetName = sheet;
+    
+    // If no data provided, read from Excel file
+    if (!csvData?.length) {
+      if (!existsSync(file)) {
+        throw new Error(`Excel file "${file}" does not exist.`);
+      }
+      
+      // Read data from Excel file
+      const readResult = await this.readExcelForCSVExport(file, sheet, range);
+      if (!readResult.success) {
+        return {
+          success: false,
+          file,
+          op: 'csvExport',
+          llmContent: `Failed to read data from Excel file "${file}": ${readResult.error}`,
+          returnDisplay: `CSV export failed: ${readResult.error}`,
+        };
+      }
+      csvData = readResult.data;
+      actualSheetName = readResult.sheetName;
+      
+      if (!csvData?.length) {
+        return {
+          success: false,
+          file,
+          op: 'csvExport',
+          llmContent: `excel(csvExport): No data found in Excel file "${file}"${actualSheetName ? ` sheet "${actualSheetName}"` : ''}${range ? ` range "${range}"` : ''}`,
+          returnDisplay: 'excel(csvExport): Failed to export CSV: No data to export',
+        };
+      }
+    }
+    
+    // Generate CSV file path
+    if (actualSheetName) {
+      // Use sheet name + Excel file directory
+      const excelDir = path.dirname(file);
+      const sanitizedSheetName = actualSheetName.replace(/[<>:"/\\|?*]/g, '_'); // Sanitize filename
+      csvFilePath = path.join(excelDir, `${sanitizedSheetName}.csv`);
+      
+      // Handle duplicate names
+      let counter = 1;
+      const basePath = csvFilePath;
+      while (existsSync(csvFilePath)) {
+        const parsed = path.parse(basePath);
+        csvFilePath = path.join(parsed.dir, `${parsed.name}_${counter}${parsed.ext}`);
+        counter++;
+      }
+    } else {
+      // Fallback: use Excel file name with .csv extension
+      csvFilePath = file.replace(/\.(xlsx?|xls)$/i, '.csv');
+    }
+    
+    try {
+      // Convert array format to csv-stringify compatible format
+      let processedData: any[];
+      
+      if (headers && csvData.length > 0) {
+        // First row contains headers, convert to object format
+        const headerRow = csvData[0] as any[];
+        const dataRows = csvData.slice(1);
+        
+        processedData = dataRows.map(row => {
+          const obj: any = {};
+          headerRow.forEach((header, index) => {
+            obj[header || `Column${index + 1}`] = row[index] || '';
+          });
+          return obj;
+        });
+      } else {
+        // No headers, use array format
+        processedData = csvData as any[];
+      }
+      
+      // Use callback-based stringify function wrapped in Promise
+      const csvContent = await new Promise<string>((resolve, reject) => {
+        stringify(processedData, {
+          delimiter,
+          header: headers,
+          quoted: true,
+          quote,
+        }, (err, output) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(output);
+          }
+        });
+      });
+      
+      await fs.writeFile(csvFilePath, csvContent, { encoding });
+      
+      return {
+        success: true,
+        file: csvFilePath,
+        op: 'csvExport',
+        rowCount: csvData.length,
+        colCount: csvData[0]?.length || 0,
+        llmContent: `excel(csvRead): Exported ${csvData.length} rows from Excel "${file}"${actualSheetName ? ` sheet "${actualSheetName}"` : ''}${range ? ` range "${range}"` : ''} to CSV "${csvFilePath}"`,
+        returnDisplay: `excel(csvRead): Exported ${csvData.length} rows to ${path.basename(csvFilePath)}`,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        file: csvFilePath || file,
+        op: 'csvExport',
+        llmContent: `excel(csvRead):Failed to write CSV file "${csvFilePath || file}": ${message}`,
+        returnDisplay: `excel(csvRead): Failed to export CSV: ${message}`,
+      };
+    }
+  }
+
+  private async csvImport(): Promise<ExcelResult> {
+    const { file, sourceFile, sheet, range, delimiter = ',', encoding = 'utf8' } = this.params;
+    
+    if (!sourceFile) {
+      throw new Error('sourceFile parameter is required for CSV import operation');
+    }
+    
+    if (!existsSync(sourceFile)) {
+      throw new Error(`Source CSV file "${sourceFile}" does not exist`);
+    }
+    
+    try {
+      // Read CSV data
+      const csvContent = await fs.readFile(sourceFile, { encoding });
+      const records = await new Promise<unknown[][]>((resolve, reject) => {
+        parse(csvContent, {
+          delimiter,
+          skip_empty_lines: true,
+          trim: true,
+          columns: false, // Return as array of arrays
+        }, (err, data) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(data as unknown[][]);
+          }
+        });
+      });
+      
+      if (!records?.length) {
+        return {
+          success: false,
+          file,
+          op: 'csvImport',
+          llmContent: `excel(csvImport): CSV file "${sourceFile}" is empty or contains no data`,
+          returnDisplay: 'excel(csvImport): Failed to import CSV: No data to import',
+        };
+      }
+      
+      // Import to Excel
+      const workbook = await this.getWorkbook();
+      const worksheet = this.getWorksheet(workbook);
+      
+      let startRow = 1;
+      let startCol = 1;
+      
+      if (range) {
+        const cell = worksheet.getCell(range);
+        startRow = Number(cell.row);
+        startCol = Number(cell.col);
+      }
+      
+      // Write CSV data to Excel
+      records.forEach((rowData, rowIndex) => {
+        rowData.forEach((cellValue, colIndex) => {
+          const cell = worksheet.getCell(startRow + rowIndex, startCol + colIndex);
+          cell.value = cellValue as ExcelJS.CellValue;
+        });
+      });
+      
+      await workbook.xlsx.writeFile(file);
+      
+      return {
+        success: true,
+        file,
+        op: 'csvImport',
+        sheet: worksheet.name,
+        rowCount: records.length,
+        colCount: records[0]?.length || 0,
+        llmContent: `excel(csvImport): Imported ${records.length} rows from CSV "${sourceFile}" to Excel "${file}"${sheet ? ` sheet "${sheet}"` : ''}${range ? ` starting at "${range}"` : ''}`,
+        returnDisplay: `excel(csvImport): Imported ${records.length} rows from ${path.basename(sourceFile)} to ${worksheet.name}`,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return {
+        success: false,
+        file,
+        op: 'csvImport',
+        llmContent: `excel(csvImport): Failed to import CSV file "${sourceFile}": ${message}`,
+        returnDisplay: `excel(csvImport): CSV import failed: ${message}`,
+      };
+    }
+  }
+
+  private async readExcelForCSVExport(excelFile: string, sheetName?: string, range?: string): Promise<{ success: boolean; data?: unknown[][]; error?: string; sheetName?: string }> {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.readFile(excelFile);
+      
+      if (workbook.worksheets.length === 0) {
+        return { success: false, error: 'Excel file contains no worksheets' };
+      }
+      
+      let worksheet: ExcelJS.Worksheet;
+      if (sheetName) {
+        const foundWorksheet = workbook.getWorksheet(sheetName);
+        if (!foundWorksheet) {
+          const availableSheets = workbook.worksheets.map(ws => ws.name).join(', ');
+          return { success: false, error: `Sheet "${sheetName}" not found. Available sheets: ${availableSheets}` };
+        }
+        worksheet = foundWorksheet;
+      } else {
+        worksheet = workbook.worksheets[0];
+      }
+      
+      const result = await this.readSingleSheet(worksheet, range);
+      return { success: true, data: result.data, sheetName: worksheet.name };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: message };
+    }
+  }
 }
 
 export class ExcelTool extends BaseDeclarativeTool<ExcelParams, ExcelResult> {
   constructor() {
     super(
       'excel',
-      'Excel Operations',
-      'Complete Excel file management: read/write data, formulas, styling, validation, formatting, row/col operations, merge cells, sheet protection',
+      'Excel & CSV Operations', 
+      'Excel/CSV file management: read/write Excel/CSV data & formulas, styling, validation, row/col operations, merge cells, sheets. CSV operations: csvRead (file=csv_path), csvExport (IMPORTANT: file=source_excel_path, sheet=sheet_name, automatically generates CSV filename), csvImport (file=target_excel_path, sourceFile=csv_path)',
       Kind.Other,
       {
         type: 'object',
         required: ['file', 'op'],
         properties: {
-          file: { type: 'string', description: 'Excel file path' },
+          file: { type: 'string', description: 'File path: Excel file for most operations (including csvExport), CSV file ONLY for csvRead' },
           op: { 
             type: 'string', 
-            enum: ['read', 'write', 'create', 'listSheets', 'copySheet', 'formula', 'style', 'validate', 'format', 'rows', 'cols', 'merge', 'protect', 'addSheet', 'editSheet', 'deleteSheet', 'comment'],
+            enum: ['read', 'write', 'create', 'listSheets', 'copySheet', 'style', 'validate', 'rows', 'cols', 'merge', 'addSheet', 'editSheet', 'deleteSheet', 'comment', 'csvRead', 'csvExport', 'csvImport'],
             description: 'Operation type'
           },
           sheet: { type: 'string', description: 'Sheet name' },
@@ -1096,9 +1459,8 @@ export class ExcelTool extends BaseDeclarativeTool<ExcelParams, ExcelResult> {
           data: { 
             type: 'array', 
             items: { type: 'array' },
-            description: 'Data rows'
+            description: 'Data rows (strings starting with = are formulas)'
           },
-          formula: { type: 'string', description: 'Formula with =' },
           style: { type: 'object', description: 'Cell styling options' },
           validation: { type: 'object', description: 'Data validation rules' },
           format: { type: 'string', description: 'Conditional format type' },
@@ -1114,10 +1476,14 @@ export class ExcelTool extends BaseDeclarativeTool<ExcelParams, ExcelResult> {
           tabColor: { type: 'string', description: 'Tab color (hex: #FF0000)' },
           comment: { type: 'string', description: 'Comment content' },
           author: { type: 'string', description: 'Comment author' },
-          sourceFile: { type: 'string', description: 'Source Excel file path for copySheet' },
+          sourceFile: { type: 'string', description: 'Source file path: Excel file for copySheet, CSV file for csvImport' },
           targetFile: { type: 'string', description: 'Target Excel file path for copySheet' },
           sourceSheet: { type: 'string', description: 'Source sheet name for copySheet' },
-          targetSheet: { type: 'string', description: 'Target sheet name for copySheet' }
+          targetSheet: { type: 'string', description: 'Target sheet name for copySheet' },
+          delimiter: { type: 'string', description: 'CSV delimiter (default: ,)' },
+          encoding: { type: 'string', description: 'CSV file encoding (default: utf8)' },
+          headers: { type: 'boolean', description: 'Include headers in CSV output (default: true)' },
+          quote: { type: 'string', description: 'CSV quote character (default: ")' }
         }
       }
     );
