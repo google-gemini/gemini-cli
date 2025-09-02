@@ -11,6 +11,12 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/bug`**
   - **Description:** File an issue about Gemini CLI. By default, the issue is filed within the GitHub repository for Gemini CLI. The string you enter after `/bug` will become the headline for the bug being filed. The default `/bug` behavior can be modified using the `advanced.bugCommand` setting in your `.gemini/settings.json` files.
 
+- **`/Issuetofixwith` (via `create_issue` tool)**
+  - **Description:** Creates a new, well-structured issue in a GitHub repository. When you describe a bug or a feature request, the agent can use this capability to formally log it as an issue. The agent will typically ask for details like the title and body of the issue before creating it.
+
+- **`/Assigncodingagent` (via `assign_copilot_to_issue` tool)**
+  - **Description:** Assigns an existing GitHub issue to the Copilot coding agent. This triggers an automated process where Copilot will attempt to generate a pull request with code changes to address the issue. This is a powerful way to automate bug fixes and feature implementation.
+
 - **`/chat`**
   - **Description:** Save and resume conversation history for branching conversation state interactively, or resuming a previous state from a later session.
   - **Sub-commands:**
