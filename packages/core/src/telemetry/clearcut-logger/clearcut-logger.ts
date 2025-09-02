@@ -874,7 +874,7 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
         value: safeJsonStringify([
-          {"smart_edit_enabled": this.config?.getUseSmartEdit() ?? false }
+          { smart_edit_enabled: this.config?.getUseSmartEdit() ?? false },
         ]),
       },
     ];
