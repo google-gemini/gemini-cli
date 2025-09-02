@@ -10,16 +10,10 @@ import type { BaseModelProvider } from './BaseModelProvider.js';
 import { OpenAIProvider } from './OpenAIProvider.js';
 import { LMStudioProvider } from './LMStudioProvider.js';
 import { GeminiProvider } from './GeminiProvider.js';
-import type { GeminiClient } from '../core/client.js';
 import type { Config } from '../config/config.js';
 
 export class ModelProviderFactory {
   private static providers: Map<string, BaseModelProvider> = new Map();
-  private static geminiClient: GeminiClient | null = null;
-
-  static setGeminiClient(client: GeminiClient): void {
-    this.geminiClient = client;
-  }
 
   static create(config: ModelProviderConfig, configInstance?: Config): BaseModelProvider {
     const key = `${config.type}-${config.model}-${config.baseUrl || 'default'}`;
@@ -39,16 +33,15 @@ export class ModelProviderFactory {
 
     switch (config.type) {
       case ModelProviderType.OPENAI:
+        config.apiKey = process.env['GEMINI_API_KEY']
         provider = new OpenAIProvider(config, configInstance);
         break;
       case ModelProviderType.LM_STUDIO:
         provider = new LMStudioProvider(config, configInstance);
         break;
-      case ModelProviderType.GEMINI:
-        if (!this.geminiClient) {
-          throw new Error('GeminiClient must be set before creating Gemini provider');
-        }
-        provider = new GeminiProvider(config, this.geminiClient, configInstance);
+        case ModelProviderType.GEMINI:
+        config.apiKey = process.env['OPENAI_API_KEY']
+        provider = new GeminiProvider(config, configInstance);
         break;
       case ModelProviderType.ANTHROPIC:
         throw new Error('Anthropic provider not yet implemented');
