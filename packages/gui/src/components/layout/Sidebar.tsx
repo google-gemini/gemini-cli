@@ -118,12 +118,11 @@ export const Sidebar: React.FC = () => {
       
       // Convert backend messages to frontend format and update store
       const chatMessages = messages
-        .filter(msg => msg.role !== 'tool') // Filter out tool messages for UI
         .map((msg, index) => ({
           id: `${sessionId}-${index}`,
-          role: msg.role as 'user' | 'assistant' | 'system', // Cast to allowed types
+          role: msg.role as 'user' | 'assistant' | 'system' | 'tool', // Cast to allowed types
           content: msg.content,
-          timestamp: new Date(), // Approximate timestamp
+          timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(), // Convert to Date object
           toolCalls: msg.toolCalls
         }));
       

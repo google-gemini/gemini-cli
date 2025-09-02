@@ -82,7 +82,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) 
       // Send ONLY the new user message (MultiModelSystem manages history internally)
       const newUserMessage: UniversalMessage = {
         role: 'user',
-        content: userMessage.content
+        content: userMessage.content,
+        timestamp: userMessage.timestamp
       };
       const stream = await multiModelService.sendMessage([newUserMessage]);
 
@@ -114,10 +115,28 @@ export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) 
               updatedAt: new Date()
             });
 
-            // Refresh session info to get updated title from backend
-            // Add a small delay to ensure backend title update is complete
+            // Refresh messages from backend to get any tool responses
+            // Add a small delay to ensure backend processing is complete
             setTimeout(async () => {
               try {
+                // Get updated messages from backend (includes any tool responses)
+                const backendMessages = await multiModelService.getDisplayMessages(activeSessionId);
+                const chatMessages = backendMessages
+                  .map((msg, index) => ({
+                    id: `${activeSessionId}-${index}`,
+                    role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
+                    content: msg.content,
+                    timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+                    toolCalls: msg.toolCalls
+                  }));
+                
+                updateSession(activeSessionId, { 
+                  messages: chatMessages,
+                  updatedAt: new Date() 
+                });
+                console.log('Refreshed messages from backend, total:', chatMessages.length);
+
+                // Also refresh session info for title updates
                 const sessionsInfo = await multiModelService.getSessionsInfo();
                 const updatedSessionInfo = sessionsInfo.find(s => s.id === activeSessionId);
                 if (updatedSessionInfo && currentSession.title !== updatedSessionInfo.title) {
@@ -128,9 +147,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) 
                   console.log('Updated session title from backend:', updatedSessionInfo.title);
                 }
               } catch (error) {
-                console.error('Failed to refresh session info:', error);
+                console.error('Failed to refresh messages and session info:', error);
               }
-            }, 100); // 100ms delay
+            }, 500); // 500ms delay to ensure backend processing is complete
           }
           break;
         } else if (event.type === 'error') {

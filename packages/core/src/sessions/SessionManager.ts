@@ -357,7 +357,7 @@ export class SessionManager {
   }
 
   /**
-   * Get display messages for UI (filter out tool messages)
+   * Get display messages for UI (include all messages including tools)
    */
   getDisplayMessages(sessionId?: string): UniversalMessage[] {
     const targetSessionId = sessionId || this.currentSessionId;
@@ -370,13 +370,10 @@ export class SessionManager {
       return [];
     }
     
-    // Filter out tool messages (messages with "Tool response:" content)
-    const displayMessages = session.conversationHistory.filter(msg => 
-      !msg.content.startsWith('Tool response:') && 
-      !msg.content.startsWith('Tool execution completed successfully')
-    );
+    // Return all conversation history without filtering
+    const displayMessages = session.conversationHistory;
     
-    console.log(`[SessionManager] Retrieved ${displayMessages.length} display messages for session ${targetSessionId} (filtered from ${session.conversationHistory.length} total)`);
+    console.log(`[SessionManager] Retrieved ${displayMessages.length} display messages for session ${targetSessionId}`);
     return displayMessages;
   }
 
