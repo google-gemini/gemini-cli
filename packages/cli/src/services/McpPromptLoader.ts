@@ -158,14 +158,14 @@ export class McpPromptLoader implements ICommandLoader {
               (flagArgument) => {
                 const regex = new RegExp(`${flagArgument}([^"]*)"`);
                 return !regex.test(rawInvocation);
-              }
+              },
             );
 
             const exactlyMatchingArgumentAtTheEnd = unusedArguments.filter(
               (flagArgument) => {
                 const regex = new RegExp(`${flagArgument}[^"]*$`);
                 return regex.test(rawInvocation);
-              }
+              },
             );
 
             if (exactlyMatchingArgumentAtTheEnd.length === 1) {

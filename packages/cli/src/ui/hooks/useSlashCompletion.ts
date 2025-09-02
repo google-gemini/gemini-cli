@@ -203,14 +203,17 @@ function useCommandSuggestions(
           const depth = commandPathParts.length;
           const argString = rawParts.slice(depth).join(' ');
           const results =
-            (await leafCommand.completion({
-              ...commandContext,
-              invocation: {
-                raw: `/${rawParts.join(' ')}`,
-                name: leafCommand.name,
-                args: argString,
-              }
-            }, argString)) || [];
+            (await leafCommand.completion(
+              {
+                ...commandContext,
+                invocation: {
+                  raw: `/${rawParts.join(' ')}`,
+                  name: leafCommand.name,
+                  args: argString,
+                },
+              },
+              argString,
+            )) || [];
 
           if (!signal.aborted) {
             const finalSuggestions = results.map((s) => ({
