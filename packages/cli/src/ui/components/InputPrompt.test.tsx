@@ -22,6 +22,7 @@ import type { UseInputHistoryReturn } from '../hooks/useInputHistory.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
+import chalk from 'chalk';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
@@ -1204,6 +1205,108 @@ describe('InputPrompt', () => {
       await wait();
 
       expect(mockBuffer.handleInput).not.toHaveBeenCalled();
+      unmount();
+    });
+  });
+
+  describe('Highlighting and Cursor Display', () => {
+    it('should display cursor mid-word by highlighting the character', async () => {
+      mockBuffer.text = 'hello world';
+      mockBuffer.lines = ['hello world'];
+      mockBuffer.viewportVisualLines = ['hello world'];
+      mockBuffer.visualCursor = [0, 3]; // cursor on the second 'l'
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      // The component will render the text with the character at the cursor inverted.
+      expect(frame).toContain(`hel${chalk.inverse('l')}o world`);
+      unmount();
+    });
+
+    it('should display cursor at the beginning of the line', async () => {
+      mockBuffer.text = 'hello';
+      mockBuffer.lines = ['hello'];
+      mockBuffer.viewportVisualLines = ['hello'];
+      mockBuffer.visualCursor = [0, 0]; // cursor on 'h'
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`${chalk.inverse('h')}ello`);
+      unmount();
+    });
+
+    it('should display cursor at the end of the line as an inverted space', async () => {
+      mockBuffer.text = 'hello';
+      mockBuffer.lines = ['hello'];
+      mockBuffer.viewportVisualLines = ['hello'];
+      mockBuffer.visualCursor = [0, 5]; // cursor after 'o'
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`hello${chalk.inverse(' ')}`);
+      unmount();
+    });
+
+    it('should display cursor correctly on a highlighted token', async () => {
+      mockBuffer.text = 'run @path/to/file';
+      mockBuffer.lines = ['run @path/to/file'];
+      mockBuffer.viewportVisualLines = ['run @path/to/file'];
+      mockBuffer.visualCursor = [0, 9]; // cursor on 't' in 'to'
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      // The token '@path/to/file' is colored, and the cursor highlights one char inside it.
+      expect(frame).toContain(`@path/${chalk.inverse('t')}o/file`);
+      unmount();
+    });
+
+    it('should display cursor correctly for multi-byte unicode characters', async () => {
+      const text = 'hello 👍 world';
+      mockBuffer.text = text;
+      mockBuffer.lines = [text];
+      mockBuffer.viewportVisualLines = [text];
+      mockBuffer.visualCursor = [0, 6]; // cursor on '👍'
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`hello ${chalk.inverse('👍')} world`);
+      unmount();
+    });
+
+    it('should display cursor at the end of a line with unicode characters', async () => {
+      const text = 'hello 👍';
+      mockBuffer.text = text;
+      mockBuffer.lines = [text];
+      mockBuffer.viewportVisualLines = [text];
+      mockBuffer.visualCursor = [0, 8]; // cursor after '👍' (length is 6 + 2 for emoji)
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`hello 👍${chalk.inverse(' ')}`);
       unmount();
     });
   });
