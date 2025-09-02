@@ -19,7 +19,6 @@ import type { GeminiClient } from '../core/client.js';
 import { WorkspaceManager } from '../utils/WorkspaceManager.js';
 import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import type { ToolCallRequestInfo } from '../core/turn.js';
-import type { Part } from '@google/genai';
 import { SessionManager } from '../sessions/SessionManager.js';
 
 export class MultiModelSystem {
@@ -27,6 +26,129 @@ export class MultiModelSystem {
   private workspaceManager: WorkspaceManager;
   private currentProvider: ModelProviderConfig | null = null;
   private config: Config;
+  // Static mapping of model names to their tool call formats
+  private static readonly MODEL_FORMATS: Record<string, 'openai' | 'harmony' | 'gemini' | 'qwen'> = {
+    // Harmony format models (gpt-oss family)
+    'openai/gpt-oss-20b': 'harmony',
+    'gpt-oss-20b': 'harmony',
+    'gpt-oss-20b@f16': 'harmony',
+    
+    // OpenAI Chat Completions format models
+    'gpt-4o': 'openai',
+    'gpt-4.1': 'openai',
+    'gpt-4': 'openai',
+    'gpt-3.5-turbo': 'openai',
+    
+    // Gemini format models (Google)
+    'gemini-pro': 'gemini',
+    'gemini-1.5-pro': 'gemini',
+    'gemini-1.5-flash': 'gemini',
+    'gemini-2.5-pro': 'gemini',
+    'gemini-2.5-flash': 'gemini',
+    
+    // Qwen models (Alibaba)
+    'qwen/qwen3-coder-30b': 'qwen',
+    'qwen/qwq-32b': 'qwen',
+    'qwen/qwen3-30b-a3b-2507': 'qwen',
+    'qwen/qwen3-4b-thinking-2507': 'qwen',
+    'qwen/qwen3-4b-2507': 'qwen',
+  };
+
+  /**
+   * Get the tool call format for the current model
+   */
+  private getModelFormat(): 'openai' | 'harmony' | 'gemini' | 'qwen' {
+    if (!this.currentProvider) {
+      return 'openai'; // Default to OpenAI format
+    }
+    
+    const modelName = this.currentProvider.model.toLowerCase();
+    
+    // Check exact match first
+    if (MultiModelSystem.MODEL_FORMATS[modelName]) {
+      return MultiModelSystem.MODEL_FORMATS[modelName];
+    }
+    
+    // Check partial matches for flexibility
+    for (const [key, format] of Object.entries(MultiModelSystem.MODEL_FORMATS)) {
+      if (modelName.includes(key.toLowerCase()) || key.toLowerCase().includes(modelName)) {
+        console.log(`[MultiModelSystem] Model ${modelName} matched pattern ${key}, using ${format} format`);
+        return format;
+      }
+    }
+    
+    // Default to OpenAI format for unknown models
+    console.log(`[MultiModelSystem] Unknown model ${modelName}, defaulting to OpenAI format`);
+    return 'openai';
+  }
+
+  /**
+   * Create tool response message in appropriate format based on model type
+   */
+  private createToolResponseMessage(
+    content: string, 
+    toolCallId: string, 
+    toolName: string
+  ): UniversalMessage {
+    const format = this.getModelFormat();
+    
+    if (format === 'harmony') {
+      // Harmony format for gpt-oss and similar models
+      const harmonyContent = `<|start|>${toolName} to=assistant
+<|channel|>commentary
+<|message|>
+{
+  "tool_call_id": "${toolCallId}",
+  "result": ${JSON.stringify(content)}
+}
+<|end|>`;
+      
+      return {
+        role: 'user', // In Harmony format, tool responses go as user messages
+        content: harmonyContent,
+        timestamp: new Date()
+      };
+    } else if (format === 'qwen') {
+      // Qwen format - uses XML-like structure with tool_response tags
+      const qwenContent = `<tool_response>\n${content}\n</tool_response>`;
+      
+      return {
+        role: 'user', // Qwen format uses user role for tool responses like Harmony
+        content: qwenContent,
+        tool_call_id: toolCallId,
+        name: toolName,
+        timestamp: new Date()
+      };
+    } else if (format === 'gemini') {
+      // Gemini format with functionResponse structure
+      const geminiContent = JSON.stringify({
+        functionResponse: {
+          name: toolName,
+          response: {
+            tool_call_id: toolCallId,
+            result: content
+          }
+        }
+      });
+      
+      return {
+        role: 'tool',
+        content: geminiContent,
+        tool_call_id: toolCallId,
+        name: toolName,
+        timestamp: new Date()
+      };
+    } else {
+      // Standard OpenAI format for other models
+      return {
+        role: 'tool',
+        content: content,
+        tool_call_id: toolCallId,
+        name: toolName,
+        timestamp: new Date()
+      };
+    }
+  }
   // private readonly DEFAULT_MAX_TURNS = 10;
 
   constructor(config: Config, geminiClient?: GeminiClient) {
@@ -64,7 +186,12 @@ export class MultiModelSystem {
     const sessionManager = SessionManager.getInstance();
     messages.forEach(msg => {
       console.log('[MultiModelSystem] Adding to history:', msg);
-      sessionManager.addHistory(msg);
+      // For user messages, use the timestamp from frontend if available, otherwise use current time
+      const msgToAdd = {
+        ...msg,
+        timestamp: msg.timestamp || new Date()
+      };
+      sessionManager.addHistory(msgToAdd);
       
       // Auto-update title if this is the first user message in the session
       sessionManager.handleAutoTitleGeneration(msg);
@@ -136,7 +263,8 @@ export class MultiModelSystem {
           if (assistantContent.trim()) {
             SessionManager.getInstance().addHistory({
               role: 'assistant',
-              content: assistantContent
+              content: assistantContent,
+              timestamp: new Date()
             });
             console.log(`[MultiModelSystem] Saved assistant response to history (${assistantContent.length} chars)`);
           }
@@ -149,10 +277,9 @@ export class MultiModelSystem {
       
       // Check if we have tool calls to execute (like nonInteractiveCli.ts)
       if (toolCallRequests.length > 0) {
-        const toolResponseParts: Part[] = [];
         
+        // Execute each tool call and create individual tool response messages
         for (const requestInfo of toolCallRequests) {
-          
           try {
             const toolResponse = await executeToolCall(this.config, requestInfo, signal);
             
@@ -163,11 +290,42 @@ export class MultiModelSystem {
                 error: toolResponse.error
               };
               return;
-            } else {
-              if (toolResponse.responseParts) {
-                toolResponseParts.push(...toolResponse.responseParts);
+            }
+            
+            // Process each response part for this specific tool call
+            if (toolResponse.responseParts && toolResponse.responseParts.length > 0) {
+              for (const responsePart of toolResponse.responseParts) {
+                let toolResponseContent: string;
+                
+                // Convert Part to content string
+                if ('text' in responsePart) {
+                  toolResponseContent = responsePart.text || '';
+                } else if ('functionResponse' in responsePart && responsePart.functionResponse) {
+                  // Extract the actual tool result from functionResponse
+                  const response = responsePart.functionResponse.response;
+                  if (response && typeof response === 'object' && 'output' in response) {
+                    toolResponseContent = response['output'] as string;
+                  } else {
+                    toolResponseContent = JSON.stringify(response, null, 2);
+                  }
+                } else if ('inlineData' in responsePart && responsePart.inlineData?.data) {
+                  toolResponseContent = `[Tool returned file data: ${responsePart.inlineData.mimeType}]`;
+                } else {
+                  toolResponseContent = '[Tool response data]';
+                }
+                
+                // Create tool response message with appropriate format based on detected model type
+                const toolResponseMessage = this.createToolResponseMessage(
+                  toolResponseContent,
+                  requestInfo.callId,
+                  requestInfo.name
+                );
+                
+                SessionManager.getInstance().addHistory(toolResponseMessage);
+                console.log(`[MultiModelSystem] Added tool response for ${requestInfo.name} (ID: ${requestInfo.callId}) to session history`);
               }
             }
+            
           } catch (error) {
             console.error(`[MultiModelSystem] Tool execution error:`, error);
             yield {
@@ -178,37 +336,8 @@ export class MultiModelSystem {
           }
         }
         
-        // Add tool response to conversation history (preserve context)
-        if (toolResponseParts.length > 0) {
-          // Convert Parts to UniversalMessage content
-          const toolResponseContent = toolResponseParts
-            .map(part => {
-              if ('text' in part) {
-                return part.text;
-              } else if ('functionResponse' in part && part.functionResponse) {
-                // Extract the actual tool result from functionResponse
-                const response = part.functionResponse.response;
-                if (response && typeof response === 'object' && 'output' in response) {
-                  return response['output'] as string;
-                }
-                return JSON.stringify(response, null, 2);
-              } else if ('inlineData' in part && part.inlineData?.data) {
-                return `[Tool returned file data: ${part.inlineData.mimeType}]`;
-              }
-              return '[Tool response data]';
-            })
-            .join('\n');
-          
-          // Add tool response to SessionManager only (no more currentMessages management)
-          const toolResponseMessage: UniversalMessage = {
-            role: 'user',
-            content: `Tool response: ${toolResponseContent}`
-          };
-          
-          SessionManager.getInstance().addHistory(toolResponseMessage);
-          // OLD: currentMessages = [...updatedHistory]; // No longer needed - we get fresh history each loop
-          console.log(`[MultiModelSystem] Added tool response to session history, continuing loop...`);
-        } 
+        // Continue to next iteration to let LLM process all tool responses
+        continue;
       } 
       else {
         // No tool calls, conversation is complete

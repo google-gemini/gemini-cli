@@ -26,8 +26,9 @@ export interface UniversalMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   toolCalls?: ToolCall[];
-  toolCallId?: string;
+  tool_call_id?: string;
   name?: string;
+  timestamp?: Date;
 }
 
 export interface UniversalResponse {
@@ -102,7 +103,7 @@ export interface ChatSession {
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: Date;
   toolCalls?: ToolCall[];

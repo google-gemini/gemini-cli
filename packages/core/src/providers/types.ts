@@ -38,8 +38,9 @@ export interface UniversalMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   toolCalls?: ToolCall[];
-  toolCallId?: string;
+  tool_call_id?: string;
   name?: string;
+  timestamp?: Date;
 }
 
 export interface ToolCall {

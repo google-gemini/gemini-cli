@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -6,12 +6,129 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import { format } from 'date-fns';
-import { Bot, User, AlertCircle } from 'lucide-react';
+import { Bot, User, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Card, CardContent } from '@/components/ui/Card';
 import { TypingIndicator } from './TypingIndicator';
 import type { ChatMessage } from '@/types';
 import 'katex/dist/katex.min.css';
+
+// Tool response format detection and parsing
+interface ParsedToolResponse {
+  toolName: string;
+  content: string;
+  format: 'harmony' | 'openai' | 'gemini' | 'qwen' | 'unknown';
+  toolCallId?: string;
+}
+
+// Think tag parsing for reasoning models
+interface ParsedThinkingContent {
+  thinkingSections: string[];
+  mainContent: string;
+}
+
+function parseThinkingContent(content: string): ParsedThinkingContent {
+  const thinkingSections: string[] = [];
+  let remainingContent = content;
+
+  // Extract all <think>...</think> sections
+  const thinkRegex = /<think>([\s\S]*?)<\/think>/g;
+  let match;
+  
+  while ((match = thinkRegex.exec(content)) !== null) {
+    thinkingSections.push(match[1].trim());
+  }
+  
+  // Remove all thinking sections from main content
+  const mainContent = remainingContent.replace(thinkRegex, '').trim();
+  
+  return {
+    thinkingSections,
+    mainContent
+  };
+}
+
+function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
+  const content = message.content;
+  
+  // Check for Harmony format: <|start|>toolname to=assistant...
+  const harmonyMatch = content.match(/<\|start\|>(\w+)\s+to=assistant[\s\S]*?<\|message\|>([\s\S]*?)<\|end\|>/);
+  if (harmonyMatch) {
+    try {
+      const [, toolName, messageContent] = harmonyMatch;
+      const parsedMessage = JSON.parse(messageContent.trim());
+      return {
+        toolName,
+        content: parsedMessage.result || messageContent.trim(),
+        format: 'harmony',
+        toolCallId: parsedMessage.tool_call_id
+      };
+    } catch {
+      return {
+        toolName: harmonyMatch[1],
+        content: harmonyMatch[2].trim(),
+        format: 'harmony'
+      };
+    }
+  }
+  
+  // Check for OpenAI format: role='tool' with tool_call_id and name
+  if (message.role === 'tool') {
+    // For OpenAI format, we should have the tool name from message properties
+    // Since we don't have direct access to tool_call_id and name in ChatMessage,
+    // we'll extract from content if it's JSON, otherwise use content directly
+    try {
+      const jsonContent = JSON.parse(content);
+      return {
+        toolName: jsonContent.name || 'Tool',
+        content: jsonContent.result || jsonContent.output || content,
+        format: 'openai',
+        toolCallId: jsonContent.tool_call_id
+      };
+    } catch {
+      return {
+        toolName: 'Tool',
+        content: content,
+        format: 'openai'
+      };
+    }
+  }
+  
+  // Check for Qwen format: <tool_response>...</tool_response>
+  const qwenMatch = content.match(/<tool_response>\s*([\s\S]*?)\s*<\/tool_response>/);
+  if (qwenMatch) {
+    const [, toolContent] = qwenMatch;
+    return {
+      toolName: 'Qwen Tool', // Qwen format doesn't include tool name in response
+      content: toolContent.trim(),
+      format: 'qwen'
+    };
+  }
+  
+  // Check for Gemini format: functionResponse structure
+  if (content.includes('functionResponse') || content.includes('functionCall')) {
+    try {
+      const jsonContent = JSON.parse(content);
+      if (jsonContent.functionResponse) {
+        return {
+          toolName: jsonContent.functionResponse.name || 'Function',
+          content: JSON.stringify(jsonContent.functionResponse.response, null, 2),
+          format: 'gemini'
+        };
+      }
+    } catch {
+      // Fallback for non-JSON Gemini format
+      return {
+        toolName: 'Function',
+        content: content,
+        format: 'gemini'
+      };
+    }
+  }
+  
+  // Not a tool response
+  return null;
+}
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -63,20 +180,94 @@ export const MessageList: React.FC<MessageListProps> = ({
   );
 };
 
+// Component to display thinking sections in a collapsible format
+const ThinkingSection: React.FC<{ thinkingSections: string[] }> = ({ thinkingSections }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  if (thinkingSections.length === 0) return null;
+
+  return (
+    <div className="mb-3">
+      <div className="bg-muted/50 border border-border rounded-lg overflow-hidden">
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="w-full px-3 py-2 text-left flex items-center gap-2 text-muted-foreground hover:bg-muted/70 transition-colors text-xs"
+        >
+          {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          <span className="font-medium">
+            Thinking process ({thinkingSections.length} step{thinkingSections.length > 1 ? 's' : ''})
+          </span>
+        </button>
+        {isExpanded && (
+          <div className="border-t border-border/50 bg-background/50">
+            {thinkingSections.map((thinking, index) => (
+              <div key={index} className="px-3 py-2 border-b border-border/30 last:border-b-0">
+                <div className="text-xs text-muted-foreground mb-1 font-medium">Step {index + 1}:</div>
+                <div className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{thinking}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 interface MessageBubbleProps {
   message: ChatMessage;
   isStreaming?: boolean;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) => {
-  const isUser = message.role === 'user';
+  // Check if this message is actually a tool response (regardless of role)
+  const toolResponse = parseToolResponse(message);
+  const isUser = message.role === 'user' && !toolResponse; // User only if not a tool response
   const isSystem = message.role === 'system';
+  const isTool = message.role === 'tool' || toolResponse; // Tool if role is tool OR if content is tool format
 
   if (isSystem) {
     return (
       <div className="flex justify-center">
         <div className="bg-muted rounded-lg px-3 py-2 text-sm text-muted-foreground max-w-2xl">
           {(Markdown as any)({ remarkPlugins: [remarkGfm], rehypePlugins: [rehypeHighlight], children: message.content })}
+        </div>
+      </div>
+    );
+  }
+
+  if (isTool && toolResponse) {
+    const parsed = toolResponse; // Use the already parsed result
+    const formatColors = {
+      harmony: 'bg-purple-50 border-purple-200 text-purple-800',
+      openai: 'bg-green-50 border-green-200 text-green-800',
+      gemini: 'bg-blue-50 border-blue-200 text-blue-800',
+      qwen: 'bg-orange-50 border-orange-200 text-orange-800',
+      unknown: 'bg-gray-50 border-gray-200 text-gray-800'
+    };
+    
+    const formatLabels = {
+      harmony: 'Harmony Tool',
+      openai: 'OpenAI Tool',
+      gemini: 'Gemini Tool',
+      qwen: 'Qwen Tool',
+      unknown: 'Tool Response'
+    };
+
+    return (
+      <div className="flex justify-center">
+        <div className={cn("border rounded-lg px-3 py-2 text-sm max-w-2xl", formatColors[parsed.format])}>
+          <div className="font-semibold text-xs mb-1 flex items-center gap-2">
+            <span>{formatLabels[parsed.format]}</span>
+            <span className="font-mono text-xs opacity-70">{parsed.toolName}</span>
+            {parsed.toolCallId && (
+              <span className="font-mono text-xs opacity-50">#{parsed.toolCallId.slice(-6)}</span>
+            )}
+          </div>
+          {(Markdown as any)({ 
+            remarkPlugins: [remarkGfm], 
+            rehypePlugins: [rehypeHighlight], 
+            children: parsed.content 
+          })}
         </div>
       </div>
     );
@@ -105,35 +296,88 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
                 <span className="text-sm">{message.error}</span>
               </div>
             ) : (
-              <div className={cn(
-                "prose prose-sm max-w-none",
-                isUser ? "prose-invert" : "",
-                "prose-pre:bg-muted prose-pre:text-foreground",
-                "prose-code:bg-muted prose-code:text-foreground prose-code:px-1 prose-code:rounded"
-              )}>
-                {(Markdown as any)({
-                  remarkPlugins: [remarkGfm, remarkMath],
-                  rehypePlugins: [rehypeKatex, rehypeHighlight],
-                  components: {
-                    code(props: any) {
-                      const { inline, className, children, ...rest } = props;
-                      const match = /language-(\w+)/.exec(className || '');
-                      const content = String(children).replace(/\n$/, '');
-                      return !inline && match ? (
-                        <pre className="overflow-x-auto">
-                          <code className={className} {...rest}>
-                            {content}
-                          </code>
-                        </pre>
-                      ) : (
-                        <code className={cn("px-1 py-0.5 rounded text-sm", className)} {...rest}>
-                          {content}
-                        </code>
-                      );
-                    },
-                  },
-                  children: message.content
-                })}
+              <div>
+                {(() => {
+                  // Parse thinking content for assistant messages only
+                  if (message.role === 'assistant') {
+                    const { thinkingSections, mainContent } = parseThinkingContent(message.content);
+                    
+                    return (
+                      <>
+                        {/* Show thinking sections if they exist */}
+                        <ThinkingSection thinkingSections={thinkingSections} />
+                        
+                        {/* Show main content */}
+                        {mainContent && (
+                          <div className={cn(
+                            "prose prose-sm max-w-none",
+                            isUser ? "prose-invert" : "",
+                            "prose-pre:bg-muted prose-pre:text-foreground",
+                            "prose-code:bg-muted prose-code:text-foreground prose-code:px-1 prose-code:rounded"
+                          )}>
+                            {(Markdown as any)({
+                              remarkPlugins: [remarkGfm, remarkMath],
+                              rehypePlugins: [rehypeKatex, rehypeHighlight],
+                              components: {
+                                code(props: any) {
+                                  const { inline, className, children, ...rest } = props;
+                                  const match = /language-(\w+)/.exec(className || '');
+                                  const content = String(children).replace(/\n$/, '');
+                                  return !inline && match ? (
+                                    <pre className="overflow-x-auto">
+                                      <code className={className} {...rest}>
+                                        {content}
+                                      </code>
+                                    </pre>
+                                  ) : (
+                                    <code className={cn("px-1 py-0.5 rounded text-sm", className)} {...rest}>
+                                      {content}
+                                    </code>
+                                  );
+                                },
+                              },
+                              children: mainContent
+                            })}
+                          </div>
+                        )}
+                      </>
+                    );
+                  } else {
+                    // For non-assistant messages, render normally
+                    return (
+                      <div className={cn(
+                        "prose prose-sm max-w-none",
+                        isUser ? "prose-invert" : "",
+                        "prose-pre:bg-muted prose-pre:text-foreground",
+                        "prose-code:bg-muted prose-code:text-foreground prose-code:px-1 prose-code:rounded"
+                      )}>
+                        {(Markdown as any)({
+                          remarkPlugins: [remarkGfm, remarkMath],
+                          rehypePlugins: [rehypeKatex, rehypeHighlight],
+                          components: {
+                            code(props: any) {
+                              const { inline, className, children, ...rest } = props;
+                              const match = /language-(\w+)/.exec(className || '');
+                              const content = String(children).replace(/\n$/, '');
+                              return !inline && match ? (
+                                <pre className="overflow-x-auto">
+                                  <code className={className} {...rest}>
+                                    {content}
+                                  </code>
+                                </pre>
+                              ) : (
+                                <code className={cn("px-1 py-0.5 rounded text-sm", className)} {...rest}>
+                                  {content}
+                                </code>
+                              );
+                            },
+                          },
+                          children: message.content
+                        })}
+                      </div>
+                    );
+                  }
+                })()}
               </div>
             )}
             
@@ -158,11 +402,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
 
             {/* Timestamp */}
             <div className={cn(
-              "text-xs mt-2 pt-2 border-t border-border/20",
+              "text-xs mt-2 pt-2 border-t border-border/20 flex items-center gap-1",
               isUser ? "text-primary-foreground/70" : "text-muted-foreground"
             )}>
-              {format(message.timestamp, 'HH:mm')}
-              {isStreaming && <span className="ml-1 animate-pulse">●</span>}
+              <time dateTime={message.timestamp.toISOString()} title={format(message.timestamp, 'yyyy-MM-dd HH:mm:ss')}>
+                {format(message.timestamp, 'HH:mm')}
+              </time>
+              {isStreaming && <span className="animate-pulse">●</span>}
             </div>
           </CardContent>
         </Card>
