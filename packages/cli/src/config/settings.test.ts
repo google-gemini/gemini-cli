@@ -125,7 +125,28 @@ describe('Settings Loading and Merging', () => {
       expect(settings.system.settings).toEqual({});
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual({});
+      expect(settings.merged).toEqual({
+        general: {},
+        ui: {
+          customThemes: {},
+        },
+        mcp: {},
+        mcpServers: {},
+        context: {
+          includeDirectories: [],
+        },
+        model: {
+          chatCompression: {},
+        },
+        advanced: {
+          excludedEnvVars: [],
+        },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        security: {},
+      });
       expect(settings.errors.length).toBe(0);
     });
 
@@ -160,6 +181,27 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...systemSettingsContent,
+        general: {},
+        ui: {
+          ...systemSettingsContent.ui,
+          customThemes: {},
+        },
+        mcp: {},
+        mcpServers: {},
+        context: {
+          includeDirectories: [],
+        },
+        model: {
+          chatCompression: {},
+        },
+        advanced: {
+          excludedEnvVars: [],
+        },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        security: {},
       });
     });
 
@@ -195,6 +237,28 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...userSettingsContent,
+        general: {},
+        ui: {
+          ...userSettingsContent.ui,
+          customThemes: {},
+        },
+        mcp: {},
+        mcpServers: {},
+        context: {
+          ...userSettingsContent.context,
+          includeDirectories: [],
+        },
+        model: {
+          chatCompression: {},
+        },
+        advanced: {
+          excludedEnvVars: [],
+        },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        security: {},
       });
     });
 
@@ -227,7 +291,30 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
-        ...workspaceSettingsContent,
+        tools: {
+          sandbox: true,
+        },
+        context: {
+          fileName: 'WORKSPACE_CONTEXT.md',
+          includeDirectories: [],
+        },
+        general: {},
+        ui: {
+          customThemes: {},
+        },
+        mcp: {},
+        mcpServers: {},
+        model: {
+          chatCompression: {},
+        },
+        advanced: {
+          excludedEnvVars: [],
+        },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        security: {},
       });
     });
 
@@ -269,6 +356,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           theme: 'dark',
         },
@@ -338,6 +426,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           theme: 'system-theme',
         },
@@ -561,6 +650,7 @@ describe('Settings Loading and Merging', () => {
         tools: {
           sandbox: false,
         },
+        general: {},
         ui: {
           theme: 'system-theme',
         },
@@ -1268,7 +1358,28 @@ describe('Settings Loading and Merging', () => {
       // Check that settings are empty due to parsing errors
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual({});
+      expect(settings.merged).toEqual({
+        general: {},
+        ui: {
+          customThemes: {},
+        },
+        mcp: {},
+        mcpServers: {},
+        context: {
+          includeDirectories: [],
+        },
+        model: {
+          chatCompression: {},
+        },
+        advanced: {
+          excludedEnvVars: [],
+        },
+        extensions: {
+          disabled: [],
+          workspacesWithMigrationNudge: [],
+        },
+        security: {},
+      });
 
       // Check that error objects are populated in settings.errors
       expect(settings.errors).toBeDefined();
@@ -1676,6 +1787,27 @@ describe('Settings Loading and Merging', () => {
         expect(settings.system.settings).toEqual(systemSettingsContent);
         expect(settings.merged).toEqual({
           ...systemSettingsContent,
+          general: {},
+          ui: {
+            ...systemSettingsContent.ui,
+            customThemes: {},
+          },
+          mcp: {},
+          mcpServers: {},
+          context: {
+            includeDirectories: [],
+          },
+          model: {
+            chatCompression: {},
+          },
+          advanced: {
+            excludedEnvVars: [],
+          },
+          extensions: {
+            disabled: [],
+            workspacesWithMigrationNudge: [],
+          },
+          security: {},
         });
       });
     });
