@@ -300,7 +300,7 @@ export const SETTINGS_SCHEMA = {
             label: 'Screen Reader Mode',
             category: 'UI',
             requiresRestart: true,
-            default: false,
+            default: undefined as boolean | undefined,
             description:
               'Render output in plain-text to be more screen reader accessible',
             showInDialog: true,
@@ -424,7 +424,7 @@ export const SETTINGS_SCHEMA = {
         label: 'Skip Next Speaker Check',
         category: 'Model',
         requiresRestart: false,
-        default: false,
+        default: true,
         description: 'Skip the next speaker check.',
         showInDialog: true,
       },
