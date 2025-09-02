@@ -10,13 +10,13 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { Colors } from '../colors.js';
 
 interface ProQuotaDialogProps {
-  currentModel: string;
+  failedModel: string;
   fallbackModel: string;
   onChoice: (choice: 'auth' | 'continue') => void;
 }
 
 export function ProQuotaDialog({
-  currentModel,
+  failedModel: currentModel,
   fallbackModel,
   onChoice,
 }: ProQuotaDialogProps): React.JSX.Element {

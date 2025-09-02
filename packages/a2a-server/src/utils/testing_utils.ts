@@ -43,7 +43,7 @@ export function createMockConfig(
     getContentGeneratorConfig: vi.fn().mockReturnValue({ model: 'gemini-pro' }),
     getModel: vi.fn().mockReturnValue('gemini-pro'),
     getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
-    setFlashFallbackHandler: vi.fn(),
+    setFallbackHandler: vi.fn(),
     initialize: vi.fn().mockResolvedValue(undefined),
     getProxy: vi.fn().mockReturnValue(undefined),
     getHistory: vi.fn().mockReturnValue([]),
