@@ -12,21 +12,19 @@ import { TokenStorageType } from './types.js';
 const FORCE_FILE_STORAGE_ENV_VAR = 'GEMINI_FORCE_FILE_STORAGE';
 
 export class HybridTokenStorage extends BaseTokenStorage {
-  private primaryStorage: TokenStorage | null = null;
-  private fallbackStorage: FileTokenStorage;
+  private storage: TokenStorage | null = null;
   private storageType: TokenStorageType | null = null;
   private storageInitPromise: Promise<TokenStorage> | null = null;
 
-  constructor(serviceName: string = 'gemini-cli-mcp-oauth') {
+  constructor(serviceName: string) {
     super(serviceName);
-    this.fallbackStorage = new FileTokenStorage(serviceName);
   }
 
   private async initializeStorage(): Promise<TokenStorage> {
     if (process.env[FORCE_FILE_STORAGE_ENV_VAR] === 'true') {
-      this.primaryStorage = this.fallbackStorage;
+      this.storage = new FileTokenStorage(this.serviceName);
       this.storageType = TokenStorageType.ENCRYPTED_FILE;
-      return this.primaryStorage;
+      return this.storage;
     }
 
     // Dynamically import KeychainTokenStorage to avoid initialization issues
@@ -38,22 +36,22 @@ export class HybridTokenStorage extends BaseTokenStorage {
 
       const isAvailable = await keychainStorage.isAvailable();
       if (isAvailable) {
-        this.primaryStorage = keychainStorage;
+        this.storage = keychainStorage;
         this.storageType = TokenStorageType.KEYCHAIN;
-        return this.primaryStorage;
+        return this.storage;
       }
     } catch (_e) {
       // Fallback to file storage if keychain fails to initialize
     }
 
-    this.primaryStorage = this.fallbackStorage;
+    this.storage = new FileTokenStorage(this.serviceName);
     this.storageType = TokenStorageType.ENCRYPTED_FILE;
-    return this.primaryStorage;
+    return this.storage;
   }
 
   private async getStorage(): Promise<TokenStorage> {
-    if (this.primaryStorage !== null) {
-      return this.primaryStorage;
+    if (this.storage !== null) {
+      return this.storage;
     }
 
     // Use a single initialization promise to avoid race conditions
@@ -102,7 +100,7 @@ export class HybridTokenStorage extends BaseTokenStorage {
   }
 
   async resetStorage(): Promise<void> {
-    this.primaryStorage = null;
+    this.storage = null;
     this.storageType = null;
     this.storageInitPromise = null;
   }
