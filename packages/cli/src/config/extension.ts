@@ -35,7 +35,11 @@ export interface ExtensionConfig {
   name: string;
   version: string;
   mcpServers?: Record<string, MCPServerConfig>;
-  contextFileName?: string | string[];
+  /**
+   * @deprecated Use `contextFileNames` instead.
+   */
+  contextFileName?: string;
+  contextFileNames?: string[];
   excludeTools?: string[];
 }
 
@@ -244,13 +248,29 @@ function loadInstallMetadata(
   }
 }
 
+// This interface is used for backward compatibility with the old ExtensionConfig.
+interface OldExtensionConfig {
+  name: string;
+  contextFileName?: string | string[];
+  contextFileNames?: string[];
+}
+
 function getContextFileNames(config: ExtensionConfig): string[] {
-  if (!config.contextFileName) {
-    return ['GEMINI.md'];
-  } else if (!Array.isArray(config.contextFileName)) {
+  if (config.contextFileNames) {
+    return config.contextFileNames;
+  }
+  // For backward compatibility, handle if an old config still passes an array.
+  const oldConfig = config as OldExtensionConfig;
+  if (Array.isArray(oldConfig.contextFileName)) {
+    console.warn(
+      `[DEPRECATION] The 'contextFileName' property with an array value in extension '${config.name}' is deprecated. Please migrate to 'contextFileNames'.`,
+    );
+    return oldConfig.contextFileName;
+  }
+  if (config.contextFileName) {
     return [config.contextFileName];
   }
-  return config.contextFileName;
+  return ['GEMINI.md'];
 }
 
 /**

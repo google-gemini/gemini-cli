@@ -163,6 +163,53 @@ describe('loadExtensions', () => {
     ]);
   });
 
+  it('should load multiple context file paths from the extension config', () => {
+    createExtension({
+      extensionsDir: workspaceExtensionsDir,
+      name: 'ext1',
+      version: '1.0.0',
+      addContextFile: false,
+      contextFileNames: ['my-context-file.md', 'another-context.md'],
+    });
+
+    const extensions = loadExtensions(tempWorkspaceDir);
+
+    expect(extensions).toHaveLength(1);
+    const ext1 = extensions.find((e) => e.config.name === 'ext1');
+    expect(ext1?.contextFiles).toEqual([
+      path.join(workspaceExtensionsDir, 'ext1', 'my-context-file.md'),
+      path.join(workspaceExtensionsDir, 'ext1', 'another-context.md'),
+    ]);
+  });
+
+  it('should maintain backward compatibility for contextFileName as an array', () => {
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const extDir = path.join(workspaceExtensionsDir, 'ext-compat');
+    fs.mkdirSync(extDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(extDir, EXTENSIONS_CONFIG_FILENAME),
+      JSON.stringify({
+        name: 'ext-compat',
+        version: '1.0.0',
+        contextFileName: ['compat-a.md', 'compat-b.md'],
+      }),
+    );
+    fs.writeFileSync(path.join(extDir, 'compat-a.md'), 'context');
+    fs.writeFileSync(path.join(extDir, 'compat-b.md'), 'context');
+
+    const extensions = loadExtensions(tempWorkspaceDir);
+    expect(extensions).toHaveLength(1);
+    const extCompat = extensions.find((e) => e.config.name === 'ext-compat');
+    expect(extCompat?.contextFiles).toEqual([
+      path.join(extDir, 'compat-a.md'),
+      path.join(extDir, 'compat-b.md'),
+    ]);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      `[DEPRECATION] The 'contextFileName' property with an array value in extension 'ext-compat' is deprecated. Please migrate to 'contextFileNames'.`,
+    );
+    consoleSpy.mockRestore();
+  });
+
   it('should filter out disabled extensions', () => {
     createExtension({
       extensionsDir: workspaceExtensionsDir,
@@ -742,13 +789,20 @@ function createExtension({
   version = '1.0.0',
   addContextFile = false,
   contextFileName = undefined as string | undefined,
+  contextFileNames = undefined as string[] | undefined,
   mcpServers = {} as Record<string, MCPServerConfig>,
 } = {}): string {
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(
     path.join(extDir, EXTENSIONS_CONFIG_FILENAME),
-    JSON.stringify({ name, version, contextFileName, mcpServers }),
+    JSON.stringify({
+      name,
+      version,
+      contextFileName,
+      contextFileNames,
+      mcpServers,
+    }),
   );
 
   if (addContextFile) {
@@ -759,6 +813,14 @@ function createExtension({
     const contextPath = path.join(extDir, contextFileName);
     fs.mkdirSync(path.dirname(contextPath), { recursive: true });
     fs.writeFileSync(contextPath, 'context');
+  }
+
+  if (contextFileNames) {
+    for (const fileName of contextFileNames) {
+      const contextPath = path.join(extDir, fileName);
+      fs.mkdirSync(path.dirname(contextPath), { recursive: true });
+      fs.writeFileSync(contextPath, 'context');
+    }
   }
   return extDir;
 }
