@@ -271,19 +271,4 @@ describe('HybridTokenStorage', () => {
       expect(mockKeychainStorage.clearAll).toHaveBeenCalled();
     });
   });
-
-  describe('resetStorage', () => {
-    it('should clear cached storage selection', async () => {
-      mockKeychainStorage.isAvailable!.mockResolvedValue(true);
-      mockKeychainStorage.getCredentials.mockResolvedValue(null);
-
-      await storage.getCredentials('test-server');
-      expect(mockKeychainStorage.isAvailable).toHaveBeenCalledTimes(1);
-
-      await storage.resetStorage();
-
-      await storage.getCredentials('test-server');
-      expect(mockKeychainStorage.isAvailable).toHaveBeenCalledTimes(2);
-    });
-  });
 });

@@ -57,8 +57,7 @@ export class HybridTokenStorage extends BaseTokenStorage {
     }
 
     // Wait for initialization to complete
-    const storage = await this.storageInitPromise;
-    return storage;
+    return await this.storageInitPromise;
   }
 
   async getCredentials(serverName: string): Promise<OAuthCredentials | null> {
@@ -94,11 +93,5 @@ export class HybridTokenStorage extends BaseTokenStorage {
   async getStorageType(): Promise<TokenStorageType> {
     await this.getStorage();
     return this.storageType!;
-  }
-
-  async resetStorage(): Promise<void> {
-    this.storage = null;
-    this.storageType = null;
-    this.storageInitPromise = null;
   }
 }
