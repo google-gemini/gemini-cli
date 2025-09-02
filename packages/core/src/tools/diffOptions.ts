@@ -38,7 +38,7 @@ export function getDiffStat(
     return { addedLines, removedLines, addedChars, removedChars };
   };
 
-  const aiPatch = Diff.structuredPatch(
+  const modelPatch = Diff.structuredPatch(
     fileName,
     fileName,
     oldStr,
@@ -47,7 +47,7 @@ export function getDiffStat(
     'Proposed',
     DEFAULT_DIFF_OPTIONS,
   );
-  const modelStats = getStats(aiPatch);
+  const modelStats = getStats(modelPatch);
 
   const userPatch = Diff.structuredPatch(
     fileName,
