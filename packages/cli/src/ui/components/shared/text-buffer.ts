@@ -1268,26 +1268,32 @@ export function textBufferReducer(
     case 'delete_word_right': {
       const { cursorRow, cursorCol, lines } = state;
       const lineContent = currentLine(cursorRow);
-      const arr = toCodePoints(lineContent);
-      if (cursorCol >= arr.length && cursorRow === lines.length - 1)
+      const lineLen = cpLen(lineContent);
+
+      if (cursorCol >= lineLen && cursorRow === lines.length - 1) {
         return state;
-      if (cursorCol >= arr.length) {
-        // Act as a delete
-        const nextState = pushUndoLocal(state);
+      }
+
+      const nextState = pushUndoLocal(state);
+      const newLines = [...nextState.lines];
+
+      if (cursorCol >= lineLen) {
+        // Act as a delete, joining with the next line
         const nextLineContent = currentLine(cursorRow + 1);
-        const newLines = [...nextState.lines];
         newLines[cursorRow] = lineContent + nextLineContent;
         newLines.splice(cursorRow + 1, 1);
-        return { ...nextState, lines: newLines, preferredCol: null };
+      } else {
+        const nextWordStart = findNextWordStartInLine(lineContent, cursorCol);
+        const end = nextWordStart === null ? lineLen : nextWordStart;
+        newLines[cursorRow] =
+          cpSlice(lineContent, 0, cursorCol) + cpSlice(lineContent, end);
       }
-      const nextState = pushUndoLocal(state);
-      let end = cursorCol;
-      while (end < arr.length && !isWordChar(arr[end])) end++;
-      while (end < arr.length && isWordChar(arr[end])) end++;
-      const newLines = [...nextState.lines];
-      newLines[cursorRow] =
-        cpSlice(lineContent, 0, cursorCol) + cpSlice(lineContent, end);
-      return { ...nextState, lines: newLines, preferredCol: null };
+
+      return {
+        ...nextState,
+        lines: newLines,
+        preferredCol: null,
+      };
     }
 
     case 'kill_line_right': {
