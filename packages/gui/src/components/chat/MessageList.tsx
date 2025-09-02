@@ -72,6 +72,59 @@ function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
     }
   }
   
+  // Check for Gemini format first: __gemini_function_response structure
+  if (content.includes('__gemini_function_response')) {
+    try {
+      const jsonContent = JSON.parse(content);
+      if (jsonContent.__gemini_function_response) {
+        return {
+          toolName: jsonContent.__gemini_function_response.name || 'Function',
+          content: jsonContent.__gemini_function_response.response?.output || JSON.stringify(jsonContent.__gemini_function_response.response, null, 2),
+          format: 'gemini'
+        };
+      }
+    } catch {
+      // Fallback for non-JSON Gemini format
+      return {
+        toolName: 'Function',
+        content: content,
+        format: 'gemini'
+      };
+    }
+  }
+  
+  // Check for standard Gemini format: functionResponse structure
+  if (content.includes('functionResponse') || content.includes('functionCall')) {
+    try {
+      const jsonContent = JSON.parse(content);
+      if (jsonContent.functionResponse) {
+        return {
+          toolName: jsonContent.functionResponse.name || 'Function',
+          content: JSON.stringify(jsonContent.functionResponse.response, null, 2),
+          format: 'gemini'
+        };
+      }
+    } catch {
+      // Fallback for non-JSON Gemini format
+      return {
+        toolName: 'Function',
+        content: content,
+        format: 'gemini'
+      };
+    }
+  }
+  
+  // Check for Qwen format: <tool_response>...</tool_response>
+  const qwenMatch = content.match(/<tool_response>\s*([\s\S]*?)\s*<\/tool_response>/);
+  if (qwenMatch) {
+    const [, toolContent] = qwenMatch;
+    return {
+      toolName: 'Qwen Tool', // Qwen format doesn't include tool name in response
+      content: toolContent.trim(),
+      format: 'qwen'
+    };
+  }
+
   // Check for OpenAI format: role='tool' with tool_call_id and name
   if (message.role === 'tool') {
     // For OpenAI format, we should have the tool name from message properties
@@ -90,38 +143,6 @@ function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
         toolName: 'Tool',
         content: content,
         format: 'openai'
-      };
-    }
-  }
-  
-  // Check for Qwen format: <tool_response>...</tool_response>
-  const qwenMatch = content.match(/<tool_response>\s*([\s\S]*?)\s*<\/tool_response>/);
-  if (qwenMatch) {
-    const [, toolContent] = qwenMatch;
-    return {
-      toolName: 'Qwen Tool', // Qwen format doesn't include tool name in response
-      content: toolContent.trim(),
-      format: 'qwen'
-    };
-  }
-  
-  // Check for Gemini format: functionResponse structure
-  if (content.includes('functionResponse') || content.includes('functionCall')) {
-    try {
-      const jsonContent = JSON.parse(content);
-      if (jsonContent.functionResponse) {
-        return {
-          toolName: jsonContent.functionResponse.name || 'Function',
-          content: JSON.stringify(jsonContent.functionResponse.response, null, 2),
-          format: 'gemini'
-        };
-      }
-    } catch {
-      // Fallback for non-JSON Gemini format
-      return {
-        toolName: 'Function',
-        content: content,
-        format: 'gemini'
       };
     }
   }
