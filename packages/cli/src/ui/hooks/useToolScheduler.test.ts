@@ -113,6 +113,7 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     renderHook(() =>
       useReactToolScheduler(
         onComplete,
+        () => {}, // onToolCallSkipped
         mockConfig as unknown as Config,
         setPendingHistoryItem,
         () => undefined,
@@ -261,6 +262,7 @@ describe('useReactToolScheduler', () => {
     renderHook(() =>
       useReactToolScheduler(
         onComplete,
+        () => {}, // onToolCallSkipped
         mockConfig as unknown as Config,
         setPendingHistoryItem,
         () => undefined,

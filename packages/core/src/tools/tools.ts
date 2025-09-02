@@ -509,6 +509,7 @@ export enum ToolConfirmationOutcome {
   ProceedAlwaysTool = 'proceed_always_tool',
   ModifyWithEditor = 'modify_with_editor',
   Cancel = 'cancel',
+  Skip = 'skip',
 }
 
 export enum Kind {

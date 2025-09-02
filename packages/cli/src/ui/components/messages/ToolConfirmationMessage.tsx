@@ -151,6 +151,10 @@ export const ToolConfirmationMessage: React.FC<
         label: 'No, suggest changes (esc)',
         value: ToolConfirmationOutcome.Cancel,
       });
+      options.push({
+        label: 'Skip',
+        value: ToolConfirmationOutcome.Skip,
+      });
     }
 
     bodyContent = (
@@ -179,6 +183,10 @@ export const ToolConfirmationMessage: React.FC<
     options.push({
       label: 'No, suggest changes (esc)',
       value: ToolConfirmationOutcome.Cancel,
+    });
+    options.push({
+      label: 'Skip',
+      value: ToolConfirmationOutcome.Skip,
     });
 
     let bodyContentHeight = availableBodyContentHeight();
@@ -219,6 +227,10 @@ export const ToolConfirmationMessage: React.FC<
     options.push({
       label: 'No, suggest changes (esc)',
       value: ToolConfirmationOutcome.Cancel,
+    });
+    options.push({
+      label: 'Skip',
+      value: ToolConfirmationOutcome.Skip,
     });
 
     bodyContent = (
@@ -268,6 +280,10 @@ export const ToolConfirmationMessage: React.FC<
     options.push({
       label: 'No, suggest changes (esc)',
       value: ToolConfirmationOutcome.Cancel,
+    });
+    options.push({
+      label: 'Skip',
+      value: ToolConfirmationOutcome.Skip,
     });
   }
 

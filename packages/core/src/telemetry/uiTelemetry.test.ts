@@ -110,6 +110,7 @@ describe('UiTelemetryService', () => {
           [ToolCallDecision.REJECT]: 0,
           [ToolCallDecision.MODIFY]: 0,
           [ToolCallDecision.AUTO_ACCEPT]: 0,
+          [ToolCallDecision.SKIP]: 0,
         },
         byName: {},
       },
@@ -373,6 +374,7 @@ describe('UiTelemetryService', () => {
           [ToolCallDecision.REJECT]: 0,
           [ToolCallDecision.MODIFY]: 0,
           [ToolCallDecision.AUTO_ACCEPT]: 0,
+          [ToolCallDecision.SKIP]: 0,
         },
       });
     });
@@ -407,6 +409,7 @@ describe('UiTelemetryService', () => {
           [ToolCallDecision.REJECT]: 1,
           [ToolCallDecision.MODIFY]: 0,
           [ToolCallDecision.AUTO_ACCEPT]: 0,
+          [ToolCallDecision.SKIP]: 0,
         },
       });
     });
@@ -447,12 +450,14 @@ describe('UiTelemetryService', () => {
         [ToolCallDecision.REJECT]: 0,
         [ToolCallDecision.MODIFY]: 0,
         [ToolCallDecision.AUTO_ACCEPT]: 0,
+        [ToolCallDecision.SKIP]: 0,
       });
       expect(tools.byName['test_tool'].decisions).toEqual({
         [ToolCallDecision.ACCEPT]: 0,
         [ToolCallDecision.REJECT]: 0,
         [ToolCallDecision.MODIFY]: 0,
         [ToolCallDecision.AUTO_ACCEPT]: 0,
+        [ToolCallDecision.SKIP]: 0,
       });
     });
 
@@ -498,6 +503,7 @@ describe('UiTelemetryService', () => {
           [ToolCallDecision.REJECT]: 1,
           [ToolCallDecision.MODIFY]: 0,
           [ToolCallDecision.AUTO_ACCEPT]: 0,
+          [ToolCallDecision.SKIP]: 0,
         },
       });
     });

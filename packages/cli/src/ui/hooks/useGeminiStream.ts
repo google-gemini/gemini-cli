@@ -128,6 +128,12 @@ export const useGeminiStream = (
           );
         }
       },
+      () => {
+        void submitQuery(
+          'The user has chosen to skip this tool call. Continue with any remaining work.',
+          { isContinuation: true },
+        );
+      }, // onToolCallSkipped
       config,
       setPendingHistoryItem,
       getPreferredEditor,

@@ -135,7 +135,7 @@ export function recordToolCallMetrics(
   functionName: string,
   durationMs: number,
   success: boolean,
-  decision?: 'accept' | 'reject' | 'modify' | 'auto_accept',
+  decision?: 'accept' | 'reject' | 'modify' | 'auto_accept' | 'skip',
   tool_type?: 'native' | 'mcp',
 ): void {
   if (!toolCallCounter || !toolCallLatencyHistogram || !isMetricsInitialized)
@@ -152,6 +152,7 @@ export function recordToolCallMetrics(
   toolCallLatencyHistogram.record(durationMs, {
     ...getCommonAttributes(config),
     function_name: functionName,
+    decision,
   });
 }
 

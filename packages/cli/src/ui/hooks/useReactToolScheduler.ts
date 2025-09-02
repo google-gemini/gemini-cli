@@ -13,6 +13,7 @@ import type {
   WaitingToolCall,
   CompletedToolCall,
   CancelledToolCall,
+  SkippedToolCall,
   OutputUpdateHandler,
   AllToolCallsCompleteHandler,
   ToolCallsUpdateHandler,
@@ -20,7 +21,10 @@ import type {
   Status as CoreStatus,
   EditorType,
 } from '@google/gemini-cli-core';
-import { CoreToolScheduler } from '@google/gemini-cli-core';
+import {
+  CoreToolScheduler,
+  ToolConfirmationOutcome,
+} from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo } from 'react';
 import type {
   HistoryItemToolGroup,
@@ -54,16 +58,22 @@ export type TrackedCancelledToolCall = CancelledToolCall & {
   responseSubmittedToGemini?: boolean;
 };
 
+export type TrackedSkippedToolCall = SkippedToolCall & {
+  responseSubmittedToGemini?: boolean;
+};
+
 export type TrackedToolCall =
   | TrackedScheduledToolCall
   | TrackedValidatingToolCall
   | TrackedWaitingToolCall
   | TrackedExecutingToolCall
   | TrackedCompletedToolCall
-  | TrackedCancelledToolCall;
+  | TrackedCancelledToolCall
+  | TrackedSkippedToolCall;
 
 export function useReactToolScheduler(
   onComplete: (tools: CompletedToolCall[]) => Promise<void>,
+  onToolCallSkipped: () => void,
   config: Config,
   setPendingHistoryItem: React.Dispatch<
     React.SetStateAction<HistoryItemWithoutId | null>
@@ -107,9 +117,15 @@ export function useReactToolScheduler(
 
   const allToolCallsCompleteHandler: AllToolCallsCompleteHandler = useCallback(
     async (completedToolCalls) => {
+      const wasSkipped = completedToolCalls.some(
+        (call) => call.outcome === ToolConfirmationOutcome.Skip,
+      );
+      if (wasSkipped) {
+        onToolCallSkipped();
+      }
       await onComplete(completedToolCalls);
     },
-    [onComplete],
+    [onComplete, onToolCallSkipped],
   );
 
   const toolCallsUpdateHandler: ToolCallsUpdateHandler = useCallback(
@@ -192,6 +208,8 @@ function mapCoreStatusToDisplayStatus(coreStatus: CoreStatus): ToolCallStatus {
       return ToolCallStatus.Success;
     case 'cancelled':
       return ToolCallStatus.Canceled;
+    case 'skipped':
+      return ToolCallStatus.Canceled;
     case 'error':
       return ToolCallStatus.Error;
     case 'scheduled':
@@ -256,6 +274,13 @@ export function mapToDisplay(
             confirmationDetails: undefined,
           };
         case 'cancelled':
+          return {
+            ...baseDisplayProperties,
+            status: mapCoreStatusToDisplayStatus(trackedCall.status),
+            resultDisplay: trackedCall.response.resultDisplay,
+            confirmationDetails: undefined,
+          };
+        case 'skipped':
           return {
             ...baseDisplayProperties,
             status: mapCoreStatusToDisplayStatus(trackedCall.status),

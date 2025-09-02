@@ -426,6 +426,19 @@ class Session {
             return errorResponse(
               new Error(`Tool "${fc.name}" was canceled by the user.`),
             );
+          case ToolConfirmationOutcome.Skip:
+            return [
+              {
+                functionResponse: {
+                  id: callId,
+                  name: fc.name ?? '',
+                  response: {
+                    output:
+                      'The user has chosen to skip this tool call. Continue with any remaining work.',
+                  },
+                },
+              },
+            ];
           case ToolConfirmationOutcome.ProceedOnce:
           case ToolConfirmationOutcome.ProceedAlways:
           case ToolConfirmationOutcome.ProceedAlwaysServer:
@@ -866,6 +879,11 @@ const basicPermissionOptions = [
     kind: 'allow_once',
   },
   {
+    optionId: ToolConfirmationOutcome.Skip,
+    name: 'Skip',
+    kind: 'skip_once',
+  },
+  {
     optionId: ToolConfirmationOutcome.Cancel,
     name: 'Reject',
     kind: 'reject_once',
@@ -875,6 +893,12 @@ const basicPermissionOptions = [
 function toPermissionOptions(
   confirmation: ToolCallConfirmationDetails,
 ): acp.PermissionOption[] {
+  const skipOption = {
+    optionId: ToolConfirmationOutcome.Skip,
+    name: 'Skip',
+    kind: 'skip_once',
+  } as const;
+
   switch (confirmation.type) {
     case 'edit':
       return [
@@ -892,6 +916,7 @@ function toPermissionOptions(
           name: `Always Allow ${confirmation.rootCommand}`,
           kind: 'allow_always',
         },
+        skipOption,
         ...basicPermissionOptions,
       ];
     case 'mcp':
@@ -906,6 +931,7 @@ function toPermissionOptions(
           name: `Always Allow ${confirmation.toolName}`,
           kind: 'allow_always',
         },
+        skipOption,
         ...basicPermissionOptions,
       ];
     case 'info':
@@ -915,6 +941,7 @@ function toPermissionOptions(
           name: `Always Allow`,
           kind: 'allow_always',
         },
+        skipOption,
         ...basicPermissionOptions,
       ];
     default: {

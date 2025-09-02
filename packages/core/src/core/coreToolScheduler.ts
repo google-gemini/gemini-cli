@@ -90,6 +90,18 @@ export type CancelledToolCall = {
   invocation: AnyToolInvocation;
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
+  skipped?: boolean;
+};
+
+export type SkippedToolCall = {
+  status: 'skipped';
+  request: ToolCallRequestInfo;
+  response: ToolCallResponseInfo;
+  tool: AnyDeclarativeTool;
+  invocation: AnyToolInvocation;
+  durationMs?: number;
+  outcome?: ToolConfirmationOutcome;
+  startTime?: number;
 };
 
 export type WaitingToolCall = {
@@ -111,12 +123,14 @@ export type ToolCall =
   | SuccessfulToolCall
   | ExecutingToolCall
   | CancelledToolCall
-  | WaitingToolCall;
+  | WaitingToolCall
+  | SkippedToolCall;
 
 export type CompletedToolCall =
   | SuccessfulToolCall
   | CancelledToolCall
-  | ErroredToolCall;
+  | ErroredToolCall
+  | SkippedToolCall;
 
 export type ConfirmHandler = (
   toolCall: WaitingToolCall,
@@ -299,6 +313,12 @@ export class CoreToolScheduler {
     targetCallId: string,
     status: 'cancelled',
     reason: string,
+    skipped?: boolean,
+  ): void;
+  private setStatusInternal(
+    targetCallId: string,
+    status: 'skipped',
+    reason: string,
   ): void;
   private setStatusInternal(
     targetCallId: string,
@@ -417,6 +437,9 @@ export class CoreToolScheduler {
             },
             durationMs,
             outcome,
+            skipped:
+              newStatus === 'cancelled' &&
+              auxiliaryData === 'Tool call skipped by user',
           } as CancelledToolCall;
         }
         case 'validating':
@@ -437,6 +460,38 @@ export class CoreToolScheduler {
             outcome,
             invocation,
           } as ExecutingToolCall;
+        case 'skipped': {
+          const durationMs = existingStartTime
+            ? Date.now() - existingStartTime
+            : undefined;
+
+          return {
+            request: currentCall.request,
+            tool: toolInstance,
+            invocation,
+            status: 'skipped',
+            response: {
+              callId: currentCall.request.callId,
+              responseParts: [
+                {
+                  functionResponse: {
+                    id: currentCall.request.callId,
+                    name: currentCall.request.name,
+                    response: {
+                      output:
+                        'The user has chosen to skip this tool call. Continue with any remaining work.',
+                    },
+                  },
+                },
+              ],
+              resultDisplay: 'Tool call skipped by user.',
+              error: undefined,
+              errorType: undefined,
+            },
+            durationMs,
+            outcome,
+          } as SkippedToolCall;
+        }
         default: {
           const exhaustiveCheck: never = newStatus;
           return exhaustiveCheck;
@@ -768,6 +823,12 @@ export class CoreToolScheduler {
         'cancelled',
         'User did not allow tool call',
       );
+    } else if (outcome === ToolConfirmationOutcome.Skip) {
+      this.setStatusInternal(
+        callId,
+        'skipped',
+        'Tool call skipped by user',
+      );
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
       if (isModifiableDeclarativeTool(waitingToolCall.tool)) {
@@ -951,7 +1012,8 @@ export class CoreToolScheduler {
       (call) =>
         call.status === 'success' ||
         call.status === 'error' ||
-        call.status === 'cancelled',
+        call.status === 'cancelled' ||
+        call.status === 'skipped',
     );
 
     if (this.toolCalls.length > 0 && allCallsAreTerminal) {
