@@ -89,17 +89,21 @@ describe('Agent Server Endpoints', () => {
   });
 
   afterAll(async () => {
-    await new Promise<void>((resolve, reject) => {
-      server.close((err) => {
-        if (err) return reject(err);
-        resolve();
+    if (server) {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => {
+          if (err) return reject(err);
+          resolve();
+        });
       });
-    });
+    }
 
-    try {
-      fs.rmSync(testWorkspace, { recursive: true, force: true });
-    } catch (e) {
-      console.warn(`Could not remove temp dir '${testWorkspace}':`, e);
+    if (testWorkspace) {
+      try {
+        fs.rmSync(testWorkspace, { recursive: true, force: true });
+      } catch (e) {
+        console.warn(`Could not remove temp dir '${testWorkspace}':`, e);
+      }
     }
   });
 
