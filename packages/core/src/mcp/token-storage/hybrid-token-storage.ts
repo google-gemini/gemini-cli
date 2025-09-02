@@ -9,11 +9,11 @@ import { FileTokenStorage } from './file-token-storage.js';
 import type { TokenStorage, OAuthCredentials } from './types.js';
 import { TokenStorageType } from './types.js';
 
+const FORCE_FILE_STORAGE_ENV_VAR = 'GEMINI_FORCE_FILE_STORAGE';
+
 export class HybridTokenStorage extends BaseTokenStorage {
   private primaryStorage: TokenStorage | null = null;
   private fallbackStorage: FileTokenStorage;
-  // Track if we've already logged the storage type globally
-  private globalStorageTypeLogged = false;
   private storageType: TokenStorageType | null = null;
   private storageInitPromise: Promise<TokenStorage> | null = null;
 
@@ -23,26 +23,14 @@ export class HybridTokenStorage extends BaseTokenStorage {
   }
 
   private async initializeStorage(): Promise<TokenStorage> {
-    const shouldLog = !this.globalStorageTypeLogged;
-
-    if (process.env['GEMINI_FORCE_FILE_STORAGE'] === 'true') {
-      if (shouldLog) {
-        console.log(
-          '📁 Using file-based token storage (forced by environment variable)',
-        );
-        this.globalStorageTypeLogged = true;
-      }
+    if (process.env[FORCE_FILE_STORAGE_ENV_VAR] === 'true') {
       this.primaryStorage = this.fallbackStorage;
-      this.storageType = TokenStorageType.FILE;
+      this.storageType = TokenStorageType.ENCRYPTED_FILE;
       return this.primaryStorage;
     }
 
-    if (shouldLog) {
-      console.log('🔐 Checking keychain availability...');
-    }
-
+    // Dynamically import KeychainTokenStorage to avoid initialization issues
     try {
-      // Dynamically import KeychainTokenStorage to avoid initialization issues
       const { KeychainTokenStorage } = await import(
         './keychain-token-storage.js'
       );
@@ -50,35 +38,14 @@ export class HybridTokenStorage extends BaseTokenStorage {
 
       const isAvailable = await keychainStorage.isAvailable();
       if (isAvailable) {
-        if (shouldLog) {
-          console.log(
-            '✅ Keychain is available - using secure OS keychain for token storage',
-          );
-          this.globalStorageTypeLogged = true;
-        }
         this.primaryStorage = keychainStorage;
         this.storageType = TokenStorageType.KEYCHAIN;
         return this.primaryStorage;
-      } else {
-        if (shouldLog) {
-          console.log(
-            '⚠️  Keychain not available - falling back to encrypted file storage',
-          );
-        }
       }
-    } catch (error) {
-      if (shouldLog) {
-        console.log(
-          '⚠️  Failed to initialize keychain - falling back to encrypted file storage',
-        );
-        console.debug('Keychain error details:', error);
-      }
+    } catch (_e) {
+      // Fallback to file storage if keychain fails to initialize
     }
 
-    if (shouldLog) {
-      console.log('📁 Using encrypted file-based token storage');
-      this.globalStorageTypeLogged = true;
-    }
     this.primaryStorage = this.fallbackStorage;
     this.storageType = TokenStorageType.ENCRYPTED_FILE;
     return this.primaryStorage;

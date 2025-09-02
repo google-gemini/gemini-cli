@@ -38,6 +38,5 @@ export interface TokenStorage {
 
 export enum TokenStorageType {
   KEYCHAIN = 'keychain',
-  FILE = 'file',
   ENCRYPTED_FILE = 'encrypted_file',
 }
