@@ -233,7 +233,7 @@ describe('McpPromptLoader', () => {
         const context = {
           invocation: {
             raw: '/find ',
-          }
+          },
         } as CommandContext;
         const suggestions = await completion(context, '');
         expect(suggestions).toEqual([
@@ -253,13 +253,10 @@ describe('McpPromptLoader', () => {
         const completion = commands[0].completion!;
         const context = {
           invocation: {
-            raw: '/find --name="test-name" --age="6" '
-          }
+            raw: '/find --name="test-name" --age="6" ',
+          },
         } as CommandContext;
-        const suggestions = await completion(
-          context,
-          '',
-        );
+        const suggestions = await completion(context, '');
         expect(suggestions).toEqual([
           '--species="',
           '--enclosure="',
