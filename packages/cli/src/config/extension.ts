@@ -17,6 +17,7 @@ import { SettingScope, loadSettings } from '../config/settings.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
+import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
@@ -44,6 +45,7 @@ export interface ExtensionInstallMetadata {
 }
 
 export interface ExtensionUpdateInfo {
+  name: string;
   originalVersion: string;
   updatedVersion: string;
 }
@@ -183,7 +185,7 @@ export function loadExtension(extensionDir: string): Extension | null {
 
   try {
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
-    const config = recursivelyHydrateStrings(JSON.parse(configContent), {
+    let config = recursivelyHydrateStrings(JSON.parse(configContent), {
       extensionPath: extensionDir,
       '/': path.sep,
       pathSeparator: path.sep,
@@ -194,6 +196,8 @@ export function loadExtension(extensionDir: string): Extension | null {
       );
       return null;
     }
+
+    config = resolveEnvVarsInObject(config);
 
     const contextFiles = getContextFileNames(config)
       .map((contextFileName) => path.join(extensionDir, contextFileName))
@@ -444,10 +448,10 @@ export function toOutputString(extension: Extension): string {
   return output;
 }
 
-export async function updateExtension(
+export async function updateExtensionByName(
   extensionName: string,
   cwd: string = process.cwd(),
-): Promise<ExtensionUpdateInfo | undefined> {
+): Promise<ExtensionUpdateInfo> {
   const installedExtensions = loadUserExtensions();
   const extension = installedExtensions.find(
     (installed) => installed.config.name === extensionName,
@@ -457,16 +461,21 @@ export async function updateExtension(
       `Extension "${extensionName}" not found. Run gemini extensions list to see available extensions.`,
     );
   }
+  return await updateExtension(extension, cwd);
+}
+
+export async function updateExtension(
+  extension: Extension,
+  cwd: string = process.cwd(),
+): Promise<ExtensionUpdateInfo> {
   if (!extension.installMetadata) {
-    throw new Error(
-      `Extension cannot be updated because it is missing the .gemini-extension.install.json file. To update manually, uninstall and then reinstall the updated version.`,
-    );
+    throw new Error(`Extension ${extension.config.name} cannot be updated.`);
   }
   const originalVersion = extension.config.version;
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
     await copyExtension(extension.path, tempDir);
-    await uninstallExtension(extensionName, cwd);
+    await uninstallExtension(extension.config.name, cwd);
     await installExtension(extension.installMetadata, cwd);
 
     const updatedExtension = loadExtension(extension.path);
@@ -475,6 +484,7 @@ export async function updateExtension(
     }
     const updatedVersion = updatedExtension.config.version;
     return {
+      name: extension.config.name,
       originalVersion,
       updatedVersion,
     };
@@ -536,4 +546,15 @@ function removeFromDisabledExtensions(
     );
     settings.setValue(scope, 'extensions', extensionSettings);
   }
+}
+
+export async function updateAllUpdatableExtensions(
+  cwd: string = process.cwd(),
+): Promise<ExtensionUpdateInfo[]> {
+  const extensions = loadExtensions(cwd).filter(
+    (extension) => !!extension.installMetadata,
+  );
+  return await Promise.all(
+    extensions.map((extension) => updateExtension(extension, cwd)),
+  );
 }
