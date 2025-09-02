@@ -653,6 +653,42 @@ describe('App UI', () => {
     );
   });
 
+  it('should not display context summary when hideContextSummary is true', async () => {
+    mockSettings = createMockSettings({
+      workspace: {
+        ui: { hideContextSummary: true },
+      },
+    });
+    vi.mocked(ideContext.getIdeContext).mockReturnValue({
+      workspaceState: {
+        openFiles: [
+          {
+            path: '/path/to/my-file.ts',
+            isActive: true,
+            selectedText: 'hello',
+            timestamp: 0,
+          },
+        ],
+      },
+    });
+    mockConfig.getGeminiMdFileCount.mockReturnValue(1);
+    mockConfig.getAllGeminiMdFilenames.mockReturnValue(['GEMINI.md']);
+
+    const { lastFrame, unmount } = renderWithProviders(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    const output = lastFrame();
+    expect(output).not.toContain('Using:');
+    expect(output).not.toContain('open file');
+    expect(output).not.toContain('GEMINI.md file');
+  });
+
   it('should display default "GEMINI.md" in footer when contextFileName is not set and count is 1', async () => {
     mockConfig.getGeminiMdFileCount.mockReturnValue(1);
     mockConfig.getAllGeminiMdFilenames.mockReturnValue(['GEMINI.md']);
