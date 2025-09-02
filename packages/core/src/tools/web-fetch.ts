@@ -18,7 +18,7 @@ import {
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../config/config.js';
+import { ApprovalMode, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { convert } from 'html-to-text';
@@ -116,6 +116,7 @@ ${textContent}
         [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
         {},
         signal,
+        DEFAULT_GEMINI_FLASH_MODEL,
       );
       const resultText = getResponseText(result) || '';
       return {
@@ -193,6 +194,7 @@ ${textContent}
         [{ role: 'user', parts: [{ text: userPrompt }] }],
         { tools: [{ urlContext: {} }] },
         signal, // Pass signal
+        DEFAULT_GEMINI_FLASH_MODEL,
       );
 
       console.debug(
