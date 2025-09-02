@@ -26,6 +26,7 @@ export class MultiModelSystem {
   private workspaceManager: WorkspaceManager;
   private currentProvider: ModelProviderConfig | null = null;
   private config: Config;
+  private initializedProviders: Map<string, any> = new Map();
   // Static mapping of model names to their tool call formats
   private static readonly MODEL_FORMATS: Record<string, 'openai' | 'harmony' | 'gemini' | 'qwen'> = {
     // Harmony format models (gpt-oss family)
@@ -161,7 +162,11 @@ export class MultiModelSystem {
    * Initialize the MultiModelSystem
    */
   async initialize(): Promise<void> {
-    // MultiModelSystem initialization logic if needed
+    // Initialize the default provider if one is configured
+    if (this.currentProvider) {
+      await this.getOrCreateProvider(this.currentProvider);
+      console.log(`[MultiModelSystem] Initialized default provider: ${this.currentProvider.type}-${this.currentProvider.model}`);
+    }
   }
   
   async *sendMessageStream(
@@ -191,12 +196,7 @@ export class MultiModelSystem {
       sessionManager.handleAutoTitleGeneration(msg);
     });
 
-    // SessionManager maintains complete conversation history
-    // const currentHistory = sessionManager.getHistory();
-    // const limitedHistory = this.limitContextSize(currentHistory);
-    // let currentMessages = [...currentHistory]; // OLD: maintained persistent currentMessages
-    
-    const provider = ModelProviderFactory.create(this.currentProvider, this.config);
+    const provider = await this.getOrCreateProvider(this.currentProvider!);
 
     // Add turn limit like nonInteractiveCli.ts to prevent infinite loops
     let turnCount = 0;
@@ -394,7 +394,7 @@ export class MultiModelSystem {
     
     for (const config of configs) {
       try {
-        const provider = ModelProviderFactory.create(config, this.config);
+        const provider = await this.getOrCreateProvider(config);
         const status = await provider.getConnectionStatus();
         statuses.push({
           ...status,
@@ -419,21 +419,30 @@ export class MultiModelSystem {
     
     const modelsByProvider: Record<string, string[]> = {};
     
+    // Import provider classes for static method access
+    const { OpenAIProvider } = await import('../providers/OpenAIProvider.js');
+    const { GeminiProvider } = await import('../providers/GeminiProvider.js');
+    const { LMStudioProvider } = await import('../providers/LMStudioProvider.js');
+    
     for (const config of configs) {
       try {
-        // Check if provider has required configuration before trying to create it
-        if (config!.type === 'gemini' && !config!.apiKey) {
-          console.warn(`Skipping Gemini provider: GEMINI_API_KEY not set`);
-          continue;
+        let models: string[] = [];
+        
+        // Route to static provider methods
+        switch (config!.type) {
+          case 'openai':
+            models = await OpenAIProvider.getAvailableModels();
+            break;
+          case 'gemini':
+            models = await GeminiProvider.getAvailableModels();
+            break;
+          case 'lm_studio':
+            models = await LMStudioProvider.getAvailableModels(config!.baseUrl);
+            break;
+          default:
+            throw new Error(`Unknown provider type: ${config!.type}`);
         }
         
-        if (config!.type === 'openai' && !config!.apiKey) {
-          console.warn(`Skipping OpenAI provider: OPENAI_API_KEY not set`);
-          continue;
-        }
-        
-        const provider = ModelProviderFactory.create(config!, this.config);
-        const models = await provider.getAvailableModels();
         modelsByProvider[config!.type] = models;
       } catch (error) {
         // Set empty array for failed providers, but continue with others
@@ -457,8 +466,44 @@ export class MultiModelSystem {
     return ModelProviderFactory.getSupportedProviders();
   }
 
+  private getProviderKey(config: ModelProviderConfig): string {
+    return `${config.type}-${config.model}-${config.baseUrl || 'default'}`;
+  }
+
+  private async getOrCreateProvider(config: ModelProviderConfig): Promise<any> {
+    const key = this.getProviderKey(config);
+    
+    if (this.initializedProviders.has(key)) {
+      const cachedProvider = this.initializedProviders.get(key)!;
+      // Update config in case it changed
+      cachedProvider.updateConfig(config);
+      return cachedProvider;
+    }
+    
+    // Create new provider and initialize it
+    const provider = ModelProviderFactory.create(config, this.config);
+    await provider.initialize();
+    
+    // Cache the initialized provider
+    this.initializedProviders.set(key, provider);
+    console.log(`[MultiModelSystem] Created and initialized provider: ${config.type}-${config.model}`);
+    
+    return provider;
+  }
+
   async switchProvider(config: ModelProviderConfig): Promise<void> {
-    ModelProviderFactory.validateConfig(config);
+    if (!config.type) {
+      throw new Error('Provider type is required');
+    }
+
+    if (!config.model) {
+      throw new Error('Model is required');
+    }
+
+    
+    // Ensure the provider is initialized before switching
+    await this.getOrCreateProvider(config);
+    
     this.configManager.setProviderConfig(config);
     this.currentProvider = config;
     
@@ -483,7 +528,7 @@ export class MultiModelSystem {
     }
     
     try {
-      const provider = ModelProviderFactory.create(this.currentProvider, this.config);
+      const provider = await this.getOrCreateProvider(this.currentProvider);
       provider.setTools();
       console.log(`[MultiModelSystem] Tools set for provider: ${this.currentProvider.type}`);
     } catch (error) {
