@@ -80,7 +80,7 @@ describe('HybridTokenStorage', () => {
       FileTokenStorage as unknown as ReturnType<typeof vi.fn>
     ).mockImplementation(() => mockFileStorage);
 
-    storage = new HybridTokenStorage();
+    storage = new HybridTokenStorage('test-service');
   });
 
   afterEach(() => {
