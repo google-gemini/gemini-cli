@@ -11,6 +11,7 @@ import { InputPrompt } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 import type { Config } from '@google/gemini-cli-core';
 import * as path from 'node:path';
+import chalk from 'chalk';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -103,6 +104,12 @@ describe('InputPrompt', () => {
         mockBuffer.cursor = [0, newText.length];
         mockBuffer.viewportVisualLines = [newText];
         mockBuffer.allVisualLines = [newText];
+        mockBuffer.visualToLogicalMap = [[0, 0]];
+        mockBuffer.transformedToLogicalMaps = [
+          Array(newText.length || 1)
+            .fill(0)
+            .map((_, i) => i),
+        ];
       }),
       replaceRangeByOffset: vi.fn(),
       viewportVisualLines: [''],
@@ -128,6 +135,8 @@ describe('InputPrompt', () => {
       replaceRange: vi.fn(),
       deleteWordLeft: vi.fn(),
       deleteWordRight: vi.fn(),
+      visualToLogicalMap: [[0, 0]],
+      transformedToLogicalMaps: [[0]],
     } as unknown as TextBuffer;
 
     mockShellHistory = {
@@ -1517,6 +1526,40 @@ describe('InputPrompt', () => {
 
       expect(props.buffer.move).toHaveBeenCalledWith('end');
       expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
+      unmount();
+    });
+  });
+
+  describe('text transformation rendering', () => {
+    it('should render transformed text with the correct color', async () => {
+      const rawText = 'hello @/path/to/image.png world';
+      const terseText = '[Image image.png]';
+      const transformedText = `hello ${terseText} world`;
+
+      mockBuffer.text = rawText;
+      mockBuffer.lines = [rawText];
+      mockBuffer.allVisualLines = [transformedText];
+      mockBuffer.viewportVisualLines = [transformedText];
+      mockBuffer.visualToLogicalMap = [[0, 0]];
+
+      const transformedToLogMap = Array(rawText.length)
+        .fill(0)
+        .map((_, i) => i);
+      const terseStart = rawText.indexOf('@');
+      for (let i = 0; i < terseText.length; i++) {
+        transformedToLogMap[terseStart + i] = terseStart;
+      }
+      mockBuffer.transformedToLogicalMaps = [transformedToLogMap];
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      // We check for the transformed text and the color code for purple which is the default theme accent color.
+      const expected = `> hello ${chalk.hex('#CBA6F7')(terseText)} world`;
+      expect(frame).toContain(expected);
       unmount();
     });
   });

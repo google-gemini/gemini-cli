@@ -1728,3 +1728,115 @@ describe('Unicode helper functions', () => {
     });
   });
 });
+
+describe('useTextBuffer transformations', () => {
+  let viewport: Viewport;
+
+  beforeEach(() => {
+    viewport = { width: 80, height: 10 };
+  });
+
+  it('should not transform a line with no image paths', () => {
+    const { result } = renderHook(() =>
+      useTextBuffer({
+        initialText: 'hello world',
+        viewport,
+        isValidPath: () => false,
+      }),
+    );
+    const state = getBufferState(result);
+    expect(state.allVisualLines).toEqual(['hello world']);
+  });
+
+  it('should transform a line with an image path', () => {
+    const { result } = renderHook(() =>
+      useTextBuffer({
+        initialText: 'hello @/path/to/image.png world',
+        viewport,
+        isValidPath: () => false,
+      }),
+    );
+    const state = getBufferState(result);
+    expect(state.allVisualLines).toEqual(['hello [Image image.png] world']);
+  });
+
+  it('should expand a transformed image path when the cursor is inside it', () => {
+    const { result } = renderHook(() =>
+      useTextBuffer({
+        initialText: 'hello @/path/to/image.png world',
+        viewport,
+        isValidPath: () => false,
+      }),
+    );
+
+    // Move cursor inside the path
+    act(() => {
+      result.current.moveToOffset(10);
+    });
+
+    const state = getBufferState(result);
+    expect(state.allVisualLines).toEqual(['hello @/path/to/image.png world']);
+  });
+
+  it('should correctly map visual cursor to logical cursor', () => {
+    const { result } = renderHook(() =>
+      useTextBuffer({
+        initialText: 'hello @/path/to/image.png world',
+        viewport,
+        isValidPath: () => false,
+      }),
+    );
+
+    act(() => {
+      result.current.moveToOffset(6);
+    });
+
+    let state = getBufferState(result);
+    expect(state.visualCursor).toEqual([0, 6]);
+
+    act(() => {
+      result.current.move('right');
+    });
+
+    state = getBufferState(result);
+    expect(state.cursor).toEqual([0, 7]);
+  });
+
+  it('should handle multiple image paths in one line', () => {
+    const { result } = renderHook(() =>
+      useTextBuffer({
+        initialText: 'image1: @/path/to/im1.png, image2: @/path/to/im2.jpeg',
+        viewport,
+        isValidPath: () => false,
+      }),
+    );
+    const state = getBufferState(result);
+    expect(state.allVisualLines).toEqual([
+      'image1: [Image im1.png], image2: [Image im2.jpeg]',
+    ]);
+  });
+
+  it('should handle an image path at the beginning of a line', () => {
+    const { result } = renderHook(() =>
+      useTextBuffer({
+        initialText: ' @/path/to/start.gif hello',
+        viewport,
+        isValidPath: () => false,
+      }),
+    );
+    const state = getBufferState(result);
+    expect(state.allVisualLines).toEqual([' [Image start.gif] hello']);
+  });
+
+  it('should handle an image path at the end of a line', () => {
+    const { result } = renderHook(() =>
+      useTextBuffer({
+        initialText: 'hello @/path/to/end.bmp',
+        viewport,
+        isValidPath: () => false,
+      }),
+    );
+    const state = getBufferState(result);
+    expect(state.allVisualLines).toEqual(['hello [Image end.bmp]']);
+  });
+});

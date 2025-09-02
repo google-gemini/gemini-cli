@@ -147,3 +147,17 @@ export async function cleanupOldClipboardImages(
     // Ignore errors in cleanup
   }
 }
+
+export function getTersePath(filePath: string): string {
+  const fileName = path.basename(filePath);
+  const extension = path.extname(fileName);
+  const baseName = path.basename(fileName, extension);
+  const maxBaseLength = 10;
+
+  const truncatedBase =
+    baseName.length > maxBaseLength
+      ? `...${baseName.slice(-maxBaseLength)}`
+      : baseName;
+
+  return `[Image ${truncatedBase}${extension}]`;
+}
