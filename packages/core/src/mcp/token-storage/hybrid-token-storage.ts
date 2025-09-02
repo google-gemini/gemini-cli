@@ -46,7 +46,7 @@ export class HybridTokenStorage extends BaseTokenStorage {
 
     try {
       // Dynamically import KeychainTokenStorage to avoid initialization issues
-      const { KeychainTokenStorage } = await import('./keychain.js');
+      const { KeychainTokenStorage } = await import('./keychain-token-storage.js');
       const keychainStorage = new KeychainTokenStorage(this.serviceName);
 
       const isAvailable = await keychainStorage.isAvailable();
