@@ -30,15 +30,19 @@ vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
 }));
 
-import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
-import { applyReplacement, EditTool, EditToolParams } from './edit.js';
-import { FileDiff, ToolConfirmationOutcome } from './tools.js';
+import type { Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { EditToolParams } from './edit.js';
+import { applyReplacement, EditTool } from './edit.js';
+import type { FileDiff } from './tools.js';
+import { ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
-import { ApprovalMode, Config } from '../config/config.js';
-import { Content, Part, SchemaUnion } from '@google/genai';
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
+import type { Content, Part, SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 
@@ -503,7 +507,7 @@ describe('EditTool', () => {
     });
 
     it('should successfully replace multiple occurrences when expected_replacements specified', async () => {
-      fs.writeFileSync(filePath, 'old text old text old text', 'utf8');
+      fs.writeFileSync(filePath, 'old text\nold text\nold text', 'utf8');
       const params: EditToolParams = {
         file_path: filePath,
         old_string: 'old',
@@ -516,12 +520,19 @@ describe('EditTool', () => {
 
       expect(result.llmContent).toMatch(/Successfully modified file/);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(
-        'new text new text new text',
+        'new text\nnew text\nnew text',
       );
       const display = result.returnDisplay as FileDiff;
-      expect(display.fileDiff).toMatch(/old text old text old text/);
-      expect(display.fileDiff).toMatch(/new text new text new text/);
+
+      expect(display.fileDiff).toMatch(/-old text\n-old text\n-old text/);
+      expect(display.fileDiff).toMatch(/\+new text\n\+new text\n\+new text/);
       expect(display.fileName).toBe(testFile);
+      expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
+        ai_added_lines: 3,
+        ai_removed_lines: 3,
+        user_added_lines: 0,
+        user_removed_lines: 0,
+      });
     });
 
     it('should return error if expected_replacements does not match actual occurrences', async () => {
@@ -558,13 +569,14 @@ describe('EditTool', () => {
     });
 
     it('should include modification message when proposed content is modified', async () => {
-      const initialContent = 'This is some old text.';
+      const initialContent = 'Line 1\nold line\nLine 3\nLine 4\nLine 5\n';
       fs.writeFileSync(filePath, initialContent, 'utf8');
       const params: EditToolParams = {
         file_path: filePath,
         old_string: 'old',
         new_string: 'new',
         modified_by_user: true,
+        ai_proposed_content: 'Line 1\nAI line\nLine 3\nLine 4\nLine 5\n',
       };
 
       (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(
@@ -576,6 +588,12 @@ describe('EditTool', () => {
       expect(result.llmContent).toMatch(
         /User modified the `new_string` content/,
       );
+      expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
+        ai_added_lines: 1,
+        ai_removed_lines: 1,
+        user_added_lines: 1,
+        user_removed_lines: 1,
+      });
     });
 
     it('should not include modification message when proposed content is not modified', async () => {

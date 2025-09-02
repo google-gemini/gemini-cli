@@ -4,12 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Settings, SettingScope, LoadedSettings } from '../config/settings.js';
-import {
-  SETTINGS_SCHEMA,
+import type {
+  Settings,
+  SettingScope,
+  LoadedSettings,
+} from '../config/settings.js';
+import type {
   SettingDefinition,
   SettingsSchema,
 } from '../config/settingsSchema.js';
+import { SETTINGS_SCHEMA } from '../config/settingsSchema.js';
 
 // The schema is now nested, but many parts of the UI and logic work better
 // with a flattened structure and dot-notation keys. This section flattens the
@@ -395,22 +399,7 @@ export function saveModifiedSettings(
     const isDefaultValue = value === getDefaultValue(settingKey);
 
     if (existsInOriginalFile || !isDefaultValue) {
-      // This is tricky because setValue only works on top-level keys.
-      // We need to set the whole parent object.
-      const [parentKey] = path;
-      if (parentKey) {
-        const newParentValue = setPendingSettingValueAny(
-          settingKey,
-          value,
-          loadedSettings.forScope(scope).settings,
-        )[parentKey as keyof Settings];
-
-        loadedSettings.setValue(
-          scope,
-          parentKey as keyof Settings,
-          newParentValue,
-        );
-      }
+      loadedSettings.setValue(scope, settingKey, value);
     }
   });
 }

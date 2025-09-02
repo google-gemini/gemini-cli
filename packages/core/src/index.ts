@@ -44,6 +44,9 @@ export * from './utils/formatters.js';
 export * from './utils/generateContentResponseUtilities.js';
 export * from './utils/filesearch/fileSearch.js';
 export * from './utils/errorParsing.js';
+export * from './utils/workspaceContext.js';
+export * from './utils/ignorePatterns.js';
+export * from './utils/partUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -55,7 +58,8 @@ export * from './services/fileSystemService.js';
 export * from './ide/ide-client.js';
 export * from './ide/ideContext.js';
 export * from './ide/ide-installer.js';
-export { getIdeInfo, DetectedIde, IdeInfo } from './ide/detect-ide.js';
+export { getIdeInfo, DetectedIde } from './ide/detect-ide.js';
+export { type IdeInfo } from './ide/detect-ide.js';
 export * from './ide/constants.js';
 
 // Export Shell Execution Service
@@ -87,11 +91,11 @@ export * from './tools/mcp-tool.js';
 
 // MCP OAuth
 export { MCPOAuthProvider } from './mcp/oauth-provider.js';
-export {
-  MCPOAuthToken,
-  MCPOAuthCredentials,
-  MCPOAuthTokenStorage,
-} from './mcp/oauth-token-storage.js';
+export type {
+  OAuthToken,
+  OAuthCredentials,
+} from './mcp/token-storage/types.js';
+export { MCPOAuthTokenStorage } from './mcp/oauth-token-storage.js';
 export type { MCPOAuthConfig } from './mcp/oauth-provider.js';
 export type {
   OAuthAuthorizationServerMetadata,
@@ -104,3 +108,6 @@ export * from './telemetry/index.js';
 export { sessionId } from './utils/session.js';
 export * from './utils/browser.js';
 export { Storage } from './config/storage.js';
+
+// Export test utils
+export * from './test-utils/index.js';

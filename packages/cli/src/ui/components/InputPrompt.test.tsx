@@ -5,31 +5,24 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
-import { waitFor } from '@testing-library/react';
-import { InputPrompt, InputPromptProps } from './InputPrompt.js';
+import { waitFor, act } from '@testing-library/react';
+import type { InputPromptProps } from './InputPrompt.js';
+import { InputPrompt } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
-import { Config } from '@google/gemini-cli-core';
-import * as path from 'path';
-import {
-  CommandContext,
-  SlashCommand,
-  CommandKind,
-} from '../commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
+import * as path from 'node:path';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import { CommandKind } from '../commands/types.js';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  useShellHistory,
-  UseShellHistoryReturn,
-} from '../hooks/useShellHistory.js';
-import {
-  useCommandCompletion,
-  UseCommandCompletionReturn,
-} from '../hooks/useCommandCompletion.js';
-import {
-  useInputHistory,
-  UseInputHistoryReturn,
-} from '../hooks/useInputHistory.js';
+import type { UseShellHistoryReturn } from '../hooks/useShellHistory.js';
+import { useShellHistory } from '../hooks/useShellHistory.js';
+import type { UseCommandCompletionReturn } from '../hooks/useCommandCompletion.js';
+import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import type { UseInputHistoryReturn } from '../hooks/useInputHistory.js';
+import { useInputHistory } from '../hooks/useInputHistory.js';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
+import chalk from 'chalk';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
@@ -1216,6 +1209,108 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('Highlighting and Cursor Display', () => {
+    it('should display cursor mid-word by highlighting the character', async () => {
+      mockBuffer.text = 'hello world';
+      mockBuffer.lines = ['hello world'];
+      mockBuffer.viewportVisualLines = ['hello world'];
+      mockBuffer.visualCursor = [0, 3]; // cursor on the second 'l'
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      // The component will render the text with the character at the cursor inverted.
+      expect(frame).toContain(`hel${chalk.inverse('l')}o world`);
+      unmount();
+    });
+
+    it('should display cursor at the beginning of the line', async () => {
+      mockBuffer.text = 'hello';
+      mockBuffer.lines = ['hello'];
+      mockBuffer.viewportVisualLines = ['hello'];
+      mockBuffer.visualCursor = [0, 0]; // cursor on 'h'
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`${chalk.inverse('h')}ello`);
+      unmount();
+    });
+
+    it('should display cursor at the end of the line as an inverted space', async () => {
+      mockBuffer.text = 'hello';
+      mockBuffer.lines = ['hello'];
+      mockBuffer.viewportVisualLines = ['hello'];
+      mockBuffer.visualCursor = [0, 5]; // cursor after 'o'
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`hello${chalk.inverse(' ')}`);
+      unmount();
+    });
+
+    it('should display cursor correctly on a highlighted token', async () => {
+      mockBuffer.text = 'run @path/to/file';
+      mockBuffer.lines = ['run @path/to/file'];
+      mockBuffer.viewportVisualLines = ['run @path/to/file'];
+      mockBuffer.visualCursor = [0, 9]; // cursor on 't' in 'to'
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      // The token '@path/to/file' is colored, and the cursor highlights one char inside it.
+      expect(frame).toContain(`@path/${chalk.inverse('t')}o/file`);
+      unmount();
+    });
+
+    it('should display cursor correctly for multi-byte unicode characters', async () => {
+      const text = 'hello 👍 world';
+      mockBuffer.text = text;
+      mockBuffer.lines = [text];
+      mockBuffer.viewportVisualLines = [text];
+      mockBuffer.visualCursor = [0, 6]; // cursor on '👍'
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`hello ${chalk.inverse('👍')} world`);
+      unmount();
+    });
+
+    it('should display cursor at the end of a line with unicode characters', async () => {
+      const text = 'hello 👍';
+      mockBuffer.text = text;
+      mockBuffer.lines = [text];
+      mockBuffer.viewportVisualLines = [text];
+      mockBuffer.visualCursor = [0, 8]; // cursor after '👍' (length is 6 + 2 for emoji)
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`hello 👍${chalk.inverse(' ')}`);
+      unmount();
+    });
+  });
+
   describe('multiline paste', () => {
     it.each([
       {
@@ -1420,13 +1515,27 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      stdin.write('\x12');
-      await wait();
-      stdin.write('\t');
 
-      await waitFor(() => {
-        expect(stdout.lastFrame()).not.toContain('(r:)');
+      // Enter reverse search mode with Ctrl+R
+      act(() => {
+        stdin.write('\x12');
       });
+      await wait();
+
+      // Verify reverse search is active
+      expect(stdout.lastFrame()).toContain('(r:)');
+
+      // Press Tab to complete the highlighted entry
+      act(() => {
+        stdin.write('\t');
+      });
+
+      await waitFor(
+        () => {
+          expect(stdout.lastFrame()).not.toContain('(r:)');
+        },
+        { timeout: 5000 },
+      ); // Increase timeout
 
       expect(props.buffer.setText).toHaveBeenCalledWith('echo hello');
       unmount();
@@ -1436,10 +1545,17 @@ describe('InputPrompt', () => {
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      stdin.write('\x12');
+
+      act(() => {
+        stdin.write('\x12');
+      });
       await wait();
+
       expect(stdout.lastFrame()).toContain('(r:)');
-      stdin.write('\r');
+
+      act(() => {
+        stdin.write('\r');
+      });
 
       await waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');

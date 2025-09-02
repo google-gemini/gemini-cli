@@ -9,13 +9,17 @@ import type { Mock } from 'vitest';
 import { mockControl } from '../__mocks__/fs/promises.js';
 import { ReadManyFilesTool } from './read-many-files.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import path from 'path';
-import fs from 'fs'; // Actual fs for setup
-import os from 'os';
-import { Config } from '../config/config.js';
+import path from 'node:path';
+import fs from 'node:fs'; // Actual fs for setup
+import os from 'node:os';
+import type { Config } from '../config/config.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from './tool-error.js';
+import {
+  COMMON_IGNORE_PATTERNS,
+  DEFAULT_FILE_EXCLUDES,
+} from '../utils/ignorePatterns.js';
 import * as glob from 'glob';
 
 vi.mock('glob', { spy: true });
@@ -77,6 +81,13 @@ describe('ReadManyFilesTool', () => {
       getTargetDir: () => tempRootDir,
       getWorkspaceDirs: () => [tempRootDir],
       getWorkspaceContext: () => new WorkspaceContext(tempRootDir),
+      getFileExclusions: () => ({
+        getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
+        getDefaultExcludePatterns: () => DEFAULT_FILE_EXCLUDES,
+        getGlobExcludes: () => COMMON_IGNORE_PATTERNS,
+        buildExcludePatterns: () => DEFAULT_FILE_EXCLUDES,
+        getReadManyFilesExcludes: () => DEFAULT_FILE_EXCLUDES,
+      }),
     } as Partial<Config> as Config;
     tool = new ReadManyFilesTool(mockConfig);
 
@@ -484,6 +495,13 @@ describe('ReadManyFilesTool', () => {
         }),
         getWorkspaceContext: () => new WorkspaceContext(tempDir1, [tempDir2]),
         getTargetDir: () => tempDir1,
+        getFileExclusions: () => ({
+          getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
+          getDefaultExcludePatterns: () => [],
+          getGlobExcludes: () => COMMON_IGNORE_PATTERNS,
+          buildExcludePatterns: () => [],
+          getReadManyFilesExcludes: () => [],
+        }),
       } as Partial<Config> as Config;
       tool = new ReadManyFilesTool(mockConfig);
 
