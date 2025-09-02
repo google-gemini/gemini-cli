@@ -134,22 +134,8 @@ const ensureInitialized = async (configParams = {}) => {
       const config = new Config(configParameters)
       await config.initialize()
       
-      // Initialize GeminiClient only if GEMINI_API_KEY is available
-      let geminiClient = null
-      if (process.env.GEMINI_API_KEY) {
-        try {
-          await config.refreshAuth(AuthType.USE_GEMINI)
-          geminiClient = config.getGeminiClient()
-          console.log('GeminiClient initialized successfully with API key')
-        } catch (error) {
-          console.warn('Failed to initialize GeminiClient:', error.message)
-        }
-      } else {
-        console.log('GEMINI_API_KEY not found, GeminiClient will not be available')
-      }
-      
       // Initialize MultiModelSystem with the proper Config instance and optional GeminiClient
-      multiModelSystem = new MultiModelSystem(config, geminiClient)
+      multiModelSystem = new MultiModelSystem(config)
       
       // Initialize SessionManager with config and ModelProviderFactory
       await SessionManager.getInstance().initializeWithConfig({
@@ -275,13 +261,7 @@ ipcMain.handle('multimodel-switch-provider', async (_, providerType, model) => {
       model: model,
       isDefault: true
     }
-    
-    // 为 LM Studio 添加默认 baseUrl
-    if (providerType === 'lm_studio') {
-      providerConfig.baseUrl = process.env.LM_STUDIO_URL || 'http://127.0.0.1:1234/v1'
-      providerConfig.displayName = 'LM Studio'
-    }
-    
+        
     // 切换到新的提供商和模型
     await system.switchProvider(providerConfig)
     
