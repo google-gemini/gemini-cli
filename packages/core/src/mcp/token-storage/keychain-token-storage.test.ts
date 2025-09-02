@@ -45,6 +45,7 @@ describe('KeychainTokenStorage', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   const validCredentials = {
@@ -131,12 +132,16 @@ describe('KeychainTokenStorage', () => {
       );
     });
 
-    it('listServers should return empty array', async () => {
-      expect(await storage.listServers()).toEqual([]);
+    it('listServers should throw', async () => {
+      await expect(storage.listServers()).rejects.toThrow(
+        'Keychain is not available',
+      );
     });
 
-    it('getAllCredentials should return empty map', async () => {
-      expect(await storage.getAllCredentials()).toEqual(new Map());
+    it('getAllCredentials should throw', async () => {
+      await expect(storage.getAllCredentials()).rejects.toThrow(
+        'Keychain is not available',
+      );
     });
   });
 
@@ -147,7 +152,7 @@ describe('KeychainTokenStorage', () => {
       mockKeytar.deletePassword.mockResolvedValue(true);
       await storage.checkKeychainAvailability();
       // Reset mocks after availability check
-      vi.clearAllMocks();
+      vi.resetAllMocks();
     });
 
     describe('getCredentials', () => {

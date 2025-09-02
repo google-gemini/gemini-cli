@@ -52,7 +52,7 @@ export class KeychainTokenStorage extends BaseTokenStorage {
       throw new Error('Keychain is not available');
     }
 
-    const keytar = this.keytarModule;
+    const keytar = await this.getKeytar();
     if (!keytar) {
       throw new Error('Keytar module not available');
     }
@@ -85,7 +85,7 @@ export class KeychainTokenStorage extends BaseTokenStorage {
       throw new Error('Keychain is not available');
     }
 
-    const keytar = this.keytarModule;
+    const keytar = await this.getKeytar();
     if (!keytar) {
       throw new Error('Keytar module not available');
     }
@@ -107,7 +107,7 @@ export class KeychainTokenStorage extends BaseTokenStorage {
       throw new Error('Keychain is not available');
     }
 
-    const keytar = this.keytarModule;
+    const keytar = await this.getKeytar();
     if (!keytar) {
       throw new Error('Keytar module not available');
     }
@@ -125,12 +125,12 @@ export class KeychainTokenStorage extends BaseTokenStorage {
 
   async listServers(): Promise<string[]> {
     if (!(await this.checkKeychainAvailability())) {
-      return [];
+      throw new Error('Keychain is not available');
     }
 
-    const keytar = this.keytarModule;
+    const keytar = await this.getKeytar();
     if (!keytar) {
-      return [];
+      throw new Error('Keytar module not available');
     }
 
     try {
@@ -145,17 +145,16 @@ export class KeychainTokenStorage extends BaseTokenStorage {
   }
 
   async getAllCredentials(): Promise<Map<string, OAuthCredentials>> {
-    const result = new Map<string, OAuthCredentials>();
-
     if (!(await this.checkKeychainAvailability())) {
-      return result;
+      throw new Error('Keychain is not available');
     }
 
-    const keytar = this.keytarModule;
+    const keytar = await this.getKeytar();
     if (!keytar) {
-      return result;
+      throw new Error('Keytar module not available');
     }
 
+    const result = new Map<string, OAuthCredentials>();
     try {
       const credentials = (
         await keytar.findCredentials(this.serviceName)
