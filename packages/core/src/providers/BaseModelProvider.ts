@@ -45,7 +45,6 @@ export abstract class BaseModelProvider {
     signal: AbortSignal
   ): AsyncGenerator<UniversalStreamEvent>;
 
-  abstract getAvailableModels(): Promise<string[]>;
 
   abstract setTools(): void;
 

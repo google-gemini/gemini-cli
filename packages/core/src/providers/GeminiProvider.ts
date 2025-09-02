@@ -216,64 +216,49 @@ export class GeminiProvider extends BaseModelProvider {
     }
   }
 
-  async getAvailableModels(): Promise<string[]> {
-    try {
-      // Use Google AI REST API to fetch available models dynamically
-      const apiKey = this.config.apiKey;
-      if (!apiKey || apiKey === '') {
-        console.warn('GeminiProvider: No API key available, using fallback models');
-        return this.getFallbackModels();
-      }
 
-      const response = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models',
-        {
-          headers: {
-            'x-goog-api-key': apiKey,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const models = [];
-
-      if (data.models && Array.isArray(data.models)) {
-        for (const model of data.models) {
-          // Check if the model supports generateContent
-          if (model.supportedGenerationMethods?.includes('generateContent')) {
-            // Extract model name from full name (e.g., "models/gemini-1.5-pro" -> "gemini-1.5-pro")
-            const modelName = model.name.replace('models/', '');
-            models.push(modelName);
-          }
-        }
-      }
-
-      if (models.length === 0) {
-        console.warn('GeminiProvider: No models found from API, using fallback models');
-        return this.getFallbackModels();
-      }
-
-      console.log(`GeminiProvider: Retrieved ${models.length} models from API:`, models);
-      return models;
-    } catch (error) {
-      console.error('GeminiProvider: Failed to fetch models from API:', error);
-      console.warn('GeminiProvider: Using fallback models due to API error');
-      return this.getFallbackModels();
+  static async getAvailableModels(apiKey?: string): Promise<string[]> {
+    // Get API key from environment if not provided
+    const geminiApiKey = apiKey || process.env['GEMINI_API_KEY'];
+    
+    if (!geminiApiKey || geminiApiKey === '') {
+      throw new Error('GeminiProvider: API key is required to fetch available models');
     }
-  }
 
-  private getFallbackModels(): string[] {
-    return [
-      'gemini-2.0-flash-exp',
-      'gemini-1.5-pro',
-      'gemini-1.5-flash',
-      'gemini-1.5-pro-002'
-    ];
+    const response = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models',
+      {
+        headers: {
+          'x-goog-api-key': geminiApiKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GeminiProvider: HTTP error ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const models = [];
+
+    if (data.models && Array.isArray(data.models)) {
+      for (const model of data.models) {
+        // Check if the model supports generateContent
+        if (model.supportedGenerationMethods?.includes('generateContent')) {
+          // Extract model name from full name (e.g., "models/gemini-1.5-pro" -> "gemini-1.5-pro")
+          const modelName = model.name.replace('models/', '');
+          models.push(modelName);
+        }
+      }
+    }
+
+    if (models.length === 0) {
+      throw new Error('GeminiProvider: No compatible models found in API response');
+    }
+
+    console.log(`GeminiProvider: Retrieved ${models.length} models from API:`, models);
+    return models;
   }
 
   setTools(): void {

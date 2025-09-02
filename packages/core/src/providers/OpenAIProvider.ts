@@ -171,7 +171,16 @@ export class OpenAIProvider extends BaseModelProvider {
     });
 
     if (!response.ok) {
-      throw this.createError(`OpenAI API error: ${response.status} ${response.statusText}`);
+      let errorMessage = `OpenAI API error: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.text();
+        if (errorData) {
+          errorMessage += ` - ${errorData}`;
+        }
+      } catch (parseError) {
+        // Ignore parsing errors, use basic error message
+      }
+      throw this.createError(errorMessage);
     }
 
     const data = await response.json() as OpenAIResponse;
@@ -215,9 +224,20 @@ export class OpenAIProvider extends BaseModelProvider {
     });
 
     if (!response.ok) {
+      let errorMessage = `OpenAI API error: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.text();
+        if (errorData) {
+          errorMessage += ` - ${errorData}`;
+        }
+      } catch (parseError) {
+        // Ignore parsing errors, use basic error message
+        console.error('Error parsing OpenAI error response:', parseError);
+      }
+      
       yield {
         type: 'error',
-        error: this.createError(`OpenAI API error: ${response.status} ${response.statusText}`)
+        error: this.createError(errorMessage)
       };
       return;
     }
@@ -337,24 +357,38 @@ export class OpenAIProvider extends BaseModelProvider {
     }
   }
 
-  async getAvailableModels(): Promise<string[]> {
-    try {
-      const response = await fetch(`${this.baseUrl}/models`, {
-        headers: this.getHeaders()
-      });
 
-      if (!response.ok) {
-        throw this.createError(`Failed to fetch models: ${response.status}`);
-      }
-
-      const data = await response.json() as { data: Array<{ id: string }> };
-      return data.data
-        .map(model => model.id)
-        .filter(id => id.startsWith('gpt-') || id.startsWith('o1-'))
-        .sort();
-    } catch (error) {
-      throw this.createError('Failed to get available models', error);
+  static async getAvailableModels(apiKey?: string, baseUrl = 'https://api.openai.com/v1'): Promise<string[]> {
+    // Get API key from environment if not provided
+    const openaiApiKey = apiKey || process.env['OPENAI_API_KEY'];
+    
+    if (!openaiApiKey) {
+      throw new Error('OpenAIProvider: API key is required to fetch available models');
     }
+
+    const response = await fetch(`${baseUrl}/models`, {
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAIProvider: HTTP error ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json() as { data: Array<{ id: string }> };
+    const models = data.data
+      .map(model => model.id)
+      .filter(id => id.startsWith('gpt-') || id.startsWith('o1-'))
+      .sort();
+
+    if (models.length === 0) {
+      throw new Error('OpenAIProvider: No compatible models found in API response');
+    }
+
+    console.log(`OpenAIProvider: Retrieved ${models.length} models from API:`, models);
+    return models;
   }
 
   setTools(): void {

@@ -383,22 +383,26 @@ export class LMStudioProvider extends BaseModelProvider {
     }
   }
 
-  async getAvailableModels(): Promise<string[]> {
-    try {
-      const response = await fetch(`${this.baseUrl}/models`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
 
-      if (!response.ok) {
-        throw this.createError(`Failed to fetch models: ${response.status}`);
-      }
+  static async getAvailableModels(baseUrl = 'http://127.0.0.1:1234/v1'): Promise<string[]> {
+    const response = await fetch(`${baseUrl}/models`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
 
-      const data = await response.json() as { data: LMStudioModel[] };
-      return data.data.map(model => model.id).sort();
-    } catch (error) {
-      throw this.createError('Failed to get available models from LM Studio', error);
+    if (!response.ok) {
+      throw new Error(`LMStudioProvider: HTTP error ${response.status}: ${response.statusText}`);
     }
+
+    const data = await response.json() as { data: LMStudioModel[] };
+    const models = data.data.map(model => model.id).sort();
+
+    if (models.length === 0) {
+      throw new Error('LMStudioProvider: No models found in LM Studio response');
+    }
+
+    console.log(`LMStudioProvider: Retrieved ${models.length} models from LM Studio:`, models);
+    return models;
   }
 
   setTools(): void {
