@@ -17,7 +17,7 @@ import type { AddressInfo } from 'node:net';
 
 // Mock the logger to avoid polluting test output
 // Comment out to help debug
-vi.mock('../util/logger.js', () => ({
+vi.mock('../utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
