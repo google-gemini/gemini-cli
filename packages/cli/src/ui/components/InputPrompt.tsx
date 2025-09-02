@@ -587,7 +587,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       setShellModeActive,
       onClearScreen,
       inputHistory,
-      handleSubmitAndClear,
       shellHistory,
       reverseSearchCompletion,
       handleClipboardImage,
