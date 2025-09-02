@@ -122,8 +122,9 @@ export function useReactToolScheduler(
       );
       if (wasSkipped) {
         onToolCallSkipped();
+      } else {
+        await onComplete(completedToolCalls);
       }
-      await onComplete(completedToolCalls);
     },
     [onComplete, onToolCallSkipped],
   );

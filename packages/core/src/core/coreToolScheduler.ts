@@ -90,7 +90,6 @@ export type CancelledToolCall = {
   invocation: AnyToolInvocation;
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
-  skipped?: boolean;
 };
 
 export type SkippedToolCall = {
@@ -437,9 +436,6 @@ export class CoreToolScheduler {
             },
             durationMs,
             outcome,
-            skipped:
-              newStatus === 'cancelled' &&
-              auxiliaryData === 'Tool call skipped by user',
           } as CancelledToolCall;
         }
         case 'validating':
