@@ -1458,7 +1458,10 @@ export class ExcelTool extends BaseDeclarativeTool<ExcelParams, ExcelResult> {
           range: { type: 'string', description: 'Cell range (A1 or A1:C5)' },
           data: { 
             type: 'array', 
-            items: { type: 'array' },
+            items: { 
+              type: 'array',
+              items: { type: 'string' }
+            },
             description: 'Data rows (strings starting with = are formulas)'
           },
           style: { type: 'object', description: 'Cell styling options' },
