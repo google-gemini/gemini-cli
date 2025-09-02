@@ -198,6 +198,15 @@ describe('KeychainTokenStorage', () => {
           JSON.stringify({ ...validCredentials, updatedAt: Date.now() }),
         );
       });
+
+      it('should throw if saving to keychain fails', async () => {
+        mockKeytar.setPassword.mockRejectedValue(
+          new Error('keychain write error'),
+        );
+        await expect(storage.setCredentials(validCredentials)).rejects.toThrow(
+          'keychain write error',
+        );
+      });
     });
 
     describe('deleteCredentials', () => {
@@ -216,12 +225,34 @@ describe('KeychainTokenStorage', () => {
           'No credentials found for test-server',
         );
       });
+
+      it('should throw if deleting from keychain fails', async () => {
+        mockKeytar.deletePassword.mockRejectedValue(
+          new Error('keychain delete error'),
+        );
+        await expect(storage.deleteCredentials('test-server')).rejects.toThrow(
+          'keychain delete error',
+        );
+      });
     });
 
     describe('listServers', () => {
       it('should return a list of server names', async () => {
         mockKeytar.findCredentials.mockResolvedValue([
           { account: 'server1', password: '' },
+          { account: 'server2', password: '' },
+        ]);
+        const result = await storage.listServers();
+        expect(result).toEqual(['server1', 'server2']);
+      });
+
+      it('should not include internal test keys in the server list', async () => {
+        mockKeytar.findCredentials.mockResolvedValue([
+          { account: 'server1', password: '' },
+          {
+            account: `__keychain_test__${mockCryptoRandomBytesString}`,
+            password: '',
+          },
           { account: 'server2', password: '' },
         ]);
         const result = await storage.listServers();
@@ -246,6 +277,9 @@ describe('KeychainTokenStorage', () => {
           serverName: 'expired-server',
           token: { ...validCredentials.token, expiresAt: Date.now() - 1000 },
         };
+        const structurallyInvalidCreds = {
+          serverName: 'invalid-server',
+        };
 
         mockKeytar.findCredentials.mockResolvedValue([
           {
@@ -253,8 +287,15 @@ describe('KeychainTokenStorage', () => {
             password: JSON.stringify(validCredentials),
           },
           { account: 'server2', password: JSON.stringify(creds2) },
-          { account: 'expired-server', password: JSON.stringify(expiredCreds) },
+          {
+            account: 'expired-server',
+            password: JSON.stringify(expiredCreds),
+          },
           { account: 'bad-server', password: 'not-json' },
+          {
+            account: 'invalid-server',
+            password: JSON.stringify(structurallyInvalidCreds),
+          },
         ]);
 
         const result = await storage.getAllCredentials();
@@ -263,6 +304,7 @@ describe('KeychainTokenStorage', () => {
         expect(result.get('server2')).toEqual(creds2);
         expect(result.has('expired-server')).toBe(false);
         expect(result.has('bad-server')).toBe(false);
+        expect(result.has('invalid-server')).toBe(false);
       });
     });
 
