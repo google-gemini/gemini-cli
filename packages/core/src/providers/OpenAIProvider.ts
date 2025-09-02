@@ -264,7 +264,7 @@ export class OpenAIProvider extends BaseModelProvider {
                   
                   const universalToolCall: ToolCall = {
                     id: toolCall.id || `call_${Date.now()}`,
-                    name: toolCall.function.name,
+                    name: toolCall.function.name.trim(),
                     arguments: args
                   };
                   toolCalls.push(universalToolCall);
@@ -397,7 +397,7 @@ export class OpenAIProvider extends BaseModelProvider {
           arguments: JSON.stringify(tc.arguments)
         }
       })),
-      tool_call_id: msg.toolCallId,
+      tool_call_id: msg.tool_call_id,
       name: msg.name
     }));
   }

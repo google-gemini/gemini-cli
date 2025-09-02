@@ -189,11 +189,6 @@ export class LMStudioProvider extends BaseModelProvider {
     signal: AbortSignal
   ): AsyncGenerator<UniversalStreamEvent> {
     const lmStudioMessages = this.convertToLMStudioMessages(messages);
-    // console.log('[sendMessageStream] LMStudio Messages:', lmStudioMessages);
-    // print tools information directly to console for debugging
-    // if (this.toolDeclarations && this.toolDeclarations.length > 0) 
-      // console.log(`[sendMessageStream] Using ${this.toolDeclarations.length} tools:`
-        // , this.toolDeclarations.map(tool => tool.name));
     
     const requestBody: LMStudioRequestBody = {
       model: this.config.model,
@@ -350,7 +345,7 @@ export class LMStudioProvider extends BaseModelProvider {
                       
                       const universalToolCall: ToolCall = {
                         id: toolCall.id || `call_${Date.now()}`,
-                        name: toolCall.function.name,
+                        name: toolCall.function.name.trim(), // Clean tool name
                         arguments: args
                       };
                       toolCalls.push(universalToolCall);
