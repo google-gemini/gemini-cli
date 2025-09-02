@@ -1,0 +1,8 @@
+{
+  "model": {
+    "quotaEstimation": {
+      "enabled": true,
+      "showDetailedBreakdown": true
+    }
+  }
+}

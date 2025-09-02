@@ -13,6 +13,7 @@ import {
   parseAndFormatApiError,
   FatalInputError,
   FatalTurnLimitedError,
+  QuotaEstimator,
 } from '@google/gemini-cli-core';
 import type { Content, Part } from '@google/genai';
 
@@ -23,6 +24,7 @@ export async function runNonInteractive(
   config: Config,
   input: string,
   prompt_id: string,
+  settings?: any,
 ): Promise<void> {
   const consolePatcher = new ConsolePatcher({
     stderr: true,
@@ -58,6 +60,59 @@ export async function runNonInteractive(
       throw new FatalInputError(
         'Exiting due to an error processing the @ command.',
       );
+    }
+
+    // Check if quota estimation is enabled
+    const quotaEstimationEnabled = settings?.model?.quotaEstimation?.enabled;
+    const showDetailedBreakdown = settings?.model?.quotaEstimation?.showDetailedBreakdown;
+    
+    if (quotaEstimationEnabled) {
+      try {
+        const quotaEstimator = new QuotaEstimator(geminiClient.getContentGenerator());
+        const estimate = await quotaEstimator.estimateQuotaUsage(
+          processedQuery as Part[],
+          {
+            model: config.getModel(),
+            showDetailedBreakdown,
+          }
+        );
+        
+        const estimateMessage = quotaEstimator.formatQuotaEstimate(estimate, {
+          showDetailedBreakdown,
+        });
+        
+        console.log('\n' + estimateMessage + '\n');
+        
+        // Handle user confirmation for quota estimation
+        if (process.stdin.isTTY) {
+          // Only ask for confirmation if we have an interactive terminal
+          const readline = await import('node:readline');
+          const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+          });
+
+          const answer = await new Promise<string>(resolve => {
+            rl.question('Do you want to proceed with this request? (y/N) ', answer => {
+              rl.close();
+              resolve(answer);
+            });
+          });
+
+          if (answer.toLowerCase() !== 'y') {
+            console.log('\nRequest cancelled.');
+            return;
+          }
+        } else {
+          // In non-interactive mode (piped input), proceed automatically
+          console.log('Proceeding with request automatically (non-interactive mode)...\n');
+        }
+      } catch (error) {
+        if (config.getDebugMode()) {
+          console.warn('Failed to estimate quota usage:', error);
+        }
+        // Continue with execution even if estimation fails
+      }
     }
 
     let currentMessages: Content[] = [

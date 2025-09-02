@@ -94,5 +94,10 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
     {item.type === 'compression' && (
       <CompressionMessage compression={item.compression} />
     )}
+    {item.type === 'quota_estimate' && (
+      <Box borderStyle="round" borderColor="blue" paddingX={1}>
+        <InfoMessage text={item.text} />
+      </Box>
+    )}
   </Box>
 );

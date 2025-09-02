@@ -31,6 +31,7 @@ import {
   ConversationFinishedEvent,
   ApprovalMode,
   parseAndFormatApiError,
+  QuotaEstimator,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -355,6 +356,43 @@ export const useGeminiStream = (
         );
         return { queryToSend: null, shouldProceed: false };
       }
+
+      // Check if quota estimation is enabled
+      const quotaEstimationEnabled = settings?.model?.quotaEstimation?.enabled;
+      const showDetailedBreakdown = settings?.model?.quotaEstimation?.showDetailedBreakdown;
+      
+      if (quotaEstimationEnabled && localQueryToSendToGemini) {
+        try {
+          const quotaEstimator = new QuotaEstimator(geminiClient.getContentGenerator());
+          const estimate = await quotaEstimator.estimateQuotaUsage(
+            localQueryToSendToGemini,
+            {
+              model: config.getModel(),
+              showDetailedBreakdown,
+            }
+          );
+          
+          const estimateMessage = quotaEstimator.formatQuotaEstimate(estimate, {
+            showDetailedBreakdown,
+          });
+          
+          // Add the quota estimate to the history
+          addItem(
+            { type: MessageType.QUOTA_ESTIMATE, text: estimateMessage },
+            userMessageTimestamp,
+          );
+          
+          // For interactive mode, we'll proceed automatically
+          // In a real implementation, you might want to add user confirmation
+          onDebugMessage('Quota estimate displayed, proceeding with request...');
+        } catch (error) {
+          if (config.getDebugMode()) {
+            onDebugMessage(`Failed to estimate quota usage: ${error}`);
+          }
+          // Continue with execution even if estimation fails
+        }
+      }
+
       return { queryToSend: localQueryToSendToGemini, shouldProceed: true };
     },
     [
