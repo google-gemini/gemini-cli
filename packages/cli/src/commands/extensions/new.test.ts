@@ -22,8 +22,8 @@ describe('extensions new command', () => {
       { name: 'custom-commands', isDirectory: () => true },
       { name: 'mcp-server', isDirectory: () => true },
     ];
-
-    mockedFs.readdir.mockResolvedValue(fakeFiles);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockedFs.readdir.mockResolvedValue(fakeFiles as any);
   });
 
   it('should fail if no path is provided', async () => {

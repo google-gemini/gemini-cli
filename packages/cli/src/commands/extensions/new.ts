@@ -50,7 +50,7 @@ async function handleNew(args: NewArgs) {
     );
   } catch (error) {
     console.error(getErrorMessage(error));
-    process.exit(1);
+    throw error;
   }
 }
 
