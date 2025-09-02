@@ -42,7 +42,8 @@ export function getDiffStat(
     'Proposed',
     DEFAULT_DIFF_OPTIONS,
   );
-  const { added: aiAddedLines, removed: aiRemovedLines } = countLines(patch);
+  const { added: modelAddedLines, removed: modelRemovedLines } =
+    countLines(patch);
 
   const userPatch = Diff.structuredPatch(
     fileName,
@@ -57,8 +58,8 @@ export function getDiffStat(
     countLines(userPatch);
 
   return {
-    ai_added_lines: aiAddedLines,
-    ai_removed_lines: aiRemovedLines,
+    model_added_lines: modelAddedLines,
+    model_removed_lines: modelRemovedLines,
     user_added_lines: userAddedLines,
     user_removed_lines: userRemovedLines,
   };

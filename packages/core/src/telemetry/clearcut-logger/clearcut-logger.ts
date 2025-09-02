@@ -465,8 +465,8 @@ export class ClearcutLogger {
 
     if (event.metadata) {
       const metadataMapping: { [key: string]: EventMetadataKey } = {
-        ai_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
-        ai_removed_lines: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
+        model_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
+        model_removed_lines: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
         user_added_lines: EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
         user_removed_lines: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
       };

@@ -528,8 +528,8 @@ describe('EditTool', () => {
       expect(display.fileDiff).toMatch(/\+new text\n\+new text\n\+new text/);
       expect(display.fileName).toBe(testFile);
       expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
-        ai_added_lines: 3,
-        ai_removed_lines: 3,
+        model_added_lines: 3,
+        model_removed_lines: 3,
         user_added_lines: 0,
         user_removed_lines: 0,
       });
@@ -589,8 +589,8 @@ describe('EditTool', () => {
         /User modified the `new_string` content/,
       );
       expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
-        ai_added_lines: 1,
-        ai_removed_lines: 1,
+        model_added_lines: 1,
+        model_removed_lines: 1,
         user_added_lines: 1,
         user_removed_lines: 1,
       });
