@@ -254,6 +254,26 @@ describe('chatCommand', () => {
         content: `Conversation checkpoint saved with tag: ${tag}.`,
       });
     });
+
+    it('should strip thoughts by default when saving a chat', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there!' }] },
+      ];
+      mockGetHistory.mockReturnValue(history);
+      await saveCommand?.action?.(mockContext, tag);
+      expect(mockGetHistory).toHaveBeenCalledWith({ stripThoughts: true });
+    });
+
+    it('should include thoughts when saving a chat if --with-thoughts is passed', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'hello' }] },
+        { role: 'model', parts: [{ text: 'Hi there!' }] },
+      ];
+      mockGetHistory.mockReturnValue(history);
+      await saveCommand?.action?.(mockContext, `${tag} --with-thoughts`);
+      expect(mockGetHistory).toHaveBeenCalledWith({ stripThoughts: false });
+    });
   });
 
   describe('resume subcommand', () => {

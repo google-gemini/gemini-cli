@@ -499,10 +499,38 @@ export class GeminiChat {
    * @return History contents alternating between user and model for the entire
    * chat session.
    */
-  getHistory(curated: boolean = false): Content[] {
-    const history = curated
+  getHistory(curated?: boolean): Content[];
+  getHistory(options?: { curated?: boolean; stripThoughts?: boolean }): Content[];
+  getHistory(
+    optionsOrCurated?:
+      | boolean
+      | { curated?: boolean; stripThoughts?: boolean },
+  ): Content[] {
+    const defaultOptions = { curated: false, stripThoughts: false };
+
+    let finalOptions;
+
+    if (typeof optionsOrCurated === 'boolean') {
+      finalOptions = { ...defaultOptions, curated: optionsOrCurated };
+    } else if (typeof optionsOrCurated === 'object' && optionsOrCurated !== null) {
+      finalOptions = { ...defaultOptions, ...optionsOrCurated };
+    } else {
+      finalOptions = defaultOptions;
+    }
+
+    const { curated, stripThoughts } = finalOptions;
+
+    let history = curated
       ? extractCuratedHistory(this.history)
       : this.history;
+
+    if (stripThoughts) {
+      history = history.map((content) => {
+        const visibleParts = content.parts.filter((part) => !part.thought);
+        return { ...content, parts: visibleParts };
+      });
+    }
+
     // Deep copy the history to avoid mutating the history outside of the
     // chat session.
     return structuredClone(history);

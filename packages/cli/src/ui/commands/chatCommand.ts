@@ -102,10 +102,12 @@ const listCommand: SlashCommand = {
 const saveCommand: SlashCommand = {
   name: 'save',
   description:
-    'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
+    'Save the current conversation as a checkpoint. Usage: /chat save <tag> [--with-thoughts]',
   kind: CommandKind.BUILT_IN,
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
-    const tag = args.trim();
+    const [tag, ...rest] = args.split(' ');
+    const withThoughts = rest.includes('--with-thoughts');
+
     if (!tag) {
       return {
         type: 'message',
@@ -145,13 +147,15 @@ const saveCommand: SlashCommand = {
       };
     }
 
-    const history = chat.getHistory();
+    const history = chat.getHistory({ stripThoughts: !withThoughts });
     if (history.length > 2) {
       await logger.saveCheckpoint(history, tag);
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint saved with tag: ${decodeTagName(tag)}.`,
+        content: `Conversation checkpoint saved with tag: ${decodeTagName(
+          tag,
+        )}.`,
       };
     } else {
       return {

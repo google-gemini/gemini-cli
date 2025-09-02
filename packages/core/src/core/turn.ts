@@ -290,7 +290,7 @@ export class Turn {
         throw error;
       }
 
-      const contextForReport = [...this.chat.getHistory(/*curated*/ true), req];
+      const contextForReport = [...this.chat.getHistory({ curated: true }), req];
       await reportError(
         error,
         'Error when talking to Gemini API',
