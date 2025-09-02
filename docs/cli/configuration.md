@@ -228,10 +228,6 @@ Settings are organized into categories. All settings should be placed within the
 
 #### `security`
 
-- **`security.folderTrust.featureEnabled`** (boolean):
-  - **Description:** Enable folder trust feature for enhanced security.
-  - **Default:** `false`
-
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
   - **Default:** `false`
