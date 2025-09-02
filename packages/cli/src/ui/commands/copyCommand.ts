@@ -10,11 +10,11 @@ import {
   SlashCommand,
   SlashCommandActionReturn,
 } from './types.js';
-import i18n from '../../i18n/index.js';
+import i18n, { t } from '../../i18n/index.js';
 
 export const copyCommand: SlashCommand = {
   name: 'copy',
-  description: 'Copy the last result or code snippet to clipboard',
+  description: t('commands:descriptions.copy'),
   kind: CommandKind.BUILT_IN,
   action: async (context, _args): Promise<SlashCommandActionReturn | void> => {
     const chat = await context.services.config?.getGeminiClient()?.getChat();

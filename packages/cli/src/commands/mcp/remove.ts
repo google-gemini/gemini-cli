@@ -7,6 +7,7 @@
 // File for 'gemini mcp remove' command
 import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
+import i18next from 'i18next';
 
 async function removeMcpServer(
   name: string,
@@ -39,7 +40,7 @@ export const removeCommand: CommandModule = {
   describe: 'Remove a server',
   builder: (yargs) =>
     yargs
-      .usage('Usage: gemini mcp remove [options] <name>')
+      .usage(i18next.t('commands:mcp.usage.removeUsage'))
       .positional('name', {
         describe: 'Name of the server',
         type: 'string',
@@ -47,7 +48,7 @@ export const removeCommand: CommandModule = {
       })
       .option('scope', {
         alias: 's',
-        describe: 'Configuration scope (user or project)',
+        describe: i18next.t('commands:mcp.usage.configScope'),
         type: 'string',
         default: 'project',
         choices: ['user', 'project'],

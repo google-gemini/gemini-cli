@@ -1,0 +1,5 @@
+{
+  "errors": {
+    "notGitRepository": "无法确定 GitHub 仓库。/setup-github 必须在 git 仓库中运行。"
+  }
+}

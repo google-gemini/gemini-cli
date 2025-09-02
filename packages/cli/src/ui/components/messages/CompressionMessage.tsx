@@ -9,6 +9,7 @@ import { Box, Text } from 'ink';
 import { CompressionProps } from '../../types.js';
 import Spinner from 'ink-spinner';
 import { Colors } from '../../colors.js';
+import { useTranslation } from 'react-i18next';
 
 export interface CompressionDisplayProps {
   compression: CompressionProps;
@@ -21,8 +22,10 @@ export interface CompressionDisplayProps {
 export const CompressionMessage: React.FC<CompressionDisplayProps> = ({
   compression,
 }) => {
+  const { t } = useTranslation();
+  
   const text = compression.isPending
-    ? 'Compressing chat history'
+    ? t('commands:compression.title')
     : `Chat history compressed from ${compression.originalTokenCount ?? 'unknown'}` +
       ` to ${compression.newTokenCount ?? 'unknown'} tokens.`;
 

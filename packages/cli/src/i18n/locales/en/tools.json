@@ -6,5 +6,24 @@
   },
   "restore": {
     "availableToolCalls": "Available tool calls to restore:\n\n{{toolCalls}}"
+  },
+  "memory": {
+    "description": "Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.",
+    "shouldIRemember": "Should I remember that for you?"
+  },
+  "edit": {
+    "replacementCount": "Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences."
+  },
+  "shell": {
+    "commandDescription": "Exact bash command to execute as `bash -c <command>`",
+    "briefDescription": "Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks."
+  },
+  "edit_corrector": {
+    "correctedSnippet": "The corrected version of the target snippet that exactly and uniquely matches a segment within the provided file content.",
+    "adjustedReplacement": "The original_new_string adjusted to be a suitable replacement for the corrected_old_string, while maintaining the original intent of the change."
+  },
+  "ui": {
+    "textElementsWrapping": "Text elements without wrapping cannot appear after elements with wrapping in the same row.",
+    "childrenMustBeText": "Children of a row Box must be <Text> elements."
   }
 }

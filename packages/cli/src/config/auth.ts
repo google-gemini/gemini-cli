@@ -6,6 +6,7 @@
 
 import { AuthType } from '@google/gemini-cli-core';
 import { loadEnvironment } from './settings.js';
+import { t } from '../i18n/index.js';
 
 export const validateAuthMethod = (authMethod: string): string | null => {
   loadEnvironment();
@@ -30,14 +31,14 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     const hasGoogleApiKey = !!process.env['GOOGLE_API_KEY'];
     if (!hasVertexProjectLocationConfig && !hasGoogleApiKey) {
       return (
-        'When using Vertex AI, you must specify either:\n' +
+        t('config:auth.vertexRequirement') +
         '• GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment variables.\n' +
         '• GOOGLE_API_KEY environment variable (if using express mode).\n' +
-        'Update your environment and try again (no reload needed if using .env)!'
+        t('config:auth.updateEnvironment')
       );
     }
     return null;
   }
 
-  return 'Invalid auth method selected.';
+  return t('auth:validation.invalidMethod');
 };

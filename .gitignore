@@ -68,7 +68,6 @@ i18n-demo-*.js
 I18N_*.md
 *_I18N_*.md
 i18n-visual-test-report.html
-find-hardcoded-strings.ts
 i18n-hardcoded-strings-report.md
 
 # PR feedback tracking and documentation files (local use only)

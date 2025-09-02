@@ -22,6 +22,7 @@ import {
   EditorType,
 } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo } from 'react';
+import { t } from '../../i18n/index.js';
 import {
   HistoryItemToolGroup,
   IndividualToolCallDisplay,
@@ -291,9 +292,9 @@ export function mapToDisplay(
           return {
             callId: (exhaustiveCheck as TrackedToolCall).request.callId,
             name: 'Unknown Tool',
-            description: 'Encountered an unknown tool call state.',
+            description: t('toolScheduler:errors.unknownState'),
             status: ToolCallStatus.Error,
-            resultDisplay: 'Unknown tool call state',
+            resultDisplay: t('toolScheduler:errors.unknownStateDisplay'),
             confirmationDetails: undefined,
             renderOutputAsMarkdown: false,
           };

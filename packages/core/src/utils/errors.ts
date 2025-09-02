@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { getTranslatedErrorMessage } from './i18nInterface.js';
+
+// Re-export for convenience
+export { getTranslatedErrorMessage };
+
 interface GaxiosError {
   response?: {
     data?: unknown;
@@ -21,7 +26,7 @@ export function getErrorMessage(error: unknown): string {
   try {
     return String(error);
   } catch {
-    return 'Failed to get error details';
+    return getTranslatedErrorMessage('errors:core.getDetailsError', 'Failed to get error details');
   }
 }
 

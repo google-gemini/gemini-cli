@@ -1,0 +1,12 @@
+{
+  "gitClone": "从本地 git 克隆运行。请使用 \"git pull\" 更新。",
+  "npx": "通过 npx 运行，无法更新。",
+  "pnpx": "通过 pnpx 运行，无法更新。",
+  "homebrew": "通过 Homebrew 安装。请使用 \"brew upgrade\" 更新。",
+  "pnpm": "使用 pnpm 安装。正在尝试自动更新...",
+  "yarn": "使用 yarn 安装。正在尝试自动更新...",
+  "bunx": "通过 bunx 运行，无法更新。",
+  "bun": "使用 bun 安装。正在尝试自动更新...",
+  "npm": "使用 npm 安装。正在尝试自动更新...",
+  "updateSuccess": "更新成功！新版本将在下次运行时使用。"
+}

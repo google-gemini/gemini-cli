@@ -1,0 +1,5 @@
+{
+  "homeDirectory": "Vous exécutez Gemini CLI dans votre répertoire home. Il est recommandé d'exécuter dans un répertoire spécifique au projet.",
+  "rootDirectory": "Avertissement : Vous exécutez Gemini CLI dans le répertoire racine. Toute votre structure de dossiers sera utilisée pour le contexte. Il est fortement recommandé d'exécuter dans un répertoire spécifique au projet.",
+  "fileSystemError": "Impossible de vérifier le répertoire actuel en raison d'une erreur du système de fichiers."
+}

@@ -11,6 +11,7 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
+import { t } from '../i18n/index.js';
 import {
   Config,
   loadServerHierarchicalMemory,
@@ -78,9 +79,7 @@ export interface CliArgs {
 export async function parseArguments(): Promise<CliArgs> {
   const yargsInstance = yargs(hideBin(process.argv))
     .scriptName('gemini')
-    .usage(
-      'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
-    )
+    .usage(t('dialogs:config.usage'))
     .command('$0', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
         .option('model', {
@@ -92,18 +91,17 @@ export async function parseArguments(): Promise<CliArgs> {
         .option('prompt', {
           alias: 'p',
           type: 'string',
-          description: 'Prompt. Appended to input on stdin (if any).',
+          description: t('commands:config.prompt'),
         })
         .option('prompt-interactive', {
           alias: 'i',
           type: 'string',
-          description:
-            'Execute the provided prompt and continue in interactive mode',
+          description: t('dialogs:config.executePrompt'),
         })
         .option('sandbox', {
           alias: 's',
           type: 'boolean',
-          description: 'Run in sandbox?',
+          description: t('commands:config.sandbox'),
         })
         .option('sandbox-image', {
           type: 'string',
@@ -112,37 +110,37 @@ export async function parseArguments(): Promise<CliArgs> {
         .option('debug', {
           alias: 'd',
           type: 'boolean',
-          description: 'Run in debug mode?',
+          description: t('commands:config.debug'),
           default: false,
         })
         .option('all-files', {
           alias: ['a'],
           type: 'boolean',
-          description: 'Include ALL files in context?',
+          description: t('commands:config.allFiles'),
           default: false,
         })
         .option('all_files', {
           type: 'boolean',
-          description: 'Include ALL files in context?',
+          description: t('commands:config.allFiles'),
           default: false,
         })
         .deprecateOption(
           'all_files',
-          'Use --all-files instead. We will be removing --all_files in the coming weeks.',
+          t('config:deprecation.allFilesDeprecated'),
         )
         .option('show-memory-usage', {
           type: 'boolean',
-          description: 'Show memory usage in status bar',
+          description: t('config:options.showMemoryUsage'),
           default: false,
         })
         .option('show_memory_usage', {
           type: 'boolean',
-          description: 'Show memory usage in status bar',
+          description: t('config:options.showMemoryUsage'),
           default: false,
         })
         .deprecateOption(
           'show_memory_usage',
-          'Use --show-memory-usage instead. We will be removing --show_memory_usage in the coming weeks.',
+          t('config:deprecation.showMemoryUsageDeprecated'),
         )
         .option('yolo', {
           alias: 'y',
@@ -154,8 +152,7 @@ export async function parseArguments(): Promise<CliArgs> {
         .option('approval-mode', {
           type: 'string',
           choices: ['default', 'auto_edit', 'yolo'],
-          description:
-            'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools)',
+          description: t('config:options.approvalMode'),
         })
         .option('telemetry', {
           type: 'boolean',
@@ -191,12 +188,12 @@ export async function parseArguments(): Promise<CliArgs> {
         .option('checkpointing', {
           alias: 'c',
           type: 'boolean',
-          description: 'Enables checkpointing of file edits',
+          description: t('config:options.checkpoint'),
           default: false,
         })
         .option('experimental-acp', {
           type: 'boolean',
-          description: 'Starts the agent in ACP mode',
+          description: t('config:options.experimentalAcp'),
         })
         .option('allowed-mcp-server-names', {
           type: 'array',
@@ -213,7 +210,7 @@ export async function parseArguments(): Promise<CliArgs> {
         .option('list-extensions', {
           alias: 'l',
           type: 'boolean',
-          description: 'List all available extensions and exit.',
+          description: t('config:options.listExtensions'),
         })
         .option('proxy', {
           type: 'string',
@@ -223,8 +220,7 @@ export async function parseArguments(): Promise<CliArgs> {
         .option('include-directories', {
           type: 'array',
           string: true,
-          description:
-            'Additional directories to include in the workspace (comma-separated or multiple --include-directories)',
+          description: t('config:options.includeDirectories'),
           coerce: (dirs: string[]) =>
             // Handle comma-separated values
             dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
@@ -233,12 +229,12 @@ export async function parseArguments(): Promise<CliArgs> {
         .check((argv) => {
           if (argv.prompt && argv['promptInteractive']) {
             throw new Error(
-              'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
+              t('dialogs:config.conflictingOptions'),
             );
           }
           if (argv.yolo && argv['approvalMode']) {
             throw new Error(
-              'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
+              t('config:validation.yoloApprovalMode'),
             );
           }
           return true;

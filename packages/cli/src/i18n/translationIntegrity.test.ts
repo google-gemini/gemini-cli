@@ -461,7 +461,8 @@ describe('Translation Integrity Tests', () => {
       // Pattern 5: getTranslatedErrorMessage('key', fallback, params)
       const pattern5 = /getTranslatedErrorMessage\(\s*['"`]([^'"`]+)['"`]/g;
       while ((match = pattern5.exec(fileContent)) !== null) {
-        const key = match[1];
+        let key = match[1];
+        let namespace = 'errors'; // default namespace
         
         // Skip dynamic keys and test placeholders
         if (key.includes('${') || key.includes('`') || key.includes('commandName') || key.includes('variable') || 
@@ -469,8 +470,14 @@ describe('Translation Integrity Tests', () => {
           continue;
         }
         
-        // getTranslatedErrorMessage uses 'errors' namespace by default
-        keys.push({ key, namespace: 'errors', file: '' });
+        // Handle keys with namespace prefix like 'errors:auth.browserOpenFailedAdvice'
+        if (key.includes(':')) {
+          const [keyNamespace, ...keyParts] = key.split(':');
+          namespace = keyNamespace;
+          key = keyParts.join(':'); // rejoin in case there are multiple colons
+        }
+        
+        keys.push({ key, namespace, file: '' });
       }
       
       // Pattern 6: tNamespace('key') - renamed translation functions like tDialogs, tUI, etc.

@@ -43,12 +43,31 @@
       "cancel": "否 (esc)"
     }
   },
+  "toolConfirm": {
+    "shellCommand": "确认 Shell 命令",
+    "mockTool": "确认Mock工具",
+    "title": "需要 Shell 命令确认"
+  },
   "theme": {
     "title": "选择主题",
     "preview": "预览",
     "applyTo": "应用到",
     "instructions": "(使用 Enter 选择{{tabInstruction}})",
     "tabInstruction": "，Tab 切换焦点"
+  },
+  "mcp": {
+    "trustServer": "信任服务器（绕过所有工具调用确认提示）"
+  },
+  "config": {
+    "usage": "使用方法：gemini [选项] [命令]\n\nGemini CLI - 启动交互式 CLI，使用 -p/--prompt 进入非交互模式",
+    "executePrompt": "执行提供的提示并继续交互模式",
+    "conflictingOptions": "不能同时使用 --prompt (-p) 和 --prompt-interactive (-i)"
+  },
+  "prompts": {
+    "helpDescription": "显示此提示的帮助",
+    "emptyResponse": "从服务器收到空的或无效的提示响应。",
+    "fieldRequired": "需要'prompt'字段。",
+    "fieldMustBeString": "'prompt'字段必须是字符串。"
   },
   "editor": {
     "title": "选择编辑器",
@@ -66,5 +85,16 @@
       "workspace": "工作区设置"
     },
     "none": "无"
+  },
+  "prompts": {
+    "fieldRequired": "此字段为必填项",
+    "fieldMustBeString": "此字段必须是字符串",
+    "helpDescription": "提供使用各种功能和命令的帮助和指导",
+    "emptyResponse": "未收到提示的响应"
+  },
+  "config": {
+    "usage": "通过stdin直接将提示传递给gemini并立即退出，而无需运行交互式CLI",
+    "executePrompt": "在CLI中执行此提示，然后继续以交互模式运行",
+    "conflictingOptions": "不能同时使用 --prompt 和 --prompt-interactive (-i)。请使用其中一个。"
   }
 }

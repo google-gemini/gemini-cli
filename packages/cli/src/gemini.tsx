@@ -6,6 +6,7 @@
 
 import { render } from 'ink';
 import { MainComponent } from './ui/MainComponent.js';
+import i18n from './i18n/index.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
@@ -174,7 +175,7 @@ export async function main() {
 
   if (argv.promptInteractive && !process.stdin.isTTY) {
     console.error(
-      'Error: The --prompt-interactive flag is not supported when piping input from stdin.',
+      i18n.t('errors:cli.promptInteractiveNotSupported'),
     );
     process.exit(1);
   }

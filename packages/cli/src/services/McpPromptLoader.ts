@@ -9,6 +9,7 @@ import {
   getErrorMessage,
   getMCPServerPrompts,
 } from '@google/gemini-cli-core';
+import { t } from '../i18n/index.js';
 import {
   CommandContext,
   CommandKind,
@@ -49,7 +50,7 @@ export class McpPromptLoader implements ICommandLoader {
           subCommands: [
             {
               name: 'help',
-              description: 'Show help for this prompt',
+              description: t('dialogs:prompts.helpDescription'),
               kind: CommandKind.MCP_PROMPT,
               action: async (): Promise<SlashCommandActionReturn> => {
                 if (!prompt.arguments || prompt.arguments.length === 0) {
@@ -128,7 +129,7 @@ export class McpPromptLoader implements ICommandLoader {
                   type: 'message',
                   messageType: 'error',
                   content:
-                    'Received an empty or invalid prompt response from the server.',
+                    t('dialogs:prompts.emptyResponse'),
                 };
               }
 

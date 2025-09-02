@@ -360,6 +360,8 @@
     "yesAllowAllToolsFromServer": "是，总是允许来自服务器 \"{{serverName}}\" 的所有工具"
   },
   "chat": {
+    "listHeader": "已保存的对话检查点：",
+    "sortNote": "（按最近保存时间排序）",
     "noCheckpoints": "未找到已保存的对话检查点。",
     "missingTagSave": "缺少标签。用法: /chat save <标签>",
     "missingTagResume": "缺少标签。用法: /chat resume <标签>",

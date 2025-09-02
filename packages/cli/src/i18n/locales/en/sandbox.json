@@ -1,0 +1,5 @@
+{
+  "errors": {
+    "imageNotFound": "Please check the image name, your network connection, or notify gemini-cli-dev@google.com if the issue persists."
+  }
+}

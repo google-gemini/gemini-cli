@@ -1068,7 +1068,7 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
             <>
               <AuthInProgress
                 onTimeout={() => {
-                  setAuthError('Authentication timed out. Please try again.');
+                  setAuthError(t('errors:auth.timeout'));
                   cancelAuthentication();
                   openAuthDialog();
                 }}

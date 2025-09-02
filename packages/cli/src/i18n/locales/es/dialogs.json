@@ -48,6 +48,12 @@
     },
     "none": "Ninguno"
   },
+  "prompts": {
+    "fieldRequired": "Este campo es requerido",
+    "fieldMustBeString": "Este campo debe ser una cadena de texto",
+    "helpDescription": "Proporciona ayuda y orientación para usar varias funciones y comandos",
+    "emptyResponse": "No se recibió respuesta del prompt"
+  },
   "folderTrust": {
     "title": "¿Confías en esta carpeta?",
     "description": "Confiar en una carpeta permite a Gemini ejecutar comandos que sugiere. Esta es una característica de seguridad para prevenir la ejecución accidental en directorios no confiables.",
@@ -66,5 +72,18 @@
       "allowAlways": "Sí, permitir siempre para esta sesión",
       "cancel": "No (esc)"
     }
+  },
+  "mcp": {
+    "trustServer": "Confiar en el servidor (omitir todas las solicitudes de confirmación de llamadas de herramientas)"
+  },
+  "toolConfirm": {
+    "shellCommand": "Confirmar comando Shell",
+    "mockTool": "Confirmar herramienta ficticia",
+    "title": "Confirmación de comando shell requerida"
+  },
+  "config": {
+    "usage": "Pasar el prompt directamente a gemini por stdin y salir inmediatamente sin ejecutar la CLI interactiva",
+    "executePrompt": "Ejecutar este prompt en la CLI, luego continuar ejecutándose de forma interactiva",
+    "conflictingOptions": "No se pueden usar --prompt y --prompt-interactive (-i) juntos. Usa uno o el otro."
   }
 }

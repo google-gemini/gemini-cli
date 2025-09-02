@@ -11,6 +11,7 @@ import { updateEventEmitter } from './updateEventEmitter.js';
 import { HistoryItem, MessageType } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
 import { spawn } from 'child_process';
+import { t } from '../i18n/index.js';
 
 export function handleAutoUpdate(
   info: UpdateObject | null,
@@ -59,7 +60,7 @@ export function handleAutoUpdate(
     if (code === 0) {
       updateEventEmitter.emit('update-success', {
         message:
-          'Update successful! The new version will be used on your next run.',
+          t('installation:updateSuccess'),
       });
     } else {
       updateEventEmitter.emit('update-failed', {
@@ -115,7 +116,7 @@ export function setUpdateHandler(
     addItem(
       {
         type: MessageType.INFO,
-        text: `Update successful! The new version will be used on your next run.`,
+        text: t('installation:updateSuccess'),
       },
       Date.now(),
     );

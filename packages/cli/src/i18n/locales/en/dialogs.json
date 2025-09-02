@@ -43,12 +43,31 @@
       "cancel": "No (esc)"
     }
   },
+  "toolConfirm": {
+    "shellCommand": "Confirm Shell Command",
+    "mockTool": "Confirm Mock Tool",
+    "title": "Shell command confirmation required"
+  },
   "theme": {
     "title": "Select Theme",
     "preview": "Preview",
     "applyTo": "Apply To",
     "instructions": "(Use Enter to select{{tabInstruction}})",
     "tabInstruction": ", Tab to change focus"
+  },
+  "mcp": {
+    "trustServer": "Trust the server (bypass all tool call confirmation prompts)"
+  },
+  "config": {
+    "usage": "Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode",
+    "executePrompt": "Execute the provided prompt and continue in interactive mode",
+    "conflictingOptions": "Cannot use both --prompt (-p) and --prompt-interactive (-i) together"
+  },
+  "prompts": {
+    "helpDescription": "Show help for this prompt",
+    "emptyResponse": "Received an empty or invalid prompt response from the server.",
+    "fieldRequired": "The 'prompt' field is required.",
+    "fieldMustBeString": "The 'prompt' field must be a string."
   },
   "editor": {
     "title": "Select Editor",
@@ -66,5 +85,16 @@
       "workspace": "Workspace Settings"
     },
     "none": "None"
+  },
+  "prompts": {
+    "fieldRequired": "This field is required",
+    "fieldMustBeString": "This field must be a string",
+    "helpDescription": "Provides help and guidance for using various features and commands",
+    "emptyResponse": "No response received from the prompt"
+  },
+  "config": {
+    "usage": "Pass the prompt directly into gemini by stdin and exit immediately without running the interactive CLI",
+    "executePrompt": "Execute this prompt in the CLI, then continue to run interactively",
+    "conflictingOptions": "Cannot use both --prompt and --prompt-interactive (-i) together. Use one or the other."
   }
 }

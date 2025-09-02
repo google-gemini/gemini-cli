@@ -27,7 +27,8 @@
   "directory": {
     "description": "管理工作区目录",
     "add": "添加目录到工作区。使用逗号分隔多个路径",
-    "show": "显示工作区中的所有目录"
+    "show": "显示工作区中的所有目录",
+    "addNotSupported": "在限制性沙盒配置文件中不支持 /directory add 命令。请在启动会话时使用 --include-directories 参数。"
   },
   "mcp": {
     "description": "管理 MCP 服务器",
@@ -43,8 +44,8 @@
   },
   "stats": {
     "description": "显示会话统计信息",
-    "model": "显示模型特定的使用统计",
-    "tools": "显示工具特定的使用统计"
+    "model": "显示模型特定的使用统计。",
+    "tools": "显示工具特定的使用统计。"
   },
   "descriptions": {
     "about": "显示版本信息",
@@ -72,8 +73,38 @@
     "theme": "更改颜色主题",
     "tools": "显示可用工具",
     "vim": "切换 Vim 模式",
-    "setup-github": "设置 GitHub Actions",
-    "terminal-setup": "配置终端多行输入键绑定"
+    "setup-github": "设置 GitHub Actions", 
+    "terminal-setup": "配置终端多行输入键绑定",
+    "chat": {
+      "description": "管理对话历史。",
+      "list": "列出已保存的对话检查点",
+      "save": "将当前对话保存为检查点。用法：/chat save <标签>",
+      "resume": "从检查点恢复对话。用法：/chat resume <标签>",
+      "delete": "删除对话检查点。用法：/chat delete <标签>"
+    },
+    "config": {
+      "prompt": "提示词。附加到stdin输入（如果有的话）。",
+      "sandbox": "在沙盒中运行？",
+      "debug": "在调试模式下运行？",
+      "allFiles": "在上下文中包含所有文件？",
+      "showMemoryUsage": "在状态栏显示内存使用情况",
+      "checkpointing": "启用文件编辑检查点",
+      "experimentalAcp": "以ACP模式启动代理",
+      "listExtensions": "列出所有可用扩展并退出。"
+    }
+  },
+  "config": {
+    "prompt": "提示词。附加到标准输入的输入（如果有的话）。",
+    "sandbox": "在沙盒中运行？",
+    "debug": "在调试模式下运行？",
+    "allFiles": "在上下文中包含所有文件？"
+  },
+  "chat": {
+    "description": "管理对话历史。",
+    "list": "列出保存的对话检查点",
+    "save": "将当前对话保存为检查点。用法：/chat save <标签>",
+    "resume": "从检查点恢复对话。用法：/chat resume <标签>",
+    "delete": "删除对话检查点。用法：/chat delete <标签>"
   },
   "tools": {
     "title": "可用的 Gemini CLI 工具：",
@@ -150,6 +181,22 @@
     "refreshDetails": {
       "description": "重启 MCP 服务器。",
       "restarting": "正在重启 MCP 服务器..."
+    },
+    "usage": {
+      "needOneCommand": "在继续之前至少需要一个命令。",
+      "removeUsage": "用法：gemini mcp remove [选项] <名称>",
+      "configScope": "配置范围（用户或项目）",
+      "addUsage": "用法：gemini mcp add [选项] <名称> <命令或URL> [参数...]",
+      "transportType": "传输类型（stdio、sse、http）",
+      "setEnvironmentVars": "设置环境变量（例如 -e KEY=value）",
+      "connectionTimeout": "设置连接超时（毫秒）",
+      "serverDescription": "设置服务器描述"
     }
+  },
+  "restore": {
+    "description": "恢复工具调用。这将重置对话和文件历史记录到建议工具调用时的状态"
+  },
+  "compression": {
+    "title": "正在压缩聊天历史"
   }
 }

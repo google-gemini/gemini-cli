@@ -6,7 +6,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { isNodeError } from '../utils/errors.js';
+import { isNodeError, getTranslatedErrorMessage } from '../utils/errors.js';
 import { exec } from 'node:child_process';
 import { simpleGit, SimpleGit, CheckRepoActions } from 'simple-git';
 import { Storage } from '../config/storage.js';
@@ -28,7 +28,7 @@ export class GitService {
     const gitAvailable = await this.verifyGitAvailability();
     if (!gitAvailable) {
       throw new Error(
-        'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
+        getTranslatedErrorMessage('config:gitService.checkpointingRequiresGit', 'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.'),
       );
     }
     this.setupShadowGitRepository();

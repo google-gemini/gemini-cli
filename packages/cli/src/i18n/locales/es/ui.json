@@ -254,6 +254,8 @@
     "yesAllowAllToolsFromServer": "Sí, permitir siempre todas las herramientas del servidor \"{{serverName}}\""
   },
   "chat": {
+    "listHeader": "Puntos de control de conversación guardados:",
+    "sortNote": "(Ordenado por guardado más reciente)",
     "noCheckpoints": "No se encontraron puntos de control de conversación guardados.",
     "missingTagSave": "Etiqueta faltante. Uso: /chat save <etiqueta>",
     "missingTagResume": "Etiqueta faltante. Uso: /chat resume <etiqueta>",

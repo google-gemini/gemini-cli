@@ -9,6 +9,7 @@ import { initReactI18next } from 'react-i18next';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { setErrorTranslator } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 
 // Get current directory in ES modules
@@ -105,6 +106,15 @@ export const initializeI18nWithSettings = (settings: LoadedSettings): void => {
   } catch (error) {
     console.debug('[i18n] Failed to initialize language from settings:', error);
   }
+
+  // Register error translator for core package
+  setErrorTranslator((key: string, fallback: string, params?: Record<string, string | number>) => {
+    try {
+      return i18n.t(key, { ...params, defaultValue: fallback });
+    } catch {
+      return fallback;
+    }
+  });
 };
 
 /**
@@ -122,5 +132,8 @@ export const initializeLanguageFromSettings = async (workspaceRoot?: string): Pr
 };
 
 export { languages };
+
+// Export t function for convenient usage
+export const t = i18n.t.bind(i18n);
 
 export default i18n;

@@ -9,7 +9,7 @@ import {
   loadServerHierarchicalMemory,
 } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
-import i18n from '../../i18n/index.js';
+import i18n, { t } from '../../i18n/index.js';
 import {
   CommandKind,
   SlashCommand,
@@ -18,12 +18,12 @@ import {
 
 export const memoryCommand: SlashCommand = {
   name: 'memory',
-  description: 'Manage memory',
+  description: t('commands:memory.description'),
   kind: CommandKind.BUILT_IN,
   subCommands: [
     {
       name: 'show',
-      description: 'Show memory',
+      description: t('commands:memory.show'),
       kind: CommandKind.BUILT_IN,
       action: async (context) => {
         const memoryContent = context.services.config?.getUserMemory() || '';
@@ -48,7 +48,7 @@ export const memoryCommand: SlashCommand = {
     },
     {
       name: 'add',
-      description: 'Add content to the memory.',
+      description: t('commands:memory.add'),
       kind: CommandKind.BUILT_IN,
       action: (context, args): SlashCommandActionReturn | void => {
         if (!args || args.trim() === '') {
@@ -78,7 +78,7 @@ export const memoryCommand: SlashCommand = {
     },
     {
       name: 'refresh',
-      description: 'Refresh the memory from the source.',
+      description: t('commands:memory.refresh'),
       kind: CommandKind.BUILT_IN,
       action: async (context) => {
         context.ui.addItem(

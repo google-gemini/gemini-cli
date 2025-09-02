@@ -15,5 +15,71 @@
     "waitAndRetryGemini": "请稍候重试。要提高限制，请通过 AI Studio 请求配额增加，或切换到其他 /auth 方法",
     "waitAndRetryVertex": "请稍候重试。要提高限制，请通过 Vertex 请求配额增加，或切换到其他 /auth 方法",
     "rateLimitDefault": "检测到可能的配额限制或响应缓慢。将在本次会话的剩余时间内切换到 {{fallbackModel}} 模型。"
+  },
+  "user": {
+    "cancelled": "用户取消了请求。",
+    "operationCancelled": "操作已取消。"
+  },
+  "file": {
+    "readError": "读取文件时出错",
+    "getDetailsError": "获取错误详情失败"
+  },
+  "toolScheduler": {
+    "cannotScheduleWhileRunning": "当其他工具调用正在运行（执行或等待批准）时无法安排新的工具调用。",
+    "unknownState": "遇到未知的工具调用状态。",
+    "unknownStateDisplay": "未知的工具调用状态"
+  },
+  "auth": {
+    "browserOpenFailed": "自动打开浏览器失败:",
+    "browserOpenFailedAdvice": "自动打开浏览器失败。请尝试设置 NO_BROWSER=true 重新运行。",
+    "googleAccountIdFailed": "身份验证过程中获取 Google 账户 ID 失败:",
+    "userInfoFailed": "获取用户信息失败:",
+    "timeout": "身份验证超时。请重试。"
+  },
+  "tools": {
+    "executeReadFiles": "执行读取文件工具时出错",
+    "allCallsFailed": "所有工具调用都失败了。请分析错误并尝试其他方法。"
+  },
+  "cli": {
+    "promptInteractiveNotSupported": "错误：从标准输入管道输入时不支持 --prompt-interactive 标志。"
+  },
+  "core": {
+    "getDetailsError": "获取错误详情失败",
+    "configurationNotAvailable": "配置不可用。无法显示内存。",
+    "loneAtDetected": "检测到孤立的 @ 符号，将作为修改查询中的文本处理。",
+    "noValidFilePaths": "在 @ 命令中未找到有效的文件路径进行读取。",
+    "clearingTerminal": "正在清除终端并重置聊天。",
+    "rateLimitExceeded": "已超过速率限制。请稍后再试。",
+    "commandCancelled": "命令已被用户取消。",
+    "commandEmpty": "命令不能为空。",
+    "commandRootNotIdentified": "无法识别命令根目录以获得用户权限。",
+    "directoryCannotBeAbsolute": "目录不能是绝对路径。请使用工作空间目录名称进行引用。",
+    "noSearchPathsProvided": "未提供搜索路径或包含模式。",
+    "noFilesFound": "未找到符合条件的文件或所有文件都被跳过。",
+    "fileNotFound": "无法读取文件，因为在指定路径下未找到文件。",
+    "pathIsDirectory": "无法读取文件，因为提供的路径是目录而不是文件。",
+    "offsetNonNegative": "偏移量必须是非负数",
+    "limitPositive": "限制必须是正数",
+    "shellGloballyDisabled": "Shell 工具在配置中全局禁用",
+    "confirmationRequired": "ConfirmationRequiredError",
+    "blockedByConfiguration": "被配置阻止。",
+    "unexpectedAllowedFalse": "意外：isCommandAllowed 返回 false 但未提供原因",
+    "tokenVerificationFailed": "令牌验证失败：保存后未找到令牌或令牌无效",
+    "noClientIdDynamicRegistration": "未提供客户端 ID，正在尝试动态客户端注册...",
+    "noClientIdUnsupportedRegistration": "未提供客户端 ID 且不支持动态注册"
+  },
+  "gemini": {
+    "queryNull": "查询处理结果为空，不发送给 Gemini。",
+    "truncated": "响应因令牌限制而被截断。",
+    "safety": "响应因安全原因而停止。",
+    "recitation": "响应因引用政策而停止。",
+    "unsupportedLanguage": "响应因不支持的语言而停止。",
+    "forbidden": "响应因禁止条目而停止。",
+    "prohibited": "响应因禁止内容而停止。",
+    "sensitiveInfo": "响应因敏感个人识别信息而停止。",
+    "other": "响应因其他原因而停止。",
+    "malformed": "响应因格式错误的函数调用而停止。",
+    "imageSafety": "响应因图像安全违规而停止。",
+    "unexpectedTool": "响应因意外的工具调用而停止。"
   }
 }

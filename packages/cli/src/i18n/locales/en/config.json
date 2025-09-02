@@ -1,0 +1,26 @@
+{
+  "options": {
+    "showMemoryUsage": "Show memory usage in status bar",
+    "checkpoint": "Enables checkpointing of file edits",
+    "experimentalAcp": "Starts the agent in ACP mode",
+    "listExtensions": "List all available extensions and exit."
+  },
+  "validation": {
+    "yoloApprovalMode": "Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead."
+  },
+  "deprecation": {
+    "allFilesDeprecated": "Use --all-files instead. We will be removing --all_files in the coming weeks.",
+    "showMemoryUsageDeprecated": "Use --show-memory-usage instead. We will be removing --show_memory_usage in the coming weeks."
+  },
+  "options": {
+    "approvalMode": "Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools)",
+    "includeDirectories": "Additional directories to include in the workspace (comma-separated or multiple --include-directories)"
+  },
+  "auth": {
+    "vertexRequirement": "When using Vertex AI, you must specify either:\n",
+    "updateEnvironment": "Update your environment and try again (no reload needed if using .env)!"
+  },
+  "gitService": {
+    "checkpointingRequiresGit": "Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue."
+  }
+}

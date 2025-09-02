@@ -5,10 +5,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getUserStartupWarnings } from './userStartupWarnings.js';
 import * as os from 'os';
 import fs from 'fs/promises';
 import path from 'path';
+import { getUserStartupWarnings } from './userStartupWarnings.js';
 
 // Mock os.homedir to control the home directory in tests
 vi.mock('os', async (importOriginal) => {

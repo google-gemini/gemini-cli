@@ -7,6 +7,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PartListUnion, PartUnion } from '@google/genai';
+import i18n from '../../i18n/index.js';
 import {
   AnyToolInvocation,
   Config,
@@ -174,7 +175,7 @@ export async function handleAtCommand({
 
     if (originalAtPath === '@') {
       onDebugMessage(
-        'Lone @ detected, will be treated as text in the modified query.',
+        i18n.t('errors:core.loneAtDetected'),
       );
       continue;
     }
@@ -385,7 +386,7 @@ export async function handleAtCommand({
 
   // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
   if (pathSpecsToRead.length === 0) {
-    onDebugMessage('No valid file paths found in @ commands to read.');
+    onDebugMessage(i18n.t('errors:core.noValidFilePaths'));
     if (initialQueryText === '@' && query.trim() === '@') {
       // If the only thing was a lone @, pass original query (which might have spaces)
       return { processedQuery: [{ text: query }], shouldProceed: true };
@@ -471,7 +472,7 @@ export async function handleAtCommand({
       name: readManyFilesTool.displayName,
       description:
         invocation?.getDescription() ??
-        'Error attempting to execute tool to read files',
+        i18n.t('errors:tools.executeReadFiles'),
       status: ToolCallStatus.Error,
       resultDisplay: `Error reading files (${contentLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
       confirmationDetails: undefined,

@@ -11,7 +11,7 @@ import {
   ToolInvocation,
   ToolResult,
 } from './tools.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, getTranslatedErrorMessage } from '../utils/errors.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { glob, escape } from 'glob';
@@ -235,7 +235,7 @@ ${finalExclusionPatternsForDescription
     const searchPatterns = [...inputPatterns, ...include];
     if (searchPatterns.length === 0) {
       return {
-        llmContent: 'No search paths or include patterns provided.',
+        llmContent: getTranslatedErrorMessage('errors:core.noSearchPathsProvided', 'No search paths or include patterns provided.'),
         returnDisplay: `## Information\n\nNo search paths or include patterns were specified. Nothing to read or concatenate.`,
       };
     }
@@ -530,7 +530,7 @@ ${finalExclusionPatternsForDescription
 
     if (contentParts.length === 0) {
       contentParts.push(
-        'No files matching the criteria were found or all were skipped.',
+        getTranslatedErrorMessage('errors:core.noFilesFound', 'No files matching the criteria were found or all were skipped.'),
       );
     }
     return {

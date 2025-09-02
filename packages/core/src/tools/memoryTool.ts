@@ -13,6 +13,7 @@ import {
   ToolResult,
 } from './tools.js';
 import { FunctionDeclaration } from '@google/genai';
+import { getTranslatedErrorMessage } from '../utils/errors.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Storage } from '../config/storage.js';
@@ -23,8 +24,7 @@ import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
   name: 'save_memory',
-  description:
-    'Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.',
+  description: getTranslatedErrorMessage('tools:memory.description', 'Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.'),
   parametersJsonSchema: {
     type: 'object',
     properties: {
@@ -50,7 +50,7 @@ Do NOT use this tool:
 
 - To remember conversational context that is only relevant for the current session.
 - To save long, complex, or rambling pieces of text. The fact should be relatively short and to the point.
-- If you are unsure whether the information is a fact worth remembering long-term. If in doubt, you can ask the user, "Should I remember that for you?"
+- If you are unsure whether the information is a fact worth remembering long-term. If in doubt, you can ask the user, "${getTranslatedErrorMessage('tools:memory.shouldIRemember', 'Should I remember that for you?')}"
 
 ## Parameters
 

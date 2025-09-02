@@ -20,7 +20,7 @@ import {
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import { isNodeError } from '../utils/errors.js';
+import { isNodeError, getTranslatedErrorMessage } from '../utils/errors.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
@@ -459,7 +459,7 @@ Expectation for required parameters:
           expected_replacements: {
             type: 'number',
             description:
-              'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
+              getTranslatedErrorMessage('tools:edit.replacementCount', 'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.'),
             minimum: 1,
           },
         },

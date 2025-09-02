@@ -6,5 +6,24 @@
   },
   "restore": {
     "availableToolCalls": "Appels d'outils disponibles pour restaurer :\n\n{{toolCalls}}"
+  },
+  "memory": {
+    "description": "Sauvegarde une information ou un fait spécifique dans votre mémoire à long terme. Utilisez ceci quand l'utilisateur vous demande explicitement de vous rappeler quelque chose, ou quand il énonce un fait clair et concis qui semble important à retenir pour les interactions futures.",
+    "shouldIRemember": "Dois-je me rappeler cela pour vous ?"
+  },
+  "edit": {
+    "replacementCount": "Nombre de remplacements attendus. Par défaut 1 si non spécifié. Utilisez quand vous voulez remplacer plusieurs occurrences."
+  },
+  "shell": {
+    "commandDescription": "Commande bash exacte à exécuter en tant que `bash -c <commande>`",
+    "briefDescription": "Description brève de la commande pour l'utilisateur. Soyez spécifique et concis. Idéalement une phrase. Peut aller jusqu'à 3 phrases pour la clarté. Pas de sauts de ligne."
+  },
+  "edit_corrector": {
+    "correctedSnippet": "La version corrigée de l'extrait cible qui correspond exactement et uniquement à un segment dans le contenu de fichier fourni.",
+    "adjustedReplacement": "Le original_new_string ajusté pour être un remplacement approprié pour le corrected_old_string, tout en maintenant l'intention originale du changement."
+  },
+  "ui": {
+    "textElementsWrapping": "Les éléments de texte sans retour à la ligne ne peuvent pas apparaître après des éléments avec retour à la ligne dans la même ligne.",
+    "childrenMustBeText": "Les enfants d'un Box de ligne doivent être des éléments <Text>."
   }
 }

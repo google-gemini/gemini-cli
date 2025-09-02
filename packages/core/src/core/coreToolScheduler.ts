@@ -24,6 +24,7 @@ import {
 } from '../index.js';
 import { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
+import { getTranslatedErrorMessage } from '../utils/errors.js';
 import {
   isModifiableDeclarativeTool,
   ModifyContext,
@@ -530,7 +531,10 @@ export class CoreToolScheduler {
     try {
       if (this.isRunning()) {
         throw new Error(
-          'Cannot schedule new tool calls while other tool calls are actively running (executing or awaiting approval).',
+          getTranslatedErrorMessage(
+            'errors:toolScheduler.cannotScheduleWhileRunning',
+            'Cannot schedule new tool calls while other tool calls are actively running (executing or awaiting approval).',
+          ),
         );
       }
       const requestsToProcess = Array.isArray(request) ? request : [request];

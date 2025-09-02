@@ -1,0 +1,11 @@
+{
+  "options": {
+    "showMemoryUsage": "在状态栏中显示内存使用情况",
+    "checkpoint": "启用文件编辑检查点功能",
+    "experimentalAcp": "以 ACP 模式启动代理",
+    "listExtensions": "列出所有可用扩展并退出"
+  },
+  "validation": {
+    "yoloApprovalMode": "不能同时使用 --yolo (-y) 和 --approval-mode。请改用 --approval-mode=yolo。"
+  }
+}

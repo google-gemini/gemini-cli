@@ -6,6 +6,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n/index.js';
 import {
   Config,
   GeminiClient,
@@ -329,7 +330,7 @@ export const useGeminiStream = (
 
       if (localQueryToSendToGemini === null) {
         onDebugMessage(
-          'Query processing resulted in null, not sending to Gemini.',
+          t('gemini.queryNull'),
         );
         return { queryToSend: null, shouldProceed: false };
       }
@@ -433,7 +434,7 @@ export const useGeminiStream = (
         setPendingHistoryItem(null);
       }
       addItem(
-        { type: MessageType.INFO, text: 'User cancelled the request.' },
+        { type: MessageType.INFO, text: i18n.t('errors:user.cancelled') },
         userMessageTimestamp,
       );
       setIsResponding(false);
@@ -473,23 +474,17 @@ export const useGeminiStream = (
       const finishReasonMessages: Record<FinishReason, string | undefined> = {
         [FinishReason.FINISH_REASON_UNSPECIFIED]: undefined,
         [FinishReason.STOP]: undefined,
-        [FinishReason.MAX_TOKENS]: 'Response truncated due to token limits.',
-        [FinishReason.SAFETY]: 'Response stopped due to safety reasons.',
-        [FinishReason.RECITATION]: 'Response stopped due to recitation policy.',
-        [FinishReason.LANGUAGE]:
-          'Response stopped due to unsupported language.',
-        [FinishReason.BLOCKLIST]: 'Response stopped due to forbidden terms.',
-        [FinishReason.PROHIBITED_CONTENT]:
-          'Response stopped due to prohibited content.',
-        [FinishReason.SPII]:
-          'Response stopped due to sensitive personally identifiable information.',
-        [FinishReason.OTHER]: 'Response stopped for other reasons.',
-        [FinishReason.MALFORMED_FUNCTION_CALL]:
-          'Response stopped due to malformed function call.',
-        [FinishReason.IMAGE_SAFETY]:
-          'Response stopped due to image safety violations.',
-        [FinishReason.UNEXPECTED_TOOL_CALL]:
-          'Response stopped due to unexpected tool call.',
+        [FinishReason.MAX_TOKENS]: t('gemini.truncated'),
+        [FinishReason.SAFETY]: t('gemini.safety'),
+        [FinishReason.RECITATION]: t('gemini.recitation'),
+        [FinishReason.LANGUAGE]: t('gemini.unsupportedLanguage'),
+        [FinishReason.BLOCKLIST]: t('gemini.forbidden'),
+        [FinishReason.PROHIBITED_CONTENT]: t('gemini.prohibited'),
+        [FinishReason.SPII]: t('gemini.sensitiveInfo'),
+        [FinishReason.OTHER]: t('gemini.other'),
+        [FinishReason.MALFORMED_FUNCTION_CALL]: t('gemini.malformed'),
+        [FinishReason.IMAGE_SAFETY]: t('gemini.imageSafety'),
+        [FinishReason.UNEXPECTED_TOOL_CALL]: t('gemini.unexpectedTool'),
       };
 
       const message = finishReasonMessages[finishReason];

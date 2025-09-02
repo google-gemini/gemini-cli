@@ -11,6 +11,7 @@ import {
   getShellConfiguration,
   ShellExecutionService,
 } from '@google/gemini-cli-core';
+import { t } from '../../i18n/index.js';
 
 import { CommandContext } from '../../ui/commands/types.js';
 import {
@@ -119,7 +120,7 @@ export class ShellProcessor implements IPromptProcessor {
     // Handle confirmation requirements.
     if (commandsToConfirm.size > 0) {
       throw new ConfirmationRequiredError(
-        'Shell command confirmation required',
+        t('dialogs:toolConfirm.title'),
         Array.from(commandsToConfirm),
       );
     }

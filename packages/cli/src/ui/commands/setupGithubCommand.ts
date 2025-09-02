@@ -10,7 +10,7 @@ import { Writable } from 'node:stream';
 import { ProxyAgent } from 'undici';
 
 import { CommandContext } from '../../ui/commands/types.js';
-import i18n from '../../i18n/index.js';
+import i18n, { t } from '../../i18n/index.js';
 import {
   getGitRepoRoot,
   getLatestGitHubRelease,
@@ -87,7 +87,7 @@ export async function updateGitignore(gitRepoRoot: string): Promise<void> {
 
 export const setupGithubCommand: SlashCommand = {
   name: 'setup-github',
-  description: 'Set up GitHub Actions',
+  description: t('commands:descriptions.setup-github'),
   kind: CommandKind.BUILT_IN,
   action: async (
     context: CommandContext,
@@ -96,7 +96,7 @@ export const setupGithubCommand: SlashCommand = {
 
     if (!isGitHubRepository()) {
       throw new Error(
-        'Unable to determine the GitHub repository. /setup-github must be run from a git repository.',
+        t('setupGithub:errors.notGitRepository'),
       );
     }
 
@@ -107,7 +107,7 @@ export const setupGithubCommand: SlashCommand = {
     } catch (_error) {
       console.debug(`Failed to get git repo root:`, _error);
       throw new Error(
-        'Unable to determine the GitHub repository. /setup-github must be run from a git repository.',
+        t('setupGithub:errors.notGitRepository'),
       );
     }
 

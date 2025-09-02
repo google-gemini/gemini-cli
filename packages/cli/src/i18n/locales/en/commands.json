@@ -11,12 +11,6 @@
     "description": "Show help information",
     "showingHelp": "Showing help in {{language}}"
   },
-  "chat": {
-    "list": "List saved conversation checkpoints",
-    "save": "Save the current conversation as a checkpoint. Usage: /chat save <tag>",
-    "resume": "Resume a conversation from a checkpoint. Usage: /chat resume <tag>",
-    "delete": "Delete a conversation checkpoint. Usage: /chat delete <tag>"
-  },
   "ide": {
     "description": "manage IDE integration",
     "status": "check status of IDE integration",
@@ -25,9 +19,10 @@
     "disable": "disable IDE integration"
   },
   "directory": {
-    "description": "manage workspace directories",
+    "description": "Manage workspace directories",
     "add": "Add directories to the workspace. Use comma to separate multiple paths",
-    "show": "Show all directories in the workspace"
+    "show": "Show all directories in the workspace",
+    "addNotSupported": "The /directory add command is not supported in restrictive sandbox profiles. Please use --include-directories when starting the session instead."
   },
   "mcp": {
     "description": "manage MCP servers",
@@ -43,8 +38,8 @@
   },
   "stats": {
     "description": "show session statistics",
-    "model": "Show model-specific usage statistics",
-    "tools": "Show tool-specific usage statistics"
+    "model": "Show model-specific usage statistics.",
+    "tools": "Show tool-specific usage statistics."
   },
   "descriptions": {
     "about": "show version info",
@@ -75,7 +70,37 @@
     "tools": "Show available tools",
     "vim": "Toggle Vim mode",
     "setup-github": "Set up GitHub Actions",
-    "terminal-setup": "Configure terminal keybindings for multiline input (VS Code, Cursor, Windsurf)"
+    "terminal-setup": "Configure terminal keybindings for multiline input (VS Code, Cursor, Windsurf)",
+    "chat": {
+      "description": "Manage conversation history.",
+      "list": "List saved conversation checkpoints",
+      "save": "Save the current conversation as a checkpoint. Usage: /chat save <tag>",
+      "resume": "Resume a conversation from a checkpoint. Usage: /chat resume <tag>",
+      "delete": "Delete a conversation checkpoint. Usage: /chat delete <tag>"
+    },
+    "config": {
+      "prompt": "Prompt. Appended to input on stdin (if any).",
+      "sandbox": "Run in sandbox?",
+      "debug": "Run in debug mode?",
+      "allFiles": "Include ALL files in context?", 
+      "showMemoryUsage": "Show memory usage in status bar",
+      "checkpointing": "Enables checkpointing of file edits",
+      "experimentalAcp": "Starts the agent in ACP mode",
+      "listExtensions": "List all available extensions and exit."
+    }
+  },
+  "config": {
+    "prompt": "Prompt. Appended to input on stdin (if any).",
+    "sandbox": "Run in sandbox?",
+    "debug": "Run in debug mode?",
+    "allFiles": "Include ALL files in context?"
+  },
+  "chat": {
+    "description": "Manage conversation history.",
+    "list": "List saved conversation checkpoints",
+    "save": "Save the current conversation as a checkpoint. Usage: /chat save <tag>",
+    "resume": "Resume a conversation from a checkpoint. Usage: /chat resume <tag>",
+    "delete": "Delete a conversation checkpoint. Usage: /chat delete <tag>"
   },
   "tools": {
     "title": "Available Gemini CLI tools:",
@@ -152,6 +177,22 @@
     "refreshDetails": {
       "description": "Restarts MCP servers.",
       "restarting": "Restarting MCP servers..."
+    },
+    "usage": {
+      "needOneCommand": "You need at least one command before continuing.",
+      "removeUsage": "Usage: gemini mcp remove [options] <name>",
+      "configScope": "Configuration scope (user or project)",
+      "addUsage": "Usage: gemini mcp add [options] <name> <commandOrUrl> [args...]",
+      "transportType": "Transport type (stdio, sse, http)",
+      "setEnvironmentVars": "Set environment variables (e.g. -e KEY=value)",
+      "connectionTimeout": "Set connection timeout in milliseconds",
+      "serverDescription": "Set the description for the server"
     }
+  },
+  "restore": {
+    "description": "Restore a tool call. This will reset the conversation and file history to the state it was in when the tool call was suggested"
+  },
+  "compression": {
+    "title": "Compressing chat history"
   }
 }

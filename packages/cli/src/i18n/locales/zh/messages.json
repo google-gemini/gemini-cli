@@ -28,11 +28,33 @@
     "loadHistoryNotAvailable": "loadHistory 函数不可用。",
     "readError": "无法读取可恢复的工具调用。错误信息: {{error}}"
   },
+  "chat": {
+    "noCheckpoints": "未找到对话检查点。",
+    "listHeader": "已保存的对话列表：",
+    "sortNote": "注意：最新的在后，最旧的在前",
+    "missingTagSave": "请提供用于保存检查点的标签名称。",
+    "noClientAvailable": "没有可用的聊天客户端来保存对话。",
+    "checkpointSaved": "对话检查点已保存为 '{{tag}}'。",
+    "noConversationFound": "未找到要保存的对话。",
+    "missingTagResume": "请提供要从检查点恢复的标签名称。",
+    "noCheckpointFound": "未找到标签 '{{tag}}' 的检查点。",
+    "missingTagDelete": "请提供要删除检查点的标签名称。",
+    "checkpointDeleted": "检查点 '{{tag}}' 已被删除。",
+    "deleteError": "删除检查点 '{{tag}}' 时出错或检查点不存在。"
+  },
   "github": {
     "setupSuccess": "成功下载了 {{count}} 个工作流程并更新了 .gitignore。请按照 {{readmeUrl}} 中的步骤（跳过 /setup-github 步骤）完成设置。",
     "setupDescription": "设置 GitHub Actions 以使用 Gemini 分类问题和审查 PR。"
   },
   "session": {
     "startTimeUnavailable": "会话开始时间不可用，无法计算统计信息。"
-  }
+  },
+  "loading": {
+    "witExe": "正在加载 wit.exe...",
+    "nextGreatIdea": "正在加载下一个绝妙想法...",
+    "barrelRoll": "加载中... 来个侧滚翻身！",
+    "research": "正在研究最新的表情包..."
+  },
+  "getStarted": "开始使用！",
+  "gotContext": "明白了。感谢提供的上下文！"
 }

@@ -11,7 +11,7 @@ import {
   type SlashCommand,
   CommandKind,
 } from './types.js';
-import i18n from '../../i18n/index.js';
+import i18n, { t } from '../../i18n/index.js';
 
 export const statsCommand: SlashCommand = {
   name: 'stats',
@@ -43,7 +43,7 @@ export const statsCommand: SlashCommand = {
   subCommands: [
     {
       name: 'model',
-      description: 'Show model-specific usage statistics.',
+      description: t('commands:stats.model'),
       kind: CommandKind.BUILT_IN,
       action: (context: CommandContext) => {
         context.ui.addItem(
@@ -56,7 +56,7 @@ export const statsCommand: SlashCommand = {
     },
     {
       name: 'tools',
-      description: 'Show tool-specific usage statistics.',
+      description: t('commands:stats.tools'),
       kind: CommandKind.BUILT_IN,
       action: (context: CommandContext) => {
         context.ui.addItem(

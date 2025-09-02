@@ -1,0 +1,11 @@
+{
+  "options": {
+    "showMemoryUsage": "Afficher l'utilisation de la mémoire dans la barre d'état",
+    "checkpoint": "Active les points de contrôle des modifications de fichiers",
+    "experimentalAcp": "Démarre l'agent en mode ACP",
+    "listExtensions": "Lister toutes les extensions disponibles et quitter."
+  },
+  "validation": {
+    "yoloApprovalMode": "Impossible d'utiliser à la fois --yolo (-y) et --approval-mode. Utilisez --approval-mode=yolo à la place."
+  }
+}

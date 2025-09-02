@@ -28,6 +28,7 @@ import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
+import { getTranslatedErrorMessage } from '../utils/i18nInterface.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -235,7 +236,7 @@ export class GeminiClient {
       },
       {
         role: 'model',
-        parts: [{ text: 'Got it. Thanks for the context!' }],
+        parts: [{ text: getTranslatedErrorMessage('messages:gotContext', 'Got it. Thanks for the context!') }],
       },
       ...(extraHistory ?? []),
     ];

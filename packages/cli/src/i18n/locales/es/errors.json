@@ -15,5 +15,71 @@
     "waitAndRetryGemini": "Por favor espera e inténtalo de nuevo más tarde. Para aumentar tus límites, solicita un aumento de cuota a través de AI Studio, o cambia a otro método /auth",
     "waitAndRetryVertex": "Por favor espera e inténtalo de nuevo más tarde. Para aumentar tus límites, solicita un aumento de cuota a través de Vertex, o cambia a otro método /auth",
     "rateLimitDefault": "Posibles limitaciones de cuota o tiempos de respuesta lentos detectados. Cambiando al modelo {{fallbackModel}} para el resto de esta sesión."
+  },
+  "user": {
+    "cancelled": "El usuario canceló la solicitud.",
+    "operationCancelled": "Operación cancelada."
+  },
+  "file": {
+    "readError": "Error al leer el archivo",
+    "getDetailsError": "Error al obtener detalles del error"
+  },
+  "toolScheduler": {
+    "cannotScheduleWhileRunning": "No se pueden programar nuevas llamadas de herramientas mientras otras llamadas de herramientas están ejecutándose activamente (ejecutándose o esperando aprobación).",
+    "unknownState": "Se encontró un estado de llamada de herramienta desconocido.",
+    "unknownStateDisplay": "Estado de llamada de herramienta desconocido"
+  },
+  "auth": {
+    "browserOpenFailed": "Error al abrir el navegador automáticamente:",
+    "browserOpenFailedAdvice": "Error al abrir el navegador automáticamente. Intenta ejecutar nuevamente con NO_BROWSER=true configurado.",
+    "googleAccountIdFailed": "Error al obtener el ID de cuenta de Google durante la autenticación:",
+    "userInfoFailed": "Error al obtener información del usuario:",
+    "timeout": "Tiempo de espera de autenticación agotado. Por favor inténtalo de nuevo."
+  },
+  "tools": {
+    "executeReadFiles": "Error al intentar ejecutar la herramienta para leer archivos",
+    "allCallsFailed": "Todas las llamadas a herramientas fallaron. Por favor analiza los errores y prueba un enfoque alternativo."
+  },
+  "cli": {
+    "promptInteractiveNotSupported": "Error: La opción --prompt-interactive no es compatible cuando se usa un pipe desde stdin."
+  },
+  "core": {
+    "getDetailsError": "Error al obtener detalles del error",
+    "configurationNotAvailable": "Configuración no disponible. No se puede mostrar la memoria.",
+    "loneAtDetected": "@ aislado detectado, será tratado como texto en la consulta modificada.",
+    "noValidFilePaths": "No se encontraron rutas de archivo válidas en los comandos @ para leer.",
+    "clearingTerminal": "Limpiando terminal y reiniciando chat.",
+    "rateLimitExceeded": "Límite de velocidad excedido. Inténtalo de nuevo más tarde.",
+    "commandCancelled": "Comando cancelado por el usuario.",
+    "commandEmpty": "El comando no puede estar vacío.",
+    "commandRootNotIdentified": "No se pudo identificar la raíz del comando para obtener permiso del usuario.",
+    "directoryCannotBeAbsolute": "El directorio no puede ser absoluto. Por favor haz referencia a los directorios del espacio de trabajo por su nombre.",
+    "noSearchPathsProvided": "No se proporcionaron rutas de búsqueda o patrones de inclusión.",
+    "noFilesFound": "No se encontraron archivos que coincidan con los criterios o todos fueron omitidos.",
+    "fileNotFound": "No se pudo leer el archivo porque no se encontró ninguno en la ruta especificada.",
+    "pathIsDirectory": "No se pudo leer el archivo porque la ruta proporcionada es un directorio, no un archivo.",
+    "offsetNonNegative": "El offset debe ser un número no negativo",
+    "limitPositive": "El límite debe ser un número positivo",
+    "shellGloballyDisabled": "La herramienta Shell está globalmente deshabilitada en la configuración",
+    "confirmationRequired": "ConfirmationRequiredError",
+    "blockedByConfiguration": "Bloqueado por configuración.",
+    "unexpectedAllowedFalse": "Inesperado: isCommandAllowed retornó false sin una razón",
+    "tokenVerificationFailed": "Verificación de token fallida: token no encontrado o inválido después de guardar",
+    "noClientIdDynamicRegistration": "No se proporcionó ID de cliente, intentando registro dinámico de cliente...",
+    "noClientIdUnsupportedRegistration": "No se proporcionó ID de cliente y el registro dinámico no es compatible"
+  },
+  "gemini": {
+    "queryNull": "El procesamiento de consulta resultó en null, no enviando a Gemini.",
+    "truncated": "Respuesta truncada debido a límites de tokens.",
+    "safety": "Respuesta detenida por razones de seguridad.",
+    "recitation": "Respuesta detenida debido a políticas de recitación.",
+    "unsupportedLanguage": "Respuesta detenida debido a idioma no soportado.",
+    "forbidden": "Respuesta detenida debido a términos prohibidos.",
+    "prohibited": "Respuesta detenida debido a contenido prohibido.",
+    "sensitiveInfo": "Respuesta detenida debido a información de identificación personal sensible.",
+    "other": "Respuesta detenida por otras razones.",
+    "malformed": "Respuesta detenida debido a llamada de función mal formada.",
+    "imageSafety": "Respuesta detenida debido a violaciones de seguridad de imagen.",
+    "unexpectedTool": "Respuesta detenida debido a llamada de herramienta inesperada."
   }
 }

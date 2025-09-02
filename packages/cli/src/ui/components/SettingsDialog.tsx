@@ -758,7 +758,7 @@ export function SettingsDialog({
                   <Text
                     color={isActive ? Colors.AccentGreen : Colors.Foreground}
                   >
-                    {item.label}
+                    {typeof item.label === 'function' ? item.label() : item.label}
                     {scopeMessage && (
                       <Text color={Colors.Gray}> {scopeMessage}</Text>
                     )}

@@ -1,0 +1,5 @@
+{
+  "errors": {
+    "imageNotFound": "请检查镜像名称、网络连接，或如果问题持续存在，请联系 gemini-cli-dev@google.com。"
+  }
+}

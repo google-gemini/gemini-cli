@@ -1,0 +1,17 @@
+{
+  "setup": {
+    "alreadyConfigured": "Your terminal is already configured for an optimal experience with multiline input (Shift+Enter and Ctrl+Enter).",
+    "couldNotDetect": "Could not detect terminal type. Supported terminals: VS Code, Cursor, and Windsurf.",
+    "restartRequired": "\\n\\nPlease restart your terminal for the changes to take effect.",
+    "failed": "Failed to configure terminal: {{error}}"
+  },
+  "loading": {
+    "dialUpTone": "Just waiting for the dial-up tone to finish...",
+    "humorometer": "Recalibrating the humor-o-meter.",
+    "otherLoadingScreen": "My other loading screen is even funnier.",
+    "enhancing": "Enhancing... Enhancing... Still loading.",
+    "turnOffAndOn": "Have you tried turning it off and on again? (The loading screen, not me.)",
+    "additionalPylons": "Constructing additional pylons...",
+    "newLineCtrlJ": "New line? That's Ctrl+J."
+  }
+}

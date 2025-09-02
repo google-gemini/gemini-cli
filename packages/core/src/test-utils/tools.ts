@@ -13,6 +13,7 @@ import {
   ToolResult,
   Kind,
 } from '../tools/tools.js';
+import { getTranslatedErrorMessage } from '../utils/i18nInterface.js';
 import {
   ModifiableDeclarativeTool,
   ModifyContext,
@@ -115,7 +116,7 @@ export class MockModifiableToolInvocation extends BaseToolInvocation<
     if (this.tool.shouldConfirm) {
       return {
         type: 'edit',
-        title: 'Confirm Mock Tool',
+        title: getTranslatedErrorMessage('dialogs:toolConfirm.mockTool', 'Confirm Mock Tool'),
         fileName: 'test.txt',
         filePath: 'test.txt',
         fileDiff: 'diff',

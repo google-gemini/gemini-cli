@@ -254,6 +254,8 @@
     "yesAllowAllToolsFromServer": "Oui, toujours autoriser tous les outils du serveur \"{{serverName}}\""
   },
   "chat": {
+    "listHeader": "Points de contrôle de conversation sauvegardés :",
+    "sortNote": "(Trié par ordre de sauvegarde le plus récent)",
     "noCheckpoints": "Aucun point de contrôle de conversation sauvegardé trouvé.",
     "missingTagSave": "Étiquette manquante. Usage: /chat save <étiquette>",
     "missingTagResume": "Étiquette manquante. Usage: /chat resume <étiquette>",

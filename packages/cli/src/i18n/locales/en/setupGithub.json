@@ -1,0 +1,5 @@
+{
+  "errors": {
+    "notGitRepository": "Unable to determine the GitHub repository. /setup-github must be run from a git repository."
+  }
+}

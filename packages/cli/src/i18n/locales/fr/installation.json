@@ -1,0 +1,12 @@
+{
+  "gitClone": "Exécution depuis un clone git local. Veuillez mettre à jour avec \"git pull\".",
+  "npx": "Exécution via npx, mise à jour non applicable.",
+  "pnpx": "Exécution via pnpx, mise à jour non applicable.",
+  "homebrew": "Installé via Homebrew. Veuillez mettre à jour avec \"brew upgrade\".",
+  "pnpm": "Installé avec pnpm. Tentative de mise à jour automatique en cours...",
+  "yarn": "Installé avec yarn. Tentative de mise à jour automatique en cours...",
+  "bunx": "Exécution via bunx, mise à jour non applicable.",
+  "bun": "Installé avec bun. Tentative de mise à jour automatique en cours...",
+  "npm": "Installé avec npm. Tentative de mise à jour automatique en cours...",
+  "updateSuccess": "Mise à jour réussie ! La nouvelle version sera utilisée lors de votre prochaine exécution."
+}

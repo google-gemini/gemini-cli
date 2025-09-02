@@ -27,7 +27,8 @@
   "directory": {
     "description": "gestionar directorios del espacio de trabajo",
     "add": "Agregar directorios al espacio de trabajo. Use comas para separar rutas",
-    "show": "Mostrar todos los directorios en el espacio de trabajo"
+    "show": "Mostrar todos los directorios en el espacio de trabajo",
+    "addNotSupported": "El comando /directory add no es compatible con perfiles de sandbox restrictivos. Por favor use --include-directories al iniciar la sesión en su lugar."
   },
   "mcp": {
     "description": "gestionar servidores MCP",
@@ -75,7 +76,37 @@
     "tools": "Mostrar herramientas disponibles",
     "vim": "Activar/desactivar modo Vim",
     "setup-github": "Configurar GitHub Actions",
-    "terminal-setup": "Configurar atajos de teclado del terminal para entrada multilínea (VS Code, Cursor, Windsurf)"
+    "terminal-setup": "Configurar atajos de teclado del terminal para entrada multilínea (VS Code, Cursor, Windsurf)",
+    "chat": {
+      "description": "Gestionar el historial de conversaciones.",
+      "list": "Listar puntos de control de conversación guardados",
+      "save": "Guardar la conversación actual como punto de control. Uso: /chat save <etiqueta>",
+      "resume": "Reanudar una conversación desde un punto de control. Uso: /chat resume <etiqueta>",
+      "delete": "Eliminar un punto de control de conversación. Uso: /chat delete <etiqueta>"
+    },
+    "config": {
+      "prompt": "Prompt. Añadido a la entrada en stdin (si la hay).",
+      "sandbox": "¿Ejecutar en sandbox?",
+      "debug": "¿Ejecutar en modo debug?",
+      "allFiles": "¿Incluir TODOS los archivos en el contexto?",
+      "showMemoryUsage": "Mostrar uso de memoria en la barra de estado",
+      "checkpointing": "Habilita puntos de control de ediciones de archivos",
+      "experimentalAcp": "Inicia el agente en modo ACP",
+      "listExtensions": "Listar todas las extensiones disponibles y salir."
+    }
+  },
+  "config": {
+    "prompt": "Prompt. Anexado a la entrada en stdin (si existe).",
+    "sandbox": "¿Ejecutar en sandbox?",
+    "debug": "¿Ejecutar en modo debug?",
+    "allFiles": "¿Incluir TODOS los archivos en el contexto?"
+  },
+  "chat": {
+    "description": "Gestionar historial de conversaciones.",
+    "list": "Listar puntos de control de conversaciones guardadas",
+    "save": "Guardar la conversación actual como punto de control. Uso: /chat save <etiqueta>",
+    "resume": "Reanudar una conversación desde un punto de control. Uso: /chat resume <etiqueta>",
+    "delete": "Eliminar un punto de control de conversación. Uso: /chat delete <etiqueta>"
   },
   "tools": {
     "title": "Herramientas Gemini CLI disponibles:",
@@ -152,6 +183,22 @@
     "refreshDetails": {
       "description": "Reinicia los servidores MCP.",
       "restarting": "Reiniciando servidores MCP..."
+    },
+    "usage": {
+      "needOneCommand": "Necesitas al menos un comando antes de continuar.",
+      "removeUsage": "Uso: gemini mcp remove [opciones] <nombre>",
+      "configScope": "Ámbito de configuración (usuario o proyecto)",
+      "addUsage": "Uso: gemini mcp add [opciones] <nombre> <comandoOUrl> [args...]",
+      "transportType": "Tipo de transporte (stdio, sse, http)",
+      "setEnvironmentVars": "Establecer variables de entorno (ej. -e CLAVE=valor)",
+      "connectionTimeout": "Establecer tiempo de espera de conexión en milisegundos",
+      "serverDescription": "Establecer la descripción del servidor"
     }
+  },
+  "restore": {
+    "description": "Restaurar una llamada de herramienta. Esto restablecerá la conversación y el historial de archivos al estado en que estaba cuando se sugirió la llamada de herramienta"
+  },
+  "compression": {
+    "title": "Comprimiendo historial de conversación"
   }
 }

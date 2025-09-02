@@ -1,0 +1,5 @@
+{
+  "homeDirectory": "您正在主目录中运行 Gemini CLI。建议在项目特定目录中运行。",
+  "rootDirectory": "警告：您正在根目录中运行 Gemini CLI。您的整个文件夹结构将用于上下文。强烈建议在项目特定目录中运行。",
+  "fileSystemError": "由于文件系统错误，无法验证当前目录。"
+}

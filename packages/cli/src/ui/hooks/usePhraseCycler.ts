@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from '../../i18n/useTranslation.js';
+import { t } from '../../i18n/index.js';
 
 // Legacy phrases - now replaced by i18n
 export const WITTY_LOADING_PHRASES = [
@@ -28,7 +29,7 @@ export const WITTY_LOADING_PHRASES = [
   'Shuffling punchlines...',
   'Untangling neural nets...',
   'Compiling brilliance...',
-  'Loading wit.exe...',
+  // 'Loading wit.exe...',  // Now using t('messages:loading.witExe')
   'Summoning the cloud of wisdom...',
   'Preparing a witty response...',
   "Just a sec, I'm debugging reality...",
@@ -55,7 +56,7 @@ export const WITTY_LOADING_PHRASES = [
   'Channeling the Force...',
   'Aligning the stars for optimal response...',
   'So say we all...',
-  'Loading the next great idea...',
+  t('status:loading.nextGreatIdea'),
   "Just a moment, I'm in the zone...",
   'Preparing to dazzle you with brilliance...',
   "Just a tick, I'm polishing my wit...",
@@ -70,7 +71,7 @@ export const WITTY_LOADING_PHRASES = [
   'Following the white rabbit...',
   'The truth is in here... somewhere...',
   'Blowing on the cartridge...',
-  'Loading... Do a barrel roll!',
+  t('status:loading.barrelRoll'),
   'Waiting for the respawn...',
   'Finishing the Kessel Run in less than 12 parsecs...',
   "The cake is not a lie, it's just still loading...",

@@ -9,6 +9,7 @@ import type { CommandModule, Argv } from 'yargs';
 import { addCommand } from './mcp/add.js';
 import { removeCommand } from './mcp/remove.js';
 import { listCommand } from './mcp/list.js';
+import i18next from 'i18next';
 
 export const mcpCommand: CommandModule = {
   command: 'mcp',
@@ -18,7 +19,7 @@ export const mcpCommand: CommandModule = {
       .command(addCommand)
       .command(removeCommand)
       .command(listCommand)
-      .demandCommand(1, 'You need at least one command before continuing.')
+      .demandCommand(1, i18next.t('commands:mcp.usage.needOneCommand'))
       .version(false),
   handler: () => {
     // yargs will automatically show help if no subcommand is provided

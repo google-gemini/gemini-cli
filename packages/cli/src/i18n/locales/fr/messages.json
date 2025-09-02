@@ -34,5 +34,13 @@
   },
   "session": {
     "startTimeUnavailable": "L'heure de début de session n'est pas disponible, impossible de calculer les statistiques."
-  }
+  },
+  "loading": {
+    "witExe": "Chargement de wit.exe...",
+    "nextGreatIdea": "Chargement de la prochaine grande idée...",
+    "barrelRoll": "Chargement... Faites un tonneau !",
+    "research": "Recherche sur les derniers mèmes..."
+  },
+  "getStarted": "Commencer !",
+  "gotContext": "Compris. Merci pour le contexte !"
 }

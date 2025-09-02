@@ -153,8 +153,8 @@ describe('SettingsDialog', () => {
 
       const output = lastFrame();
       expect(output).toContain('Settings');
-      expect(output).toContain('Apply To');
-      expect(output).toContain('Use Enter to select, Tab to change focus');
+      expect(output).toContain('Apply to:');
+      expect(output).toContain('Use ↑↓ navigate, ←→ for options, space toggle, numbers edit, Tab switch');
     });
 
     it('should show settings list with default values', () => {
@@ -336,7 +336,7 @@ describe('SettingsDialog', () => {
 
       // The UI should show the settings section is active and scope section is inactive
       expect(lastFrame()).toContain('● Hide Window Title'); // Settings section active
-      expect(lastFrame()).toContain('  Apply To'); // Scope section inactive
+      expect(lastFrame()).toContain('  Apply to:'); // Scope section inactive
 
       // This test validates the initial state - scope selection behavior
       // is complex due to keypress handling, so we focus on state validation
@@ -402,7 +402,7 @@ describe('SettingsDialog', () => {
 
       // Verify the dialog is rendered properly
       expect(lastFrame()).toContain('Settings');
-      expect(lastFrame()).toContain('Apply To');
+      expect(lastFrame()).toContain('Apply to:');
 
       // This test validates rendering - escape key behavior depends on complex
       // keypress handling that's difficult to test reliably in this environment
@@ -718,7 +718,7 @@ describe('SettingsDialog', () => {
 
       // Verify initial state: settings section active, scope section inactive
       expect(lastFrame()).toContain('● Hide Window Title'); // Settings section active
-      expect(lastFrame()).toContain('  Apply To'); // Scope section inactive
+      expect(lastFrame()).toContain('  Apply to:'); // Scope section inactive
 
       // This test validates the rendered UI structure for tab navigation
       // Actual tab behavior testing is complex due to keypress handling
@@ -775,10 +775,10 @@ describe('SettingsDialog', () => {
       // Verify the complete UI is rendered with all necessary sections
       expect(lastFrame()).toContain('Settings'); // Title
       expect(lastFrame()).toContain('● Hide Window Title'); // Active setting
-      expect(lastFrame()).toContain('Apply To'); // Scope section
+      expect(lastFrame()).toContain('Apply to:'); // Scope section
       expect(lastFrame()).toContain('1. User Settings'); // Scope options
       expect(lastFrame()).toContain(
-        '(Use Enter to select, Tab to change focus)',
+        'Use ↑↓ navigate, ←→ for options, space toggle, numbers edit, Tab switch',
       ); // Help text
 
       // This test validates the complete UI structure is available for user workflow

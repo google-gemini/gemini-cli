@@ -27,7 +27,8 @@
   "directory": {
     "description": "gérer les répertoires de l'espace de travail",
     "add": "Ajouter des répertoires à l'espace de travail. Utilisez une virgule pour séparer les chemins",
-    "show": "Afficher tous les répertoires dans l'espace de travail"
+    "show": "Afficher tous les répertoires dans l'espace de travail",
+    "addNotSupported": "La commande /directory add n'est pas prise en charge dans les profils de sandbox restrictifs. Veuillez utiliser --include-directories lors du démarrage de la session à la place."
   },
   "mcp": {
     "description": "gérer les serveurs MCP",
@@ -75,7 +76,37 @@
     "tools": "Afficher les outils disponibles",
     "vim": "Activer/désactiver le mode Vim",
     "setup-github": "Configurer GitHub Actions",
-    "terminal-setup": "Configurer les raccourcis clavier du terminal pour l'entrée multiligne (VS Code, Cursor, Windsurf)"
+    "terminal-setup": "Configurer les raccourcis clavier du terminal pour l'entrée multiligne (VS Code, Cursor, Windsurf)",
+    "chat": {
+      "description": "Gérer l'historique des conversations.",
+      "list": "Lister les points de contrôle de conversation sauvegardés",
+      "save": "Sauvegarder la conversation courante en tant que point de contrôle. Usage: /chat save <tag>",
+      "resume": "Reprendre une conversation depuis un point de contrôle. Usage: /chat resume <tag>",
+      "delete": "Supprimer un point de contrôle de conversation. Usage: /chat delete <tag>"
+    },
+    "config": {
+      "prompt": "Invite. Ajoutée à l'entrée sur stdin (le cas échéant).",
+      "sandbox": "Exécuter dans un sandbox ?",
+      "debug": "Exécuter en mode débogage ?",
+      "allFiles": "Inclure TOUS les fichiers dans le contexte ?",
+      "showMemoryUsage": "Afficher l'utilisation de la mémoire dans la barre d'état",
+      "checkpointing": "Active les points de contrôle des modifications de fichiers",
+      "experimentalAcp": "Démarre l'agent en mode ACP",
+      "listExtensions": "Lister toutes les extensions disponibles et quitter."
+    }
+  },
+  "config": {
+    "prompt": "Invite. Ajouté à l'entrée sur stdin (si elle existe).",
+    "sandbox": "Exécuter en sandbox ?",
+    "debug": "Exécuter en mode debug ?",
+    "allFiles": "Inclure TOUS les fichiers dans le contexte ?"
+  },
+  "chat": {
+    "description": "Gérer l'historique des conversations.",
+    "list": "Lister les points de contrôle de conversations sauvegardées",
+    "save": "Sauvegarder la conversation actuelle comme point de contrôle. Usage : /chat save <étiquette>",
+    "resume": "Reprendre une conversation à partir d'un point de contrôle. Usage : /chat resume <étiquette>",
+    "delete": "Supprimer un point de contrôle de conversation. Usage : /chat delete <étiquette>"
   },
   "tools": {
     "title": "Outils Gemini CLI disponibles:",
@@ -152,6 +183,22 @@
     "refreshDetails": {
       "description": "Redémarre les serveurs MCP.",
       "restarting": "Redémarrage des serveurs MCP..."
+    },
+    "usage": {
+      "needOneCommand": "Vous devez avoir au moins une commande avant de continuer.",
+      "removeUsage": "Usage: gemini mcp remove [options] <nom>",
+      "configScope": "Portée de configuration (utilisateur ou projet)",
+      "addUsage": "Usage: gemini mcp add [options] <nom> <commandeOuUrl> [args...]",
+      "transportType": "Type de transport (stdio, sse, http)",
+      "setEnvironmentVars": "Définir les variables d'environnement (ex. -e CLE=valeur)",
+      "connectionTimeout": "Définir le délai de connexion en millisecondes",
+      "serverDescription": "Définir la description du serveur"
     }
+  },
+  "restore": {
+    "description": "Restaurer un appel d'outil. Cela réinitialisera l'historique des conversations et des fichiers à l'état où il était lorsque l'appel d'outil a été suggéré"
+  },
+  "compression": {
+    "title": "Compression de l'historique de conversation"
   }
 }

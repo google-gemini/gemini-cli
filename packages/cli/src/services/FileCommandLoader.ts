@@ -10,6 +10,7 @@ import toml from '@iarna/toml';
 import { glob } from 'glob';
 import { z } from 'zod';
 import { Config, Storage } from '@google/gemini-cli-core';
+import { t } from '../i18n/index.js';
 import { ICommandLoader } from './types.js';
 import {
   CommandContext,
@@ -39,8 +40,8 @@ interface CommandDirectory {
  */
 const TomlCommandDefSchema = z.object({
   prompt: z.string({
-    required_error: "The 'prompt' field is required.",
-    invalid_type_error: "The 'prompt' field must be a string.",
+    required_error: t('dialogs:prompts.fieldRequired'),
+    invalid_type_error: t('dialogs:prompts.fieldMustBeString'),
   }),
   description: z.string().optional(),
 });

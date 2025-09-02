@@ -16,6 +16,20 @@
   "initialization": {
     "geminiCreated": "Empty GEMINI.md created. Now analyzing the project to populate it."
   },
+  "chat": {
+    "noCheckpoints": "No conversation checkpoints found.",
+    "listHeader": "List of saved conversations:",
+    "sortNote": "Note: Newest last, oldest first",
+    "missingTagSave": "Please provide a tag name for saving the checkpoint.",
+    "noClientAvailable": "No chat client available to save conversation.",
+    "checkpointSaved": "Conversation checkpoint saved as '{{tag}}'.",
+    "noConversationFound": "No conversation found to save.",
+    "missingTagResume": "Please provide a tag name to resume from checkpoint.",
+    "noCheckpointFound": "No checkpoint found with tag '{{tag}}'.",
+    "missingTagDelete": "Please provide a tag name to delete the checkpoint.",
+    "checkpointDeleted": "Checkpoint '{{tag}}' has been deleted.",
+    "deleteError": "Error deleting checkpoint '{{tag}}' or checkpoint not found."
+  },
   "operation": {
     "cancelled": "Operation cancelled.",
     "restored": "Restored project to the state before the tool call."
@@ -34,5 +48,13 @@
   },
   "session": {
     "startTimeUnavailable": "Session start time is unavailable, cannot calculate stats."
-  }
+  },
+  "loading": {
+    "witExe": "Loading wit.exe...",
+    "nextGreatIdea": "Loading the next great idea...",
+    "barrelRoll": "Loading... Do a barrel roll!",
+    "research": "Doing research on the latest memes..."
+  },
+  "getStarted": "Get Started!",
+  "gotContext": "Got it. Thanks for the context!"
 }

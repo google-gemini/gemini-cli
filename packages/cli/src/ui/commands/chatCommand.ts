@@ -8,7 +8,7 @@ import * as fsPromises from 'fs/promises';
 import React from 'react';
 import { Text } from 'ink';
 import { Colors } from '../colors.js';
-import i18n from '../../i18n/index.js';
+import i18n, { t } from '../../i18n/index.js';
 import {
   CommandContext,
   SlashCommand,
@@ -66,7 +66,7 @@ const getSavedChatTags = async (
 
 const listCommand: SlashCommand = {
   name: 'list',
-  description: 'List saved conversation checkpoints',
+  description: t('commands:chat.list'),
   kind: CommandKind.BUILT_IN,
   action: async (context): Promise<MessageActionReturn> => {
     const chatDetails = await getSavedChatTags(context, false);
@@ -82,7 +82,7 @@ const listCommand: SlashCommand = {
       ...chatDetails.map((chat) => chat.name.length),
     );
 
-    let message = 'List of saved conversations:\n\n';
+    let message = i18n.t('ui:chat.listHeader') + '\n\n';
     for (const chat of chatDetails) {
       const paddedName = chat.name.padEnd(maxNameLength, ' ');
       const isoString = chat.mtime.toISOString();
@@ -90,7 +90,7 @@ const listCommand: SlashCommand = {
       const formattedDate = match ? `${match[1]} ${match[2]}` : 'Invalid Date';
       message += `  - \u001b[36m${paddedName}\u001b[0m  \u001b[90m(saved on ${formattedDate})\u001b[0m\n`;
     }
-    message += `\n\u001b[90mNote: Newest last, oldest first\u001b[0m`;
+    message += `\n\u001b[90m${i18n.t('ui:chat.sortNote')}\u001b[0m`;
     return {
       type: 'message',
       messageType: 'info',
@@ -101,8 +101,7 @@ const listCommand: SlashCommand = {
 
 const saveCommand: SlashCommand = {
   name: 'save',
-  description:
-    'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
+  description: t('commands:chat.save'),
   kind: CommandKind.BUILT_IN,
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
     const tag = args.trim();
@@ -166,8 +165,7 @@ const saveCommand: SlashCommand = {
 const resumeCommand: SlashCommand = {
   name: 'resume',
   altNames: ['load'],
-  description:
-    'Resume a conversation from a checkpoint. Usage: /chat resume <tag>',
+  description: t('commands:chat.resume'),
   kind: CommandKind.BUILT_IN,
   action: async (context, args) => {
     const tag = args.trim();
@@ -238,7 +236,7 @@ const resumeCommand: SlashCommand = {
 
 const deleteCommand: SlashCommand = {
   name: 'delete',
-  description: 'Delete a conversation checkpoint. Usage: /chat delete <tag>',
+  description: t('commands:chat.delete'),
   kind: CommandKind.BUILT_IN,
   action: async (context, args): Promise<MessageActionReturn> => {
     const tag = args.trim();
@@ -280,7 +278,7 @@ const deleteCommand: SlashCommand = {
 
 export const chatCommand: SlashCommand = {
   name: 'chat',
-  description: 'Manage conversation history.',
+  description: t('commands:chat.description'),
   kind: CommandKind.BUILT_IN,
   subCommands: [listCommand, saveCommand, resumeCommand, deleteCommand],
 };

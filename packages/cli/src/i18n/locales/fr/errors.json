@@ -15,5 +15,71 @@
     "waitAndRetryGemini": "Veuillez patienter et réessayer plus tard. Pour augmenter vos limites, demandez une augmentation de quota via AI Studio, ou passez à une autre méthode /auth",
     "waitAndRetryVertex": "Veuillez patienter et réessayer plus tard. Pour augmenter vos limites, demandez une augmentation de quota via Vertex, ou passez à une autre méthode /auth",
     "rateLimitDefault": "Limitations de quota possibles ou temps de réponse lents détectés. Basculement vers le modèle {{fallbackModel}} pour le reste de cette session."
+  },
+  "user": {
+    "cancelled": "L'utilisateur a annulé la requête.",
+    "operationCancelled": "Opération annulée."
+  },
+  "file": {
+    "readError": "Erreur de lecture du fichier",
+    "getDetailsError": "Échec de l'obtention des détails de l'erreur"
+  },
+  "toolScheduler": {
+    "cannotScheduleWhileRunning": "Impossible de programmer de nouveaux appels d'outils pendant que d'autres appels d'outils sont en cours d'exécution (en cours d'exécution ou en attente d'approbation).",
+    "unknownState": "Un état d'appel d'outil inconnu a été rencontré.",
+    "unknownStateDisplay": "État d'appel d'outil inconnu"
+  },
+  "auth": {
+    "browserOpenFailed": "Échec de l'ouverture automatique du navigateur :",
+    "browserOpenFailedAdvice": "Échec de l'ouverture automatique du navigateur. Veuillez essayer de relancer avec NO_BROWSER=true défini.",
+    "googleAccountIdFailed": "Échec de la récupération de l'ID de compte Google lors de l'authentification :",
+    "userInfoFailed": "Échec de la récupération des informations utilisateur :",
+    "timeout": "Délai d'authentification expiré. Veuillez réessayer."
+  },
+  "tools": {
+    "executeReadFiles": "Erreur lors de la tentative d'exécution de l'outil pour lire les fichiers",
+    "allCallsFailed": "Tous les appels d'outils ont échoué. Veuillez analyser les erreurs et essayer une approche alternative."
+  },
+  "cli": {
+    "promptInteractiveNotSupported": "Erreur : L'option --prompt-interactive n'est pas prise en charge lors de l'utilisation d'un pipe depuis stdin."
+  },
+  "core": {
+    "getDetailsError": "Échec de l'obtention des détails de l'erreur",
+    "configurationNotAvailable": "Configuration non disponible. Impossible d'afficher la mémoire.",
+    "loneAtDetected": "@ isolé détecté, sera traité comme texte dans la requête modifiée.",
+    "noValidFilePaths": "Aucun chemin de fichier valide trouvé dans les commandes @ à lire.",
+    "clearingTerminal": "Effacement du terminal et réinitialisation du chat.",
+    "rateLimitExceeded": "Limite de débit dépassée. Réessayez plus tard.",
+    "commandCancelled": "Commande annulée par l'utilisateur.",
+    "commandEmpty": "La commande ne peut pas être vide.",
+    "commandRootNotIdentified": "Impossible d'identifier la racine de commande pour obtenir l'autorisation de l'utilisateur.",
+    "directoryCannotBeAbsolute": "Le répertoire ne peut pas être absolu. Veuillez faire référence aux répertoires de l'espace de travail par leur nom.",
+    "noSearchPathsProvided": "Aucun chemin de recherche ou motif d'inclusion fourni.",
+    "noFilesFound": "Aucun fichier correspondant aux critères n'a été trouvé ou tous ont été ignorés.",
+    "fileNotFound": "Impossible de lire le fichier car aucun fichier n'a été trouvé au chemin spécifié.",
+    "pathIsDirectory": "Impossible de lire le fichier car le chemin fourni est un répertoire, pas un fichier.",
+    "offsetNonNegative": "L'offset doit être un nombre non négatif",
+    "limitPositive": "La limite doit être un nombre positif",
+    "shellGloballyDisabled": "L'outil Shell est globalement désactivé dans la configuration",
+    "confirmationRequired": "ConfirmationRequiredError",
+    "blockedByConfiguration": "Bloqué par la configuration.",
+    "unexpectedAllowedFalse": "Inattendu : isCommandAllowed a retourné false sans raison",
+    "tokenVerificationFailed": "Échec de la vérification du token : token non trouvé ou invalide après sauvegarde",
+    "noClientIdDynamicRegistration": "Aucun ID client fourni, tentative d'enregistrement client dynamique...",
+    "noClientIdUnsupportedRegistration": "Aucun ID client fourni et enregistrement dynamique non supporté"
+  },
+  "gemini": {
+    "queryNull": "Le traitement de la requête a donné null, n'envoie pas à Gemini.",
+    "truncated": "Réponse tronquée en raison des limites de tokens.",
+    "safety": "Réponse arrêtée pour des raisons de sécurité.",
+    "recitation": "Réponse arrêtée en raison de la politique de récitation.",
+    "unsupportedLanguage": "Réponse arrêtée en raison d'une langue non supportée.",
+    "forbidden": "Réponse arrêtée en raison de termes interdits.",
+    "prohibited": "Réponse arrêtée en raison de contenu prohibé.",
+    "sensitiveInfo": "Réponse arrêtée en raison d'informations personnelles identifiables sensibles.",
+    "other": "Réponse arrêtée pour d'autres raisons.",
+    "malformed": "Réponse arrêtée en raison d'un appel de fonction mal formé.",
+    "imageSafety": "Réponse arrêtée en raison de violations de sécurité d'image.",
+    "unexpectedTool": "Réponse arrêtée en raison d'un appel d'outil inattendu."
   }
 }

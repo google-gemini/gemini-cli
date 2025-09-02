@@ -7,6 +7,7 @@
 import { Message, MessageType } from '../types.js';
 import { Config } from '@google/gemini-cli-core';
 import { LoadedSettings } from '../../config/settings.js';
+import i18next from 'i18next';
 
 export function createShowMemoryAction(
   config: Config | null,
@@ -17,7 +18,7 @@ export function createShowMemoryAction(
     if (!config) {
       addMessage({
         type: MessageType.ERROR,
-        content: 'Configuration not available. Cannot show memory.',
+        content: i18next.t('errors:core.configurationNotAvailable'),
         timestamp: new Date(),
       });
       return;

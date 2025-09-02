@@ -6,6 +6,7 @@
 
 import { useCallback, useMemo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n/index.js';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -477,7 +478,7 @@ export const useSlashCommandProcessor = (
                     addItem(
                       {
                         type: MessageType.INFO,
-                        text: 'Operation cancelled.',
+                        text: i18n.t('errors:user.operationCancelled'),
                       },
                       Date.now(),
                     );

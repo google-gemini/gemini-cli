@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
+import { getTranslatedErrorMessage } from '../utils/errors.js';
 import { Config } from '../config/config.js';
 import {
   BaseDeclarativeTool,
@@ -81,7 +82,7 @@ class ShellToolInvocation extends BaseToolInvocation<
 
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
-      title: 'Confirm Shell Command',
+      title: getTranslatedErrorMessage('dialogs:toolConfirm.shellCommand', 'Confirm Shell Command'),
       command: this.params.command,
       rootCommand: commandsToConfirm.join(', '),
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
@@ -104,7 +105,7 @@ class ShellToolInvocation extends BaseToolInvocation<
     if (signal.aborted) {
       return {
         llmContent: 'Command was cancelled by user before it could start.',
-        returnDisplay: 'Command cancelled by user.',
+        returnDisplay: getTranslatedErrorMessage('errors:core.commandCancelled', 'Command cancelled by user.'),
       };
     }
 
@@ -247,7 +248,7 @@ class ShellToolInvocation extends BaseToolInvocation<
           returnDisplayMessage = result.output;
         } else {
           if (result.aborted) {
-            returnDisplayMessage = 'Command cancelled by user.';
+            returnDisplayMessage = getTranslatedErrorMessage('errors:core.commandCancelled', 'Command cancelled by user.');
           } else if (result.signal) {
             returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
           } else if (result.error) {
@@ -314,7 +315,7 @@ function getCommandDescription(): string {
   if (os.platform() === 'win32') {
     return 'Exact command to execute as `cmd.exe /c <command>`';
   } else {
-    return 'Exact bash command to execute as `bash -c <command>`';
+    return getTranslatedErrorMessage('tools:shell.commandDescription', 'Exact bash command to execute as `bash -c <command>`');
   }
 }
 
@@ -341,7 +342,7 @@ export class ShellTool extends BaseDeclarativeTool<
           description: {
             type: 'string',
             description:
-              'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
+              getTranslatedErrorMessage('tools:shell.briefDescription', 'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.'),
           },
           directory: {
             type: 'string',
@@ -363,21 +364,21 @@ export class ShellTool extends BaseDeclarativeTool<
     if (!commandCheck.allowed) {
       if (!commandCheck.reason) {
         console.error(
-          'Unexpected: isCommandAllowed returned false without a reason',
+          getTranslatedErrorMessage('errors:core.unexpectedAllowedFalse', 'Unexpected: isCommandAllowed returned false without a reason'),
         );
         return `Command is not allowed: ${params.command}`;
       }
       return commandCheck.reason;
     }
     if (!params.command.trim()) {
-      return 'Command cannot be empty.';
+      return getTranslatedErrorMessage('errors:core.commandEmpty', 'Command cannot be empty.');
     }
     if (getCommandRoots(params.command).length === 0) {
-      return 'Could not identify command root to obtain permission from user.';
+      return getTranslatedErrorMessage('errors:core.commandRootNotIdentified', 'Could not identify command root to obtain permission from user.');
     }
     if (params.directory) {
       if (path.isAbsolute(params.directory)) {
-        return 'Directory cannot be absolute. Please refer to workspace directories by their name.';
+        return getTranslatedErrorMessage('errors:core.directoryCannotBeAbsolute', 'Directory cannot be absolute. Please refer to workspace directories by their name.');
       }
       const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
       const matchingDirs = workspaceDirs.filter(

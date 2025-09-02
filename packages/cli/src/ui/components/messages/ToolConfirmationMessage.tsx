@@ -7,6 +7,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { useTranslation } from 'react-i18next';
+import i18n from '../../../i18n/index.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
@@ -120,7 +121,7 @@ export const ToolConfirmationMessage: React.FC<
           padding={1}
           overflow="hidden"
         >
-          <Text>Modify in progress: </Text>
+          <Text>{i18n.t('ui:tools.modifyInProgress')}</Text>
           <Text color={Colors.AccentGreen}>
             Save and close external editor to continue
           </Text>
@@ -247,8 +248,8 @@ export const ToolConfirmationMessage: React.FC<
 
     bodyContent = (
       <Box flexDirection="column" paddingX={1} marginLeft={1}>
-        <Text color={Colors.AccentCyan}>MCP Server: {mcpProps.serverName}</Text>
-        <Text color={Colors.AccentCyan}>Tool: {mcpProps.toolName}</Text>
+        <Text color={Colors.AccentCyan}>{i18n.t('ui:tools.mcpServer', { serverName: mcpProps.serverName })}</Text>
+        <Text color={Colors.AccentCyan}>{i18n.t('ui:tools.tool', { toolName: mcpProps.toolName })}</Text>
       </Box>
     );
 

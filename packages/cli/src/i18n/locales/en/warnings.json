@@ -1,0 +1,7 @@
+{
+  "homeDirectory": "You are running Gemini CLI in your home directory. It is recommended to run in a project-specific directory.",
+  "rootDirectory": "Warning: You are running Gemini CLI in the root directory. Your entire folder structure will be used for context. It is strongly recommended to run in a project-specific directory.",
+  "fileSystemError": "Could not verify the current directory due to a file system error.",
+  "tempFileDelete": "Warning: Could not delete temporary warnings file.",
+  "sandboxBuild": "Try running `npm run build:all` or `npm run build:sandbox` under the gemini-cli repo to build it locally, or check the image name and your network connection."
+}

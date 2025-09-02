@@ -15,5 +15,72 @@
     "waitAndRetryGemini": "Please wait and try again later. To increase your limits, request a quota increase through AI Studio, or switch to another /auth method",
     "waitAndRetryVertex": "Please wait and try again later. To increase your limits, request a quota increase through Vertex, or switch to another /auth method",
     "rateLimitDefault": "Possible quota limitations in place or slow response times detected. Switching to the {{fallbackModel}} model for the rest of this session."
+  },
+  "user": {
+    "cancelled": "User cancelled the request.",
+    "operationCancelled": "Operation cancelled."
+  },
+  "file": {
+    "readError": "Error reading file",
+    "getDetailsError": "Failed to get error details"
+  },
+  "toolScheduler": {
+    "cannotScheduleWhileRunning": "Cannot schedule new tool calls while other tool calls are actively running (executing or awaiting approval).",
+    "unknownState": "Encountered an unknown tool call state.",
+    "unknownStateDisplay": "Unknown tool call state"
+  },
+  "auth": {
+    "browserOpenFailed": "Failed to open browser automatically:",
+    "browserOpenFailedAdvice": "Failed to open browser automatically. Please try running again with NO_BROWSER=true set.",
+    "googleAccountIdFailed": "Failed to retrieve Google Account ID during authentication:",
+    "userInfoFailed": "Failed to fetch user info:",
+    "timeout": "Authentication timed out. Please try again.",
+    "browserOpenUnexpectedError": "An unexpected error occurred while trying to open the browser:"
+  },
+  "tools": {
+    "executeReadFiles": "Error attempting to execute tool to read files",
+    "allCallsFailed": "All tool calls failed. Please analyze the errors and try an alternative approach."
+  },
+  "cli": {
+    "promptInteractiveNotSupported": "Error: The --prompt-interactive flag is not supported when piping input from stdin."
+  },
+  "core": {
+    "getDetailsError": "Failed to get error details",
+    "configurationNotAvailable": "Configuration not available. Cannot show memory.",
+    "loneAtDetected": "Lone @ detected, will be treated as text in the modified query.",
+    "noValidFilePaths": "No valid file paths found in @ commands to read.",
+    "clearingTerminal": "Clearing terminal and resetting chat.",
+    "rateLimitExceeded": "Rate limit exceeded. Try again later.",
+    "commandCancelled": "Command cancelled by user.",
+    "commandEmpty": "Command cannot be empty.",
+    "commandRootNotIdentified": "Could not identify command root to obtain permission from user.",
+    "directoryCannotBeAbsolute": "Directory cannot be absolute. Please refer to workspace directories by their name.",
+    "noSearchPathsProvided": "No search paths or include patterns provided.",
+    "noFilesFound": "No files matching the criteria were found or all were skipped.",
+    "fileNotFound": "Could not read file because no file was found at the specified path.",
+    "pathIsDirectory": "Could not read file because the provided path is a directory, not a file.",
+    "offsetNonNegative": "Offset must be a non-negative number",
+    "limitPositive": "Limit must be a positive number",
+    "shellGloballyDisabled": "Shell tool is globally disabled in configuration",
+    "confirmationRequired": "ConfirmationRequiredError",
+    "blockedByConfiguration": "Blocked by configuration.",
+    "unexpectedAllowedFalse": "Unexpected: isCommandAllowed returned false without a reason",
+    "tokenVerificationFailed": "Token verification failed: token not found or invalid after save",
+    "noClientIdDynamicRegistration": "No client ID provided, attempting dynamic client registration...",
+    "noClientIdUnsupportedRegistration": "No client ID provided and dynamic registration not supported"
+  },
+  "gemini": {
+    "queryNull": "Query processing resulted in null, not sending to Gemini.",
+    "truncated": "Response truncated due to token limits.",
+    "safety": "Response stopped due to safety reasons.",
+    "recitation": "Response stopped due to recitation policy.",
+    "unsupportedLanguage": "Response stopped due to unsupported language.",
+    "forbidden": "Response stopped due to forbidden terms.",
+    "prohibited": "Response stopped due to prohibited content.",
+    "sensitiveInfo": "Response stopped due to sensitive personally identifiable information.",
+    "other": "Response stopped for other reasons.",
+    "malformed": "Response stopped due to malformed function call.",
+    "imageSafety": "Response stopped due to image safety violations.",
+    "unexpectedTool": "Response stopped due to unexpected tool call."
   }
 }

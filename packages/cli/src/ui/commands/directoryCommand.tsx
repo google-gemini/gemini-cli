@@ -9,7 +9,7 @@ import { MessageType } from '../types.js';
 import * as os from 'os';
 import * as path from 'path';
 import { loadServerHierarchicalMemory } from '@google/gemini-cli-core';
-import i18n from '../../i18n/index.js';
+import i18n, { t } from '../../i18n/index.js';
 
 export function expandHomeDir(p: string): string {
   if (!p) {
@@ -27,13 +27,12 @@ export function expandHomeDir(p: string): string {
 export const directoryCommand: SlashCommand = {
   name: 'directory',
   altNames: ['dir'],
-  description: 'Manage workspace directories',
+  description: t('commands:directory.description'),
   kind: CommandKind.BUILT_IN,
   subCommands: [
     {
       name: 'add',
-      description:
-        'Add directories to the workspace. Use comma to separate multiple paths',
+      description: t('commands:directory.add'),
       kind: CommandKind.BUILT_IN,
       action: async (context: CommandContext, args: string) => {
         const {
@@ -74,8 +73,7 @@ export const directoryCommand: SlashCommand = {
           return {
             type: 'message' as const,
             messageType: 'error' as const,
-            content:
-              'The /directory add command is not supported in restrictive sandbox profiles. Please use --include-directories when starting the session instead.',
+            content: t('commands:directory.addNotSupported'),
           };
         }
 
@@ -148,7 +146,7 @@ export const directoryCommand: SlashCommand = {
     },
     {
       name: 'show',
-      description: 'Show all directories in the workspace',
+      description: t('commands:directory.show'),
       kind: CommandKind.BUILT_IN,
       action: async (context: CommandContext) => {
         const {

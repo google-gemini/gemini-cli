@@ -8,6 +8,7 @@ import { isGitRepository } from '@google/gemini-cli-core';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as childProcess from 'child_process';
+import { t } from '../i18n/index.js';
 
 export enum PackageManager {
   NPM = 'npm',
@@ -54,7 +55,7 @@ export function getInstallationInfo(
         packageManager: PackageManager.UNKNOWN, // Not managed by a package manager in this sense
         isGlobal: false,
         updateMessage:
-          'Running from a local git clone. Please update with "git pull".',
+          t('installation:gitClone'),
       };
     }
 
@@ -63,14 +64,14 @@ export function getInstallationInfo(
       return {
         packageManager: PackageManager.NPX,
         isGlobal: false,
-        updateMessage: 'Running via npx, update not applicable.',
+        updateMessage: t('installation:npx'),
       };
     }
     if (realPath.includes('/.pnpm/_pnpx')) {
       return {
         packageManager: PackageManager.PNPX,
         isGlobal: false,
-        updateMessage: 'Running via pnpx, update not applicable.',
+        updateMessage: t('installation:pnpx'),
       };
     }
 
@@ -85,7 +86,7 @@ export function getInstallationInfo(
           packageManager: PackageManager.HOMEBREW,
           isGlobal: true,
           updateMessage:
-            'Installed via Homebrew. Please update with "brew upgrade".',
+            t('installation:homebrew'),
         };
       } catch (_error) {
         // Brew is not installed or gemini-cli is not installed via brew.
@@ -102,7 +103,7 @@ export function getInstallationInfo(
         updateCommand,
         updateMessage: isAutoUpdateDisabled
           ? `Please run ${updateCommand} to update`
-          : 'Installed with pnpm. Attempting to automatically update now...',
+          : t('installation:pnpm'),
       };
     }
 
@@ -115,7 +116,7 @@ export function getInstallationInfo(
         updateCommand,
         updateMessage: isAutoUpdateDisabled
           ? `Please run ${updateCommand} to update`
-          : 'Installed with yarn. Attempting to automatically update now...',
+          : t('installation:yarn'),
       };
     }
 
@@ -124,7 +125,7 @@ export function getInstallationInfo(
       return {
         packageManager: PackageManager.BUNX,
         isGlobal: false,
-        updateMessage: 'Running via bunx, update not applicable.',
+        updateMessage: t('installation:bunx'),
       };
     }
     if (realPath.includes('/.bun/bin')) {
@@ -135,7 +136,7 @@ export function getInstallationInfo(
         updateCommand,
         updateMessage: isAutoUpdateDisabled
           ? `Please run ${updateCommand} to update`
-          : 'Installed with bun. Attempting to automatically update now...',
+          : t('installation:bun'),
       };
     }
 
@@ -168,7 +169,7 @@ export function getInstallationInfo(
       updateCommand,
       updateMessage: isAutoUpdateDisabled
         ? `Please run ${updateCommand} to update`
-        : 'Installed with npm. Attempting to automatically update now...',
+        : t('installation:npm'),
     };
   } catch (error) {
     console.log(error);

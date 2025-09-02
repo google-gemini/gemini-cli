@@ -8,6 +8,7 @@ import fs from 'fs/promises';
 import os from 'os';
 import { join as pathJoin } from 'node:path';
 import { getErrorMessage } from '@google/gemini-cli-core';
+import { t } from '../i18n/index.js';
 
 const warningsFilePath = pathJoin(os.tmpdir(), 'gemini-cli-warnings.txt');
 
@@ -21,7 +22,7 @@ export async function getStartupWarnings(): Promise<string[]> {
     try {
       await fs.unlink(warningsFilePath);
     } catch {
-      warnings.push('Warning: Could not delete temporary warnings file.');
+      warnings.push(t('warnings:tempFileDelete'));
     }
     return warnings;
   } catch (err: unknown) {
