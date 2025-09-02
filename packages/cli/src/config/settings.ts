@@ -78,7 +78,6 @@ const MIGRATION_MAP: Record<string, string> = {
   mcpServerCommand: 'mcp.serverCommand',
   allowMCPServers: 'mcp.allowed',
   excludeMCPServers: 'mcp.excluded',
-  folderTrustFeature: 'security.folderTrust.featureEnabled',
   folderTrust: 'security.folderTrust.enabled',
   selectedAuthType: 'security.auth.selectedType',
   useExternalAuth: 'security.auth.useExternal',
