@@ -251,7 +251,7 @@ export const SETTINGS_SCHEMA = {
             label: 'Screen Reader Mode',
             category: 'UI',
             requiresRestart: true,
-            default: undefined,
+            default: undefined as boolean | undefined,
             description:
               'Render output in plain-text to be more screen reader accessible',
             showInDialog: true,
