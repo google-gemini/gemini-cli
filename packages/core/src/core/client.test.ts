@@ -425,11 +425,16 @@ describe('Gemini Client (client.ts)', () => {
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 
-      await client.generateJson(contents, schema, abortSignal);
+      await client.generateJson(
+        contents,
+        schema,
+        abortSignal,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
 
       expect(mockGenerateContentFn).toHaveBeenCalledWith(
         {
-          model: 'test-model', // Should use current model from config
+          model: DEFAULT_GEMINI_FLASH_MODEL,
           config: {
             abortSignal,
             systemInstruction: getCoreSystemPrompt(''),
@@ -2306,11 +2311,16 @@ ${JSON.stringify(
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 
-      await client.generateContent(contents, generationConfig, abortSignal);
+      await client.generateContent(
+        contents,
+        generationConfig,
+        abortSignal,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
 
       expect(mockGenerateContentFn).toHaveBeenCalledWith(
         {
-          model: 'test-model',
+          model: DEFAULT_GEMINI_FLASH_MODEL,
           config: {
             abortSignal,
             systemInstruction: getCoreSystemPrompt(''),
@@ -2336,7 +2346,12 @@ ${JSON.stringify(
       };
       client['contentGenerator'] = mockGenerator as ContentGenerator;
 
-      await client.generateContent(contents, {}, new AbortController().signal);
+      await client.generateContent(
+        contents,
+        {},
+        new AbortController().signal,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
 
       expect(mockGenerateContentFn).not.toHaveBeenCalledWith({
         model: initialModel,
@@ -2345,7 +2360,7 @@ ${JSON.stringify(
       });
       expect(mockGenerateContentFn).toHaveBeenCalledWith(
         {
-          model: currentModel,
+          model: DEFAULT_GEMINI_FLASH_MODEL,
           config: expect.any(Object),
           contents,
         },
