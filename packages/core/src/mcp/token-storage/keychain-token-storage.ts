@@ -186,7 +186,16 @@ export class KeychainTokenStorage extends BaseTokenStorage {
       throw new Error('Keychain is not available');
     }
 
-    const servers = await this.listServers();
+    const servers = this.keytarModule
+      ? await this.keytarModule
+          .findCredentials(this.serviceName)
+          .then((creds) => creds.map((c) => c.account))
+          .catch((error: Error) => {
+            throw new Error(
+              `Failed to list servers for clearing: ${error.message}`,
+            );
+          })
+      : [];
     const errors: Error[] = [];
 
     for (const server of servers) {
