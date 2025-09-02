@@ -528,8 +528,8 @@ export class GeminiChat {
 
     if (stripThoughts) {
       history = history.map((content) => {
-        const visibleParts = content.parts.filter((part) => !part.thought);
-        return { ...content, parts: visibleParts };
+        const visibleParts = content.parts?.filter((part) => !part.thought);
+        return { ...content, parts: visibleParts || [] };
       });
     }
 
