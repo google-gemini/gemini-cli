@@ -5,14 +5,19 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { installCommand } from './install.js';
+import { installCommand, handleInstall } from './install.js';
 import yargs from 'yargs';
+import * as extension from '../../config/extension.js';
+
+vi.mock('../../config/extension.js', () => ({
+  installExtension: vi.fn(),
+}));
 
 describe('extensions install command', () => {
   it('should fail if no source is provided', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);
     expect(() => validationParser.parse('install')).toThrow(
-      'Either a git URL --source or a --path must be provided.',
+      'Either --source or --path must be provided.',
     );
   });
 
@@ -21,5 +26,24 @@ describe('extensions install command', () => {
     expect(() =>
       validationParser.parse('install --source some-url --path /some/path'),
     ).toThrow('Arguments source and path are mutually exclusive');
+  });
+});
+
+describe('extensions install with org/repo', () => {
+  it('should call installExtension with the correct git URL', async () => {
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const installExtensionSpy = vi
+      .spyOn(extension, 'installExtension')
+      .mockResolvedValue('test-extension');
+
+    await handleInstall({ source: 'test-org/test-repo' });
+
+    expect(installExtensionSpy).toHaveBeenCalledWith({
+      source: 'https://github.com/test-org/test-repo.git',
+      type: 'git',
+    });
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      'Extension "test-extension" installed successfully and enabled.',
+    );
   });
 });
