@@ -123,11 +123,27 @@ describe('activate', () => {
   });
 
   describe('update notification', () => {
-    it('should show an update notification if a newer version is available', async () => {
+    beforeEach(() => {
+      // Prevent the "installed" message from showing
       vi.mocked(context.globalState.get).mockReturnValue(true);
-      vi.mocked(vscode.extensions.getExtension).mockReturnValue({
-        packageJSON: { version: '1.2.0' },
-      } as vscode.Extension<unknown>);
+    });
+
+    it('should show an update notification if a newer version is available', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          results: [
+            {
+              extensions: [
+                {
+                  versions: [{ version: '1.2.0' }],
+                },
+              ],
+            },
+          ],
+        }),
+      } as Response);
+
       const showInformationMessageMock = vi.mocked(
         vscode.window.showInformationMessage,
       );
@@ -135,33 +151,76 @@ describe('activate', () => {
       await activate(context);
 
       expect(showInformationMessageMock).toHaveBeenCalledWith(
-        'A new version of the Gemini CLI extension has been released',
+        'A new version (1.2.0) of the Gemini CLI Companion extension is available.',
         'Update to latest version',
       );
     });
 
     it('should not show an update notification if the version is the same', async () => {
-      vi.mocked(context.globalState.get).mockReturnValue(true);
-      vi.mocked(vscode.extensions.getExtension).mockReturnValue({
-        packageJSON: { version: '1.1.0' },
-      } as vscode.Extension<unknown>);
+      vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          results: [
+            {
+              extensions: [
+                {
+                  versions: [{ version: '1.1.0' }],
+                },
+              ],
+            },
+          ],
+        }),
+      } as Response);
+
       const showInformationMessageMock = vi.mocked(
         vscode.window.showInformationMessage,
       );
 
       await activate(context);
 
-      expect(showInformationMessageMock).not.toHaveBeenCalledWith(
-        'A new version of the Gemini CLI extension has been released',
-        'Update to latest version',
+      expect(showInformationMessageMock).not.toHaveBeenCalled();
+    });
+
+    it('should not show an update notification if the version is older', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          results: [
+            {
+              extensions: [
+                {
+                  versions: [{ version: '1.0.0' }],
+                },
+              ],
+            },
+          ],
+        }),
+      } as Response);
+
+      const showInformationMessageMock = vi.mocked(
+        vscode.window.showInformationMessage,
       );
+
+      await activate(context);
+
+      expect(showInformationMessageMock).not.toHaveBeenCalled();
     });
 
     it('should execute the install command when the user clicks "Update"', async () => {
-      vi.mocked(context.globalState.get).mockReturnValue(true);
-      vi.mocked(vscode.extensions.getExtension).mockReturnValue({
-        packageJSON: { version: '1.2.0' },
-      } as vscode.Extension<unknown>);
+      vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          results: [
+            {
+              extensions: [
+                {
+                  versions: [{ version: '1.2.0' }],
+                },
+              ],
+            },
+          ],
+        }),
+      } as Response);
       vi.mocked(vscode.window.showInformationMessage).mockResolvedValue(
         'Update to latest version' as never,
       );
@@ -176,6 +235,21 @@ describe('activate', () => {
         'workbench.extensions.installExtension',
         'Google.gemini-cli-vscode-ide-companion',
       );
+    });
+
+    it('should handle fetch errors gracefully', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: false,
+        statusText: 'Internal Server Error',
+      } as Response);
+
+      const showInformationMessageMock = vi.mocked(
+        vscode.window.showInformationMessage,
+      );
+
+      await activate(context);
+
+      expect(showInformationMessageMock).not.toHaveBeenCalled();
     });
   });
 });
