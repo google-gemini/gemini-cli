@@ -846,6 +846,7 @@ export class GeminiClient {
 
     this.getChat().setHistory(historyToCompress);
 
+    const MAX_COMPRESSION_OUTPUT_TOKENS = 65535;
     const { text: summary } = await this.getChat().sendMessage(
       {
         message: {
@@ -853,7 +854,10 @@ export class GeminiClient {
         },
         config: {
           systemInstruction: { text: getCompressionPrompt() },
-          maxOutputTokens: originalTokenCount,
+          maxOutputTokens: Math.min(
+            originalTokenCount,
+            MAX_COMPRESSION_OUTPUT_TOKENS,
+          ),
         },
       },
       prompt_id,
