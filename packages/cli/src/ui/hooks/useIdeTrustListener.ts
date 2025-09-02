@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import type { Config } from '@google/gemini-cli-core';
 import { ideContext } from '@google/gemini-cli-core';
 
@@ -14,40 +14,34 @@ import { ideContext } from '@google/gemini-cli-core';
  * if a restart is needed because the trust state has changed.
  */
 export function useIdeTrustListener(config: Config) {
-  const [isIdeTrusted, setIsIdeTrusted] = useState<boolean | undefined>(
-    undefined,
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      const ideClient = config.getIdeClient();
+      ideClient.addTrustChangeListener(onStoreChange);
+      return () => {
+        ideClient.removeTrustChangeListener(onStoreChange);
+      };
+    },
+    [config],
   );
+
+  const getSnapshot = () =>
+    ideContext.getIdeContext()?.workspaceState?.isTrusted;
+
+  const isIdeTrusted = useSyncExternalStore(subscribe, getSnapshot);
+
   const [needsRestart, setNeedsRestart] = useState(false);
-  const initialCheckPerformed = useRef(false);
+  const [initialTrustValue] = useState(isIdeTrusted);
 
   useEffect(() => {
-    const ideClient = config.getIdeClient();
-
-    const handleTrustChange = (newTrustValue: boolean) => {
-      setIsIdeTrusted((prevTrustValue) => {
-        // Only trigger a restart if a previous value existed and it changed.
-        if (prevTrustValue !== undefined && prevTrustValue !== newTrustValue) {
-          setNeedsRestart(true);
-        }
-        return newTrustValue;
-      });
-    };
-
-    if (!initialCheckPerformed.current) {
-      const initialContext = ideContext.getIdeContext();
-      if (initialContext?.workspaceState?.isTrusted !== undefined) {
-        // Set the very first value without triggering a restart check.
-        setIsIdeTrusted(initialContext.workspaceState.isTrusted);
-      }
-      initialCheckPerformed.current = true;
+    if (
+      !needsRestart &&
+      initialTrustValue !== undefined &&
+      initialTrustValue !== isIdeTrusted
+    ) {
+      setNeedsRestart(true);
     }
-
-    ideClient.addTrustChangeListener(handleTrustChange);
-
-    return () => {
-      ideClient.removeTrustChangeListener(handleTrustChange);
-    };
-  }, [config]);
+  }, [isIdeTrusted, initialTrustValue, needsRestart]);
 
   return { isIdeTrusted, needsRestart };
 }

@@ -11,6 +11,5 @@ import { ideContext } from '../ide/ideContext.js';
  * @returns A boolean if the IDE provides a trust value, otherwise undefined.
  */
 export function getIdeTrust(): boolean | undefined {
-  const context = ideContext.getIdeContext();
-  return context?.workspaceState?.isTrusted;
+  return ideContext.getIdeContext()?.workspaceState?.isTrusted;
 }
