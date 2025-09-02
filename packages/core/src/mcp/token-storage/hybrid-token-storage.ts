@@ -21,27 +21,24 @@ export class HybridTokenStorage extends BaseTokenStorage {
   }
 
   private async initializeStorage(): Promise<TokenStorage> {
-    if (process.env[FORCE_FILE_STORAGE_ENV_VAR] === 'true') {
-      this.storage = new FileTokenStorage(this.serviceName);
-      this.storageType = TokenStorageType.ENCRYPTED_FILE;
-      return this.storage;
-    }
+    const forceFileStorage = process.env[FORCE_FILE_STORAGE_ENV_VAR] === 'true';
 
-    // Dynamically import KeychainTokenStorage to avoid initialization issues
-    try {
-      const { KeychainTokenStorage } = await import(
-        './keychain-token-storage.js'
-      );
-      const keychainStorage = new KeychainTokenStorage(this.serviceName);
+    if (!forceFileStorage) {
+      try {
+        const { KeychainTokenStorage } = await import(
+          './keychain-token-storage.js'
+        );
+        const keychainStorage = new KeychainTokenStorage(this.serviceName);
 
-      const isAvailable = await keychainStorage.isAvailable();
-      if (isAvailable) {
-        this.storage = keychainStorage;
-        this.storageType = TokenStorageType.KEYCHAIN;
-        return this.storage;
+        const isAvailable = await keychainStorage.isAvailable();
+        if (isAvailable) {
+          this.storage = keychainStorage;
+          this.storageType = TokenStorageType.KEYCHAIN;
+          return this.storage;
+        }
+      } catch (_e) {
+        // Fallback to file storage if keychain fails to initialize
       }
-    } catch (_e) {
-      // Fallback to file storage if keychain fails to initialize
     }
 
     this.storage = new FileTokenStorage(this.serviceName);
