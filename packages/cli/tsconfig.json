@@ -57,6 +57,7 @@
     "src/ui/commands/statsCommand.test.ts",
     "src/ui/commands/terminalSetupCommand.test.ts",
     "src/ui/commands/toolsCommand.test.ts",
+    "src/ui/components/AuthDialog.test.tsx",
     "src/ui/components/ContextSummaryDisplay.test.tsx",
     "src/ui/components/Footer.test.tsx",
     "src/ui/components/InputPrompt.test.tsx",

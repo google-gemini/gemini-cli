@@ -27,22 +27,26 @@ The Gemini CLI requires you to authenticate with Google's AI services. On initia
       ```
 
 2.  **<a id="gemini-api-key"></a>Gemini API key:**
+    - When you select this option during the initial setup, the CLI will prompt you to enter your API key.
     - Obtain your API key from Google AI Studio: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
-    - Set the `GEMINI_API_KEY` environment variable. In the following methods, replace `YOUR_GEMINI_API_KEY` with the API key you obtained from Google AI Studio:
-      - You can temporarily set the environment variable in your current shell session using the following command:
-        ```bash
-        export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
-        ```
-      - For repeated use, you can add the environment variable to your [.env file](#persisting-environment-variables-with-env-files).
+    - Paste the key into the CLI prompt. It will be automatically saved to a `.env` file in your project's root directory.
+    - If you need to change the key later, you can edit the `.env` file directly.
 
-      - Alternatively you can export the API key from your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
+    Alternatively, you can set the `GEMINI_API_KEY` environment variable manually. In the following methods, replace `YOUR_GEMINI_API_KEY` with the API key you obtained from Google AI Studio:
+    - You can temporarily set the environment variable in your current shell session using the following command:
+      ```bash
+      export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+      ```
+    - For repeated use, you can add the environment variable to your [.env file](#persisting-environment-variables-with-env-files).
 
-        ```bash
-        echo 'export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"' >> ~/.bashrc
-        source ~/.bashrc
-        ```
+    - You can also export the API key from your shell's configuration file (like `~/.bashrc`, `~/.zshrc`, or `~/.profile`). For example, the following command adds the environment variable to a `~/.bashrc` file:
 
-        :warning: Be advised that when you export your API key inside your shell configuration file, any other process executed from the shell can read it.
+      ```bash
+      echo 'export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"' >> ~/.bashrc
+      source ~/.bashrc
+      ```
+
+      :warning: Be advised that when you export your API key inside your shell configuration file, any other process executed from the shell can read it.
 
 3.  **Vertex AI:**
     - **API Key:**

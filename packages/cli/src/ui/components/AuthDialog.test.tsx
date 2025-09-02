@@ -6,9 +6,38 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AuthDialog } from './AuthDialog.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import {
+  LoadedSettings,
+  SettingScope,
+  type Settings,
+} from '../../config/settings.js';
 import { AuthType } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../test-utils/render.js';
+import {
+  validateAuthMethod,
+  saveGeminiApiKeyToEnvFile,
+} from '../../config/auth.js';
+
+vi.mock('../../config/auth.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../config/auth.js')>();
+  return {
+    ...actual,
+    validateAuthMethod: vi.fn(),
+    saveGeminiApiKeyToEnvFile: vi.fn(),
+  };
+});
+
+function createTestSettings(settings: Partial<Settings> = {}): LoadedSettings {
+  return new LoadedSettings(
+    { settings: {}, path: '' },
+    { settings, path: '' },
+    { settings: {}, path: '' },
+    { settings: {}, path: '' },
+    [],
+    true,
+    new Set(),
+  );
+}
 
 describe('AuthDialog', () => {
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -436,5 +465,128 @@ describe('AuthDialog', () => {
     // Should call onSelect with undefined to exit
     expect(onSelect).toHaveBeenCalledWith(undefined, SettingScope.User);
     unmount();
+  });
+
+  describe('API Key Input Flow', () => {
+    it('should show API key input when USE_GEMINI is selected and key is not set', async () => {
+      const { lastFrame, stdin, unmount } = renderWithProviders(
+        <AuthDialog onSelect={() => {}} settings={createTestSettings()} />,
+      );
+      (validateAuthMethod as vi.Mock).mockReturnValue(
+        'GEMINI_API_KEY environment variable not found. Please provide one to continue.',
+      );
+
+      // Select "Use Gemini API Key"
+      stdin.write('\x1B[B'); // Press down arrow
+      await wait();
+      stdin.write('\r'); // Press enter
+      await wait();
+
+      expect(lastFrame()).toContain('Enter your Gemini API Key');
+      expect(lastFrame()).toContain('https://aistudio.google.com/app/apikey');
+      unmount();
+    });
+
+    it('should call onSelect when a valid API key is entered', async () => {
+      const onSelect = vi.fn();
+      const { stdin, unmount } = renderWithProviders(
+        <AuthDialog onSelect={onSelect} settings={createTestSettings()} />,
+      );
+      (validateAuthMethod as vi.Mock).mockReturnValue(
+        'GEMINI_API_KEY environment variable not found. Please provide one to continue.',
+      );
+      (saveGeminiApiKeyToEnvFile as vi.Mock).mockReturnValue(true);
+
+      // Select "Use Gemini API Key"
+      stdin.write('\x1B[B'); // Press down arrow
+      await wait();
+      stdin.write('\r'); // Press enter
+      await wait();
+
+      // Enter API Key
+      stdin.write('my-api-key');
+      await wait();
+      stdin.write('\r');
+      await wait();
+
+      expect(onSelect).toHaveBeenCalledWith(
+        AuthType.USE_GEMINI,
+        SettingScope.User,
+      );
+      unmount();
+    });
+
+    it('should show an error when an empty API key is entered', async () => {
+      const { lastFrame, stdin, unmount } = renderWithProviders(
+        <AuthDialog onSelect={() => {}} settings={createTestSettings()} />,
+      );
+      (validateAuthMethod as vi.Mock).mockReturnValue(
+        'GEMINI_API_KEY environment variable not found. Please provide one to continue.',
+      );
+
+      // Select "Use Gemini API Key"
+      stdin.write('\x1B[B'); // Press down arrow
+      await wait();
+      stdin.write('\r'); // Press enter
+      await wait();
+
+      // Submit empty API Key
+      stdin.write('\r');
+      await wait();
+
+      expect(lastFrame()).toContain('API Key cannot be empty.');
+      unmount();
+    });
+
+    it('should show an error when saving the API key fails', async () => {
+      const { lastFrame, stdin, unmount } = renderWithProviders(
+        <AuthDialog onSelect={() => {}} settings={createTestSettings()} />,
+      );
+      (validateAuthMethod as vi.Mock).mockReturnValue(
+        'GEMINI_API_KEY environment variable not found. Please provide one to continue.',
+      );
+      (saveGeminiApiKeyToEnvFile as vi.Mock).mockReturnValue(false);
+
+      // Select "Use Gemini API Key"
+      stdin.write('\x1B[B'); // Press down arrow
+      await wait();
+      stdin.write('\r'); // Press enter
+      await wait();
+
+      // Enter API Key
+      stdin.write('my-api-key');
+      await wait();
+      stdin.write('\r');
+      await wait();
+
+      expect(lastFrame()).toContain('Failed to save API Key.');
+      unmount();
+    });
+
+    it('should go back to auth selection when escape is pressed', async () => {
+      const { lastFrame, stdin, unmount } = renderWithProviders(
+        <AuthDialog onSelect={() => {}} settings={createTestSettings()} />,
+      );
+      (validateAuthMethod as vi.Mock).mockReturnValue(
+        'GEMINI_API_KEY environment variable not found. Please provide one to continue.',
+      );
+
+      // Select "Use Gemini API Key"
+      stdin.write('\x1B[B'); // Press down arrow
+      await wait();
+      stdin.write('\r'); // Press enter
+      await wait();
+
+      expect(lastFrame()).toContain('Enter your Gemini API Key');
+
+      // Press escape
+      stdin.write('\u001b');
+      await wait();
+
+      expect(lastFrame()).toContain(
+        'How would you like to authenticate for this project?',
+      );
+      unmount();
+    });
   });
 });
