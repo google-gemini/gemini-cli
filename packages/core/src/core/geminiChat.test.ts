@@ -16,6 +16,32 @@ import { GeminiChat, EmptyStreamError } from './geminiChat.js';
 import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 
+// Mock fs module to prevent actual file system operations during tests
+const mockFileSystem = new Map<string, string>();
+
+vi.mock('node:fs', () => {
+  const fsModule = {
+    mkdirSync: vi.fn(),
+    writeFileSync: vi.fn((path: string, data: string) => {
+      mockFileSystem.set(path, data);
+    }),
+    readFileSync: vi.fn((path: string) => {
+      if (mockFileSystem.has(path)) {
+        return mockFileSystem.get(path);
+      }
+      throw Object.assign(new Error('ENOENT: no such file or directory'), {
+        code: 'ENOENT',
+      });
+    }),
+    existsSync: vi.fn((path: string) => mockFileSystem.has(path)),
+  };
+
+  return {
+    default: fsModule,
+    ...fsModule,
+  };
+});
+
 // Mocks
 const mockModelsModule = {
   generateContent: vi.fn(),
