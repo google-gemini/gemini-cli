@@ -278,6 +278,7 @@ describe('Gemini Client (client.ts)', () => {
       setFallbackMode: vi.fn(),
       getChatCompression: vi.fn().mockReturnValue(undefined),
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
+      getUseSmartEdit: vi.fn().mockReturnValue(false),
     };
     const MockedConfig = vi.mocked(Config, true);
     MockedConfig.mockImplementation(
@@ -437,7 +438,7 @@ describe('Gemini Client (client.ts)', () => {
           model: DEFAULT_GEMINI_FLASH_MODEL,
           config: {
             abortSignal,
-            systemInstruction: getCoreSystemPrompt(''),
+            systemInstruction: getCoreSystemPrompt(client['config'], ''),
             temperature: 0,
             topP: 1,
             responseJsonSchema: schema,
@@ -477,7 +478,7 @@ describe('Gemini Client (client.ts)', () => {
           model: customModel,
           config: {
             abortSignal,
-            systemInstruction: getCoreSystemPrompt(''),
+            systemInstruction: getCoreSystemPrompt(client['config'], ''),
             temperature: 0.9,
             topP: 1, // from default
             topK: 20,
@@ -2323,7 +2324,7 @@ ${JSON.stringify(
           model: DEFAULT_GEMINI_FLASH_MODEL,
           config: {
             abortSignal,
-            systemInstruction: getCoreSystemPrompt(''),
+            systemInstruction: getCoreSystemPrompt(client['config'], ''),
             temperature: 0.5,
             topP: 1,
           },
