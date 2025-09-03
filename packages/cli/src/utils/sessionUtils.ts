@@ -43,7 +43,7 @@ export const getSessionFiles = async (
         );
 
         const isCurrentSession = currentSessionId
-          ? file.includes(currentSessionId.slice(0, 8))
+          ? content.sessionId === currentSessionId
           : false;
 
         return {
