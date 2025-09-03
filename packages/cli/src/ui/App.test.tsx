@@ -336,7 +336,6 @@ describe('App UI', () => {
       systemDefaultsFile,
       userSettingsFile,
       workspaceSettingsFile,
-      [],
       true,
       new Set(),
     );

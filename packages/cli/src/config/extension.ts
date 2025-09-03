@@ -110,7 +110,9 @@ export async function performWorkspaceExtensionMigration(
   return failedInstallNames;
 }
 
-export function loadExtensions(workspaceDir: string): Extension[] {
+export function loadExtensions(
+  workspaceDir: string = process.cwd(),
+): Extension[] {
   const settings = loadSettings(workspaceDir).merged;
   const disabledExtensions = settings.extensions?.disabled ?? [];
   const allExtensions = [...loadUserExtensions()];

@@ -63,7 +63,6 @@ const createMockSettings = (
       },
       path: '/workspace/settings.json',
     },
-    [],
     true,
     new Set(),
   );
@@ -188,7 +187,6 @@ describe('SettingsDialog', () => {
         },
         path: '/workspace/settings.json',
       },
-      [],
       true,
       new Set(),
     );
