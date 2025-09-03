@@ -208,12 +208,16 @@ export class IdeClient {
     });
   }
 
-  async closeDiff(filePath: string): Promise<string | undefined> {
+  async closeDiff(
+    filePath: string,
+    suppressNotifcations: boolean,
+  ): Promise<string | undefined> {
     try {
       const result = await this.client?.callTool({
         name: `closeDiff`,
         arguments: {
           filePath,
+          suppressNotifcations,
         },
       });
 
@@ -230,7 +234,7 @@ export class IdeClient {
   // Closes the diff. Instead of waiting for a notification,
   // manually resolves the diff resolver as the desired outcome.
   async resolveDiffFromCli(filePath: string, outcome: 'accepted' | 'rejected') {
-    const content = await this.closeDiff(filePath);
+    const content = await this.closeDiff(filePath, true);
     const resolver = this.diffResponses.get(filePath);
     if (resolver) {
       if (outcome === 'accepted') {
@@ -247,7 +251,7 @@ export class IdeClient {
       return;
     }
     for (const filePath of this.diffResponses.keys()) {
-      await this.closeDiff(filePath);
+      await this.closeDiff(filePath, false);
     }
     this.diffResponses.clear();
     this.setState(
