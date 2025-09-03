@@ -245,10 +245,13 @@ function validateRetentionConfig(config: SessionRetentionSettings): {
       return { valid: false, error: `Invalid maxAge format: ${config.maxAge}` };
     }
 
-    // Enforce minimum retention period (1 day)
-    const minRetentionMs = 24 * 60 * 60 * 1000; // 1 day
-    if (maxAgeMs < minRetentionMs) {
-      return { valid: false, error: 'maxAge cannot be less than 1 day' };
+    // Enforce minimum retention period
+    const minRetentionMs = parseRetentionPeriod(config.minRetention || '1d');
+    if (minRetentionMs > 0 && maxAgeMs < minRetentionMs) {
+      return {
+        valid: false,
+        error: `maxAge cannot be less than minRetention (${config.minRetention || '1d'})`,
+      };
     }
   }
 
