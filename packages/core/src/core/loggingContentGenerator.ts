@@ -60,6 +60,7 @@ export class LoggingContentGenerator implements ContentGenerator {
 
   private _logApiResponse(
     durationMs: number,
+    model: string,
     prompt_id: string,
     usageMetadata?: GenerateContentResponseUsageMetadata,
     responseText?: string,
@@ -67,7 +68,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     logApiResponse(
       this.config,
       new ApiResponseEvent(
-        this.config.getModel(),
+        model,
         durationMs,
         prompt_id,
         this.config.getContentGeneratorConfig()?.authType,
@@ -112,6 +113,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       const durationMs = Date.now() - startTime;
       this._logApiResponse(
         durationMs,
+        response.modelVersion || '',
         userPromptId,
         response.usageMetadata,
         JSON.stringify(response),
@@ -171,6 +173,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       this._logApiResponse(
         durationMs,
         userPromptId,
+        responses[0]?.modelVersion || '',
         lastUsageMetadata,
         JSON.stringify(responses),
       );
