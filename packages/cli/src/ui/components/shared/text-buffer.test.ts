@@ -172,6 +172,117 @@ describe('textBufferReducer', () => {
       expect(state.undoStack[0].cursorCol).toBe(5);
     });
   });
+
+  describe('delete_word_left action', () => {
+    it('should delete a simple word', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 11,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['hello ']);
+      expect(state.cursorCol).toBe(6);
+    });
+
+    it('should delete a path segment', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['path/to/file'],
+        cursorRow: 0,
+        cursorCol: 12,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['path/to/']);
+      expect(state.cursorCol).toBe(8);
+    });
+
+    it('should delete variable_name parts', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['variable_name'],
+        cursorRow: 0,
+        cursorCol: 13,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['variable_']);
+      expect(state.cursorCol).toBe(9);
+    });
+
+    it('should act like backspace at the beginning of a line', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello', 'world'],
+        cursorRow: 1,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['helloworld']);
+      expect(state.cursorRow).toBe(0);
+      expect(state.cursorCol).toBe(5);
+    });
+  });
+
+  describe('delete_word_right action', () => {
+    it('should delete a simple word', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['world']);
+      expect(state.cursorCol).toBe(0);
+    });
+
+    it('should delete a path segment', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['path/to/file'],
+        cursorRow: 0,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      let state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['/to/file']);
+      state = textBufferReducer(state, action);
+      expect(state.lines).toEqual(['to/file']);
+    });
+
+    it('should delete variable_name parts', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['variable_name'],
+        cursorRow: 0,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['_name']);
+      expect(state.cursorCol).toBe(0);
+    });
+
+    it('should act like delete at the end of a line', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello', 'world'],
+        cursorRow: 0,
+        cursorCol: 5,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['helloworld']);
+      expect(state.cursorRow).toBe(0);
+      expect(state.cursorCol).toBe(5);
+    });
+  });
 });
 
 // Helper to get the state from the hook
