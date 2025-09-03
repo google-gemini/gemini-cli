@@ -31,7 +31,7 @@
     "@google/gemini-cli-core": "file:../core",
     "@google/genai": "1.16.0",
     "@iarna/toml": "^2.2.5",
-    "@modelcontextprotocol/sdk": "^1.15.1",
+    "@modelcontextprotocol/sdk": "^1.17.0",
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
@@ -55,7 +55,8 @@
     "undici": "^7.10.0",
     "update-notifier": "^7.3.1",
     "yargs": "^17.7.2",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "google-auth-library": "^10.2.0"
   },
   "devDependencies": {
     "@babel/runtime": "^7.27.6",
