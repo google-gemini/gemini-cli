@@ -112,6 +112,12 @@ const COMPRESSION_TOKEN_THRESHOLD = 0.7;
  */
 const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
+/**
+ * Maximum value allowed by the Gemini API for maxOutputTokens.
+ * This is used to cap the token limit during chat compression.
+ */
+const MAX_COMPRESSION_OUTPUT_TOKENS = 65535;
+
 export class GeminiClient {
   private chat?: GeminiChat;
   private contentGenerator?: ContentGenerator;
@@ -853,7 +859,10 @@ export class GeminiClient {
         },
         config: {
           systemInstruction: { text: getCompressionPrompt() },
-          maxOutputTokens: originalTokenCount,
+          maxOutputTokens: Math.min(
+            originalTokenCount,
+            MAX_COMPRESSION_OUTPUT_TOKENS,
+          ),
         },
       },
       prompt_id,
