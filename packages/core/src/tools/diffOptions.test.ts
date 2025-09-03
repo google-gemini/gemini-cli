@@ -18,12 +18,16 @@ describe('getDiffStat', () => {
     expect(diffStat).toEqual({
       ai_added_lines: 0,
       ai_removed_lines: 0,
+      model_added_chars: 0,
+      model_removed_chars: 0,
       user_added_lines: 0,
       user_removed_lines: 0,
+      user_added_chars: 0,
+      user_removed_chars: 0,
     });
   });
 
-  it('should correctly report AI additions', () => {
+  it('should correctly report model additions', () => {
     const oldStr = 'line1\nline2\n';
     const aiStr = 'line1\nline2\nline3\n';
     const userStr = 'line1\nline2\nline3\n';
@@ -31,12 +35,16 @@ describe('getDiffStat', () => {
     expect(diffStat).toEqual({
       ai_added_lines: 1,
       ai_removed_lines: 0,
+      model_added_chars: 5,
+      model_removed_chars: 0,
       user_added_lines: 0,
       user_removed_lines: 0,
+      user_added_chars: 0,
+      user_removed_chars: 0,
     });
   });
 
-  it('should correctly report AI removals', () => {
+  it('should correctly report model removals', () => {
     const oldStr = 'line1\nline2\nline3\n';
     const aiStr = 'line1\nline3\n';
     const userStr = 'line1\nline3\n';
@@ -44,12 +52,16 @@ describe('getDiffStat', () => {
     expect(diffStat).toEqual({
       ai_added_lines: 0,
       ai_removed_lines: 1,
+      model_added_chars: 0,
+      model_removed_chars: 5,
       user_added_lines: 0,
       user_removed_lines: 0,
+      user_added_chars: 0,
+      user_removed_chars: 0,
     });
   });
 
-  it('should correctly report AI modifications', () => {
+  it('should correctly report model modifications', () => {
     const oldStr = 'line1\nline2\nline3\n';
     const aiStr = 'line1\nline_two\nline3\n';
     const userStr = 'line1\nline_two\nline3\n';
@@ -57,8 +69,12 @@ describe('getDiffStat', () => {
     expect(diffStat).toEqual({
       ai_added_lines: 1,
       ai_removed_lines: 1,
+      model_added_chars: 8,
+      model_removed_chars: 5,
       user_added_lines: 0,
       user_removed_lines: 0,
+      user_added_chars: 0,
+      user_removed_chars: 0,
     });
   });
 
@@ -70,8 +86,12 @@ describe('getDiffStat', () => {
     expect(diffStat).toEqual({
       ai_added_lines: 1,
       ai_removed_lines: 0,
+      model_added_chars: 5,
+      model_removed_chars: 0,
       user_added_lines: 1,
       user_removed_lines: 0,
+      user_added_chars: 5,
+      user_removed_chars: 0,
     });
   });
 
@@ -83,8 +103,12 @@ describe('getDiffStat', () => {
     expect(diffStat).toEqual({
       ai_added_lines: 1,
       ai_removed_lines: 0,
+      model_added_chars: 5,
+      model_removed_chars: 0,
       user_added_lines: 0,
       user_removed_lines: 1,
+      user_added_chars: 0,
+      user_removed_chars: 5,
     });
   });
 
@@ -96,12 +120,16 @@ describe('getDiffStat', () => {
     expect(diffStat).toEqual({
       ai_added_lines: 1,
       ai_removed_lines: 0,
+      model_added_chars: 5,
+      model_removed_chars: 0,
       user_added_lines: 1,
       user_removed_lines: 1,
+      user_added_chars: 10,
+      user_removed_chars: 5,
     });
   });
 
-  it('should handle complex changes from both AI and user', () => {
+  it('should handle complex changes from both model and user', () => {
     const oldStr = 'line1\nline2\nline3\nline4\n';
     const aiStr = 'line_one\nline2\nline_three\nline4\n';
     const userStr = 'line_one\nline_two\nline_three\nline4\nline5\n';
@@ -109,8 +137,12 @@ describe('getDiffStat', () => {
     expect(diffStat).toEqual({
       ai_added_lines: 2,
       ai_removed_lines: 2,
+      model_added_chars: 18,
+      model_removed_chars: 10,
       user_added_lines: 2,
       user_removed_lines: 1,
+      user_added_chars: 13,
+      user_removed_chars: 5,
     });
   });
 
@@ -122,8 +154,12 @@ describe('getDiffStat', () => {
     expect(diffStat).toEqual({
       ai_added_lines: 1,
       ai_removed_lines: 1,
+      model_added_chars: 14,
+      model_removed_chars: 11,
       user_added_lines: 0,
       user_removed_lines: 0,
+      user_added_chars: 0,
+      user_removed_chars: 0,
     });
   });
 });
