@@ -10,6 +10,7 @@ import { homedir, platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
+  FatalConfigError,
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
   Storage,
@@ -39,12 +40,18 @@ const MIGRATION_MAP: Record<string, string> = {
   disableAutoUpdate: 'general.disableAutoUpdate',
   disableUpdateNag: 'general.disableUpdateNag',
   checkpointing: 'general.checkpointing',
+  enablePromptCompletion: 'general.enablePromptCompletion',
+  debugKeystrokeLogging: 'general.debugKeystrokeLogging',
   theme: 'ui.theme',
   customThemes: 'ui.customThemes',
   hideWindowTitle: 'ui.hideWindowTitle',
   hideTips: 'ui.hideTips',
   hideBanner: 'ui.hideBanner',
   hideFooter: 'ui.hideFooter',
+  hideCWD: 'ui.footer.hideCWD',
+  hideSandboxStatus: 'ui.footer.hideSandboxStatus',
+  hideModelInfo: 'ui.footer.hideModelInfo',
+  hideContextSummary: 'ui.hideContextSummary',
   showMemoryUsage: 'ui.showMemoryUsage',
   showLineNumbers: 'ui.showLineNumbers',
   showCitations: 'ui.showCitations',
@@ -64,8 +71,10 @@ const MIGRATION_MAP: Record<string, string> = {
   includeDirectories: 'context.includeDirectories',
   loadMemoryFromIncludeDirectories: 'context.loadFromIncludeDirectories',
   fileFiltering: 'context.fileFiltering',
+  useRipgrep: 'tools.useRipgrep',
   sandbox: 'tools.sandbox',
   shouldUseNodePtyShell: 'tools.usePty',
+  autoAccept: 'tools.autoAccept',
   allowedTools: 'tools.allowed',
   coreTools: 'tools.core',
   excludeTools: 'tools.exclude',
@@ -74,14 +83,16 @@ const MIGRATION_MAP: Record<string, string> = {
   mcpServerCommand: 'mcp.serverCommand',
   allowMCPServers: 'mcp.allowed',
   excludeMCPServers: 'mcp.excluded',
-  folderTrustFeature: 'security.folderTrust.featureEnabled',
   folderTrust: 'security.folderTrust.enabled',
   selectedAuthType: 'security.auth.selectedType',
+  enforcedAuthType: 'security.auth.enforcedType',
   useExternalAuth: 'security.auth.useExternal',
   autoConfigureMaxOldSpaceSize: 'advanced.autoConfigureMemory',
   dnsResolutionOrder: 'advanced.dnsResolutionOrder',
   excludedProjectEnvVars: 'advanced.excludedEnvVars',
   bugCommand: 'advanced.bugCommand',
+  extensionManagement: 'experimental.extensionManagement',
+  extensions: 'extensions',
 };
 
 export function getSystemSettingsPath(): string {
@@ -303,6 +314,12 @@ function mergeSettings(
     ...user,
     ...safeWorkspaceWithoutFolderTrust,
     ...system,
+    general: {
+      ...(systemDefaults.general || {}),
+      ...(user.general || {}),
+      ...(safeWorkspaceWithoutFolderTrust.general || {}),
+      ...(system.general || {}),
+    },
     ui: {
       ...(systemDefaults.ui || {}),
       ...(user.ui || {}),
@@ -403,7 +420,6 @@ export class LoadedSettings {
     systemDefaults: SettingsFile,
     user: SettingsFile,
     workspace: SettingsFile,
-    errors: SettingsError[],
     isTrusted: boolean,
     migratedInMemorScopes: Set<SettingScope>,
   ) {
@@ -411,7 +427,6 @@ export class LoadedSettings {
     this.systemDefaults = systemDefaults;
     this.user = user;
     this.workspace = workspace;
-    this.errors = errors;
     this.isTrusted = isTrusted;
     this.migratedInMemorScopes = migratedInMemorScopes;
     this._merged = this.computeMergedSettings();
@@ -421,7 +436,6 @@ export class LoadedSettings {
   readonly systemDefaults: SettingsFile;
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
-  readonly errors: SettingsError[];
   readonly isTrusted: boolean;
   readonly migratedInMemorScopes: Set<SettingScope>;
 
@@ -561,7 +575,9 @@ export function loadEnvironment(settings: Settings): void {
  * Loads settings from user and workspace directories.
  * Project settings override user settings.
  */
-export function loadSettings(workspaceDir: string): LoadedSettings {
+export function loadSettings(
+  workspaceDir: string = process.cwd(),
+): LoadedSettings {
   let systemSettings: Settings = {};
   let systemDefaultSettings: Settings = {};
   let userSettings: Settings = {};
@@ -694,7 +710,17 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   workspaceSettings = resolveEnvVarsInObject(workspaceSettings);
 
   // Create LoadedSettings first
-  const loadedSettings = new LoadedSettings(
+
+  if (settingsErrors.length > 0) {
+    const errorMessages = settingsErrors.map(
+      (error) => `Error in ${error.path}: ${error.message}`,
+    );
+    throw new FatalConfigError(
+      `${errorMessages.join('\n')}\nPlease fix the configuration file(s) and try again.`,
+    );
+  }
+
+  return new LoadedSettings(
     {
       path: systemSettingsPath,
       settings: systemSettings,
@@ -711,12 +737,9 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
       path: workspaceSettingsPath,
       settings: workspaceSettings,
     },
-    settingsErrors,
     isTrusted,
     migratedInMemorScopes,
   );
-
-  return loadedSettings;
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {

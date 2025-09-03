@@ -21,9 +21,9 @@ describe('usePhraseCycler', () => {
     vi.restoreAllMocks();
   });
 
-  it('should initialize with the first witty phrase when not active and not waiting', () => {
+  it('should initialize with a witty phrase when not active and not waiting', () => {
     const { result } = renderHook(() => usePhraseCycler(false, false));
-    expect(result.current).toBe(WITTY_LOADING_PHRASES[0]);
+    expect(WITTY_LOADING_PHRASES).toContain(result.current);
   });
 
   it('should show "Waiting for user confirmation..." when isWaiting is true', () => {
@@ -37,10 +37,11 @@ describe('usePhraseCycler', () => {
 
   it('should not cycle phrases if isActive is false and not waiting', () => {
     const { result } = renderHook(() => usePhraseCycler(false, false));
+    const initialPhrase = result.current;
     act(() => {
       vi.advanceTimersByTime(PHRASE_CHANGE_INTERVAL_MS * 2);
     });
-    expect(result.current).toBe(WITTY_LOADING_PHRASES[0]);
+    expect(result.current).toBe(initialPhrase);
   });
 
   it('should cycle through witty phrases when isActive is true and not waiting', () => {
@@ -99,7 +100,7 @@ describe('usePhraseCycler', () => {
 
     // Set to inactive - should reset to the default initial phrase
     rerender({ isActive: false, isWaiting: false });
-    expect(result.current).toBe(WITTY_LOADING_PHRASES[0]);
+    expect(WITTY_LOADING_PHRASES).toContain(result.current);
 
     // Set back to active - should pick a random witty phrase (which our mock controls)
     act(() => {
@@ -114,6 +115,56 @@ describe('usePhraseCycler', () => {
     const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
     unmount();
     expect(clearIntervalSpy).toHaveBeenCalledOnce();
+  });
+
+  it('should use custom phrases when provided', () => {
+    const customPhrases = ['Custom Phrase 1', 'Custom Phrase 2'];
+    let callCount = 0;
+    vi.spyOn(Math, 'random').mockImplementation(() => {
+      const val = callCount % 2;
+      callCount++;
+      return val / customPhrases.length;
+    });
+
+    const { result, rerender } = renderHook(
+      ({ isActive, isWaiting, customPhrases: phrases }) =>
+        usePhraseCycler(isActive, isWaiting, phrases),
+      {
+        initialProps: {
+          isActive: true,
+          isWaiting: false,
+          customPhrases,
+        },
+      },
+    );
+
+    expect(result.current).toBe(customPhrases[0]);
+
+    act(() => {
+      vi.advanceTimersByTime(PHRASE_CHANGE_INTERVAL_MS);
+    });
+
+    expect(result.current).toBe(customPhrases[1]);
+
+    rerender({ isActive: true, isWaiting: false, customPhrases: undefined });
+
+    expect(WITTY_LOADING_PHRASES).toContain(result.current);
+  });
+
+  it('should fall back to witty phrases if custom phrases are an empty array', () => {
+    const { result } = renderHook(
+      ({ isActive, isWaiting, customPhrases: phrases }) =>
+        usePhraseCycler(isActive, isWaiting, phrases),
+      {
+        initialProps: {
+          isActive: true,
+          isWaiting: false,
+          customPhrases: [],
+        },
+      },
+    );
+
+    expect(WITTY_LOADING_PHRASES).toContain(result.current);
   });
 
   it('should reset to a witty phrase when transitioning from waiting to active', () => {

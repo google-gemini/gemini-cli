@@ -384,10 +384,7 @@ export async function loadCliConfig(
 
   const ideMode = settings.ide?.enabled ?? false;
 
-  const folderTrustFeature =
-    settings.security?.folderTrust?.featureEnabled ?? false;
-  const folderTrustSetting = settings.security?.folderTrust?.enabled ?? true;
-  const folderTrust = folderTrustFeature && folderTrustSetting;
+  const folderTrust = settings.security?.folderTrust?.enabled ?? false;
   const trustedFolder = isWorkspaceTrusted(settings) ?? true;
 
   const allExtensions = annotateActiveExtensions(
@@ -583,14 +580,7 @@ export async function loadCliConfig(
       outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
     },
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
-    // Git-aware file filtering settings
-    fileFiltering: {
-      respectGitIgnore: settings.context?.fileFiltering?.respectGitIgnore,
-      respectGeminiIgnore: settings.context?.fileFiltering?.respectGeminiIgnore,
-      enableRecursiveFileSearch:
-        settings.context?.fileFiltering?.enableRecursiveFileSearch,
-      disableFuzzySearch: settings.context?.fileFiltering?.disableFuzzySearch,
-    },
+    fileFiltering: settings.context?.fileFiltering,
     checkpointing:
       argv.checkpointing || settings.general?.checkpointing?.enabled,
     proxy:
@@ -613,7 +603,6 @@ export async function loadCliConfig(
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
     chatCompression: settings.model?.chatCompression,
-    folderTrustFeature,
     folderTrust,
     interactive,
     trustedFolder,
