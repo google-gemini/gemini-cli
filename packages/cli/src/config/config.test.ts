@@ -1893,3 +1893,81 @@ describe('loadCliConfig approval mode', () => {
     });
   });
 });
+
+describe('loadCliConfig fileFiltering', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    process.argv = ['node', 'script.js']; // Reset argv for each test
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  const testCases: Array<{
+    property: keyof NonNullable<Settings['fileFiltering']>;
+    getter: (config: ServerConfig.Config) => boolean;
+    value: boolean;
+  }> = [
+    {
+      property: 'disableFuzzySearch',
+      getter: (c) => c.getFileFilteringDisableFuzzySearch(),
+      value: true,
+    },
+    {
+      property: 'disableFuzzySearch',
+      getter: (c) => c.getFileFilteringDisableFuzzySearch(),
+      value: false,
+    },
+    {
+      property: 'respectGitIgnore',
+      getter: (c) => c.getFileFilteringRespectGitIgnore(),
+      value: true,
+    },
+    {
+      property: 'respectGitIgnore',
+      getter: (c) => c.getFileFilteringRespectGitIgnore(),
+      value: false,
+    },
+    {
+      property: 'respectGeminiIgnore',
+      getter: (c) => c.getFileFilteringRespectGeminiIgnore(),
+      value: true,
+    },
+    {
+      property: 'respectGeminiIgnore',
+      getter: (c) => c.getFileFilteringRespectGeminiIgnore(),
+      value: false,
+    },
+    {
+      property: 'enableRecursiveFileSearch',
+      getter: (c) => c.getEnableRecursiveFileSearch(),
+      value: true,
+    },
+    {
+      property: 'enableRecursiveFileSearch',
+      getter: (c) => c.getEnableRecursiveFileSearch(),
+      value: false,
+    },
+  ];
+
+  it.each(testCases)(
+    'should pass $property from settings to config when $value',
+    async ({ property, getter, value }) => {
+      const settings: Settings = {
+        context: {
+          fileFiltering: { [property]: value },
+        },
+      };
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(getter(config)).toBe(value);
+    },
+  );
+});

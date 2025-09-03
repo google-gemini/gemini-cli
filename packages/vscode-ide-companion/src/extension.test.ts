@@ -32,6 +32,7 @@ vi.mock('vscode', () => ({
     onDidCloseTextDocument: vi.fn(),
     registerTextDocumentContentProvider: vi.fn(),
     onDidChangeWorkspaceFolders: vi.fn(),
+    onDidGrantWorkspaceTrust: vi.fn(),
   },
   commands: {
     registerCommand: vi.fn(),
@@ -106,6 +107,11 @@ describe('activate', () => {
     } as vscode.Extension<unknown>);
     await activate(context);
     expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
+  });
+
+  it('should register a handler for onDidGrantWorkspaceTrust', async () => {
+    await activate(context);
+    expect(vscode.workspace.onDidGrantWorkspaceTrust).toHaveBeenCalled();
   });
 
   it('should launch the Gemini CLI when the user clicks the button', async () => {
