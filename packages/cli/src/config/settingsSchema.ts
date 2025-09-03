@@ -277,6 +277,15 @@ export const SETTINGS_SCHEMA = {
         description: 'Show citations for generated text in the chat.',
         showInDialog: true,
       },
+      customWittyPhrases: {
+        type: 'array',
+        label: 'Custom Witty Phrases',
+        category: 'UI',
+        requiresRestart: false,
+        default: [] as string[],
+        description: 'Custom witty phrases to display during loading.',
+        showInDialog: false,
+      },
       accessibility: {
         type: 'object',
         label: 'Accessibility',
