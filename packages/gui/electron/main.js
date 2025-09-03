@@ -426,6 +426,25 @@ ipcMain.handle('multimodel-delete-session', async (_, sessionId) => {
   }
 })
 
+ipcMain.handle('multimodel-delete-all-sessions', async () => {
+  try {
+    const system = await ensureInitialized()
+    const sessionManager = SessionManager.getInstance()
+    const sessionsInfo = sessionManager.getSessionsInfo()
+    
+    // Delete all sessions
+    for (const sessionInfo of sessionsInfo) {
+      sessionManager.deleteSession(sessionInfo.id)
+    }
+    
+    console.log('MultiModel deleteAllSessions called, deleted', sessionsInfo.length, 'sessions')
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to delete all sessions:', error)
+    throw error
+  }
+})
+
 ipcMain.handle('multimodel-get-current-session-id', async () => {
   try {
     const system = await ensureInitialized()
