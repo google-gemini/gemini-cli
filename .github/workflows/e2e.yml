@@ -4,13 +4,18 @@ on:
   push:
     branches:
       - 'main'
+  pull_request:
+    branches:
+      - 'main'
+      - 'release/**'
   merge_group:
 
 jobs:
   e2e-test-linux:
-    name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
+    name: 'E2E Test (Linux) - ${{ matrix.sandbox }} : ${{ matrix.node-version }}'
     runs-on: 'ubuntu-latest'
     strategy:
+      fail-fast: false
       matrix:
         sandbox:
           - 'sandbox:none'
