@@ -157,7 +157,22 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getProjectRoot: vi.fn(() => opts.targetDir),
         getEnablePromptCompletion: vi.fn(() => false),
         getGeminiClient: vi.fn(() => ({
+          isInitialized: vi.fn(() => true),
           getUserTier: vi.fn(),
+          getChatRecordingService: vi.fn(() => ({
+            initialize: vi.fn(),
+            recordMessage: vi.fn(),
+            recordMessageTokens: vi.fn(),
+            recordToolCalls: vi.fn(),
+          })),
+          getChat: vi.fn(() => ({
+            getChatRecordingService: vi.fn(() => ({
+              initialize: vi.fn(),
+              recordMessage: vi.fn(),
+              recordMessageTokens: vi.fn(),
+              recordToolCalls: vi.fn(),
+            })),
+          })),
         })),
         getCheckpointingEnabled: vi.fn(() => opts.checkpointing ?? true),
         getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),

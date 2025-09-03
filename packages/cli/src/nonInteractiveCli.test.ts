@@ -24,11 +24,20 @@ vi.mock('./ui/hooks/atCommandProcessor.js');
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
+
+  class MockChatRecordingService {
+    initialize = vi.fn();
+    recordMessage = vi.fn();
+    recordMessageTokens = vi.fn();
+    recordToolCalls = vi.fn();
+  }
+
   return {
     ...original,
     executeToolCall: vi.fn(),
     shutdownTelemetry: vi.fn(),
     isTelemetrySdkInitialized: vi.fn().mockReturnValue(true),
+    ChatRecordingService: MockChatRecordingService,
   };
 });
 
@@ -41,6 +50,7 @@ describe('runNonInteractive', () => {
   let processStdoutSpy: vi.SpyInstance;
   let mockGeminiClient: {
     sendMessageStream: vi.Mock;
+    getChatRecordingService: vi.Mock;
   };
 
   beforeEach(async () => {
@@ -59,6 +69,12 @@ describe('runNonInteractive', () => {
 
     mockGeminiClient = {
       sendMessageStream: vi.fn(),
+      getChatRecordingService: vi.fn(() => ({
+        initialize: vi.fn(),
+        recordMessage: vi.fn(),
+        recordMessageTokens: vi.fn(),
+        recordToolCalls: vi.fn(),
+      })),
     };
 
     mockConfig = {
@@ -66,6 +82,11 @@ describe('runNonInteractive', () => {
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getMaxSessionTurns: vi.fn().mockReturnValue(10),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      getProjectRoot: vi.fn().mockReturnValue('/test/project'),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/test/project/.gemini/tmp'),
+      },
       getIdeMode: vi.fn().mockReturnValue(false),
       getFullContext: vi.fn().mockReturnValue(false),
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
@@ -97,6 +118,10 @@ describe('runNonInteractive', () => {
     const events: ServerGeminiStreamEvent[] = [
       { type: GeminiEventType.Content, value: 'Hello' },
       { type: GeminiEventType.Content, value: ' World' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+      },
     ];
     mockGeminiClient.sendMessageStream.mockReturnValue(
       createStreamFromEvents(events),
@@ -132,6 +157,10 @@ describe('runNonInteractive', () => {
     const firstCallEvents: ServerGeminiStreamEvent[] = [toolCallEvent];
     const secondCallEvents: ServerGeminiStreamEvent[] = [
       { type: GeminiEventType.Content, value: 'Final answer' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+      },
     ];
 
     mockGeminiClient.sendMessageStream
@@ -186,6 +215,10 @@ describe('runNonInteractive', () => {
       {
         type: GeminiEventType.Content,
         value: 'Sorry, let me try again.',
+      },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
       },
     ];
     mockGeminiClient.sendMessageStream
@@ -242,11 +275,16 @@ describe('runNonInteractive', () => {
     mockCoreExecuteToolCall.mockResolvedValue({
       error: new Error('Tool "nonexistentTool" not found in registry.'),
       resultDisplay: 'Tool "nonexistentTool" not found in registry.',
+      responseParts: [],
     });
     const finalResponse: ServerGeminiStreamEvent[] = [
       {
         type: GeminiEventType.Content,
         value: "Sorry, I can't find that tool.",
+      },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
       },
     ];
 
@@ -304,6 +342,10 @@ describe('runNonInteractive', () => {
     // Mock a simple stream response from the Gemini client
     const events: ServerGeminiStreamEvent[] = [
       { type: GeminiEventType.Content, value: 'Summary complete.' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+      },
     ];
     mockGeminiClient.sendMessageStream.mockReturnValue(
       createStreamFromEvents(events),

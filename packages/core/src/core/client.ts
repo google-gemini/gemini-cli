@@ -30,6 +30,7 @@ import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { tokenLimit } from './tokenLimits.js';
+import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import type {
   ContentGenerator,
   ContentGeneratorConfig,
@@ -220,6 +221,10 @@ export class GeminiClient {
 
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
+  }
+
+  getChatRecordingService(): ChatRecordingService | undefined {
+    return this.chat?.getChatRecordingService();
   }
 
   async addDirectoryContext(): Promise<void> {
