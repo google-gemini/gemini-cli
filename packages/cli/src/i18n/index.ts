@@ -65,6 +65,7 @@ const resources = languages.reduce(
 
 // Initialize with default language, will be updated by initializeI18nWithSettings
 
+// eslint-disable-next-line import/no-named-as-default-member
 i18n.use(initReactI18next).init({
   resources,
   lng: 'en', // Default to English, will be updated by main() function
@@ -150,4 +151,5 @@ export { languages };
 // Export t function for convenient usage
 export { t };
 
+// eslint-disable-next-line import/no-default-export
 export default i18n;

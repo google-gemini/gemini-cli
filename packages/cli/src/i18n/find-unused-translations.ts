@@ -111,7 +111,12 @@ class UnusedTranslationFinder {
         !Array.isArray(obj[key])
       ) {
         // Recursively process nested objects
-        this.extractKeysFromObject(obj[key] as Record<string, unknown>, namespace, filePath, fullKey);
+        this.extractKeysFromObject(
+          obj[key] as Record<string, unknown>,
+          namespace,
+          filePath,
+          fullKey,
+        );
       } else {
         // This is a leaf node (actual translation)
         this.translationKeys.push({
@@ -353,9 +358,10 @@ class UnusedTranslationFinder {
     });
 
     // Find potential orphans (keys that might be legitimate but seem unused)
-    const potentialOrphans = unusedKeys.filter((key) => 
-      // Keys that might be used dynamically or in templates
-       key.value.length > 10 && !key.key.includes('test')
+    const potentialOrphans = unusedKeys.filter(
+      (key) =>
+        // Keys that might be used dynamically or in templates
+        key.value.length > 10 && !key.key.includes('test'),
     );
 
     return {

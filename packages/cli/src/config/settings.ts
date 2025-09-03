@@ -99,7 +99,7 @@ function mergeSettings(
     };
   }
   // folderTrust is not supported at workspace level.
-   
+
   const { folderTrust, ...workspaceWithoutFolderTrust } = workspace;
 
   return {

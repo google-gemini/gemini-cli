@@ -9,7 +9,8 @@ import * as fs from 'node:fs';
 import { Writable } from 'node:stream';
 import { ProxyAgent } from 'undici';
 
-import { CommandContext ,
+import {
+  CommandContext,
   CommandKind,
   SlashCommand,
   SlashCommandActionReturn,

@@ -16,7 +16,10 @@ const useTerminalSizeMock = vi.mocked(useTerminalSize.useTerminalSize);
 
 // Create a configurable mock function for different languages
 const mockTranslation = vi.fn((key: string, options?: { percent?: string }) => {
-  const translations: Record<string, string | ((opts: { percent?: string }) => string)> = {
+  const translations: Record<
+    string,
+    string | ((opts: { percent?: string }) => string)
+  > = {
     'footer.noSandbox': 'no sandbox',
     'footer.seeDocsHint': '(see /docs)',
     'footer.untrusted': 'untrusted',

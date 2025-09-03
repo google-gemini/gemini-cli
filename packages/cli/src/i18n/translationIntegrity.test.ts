@@ -74,7 +74,10 @@ describe('Translation Integrity Tests', () => {
   });
 
   describe('Translation Key Consistency', () => {
-    function getTranslationKeys(obj: Record<string, unknown>, prefix = ''): string[] {
+    function getTranslationKeys(
+      obj: Record<string, unknown>,
+      prefix = '',
+    ): string[] {
       const keys: string[] = [];
 
       for (const key in obj) {
@@ -85,7 +88,9 @@ describe('Translation Integrity Tests', () => {
           obj[key] !== null &&
           !Array.isArray(obj[key])
         ) {
-          keys.push(...getTranslationKeys(obj[key] as Record<string, unknown>, fullKey));
+          keys.push(
+            ...getTranslationKeys(obj[key] as Record<string, unknown>, fullKey),
+          );
         } else {
           keys.push(fullKey);
         }
@@ -268,7 +273,10 @@ describe('Translation Integrity Tests', () => {
             const filePath = path.join(localesDir, lang, `${namespace}.json`);
             const translations = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
-            function checkForEmptyValues(obj: Record<string, unknown>, keyPath = ''): void {
+            function checkForEmptyValues(
+              obj: Record<string, unknown>,
+              keyPath = '',
+            ): void {
               for (const key in obj) {
                 const fullPath = keyPath ? `${keyPath}.${key}` : key;
 
@@ -277,7 +285,10 @@ describe('Translation Integrity Tests', () => {
                   obj[key] !== null &&
                   !Array.isArray(obj[key])
                 ) {
-                  checkForEmptyValues(obj[key] as Record<string, unknown>, fullPath);
+                  checkForEmptyValues(
+                    obj[key] as Record<string, unknown>,
+                    fullPath,
+                  );
                 } else if (typeof obj[key] === 'string') {
                   expect(
                     obj[key].trim(),
@@ -302,7 +313,10 @@ describe('Translation Integrity Tests', () => {
             const filePath = path.join(localesDir, lang, `${namespace}.json`);
             const translations = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
-            function checkForUntranslatedKeys(obj: Record<string, unknown>, keyPath = ''): void {
+            function checkForUntranslatedKeys(
+              obj: Record<string, unknown>,
+              keyPath = '',
+            ): void {
               for (const key in obj) {
                 const fullPath = keyPath ? `${keyPath}.${key}` : key;
 
@@ -311,7 +325,10 @@ describe('Translation Integrity Tests', () => {
                   obj[key] !== null &&
                   !Array.isArray(obj[key])
                 ) {
-                  checkForUntranslatedKeys(obj[key] as Record<string, unknown>, fullPath);
+                  checkForUntranslatedKeys(
+                    obj[key] as Record<string, unknown>,
+                    fullPath,
+                  );
                 } else if (typeof obj[key] === 'string') {
                   // Check if the value looks like a translation key (contains dots and no spaces)
                   const value = obj[key].trim();
@@ -341,7 +358,10 @@ describe('Translation Integrity Tests', () => {
 
   describe('Code Usage Validation', () => {
     // Use the same helper function from above
-    function getTranslationKeysLocal(obj: Record<string, unknown>, prefix = ''): string[] {
+    function getTranslationKeysLocal(
+      obj: Record<string, unknown>,
+      prefix = '',
+    ): string[] {
       const keys: string[] = [];
 
       for (const key in obj) {
@@ -352,7 +372,12 @@ describe('Translation Integrity Tests', () => {
           obj[key] !== null &&
           !Array.isArray(obj[key])
         ) {
-          keys.push(...getTranslationKeysLocal(obj[key] as Record<string, unknown>, fullKey));
+          keys.push(
+            ...getTranslationKeysLocal(
+              obj[key] as Record<string, unknown>,
+              fullKey,
+            ),
+          );
         } else {
           keys.push(fullKey);
         }
