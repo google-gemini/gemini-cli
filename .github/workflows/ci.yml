@@ -261,7 +261,7 @@ jobs:
         os:
           - 'macos-latest'
           - 'ubuntu-latest'
-          - 'gemini-cli-windows-16-core'
+          - 'windows-latest'
         node-version:
           - '20.x'
           - '22.x'
