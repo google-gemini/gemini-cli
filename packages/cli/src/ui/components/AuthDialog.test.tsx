@@ -427,4 +427,47 @@ describe('AuthDialog', () => {
     expect(onSelect).toHaveBeenCalledWith(undefined, SettingScope.User);
     unmount();
   });
+
+  describe('enforcedAuthType', () => {
+    it('should display the enforced auth type message if enforcedAuthType is set', () => {
+      const settings: LoadedSettings = new LoadedSettings(
+        {
+          settings: {
+            security: {
+              auth: {
+                enforcedType: AuthType.USE_VERTEX_AI,
+              },
+            },
+          },
+          path: '',
+        },
+        {
+          settings: {
+            security: {
+              auth: {
+                selectedType: AuthType.USE_VERTEX_AI,
+              },
+            },
+          },
+          path: '',
+        },
+        {
+          settings: {},
+          path: '',
+        },
+        {
+          settings: {},
+          path: '',
+        },
+        true,
+        new Set(),
+      );
+
+      const { lastFrame } = renderWithProviders(
+        <AuthDialog onSelect={() => {}} settings={settings} />,
+      );
+
+      expect(lastFrame()).toContain('1. Vertex AI');
+    });
+  });
 });
