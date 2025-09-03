@@ -63,7 +63,12 @@ export const getSessionFiles = async (
     );
 
     return filteredResults;
-  } catch {
-    return []; // Return empty array if directory doesn't exist or can't be read
+  } catch (error) {
+    // It's expected that the directory might not exist, which is not an error.
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return [];
+    }
+    // For other errors (e.g., permissions), re-throw to be handled by the caller.
+    throw error;
   }
 };
