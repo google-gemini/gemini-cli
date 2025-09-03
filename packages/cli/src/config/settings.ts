@@ -85,6 +85,7 @@ const MIGRATION_MAP: Record<string, string> = {
   excludeMCPServers: 'mcp.excluded',
   folderTrust: 'security.folderTrust.enabled',
   selectedAuthType: 'security.auth.selectedType',
+  enforcedAuthType: 'security.auth.enforcedType',
   useExternalAuth: 'security.auth.useExternal',
   autoConfigureMaxOldSpaceSize: 'advanced.autoConfigureMemory',
   dnsResolutionOrder: 'advanced.dnsResolutionOrder',

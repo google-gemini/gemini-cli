@@ -240,6 +240,10 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** The currently selected authentication type.
   - **Default:** `undefined`
 
+- **`security.auth.enforcedType`** (string):
+  - **Description:** The required auth type (useful for enterprises).
+  - **Default:** `undefined`
+
 - **`security.auth.useExternal`** (boolean):
   - **Description:** Whether to use an external authentication flow.
   - **Default:** `undefined`
