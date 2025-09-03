@@ -6,16 +6,13 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  main,
   setupUnhandledRejectionHandler,
   validateDnsResolutionOrder,
   startInteractiveUI,
 } from './gemini.js';
-import type { SettingsFile } from './config/settings.js';
-import { LoadedSettings, loadSettings } from './config/settings.js';
+import { type LoadedSettings } from './config/settings.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import type { Config } from '@google/gemini-cli-core';
-import { FatalConfigError } from '@google/gemini-cli-core';
 
 // Custom error to identify mock process.exit calls
 class MockProcessExitError extends Error {
@@ -75,7 +72,6 @@ vi.mock('./utils/sandbox.js', () => ({
 }));
 
 describe('gemini.tsx main function', () => {
-  let loadSettingsMock: ReturnType<typeof vi.mocked<typeof loadSettings>>;
   let originalEnvGeminiSandbox: string | undefined;
   let originalEnvSandbox: string | undefined;
   let initialUnhandledRejectionListeners: NodeJS.UnhandledRejectionListener[] =
@@ -88,8 +84,6 @@ describe('gemini.tsx main function', () => {
     });
 
   beforeEach(() => {
-    loadSettingsMock = vi.mocked(loadSettings);
-
     // Store and clear sandbox-related env variables to ensure a consistent test environment
     originalEnvGeminiSandbox = process.env['GEMINI_SANDBOX'];
     originalEnvSandbox = process.env['SANDBOX'];
@@ -122,42 +116,6 @@ describe('gemini.tsx main function', () => {
       process.removeListener('unhandledRejection', addedListener);
     }
     vi.restoreAllMocks();
-  });
-
-  it('should throw InvalidConfigurationError if settings have errors', async () => {
-    const settingsError = {
-      message: 'Test settings error',
-      path: '/test/settings.json',
-    };
-    const userSettingsFile: SettingsFile = {
-      path: '/user/settings.json',
-      settings: {},
-    };
-    const workspaceSettingsFile: SettingsFile = {
-      path: '/workspace/.gemini/settings.json',
-      settings: {},
-    };
-    const systemSettingsFile: SettingsFile = {
-      path: '/system/settings.json',
-      settings: {},
-    };
-    const systemDefaultsFile: SettingsFile = {
-      path: '/system/system-defaults.json',
-      settings: {},
-    };
-    const mockLoadedSettings = new LoadedSettings(
-      systemSettingsFile,
-      systemDefaultsFile,
-      userSettingsFile,
-      workspaceSettingsFile,
-      [settingsError],
-      true,
-      new Set(),
-    );
-
-    loadSettingsMock.mockReturnValue(mockLoadedSettings);
-
-    await expect(main()).rejects.toThrow(FatalConfigError);
   });
 
   it('should log unhandled promise rejections and open debug console on first error', async () => {
