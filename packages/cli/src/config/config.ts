@@ -580,14 +580,7 @@ export async function loadCliConfig(
       outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
     },
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
-    // Git-aware file filtering settings
-    fileFiltering: {
-      respectGitIgnore: settings.context?.fileFiltering?.respectGitIgnore,
-      respectGeminiIgnore: settings.context?.fileFiltering?.respectGeminiIgnore,
-      enableRecursiveFileSearch:
-        settings.context?.fileFiltering?.enableRecursiveFileSearch,
-      disableFuzzySearch: settings.context?.fileFiltering?.disableFuzzySearch,
-    },
+    fileFiltering: settings.context?.fileFiltering,
     checkpointing:
       argv.checkpointing || settings.general?.checkpointing?.enabled,
     proxy:
