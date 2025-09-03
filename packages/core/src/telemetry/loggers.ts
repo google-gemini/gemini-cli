@@ -206,9 +206,6 @@ export function logFileOperation(
   if (event.extension) {
     attributes['extension'] = event.extension;
   }
-  if (event.diff_stat) {
-    attributes['diff_stat'] = safeJsonStringify(event.diff_stat);
-  }
   if (event.programming_language) {
     attributes['programming_language'] = event.programming_language;
   }
