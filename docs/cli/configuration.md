@@ -230,11 +230,11 @@ Settings are organized into categories. All settings should be placed within the
   - **Default:** `undefined`
 
 - **`mcp.allowed`** (array of strings):
-  - **Description:** A whitelist of MCP servers to allow.
+  - **Description:** An allowlist of MCP servers to allow.
   - **Default:** `undefined`
 
 - **`mcp.excluded`** (array of strings):
-  - **Description:** A blacklist of MCP servers to exclude.
+  - **Description:** A denylist of MCP servers to exclude.
   - **Default:** `undefined`
 
 #### `security`
