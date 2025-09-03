@@ -333,6 +333,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   useEffect(() => {
     if (
+      settings.merged.security?.auth?.enforcedType &&
+      settings.merged.security?.auth.selectedType &&
+      settings.merged.security?.auth.enforcedType !==
+        settings.merged.security?.auth.selectedType
+    ) {
+      setAuthError(
+        `Authentication is enforced to be ${settings.merged.security?.auth.enforcedType}, but you are currently using ${settings.merged.security?.auth.selectedType}.`,
+      );
+      openAuthDialog();
+    } else if (
       settings.merged.security?.auth?.selectedType &&
       !settings.merged.security?.auth?.useExternal
     ) {
@@ -346,6 +356,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     }
   }, [
     settings.merged.security?.auth?.selectedType,
+    settings.merged.security?.auth?.enforcedType,
     settings.merged.security?.auth?.useExternal,
     openAuthDialog,
     setAuthError,
