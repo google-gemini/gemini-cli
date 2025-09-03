@@ -7,8 +7,8 @@
 import * as url from 'node:url';
 import * as path from 'node:path';
 
-import { logger } from './logger.js';
-import { main } from './agent.js';
+import { logger } from '../utils/logger.js';
+import { main } from './app.js';
 
 // Check if the module is the main script being run. path.resolve() creates a
 // canonical, absolute path, which avoids cross-platform issues.

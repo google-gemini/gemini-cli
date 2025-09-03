@@ -7,22 +7,22 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
 import type express from 'express';
-import { createApp, updateCoderAgentCardUrl } from './agent.js';
+import { createApp, updateCoderAgentCardUrl } from './app.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import type { Server } from 'node:http';
-import type { TaskMetadata } from './types.js';
+import type { TaskMetadata } from '../types.js';
 import type { AddressInfo } from 'node:net';
 
 // Mock the logger to avoid polluting test output
 // Comment out to help debug
-vi.mock('./logger.js', () => ({
+vi.mock('../utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 // Mock Task.create to avoid its complex setup
-vi.mock('./task.js', () => {
+vi.mock('../agent/task.js', () => {
   class MockTask {
     id: string;
     contextId: string;
