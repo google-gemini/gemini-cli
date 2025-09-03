@@ -26,7 +26,7 @@ import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 
-import type { FunctionDeclaration, CallableToolConfig } from '@google/genai';
+import type { FunctionDeclaration } from '@google/genai';
 import { mcpToTool } from '@google/genai';
 import type { ToolRegistry } from './tool-registry.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
