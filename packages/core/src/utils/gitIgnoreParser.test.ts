@@ -181,6 +181,16 @@ src/*.tmp
       expect(() => parser.isIgnored('/node_modules')).not.toThrow();
       expect(parser.isIgnored('/node_modules')).toBe(false);
     });
+
+    it('should handle backslash-prefixed files without crashing', () => {
+      expect(() => parser.isIgnored('\\backslash-file-test.txt')).not.toThrow();
+      expect(parser.isIgnored('\\backslash-file-test.txt')).toBe(false);
+    });
+
+    it('should handle files with absolute-like names', () => {
+      expect(() => parser.isIgnored('/backslash-file-test.txt')).not.toThrow();
+      expect(parser.isIgnored('/backslash-file-test.txt')).toBe(false);
+    });
   });
 
   describe('getIgnoredPatterns', () => {
