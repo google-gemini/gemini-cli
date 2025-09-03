@@ -63,6 +63,7 @@ describe('Telemetry Metrics', () => {
   let recordTokenUsageMetricsModule: typeof import('./metrics.js').recordTokenUsageMetrics;
   let recordFileOperationMetricModule: typeof import('./metrics.js').recordFileOperationMetric;
   let recordChatCompressionMetricsModule: typeof import('./metrics.js').recordChatCompressionMetrics;
+  let recordInvalidHistoryModule: typeof import('./metrics.js').recordInvalidHistory;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -78,6 +79,7 @@ describe('Telemetry Metrics', () => {
     recordFileOperationMetricModule = metricsJsModule.recordFileOperationMetric;
     recordChatCompressionMetricsModule =
       metricsJsModule.recordChatCompressionMetrics;
+    recordInvalidHistoryModule = metricsJsModule.recordInvalidHistory;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -313,6 +315,28 @@ describe('Telemetry Metrics', () => {
       expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
         'session.id': 'test-session-id',
         operation: FileOperation.UPDATE,
+      });
+    });
+  });
+
+  describe('recordInvalidHistory', () => {
+    it('does not record metrics if not initialized', () => {
+      const config = makeFakeConfig({});
+
+      recordInvalidHistoryModule(config);
+
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('records invalid history with the correct attributes', () => {
+      const config = makeFakeConfig({});
+      initializeMetricsModule(config);
+      mockCounterAddFn.mockClear();
+
+      recordInvalidHistoryModule(config);
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
       });
     });
   });

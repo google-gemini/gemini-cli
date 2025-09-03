@@ -331,4 +331,11 @@ export enum EventMetadataKey {
 
   // Logs the current nodejs version
   GEMINI_CLI_NODE_VERSION = 83,
+
+  // ==========================================================================
+  // Chat History Validation Check Event Keys
+  // ===========================================================================
+  GEMINI_CLI_CHAT_HISTORY_VALIDATION_ERROR_MESSAGE = 84,
+
+  GEMINI_CLI_CHAT_HISTORY_LENGTH = 85,
 }

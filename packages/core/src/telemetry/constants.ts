@@ -36,3 +36,7 @@ export const METRIC_INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
 export const METRIC_CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
 export const METRIC_CONTENT_RETRY_FAILURE_COUNT =
   'gemini_cli.chat.content_retry_failure.count';
+
+export const EVENT_INVALID_HISTORY = 'gemini_cli.chat.invalid_history';
+export const METRIC_INVALID_HISTORY_COUNT =
+  'gemini_cli.chat.invalid_history.count';

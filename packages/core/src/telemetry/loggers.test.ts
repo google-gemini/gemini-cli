@@ -29,6 +29,7 @@ import {
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
   EVENT_MALFORMED_JSON_RESPONSE,
+  EVENT_INVALID_HISTORY,
 } from './constants.js';
 import {
   logApiRequest,
@@ -39,6 +40,7 @@ import {
   logFlashFallback,
   logChatCompression,
   logMalformedJsonResponse,
+  logInvalidHistory,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -50,6 +52,7 @@ import {
   FlashFallbackEvent,
   MalformedJsonResponseEvent,
   makeChatCompressionEvent,
+  InvalidHistoryEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
 import * as sdk from './sdk.js';
@@ -888,6 +891,38 @@ describe('loggers', () => {
           model: 'test-model',
         },
       });
+    });
+  });
+
+  describe('logInvalidHistory', () => {
+    beforeEach(() => {
+      vi.spyOn(metrics, 'recordInvalidHistory');
+      vi.spyOn(ClearcutLogger.prototype, 'logInvalidHistoryEvent');
+    });
+
+    it('logs the event to Clearcut and OTEL', () => {
+      const mockConfig = makeFakeConfig();
+      const event = new InvalidHistoryEvent('some error', 123);
+
+      logInvalidHistory(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logInvalidHistoryEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Invalid history detected.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_INVALID_HISTORY,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          'error.message': 'some error',
+          'history.length': 123,
+        },
+      });
+
+      expect(metrics.recordInvalidHistory).toHaveBeenCalledWith(mockConfig);
     });
   });
 });

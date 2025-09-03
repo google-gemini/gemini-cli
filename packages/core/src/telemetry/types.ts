@@ -498,6 +498,20 @@ export class ContentRetryFailureEvent implements BaseTelemetryEvent {
   }
 }
 
+export class InvalidHistoryEvent implements BaseTelemetryEvent {
+  'event.name': 'invalid_history';
+  'event.timestamp': string;
+  error_message: string;
+  history_length: number;
+
+  constructor(error_message: string, history_length: number) {
+    this['event.name'] = 'invalid_history';
+    this['event.timestamp'] = new Date().toISOString();
+    this.error_message = error_message;
+    this.history_length = history_length;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -517,4 +531,5 @@ export type TelemetryEvent =
   | FileOperationEvent
   | InvalidChunkEvent
   | ContentRetryEvent
-  | ContentRetryFailureEvent;
+  | ContentRetryFailureEvent
+  | InvalidHistoryEvent;

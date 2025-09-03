@@ -23,7 +23,11 @@ import { EventMetadataKey } from './event-metadata-key.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../mocks/msw.js';
-import { UserPromptEvent, makeChatCompressionEvent } from '../types.js';
+import {
+  UserPromptEvent,
+  makeChatCompressionEvent,
+  InvalidHistoryEvent,
+} from '../types.js';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { InstallationManager } from '../../utils/installationManager.js';
@@ -388,6 +392,27 @@ describe('ClearcutLogger', () => {
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_COMPRESSION_TOKENS_AFTER,
         '8000',
+      ]);
+    });
+  });
+
+  describe('logInvalidHistoryEvent', () => {
+    it('logs an event with proper fields', () => {
+      const { logger } = setup();
+      logger?.logInvalidHistoryEvent(
+        new InvalidHistoryEvent('some error', 123),
+      );
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.INVALID_HISTORY);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_CHAT_HISTORY_VALIDATION_ERROR_MESSAGE,
+        'some error',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_CHAT_HISTORY_LENGTH,
+        '123',
       ]);
     });
   });

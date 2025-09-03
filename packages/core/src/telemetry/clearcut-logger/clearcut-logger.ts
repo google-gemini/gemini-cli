@@ -24,6 +24,7 @@ import type {
   InvalidChunkEvent,
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  InvalidHistoryEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -55,6 +56,7 @@ export enum EventNames {
   INVALID_CHUNK = 'invalid_chunk',
   CONTENT_RETRY = 'content_retry',
   CONTENT_RETRY_FAILURE = 'content_retry_failure',
+  INVALID_HISTORY = 'invalid_history',
 }
 
 export interface LogResponse {
@@ -773,6 +775,23 @@ export class ClearcutLogger {
     }
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.INVALID_CHUNK, data));
+    this.flushIfNeeded();
+  }
+
+  logInvalidHistoryEvent(event: InvalidHistoryEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_CHAT_HISTORY_VALIDATION_ERROR_MESSAGE,
+        value: event.error_message,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CHAT_HISTORY_LENGTH,
+        value: String(event.history_length),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.INVALID_HISTORY, data));
     this.flushIfNeeded();
   }
 

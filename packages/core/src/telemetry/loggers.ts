@@ -26,6 +26,7 @@ import {
   EVENT_INVALID_CHUNK,
   EVENT_CONTENT_RETRY,
   EVENT_CONTENT_RETRY_FAILURE,
+  EVENT_INVALID_HISTORY,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -47,6 +48,7 @@ import type {
   InvalidChunkEvent,
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  InvalidHistoryEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -58,6 +60,7 @@ import {
   recordInvalidChunk,
   recordContentRetry,
   recordContentRetryFailure,
+  recordInvalidHistory,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -583,4 +586,28 @@ export function logContentRetryFailure(
   };
   logger.emit(logRecord);
   recordContentRetryFailure(config);
+}
+
+export function logInvalidHistory(
+  config: Config,
+  event: InvalidHistoryEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logInvalidHistoryEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    'event.name': EVENT_INVALID_HISTORY,
+    'event.timestamp': event['event.timestamp'],
+    'error.message': event.error_message,
+    'history.length': event.history_length,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Invalid history detected.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+  recordInvalidHistory(config);
 }

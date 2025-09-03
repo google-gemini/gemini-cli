@@ -19,6 +19,7 @@ import {
   METRIC_INVALID_CHUNK_COUNT,
   METRIC_CONTENT_RETRY_COUNT,
   METRIC_CONTENT_RETRY_FAILURE_COUNT,
+  METRIC_INVALID_HISTORY_COUNT,
 } from './constants.js';
 import type { Config } from '../config/config.js';
 
@@ -39,6 +40,7 @@ let chatCompressionCounter: Counter | undefined;
 let invalidChunkCounter: Counter | undefined;
 let contentRetryCounter: Counter | undefined;
 let contentRetryFailureCounter: Counter | undefined;
+let invalidHistoryCounter: Counter | undefined;
 let isMetricsInitialized = false;
 
 function getCommonAttributes(config: Config): Attributes {
@@ -110,6 +112,11 @@ export function initializeMetrics(config: Config): void {
       valueType: ValueType.INT,
     },
   );
+
+  invalidHistoryCounter = meter.createCounter(METRIC_INVALID_HISTORY_COUNT, {
+    description: 'Counts invalid history events.',
+    valueType: ValueType.INT,
+  });
 
   const sessionCounter = meter.createCounter(METRIC_SESSION_COUNT, {
     description: 'Count of CLI sessions started.',
@@ -266,4 +273,12 @@ export function recordContentRetry(config: Config): void {
 export function recordContentRetryFailure(config: Config): void {
   if (!contentRetryFailureCounter || !isMetricsInitialized) return;
   contentRetryFailureCounter.add(1, getCommonAttributes(config));
+}
+
+/**
+ * Records a metric for when an invalid history is detected.
+ */
+export function recordInvalidHistory(config: Config): void {
+  if (!invalidHistoryCounter || !isMetricsInitialized) return;
+  invalidHistoryCounter.add(1, getCommonAttributes(config));
 }
