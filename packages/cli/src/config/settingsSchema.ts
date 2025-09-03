@@ -300,7 +300,7 @@ export const SETTINGS_SCHEMA = {
             label: 'Screen Reader Mode',
             category: 'UI',
             requiresRestart: true,
-            default: false,
+            default: undefined as boolean | undefined,
             description:
               'Render output in plain-text to be more screen reader accessible',
             showInDialog: true,
@@ -648,7 +648,7 @@ export const SETTINGS_SCHEMA = {
         category: 'MCP',
         requiresRestart: true,
         default: undefined as string[] | undefined,
-        description: 'A whitelist of MCP servers to allow.',
+        description: 'A list of MCP servers to allow.',
         showInDialog: false,
       },
       excluded: {
@@ -657,7 +657,7 @@ export const SETTINGS_SCHEMA = {
         category: 'MCP',
         requiresRestart: true,
         default: undefined as string[] | undefined,
-        description: 'A blacklist of MCP servers to exclude.',
+        description: 'A list of MCP servers to exclude.',
         showInDialog: false,
       },
     },
