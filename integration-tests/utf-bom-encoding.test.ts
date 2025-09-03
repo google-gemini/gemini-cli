@@ -130,7 +130,7 @@ d('BOM end-to-end integration', () => {
     const imageContent = readFileSync(imagePath);
     const filename = 'gemini-screenshot.png';
     writeFileSync(join(dir, filename), imageContent);
-    const prompt = `describe the image ${filename}, what is the name tool being used and how long has it been running`;
+    const prompt = `describe the image ${filename}, what is the name of the tool being used and how long has it been running`;
     const output = await rig.run(prompt);
     await rig.waitForToolCall('read_file');
     const lower = output.toLowerCase();
