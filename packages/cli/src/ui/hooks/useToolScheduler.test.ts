@@ -59,6 +59,7 @@ const mockConfig = {
     model: 'test-model',
     authType: 'oauth-personal',
   }),
+  getUseSmartEdit: () => false,
 } as unknown as Config;
 
 const mockTool = new MockTool({

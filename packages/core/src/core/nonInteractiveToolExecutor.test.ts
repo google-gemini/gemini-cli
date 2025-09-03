@@ -41,6 +41,7 @@ describe('executeToolCall', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getUseSmartEdit: () => false,
     } as unknown as Config;
 
     abortController = new AbortController();
