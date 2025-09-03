@@ -49,6 +49,32 @@ import { tokenLimit } from './tokenLimits.js';
 import { ideContext } from '../ide/ideContext.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
+// Mock fs module to prevent actual file system operations during tests
+const mockFileSystem = new Map<string, string>();
+
+vi.mock('node:fs', () => {
+  const fsModule = {
+    mkdirSync: vi.fn(),
+    writeFileSync: vi.fn((path: string, data: string) => {
+      mockFileSystem.set(path, data);
+    }),
+    readFileSync: vi.fn((path: string) => {
+      if (mockFileSystem.has(path)) {
+        return mockFileSystem.get(path);
+      }
+      throw Object.assign(new Error('ENOENT: no such file or directory'), {
+        code: 'ENOENT',
+      });
+    }),
+    existsSync: vi.fn((path: string) => mockFileSystem.has(path)),
+  };
+
+  return {
+    default: fsModule,
+    ...fsModule,
+  };
+});
+
 // --- Mocks ---
 const mockChatCreateFn = vi.fn();
 const mockGenerateContentFn = vi.fn();
@@ -278,6 +304,11 @@ describe('Gemini Client (client.ts)', () => {
       setFallbackMode: vi.fn(),
       getChatCompression: vi.fn().mockReturnValue(undefined),
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
+      getUseSmartEdit: vi.fn().mockReturnValue(false),
+      getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+      },
     };
     const MockedConfig = vi.mocked(Config, true);
     MockedConfig.mockImplementation(
