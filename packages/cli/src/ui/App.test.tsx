@@ -242,6 +242,12 @@ vi.mock('./hooks/useFolderTrust', () => ({
   })),
 }));
 
+vi.mock('./hooks/useIdeTrustListener', () => ({
+  useIdeTrustListener: vi.fn(() => ({
+    needsRestart: false,
+  })),
+}));
+
 vi.mock('./hooks/useLogger', () => ({
   useLogger: vi.fn(() => ({
     getPreviousUserMessages: vi.fn().mockResolvedValue([]),

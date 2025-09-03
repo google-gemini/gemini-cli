@@ -425,6 +425,7 @@ export async function main() {
     settings.merged.security?.auth?.selectedType,
     settings.merged.security?.auth?.useExternal,
     config,
+    settings,
   );
 
   if (config.getDebugMode()) {
