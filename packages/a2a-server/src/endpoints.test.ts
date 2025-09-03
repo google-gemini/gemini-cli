@@ -88,21 +88,24 @@ describe('Agent Server Endpoints', () => {
     });
   });
 
-  afterAll(
-    () =>
-      new Promise<void>((resolve, reject) => {
+  afterAll(async () => {
+    if (server) {
+      await new Promise<void>((resolve, reject) => {
         server.close((err) => {
           if (err) return reject(err);
-
-          try {
-            fs.rmSync(testWorkspace, { recursive: true, force: true });
-          } catch (e) {
-            console.warn(`Could not remove temp dir '${testWorkspace}':`, e);
-          }
           resolve();
         });
-      }),
-  );
+      });
+    }
+
+    if (testWorkspace) {
+      try {
+        fs.rmSync(testWorkspace, { recursive: true, force: true });
+      } catch (e) {
+        console.warn(`Could not remove temp dir '${testWorkspace}':`, e);
+      }
+    }
+  });
 
   it('should create a new task via POST /tasks', async () => {
     const response = await createTask('test-context');
