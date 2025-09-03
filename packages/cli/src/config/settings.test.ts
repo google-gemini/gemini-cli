@@ -125,6 +125,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           customThemes: {},
         },
@@ -179,6 +180,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...systemSettingsContent,
+        general: {},
         ui: {
           ...systemSettingsContent.ui,
           customThemes: {},
@@ -234,6 +236,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...userSettingsContent,
+        general: {},
         ui: {
           ...userSettingsContent.ui,
           customThemes: {},
@@ -294,6 +297,7 @@ describe('Settings Loading and Merging', () => {
           fileName: 'WORKSPACE_CONTEXT.md',
           includeDirectories: [],
         },
+        general: {},
         ui: {
           customThemes: {},
         },
@@ -351,6 +355,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           theme: 'dark',
           customThemes: {},
@@ -435,6 +440,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           theme: 'system-theme',
           customThemes: {},
@@ -541,6 +547,27 @@ describe('Settings Loading and Merging', () => {
         },
         security: {},
       });
+    });
+
+    it('should rewrite allowedTools to tools.allowed during migration', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const legacySettingsContent = {
+        allowedTools: ['fs', 'shell'],
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(legacySettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.tools?.allowed).toEqual(['fs', 'shell']);
+      expect((settings.merged as TestSettings)['allowedTools']).toBeUndefined();
     });
 
     it('should correctly merge and migrate legacy array properties from multiple scopes', () => {
@@ -674,6 +701,7 @@ describe('Settings Loading and Merging', () => {
         tools: {
           sandbox: false,
         },
+        general: {},
         ui: {
           customThemes: {},
           theme: 'system-theme',
@@ -1383,6 +1411,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           customThemes: {},
         },
@@ -1810,6 +1839,7 @@ describe('Settings Loading and Merging', () => {
         expect(settings.system.settings).toEqual(systemSettingsContent);
         expect(settings.merged).toEqual({
           ...systemSettingsContent,
+          general: {},
           ui: {
             ...systemSettingsContent.ui,
             customThemes: {},

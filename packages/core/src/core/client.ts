@@ -37,7 +37,10 @@ import type {
 } from './contentGenerator.js';
 import { AuthType, createContentGenerator } from './contentGenerator.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import {
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_THINKING_MODE,
+} from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ideContext } from '../ide/ideContext.js';
 import {
@@ -52,7 +55,13 @@ import {
 } from '../telemetry/types.js';
 import type { IdeContext, File } from '../ide/ideContext.js';
 
-function isThinkingSupported(model: string) {
+export function isThinkingSupported(model: string) {
+  if (model.startsWith('gemini-2.5')) return true;
+  return false;
+}
+
+export function isThinkingDefault(model: string) {
+  if (model.startsWith('gemini-2.5-flash-lite')) return false;
   if (model.startsWith('gemini-2.5')) return true;
   return false;
 }
@@ -250,14 +259,16 @@ export class GeminiClient {
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
-      const generateContentConfigWithThinking = isThinkingSupported(
-        this.config.getModel(),
-      )
+      const model = this.config.getModel();
+      const generateContentConfigWithThinking = isThinkingSupported(model)
         ? {
             ...this.generateContentConfig,
             thinkingConfig: {
               thinkingBudget: -1,
               includeThoughts: true,
+              ...(!isThinkingDefault(model)
+                ? { thinkingBudget: DEFAULT_THINKING_MODE }
+                : {}),
             },
           }
         : this.generateContentConfig;
@@ -576,12 +587,9 @@ export class GeminiClient {
     contents: Content[],
     schema: Record<string, unknown>,
     abortSignal: AbortSignal,
-    model?: string,
+    model: string,
     config: GenerateContentConfig = {},
   ): Promise<Record<string, unknown>> {
-    // Use current model from config instead of hardcoded Flash model
-    const modelToUse =
-      model || this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
@@ -594,7 +602,7 @@ export class GeminiClient {
       const apiCall = () =>
         this.getContentGenerator().generateContent(
           {
-            model: modelToUse,
+            model,
             config: {
               ...requestConfig,
               systemInstruction,
@@ -631,7 +639,7 @@ export class GeminiClient {
       if (text.startsWith(prefix) && text.endsWith(suffix)) {
         logMalformedJsonResponse(
           this.config,
-          new MalformedJsonResponseEvent(modelToUse),
+          new MalformedJsonResponseEvent(model),
         );
         text = text
           .substring(prefix.length, text.length - suffix.length)
@@ -685,9 +693,8 @@ export class GeminiClient {
     contents: Content[],
     generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
-    model?: string,
+    model: string,
   ): Promise<GenerateContentResponse> {
-    const modelToUse = model ?? this.config.getModel();
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
       ...generationConfig,
@@ -706,7 +713,7 @@ export class GeminiClient {
       const apiCall = () =>
         this.getContentGenerator().generateContent(
           {
-            model: modelToUse,
+            model,
             config: requestConfig,
             contents,
           },
@@ -726,7 +733,7 @@ export class GeminiClient {
 
       await reportError(
         error,
-        `Error generating content via API with model ${modelToUse}.`,
+        `Error generating content via API with model ${model}.`,
         {
           requestContents: contents,
           requestConfig: configToUse,
@@ -734,7 +741,7 @@ export class GeminiClient {
         'generateContent-api',
       );
       throw new Error(
-        `Failed to generate content with model ${modelToUse}: ${getErrorMessage(error)}`,
+        `Failed to generate content with model ${model}: ${getErrorMessage(error)}`,
       );
     }
   }

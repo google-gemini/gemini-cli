@@ -49,7 +49,7 @@ jobs:
 
           echo '🏷️ Finding issues that need triage...'
           NEED_TRIAGE_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue label:"status/needs-triage"' --json number,title,body)"
+            --search "is:open is:issue label:\"status/need-triage\""  --limit 1000 --json number,title,body)"
 
           echo '🔄 Merging and deduplicating issues...'
           ISSUES="$(echo "${NO_LABEL_ISSUES}" "${NEED_TRIAGE_ISSUES}" | jq -c -s 'add | unique_by(.number)')"
@@ -64,7 +64,7 @@ jobs:
         id: 'get_labels'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
-          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          github-token: '${{ steps.generate_token.outputs.token }}'
           script: |-
             const { data: labels } = await github.rest.issues.listLabelsForRepo({
               owner: context.repo.owner,
@@ -113,11 +113,13 @@ jobs:
 
             ## Steps
 
-            1. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
+            1. You are only able to use the echo command. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
             2. Check environment variable for issues to triage: $ISSUES_TO_TRIAGE (JSON array of issues)
             3. Review the issue title, body and any comments provided in the environment variables.
-            4. Ignore any existing priorities or tags on the issue.
-            5. Identify the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*.
+            4. Identify the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*.
+            5. If the issue already has area/ label, dont try to change it. Similarly, if the issue already has a kind/ label don't change it. And if the issue already has a priority/ label do not change it for example:
+               If an issue has area/core and kind/bug  you will only add a priority/ label.
+               Instead if an issue has no labels, you will could add one lable of each kind.
             6. Identify other applicable labels based on the issue content, such as status/*, help wanted, good first issue, etc.
             7. For area/* and kind/* limit yourself to only the single most applicable label in each case.
             8. Give me a single short explanation about why you are selecting each label in the process.
@@ -128,7 +130,7 @@ jobs:
                  {
                    "issue_number": 123,
                    "labels_to_add": ["kind/bug", "priority/p2"],
-                   "labels_to_remove": ["status/needs-triage"],
+                   "labels_to_remove": ["status/need-triage"],
                    "explanation": "This issue is a bug that needs to be addressed with medium priority."
                  },
                  {
@@ -142,8 +144,10 @@ jobs:
               If an issue cannot be classified, do not include it in the output array.
             10. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5
               - Anything more than 6 versions older than the most recent should add the status/need-retesting label
-            11. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label
+            11. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label and leave a comment politely requesting the relevant information, eg.. if repro steps are missing request for repro steps. if version information is missing request for version information into the explanation section below.
               - After identifying appropriate labels to an issue, add "status/need-triage" label to labels_to_remove in the output.
+            12. If you think an issue might be a Priority/P0 do not apply the priority/p0 label. Instead apply a status/manual-triage label and include a note in your explanation.
+            13. If you are uncertain and have not been able to apply one each of kind/, area/ and priority/ , apply the status/manual-triage label.
 
             ## Guidelines
 
@@ -151,7 +155,7 @@ jobs:
             - Do not include any explanation or additional text, just the JSON
             - Only use labels that already exist in the repository.
               - Do not add comments or modify the issue content.
-              - Do not remove labels titled help wanted or good first issue.
+              - Do not remove the following labels maintainer, help wanted or good first issue.
               - Triage only the current issue.
               - Identify only one area/ label
               - Identify only one kind/ label (Do not apply kind/duplicate or kind/parent-issue)
@@ -159,8 +163,11 @@ jobs:
               - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
             Categorization Guidelines:
             P0: Critical / Blocker
-              - A P0 bug is a catastrophic failure that demands immediate attention. It represents a complete showstopper for a significant portion of users or for the development process itself.
-              Impact:
+              - A P0 bug is a catastrophic failure that demands immediate attention.
+              - To be a P0 it means almost all users are running into this issue and it is blocking users from being able to use the product.
+              - You would see this in the form of many comments from different developers on the bug.
+              - It represents a complete showstopper for a significant portion of users or for the development process itself.
+            Impact:
               - Blocks development or testing for the entire team.
               - Major security vulnerability that could compromise user data or system integrity.
               - Causes data loss or corruption with no workaround.
@@ -169,15 +176,17 @@ jobs:
               Qualifier: Is the main function of the software broken?
               Example: The gemini auth login command fails with an unrecoverable error, preventing any user from authenticating and using the rest of the CLI.
             P1: High
-              - A P1 bug is a serious issue that significantly degrades the user experience or impacts a core feature. While not a complete blocker, it's a major problem that needs a fast resolution.
-              - Feature requests are almost never P1.
+              - A P1 bug is a serious issue that significantly degrades the user experience or impacts a core feature.
+              - While not a complete blocker, it's a major problem that needs a fast resolution. Feature requests are almost never P1.
+              - Once again this would be affecting many users.
+              - You would see this in the form of comments from different developers on the bug.
               Impact:
               - A core feature is broken or behaving incorrectly for a large number of users or large number of use cases.
               - Review the bug details and comments to try figure out if this issue affects a large set of use cases or if it's a narrow set of use cases.
               - Severe performance degradation making the application frustratingly slow.
               - No straightforward workaround exists, or the workaround is difficult and non-obvious.
               Qualifier: Is a key feature unusable or giving very wrong results?
-              Example: The gemini -p "..." command consistently returns a malformed JSON response or an empty result, making the CLI's primary generation feature unreliable.
+              Example: Gemini CLI enters a loop when making read-many-files tool call. I am unable to break out of the loop and gemini doesn't follow instructions subsequently.
             P2: Medium
               - A P2 bug is a moderately impactful issue. It's a noticeable problem but doesn't prevent the use of the software's main functionality.
               Impact:
@@ -252,15 +261,18 @@ jobs:
           LABELS_OUTPUT: '${{ steps.gemini_issue_analysis.outputs.summary }}'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
-          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
+          github-token: '${{ steps.generate_token.outputs.token }}'
           script: |-
-            // Strip code block markers if present
             const rawLabels = process.env.LABELS_OUTPUT;
             core.info(`Raw labels JSON: ${rawLabels}`);
             let parsedLabels;
             try {
-              const trimmedLabels = rawLabels.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '').trim();
-              parsedLabels = JSON.parse(trimmedLabels);
+              const jsonMatch = rawLabels.match(/```json\s*([\s\S]*?)\s*```/);
+              if (!jsonMatch || !jsonMatch[1]) {
+                throw new Error("Could not find a ```json ... ``` block in the output.");
+              }
+              const jsonString = jsonMatch[1].trim();
+              parsedLabels = JSON.parse(jsonString);
               core.info(`Parsed labels JSON: ${JSON.stringify(parsedLabels)}`);
             } catch (err) {
               core.setFailed(`Failed to parse labels JSON from Gemini output: ${err.message}\nRaw output: ${rawLabels}`);
@@ -274,18 +286,45 @@ jobs:
                 continue;
               }
 
-              // Set labels based on triage result
-              if (entry.labels_to_set && entry.labels_to_set.length > 0) {
-                await github.rest.issues.setLabels({
+              if (entry.labels_to_add && entry.labels_to_add.length > 0) {
+                await github.rest.issues.addLabels({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: issueNumber,
-                  labels: entry.labels_to_set
+                  labels: entry.labels_to_add
                 });
                 const explanation = entry.explanation ? ` - ${entry.explanation}` : '';
-                core.info(`Successfully set labels for #${issueNumber}: ${entry.labels_to_set.join(', ')}${explanation}`);
-              } else {
-                // If no labels to set, leave the issue as is
-                core.info(`No labels to set for #${issueNumber}, leaving as is`);
+                core.info(`Successfully added labels for #${issueNumber}: ${entry.labels_to_add.join(', ')}${explanation}`);
+              }
+
+              if (entry.labels_to_remove && entry.labels_to_remove.length > 0) {
+                for (const label of entry.labels_to_remove) {
+                  try {
+                    await github.rest.issues.removeLabel({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issueNumber,
+                      name: label
+                    });
+                  } catch (error) {
+                    if (error.status !== 404) {
+                      throw error;
+                    }
+                  }
+                }
+                core.info(`Successfully removed labels for #${issueNumber}: ${entry.labels_to_remove.join(', ')}`);
+              }
+
+              if (entry.explanation) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  body: entry.explanation,
+                });
+              }
+
+              if ((!entry.labels_to_add || entry.labels_to_add.length === 0) && (!entry.labels_to_remove || entry.labels_to_remove.length === 0)) {
+                core.info(`No labels to add or remove for #${issueNumber}, leaving as is`);
               }
             }
