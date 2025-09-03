@@ -16,7 +16,7 @@ import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
-import { RipGrepTool } from '../tools/ripGrep.js';
+import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
 import { GlobTool } from '../tools/glob.js';
 import { EditTool } from '../tools/edit.js';
 import { SmartEditTool } from '../tools/smart-edit.js';
@@ -46,8 +46,16 @@ import { IdeClient } from '../ide/ide-client.js';
 import type { Content } from '@google/genai';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { logCliConfiguration, logIdeConnection } from '../telemetry/loggers.js';
-import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
+import {
+  logCliConfiguration,
+  logIdeConnection,
+  logRipgrepFallback,
+} from '../telemetry/loggers.js';
+import {
+  IdeConnectionEvent,
+  IdeConnectionType,
+  RipgrepFallbackEvent,
+} from '../telemetry/types.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -355,7 +363,7 @@ export class Config {
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
-    this.useRipgrep = params.useRipgrep ?? false;
+    this.useRipgrep = params.useRipgrep ?? true;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
     this.useSmartEdit = params.useSmartEdit ?? false;
@@ -867,7 +875,19 @@ export class Config {
     registerCoreTool(ReadFileTool, this);
 
     if (this.getUseRipgrep()) {
-      registerCoreTool(RipGrepTool, this);
+      let useRipgrep = false;
+      let errorString: undefined | string = undefined;
+      try {
+        useRipgrep = await canUseRipgrep();
+      } catch (error: unknown) {
+        errorString = String(error);
+      }
+      if (useRipgrep) {
+        registerCoreTool(RipGrepTool, this);
+      } else {
+        logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
+        registerCoreTool(GrepTool, this);
+      }
     } else {
       registerCoreTool(GrepTool, this);
     }
