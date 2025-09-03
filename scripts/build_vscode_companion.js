@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
-execSync('npx --yes @vscode/vsce package --no-dependencies', {
+execSync('npm --workspace=gemini-cli-vscode-ide-companion run package', {
   stdio: 'inherit',
-  cwd: join(root, 'packages', 'vscode-ide-companion'),
+  cwd: root,
 });
