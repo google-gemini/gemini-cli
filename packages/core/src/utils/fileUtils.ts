@@ -5,6 +5,7 @@
  */
 
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { PartUnion } from '@google/genai';
 import mime from 'mime-types';
@@ -464,5 +465,14 @@ export async function processSingleFileContent(
       error: `Error reading file ${filePath}: ${errorMessage}`,
       errorType: ToolErrorType.READ_CONTENT_FAILURE,
     };
+  }
+}
+
+export async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fsPromises.access(filePath, fs.constants.F_OK);
+    return true;
+  } catch (_: unknown) {
+    return false;
   }
 }
