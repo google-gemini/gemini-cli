@@ -48,6 +48,7 @@ import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { logCliConfiguration, logIdeConnection } from '../telemetry/loggers.js';
 import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
+import type { FallbackHandler } from '../fallback/types.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -146,12 +147,6 @@ export interface SandboxConfig {
   command: 'docker' | 'podman' | 'sandbox-exec';
   image: string;
 }
-
-export type FlashFallbackHandler = (
-  currentModel: string,
-  fallbackModel: string,
-  error?: unknown,
-) => Promise<boolean | string | null>;
 
 export interface ConfigParameters {
   sessionId: string;
@@ -268,7 +263,7 @@ export class Config {
     name: string;
     extensionName: string;
   }>;
-  flashFallbackHandler?: FlashFallbackHandler;
+  fallbackHandler?: FallbackHandler;
   private quotaErrorOccurred: boolean = false;
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
@@ -461,8 +456,8 @@ export class Config {
     this.inFallbackMode = active;
   }
 
-  setFlashFallbackHandler(handler: FlashFallbackHandler): void {
-    this.flashFallbackHandler = handler;
+  setFallbackHandler(handler: FallbackHandler): void {
+    this.fallbackHandler = handler;
   }
 
   getMaxSessionTurns(): number {

@@ -17,10 +17,13 @@ import {
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { retryWithBackoff } from './retry.js';
 import { AuthType } from '../core/contentGenerator.js';
+// Import the new types (Assuming this test file is in packages/core/src/utils/)
+import type { FallbackHandler } from '../fallback/types.js';
 
 vi.mock('node:fs');
 
-describe('Flash Fallback Integration', () => {
+// Update the description to reflect that this tests the retry utility's integration
+describe('Retry Utility Fallback Integration', () => {
   let config: Config;
 
   beforeEach(() => {
@@ -41,25 +44,28 @@ describe('Flash Fallback Integration', () => {
     resetRequestCounter();
   });
 
-  it('should automatically accept fallback', async () => {
-    // Set up a minimal flash fallback handler for testing
-    const flashFallbackHandler = async (): Promise<boolean> => true;
+  // This test validates the Config's ability to store and execute the handler contract.
+  it('should execute the injected FallbackHandler contract correctly', async () => {
+    // Set up a minimal handler for testing, ensuring it matches the new type.
+    const fallbackHandler: FallbackHandler = async () => 'retry';
 
-    config.setFlashFallbackHandler(flashFallbackHandler);
+    // Use the generalized setter
+    config.setFallbackHandler(fallbackHandler);
 
-    // Call the handler directly to test
-    const result = await config.flashFallbackHandler!(
+    // Call the handler directly via the config property
+    const result = await config.fallbackHandler!(
       'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );
 
-    // Verify it automatically accepts
-    expect(result).toBe(true);
+    // Verify it returns the correct intent
+    expect(result).toBe('retry');
   });
 
-  it('should trigger fallback after 2 consecutive 429 errors for OAuth users', async () => {
+  // This test validates the retry utility's logic for triggering the callback.
+  it('should trigger onPersistent429 after 2 consecutive 429 errors for OAuth users', async () => {
     let fallbackCalled = false;
-    let fallbackModel = '';
+    // Removed fallbackModel variable as it's no longer relevant here.
 
     // Mock function that simulates exactly 2 429 errors, then succeeds after fallback
     const mockApiCall = vi
@@ -68,11 +74,11 @@ describe('Flash Fallback Integration', () => {
       .mockRejectedValueOnce(createSimulated429Error())
       .mockResolvedValueOnce('success after fallback');
 
-    // Mock fallback handler
-    const mockFallbackHandler = vi.fn(async (_authType?: string) => {
+    // Mock the onPersistent429 callback (this is what client.ts/geminiChat.ts provides)
+    const mockPersistent429Callback = vi.fn(async (_authType?: string) => {
       fallbackCalled = true;
-      fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
-      return fallbackModel;
+      // Return true to signal retryWithBackoff to reset attempts and continue.
+      return true;
     });
 
     // Test with OAuth personal auth type, with maxAttempts = 2 to ensure fallback triggers
@@ -84,14 +90,13 @@ describe('Flash Fallback Integration', () => {
         const status = (error as Error & { status?: number }).status;
         return status === 429;
       },
-      onPersistent429: mockFallbackHandler,
+      onPersistent429: mockPersistent429Callback,
       authType: AuthType.LOGIN_WITH_GOOGLE,
     });
 
-    // Verify fallback was triggered
+    // Verify fallback mechanism was triggered
     expect(fallbackCalled).toBe(true);
-    expect(fallbackModel).toBe(DEFAULT_GEMINI_FLASH_MODEL);
-    expect(mockFallbackHandler).toHaveBeenCalledWith(
+    expect(mockPersistent429Callback).toHaveBeenCalledWith(
       AuthType.LOGIN_WITH_GOOGLE,
       expect.any(Error),
     );
@@ -100,16 +105,16 @@ describe('Flash Fallback Integration', () => {
     expect(mockApiCall).toHaveBeenCalledTimes(3);
   });
 
-  it('should not trigger fallback for API key users', async () => {
+  it('should not trigger onPersistent429 for API key users', async () => {
     let fallbackCalled = false;
 
     // Mock function that simulates 429 errors
     const mockApiCall = vi.fn().mockRejectedValue(createSimulated429Error());
 
-    // Mock fallback handler
-    const mockFallbackHandler = vi.fn(async () => {
+    // Mock the callback
+    const mockPersistent429Callback = vi.fn(async () => {
       fallbackCalled = true;
-      return DEFAULT_GEMINI_FLASH_MODEL;
+      return true;
     });
 
     // Test with API key auth type - should not trigger fallback
@@ -122,7 +127,7 @@ describe('Flash Fallback Integration', () => {
           const status = (error as Error & { status?: number }).status;
           return status === 429;
         },
-        onPersistent429: mockFallbackHandler,
+        onPersistent429: mockPersistent429Callback,
         authType: AuthType.USE_GEMINI, // API key auth type
       });
     } catch (error) {
@@ -132,10 +137,11 @@ describe('Flash Fallback Integration', () => {
 
     // Verify fallback was NOT triggered for API key users
     expect(fallbackCalled).toBe(false);
-    expect(mockFallbackHandler).not.toHaveBeenCalled();
+    expect(mockPersistent429Callback).not.toHaveBeenCalled();
   });
 
-  it('should properly disable simulation state after fallback', () => {
+  // This test validates the test utilities themselves.
+  it('should properly disable simulation state after fallback (Test Utility)', () => {
     // Enable simulation
     setSimulate429(true);
 

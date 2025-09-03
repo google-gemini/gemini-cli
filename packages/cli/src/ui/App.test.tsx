@@ -9,6 +9,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../test-utils/render.js';
 import { AppWrapper as App } from './App.js';
+import {
+  ApprovalMode,
+  ideContext,
+  Config as ServerConfig,
+  DEFAULT_GEMINI_FLASH_MODEL,
+} from '@google/gemini-cli-core';
 import type {
   AccessibilitySettings,
   MCPServerConfig,
@@ -16,11 +22,8 @@ import type {
   SandboxConfig,
   GeminiClient,
   AuthType,
-} from '@google/gemini-cli-core';
-import {
-  ApprovalMode,
-  ideContext,
-  Config as ServerConfig,
+  FallbackHandler,
+  Config,
 } from '@google/gemini-cli-core';
 import type { SettingsFile, Settings } from '../config/settings.js';
 import { LoadedSettings } from '../config/settings.js';
@@ -101,10 +104,15 @@ interface MockServerConfig {
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actualCore =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const RealAuthType = actualCore.AuthType;
   const ConfigClassMock = vi
     .fn()
     .mockImplementation((optionsPassedToConstructor) => {
       const opts = { ...optionsPassedToConstructor }; // Clone
+
+      // Add state to track fallback mode within the mock instance for testing
+      let fallbackMode = false;
+
       // Basic mock structure, will be extended by the instance in tests
       return {
         apiKey: opts.apiKey || 'test-key',
@@ -161,7 +169,16 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         })),
         getCheckpointingEnabled: vi.fn(() => opts.checkpointing ?? true),
         getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
-        setFlashFallbackHandler: vi.fn(),
+        isInFallbackMode: vi.fn(() => fallbackMode),
+        setFallbackMode: vi.fn((active: boolean) => {
+          fallbackMode = active;
+        }),
+        setFallbackHandler: vi.fn(),
+        setQuotaErrorOccurred: vi.fn(),
+        getQuotaErrorOccurred: vi.fn(() => false),
+        getContentGeneratorConfig: vi.fn(() => ({
+          authType: RealAuthType.LOGIN_WITH_GOOGLE,
+        })),
         getSessionId: vi.fn(() => 'test-session-id'),
         getUserTier: vi.fn().mockResolvedValue(undefined),
         getIdeMode: vi.fn(() => true),
@@ -198,6 +215,15 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 // Mock heavy dependencies or those with side effects
+vi.mock('./components/ProQuotaDialog.js', () => ({
+  ProQuotaDialog: vi.fn(({ failedModel, fallbackModel, _onChoice }) => (
+    <div>
+      Mock ProQuotaDialog: Failed={failedModel} Fallback={fallbackModel}
+      {/* onChoice callback is captured by the mock and can be invoked in tests */}
+    </div>
+  )),
+}));
+
 vi.mock('./hooks/useGeminiStream', () => ({
   useGeminiStream: vi.fn(() => ({
     streamingState: 'Idle',
@@ -266,6 +292,23 @@ vi.mock('./components/Tips.js', () => ({
 
 vi.mock('./components/Header.js', () => ({
   Header: vi.fn(() => null),
+}));
+
+const mockHistory: HistoryItem[] = [];
+const mockAddItem = vi.fn((item) => {
+  mockHistory.push({ ...item, id: mockHistory.length });
+});
+const mockClearItems = vi.fn(() => {
+  mockHistory.length = 0;
+});
+
+vi.mock('./hooks/useHistoryManager.js', () => ({
+  useHistory: () => ({
+    history: mockHistory,
+    addItem: mockAddItem,
+    clearItems: mockClearItems,
+    loadHistory: vi.fn(),
+  }),
 }));
 
 vi.mock('./utils/updateCheck.js', () => ({
@@ -364,6 +407,7 @@ describe('App UI', () => {
       }));
     }
     vi.mocked(ideContext.getIdeContext).mockReturnValue(undefined);
+    mockClearItems();
   });
 
   afterEach(() => {
@@ -1720,6 +1764,266 @@ describe('App UI', () => {
       await waitFor(() => {
         expect(lastFrame()).not.toContain('some text');
       });
+    });
+  });
+
+  describe('Fallback Mechanism (ProQuotaDialog)', () => {
+    let capturedFallbackHandler: FallbackHandler | undefined;
+    const FAILED_MODEL = 'gemini-2.5-pro';
+    // Use the imported constant for the fallback model
+    const FALLBACK_MODEL = DEFAULT_GEMINI_FLASH_MODEL;
+
+    beforeEach(() => {
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Idle,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+      capturedFallbackHandler = undefined;
+      (mockConfig as unknown as Config).setFallbackHandler.mockImplementation(
+        (handler: FallbackHandler) => {
+          capturedFallbackHandler = handler;
+        },
+      );
+      // Ensure the config returns the expected configured model
+      mockConfig.getModel.mockReturnValue(FAILED_MODEL);
+    });
+
+    it('should register a fallback handler on mount', () => {
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      expect(
+        (mockConfig as unknown as Config).setFallbackHandler,
+      ).toHaveBeenCalled();
+      expect(capturedFallbackHandler).toBeDefined();
+    });
+
+    it('should open ProQuotaDialog when handler is invoked with Pro error', async () => {
+      const { ProQuotaDialog } = await import('./components/ProQuotaDialog.js');
+      const MockedProQuotaDialog = vi.mocked(ProQuotaDialog);
+
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      expect(capturedFallbackHandler).toBeDefined();
+      (mockConfig as unknown as Config).isInFallbackMode.mockReturnValue(false);
+
+      const mockProError = new Error(
+        "Quota exceeded for quota metric 'Gemini 2.5 Pro Requests'",
+      );
+
+      capturedFallbackHandler!(FAILED_MODEL, FALLBACK_MODEL, mockProError);
+
+      // Wait for the dialog to appear in the UI
+      await waitFor(() => {
+        expect(MockedProQuotaDialog).toHaveBeenCalled();
+      });
+    });
+
+    it('should disable the input prompt while the ProQuotaDialog is open', async () => {
+      const { ProQuotaDialog } = await import('./components/ProQuotaDialog.js');
+      const MockedProQuotaDialog = vi.mocked(ProQuotaDialog);
+
+      const { unmount, lastFrame } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Verify input is initially active
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Type your message or @path/to/file');
+      });
+
+      (mockConfig as unknown as Config).isInFallbackMode.mockReturnValue(false);
+      // Trigger the dialog
+      const mockProError = new Error(
+        "Quota exceeded for quota metric 'Gemini 2.5 Pro Requests'",
+      );
+      capturedFallbackHandler!(FAILED_MODEL, FALLBACK_MODEL, mockProError);
+
+      await waitFor(() => {
+        // Verify dialog is open
+        expect(MockedProQuotaDialog).toHaveBeenCalled();
+        // Verify input prompt placeholder is NOT visible (isInputActive is false)
+        expect(lastFrame()).not.toContain('Type your message or @path/to/file');
+      });
+    });
+
+    it('should display automatic fallback message for generic quota errors and resolve with "stop"', async () => {
+      const { unmount, lastFrame } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      expect(capturedFallbackHandler).toBeDefined();
+      (mockConfig as unknown as Config).isInFallbackMode.mockReturnValue(false);
+
+      // Simulate Core invoking the handler with a generic error (detected by isGenericQuotaExceededError)
+      const mockGenericError = new Error(
+        "Quota exceeded for quota metric 'Requests'",
+      );
+      const handlerPromise = capturedFallbackHandler!(
+        FAILED_MODEL,
+        FALLBACK_MODEL,
+        mockGenericError,
+      );
+
+      // It should resolve immediately with 'stop' for automatic fallbacks
+      await expect(handlerPromise).resolves.toBe('stop');
+
+      // The UI should show the automatic fallback message (added via addItem)
+      await waitFor(() => {
+        const frame = lastFrame();
+        expect(frame).toContain(
+          `Automatically switching from ${FAILED_MODEL} to ${FALLBACK_MODEL}`,
+        );
+        // Ensure the interactive dialog did NOT open
+        expect(frame).not.toContain('Pro quota limit reached');
+      });
+    });
+
+    it('should resolve with "retry" when user chooses Continue in ProQuotaDialog', async () => {
+      const { ProQuotaDialog } = await import('./components/ProQuotaDialog.js');
+      const MockedProQuotaDialog = vi.mocked(ProQuotaDialog);
+
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      (mockConfig as unknown as Config).isInFallbackMode.mockReturnValue(false);
+      const mockProError = new Error(
+        "Quota exceeded for quota metric 'Gemini 2.5 Pro Requests'",
+      );
+
+      const handlerPromise = capturedFallbackHandler!(
+        FAILED_MODEL,
+        FALLBACK_MODEL,
+        mockProError,
+      );
+
+      await waitFor(() => {
+        expect(MockedProQuotaDialog).toHaveBeenCalled();
+      });
+
+      const props =
+        MockedProQuotaDialog.mock.calls[
+          MockedProQuotaDialog.mock.calls.length - 1
+        ][0];
+      props.onChoice('continue');
+
+      await expect(handlerPromise).resolves.toBe('retry');
+    });
+
+    it('should resolve with "auth" and open AuthDialog when user chooses Auth in ProQuotaDialog', async () => {
+      const { ProQuotaDialog } = await import('./components/ProQuotaDialog.js');
+      const MockedProQuotaDialog = vi.mocked(ProQuotaDialog);
+
+      const mockOpenAuthDialog = vi.fn();
+      const { useAuthCommand } = await import('./hooks/useAuthCommand.js');
+
+      const originalUseAuthCommandImpl = vi
+        .mocked(useAuthCommand)
+        .getMockImplementation();
+      vi.mocked(useAuthCommand).mockReturnValue({
+        isAuthDialogOpen: false,
+        openAuthDialog: mockOpenAuthDialog,
+        handleAuthSelect: vi.fn(),
+        isAuthenticating: false,
+        cancelAuthentication: vi.fn(),
+      });
+
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      (mockConfig as unknown as Config).isInFallbackMode.mockReturnValue(false);
+      const mockProError = new Error(
+        "Quota exceeded for quota metric 'Gemini 2.5 Pro Requests'",
+      );
+
+      const handlerPromise = capturedFallbackHandler!(
+        FAILED_MODEL,
+        FALLBACK_MODEL,
+        mockProError,
+      );
+
+      await waitFor(() => {
+        expect(MockedProQuotaDialog).toHaveBeenCalled();
+      });
+
+      const props =
+        MockedProQuotaDialog.mock.calls[
+          MockedProQuotaDialog.mock.calls.length - 1
+        ][0];
+      props.onChoice('auth');
+
+      await expect(handlerPromise).resolves.toBe('auth');
+      // Verify that the App initiated the auth flow
+      expect(mockOpenAuthDialog).toHaveBeenCalled();
+
+      // Restore the original mock implementation
+      if (originalUseAuthCommandImpl) {
+        vi.mocked(useAuthCommand).mockImplementation(
+          originalUseAuthCommandImpl,
+        );
+      }
+    });
+
+    it('should return null immediately if already in fallback mode', async () => {
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      // Set the state to already be in fallback mode
+      (mockConfig as unknown as Config).isInFallbackMode.mockReturnValue(true);
+
+      const mockError = new Error('Some error');
+      const result = await capturedFallbackHandler!(
+        FAILED_MODEL,
+        FALLBACK_MODEL,
+        mockError,
+      );
+
+      expect(result).toBeNull();
     });
   });
 });

@@ -34,7 +34,7 @@ import type {
   ContentGenerator,
   ContentGeneratorConfig,
 } from './contentGenerator.js';
-import { AuthType, createContentGenerator } from './contentGenerator.js';
+import { createContentGenerator } from './contentGenerator.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -53,6 +53,7 @@ import {
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
 import type { IdeContext, File } from '../ide/ideContext.js';
+import { handleFallback } from '../fallback/handler.js';
 
 export function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -585,6 +586,8 @@ export class GeminiClient {
     model: string,
     config: GenerateContentConfig = {},
   ): Promise<Record<string, unknown>> {
+    let currentAttemptModel: string = model;
+
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
@@ -594,10 +597,15 @@ export class GeminiClient {
         ...config,
       };
 
-      const apiCall = () =>
-        this.getContentGenerator().generateContent(
+      const apiCall = () => {
+        const modelToUse = this.config.isInFallbackMode()
+          ? DEFAULT_GEMINI_FLASH_MODEL
+          : model;
+        currentAttemptModel = modelToUse;
+
+        return this.getContentGenerator().generateContent(
           {
-            model,
+            model: modelToUse,
             config: {
               ...requestConfig,
               systemInstruction,
@@ -608,10 +616,17 @@ export class GeminiClient {
           },
           this.lastPromptId,
         );
+      };
+
+      const onPersistent429Callback = async (
+        authType?: string,
+        error?: unknown,
+      ) =>
+        // Pass the captured model to the centralized handler.
+        await handleFallback(this.config, currentAttemptModel, authType, error);
 
       const result = await retryWithBackoff(apiCall, {
-        onPersistent429: async (authType?: string, error?: unknown) =>
-          await this.handleFlashFallback(authType, error),
+        onPersistent429: onPersistent429Callback,
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
 
@@ -634,7 +649,7 @@ export class GeminiClient {
       if (text.startsWith(prefix) && text.endsWith(suffix)) {
         logMalformedJsonResponse(
           this.config,
-          new MalformedJsonResponseEvent(model),
+          new MalformedJsonResponseEvent(currentAttemptModel),
         );
         text = text
           .substring(prefix.length, text.length - suffix.length)
@@ -690,6 +705,8 @@ export class GeminiClient {
     abortSignal: AbortSignal,
     model: string,
   ): Promise<GenerateContentResponse> {
+    let currentAttemptModel: string = model;
+
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
       ...generationConfig,
@@ -705,19 +722,30 @@ export class GeminiClient {
         systemInstruction,
       };
 
-      const apiCall = () =>
-        this.getContentGenerator().generateContent(
+      const apiCall = () => {
+        const modelToUse = this.config.isInFallbackMode()
+          ? DEFAULT_GEMINI_FLASH_MODEL
+          : model;
+        currentAttemptModel = modelToUse;
+
+        return this.getContentGenerator().generateContent(
           {
-            model,
+            model: modelToUse,
             config: requestConfig,
             contents,
           },
           this.lastPromptId,
         );
+      };
+      const onPersistent429Callback = async (
+        authType?: string,
+        error?: unknown,
+      ) =>
+        // Pass the captured model to the centralized handler.
+        await handleFallback(this.config, currentAttemptModel, authType, error);
 
       const result = await retryWithBackoff(apiCall, {
-        onPersistent429: async (authType?: string, error?: unknown) =>
-          await this.handleFlashFallback(authType, error),
+        onPersistent429: onPersistent429Callback,
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
       return result;
@@ -728,7 +756,7 @@ export class GeminiClient {
 
       await reportError(
         error,
-        `Error generating content via API with model ${model}.`,
+        `Error generating content via API with model ${currentAttemptModel}.`,
         {
           requestContents: contents,
           requestConfig: configToUse,
@@ -736,7 +764,7 @@ export class GeminiClient {
         'generateContent-api',
       );
       throw new Error(
-        `Failed to generate content with model ${model}: ${getErrorMessage(error)}`,
+        `Failed to generate content with model ${currentAttemptModel}: ${getErrorMessage(error)}`,
       );
     }
   }
@@ -914,53 +942,6 @@ export class GeminiClient {
       newTokenCount,
       compressionStatus: CompressionStatus.COMPRESSED,
     };
-  }
-
-  /**
-   * Handles falling back to Flash model when persistent 429 errors occur for OAuth users.
-   * Uses a fallback handler if provided by the config; otherwise, returns null.
-   */
-  private async handleFlashFallback(
-    authType?: string,
-    error?: unknown,
-  ): Promise<string | null> {
-    // Only handle fallback for OAuth users
-    if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
-      return null;
-    }
-
-    const currentModel = this.config.getModel();
-    const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
-
-    // Don't fallback if already using Flash model
-    if (currentModel === fallbackModel) {
-      return null;
-    }
-
-    // Check if config has a fallback handler (set by CLI package)
-    const fallbackHandler = this.config.flashFallbackHandler;
-    if (typeof fallbackHandler === 'function') {
-      try {
-        const accepted = await fallbackHandler(
-          currentModel,
-          fallbackModel,
-          error,
-        );
-        if (accepted !== false && accepted !== null) {
-          this.config.setModel(fallbackModel);
-          this.config.setFallbackMode(true);
-          return fallbackModel;
-        }
-        // Check if the model was switched manually in the handler
-        if (this.config.getModel() === fallbackModel) {
-          return null; // Model was switched but don't continue with current prompt
-        }
-      } catch (error) {
-        console.warn('Flash fallback handler failed:', error);
-      }
-    }
-
-    return null;
   }
 }
 
