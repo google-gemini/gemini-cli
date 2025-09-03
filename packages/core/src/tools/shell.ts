@@ -77,7 +77,7 @@ class ShellToolInvocation extends BaseToolInvocation<
     );
 
     if (commandsToConfirm.length === 0) {
-      return false; // already approved and whitelisted
+      return false; // already approved and allowlisted
     }
 
     const confirmationDetails: ToolExecuteConfirmationDetails = {
