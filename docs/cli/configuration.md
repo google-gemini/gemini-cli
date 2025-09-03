@@ -110,6 +110,10 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Show line numbers in the chat.
   - **Default:** `false`
 
+- **`ui.showCitations`** (boolean):
+  - **Description:** Show citations for generated text in the chat.
+  - **Default:** `false`
+
 - **`ui.accessibility.disableLoadingPhrases`** (boolean):
   - **Description:** Disable loading phrases for accessibility.
   - **Default:** `false`
@@ -219,18 +223,14 @@ Settings are organized into categories. All settings should be placed within the
   - **Default:** `undefined`
 
 - **`mcp.allowed`** (array of strings):
-  - **Description:** A whitelist of MCP servers to allow.
+  - **Description:** An allowlist of MCP servers to allow.
   - **Default:** `undefined`
 
 - **`mcp.excluded`** (array of strings):
-  - **Description:** A blacklist of MCP servers to exclude.
+  - **Description:** A denylist of MCP servers to exclude.
   - **Default:** `undefined`
 
 #### `security`
-
-- **`security.folderTrust.featureEnabled`** (boolean):
-  - **Description:** Enable folder trust feature for enhanced security.
-  - **Default:** `false`
 
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
@@ -281,7 +281,7 @@ The following settings remain at the top level of the `settings.json` file.
       - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
       - `trust` (boolean, optional): Trust this server and bypass all tool call confirmations.
       - `description` (string, optional): A brief description of the server, which may be used for display purposes.
-      - `includeTools` (array of strings, optional): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (whitelist behavior). If not specified, all tools from the server are enabled by default.
+      - `includeTools` (array of strings, optional): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (allowlist behavior). If not specified, all tools from the server are enabled by default.
       - `excludeTools` (array of strings, optional): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
 
 - **`telemetry`** (object)
