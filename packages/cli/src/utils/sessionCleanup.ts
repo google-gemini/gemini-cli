@@ -63,8 +63,7 @@ export async function cleanupExpiredSessions(
     // Determine which sessions to delete
     const sessionsToDelete = await identifyExpiredSessions(
       sessionFiles,
-      retentionConfig,
-      config.getSessionId(),
+      retentionConfig
     );
 
     // Perform cleanup
@@ -106,8 +105,7 @@ export async function cleanupExpiredSessions(
  */
 async function identifyExpiredSessions(
   sessions: SessionInfo[],
-  retentionConfig: SessionRetentionSettings,
-  currentSessionId: string,
+  retentionConfig: SessionRetentionSettings
 ): Promise<SessionInfo[]> {
   const now = new Date();
   const expiredSessions: SessionInfo[] = [];
@@ -131,7 +129,7 @@ async function identifyExpiredSessions(
     const session = sortedSessions[i];
 
     // Never delete the current active session
-    if (isActiveSession(session, currentSessionId)) {
+    if (session.isCurrentSession) {
       continue;
     }
 
@@ -153,20 +151,6 @@ async function identifyExpiredSessions(
   }
 
   return expiredSessions;
-}
-
-/**
- * Checks if a session is currently active and should not be deleted
- */
-function isActiveSession(
-  session: SessionInfo,
-  currentSessionId: string,
-): boolean {
-  return (
-    session.id === currentSessionId ||
-    session.isCurrentSession ||
-    session.id === currentSessionId.slice(0, 8) // Handle shortened IDs
-  );
 }
 
 /**
