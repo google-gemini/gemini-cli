@@ -574,6 +574,16 @@ export const SETTINGS_SCHEMA = {
           'Use node-pty for shell command execution. Fallback to child_process still applies.',
         showInDialog: true,
       },
+      autoAccept: {
+        type: 'boolean',
+        label: 'Auto Accept',
+        category: 'Tools',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).',
+        showInDialog: true,
+      },
       core: {
         type: 'array',
         label: 'Core Tools',
