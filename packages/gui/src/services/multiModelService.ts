@@ -37,6 +37,7 @@ interface ElectronAPI {
     createSession: (sessionId: string, title?: string) => Promise<void>;
     switchSession: (sessionId: string) => Promise<void>;
     deleteSession: (sessionId: string) => Promise<void>;
+    deleteAllSessions: () => Promise<void>;
     getCurrentSessionId: () => Promise<string | null>;
     getDisplayMessages: (sessionId?: string) => Promise<UniversalMessage[]>;
     getSessionsInfo: () => Promise<Array<{id: string, title: string, messageCount: number, lastUpdated: Date}>>;
@@ -424,6 +425,14 @@ class MultiModelService {
     }
 
     await this.api.deleteSession(sessionId);
+  }
+
+  async deleteAllSessions(): Promise<void> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    await this.api.deleteAllSessions();
   }
 
   async getCurrentSessionId(): Promise<string | null> {

@@ -18,6 +18,7 @@ interface AppStore extends AppState {
   addSession: (session: ChatSession) => void;
   updateSession: (sessionId: string, updates: Partial<ChatSession>) => void;
   removeSession: (sessionId: string) => void;
+  clearAllSessions: () => void;
   
   setCurrentProvider: (provider: ModelProviderType) => void;
   setCurrentModel: (model: string) => void;
@@ -82,6 +83,12 @@ export const useAppStore = create<AppStore>()(
           activeSessionId:
             state.activeSessionId === sessionId ? null : state.activeSessionId,
         })),
+
+      clearAllSessions: () =>
+        set({
+          sessions: [],
+          activeSessionId: null,
+        }),
 
       setCurrentProvider: (provider: ModelProviderType) =>
         set({ currentProvider: provider }),
