@@ -574,6 +574,16 @@ export const SETTINGS_SCHEMA = {
           'Use node-pty for shell command execution. Fallback to child_process still applies.',
         showInDialog: true,
       },
+      autoAccept: {
+        type: 'boolean',
+        label: 'Auto Accept',
+        category: 'Tools',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).',
+        showInDialog: true,
+      },
       core: {
         type: 'array',
         label: 'Core Tools',
@@ -725,6 +735,16 @@ export const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: undefined as AuthType | undefined,
             description: 'The currently selected authentication type.',
+            showInDialog: false,
+          },
+          enforcedType: {
+            type: 'string',
+            label: 'Enforced Auth Type',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as AuthType | undefined,
+            description:
+              'The required auth type. If this does not match the selected auth type, the user will be prompted to re-authenticate.',
             showInDialog: false,
           },
           useExternal: {

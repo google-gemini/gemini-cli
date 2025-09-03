@@ -209,7 +209,7 @@ describe('ClearcutLogger', () => {
       const cli_version = CLI_VERSION;
       const git_commit_hash = GIT_COMMIT_INFO;
       const prompt_id = 'my-prompt-123';
-      const user_settings = safeJsonStringify([{ smart_edit_enabled: false }]);
+      const user_settings = safeJsonStringify([{ smart_edit_enabled: true }]);
 
       // Setup logger with expected values
       const { logger, loggerConfig } = setup({

@@ -445,8 +445,12 @@ export interface FileDiff {
 export interface DiffStat {
   model_removed_lines: number;
   model_added_lines: number;
+  model_added_chars: number;
+  model_removed_chars: number;
   user_added_lines: number;
   user_removed_lines: number;
+  user_added_chars: number;
+  user_removed_chars: number;
 }
 
 export interface ToolEditConfirmationDetails {

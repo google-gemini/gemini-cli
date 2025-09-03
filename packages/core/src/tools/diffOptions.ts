@@ -18,22 +18,27 @@ export function getDiffStat(
   aiStr: string,
   userStr: string,
 ): DiffStat {
-  const countLines = (patch: Diff.ParsedDiff) => {
-    let added = 0;
-    let removed = 0;
+  const getStats = (patch: Diff.ParsedDiff) => {
+    let addedLines = 0;
+    let removedLines = 0;
+    let addedChars = 0;
+    let removedChars = 0;
+
     patch.hunks.forEach((hunk: Diff.Hunk) => {
       hunk.lines.forEach((line: string) => {
         if (line.startsWith('+')) {
-          added++;
+          addedLines++;
+          addedChars += line.length - 1;
         } else if (line.startsWith('-')) {
-          removed++;
+          removedLines++;
+          removedChars += line.length - 1;
         }
       });
     });
-    return { added, removed };
+    return { addedLines, removedLines, addedChars, removedChars };
   };
 
-  const patch = Diff.structuredPatch(
+  const modelPatch = Diff.structuredPatch(
     fileName,
     fileName,
     oldStr,
@@ -42,8 +47,7 @@ export function getDiffStat(
     'Proposed',
     DEFAULT_DIFF_OPTIONS,
   );
-  const { added: modelAddedLines, removed: modelRemovedLines } =
-    countLines(patch);
+  const modelStats = getStats(modelPatch);
 
   const userPatch = Diff.structuredPatch(
     fileName,
@@ -54,13 +58,16 @@ export function getDiffStat(
     'User',
     DEFAULT_DIFF_OPTIONS,
   );
-  const { added: userAddedLines, removed: userRemovedLines } =
-    countLines(userPatch);
+  const userStats = getStats(userPatch);
 
   return {
     model_added_lines: modelAddedLines,
     model_removed_lines: modelRemovedLines,
-    user_added_lines: userAddedLines,
-    user_removed_lines: userRemovedLines,
+    model_added_chars: modelStats.addedChars,
+    model_removed_chars: modelStats.removedChars,
+    user_added_lines: userStats.addedLines,
+    user_removed_lines: userStats.removedLines,
+    user_added_chars: userStats.addedChars,
+    user_removed_chars: userStats.removedChars,
   };
 }
