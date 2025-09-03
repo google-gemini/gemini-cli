@@ -93,7 +93,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "@lvce-editor/ripgrep": "^1.6.0",
+    "@lvce-editor/ripgrep": "https://github.com/joshualitt/ripgrep/tree/one-six-with-patch",
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0"
   },

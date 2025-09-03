@@ -616,7 +616,7 @@ export const SETTINGS_SCHEMA = {
         label: 'Use Ripgrep',
         category: 'Tools',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
         showInDialog: true,
