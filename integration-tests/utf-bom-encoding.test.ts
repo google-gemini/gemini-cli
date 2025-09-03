@@ -130,12 +130,13 @@ d('BOM end-to-end integration', () => {
     const imageContent = readFileSync(imagePath);
     const filename = 'gemini-screenshot.png';
     writeFileSync(join(dir, filename), imageContent);
-    const prompt = `describe the image ${filename}`;
+    const prompt = `describe the image ${filename}, what tool is being used and how long has it been running`;
     const output = await rig.run(prompt);
     await rig.waitForToolCall('read_file');
     const lower = output.toLowerCase();
     expect(lower.includes('screenshot')).toBeTruthy();
     expect(lower.includes('gemini cli')).toBeTruthy();
-    expect(lower.includes('terminal')).toBeTruthy();
+    expect(lower.replace(/\s/g, '').includes('googlesearch')).toBeTruthy();
+    expect(lower.includes('21')).toBeTruthy();
   });
 });
