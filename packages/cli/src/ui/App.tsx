@@ -27,6 +27,7 @@ import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './hooks/useAuthCommand.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
+import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
@@ -230,6 +231,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     IdeContext | undefined
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
+  const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   const {
@@ -303,6 +305,23 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder);
+
+  const { needsRestart: ideNeedsRestart } = useIdeTrustListener(config);
+  useEffect(() => {
+    if (ideNeedsRestart) {
+      // IDE trust changed, force a restart.
+      setShowIdeRestartPrompt(true);
+    }
+  }, [ideNeedsRestart]);
+
+  useKeypress(
+    (key) => {
+      if (key.name === 'r' || key.name === 'R') {
+        process.exit(0);
+      }
+    },
+    { isActive: showIdeRestartPrompt },
+  );
 
   const {
     isAuthDialogOpen,
@@ -1102,6 +1121,17 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 }
               }}
             />
+          ) : showIdeRestartPrompt ? (
+            <Box
+              borderStyle="round"
+              borderColor={Colors.AccentYellow}
+              paddingX={1}
+            >
+              <Text color={Colors.AccentYellow}>
+                Workspace trust has changed. Press &apos;r&apos; to restart
+                Gemini to apply the changes.
+              </Text>
+            </Box>
           ) : isFolderTrustDialogOpen ? (
             <FolderTrustDialog
               onSelect={handleFolderTrustSelect}

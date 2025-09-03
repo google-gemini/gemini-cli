@@ -7,7 +7,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { homedir } from 'node:os';
-import { getErrorMessage, isWithinRoot } from '@google/gemini-cli-core';
+import {
+  getErrorMessage,
+  isWithinRoot,
+  getIdeTrust,
+} from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
 
@@ -159,11 +163,7 @@ export function isFolderTrustEnabled(settings: Settings): boolean {
   return folderTrustSetting;
 }
 
-export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
-  if (!isFolderTrustEnabled(settings)) {
-    return true;
-  }
-
+function getWorkspaceTrustFromLocalConfig(): boolean | undefined {
   const folders = loadTrustedFolders();
 
   if (folders.errors.length > 0) {
@@ -175,4 +175,18 @@ export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
   }
 
   return folders.isPathTrusted(process.cwd());
+}
+
+export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
+  if (!isFolderTrustEnabled(settings)) {
+    return true;
+  }
+
+  const ideTrust = getIdeTrust();
+  if (ideTrust !== undefined) {
+    return ideTrust;
+  }
+
+  // Fall back to the local user configuration
+  return getWorkspaceTrustFromLocalConfig();
 }
