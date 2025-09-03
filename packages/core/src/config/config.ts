@@ -359,7 +359,7 @@ export class Config {
     this.useRipgrep = params.useRipgrep ?? false;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
-    this.useSmartEdit = params.useSmartEdit ?? false;
+    this.useSmartEdit = params.useSmartEdit ?? true;
     this.extensionManagement = params.extensionManagement ?? false;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
