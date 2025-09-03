@@ -40,6 +40,8 @@ const MIGRATION_MAP: Record<string, string> = {
   disableAutoUpdate: 'general.disableAutoUpdate',
   disableUpdateNag: 'general.disableUpdateNag',
   checkpointing: 'general.checkpointing',
+  enablePromptCompletion: 'general.enablePromptCompletion',
+  debugKeystrokeLogging: 'general.debugKeystrokeLogging',
   theme: 'ui.theme',
   customThemes: 'ui.customThemes',
   hideWindowTitle: 'ui.hideWindowTitle',
@@ -69,8 +71,10 @@ const MIGRATION_MAP: Record<string, string> = {
   includeDirectories: 'context.includeDirectories',
   loadMemoryFromIncludeDirectories: 'context.loadFromIncludeDirectories',
   fileFiltering: 'context.fileFiltering',
+  useRipgrep: 'tools.useRipgrep',
   sandbox: 'tools.sandbox',
   shouldUseNodePtyShell: 'tools.usePty',
+  autoAccept: 'tools.autoAccept',
   allowedTools: 'tools.allowed',
   coreTools: 'tools.core',
   excludeTools: 'tools.exclude',
@@ -86,6 +90,8 @@ const MIGRATION_MAP: Record<string, string> = {
   dnsResolutionOrder: 'advanced.dnsResolutionOrder',
   excludedProjectEnvVars: 'advanced.excludedEnvVars',
   bugCommand: 'advanced.bugCommand',
+  extensionManagement: 'experimental.extensionManagement',
+  extensions: 'extensions',
 };
 
 export function getSystemSettingsPath(): string {
