@@ -18,8 +18,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GCSTaskStore, NoOpTaskStore } from './gcs.js';
 import { logger } from '../utils/logger.js';
 import * as configModule from '../config/config.js';
-import {getPersistedState, METADATA_KEY} from '../types.js';
-
+import { getPersistedState, METADATA_KEY } from '../types.js';
 
 // Mock dependencies
 vi.mock('@google-cloud/storage');
@@ -54,10 +53,16 @@ vi.mock('../utils/logger.js', () => ({
 vi.mock('../config/config.js', () => ({
   setTargetDir: vi.fn(),
 }));
-vi.mock('../metadata_types');
 vi.mock('node:stream/promises', () => ({
   pipeline: vi.fn(),
 }));
+vi.mock('../types.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../types.js')>();
+  return {
+    ...actual,
+    getPersistedState: vi.fn(),
+  };
+});
 
 const mockStorage = Storage as MockedClass<typeof Storage>;
 const mockFse = fse as Mocked<typeof fse>;
@@ -229,7 +234,10 @@ describe('GCSTaskStore', () => {
       mockGunzipSync.mockReturnValue(
         Buffer.from(
           JSON.stringify({
-            [TEST_METADATA_KEY]: { _agentSettings: {}, _taskState: 'submitted' },
+            [TEST_METADATA_KEY]: {
+              _agentSettings: {},
+              _taskState: 'submitted',
+            },
             _contextId: 'ctx1',
           }),
         ),
@@ -283,7 +291,10 @@ describe('GCSTaskStore', () => {
       mockGunzipSync.mockReturnValue(
         Buffer.from(
           JSON.stringify({
-            [TEST_METADATA_KEY]: { _agentSettings: {}, _taskState: 'submitted' },
+            [TEST_METADATA_KEY]: {
+              _agentSettings: {},
+              _taskState: 'submitted',
+            },
             _contextId: 'ctx1',
           }),
         ),
