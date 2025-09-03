@@ -346,6 +346,25 @@ describe('KeypressContext - Kitty Protocol', () => {
         }),
       );
     });
+
+    it('should recognize Ctrl+Backspace in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Modifier 5 is Ctrl
+      act(() => {
+        stdin.sendKittySequence(`\x1b[127;5u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          kittyProtocol: true,
+          ctrl: true,
+        }),
+      );
+    });
   });
 
   describe('paste mode', () => {
