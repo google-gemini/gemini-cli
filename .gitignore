@@ -53,30 +53,3 @@ packages/vscode-ide-companion/*.vsix
 # GHA credentials
 gha-creds-*.json
 
-# i18n development artifacts
-*-demo-output/
-test-*.js
-test-*.cjs
-debug-*.js
-debug-*.sh
-simple-*.js
-comprehensive-*.js
-enhanced-*.js
-i18n-demo-*.js
-*-i18n-*.js
-*-demo-*.md
-I18N_*.md
-*_I18N_*.md
-i18n-visual-test-report.html
-i18n-hardcoded-strings-report.md
-
-# PR feedback tracking and documentation files (local use only)
-jacob314-feedback-tracking.md
-
-# Local documentation and project files (exclude from non-main branches)
-*.md
-!README.md
-!LICENSE.md
-!CHANGELOG.md
-!CONTRIBUTING.md
-!docs/**/*.md
