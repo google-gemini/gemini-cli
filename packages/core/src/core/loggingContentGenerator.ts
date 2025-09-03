@@ -173,7 +173,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       this._logApiResponse(
         durationMs,
         userPromptId,
-        responses[0].modelVersion || '',
+        responses[0]?.modelVersion || '',
         lastUsageMetadata,
         JSON.stringify(responses),
       );
