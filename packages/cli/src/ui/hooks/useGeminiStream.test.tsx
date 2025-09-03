@@ -48,6 +48,14 @@ const MockedGeminiClientClass = vi.hoisted(() =>
     this.startChat = mockStartChat;
     this.sendMessageStream = mockSendMessageStream;
     this.addHistory = vi.fn();
+    this.getChatRecordingService = vi.fn().mockReturnValue({
+      recordThought: vi.fn(),
+      initialize: vi.fn(),
+      recordMessage: vi.fn(),
+      recordMessageTokens: vi.fn(),
+      recordToolCalls: vi.fn(),
+      getConversationFile: vi.fn(),
+    });
   }),
 );
 
@@ -1275,7 +1283,10 @@ describe('useGeminiStream', () => {
             type: ServerGeminiEventType.Content,
             value: 'This is a truncated response...',
           };
-          yield { type: ServerGeminiEventType.Finished, value: 'MAX_TOKENS' };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'MAX_TOKENS', usageMetadata: undefined },
+          };
         })(),
       );
 
@@ -1324,7 +1335,10 @@ describe('useGeminiStream', () => {
             type: ServerGeminiEventType.Content,
             value: 'Complete response',
           };
-          yield { type: ServerGeminiEventType.Finished, value: 'STOP' };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP', usageMetadata: undefined },
+          };
         })(),
       );
 
@@ -1373,7 +1387,10 @@ describe('useGeminiStream', () => {
           };
           yield {
             type: ServerGeminiEventType.Finished,
-            value: 'FINISH_REASON_UNSPECIFIED',
+            value: {
+              reason: 'FINISH_REASON_UNSPECIFIED',
+              usageMetadata: undefined,
+            },
           };
         })(),
       );
@@ -1464,7 +1481,10 @@ describe('useGeminiStream', () => {
               type: ServerGeminiEventType.Content,
               value: `Response for ${reason}`,
             };
-            yield { type: ServerGeminiEventType.Finished, value: reason };
+            yield {
+              type: ServerGeminiEventType.Finished,
+              value: { reason, usageMetadata: undefined },
+            };
           })(),
         );
 
@@ -1579,7 +1599,10 @@ describe('useGeminiStream', () => {
             type: ServerGeminiEventType.Content,
             value: 'Some response content',
           };
-          yield { type: ServerGeminiEventType.Finished, value: 'STOP' };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP', usageMetadata: undefined },
+          };
         })(),
       );
 
@@ -1626,7 +1649,10 @@ describe('useGeminiStream', () => {
             type: ServerGeminiEventType.Content,
             value: 'New response content',
           };
-          yield { type: ServerGeminiEventType.Finished, value: 'STOP' };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP', usageMetadata: undefined },
+          };
         })(),
       );
 
