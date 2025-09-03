@@ -25,15 +25,13 @@ import type {
 import { GeminiEventType } from '@google/gemini-cli-core';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from './logger.js';
-import type { StateChange, AgentSettings } from './types.js';
-import { CoderAgentEvent } from './types.js';
+import type { StateChange, AgentSettings, PersistedStateMetadata } from './types.js';
+import { CoderAgentEvent, getPersistedState, setPersistedState } from './types.js';
 import { loadConfig, loadEnvironment, setTargetDir } from './config.js';
 import { loadSettings } from './settings.js';
 import { loadExtensions } from './extension.js';
 import { Task } from './task.js';
 import { GCSTaskStore, NoOpTaskStore } from './gcs.js';
-import type { PersistedStateMetadata } from './metadata_types.js';
-import { getPersistedState, setPersistedState } from './metadata_types.js';
 
 const requestStorage = new AsyncLocalStorage<{ req: express.Request }>();
 

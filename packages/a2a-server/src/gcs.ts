@@ -18,7 +18,7 @@ import { setTargetDir } from './config.js';
 import {
   getPersistedState,
   type PersistedTaskMetadata,
-} from './metadata_types.js';
+} from './types.js';
 import { v4 as uuidv4 } from 'uuid';
 
 type ObjectType = 'metadata' | 'workspace';
