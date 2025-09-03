@@ -47,6 +47,13 @@ describe('ChatRecordingService', () => {
       },
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getDebugMode: vi.fn().mockReturnValue(false),
+      getToolRegistry: vi.fn().mockReturnValue({
+        getTool: vi.fn().mockReturnValue({
+          displayName: 'Test Tool',
+          description: 'A test tool',
+          isOutputMarkdown: false,
+        }),
+      }),
     } as unknown as Config;
 
     vi.mocked(getProjectHash).mockReturnValue('test-project-hash');
@@ -313,7 +320,14 @@ describe('ChatRecordingService', () => {
       ) as ConversationRecord;
       expect(conversation.messages[0]).toEqual({
         ...initialConversation.messages[0],
-        toolCalls: [toolCall],
+        toolCalls: [
+          {
+            ...toolCall,
+            displayName: 'Test Tool',
+            description: 'A test tool',
+            renderOutputAsMarkdown: false,
+          },
+        ],
       });
     });
 
@@ -359,7 +373,14 @@ describe('ChatRecordingService', () => {
         type: 'gemini',
         thoughts: [],
         content: '',
-        toolCalls: [toolCall],
+        toolCalls: [
+          {
+            ...toolCall,
+            displayName: 'Test Tool',
+            description: 'A test tool',
+            renderOutputAsMarkdown: false,
+          },
+        ],
       });
     });
   });

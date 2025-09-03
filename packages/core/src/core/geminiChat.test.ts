@@ -89,6 +89,9 @@ describe('GeminiChat', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
+      getToolRegistry: vi.fn().mockReturnValue({
+        getTool: vi.fn(),
+      }),
     } as unknown as Config;
 
     // Disable 429 simulation for tests
