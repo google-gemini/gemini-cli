@@ -716,7 +716,7 @@ export const SETTINGS_SCHEMA = {
             default: false,
             description: 'Setting to track whether Folder trust is enabled.',
             showInDialog: true,
-          }
+          },
         },
       },
       auth: {
