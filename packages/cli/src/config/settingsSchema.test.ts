@@ -304,5 +304,27 @@ describe('SettingsSchema', () => {
         SETTINGS_SCHEMA.general.properties.debugKeystrokeLogging.description,
       ).toBe('Enable debug logging of keystrokes to the console.');
     });
+
+    it('should have useEnvProxy setting in schema', () => {
+      expect(SETTINGS_SCHEMA.general.properties.useEnvProxy).toBeDefined();
+      expect(SETTINGS_SCHEMA.general.properties.useEnvProxy.type).toBe(
+        'boolean',
+      );
+      expect(SETTINGS_SCHEMA.general.properties.useEnvProxy.category).toBe(
+        'General',
+      );
+      expect(SETTINGS_SCHEMA.general.properties.useEnvProxy.default).toBe(
+        false,
+      );
+      expect(
+        SETTINGS_SCHEMA.general.properties.useEnvProxy.requiresRestart,
+      ).toBe(true);
+      expect(SETTINGS_SCHEMA.general.properties.useEnvProxy.showInDialog).toBe(
+        true,
+      );
+      expect(SETTINGS_SCHEMA.general.properties.useEnvProxy.description).toBe(
+        'Use proxy settings from environment variables such as `https_proxy` and `no_proxy`.',
+      );
+    });
   });
 });

@@ -37,6 +37,7 @@ export function createMockConfig(
     setFlashFallbackHandler: vi.fn(),
     initialize: vi.fn().mockResolvedValue(undefined),
     getProxy: vi.fn().mockReturnValue(undefined),
+    getUseEnvProxy: vi.fn().mockReturnValue(false),
     getHistory: vi.fn().mockReturnValue([]),
     getEmbeddingModel: vi.fn().mockReturnValue('text-embedding-004'),
     getSessionId: vi.fn().mockReturnValue('test-session-id'),

@@ -36,7 +36,7 @@ import type {
   ContentGeneratorConfig,
 } from './contentGenerator.js';
 import { AuthType, createContentGenerator } from './contentGenerator.js';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import { EnvHttpProxyAgent, ProxyAgent, setGlobalDispatcher } from 'undici';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_THINKING_MODE,
@@ -135,7 +135,9 @@ export class GeminiClient {
   private hasFailedCompressionAttempt = false;
 
   constructor(private readonly config: Config) {
-    if (config.getProxy()) {
+    if (config.getUseEnvProxy()) {
+      setGlobalDispatcher(new EnvHttpProxyAgent());
+    } else if (config.getProxy()) {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
     }
 
