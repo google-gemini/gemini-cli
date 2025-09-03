@@ -15,10 +15,7 @@ import type { Task as SDKTask } from '@a2a-js/sdk';
 import type { TaskStore } from '@a2a-js/sdk/server';
 import { logger } from '../utils/logger.js';
 import { setTargetDir } from '../config/config.js';
-import {
-  getPersistedState,
-  type PersistedTaskMetadata,
-} from '../metadata_types.js';
+import { getPersistedState, type PersistedTaskMetadata } from '../types.js';
 import { v4 as uuidv4 } from 'uuid';
 
 type ObjectType = 'metadata' | 'workspace';

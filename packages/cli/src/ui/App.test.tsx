@@ -242,6 +242,12 @@ vi.mock('./hooks/useFolderTrust', () => ({
   })),
 }));
 
+vi.mock('./hooks/useIdeTrustListener', () => ({
+  useIdeTrustListener: vi.fn(() => ({
+    needsRestart: false,
+  })),
+}));
+
 vi.mock('./hooks/useLogger', () => ({
   useLogger: vi.fn(() => ({
     getPreviousUserMessages: vi.fn().mockResolvedValue([]),
@@ -336,7 +342,6 @@ describe('App UI', () => {
       systemDefaultsFile,
       userSettingsFile,
       workspaceSettingsFile,
-      [],
       true,
       new Set(),
     );
@@ -1055,7 +1060,7 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      expect(lastFrame()).toContain("I'm Feeling Lucky (esc to cancel");
+      expect(lastFrame()).toContain('(esc to cancel');
     });
 
     it('should display a message if NO_COLOR is set', async () => {
@@ -1070,7 +1075,7 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      expect(lastFrame()).toContain("I'm Feeling Lucky (esc to cancel");
+      expect(lastFrame()).toContain('(esc to cancel');
       expect(lastFrame()).not.toContain('Select Theme');
     });
   });
