@@ -16,9 +16,10 @@ import type { Mocked, MockedClass, Mock } from 'vitest';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import { GCSTaskStore, NoOpTaskStore } from './gcs.js';
-import { logger } from './logger.js';
-import * as configModule from './config.js';
-import {getPersistedState, METADATA_KEY} from './types.js';
+import { logger } from '../utils/logger.js';
+import * as configModule from '../config/config.js';
+import {getPersistedState, METADATA_KEY} from '../types.js';
+
 
 // Mock dependencies
 vi.mock('@google-cloud/storage');
@@ -42,7 +43,7 @@ vi.mock('node:fs', async () => {
 vi.mock('tar');
 vi.mock('zlib');
 vi.mock('uuid');
-vi.mock('./logger', () => ({
+vi.mock('../utils/logger.js', () => ({
   logger: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -50,8 +51,10 @@ vi.mock('./logger', () => ({
     debug: vi.fn(),
   },
 }));
-vi.mock('./config');
-vi.mock('./metadata_types');
+vi.mock('../config/config.js', () => ({
+  setTargetDir: vi.fn(),
+}));
+vi.mock('../metadata_types');
 vi.mock('node:stream/promises', () => ({
   pipeline: vi.fn(),
 }));
