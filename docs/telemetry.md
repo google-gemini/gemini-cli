@@ -198,7 +198,7 @@ Logs are timestamped records of specific events. The following events are logged
 - `gemini_cli.file_operation`: This event occurs for each file operation.
   - **Attributes**:
     - `tool_name` (string)
-    - `operation` (string: "create", "read", "update", "delete")
+    - `operation` (string: "create", "read", "update")
     - `lines` (int, if applicable)
     - `mimetype` (string, if applicable)
     - `extension` (string, if applicable)
