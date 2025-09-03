@@ -16,6 +16,7 @@ import {
   loadServerHierarchicalMemory,
   type FileDiscoveryService,
 } from '@google/gemini-cli-core';
+import type { LoadServerHierarchicalMemoryResponse } from '@google/gemini-cli-core/index.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
@@ -170,6 +171,7 @@ describe('memoryCommand', () => {
           ignore: [],
           include: [],
         }),
+        getFolderTrust: () => false,
       };
 
       mockContext = createMockCommandContext({
@@ -188,7 +190,7 @@ describe('memoryCommand', () => {
     it('should display success message when memory is refreshed with content', async () => {
       if (!refreshCommand.action) throw new Error('Command has no action');
 
-      const refreshResult = {
+      const refreshResult: LoadServerHierarchicalMemoryResponse = {
         memoryContent: 'new memory content',
         fileCount: 2,
       };

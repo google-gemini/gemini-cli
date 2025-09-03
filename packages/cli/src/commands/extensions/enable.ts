@@ -35,7 +35,7 @@ export async function handleEnable(args: EnableArgs) {
 }
 
 export const enableCommand: CommandModule = {
-  command: 'disable [--scope] <name>',
+  command: 'enable [--scope] <name>',
   describe: 'Enables an extension.',
   builder: (yargs) =>
     yargs
