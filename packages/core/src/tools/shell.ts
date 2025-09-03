@@ -149,7 +149,7 @@ class ShellToolInvocation extends BaseToolInvocation<
           switch (event.type) {
             case 'data':
               if (isBinaryStream) break;
-              cumulativeOutput = event.chunk;
+              cumulativeOutput += event.chunk;
               currentDisplayOutput = cumulativeOutput;
               if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
                 shouldUpdate = true;
