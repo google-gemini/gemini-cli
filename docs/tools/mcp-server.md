@@ -58,8 +58,8 @@ You can configure MCP servers in your `settings.json` file in two main ways: thr
 The `mcp` object in your `settings.json` allows you to define global rules for all MCP servers.
 
 - **`mcp.serverCommand`** (string): A global command to start an MCP server.
-- **`mcp.allowed`** (array of strings): A whitelist of MCP server names to allow. If this is set, only servers from this list (matching the keys in the `mcpServers` object) will be connected to.
-- **`mcp.excluded`** (array of strings): A blacklist of MCP server names to exclude. Servers in this list will not be connected to.
+- **`mcp.allowed`** (array of strings): A list of MCP server names to allow. If this is set, only servers from this list (matching the keys in the `mcpServers` object) will be connected to.
+- **`mcp.excluded`** (array of strings): A list of MCP server names to exclude. Servers in this list will not be connected to.
 
 **Example:**
 
@@ -115,7 +115,7 @@ Each server configuration supports the following properties:
 - **`cwd`** (string): Working directory for Stdio transport
 - **`timeout`** (number): Request timeout in milliseconds (default: 600,000ms = 10 minutes)
 - **`trust`** (boolean): When `true`, bypasses all tool call confirmations for this server (default: `false`)
-- **`includeTools`** (string[]): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (whitelist behavior). If not specified, all tools from the server are enabled by default.
+- **`includeTools`** (string[]): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (allowlist behavior). If not specified, all tools from the server are enabled by default.
 - **`excludeTools`** (string[]): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
 
 ### OAuth Support for Remote MCP Servers

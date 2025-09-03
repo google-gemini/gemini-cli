@@ -346,6 +346,25 @@ describe('KeypressContext - Kitty Protocol', () => {
         }),
       );
     });
+
+    it('should recognize Ctrl+Backspace in kitty protocol', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Modifier 5 is Ctrl
+      act(() => {
+        stdin.sendKittySequence(`\x1b[127;5u`);
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          kittyProtocol: true,
+          ctrl: true,
+        }),
+      );
+    });
   });
 
   describe('paste mode', () => {
@@ -451,10 +470,13 @@ describe('KeypressContext - Kitty Protocol', () => {
         '[DEBUG] Kitty buffer accumulating:',
         expect.stringContaining('\x1b[27u'),
       );
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '[DEBUG] Kitty sequence parsed successfully:',
-        expect.stringContaining('\x1b[27u'),
+      const parsedCall = consoleLogSpy.mock.calls.find(
+        (args) =>
+          typeof args[0] === 'string' &&
+          args[0].includes('[DEBUG] Kitty sequence parsed successfully'),
       );
+      expect(parsedCall).toBeTruthy();
+      expect(parsedCall?.[1]).toEqual(expect.stringContaining('\x1b[27u'));
     });
 
     it('should log kitty buffer overflow when debugKeystrokeLogging is true', async () => {
@@ -581,6 +603,139 @@ describe('KeypressContext - Kitty Protocol', () => {
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         'Kitty sequence buffer has char codes:',
         [27, 91, 49, 50],
+      );
+    });
+  });
+
+  describe('Parameterized functional keys', () => {
+    it.each([
+      // Parameterized
+      { sequence: `\x1b[1;2H`, expected: { name: 'home', shift: true } },
+      { sequence: `\x1b[1;5F`, expected: { name: 'end', ctrl: true } },
+      { sequence: `\x1b[1;1P`, expected: { name: 'f1' } },
+      { sequence: `\x1b[1;3Q`, expected: { name: 'f2', meta: true } },
+      { sequence: `\x1b[3~`, expected: { name: 'delete' } },
+      { sequence: `\x1b[5~`, expected: { name: 'pageup' } },
+      { sequence: `\x1b[6~`, expected: { name: 'pagedown' } },
+      { sequence: `\x1b[1~`, expected: { name: 'home' } },
+      { sequence: `\x1b[4~`, expected: { name: 'end' } },
+      { sequence: `\x1b[2~`, expected: { name: 'insert' } },
+      // Legacy Arrows
+      {
+        sequence: `\x1b[A`,
+        expected: { name: 'up', ctrl: false, meta: false, shift: false },
+      },
+      {
+        sequence: `\x1b[B`,
+        expected: { name: 'down', ctrl: false, meta: false, shift: false },
+      },
+      {
+        sequence: `\x1b[C`,
+        expected: { name: 'right', ctrl: false, meta: false, shift: false },
+      },
+      {
+        sequence: `\x1b[D`,
+        expected: { name: 'left', ctrl: false, meta: false, shift: false },
+      },
+      // Legacy Home/End
+      {
+        sequence: `\x1b[H`,
+        expected: { name: 'home', ctrl: false, meta: false, shift: false },
+      },
+      {
+        sequence: `\x1b[F`,
+        expected: { name: 'end', ctrl: false, meta: false, shift: false },
+      },
+    ])(
+      'should recognize sequence "$sequence" as $expected.name',
+      ({ sequence, expected }) => {
+        const keyHandler = vi.fn();
+        const { result } = renderHook(() => useKeypressContext(), { wrapper });
+        act(() => result.current.subscribe(keyHandler));
+
+        act(() => stdin.sendKittySequence(sequence));
+
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining(expected),
+        );
+      },
+    );
+  });
+
+  describe('Shift+Tab forms', () => {
+    it.each([
+      { sequence: `\x1b[Z`, description: 'legacy reverse Tab' },
+      { sequence: `\x1b[1;2Z`, description: 'parameterized reverse Tab' },
+    ])(
+      'should recognize $description "$sequence" as Shift+Tab',
+      ({ sequence }) => {
+        const keyHandler = vi.fn();
+        const { result } = renderHook(() => useKeypressContext(), { wrapper });
+        act(() => result.current.subscribe(keyHandler));
+
+        act(() => stdin.sendKittySequence(sequence));
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'tab', shift: true }),
+        );
+      },
+    );
+  });
+
+  describe('Double-tap and batching', () => {
+    it('should emit two delete events for double-tap CSI[3~', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.sendKittySequence(`\x1b[3~`));
+      act(() => stdin.sendKittySequence(`\x1b[3~`));
+
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ name: 'delete' }),
+      );
+      expect(keyHandler).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ name: 'delete' }),
+      );
+    });
+
+    it('should parse two concatenated tilde-coded sequences in one chunk', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => stdin.sendKittySequence(`\x1b[3~\x1b[5~`));
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'delete' }),
+      );
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'pageup' }),
+      );
+    });
+
+    it('should ignore incomplete CSI then parse the next complete sequence', async () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      // Incomplete ESC sequence then a complete Delete
+      act(() => {
+        // Provide an incomplete ESC sequence chunk with a real ESC character
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          sequence: '\x1b[1;',
+        });
+      });
+      act(() => stdin.sendKittySequence(`\x1b[3~`));
+
+      expect(keyHandler).toHaveBeenCalledTimes(1);
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'delete' }),
       );
     });
   });
