@@ -390,5 +390,5 @@ jobs:
         with:
           repo-token: '${{ secrets.GITHUB_TOKEN }}'
           pattern: './bundle/**/*.{js,sb}'
-          minimum-change-threshold: '100'
+          minimum-change-threshold: '1000'
           compression: 'none'
