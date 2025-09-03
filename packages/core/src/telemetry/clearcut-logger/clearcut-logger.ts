@@ -871,6 +871,12 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_NODE_VERSION,
         value: process.versions.node,
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
+        value: safeJsonStringify([
+          { smart_edit_enabled: this.config?.getUseSmartEdit() ?? false },
+        ]),
+      },
     ];
     return [...data, ...defaultLogMetadata];
   }

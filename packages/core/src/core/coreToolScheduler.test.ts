@@ -168,6 +168,7 @@ describe('CoreToolScheduler', () => {
         authType: 'oauth-personal',
       }),
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -202,6 +203,7 @@ describe('CoreToolScheduler', () => {
       // Create mocked tool registry
       const mockConfig = {
         getToolRegistry: () => mockToolRegistry,
+        getUseSmartEdit: () => false,
         getGeminiClient: () => null, // No client needed for these tests
       } as unknown as Config;
       const mockToolRegistry = {
@@ -267,6 +269,7 @@ describe('CoreToolScheduler with payload', () => {
         authType: 'oauth-personal',
       }),
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -574,6 +577,7 @@ describe('CoreToolScheduler edit cancellation', () => {
         authType: 'oauth-personal',
       }),
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -666,6 +670,7 @@ describe('CoreToolScheduler YOLO mode', () => {
         authType: 'oauth-personal',
       }),
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -757,6 +762,7 @@ describe('CoreToolScheduler request queueing', () => {
         authType: 'oauth-personal',
       }),
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -874,6 +880,7 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -955,6 +962,7 @@ describe('CoreToolScheduler request queueing', () => {
         authType: 'oauth-personal',
       }),
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -1015,6 +1023,7 @@ describe('CoreToolScheduler request queueing', () => {
       setApprovalMode: (mode: ApprovalMode) => {
         approvalMode = mode;
       },
+      getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
