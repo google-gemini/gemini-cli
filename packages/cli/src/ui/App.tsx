@@ -1016,6 +1016,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
     : '  Type your message or @path/to/file';
 
+  const hideContextSummary = settings.merged.ui?.hideContextSummary ?? false;
+
   return (
     <StreamingContext.Provider value={streamingState}>
       <Box flexDirection="column" width="90%">
@@ -1249,7 +1251,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 }
                 elapsedTime={elapsedTime}
               />
-
               {/* Display queued messages below loading indicator */}
               {messageQueue.length > 0 && (
                 <Box flexDirection="column" marginTop={1}>
@@ -1281,10 +1282,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   )}
                 </Box>
               )}
-
               <Box
                 marginTop={1}
-                justifyContent="space-between"
+                justifyContent={
+                  hideContextSummary ? 'flex-start' : 'space-between'
+                }
                 width="100%"
                 flexDirection={isNarrow ? 'column' : 'row'}
                 alignItems={isNarrow ? 'flex-start' : 'center'}
@@ -1303,7 +1305,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     </Text>
                   ) : showEscapePrompt ? (
                     <Text color={Colors.Gray}>Press Esc again to clear.</Text>
-                  ) : (
+                  ) : !hideContextSummary ? (
                     <ContextSummaryDisplay
                       ideContext={ideContextState}
                       geminiMdFileCount={geminiMdFileCount}
@@ -1312,9 +1314,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                       blockedMcpServers={config.getBlockedMcpServers()}
                       showToolDescriptions={showToolDescriptions}
                     />
-                  )}
+                  ) : null}
                 </Box>
-                <Box paddingTop={isNarrow ? 1 : 0}>
+                <Box
+                  paddingTop={isNarrow ? 1 : 0}
+                  marginLeft={hideContextSummary ? 1 : 2}
+                >
                   {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
                     !shellModeActive && (
                       <AutoAcceptIndicator
@@ -1324,7 +1329,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   {shellModeActive && <ShellModeIndicator />}
                 </Box>
               </Box>
-
               {showErrorDetails && (
                 <OverflowProvider>
                   <Box flexDirection="column">
@@ -1339,7 +1343,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   </Box>
                 </OverflowProvider>
               )}
-
               {isInputActive && (
                 <InputPrompt
                   buffer={buffer}
@@ -1413,6 +1416,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               nightly={nightly}
               vimMode={vimModeEnabled ? vimMode : undefined}
               isTrustedFolder={isTrustedFolderState}
+              hideCWD={settings.merged.ui?.footer?.hideCWD}
+              hideSandboxStatus={settings.merged.ui?.footer?.hideSandboxStatus}
+              hideModelInfo={settings.merged.ui?.footer?.hideModelInfo}
             />
           )}
         </Box>

@@ -380,7 +380,7 @@ describe('ShellTool', () => {
   });
 
   describe('shouldConfirmExecute', () => {
-    it('should request confirmation for a new command and whitelist it on "Always"', async () => {
+    it('should request confirmation for a new command and allowlist it on "Always"', async () => {
       const params = { command: 'npm install' };
       const invocation = shellTool.build(params);
       const confirmation = await invocation.shouldConfirmExecute(
@@ -395,7 +395,7 @@ describe('ShellTool', () => {
         ToolConfirmationOutcome.ProceedAlways,
       );
 
-      // Should now be whitelisted
+      // Should now be allowlisted
       const secondInvocation = shellTool.build({ command: 'npm test' });
       const secondConfirmation = await secondInvocation.shouldConfirmExecute(
         new AbortController().signal,
