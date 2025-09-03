@@ -938,8 +938,6 @@ describe('loggers', () => {
           lines: 10,
           mimetype: 'text/plain',
           extension: '.txt',
-          diff_stat:
-            '{"ai_added_lines":1,"ai_removed_lines":2,"user_added_lines":3,"user_removed_lines":4}',
           programming_language: 'typescript',
         },
       });
@@ -950,12 +948,6 @@ describe('loggers', () => {
         10,
         'text/plain',
         '.txt',
-        {
-          ai_added_lines: 1,
-          ai_removed_lines: 2,
-          user_added_lines: 3,
-          user_removed_lines: 4,
-        },
         'typescript',
       );
     });
