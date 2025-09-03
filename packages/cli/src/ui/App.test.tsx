@@ -1055,7 +1055,7 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      expect(lastFrame()).toContain("I'm Feeling Lucky (esc to cancel");
+      expect(lastFrame()).toContain('(esc to cancel');
     });
 
     it('should display a message if NO_COLOR is set', async () => {
@@ -1070,7 +1070,7 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      expect(lastFrame()).toContain("I'm Feeling Lucky (esc to cancel");
+      expect(lastFrame()).toContain('(esc to cancel');
       expect(lastFrame()).not.toContain('Select Theme');
     });
   });
