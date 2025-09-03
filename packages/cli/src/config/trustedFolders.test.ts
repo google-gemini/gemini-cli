@@ -270,7 +270,6 @@ describe('isWorkspaceTrusted with IDE override', () => {
   const mockSettings: Settings = {
     security: {
       folderTrust: {
-        featureEnabled: true,
         enabled: true,
       },
     },
@@ -303,24 +302,10 @@ describe('isWorkspaceTrusted with IDE override', () => {
     expect(isWorkspaceTrusted(mockSettings)).toBe(true);
   });
 
-  it('should always return true if folderTrust feature is disabled', () => {
-    const settings: Settings = {
-      security: {
-        folderTrust: {
-          featureEnabled: false,
-          enabled: true,
-        },
-      },
-    };
-    vi.mocked(getIdeTrust).mockReturnValue(false);
-    expect(isWorkspaceTrusted(settings)).toBe(true);
-  });
-
   it('should always return true if folderTrust setting is disabled', () => {
     const settings: Settings = {
       security: {
         folderTrust: {
-          featureEnabled: true,
           enabled: false,
         },
       },
