@@ -125,13 +125,19 @@ async function identifyExpiredSessions(
       new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime(),
   );
 
-  for (let i = 0; i < sortedSessions.length; i++) {
-    const session = sortedSessions[i];
+  // Separate deletable sessions from the active session
+  const deletableSessions = sortedSessions.filter(
+    (session) => !session.isCurrentSession,
+  );
 
-    // Never delete the current active session
-    if (session.isCurrentSession) {
-      continue;
-    }
+  // Calculate how many deletable sessions to keep (accounting for the active session)
+  const hasActiveSession = sortedSessions.some(s => s.isCurrentSession);
+  const maxDeletableSessions = retentionConfig.maxCount && hasActiveSession
+    ? Math.max(0, retentionConfig.maxCount - 1)
+    : retentionConfig.maxCount;
+
+  for (let i = 0; i < deletableSessions.length; i++) {
+    const session = deletableSessions[i];
 
     let shouldDelete = false;
 
@@ -140,8 +146,8 @@ async function identifyExpiredSessions(
       shouldDelete = true;
     }
 
-    // Count-based retention check (keep only N most recent)
-    if (retentionConfig.maxCount && i >= retentionConfig.maxCount) {
+    // Count-based retention check (keep only N most recent deletable sessions)
+    if (maxDeletableSessions !== undefined && i >= maxDeletableSessions) {
       shouldDelete = true;
     }
 
