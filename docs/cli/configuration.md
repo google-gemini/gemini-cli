@@ -145,11 +145,11 @@ Settings are organized into categories. All settings should be placed within the
   - **Default:** `-1`
 
 - **`model.summarizeToolOutput`** (object):
-  - **Description:**  Enables or disables the summarization of tool output. You can specify the token budget for the summarization using the `tokenBudget` setting. Note: Currently only the `run_shell_command` tool is supported. For example `{"run_shell_command": {"tokenBudget": 2000}}`
+  - **Description:** Enables or disables the summarization of tool output. You can specify the token budget for the summarization using the `tokenBudget` setting. Note: Currently only the `run_shell_command` tool is supported. For example `{"run_shell_command": {"tokenBudget": 2000}}`
   - **Default:** `undefined`
 
 - **`model.chatCompression.contextPercentageThreshold`** (number):
-  - **Description:** Sets the threshold for chat history compression as a percentage of the model's total token limit.  This is a value between 0 and 1 that applies to both automatic compression and the manual `/compress` command. For example, a value of `0.6` will trigger compression when the chat history exceeds 60% of the token limit.
+  - **Description:** Sets the threshold for chat history compression as a percentage of the model's total token limit. This is a value between 0 and 1 that applies to both automatic compression and the manual `/compress` command. For example, a value of `0.6` will trigger compression when the chat history exceeds 60% of the token limit.
   - **Default:** `0.7`
 
 - **`model.skipNextSpeakerCheck`** (boolean):
@@ -201,7 +201,7 @@ Settings are organized into categories. All settings should be placed within the
   - **Default:** `false`
 
 - **`tools.core`** (array of strings):
-  - **Description:**  This can be used to restrict the set of built-in tools [with an allowlist](./enterprise.md#restricting-tool-access). See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools.  The match semantics are the same as `tools.allowed`.
+  - **Description:** This can be used to restrict the set of built-in tools [with an allowlist](./enterprise.md#restricting-tool-access). See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools. The match semantics are the same as `tools.allowed`.
   - **Default:** `undefined`
 
 - **`tools.exclude`** (array of strings):
@@ -273,31 +273,31 @@ Settings are organized into categories. All settings should be placed within the
 
 Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools. Gemini CLI attempts to connect to each configured MCP server to discover available tools. If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts. Note that the system might strip certain schema properties from MCP tool definitions for compatibility. At least one of `command`, `url`, or `httpUrl` must be provided. If multiple are specified, the order of precedence is `httpUrl`, then `url`, then `command`.
 
-  - **`mcpServers.<SERVER_NAME>`** (object): The server parameters for the named server.
-    - `command` (string, optional): The command to execute to start the MCP server via standard I/O.
-    - `args` (array of strings, optional): Arguments to pass to the command.
-    - `env` (object, optional): Environment variables to set for the server process.
-    - `cwd` (string, optional): The working directory in which to start the server.
-    - `url` (string, optional): The URL of an MCP server that uses Server-Sent Events (SSE) for communication.
-    - `httpUrl` (string, optional): The URL of an MCP server that uses streamable HTTP for communication.
-    - `headers` (object, optional): A map of HTTP headers to send with requests to `url` or `httpUrl`.
-    - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
-    - `trust` (boolean, optional): Trust this server and bypass all tool call confirmations.
-    - `description` (string, optional): A brief description of the server, which may be used for display purposes.
-    - `includeTools` (array of strings, optional): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (allowlist behavior). If not specified, all tools from the server are enabled by default.
-    - `excludeTools` (array of strings, optional): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
+- **`mcpServers.<SERVER_NAME>`** (object): The server parameters for the named server.
+  - `command` (string, optional): The command to execute to start the MCP server via standard I/O.
+  - `args` (array of strings, optional): Arguments to pass to the command.
+  - `env` (object, optional): Environment variables to set for the server process.
+  - `cwd` (string, optional): The working directory in which to start the server.
+  - `url` (string, optional): The URL of an MCP server that uses Server-Sent Events (SSE) for communication.
+  - `httpUrl` (string, optional): The URL of an MCP server that uses streamable HTTP for communication.
+  - `headers` (object, optional): A map of HTTP headers to send with requests to `url` or `httpUrl`.
+  - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
+  - `trust` (boolean, optional): Trust this server and bypass all tool call confirmations.
+  - `description` (string, optional): A brief description of the server, which may be used for display purposes.
+  - `includeTools` (array of strings, optional): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (allowlist behavior). If not specified, all tools from the server are enabled by default.
+  - `excludeTools` (array of strings, optional): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
 
 #### `telemetry`
 
-Configures logging and metrics collection for Gemini CLI. For more information, see [Telemetry](../telemetry.md). 
+Configures logging and metrics collection for Gemini CLI. For more information, see [Telemetry](../telemetry.md).
 
-  - **Properties:**
-    - **`enabled`** (boolean): Whether or not telemetry is enabled.
-    - **`target`** (string): The destination for collected telemetry. Supported values are `local` and `gcp`.
-    - **`otlpEndpoint`** (string): The endpoint for the OTLP Exporter.
-    - **`otlpProtocol`** (string): The protocol for the OTLP Exporter (`grpc` or `http`).
-    - **`logPrompts`** (boolean): Whether or not to include the content of user prompts in the logs.
-    - **`outfile`** (string): The file to write telemetry to when `target` is `local`.
+- **Properties:**
+  - **`enabled`** (boolean): Whether or not telemetry is enabled.
+  - **`target`** (string): The destination for collected telemetry. Supported values are `local` and `gcp`.
+  - **`otlpEndpoint`** (string): The endpoint for the OTLP Exporter.
+  - **`otlpProtocol`** (string): The protocol for the OTLP Exporter (`grpc` or `http`).
+  - **`logPrompts`** (boolean): Whether or not to include the content of user prompts in the logs.
+  - **`outfile`** (string): The file to write telemetry to when `target` is `local`.
 
 ### Example `settings.json`
 
