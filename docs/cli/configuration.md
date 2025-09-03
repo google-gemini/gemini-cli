@@ -289,7 +289,8 @@ Configures connections to one or more Model-Context Protocol (MCP) servers for d
 
 #### `telemetry`
 
-Configures logging and metrics collection for Gemini CLI. For more information, see [Telemetry](../telemetry.md).
+Configures logging and metrics collection for Gemini CLI. For more information, see [Telemetry](../telemetry.md). 
+
   - **Properties:**
     - **`enabled`** (boolean): Whether or not telemetry is enabled.
     - **`target`** (string): The destination for collected telemetry. Supported values are `local` and `gcp`.
