@@ -52,7 +52,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
     try {
       const entries = fs.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
-        if (entry.name === '.git' || entry.name === 'node_modules') {
+        if (entry.name === '.git') {
           continue;
         }
         if (entry.isDirectory()) {
