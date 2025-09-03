@@ -44,7 +44,10 @@
     "folderTrust": "Confianza de carpeta",
     "chatCompression": "Compresión de chat",
     "showLineNumbers": "Mostrar números de línea",
-    "skipNextSpeakerCheck": "Omitir verificación del siguiente hablante"
+    "skipNextSpeakerCheck": "Desactivar flujo inteligente de conversación",
+    "respectGitIgnore": "Respetar .gitignore",
+    "respectGeminiIgnore": "Respetar .geminiignore",
+    "shouldUseNodePtyShell": "Usar node-pty para ejecución de Shell"
   },
   "descriptions": {
     "theme": "El tema de color para la interfaz de usuario.",
@@ -91,7 +94,10 @@
     "folderTrust": "Configuración para rastrear si la confianza de carpeta está habilitada.",
     "chatCompression": "Configuraciones de compresión de chat.",
     "showLineNumbers": "Mostrar números de línea en el chat.",
-    "skipNextSpeakerCheck": "Omitir la verificación del siguiente hablante."
+    "skipNextSpeakerCheck": "Desactivar el análisis inteligente del flujo de conversación por IA. Cuando está habilitado, las conversaciones procederán usando el comportamiento predeterminado en lugar del análisis inteligente de quién debería hablar a continuación.",
+    "respectGitIgnore": "Respetar archivos .gitignore al buscar.",
+    "respectGeminiIgnore": "Respetar archivos .geminiignore al buscar.",
+    "shouldUseNodePtyShell": "Usar node-pty para ejecución de comandos shell. Todavía se aplica la recuperación child_process."
   },
   "languageOptions": {
     "english": "English",

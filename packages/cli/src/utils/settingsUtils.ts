@@ -437,7 +437,7 @@ export function getDisplayValue(
 ): string {
   // Get the setting definition to understand the type
   const definition = getSettingDefinition(key);
-  
+
   // Prioritize pending changes if user has modified this setting
   let value: unknown;
   if (pendingSettings && settingExistsInScope(key, pendingSettings)) {
@@ -456,7 +456,7 @@ export function getDisplayValue(
   if (definition?.type === 'enum' && definition.options) {
     // Handle enum type with options
     const stringValue = typeof value === 'string' ? value : String(value);
-    const option = definition.options.find(opt => opt.value === stringValue);
+    const option = definition.options.find((opt) => opt.value === stringValue);
     valueString = option ? option.label : stringValue;
   } else if (definition?.type === 'string' && key === 'language') {
     // Fallback for legacy language handling

@@ -53,7 +53,7 @@ export function SettingsDialog({
   onRestartRequest,
 }: SettingsDialogProps): React.JSX.Element {
   const { t: tDiaglogs } = useTranslation('dialogs');
-  
+
   // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
 
@@ -130,7 +130,7 @@ export function SettingsDialog({
           if (definition?.type === 'enum') {
             return;
           }
-          
+
           if (definition?.type !== 'boolean') {
             // For non-boolean (e.g., number) items, toggle will be handled via edit mode.
             return;
@@ -234,7 +234,6 @@ export function SettingsDialog({
   const [editBuffer, setEditBuffer] = useState<string>('');
   const [editCursorPos, setEditCursorPos] = useState<number>(0); // Cursor position within edit buffer
   const [cursorVisible, setCursorVisible] = useState<boolean>(true);
-
 
   useEffect(() => {
     if (!editingKey) {
@@ -344,28 +343,36 @@ export function SettingsDialog({
     setFocusSection('settings');
   };
 
-  const handleEnumNavigation = async (settingKey: string, direction: 'left' | 'right') => {
+  const handleEnumNavigation = async (
+    settingKey: string,
+    direction: 'left' | 'right',
+  ) => {
     const definition = getSettingDefinition(settingKey);
     if (!definition || definition.type !== 'enum' || !definition.options) {
       return;
     }
 
     const currentValue = getNestedValue(pendingSettings, settingKey.split('.'));
-    const currentStringValue = typeof currentValue === 'string' ? currentValue : String(currentValue);
-    const currentIndex = definition.options.findIndex(opt => opt.value === currentStringValue);
-    
+    const currentStringValue =
+      typeof currentValue === 'string' ? currentValue : String(currentValue);
+    const currentIndex = definition.options.findIndex(
+      (opt) => opt.value === currentStringValue,
+    );
+
     let newIndex;
     if (direction === 'left') {
-      newIndex = currentIndex > 0 ? currentIndex - 1 : definition.options.length - 1;
+      newIndex =
+        currentIndex > 0 ? currentIndex - 1 : definition.options.length - 1;
     } else {
-      newIndex = currentIndex < definition.options.length - 1 ? currentIndex + 1 : 0;
+      newIndex =
+        currentIndex < definition.options.length - 1 ? currentIndex + 1 : 0;
     }
-    
+
     const newValue = definition.options[newIndex].value;
-    
+
     // Update pending settings
-    setPendingSettings((prev) => 
-      setPendingSettingValueAny(settingKey, newValue, prev)
+    setPendingSettings((prev) =>
+      setPendingSettingValueAny(settingKey, newValue, prev),
     );
 
     // Mark as modified
@@ -376,13 +383,17 @@ export function SettingsDialog({
       const success = await switchLanguage(newValue);
       if (success) {
         // Save language setting immediately since it doesn't require restart
-        const languageSettings = setPendingSettingValueAny('language', newValue, {});
+        const languageSettings = setPendingSettingValueAny(
+          'language',
+          newValue,
+          {},
+        );
         try {
           saveModifiedSettings(
             new Set(['language']),
             languageSettings,
             settings,
-            selectedScope
+            selectedScope,
           );
         } catch (error) {
           console.error('Failed to save language setting:', error);
@@ -758,7 +769,9 @@ export function SettingsDialog({
                   <Text
                     color={isActive ? Colors.AccentGreen : Colors.Foreground}
                   >
-                    {typeof item.label === 'function' ? item.label() : item.label}
+                    {typeof item.label === 'function'
+                      ? item.label()
+                      : item.label}
                     {scopeMessage && (
                       <Text color={Colors.Gray}> {scopeMessage}</Text>
                     )}
@@ -768,9 +781,22 @@ export function SettingsDialog({
                 {item.type === 'enum' ? (
                   <EnumSelector
                     options={getSettingDefinition(item.value)?.options || []}
-                    currentValue={typeof getNestedValue(pendingSettings, item.value.split('.')) === 'string' 
-                      ? getNestedValue(pendingSettings, item.value.split('.')) as string
-                      : String(getNestedValue(pendingSettings, item.value.split('.')) || getDefaultValue(item.value))}
+                    currentValue={
+                      typeof getNestedValue(
+                        pendingSettings,
+                        item.value.split('.'),
+                      ) === 'string'
+                        ? (getNestedValue(
+                            pendingSettings,
+                            item.value.split('.'),
+                          ) as string)
+                        : String(
+                            getNestedValue(
+                              pendingSettings,
+                              item.value.split('.'),
+                            ) || getDefaultValue(item.value),
+                          )
+                    }
                     isActive={isActive}
                     onValueChange={() => {}} // Not used - navigation handled by keyboard
                   />
@@ -798,7 +824,8 @@ export function SettingsDialog({
 
         <Box marginTop={1} flexDirection="column">
           <Text bold={focusSection === 'scope'} wrap="truncate">
-            {focusSection === 'scope' ? '> ' : '  '}{tDiaglogs('settings.applyTo')}
+            {focusSection === 'scope' ? '> ' : '  '}
+            {tDiaglogs('settings.applyTo')}
           </Text>
           <RadioButtonSelect
             items={scopeItems}
@@ -810,11 +837,8 @@ export function SettingsDialog({
           />
         </Box>
 
-
         <Box height={1} />
-        <Text color={Colors.Gray}>
-          {tDiaglogs('settings.instructions')}
-        </Text>
+        <Text color={Colors.Gray}>{tDiaglogs('settings.instructions')}</Text>
         {showRestartPrompt && (
           <Text color={Colors.AccentYellow}>
             {tDiaglogs('settings.restartPrompt')}

@@ -175,20 +175,16 @@ export const usePhraseCycler = (isActive: boolean, isWaiting: boolean) => {
       if (phraseIntervalRef.current) {
         clearInterval(phraseIntervalRef.current);
       }
-      
+
       const phrases = getLoadingPhrases();
       // Select an initial random phrase
-      const initialRandomIndex = Math.floor(
-        Math.random() * phrases.length,
-      );
+      const initialRandomIndex = Math.floor(Math.random() * phrases.length);
       setCurrentLoadingPhrase(phrases[initialRandomIndex]);
 
       phraseIntervalRef.current = setInterval(() => {
         const currentPhrases = getLoadingPhrases();
         // Select a new random phrase
-        const randomIndex = Math.floor(
-          Math.random() * currentPhrases.length,
-        );
+        const randomIndex = Math.floor(Math.random() * currentPhrases.length);
         setCurrentLoadingPhrase(currentPhrases[randomIndex]);
       }, PHRASE_CHANGE_INTERVAL_MS);
     } else {

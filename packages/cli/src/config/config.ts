@@ -228,14 +228,10 @@ export async function parseArguments(): Promise<CliArgs> {
 
         .check((argv) => {
           if (argv.prompt && argv['promptInteractive']) {
-            throw new Error(
-              t('dialogs:config.conflictingOptions'),
-            );
+            throw new Error(t('dialogs:config.conflictingOptions'));
           }
           if (argv.yolo && argv['approvalMode']) {
-            throw new Error(
-              t('config:validation.yoloApprovalMode'),
-            );
+            throw new Error(t('config:validation.yoloApprovalMode'));
           }
           return true;
         }),

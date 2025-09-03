@@ -8,9 +8,9 @@
  * Translation function type for error messages
  */
 export type ErrorTranslationFunction = (
-  key: string, 
-  fallback: string, 
-  params?: Record<string, string | number>
+  key: string,
+  fallback: string,
+  params?: Record<string, string | number>,
 ) => string;
 
 /**
@@ -29,9 +29,9 @@ export function setErrorTranslator(translator: ErrorTranslationFunction): void {
  * Get translated error message with fallback
  */
 export function getTranslatedErrorMessage(
-  key: string, 
-  fallback: string, 
-  params?: Record<string, string | number>
+  key: string,
+  fallback: string,
+  params?: Record<string, string | number>,
 ): string {
   if (globalErrorTranslator) {
     try {

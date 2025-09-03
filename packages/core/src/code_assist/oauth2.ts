@@ -164,7 +164,10 @@ async function initOauthClient(
       // causing the entire Node.js process to crash.
       childProcess.on('error', (_) => {
         console.error(
-          getTranslatedErrorMessage('errors:auth.browserOpenFailedAdvice', 'Failed to open browser automatically. Please try running again with NO_BROWSER=true set.'),
+          getTranslatedErrorMessage(
+            'errors:auth.browserOpenFailedAdvice',
+            'Failed to open browser automatically. Please try running again with NO_BROWSER=true set.',
+          ),
         );
         process.exit(1);
       });
@@ -287,7 +290,10 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
             await fetchAndCacheUserInfo(client);
           } catch (error) {
             console.error(
-              getTranslatedErrorMessage('errors:auth.googleAccountIdFailed', 'Failed to retrieve Google Account ID during authentication:'),
+              getTranslatedErrorMessage(
+                'errors:auth.googleAccountIdFailed',
+                'Failed to retrieve Google Account ID during authentication:',
+              ),
               error,
             );
             // Don't fail the auth flow if Google Account ID retrieval fails
@@ -416,7 +422,10 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
 
     if (!response.ok) {
       console.error(
-        getTranslatedErrorMessage('errors:auth.userInfoFailed', 'Failed to fetch user info:'),
+        getTranslatedErrorMessage(
+          'errors:auth.userInfoFailed',
+          'Failed to fetch user info:',
+        ),
         response.status,
         response.statusText,
       );

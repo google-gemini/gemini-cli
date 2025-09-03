@@ -99,7 +99,7 @@ function mergeSettings(
     };
   }
   // folderTrust is not supported at workspace level.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const { folderTrust, ...workspaceWithoutFolderTrust } = workspace;
 
   return {

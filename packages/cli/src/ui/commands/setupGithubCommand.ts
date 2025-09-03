@@ -9,7 +9,11 @@ import * as fs from 'node:fs';
 import { Writable } from 'node:stream';
 import { ProxyAgent } from 'undici';
 
-import { CommandContext } from '../../ui/commands/types.js';
+import { CommandContext ,
+  CommandKind,
+  SlashCommand,
+  SlashCommandActionReturn,
+} from '../../ui/commands/types.js';
 import i18n, { t } from '../../i18n/index.js';
 import {
   getGitRepoRoot,
@@ -18,11 +22,6 @@ import {
   getGitHubRepoInfo,
 } from '../../utils/gitUtils.js';
 
-import {
-  CommandKind,
-  SlashCommand,
-  SlashCommandActionReturn,
-} from './types.js';
 import { getUrlOpenCommand } from '../../ui/utils/commandUtils.js';
 
 // Generate OS-specific commands to open the GitHub pages needed for setup.
@@ -95,9 +94,7 @@ export const setupGithubCommand: SlashCommand = {
     const abortController = new AbortController();
 
     if (!isGitHubRepository()) {
-      throw new Error(
-        t('setupGithub:errors.notGitRepository'),
-      );
+      throw new Error(t('setupGithub:errors.notGitRepository'));
     }
 
     // Find the root directory of the repo
@@ -106,9 +103,7 @@ export const setupGithubCommand: SlashCommand = {
       gitRepoRoot = getGitRepoRoot();
     } catch (_error) {
       console.debug(`Failed to get git repo root:`, _error);
-      throw new Error(
-        t('setupGithub:errors.notGitRepository'),
-      );
+      throw new Error(t('setupGithub:errors.notGitRepository'));
     }
 
     // Get the latest release tag from GitHub
@@ -193,9 +188,9 @@ export const setupGithubCommand: SlashCommand = {
     // Print out a message
     const commands = [];
     commands.push('set -eEuo pipefail');
-    const successMessage = i18n.t('messages:github.setupSuccess', { 
-      count: workflows.length, 
-      readmeUrl 
+    const successMessage = i18n.t('messages:github.setupSuccess', {
+      count: workflows.length,
+      readmeUrl,
     });
     commands.push(`echo "${successMessage}"`);
     commands.push(...getOpenUrlsCommands(readmeUrl));

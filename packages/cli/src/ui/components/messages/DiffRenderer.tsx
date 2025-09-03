@@ -160,6 +160,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
       tabWidth,
       availableTerminalHeight,
       terminalWidth,
+      t,
     );
   }
 
@@ -172,8 +173,8 @@ const renderDiffContent = (
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight: number | undefined,
   terminalWidth: number,
+  t: (key: string) => string,
 ) => {
-  const { t } = useTranslation('ui');
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
     ...line,

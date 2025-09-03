@@ -44,7 +44,10 @@
     "folderTrust": "Confiance de dossier",
     "chatCompression": "Compression du chat",
     "showLineNumbers": "Afficher les numéros de ligne",
-    "skipNextSpeakerCheck": "Ignorer la vérification du prochain locuteur"
+    "skipNextSpeakerCheck": "Désactiver le flux de conversation intelligent",
+    "respectGitIgnore": "Respecter .gitignore",
+    "respectGeminiIgnore": "Respecter .geminiignore",
+    "shouldUseNodePtyShell": "Utiliser node-pty pour l'exécution Shell"
   },
   "descriptions": {
     "theme": "Le thème de couleur pour l'interface utilisateur.",
@@ -91,7 +94,10 @@
     "folderTrust": "Paramètre pour suivre si la confiance de dossier est activée.",
     "chatCompression": "Paramètres de compression du chat.",
     "showLineNumbers": "Afficher les numéros de ligne dans le chat.",
-    "skipNextSpeakerCheck": "Ignorer la vérification du prochain locuteur."
+    "skipNextSpeakerCheck": "Désactiver l'analyse intelligente du flux de conversation par IA. Quand activé, les conversations procèdent selon le comportement par défaut au lieu d'une analyse intelligente de qui devrait parler ensuite.",
+    "respectGitIgnore": "Respecter les fichiers .gitignore lors de la recherche.",
+    "respectGeminiIgnore": "Respecter les fichiers .geminiignore lors de la recherche.",
+    "shouldUseNodePtyShell": "Utiliser node-pty pour l'exécution de commandes shell. La repli sur child_process s'applique toujours."
   },
   "languageOptions": {
     "english": "English",

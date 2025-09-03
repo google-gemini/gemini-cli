@@ -28,7 +28,10 @@ export class GitService {
     const gitAvailable = await this.verifyGitAvailability();
     if (!gitAvailable) {
       throw new Error(
-        getTranslatedErrorMessage('config:gitService.checkpointingRequiresGit', 'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.'),
+        getTranslatedErrorMessage(
+          'config:gitService.checkpointingRequiresGit',
+          'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
+        ),
       );
     }
     this.setupShadowGitRepository();

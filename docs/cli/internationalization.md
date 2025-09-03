@@ -38,6 +38,7 @@ You can also set the language by editing your `settings.json` file:
 ```
 
 The `language` setting can be configured in any of the [configuration file locations](./configuration.md#settings-files):
+
 - User settings: `~/.gemini/settings.json`
 - Project settings: `.gemini/settings.json`
 - System settings: Platform-specific system directory
@@ -53,6 +54,7 @@ You can use environment variables in your settings file for dynamic configuratio
 ```
 
 Then set the environment variable:
+
 ```bash
 export MY_PREFERRED_LANGUAGE=zh
 ```
@@ -64,6 +66,7 @@ This approach follows the same [environment variable resolution](./configuration
 When you change the language setting, the following elements are localized:
 
 ### User Interface Elements
+
 - Navigation menus and options
 - Button labels and controls
 - Status indicators and feedback messages
@@ -71,18 +74,21 @@ When you change the language setting, the following elements are localized:
 - Loading indicators and progress text
 
 ### Help System
+
 - Command descriptions and usage instructions
 - Keyboard shortcuts and key bindings
 - Feature explanations and tips
 - Quick help tooltips
 
 ### Command System
+
 - Built-in command descriptions
 - Command output and feedback
 - Validation messages
 - Success and error notifications
 
 ### Settings Interface
+
 - Setting names and descriptions
 - Option labels and values
 - Configuration explanations
@@ -95,7 +101,7 @@ The language setting follows the same precedence rules as other [configuration s
 1. **Command-line arguments** (highest priority)
 2. **Environment variables**
 3. **System settings file**
-4. **Project settings file** 
+4. **Project settings file**
 5. **User settings file**
 6. **Default values** (English - lowest priority)
 

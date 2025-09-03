@@ -44,7 +44,10 @@
     "folderTrust": "文件夹信任",
     "chatCompression": "聊天压缩",
     "showLineNumbers": "显示行号",
-    "skipNextSpeakerCheck": "跳过下一个说话者检查"
+    "skipNextSpeakerCheck": "禁用智能对话流控制",
+    "respectGitIgnore": "遵守 .gitignore",
+    "respectGeminiIgnore": "遵守 .geminiignore",
+    "shouldUseNodePtyShell": "使用 node-pty 执行 Shell"
   },
   "descriptions": {
     "theme": "界面的颜色主题。",
@@ -91,7 +94,10 @@
     "folderTrust": "跟踪文件夹信任是否启用的设置。",
     "chatCompression": "聊天压缩设置。",
     "showLineNumbers": "在聊天中显示行号。",
-    "skipNextSpeakerCheck": "跳过下一个说话者检查。"
+    "skipNextSpeakerCheck": "禁用AI智能判断对话流程的功能。启用后，对话将按默认方式进行，而不会智能分析谁应该下一个发言。",
+    "respectGitIgnore": "搜索时遵守 .gitignore 文件。",
+    "respectGeminiIgnore": "搜索时遵守 .geminiignore 文件。",
+    "shouldUseNodePtyShell": "使用 node-pty 进行 shell 命令执行。仍然适用 child_process 回退。"
   },
   "languageOptions": {
     "english": "English",

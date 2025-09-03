@@ -221,7 +221,8 @@ export function ThemeDialog({
         {/* Left Column: Selection */}
         <Box flexDirection="column" width="45%" paddingRight={2}>
           <Text bold={currentFocusedSection === 'theme'} wrap="truncate">
-            {currentFocusedSection === 'theme' ? '> ' : '  '}{t('theme.title')}{' '}
+            {currentFocusedSection === 'theme' ? '> ' : '  '}
+            {t('theme.title')}{' '}
             <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
           </Text>
           <RadioButtonSelect
@@ -240,7 +241,8 @@ export function ThemeDialog({
           {showScopeSelection && (
             <Box marginTop={1} flexDirection="column">
               <Text bold={currentFocusedSection === 'scope'} wrap="truncate">
-                {currentFocusedSection === 'scope' ? '> ' : '  '}{t('theme.applyTo')}
+                {currentFocusedSection === 'scope' ? '> ' : '  '}
+                {t('theme.applyTo')}
               </Text>
               <RadioButtonSelect
                 items={scopeItems}
@@ -304,7 +306,7 @@ def fibonacci(n):
       <Box marginTop={1}>
         <Text color={Colors.Gray} wrap="truncate">
           {t('theme.instructions', {
-            tabInstruction: showScopeSelection ? t('theme.tabInstruction') : ''
+            tabInstruction: showScopeSelection ? t('theme.tabInstruction') : '',
           })}
         </Text>
       </Box>

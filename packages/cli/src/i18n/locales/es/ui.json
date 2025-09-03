@@ -32,7 +32,7 @@
     "toolTime": "Tiempo herramientas:",
     "modelUsage": "Uso del modelo",
     "reqs": "Sol",
-    "inputTokens": "Tokens de entrada", 
+    "inputTokens": "Tokens de entrada",
     "outputTokens": "Tokens de salida"
   },
   "errors": {
@@ -44,7 +44,7 @@
     "phrases": [
       "Sintiéndome con suerte",
       "Enviando excelencia...",
-      "Entregando serifas...", 
+      "Entregando serifas...",
       "Navegando el limo viscoso...",
       "Consultando espíritus digitales...",
       "Reticulando splines...",
@@ -207,7 +207,7 @@
   "autoAccept": {
     "acceptingEdits": "aceptando ediciones",
     "shiftTabToggle": " (shift + tab para cambiar)",
-    "yoloMode": "modo YOLO", 
+    "yoloMode": "modo YOLO",
     "ctrlYToggle": " (ctrl + y para cambiar)"
   },
   "shellMode": {

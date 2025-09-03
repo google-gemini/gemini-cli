@@ -119,7 +119,8 @@ export const Footer: React.FC<FooterProps> = ({
           </Text>
         ) : (
           <Text color={theme.status.error}>
-            {t('footer.noSandbox')} <Text color={theme.text.secondary}>{t('footer.seeDocsHint')}</Text>
+            {t('footer.noSandbox')}{' '}
+            <Text color={theme.text.secondary}>{t('footer.seeDocsHint')}</Text>
           </Text>
         )}
       </Box>

@@ -141,7 +141,8 @@ export const SETTINGS_SCHEMA = {
     category: 'General',
     requiresRestart: true,
     default: false,
-    description: () => i18n.t('settings:descriptions.autoConfigureMaxOldSpaceSize'),
+    description: () =>
+      i18n.t('settings:descriptions.autoConfigureMaxOldSpaceSize'),
     showInDialog: true,
   },
   preferredEditor: {
@@ -223,7 +224,8 @@ export const SETTINGS_SCHEMA = {
         category: 'Accessibility',
         requiresRestart: true,
         default: false,
-        description: () => i18n.t('settings:descriptions.disableLoadingPhrases'),
+        description: () =>
+          i18n.t('settings:descriptions.disableLoadingPhrases'),
         showInDialog: true,
       },
     },
@@ -259,20 +261,20 @@ export const SETTINGS_SCHEMA = {
     properties: {
       respectGitIgnore: {
         type: 'boolean',
-        label: 'Respect .gitignore',
+        label: () => i18n.t('settings:labels.respectGitIgnore'),
         category: 'File Filtering',
         requiresRestart: true,
         default: true,
-        description: 'Respect .gitignore files when searching',
+        description: () => i18n.t('settings:descriptions.respectGitIgnore'),
         showInDialog: true,
       },
       respectGeminiIgnore: {
         type: 'boolean',
-        label: 'Respect .geminiignore',
+        label: () => i18n.t('settings:labels.respectGeminiIgnore'),
         category: 'File Filtering',
         requiresRestart: true,
         default: true,
-        description: 'Respect .geminiignore files when searching',
+        description: () => i18n.t('settings:descriptions.respectGeminiIgnore'),
         showInDialog: true,
       },
       enableRecursiveFileSearch: {
@@ -281,7 +283,8 @@ export const SETTINGS_SCHEMA = {
         category: 'File Filtering',
         requiresRestart: true,
         default: true,
-        description: () => i18n.t('settings:descriptions.enableRecursiveFileSearch'),
+        description: () =>
+          i18n.t('settings:descriptions.enableRecursiveFileSearch'),
         showInDialog: true,
       },
     },
@@ -299,12 +302,11 @@ export const SETTINGS_SCHEMA = {
 
   shouldUseNodePtyShell: {
     type: 'boolean',
-    label: 'Use node-pty for Shell Execution',
+    label: () => i18n.t('settings:labels.shouldUseNodePtyShell'),
     category: 'Shell',
     requiresRestart: true,
     default: false,
-    description:
-      'Use node-pty for shell command execution. Fallback to child_process still applies.',
+    description: () => i18n.t('settings:descriptions.shouldUseNodePtyShell'),
     showInDialog: true,
   },
 
@@ -450,7 +452,8 @@ export const SETTINGS_SCHEMA = {
     category: 'Advanced',
     requiresRestart: false,
     default: ['DEBUG', 'DEBUG_MODE'] as string[],
-    description: () => i18n.t('settings:descriptions.excludedProjectEnvironmentVariables'),
+    description: () =>
+      i18n.t('settings:descriptions.excludedProjectEnvironmentVariables'),
     showInDialog: false,
   },
   disableUpdateNag: {
@@ -477,7 +480,8 @@ export const SETTINGS_SCHEMA = {
     category: 'General',
     requiresRestart: false,
     default: false,
-    description: () => i18n.t('settings:descriptions.loadMemoryFromIncludeDirectories'),
+    description: () =>
+      i18n.t('settings:descriptions.loadMemoryFromIncludeDirectories'),
     showInDialog: true,
   },
   model: {
@@ -495,7 +499,8 @@ export const SETTINGS_SCHEMA = {
     category: 'General',
     requiresRestart: false,
     default: false,
-    description: () => i18n.t('settings:descriptions.hasSeenIdeIntegrationNudge'),
+    description: () =>
+      i18n.t('settings:descriptions.hasSeenIdeIntegrationNudge'),
     showInDialog: false,
   },
   folderTrustFeature: {

@@ -16,11 +16,12 @@ const useTerminalSizeMock = vi.mocked(useTerminalSize.useTerminalSize);
 
 // Create a configurable mock function for different languages
 const mockTranslation = vi.fn((key: string, options?: { percent?: string }) => {
-  const translations: Record<string, string | ((opts: any) => string)> = {
+  const translations: Record<string, string | ((opts: { percent?: string }) => string)> = {
     'footer.noSandbox': 'no sandbox',
-    'footer.seeDocsHint': '(see /docs)', 
+    'footer.seeDocsHint': '(see /docs)',
     'footer.untrusted': 'untrusted',
-    'ui:contextUsage.remaining': (opts: { percent: string }) => `${opts.percent}% context left`,
+    'ui:contextUsage.remaining': (opts: { percent: string }) =>
+      `${opts.percent}% context left`,
   };
   const translation = translations[key];
   if (typeof translation === 'function') {
@@ -194,25 +195,29 @@ describe('Footer - Multi-language Support', () => {
   describe('Chinese Language (zh)', () => {
     beforeEach(() => {
       // Configure mock for Chinese translations
-      mockTranslation.mockImplementation((key: string, options?: { percent?: string }) => {
-        const chineseTranslations: Record<string, string | ((opts: any) => string)> = {
-          'footer.noSandbox': '无沙箱',
-          'footer.seeDocsHint': '(查看 /docs)', 
-          'footer.untrusted': '不受信任',
-          'ui:contextUsage.remaining': (opts: { percent: string }) => `对话空间剩余${opts.percent}%`,
-        };
-        const translation = chineseTranslations[key];
-        if (typeof translation === 'function') {
-          return translation(options);
-        }
-        return translation || key;
-      });
+      mockTranslation.mockImplementation(
+        (key: string, options?: { percent?: string }) => {
+          const chineseTranslations: Record<
+            string,
+            string | ((opts: { percent?: string }) => string)
+          > = {
+            'footer.noSandbox': '无沙箱',
+            'footer.seeDocsHint': '(查看 /docs)',
+            'footer.untrusted': '不受信任',
+            'ui:contextUsage.remaining': (opts: { percent: string }) =>
+              `对话空间剩余${opts.percent}%`,
+          };
+          const translation = chineseTranslations[key];
+          if (typeof translation === 'function') {
+            return translation(options);
+          }
+          return translation || key;
+        },
+      );
     });
 
     it('should display Chinese no sandbox message', () => {
-      const { lastFrame } = render(
-        <Footer {...defaultProps} />,
-      );
+      const { lastFrame } = render(<Footer {...defaultProps} />);
       expect(lastFrame()).toContain('无沙箱');
       expect(lastFrame()).toContain('查看');
       expect(lastFrame()).toContain('/docs');
@@ -235,9 +240,7 @@ describe('Footer - Multi-language Support', () => {
 
     it('should display Chinese sandbox status when environment variable is set', () => {
       vi.stubEnv('SANDBOX', 'gemini-test-sandbox');
-      const { lastFrame } = render(
-        <Footer {...defaultProps} />,
-      );
+      const { lastFrame } = render(<Footer {...defaultProps} />);
       expect(lastFrame()).toContain('test-sandbox');
       vi.unstubAllEnvs();
     });
@@ -246,25 +249,29 @@ describe('Footer - Multi-language Support', () => {
   describe('French Language (fr)', () => {
     beforeEach(() => {
       // Configure mock for French translations (example)
-      mockTranslation.mockImplementation((key: string, options?: { percent?: string }) => {
-        const frenchTranslations: Record<string, string | ((opts: any) => string)> = {
-          'footer.noSandbox': 'pas de bac à sable',
-          'footer.seeDocsHint': '(voir /docs)', 
-          'footer.untrusted': 'non fiable',
-          'ui:contextUsage.remaining': (opts: { percent: string }) => `${opts.percent}% du contexte restant`,
-        };
-        const translation = frenchTranslations[key];
-        if (typeof translation === 'function') {
-          return translation(options);
-        }
-        return translation || key;
-      });
+      mockTranslation.mockImplementation(
+        (key: string, options?: { percent?: string }) => {
+          const frenchTranslations: Record<
+            string,
+            string | ((opts: { percent?: string }) => string)
+          > = {
+            'footer.noSandbox': 'pas de bac à sable',
+            'footer.seeDocsHint': '(voir /docs)',
+            'footer.untrusted': 'non fiable',
+            'ui:contextUsage.remaining': (opts: { percent: string }) =>
+              `${opts.percent}% du contexte restant`,
+          };
+          const translation = frenchTranslations[key];
+          if (typeof translation === 'function') {
+            return translation(options);
+          }
+          return translation || key;
+        },
+      );
     });
 
     it('should display French no sandbox message', () => {
-      const { lastFrame } = render(
-        <Footer {...defaultProps} />,
-      );
+      const { lastFrame } = render(<Footer {...defaultProps} />);
       expect(lastFrame()).toContain('pas de bac à sable');
       expect(lastFrame()).toContain('(voir /docs)');
     });
@@ -289,19 +296,25 @@ describe('Footer - Multi-language Support', () => {
   describe('Multi-language Regression Test', () => {
     beforeEach(() => {
       // Reset to English translations to ensure original functionality still works
-      mockTranslation.mockImplementation((key: string, options?: { percent?: string }) => {
-        const englishTranslations: Record<string, string | ((opts: any) => string)> = {
-          'footer.noSandbox': 'no sandbox',
-          'footer.seeDocsHint': '(see /docs)', 
-          'footer.untrusted': 'untrusted',
-          'ui:contextUsage.remaining': (opts: { percent: string }) => `${opts.percent}% context left`,
-        };
-        const translation = englishTranslations[key];
-        if (typeof translation === 'function') {
-          return translation(options);
-        }
-        return translation || key;
-      });
+      mockTranslation.mockImplementation(
+        (key: string, options?: { percent?: string }) => {
+          const englishTranslations: Record<
+            string,
+            string | ((opts: { percent?: string }) => string)
+          > = {
+            'footer.noSandbox': 'no sandbox',
+            'footer.seeDocsHint': '(see /docs)',
+            'footer.untrusted': 'untrusted',
+            'ui:contextUsage.remaining': (opts: { percent: string }) =>
+              `${opts.percent}% context left`,
+          };
+          const translation = englishTranslations[key];
+          if (typeof translation === 'function') {
+            return translation(options);
+          }
+          return translation || key;
+        },
+      );
     });
 
     it('should still work correctly in English after adding multi-language support', () => {
@@ -323,7 +336,7 @@ describe('Footer - Multi-language Support', () => {
       const { lastFrame } = render(
         <Footer {...defaultProps} isTrustedFolder={false} />,
       );
-      expect(lastFrame()).toContain('footer.untrus');  // May be split due to width
+      expect(lastFrame()).toContain('footer.untrus'); // May be split due to width
       expect(lastFrame()).toContain('ted');
     });
 

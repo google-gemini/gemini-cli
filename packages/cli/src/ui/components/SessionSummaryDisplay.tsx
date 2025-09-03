@@ -16,8 +16,6 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
   duration,
 }) => {
   const { t } = useTranslation('ui');
-  
-  return (
-    <StatsDisplay title={t('sessionSummary.title')} duration={duration} />
-  );
+
+  return <StatsDisplay title={t('sessionSummary.title')} duration={duration} />;
 };

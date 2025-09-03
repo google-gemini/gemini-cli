@@ -38,7 +38,8 @@ const rootDirectoryCheck: WarningCheck = {
   check: async (workspaceRoot: string) => {
     try {
       const workspaceRealPath = await fs.realpath(workspaceRoot);
-      const errorMessage = 'Warning: You are running Gemini CLI in the root directory. Your entire folder structure will be used for context. It is strongly recommended to run in a project-specific directory.';
+      const errorMessage =
+        'Warning: You are running Gemini CLI in the root directory. Your entire folder structure will be used for context. It is strongly recommended to run in a project-specific directory.';
 
       // Check for Unix root directory
       if (path.dirname(workspaceRealPath) === workspaceRealPath) {

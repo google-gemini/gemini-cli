@@ -13,7 +13,7 @@ import {
   useContext,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-// Initialize i18n system 
+// Initialize i18n system
 import '../i18n/index.js';
 import {
   Box,
@@ -166,7 +166,7 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
   useEffect(() => {
     registerCleanup(() => config.getIdeClient().disconnect());
   }, [config]);
-  
+
   const shouldShowIdePrompt =
     currentIDE &&
     !config.getIdeMode() &&
@@ -368,9 +368,13 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
       addItem(
         {
           type: MessageType.INFO,
-          text: memoryContent.length > 0 
-            ? t('messages:memory.refreshedSuccess', { characters: memoryContent.length, fileCount })
-            : t('messages:memory.refreshedEmpty'),
+          text:
+            memoryContent.length > 0
+              ? t('messages:memory.refreshedSuccess', {
+                  characters: memoryContent.length,
+                  fileCount,
+                })
+              : t('messages:memory.refreshedEmpty'),
         },
         Date.now(),
       );
@@ -1184,7 +1188,9 @@ const App = ({ config, startupWarnings = [], version }: AppProps) => {
                       {t('ui:prompts.pressCtrlDToExit')}
                     </Text>
                   ) : showEscapePrompt ? (
-                    <Text color={Colors.Gray}>{t('ui:prompts.pressEscToClear')}</Text>
+                    <Text color={Colors.Gray}>
+                      {t('ui:prompts.pressEscToClear')}
+                    </Text>
                   ) : (
                     <ContextSummaryDisplay
                       ideContext={ideContextState}

@@ -49,7 +49,8 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     if (openFileCount === 0) {
       return '';
     }
-    const openFileWord = openFileCount > 1 ? t('ui:context.openFiles') : t('ui:context.openFile');
+    const openFileWord =
+      openFileCount > 1 ? t('ui:context.openFiles') : t('ui:context.openFile');
     return `${openFileCount} ${openFileWord} ${t('ui:context.viewHint')}`;
   })();
 
@@ -59,7 +60,8 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     }
     const allNamesTheSame = new Set(contextFileNames).size < 2;
     const name = allNamesTheSame ? contextFileNames[0] : 'context';
-    const fileWord = geminiMdFileCount > 1 ? t('ui:context.files') : t('ui:context.file');
+    const fileWord =
+      geminiMdFileCount > 1 ? t('ui:context.files') : t('ui:context.file');
     return `${geminiMdFileCount} ${name} ${fileWord}`;
   })();
 
@@ -111,7 +113,9 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
 
   return (
     <Box>
-      <Text color={Colors.Gray}>{t('ui:context.using')} {summaryParts.join(' | ')}</Text>
+      <Text color={Colors.Gray}>
+        {t('ui:context.using')} {summaryParts.join(' | ')}
+      </Text>
     </Box>
   );
 };

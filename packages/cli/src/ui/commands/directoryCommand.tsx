@@ -113,7 +113,9 @@ export const directoryCommand: SlashCommand = {
           addItem(
             {
               type: MessageType.INFO,
-              text: i18n.t('feedback:success.geminiFilesAdded', { directories: added.join('\n- ') }),
+              text: i18n.t('feedback:success.geminiFilesAdded', {
+                directories: added.join('\n- '),
+              }),
             },
             Date.now(),
           );
@@ -129,7 +131,9 @@ export const directoryCommand: SlashCommand = {
           addItem(
             {
               type: MessageType.INFO,
-              text: i18n.t('feedback:success.directoriesAdded', { directories: added.join('\n- ') }),
+              text: i18n.t('feedback:success.directoriesAdded', {
+                directories: added.join('\n- '),
+              }),
             },
             Date.now(),
           );
@@ -169,7 +173,9 @@ export const directoryCommand: SlashCommand = {
         addItem(
           {
             type: MessageType.INFO,
-            text: i18n.t('feedback:status.workspaceDirectories', { directoryList }),
+            text: i18n.t('feedback:status.workspaceDirectories', {
+              directoryList,
+            }),
           },
           Date.now(),
         );

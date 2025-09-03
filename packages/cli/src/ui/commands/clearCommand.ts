@@ -5,20 +5,20 @@
  */
 
 import { uiTelemetryService } from '@google/gemini-cli-core';
-import i18n from 'i18next';
+import { t } from 'i18next';
 import { CommandKind, SlashCommand } from './types.js';
 
 export const clearCommand: SlashCommand = {
   name: 'clear',
   get description() {
-    return i18n.t('commands.clear.description', { ns: 'ui' });
+    return t('commands.clear.description', { ns: 'ui' });
   },
   kind: CommandKind.BUILT_IN,
   action: async (context, _args) => {
     const geminiClient = context.services.config?.getGeminiClient();
 
     if (geminiClient) {
-      context.ui.setDebugMessage(i18n.t('errors:core.clearingTerminal'));
+      context.ui.setDebugMessage(t('errors:core.clearingTerminal'));
       // If resetChat fails, the exception will propagate and halt the command,
       // which is the correct behavior to signal a failure to the user.
       await geminiClient.resetChat();

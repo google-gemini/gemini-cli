@@ -8,7 +8,7 @@
 import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { MCPServerConfig } from '@google/gemini-cli-core';
-import i18next from 'i18next';
+import { t } from 'i18next';
 
 async function addMcpServer(
   name: string,
@@ -130,7 +130,7 @@ export const addCommand: CommandModule = {
   describe: 'Add a server',
   builder: (yargs) =>
     yargs
-      .usage(i18next.t('commands:mcp.usage.addUsage'))
+      .usage(t('commands:mcp.usage.addUsage'))
       .parserConfiguration({
         'unknown-options-as-args': true, // Pass unknown options as server args
         'populate--': true, // Populate server args after -- separator
@@ -147,21 +147,21 @@ export const addCommand: CommandModule = {
       })
       .option('scope', {
         alias: 's',
-        describe: i18next.t('commands:mcp.usage.configScope'),
+        describe: t('commands:mcp.usage.configScope'),
         type: 'string',
         default: 'project',
         choices: ['user', 'project'],
       })
       .option('transport', {
         alias: 't',
-        describe: i18next.t('commands:mcp.usage.transportType'),
+        describe: t('commands:mcp.usage.transportType'),
         type: 'string',
         default: 'stdio',
         choices: ['stdio', 'sse', 'http'],
       })
       .option('env', {
         alias: 'e',
-        describe: i18next.t('commands:mcp.usage.setEnvironmentVars'),
+        describe: t('commands:mcp.usage.setEnvironmentVars'),
         type: 'array',
         string: true,
       })
@@ -173,15 +173,15 @@ export const addCommand: CommandModule = {
         string: true,
       })
       .option('timeout', {
-        describe: i18next.t('commands:mcp.usage.connectionTimeout'),
+        describe: t('commands:mcp.usage.connectionTimeout'),
         type: 'number',
       })
       .option('trust', {
-        describe: i18next.t('dialogs:mcp.trustServer'),
+        describe: t('dialogs:mcp.trustServer'),
         type: 'boolean',
       })
       .option('description', {
-        describe: i18next.t('commands:mcp.usage.serverDescription'),
+        describe: t('commands:mcp.usage.serverDescription'),
         type: 'string',
       })
       .option('include-tools', {

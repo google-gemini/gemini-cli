@@ -20,12 +20,8 @@ export const Tips: React.FC<TipsProps> = ({ config }) => {
   return (
     <Box flexDirection="column">
       <Text color={Colors.Foreground}>{t('ui:tips.title')}</Text>
-      <Text color={Colors.Foreground}>
-        1. {t('ui:tips.tip1')}
-      </Text>
-      <Text color={Colors.Foreground}>
-        2. {t('ui:tips.tip2')}
-      </Text>
+      <Text color={Colors.Foreground}>1. {t('ui:tips.tip1')}</Text>
+      <Text color={Colors.Foreground}>2. {t('ui:tips.tip2')}</Text>
       {geminiMdFileCount === 0 && (
         <Text color={Colors.Foreground}>
           3. {t('ui:tips.tip3Before')}{' '}

@@ -87,7 +87,10 @@ export function EditorSettingsDialog({
       ? SettingScope.Workspace
       : SettingScope.User;
   if (settings.forScope(otherScope).settings.preferredEditor !== undefined) {
-    const scopeName = otherScope === SettingScope.User ? t('editor.scopes.user') : t('editor.scopes.workspace');
+    const scopeName =
+      otherScope === SettingScope.User
+        ? t('editor.scopes.user')
+        : t('editor.scopes.workspace');
     otherScopeModifiedMessage =
       settings.forScope(selectedScope).settings.preferredEditor !== undefined
         ? t('editor.scopeMessages.alsoModified', { scope: scopeName })
@@ -113,7 +116,8 @@ export function EditorSettingsDialog({
     >
       <Box flexDirection="column" width="45%" paddingRight={2}>
         <Text bold={focusedSection === 'editor'}>
-          {focusedSection === 'editor' ? '> ' : '  '}{t('editor.title')}{' '}
+          {focusedSection === 'editor' ? '> ' : '  '}
+          {t('editor.title')}{' '}
           <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
         </Text>
         <RadioButtonSelect
@@ -130,7 +134,8 @@ export function EditorSettingsDialog({
 
         <Box marginTop={1} flexDirection="column">
           <Text bold={focusedSection === 'scope'}>
-            {focusedSection === 'scope' ? '> ' : '  '}{t('editor.applyTo')}
+            {focusedSection === 'scope' ? '> ' : '  '}
+            {t('editor.applyTo')}
           </Text>
           <RadioButtonSelect
             items={scopeItems}
@@ -141,18 +146,14 @@ export function EditorSettingsDialog({
         </Box>
 
         <Box marginTop={1}>
-          <Text color={Colors.Gray}>
-            {t('editor.instructions')}
-          </Text>
+          <Text color={Colors.Gray}>{t('editor.instructions')}</Text>
         </Box>
       </Box>
 
       <Box flexDirection="column" width="55%" paddingLeft={2}>
         <Text bold>{t('editor.preference')}</Text>
         <Box flexDirection="column" gap={1} marginTop={1}>
-          <Text color={Colors.Gray}>
-            {t('editor.description')}
-          </Text>
+          <Text color={Colors.Gray}>{t('editor.description')}</Text>
           <Text color={Colors.Gray}>
             {t('editor.currentPreference', { editor: '' })}
             <Text

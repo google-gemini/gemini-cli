@@ -54,8 +54,7 @@ export function getInstallationInfo(
       return {
         packageManager: PackageManager.UNKNOWN, // Not managed by a package manager in this sense
         isGlobal: false,
-        updateMessage:
-          t('installation:gitClone'),
+        updateMessage: t('installation:gitClone'),
       };
     }
 
@@ -85,8 +84,7 @@ export function getInstallationInfo(
         return {
           packageManager: PackageManager.HOMEBREW,
           isGlobal: true,
-          updateMessage:
-            t('installation:homebrew'),
+          updateMessage: t('installation:homebrew'),
         };
       } catch (_error) {
         // Brew is not installed or gemini-cli is not installed via brew.

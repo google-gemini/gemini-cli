@@ -235,7 +235,10 @@ ${finalExclusionPatternsForDescription
     const searchPatterns = [...inputPatterns, ...include];
     if (searchPatterns.length === 0) {
       return {
-        llmContent: getTranslatedErrorMessage('errors:core.noSearchPathsProvided', 'No search paths or include patterns provided.'),
+        llmContent: getTranslatedErrorMessage(
+          'errors:core.noSearchPathsProvided',
+          'No search paths or include patterns provided.',
+        ),
         returnDisplay: `## Information\n\nNo search paths or include patterns were specified. Nothing to read or concatenate.`,
       };
     }
@@ -530,7 +533,10 @@ ${finalExclusionPatternsForDescription
 
     if (contentParts.length === 0) {
       contentParts.push(
-        getTranslatedErrorMessage('errors:core.noFilesFound', 'No files matching the criteria were found or all were skipped.'),
+        getTranslatedErrorMessage(
+          'errors:core.noFilesFound',
+          'No files matching the criteria were found or all were skipped.',
+        ),
       );
     }
     return {

@@ -80,7 +80,9 @@ export class BuiltinCommandLoader implements ICommandLoader {
       terminalSetupCommand,
     ];
 
-    const filteredCommands = allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);
+    const filteredCommands = allDefinitions.filter(
+      (cmd): cmd is SlashCommand => cmd !== null,
+    );
     return filteredCommands;
   }
 }

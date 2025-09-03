@@ -69,7 +69,9 @@ async function restoreAction(
       return {
         type: 'message',
         messageType: 'error',
-        content: i18n.t('messages:restore.fileNotFound', { filename: selectedFile }),
+        content: i18n.t('messages:restore.fileNotFound', {
+          filename: selectedFile,
+        }),
       };
     }
 

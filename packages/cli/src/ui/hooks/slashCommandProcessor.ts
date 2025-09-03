@@ -275,7 +275,6 @@ export const useSlashCommandProcessor = (
       const parts = trimmed.substring(1).trim().split(/\s+/);
       const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
 
-      
       let currentCommands = commands;
       let commandToExecute: SlashCommand | undefined;
       let pathIndex = 0;
@@ -283,7 +282,6 @@ export const useSlashCommandProcessor = (
       const canonicalPath: string[] = [];
 
       for (const part of commandPath) {
-        
         // TODO: For better performance and architectural clarity, this two-pass
         // search could be replaced. A more optimal approach would be to
         // pre-compute a single lookup map in `CommandService.ts` that resolves
@@ -319,7 +317,6 @@ export const useSlashCommandProcessor = (
         resolvedCommandPath.length > 1
           ? resolvedCommandPath.slice(1).join(' ')
           : undefined;
-
 
       try {
         if (commandToExecute) {

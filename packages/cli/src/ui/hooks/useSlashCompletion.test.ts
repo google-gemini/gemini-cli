@@ -229,7 +229,11 @@ describe('useSlashCompletion', () => {
       expect(result.current.suggestions).toEqual(
         expect.arrayContaining([
           { label: 'show', value: 'show', description: 'Show memory' },
-          { label: 'add', value: 'add', description: 'Add content to the memory' },
+          {
+            label: 'add',
+            value: 'add',
+            description: 'Add content to the memory',
+          },
         ]),
       );
     });
@@ -258,7 +262,11 @@ describe('useSlashCompletion', () => {
       expect(result.current.suggestions).toEqual(
         expect.arrayContaining([
           { label: 'show', value: 'show', description: 'Show memory' },
-          { label: 'add', value: 'add', description: 'Add content to the memory' },
+          {
+            label: 'add',
+            value: 'add',
+            description: 'Add content to the memory',
+          },
         ]),
       );
     });
@@ -284,7 +292,11 @@ describe('useSlashCompletion', () => {
       );
 
       expect(result.current.suggestions).toEqual([
-        { label: 'add', value: 'add', description: 'Add content to the memory' },
+        {
+          label: 'add',
+          value: 'add',
+          description: 'Add content to the memory',
+        },
       ]);
     });
 

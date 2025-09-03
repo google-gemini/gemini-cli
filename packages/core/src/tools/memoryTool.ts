@@ -24,7 +24,10 @@ import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
   name: 'save_memory',
-  description: getTranslatedErrorMessage('tools:memory.description', 'Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.'),
+  description: getTranslatedErrorMessage(
+    'tools:memory.description',
+    'Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.',
+  ),
   parametersJsonSchema: {
     type: 'object',
     properties: {

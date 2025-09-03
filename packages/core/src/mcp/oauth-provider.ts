@@ -664,7 +664,10 @@ export class MCPOAuthProvider {
       const serverUrl = `${authUrl.protocol}//${authUrl.host}`;
 
       console.log(
-        getTranslatedErrorMessage('errors:core.noClientIdDynamicRegistration', 'No client ID provided, attempting dynamic client registration...'),
+        getTranslatedErrorMessage(
+          'errors:core.noClientIdDynamicRegistration',
+          'No client ID provided, attempting dynamic client registration...',
+        ),
       );
 
       // Get the authorization server metadata for registration
@@ -698,7 +701,10 @@ export class MCPOAuthProvider {
         console.log('Dynamic client registration successful');
       } else {
         throw new Error(
-          getTranslatedErrorMessage('errors:core.noClientIdUnsupportedRegistration', 'No client ID provided and dynamic registration not supported'),
+          getTranslatedErrorMessage(
+            'errors:core.noClientIdUnsupportedRegistration',
+            'No client ID provided and dynamic registration not supported',
+          ),
         );
       }
     }
@@ -753,7 +759,10 @@ export class MCPOAuthProvider {
       await openBrowserSecurely(authUrl);
     } catch (error) {
       console.warn(
-        getTranslatedErrorMessage('errors:auth.browserOpenFailed', 'Failed to open browser automatically:'),
+        getTranslatedErrorMessage(
+          'errors:auth.browserOpenFailed',
+          'Failed to open browser automatically:',
+        ),
         getErrorMessage(error),
       );
     }
@@ -808,7 +817,10 @@ export class MCPOAuthProvider {
         console.log(`Token verification successful: ${tokenPreview}`);
       } else {
         console.error(
-          getTranslatedErrorMessage('errors:core.tokenVerificationFailed', 'Token verification failed: token not found or invalid after save'),
+          getTranslatedErrorMessage(
+            'errors:core.tokenVerificationFailed',
+            'Token verification failed: token not found or invalid after save',
+          ),
         );
       }
     } catch (saveError) {

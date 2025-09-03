@@ -44,7 +44,10 @@
     "folderTrust": "Folder Trust",
     "chatCompression": "Chat Compression",
     "showLineNumbers": "Show Line Numbers",
-    "skipNextSpeakerCheck": "Skip Next Speaker Check"
+    "skipNextSpeakerCheck": "Disable Smart Conversation Flow",
+    "respectGitIgnore": "Respect .gitignore",
+    "respectGeminiIgnore": "Respect .geminiignore",
+    "shouldUseNodePtyShell": "Use node-pty for Shell Execution"
   },
   "descriptions": {
     "theme": "The color theme for the UI.",
@@ -91,11 +94,14 @@
     "folderTrust": "Setting to track whether Folder trust is enabled.",
     "chatCompression": "Chat compression settings.",
     "showLineNumbers": "Show line numbers in the chat.",
-    "skipNextSpeakerCheck": "Skip the next speaker check."
+    "skipNextSpeakerCheck": "Disable AI-powered conversation flow analysis. When enabled, conversations will proceed using default behavior instead of intelligent analysis of who should speak next.",
+    "respectGitIgnore": "Respect .gitignore files when searching.",
+    "respectGeminiIgnore": "Respect .geminiignore files when searching.",
+    "shouldUseNodePtyShell": "Use node-pty for shell command execution. Fallback to child_process still applies."
   },
   "languageOptions": {
     "english": "English",
-    "spanish": "Español", 
+    "spanish": "Español",
     "french": "Français"
   }
 }

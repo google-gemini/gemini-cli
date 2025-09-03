@@ -26,13 +26,13 @@ export function EnumSelector({
   onValueChange,
 }: EnumSelectorProps): React.JSX.Element {
   const [currentIndex, setCurrentIndex] = useState(() => {
-    const index = options.findIndex(option => option.value === currentValue);
+    const index = options.findIndex((option) => option.value === currentValue);
     return index >= 0 ? index : 0;
   });
 
   // Update index when currentValue changes externally
   useEffect(() => {
-    const index = options.findIndex(option => option.value === currentValue);
+    const index = options.findIndex((option) => option.value === currentValue);
     if (index >= 0) {
       setCurrentIndex(index);
     }
@@ -47,12 +47,14 @@ export function EnumSelector({
 
   return (
     <Box flexDirection="row" alignItems="center">
-      <Text color={isActive && canScrollLeft ? Colors.AccentGreen : Colors.Gray}>
+      <Text
+        color={isActive && canScrollLeft ? Colors.AccentGreen : Colors.Gray}
+      >
         {canScrollLeft ? '◀' : ' '}
       </Text>
       <Box minWidth={2} />
       <Box minWidth={12} justifyContent="center">
-        <Text 
+        <Text
           color={isActive ? Colors.AccentGreen : Colors.Foreground}
           bold={isActive}
         >
@@ -60,7 +62,9 @@ export function EnumSelector({
         </Text>
       </Box>
       <Box minWidth={2} />
-      <Text color={isActive && canScrollRight ? Colors.AccentGreen : Colors.Gray}>
+      <Text
+        color={isActive && canScrollRight ? Colors.AccentGreen : Colors.Gray}
+      >
         {canScrollRight ? '▶' : ' '}
       </Text>
     </Box>

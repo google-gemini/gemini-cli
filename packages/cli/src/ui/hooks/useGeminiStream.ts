@@ -329,9 +329,7 @@ export const useGeminiStream = (
       }
 
       if (localQueryToSendToGemini === null) {
-        onDebugMessage(
-          t('gemini.queryNull'),
-        );
+        onDebugMessage(t('gemini.queryNull'));
         return { queryToSend: null, shouldProceed: false };
       }
       return { queryToSend: localQueryToSendToGemini, shouldProceed: true };
@@ -345,6 +343,7 @@ export const useGeminiStream = (
       logger,
       shellModeActive,
       scheduleToolCalls,
+      t,
     ],
   );
 
@@ -498,7 +497,7 @@ export const useGeminiStream = (
         );
       }
     },
-    [addItem],
+    [addItem, t],
   );
 
   const handleChatCompressionEvent = useCallback(

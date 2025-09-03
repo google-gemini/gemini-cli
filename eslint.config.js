@@ -34,6 +34,10 @@ export default tseslint.config(
       'packages/core/dist/**',
       'packages/server/dist/**',
       'packages/vscode-ide-companion/dist/**',
+      'packages/*/src/**/*.js',
+      'packages/*/src/**/*.js.map',
+      'packages/*/test-setup.js',
+      '**/*.d.ts',
       'bundle/**',
       'package/bundle/**',
       '.integration-tests/**',
@@ -84,6 +88,7 @@ export default tseslint.config(
     languageOptions: {
       globals: {
         ...globals.node,
+        ...globals.browser,
         ...globals.es2021,
       },
     },
@@ -110,9 +115,9 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
+          argsIgnorePattern: '^',
+          varsIgnorePattern: '^',
+          caughtErrorsIgnorePattern: '^',
         },
       ],
       'import/no-internal-modules': [
@@ -123,6 +128,8 @@ export default tseslint.config(
             'memfs/lib/volume.js',
             'yargs/**',
             'msw/node',
+            '**/packages/cli/src/**',
+            '**/packages/core/src/**',
           ],
         },
       ],
@@ -190,9 +197,9 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
+          argsIgnorePattern: '^',
+          varsIgnorePattern: '^',
+          caughtErrorsIgnorePattern: '^',
         },
       ],
     },
@@ -226,6 +233,25 @@ export default tseslint.config(
       '@typescript-eslint/no-require-imports': 'off',
     },
   },
+  {
+    // Configuration for test files
+    files: ['**/*.test.{ts,tsx,js,jsx}'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+        ...globals.es2021,
+        describe: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        vi: 'readonly',
+      },
+    },
+  },
   // Prettier config must be last
   prettierConfig,
   // extra settings for scripts that we run directly with node
@@ -242,9 +268,9 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
+          argsIgnorePattern: '^',
+          varsIgnorePattern: '^',
+          caughtErrorsIgnorePattern: '^',
         },
       ],
     },

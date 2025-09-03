@@ -146,7 +146,9 @@ export const ToolStatsDisplay: React.FC = () => {
         <Box
           width={TOOL_NAME_COL_WIDTH + CALLS_COL_WIDTH + SUCCESS_RATE_COL_WIDTH}
         >
-          <Text color={Colors.LightBlue}>{t('stats.totalReviewedSuggestions')}</Text>
+          <Text color={Colors.LightBlue}>
+            {t('stats.totalReviewedSuggestions')}
+          </Text>
         </Box>
         <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
           <Text>{totalReviewed}</Text>

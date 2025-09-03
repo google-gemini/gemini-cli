@@ -372,7 +372,17 @@ export class SubAgentScope {
     }
 
     let currentMessages: Content[] = [
-      { role: 'user', parts: [{ text: getTranslatedErrorMessage('messages:getStarted', 'Get Started!') }] },
+      {
+        role: 'user',
+        parts: [
+          {
+            text: getTranslatedErrorMessage(
+              'messages:getStarted',
+              'Get Started!',
+            ),
+          },
+        ],
+      },
     ];
 
     const startTime = Date.now();
@@ -537,7 +547,10 @@ export class SubAgentScope {
     // If all tool calls failed, inform the model so it can re-evaluate.
     if (functionCalls.length > 0 && toolResponseParts.length === 0) {
       toolResponseParts.push({
-        text: getTranslatedErrorMessage('errors:tools.allCallsFailed', 'All tool calls failed. Please analyze the errors and try an alternative approach.'),
+        text: getTranslatedErrorMessage(
+          'errors:tools.allCallsFailed',
+          'All tool calls failed. Please analyze the errors and try an alternative approach.',
+        ),
       });
     }
 
@@ -559,7 +572,17 @@ export class SubAgentScope {
     const envParts = await getEnvironmentContext(this.runtimeContext);
     const envHistory: Content[] = [
       { role: 'user', parts: envParts },
-      { role: 'model', parts: [{ text: getTranslatedErrorMessage('messages:gotContext', 'Got it. Thanks for the context!') }] },
+      {
+        role: 'model',
+        parts: [
+          {
+            text: getTranslatedErrorMessage(
+              'messages:gotContext',
+              'Got it. Thanks for the context!',
+            ),
+          },
+        ],
+      },
     ];
 
     const start_history = [

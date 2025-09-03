@@ -120,7 +120,9 @@ const getMcpStatus = async (
       case MCPServerStatus.DISCONNECTED:
       default:
         statusIndicator = '🔴';
-        statusText = i18n.t('mcp.serverStatus.disconnected', { ns: 'commands' });
+        statusText = i18n.t('mcp.serverStatus.disconnected', {
+          ns: 'commands',
+        });
         break;
     }
 
@@ -164,12 +166,18 @@ const getMcpStatus = async (
       const parts = [];
       if (serverTools.length > 0) {
         parts.push(
-          i18n.t('mcp.toolCount', { count: serverTools.length, ns: 'commands' }),
+          i18n.t('mcp.toolCount', {
+            count: serverTools.length,
+            ns: 'commands',
+          }),
         );
       }
       if (serverPrompts.length > 0) {
         parts.push(
-          i18n.t('mcp.promptCount', { count: serverPrompts.length, ns: 'commands' }),
+          i18n.t('mcp.promptCount', {
+            count: serverPrompts.length,
+            ns: 'commands',
+          }),
         );
       }
       if (parts.length > 0) {
@@ -352,7 +360,10 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: i18n.t('mcp.authDetails.oauthServersList', { servers: serverList, ns: 'commands' }),
+        content: i18n.t('mcp.authDetails.oauthServersList', {
+          servers: serverList,
+          ns: 'commands',
+        }),
       };
     }
 
@@ -361,7 +372,10 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: i18n.t('mcp.authDetails.serverNotFound', { serverName, ns: 'commands' }),
+        content: i18n.t('mcp.authDetails.serverNotFound', {
+          serverName,
+          ns: 'commands',
+        }),
       };
     }
 
@@ -372,7 +386,10 @@ const authCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: 'info',
-          text: i18n.t('mcp.authDetails.startingAuth', { serverName, ns: 'commands' }),
+          text: i18n.t('mcp.authDetails.startingAuth', {
+            serverName,
+            ns: 'commands',
+          }),
         },
         Date.now(),
       );
@@ -396,7 +413,10 @@ const authCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: 'info',
-          text: i18n.t('mcp.authDetails.authSuccess', { serverName, ns: 'commands' }),
+          text: i18n.t('mcp.authDetails.authSuccess', {
+            serverName,
+            ns: 'commands',
+          }),
         },
         Date.now(),
       );
@@ -407,7 +427,10 @@ const authCommand: SlashCommand = {
         context.ui.addItem(
           {
             type: 'info',
-            text: i18n.t('mcp.authDetails.rediscoveringTools', { serverName, ns: 'commands' }),
+            text: i18n.t('mcp.authDetails.rediscoveringTools', {
+              serverName,
+              ns: 'commands',
+            }),
           },
           Date.now(),
         );
@@ -425,13 +448,20 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: i18n.t('mcp.authDetails.refreshSuccess', { serverName, ns: 'commands' }),
+        content: i18n.t('mcp.authDetails.refreshSuccess', {
+          serverName,
+          ns: 'commands',
+        }),
       };
     } catch (error) {
       return {
         type: 'message',
         messageType: 'error',
-        content: i18n.t('mcp.authFailed', { serverName, error: getErrorMessage(error), ns: 'commands' }),
+        content: i18n.t('mcp.authFailed', {
+          serverName,
+          error: getErrorMessage(error),
+          ns: 'commands',
+        }),
       };
     }
   },

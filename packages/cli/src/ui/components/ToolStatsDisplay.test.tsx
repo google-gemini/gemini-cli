@@ -27,7 +27,7 @@ vi.mock('react-i18next', () => ({
         'stats.accepted': '» Accepted:',
         'stats.rejected': '» Rejected:',
         'stats.modified': '» Modified:',
-        'stats.overallAgreementRate': 'Overall Agreement Rate:'
+        'stats.overallAgreementRate': 'Overall Agreement Rate:',
       };
       return translations[key] || key;
     },

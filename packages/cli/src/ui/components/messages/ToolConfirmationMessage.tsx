@@ -248,8 +248,12 @@ export const ToolConfirmationMessage: React.FC<
 
     bodyContent = (
       <Box flexDirection="column" paddingX={1} marginLeft={1}>
-        <Text color={Colors.AccentCyan}>{i18n.t('ui:tools.mcpServer', { serverName: mcpProps.serverName })}</Text>
-        <Text color={Colors.AccentCyan}>{i18n.t('ui:tools.tool', { toolName: mcpProps.toolName })}</Text>
+        <Text color={Colors.AccentCyan}>
+          {i18n.t('ui:tools.mcpServer', { serverName: mcpProps.serverName })}
+        </Text>
+        <Text color={Colors.AccentCyan}>
+          {i18n.t('ui:tools.tool', { toolName: mcpProps.toolName })}
+        </Text>
       </Box>
     );
 
@@ -260,15 +264,15 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedOnce,
       },
       {
-        label: t('confirmations.yesAllowToolFromServer', { 
-          toolName: mcpProps.toolName, 
-          serverName: mcpProps.serverName 
+        label: t('confirmations.yesAllowToolFromServer', {
+          toolName: mcpProps.toolName,
+          serverName: mcpProps.serverName,
         }),
         value: ToolConfirmationOutcome.ProceedAlwaysTool, // Cast until types are updated
       },
       {
-        label: t('confirmations.yesAllowAllToolsFromServer', { 
-          serverName: mcpProps.serverName 
+        label: t('confirmations.yesAllowAllToolsFromServer', {
+          serverName: mcpProps.serverName,
         }),
         value: ToolConfirmationOutcome.ProceedAlwaysServer,
       },

@@ -458,8 +458,10 @@ Expectation for required parameters:
           },
           expected_replacements: {
             type: 'number',
-            description:
-              getTranslatedErrorMessage('tools:edit.replacementCount', 'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.'),
+            description: getTranslatedErrorMessage(
+              'tools:edit.replacementCount',
+              'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
+            ),
             minimum: 1,
           },
         },

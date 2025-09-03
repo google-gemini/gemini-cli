@@ -174,9 +174,7 @@ export async function handleAtCommand({
     const originalAtPath = atPathPart.content; // e.g., "@file.txt" or "@"
 
     if (originalAtPath === '@') {
-      onDebugMessage(
-        i18n.t('errors:core.loneAtDetected'),
-      );
+      onDebugMessage(i18n.t('errors:core.loneAtDetected'));
       continue;
     }
 
@@ -471,8 +469,7 @@ export async function handleAtCommand({
       callId: `client-read-${userMessageTimestamp}`,
       name: readManyFilesTool.displayName,
       description:
-        invocation?.getDescription() ??
-        i18n.t('errors:tools.executeReadFiles'),
+        invocation?.getDescription() ?? i18n.t('errors:tools.executeReadFiles'),
       status: ToolCallStatus.Error,
       resultDisplay: `Error reading files (${contentLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
       confirmationDetails: undefined,

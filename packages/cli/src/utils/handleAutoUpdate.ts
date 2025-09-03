@@ -59,8 +59,7 @@ export function handleAutoUpdate(
   updateProcess.on('close', (code) => {
     if (code === 0) {
       updateEventEmitter.emit('update-success', {
-        message:
-          t('installation:updateSuccess'),
+        message: t('installation:updateSuccess'),
       });
     } else {
       updateEventEmitter.emit('update-failed', {

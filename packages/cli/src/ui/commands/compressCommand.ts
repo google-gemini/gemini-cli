@@ -68,7 +68,7 @@ export const compressCommand: SlashCommand = {
           type: MessageType.ERROR,
           text: i18n.t('compress.failedWithError', {
             error: e instanceof Error ? e.message : String(e),
-            ns: 'commands'
+            ns: 'commands',
           }),
         },
         Date.now(),

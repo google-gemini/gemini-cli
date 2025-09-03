@@ -6,7 +6,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import i18n from 'i18next';
+import { t } from 'i18next';
 import {
   CommandContext,
   SlashCommand,
@@ -17,7 +17,7 @@ import {
 export const initCommand: SlashCommand = {
   name: 'init',
   get description() {
-    return i18n.t('commands.init.description', { ns: 'ui' });
+    return t('commands.init.description', { ns: 'ui' });
   },
   kind: CommandKind.BUILT_IN,
   action: async (
@@ -28,7 +28,7 @@ export const initCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: i18n.t('commands.init.configNotAvailable', { ns: 'ui' }),
+        content: t('commands.init.configNotAvailable', { ns: 'ui' }),
       };
     }
     const targetDir = context.services.config.getTargetDir();
@@ -38,7 +38,7 @@ export const initCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: i18n.t('commands.init.fileExists', { ns: 'ui' }),
+        content: t('commands.init.fileExists', { ns: 'ui' }),
       };
     }
 
@@ -48,7 +48,7 @@ export const initCommand: SlashCommand = {
     context.ui.addItem(
       {
         type: 'info',
-        text: i18n.t('commands.init.creatingFile', { ns: 'ui' }),
+        text: t('commands.init.creatingFile', { ns: 'ui' }),
       },
       Date.now(),
     );

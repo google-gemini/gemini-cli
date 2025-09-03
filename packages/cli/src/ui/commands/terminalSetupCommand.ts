@@ -6,7 +6,7 @@
 
 import { MessageActionReturn, SlashCommand, CommandKind } from './types.js';
 import { terminalSetup } from '../utils/terminalSetup.js';
-import i18n from 'i18next';
+import { t } from 'i18next';
 
 /**
  * Command to configure terminal keybindings for multiline input support.
@@ -17,7 +17,7 @@ import i18n from 'i18next';
 export const terminalSetupCommand: SlashCommand = {
   name: 'terminal-setup',
   get description() {
-    return i18n.t('commands.terminalSetup.description', { ns: 'ui' });
+    return t('commands.terminalSetup.description', { ns: 'ui' });
   },
   kind: CommandKind.BUILT_IN,
 
@@ -27,7 +27,9 @@ export const terminalSetupCommand: SlashCommand = {
 
       let content = result.message;
       if (result.requiresRestart) {
-        content += i18n.t('commands.terminalSetup.restartRequired', { ns: 'ui' });
+        content += t('commands.terminalSetup.restartRequired', {
+          ns: 'ui',
+        });
       }
 
       return {
@@ -38,7 +40,7 @@ export const terminalSetupCommand: SlashCommand = {
     } catch (error) {
       return {
         type: 'message',
-        content: i18n.t('commands.terminalSetup.failed', { error, ns: 'ui' }),
+        content: t('commands.terminalSetup.failed', { error, ns: 'ui' }),
         messageType: 'error',
       };
     }

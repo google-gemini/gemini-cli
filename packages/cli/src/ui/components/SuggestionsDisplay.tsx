@@ -34,7 +34,7 @@ export function SuggestionsDisplay({
   userInput,
 }: SuggestionsDisplayProps) {
   const { t } = useTranslation('ui');
-  
+
   if (isLoading) {
     return (
       <Box paddingX={1} width={width}>

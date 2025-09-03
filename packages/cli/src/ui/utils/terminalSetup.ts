@@ -30,7 +30,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { isKittyProtocolEnabled } from './kittyProtocolDetector.js';
 import { VSCODE_SHIFT_ENTER_SEQUENCE } from './platformConstants.js';
-import i18next from 'i18next';
+import { t } from 'i18next';
 
 const execAsync = promisify(exec);
 
@@ -312,7 +312,7 @@ export async function terminalSetup(): Promise<TerminalSetupResult> {
   if (isKittyProtocolEnabled()) {
     return {
       success: true,
-      message: i18next.t('terminal:setup.alreadyConfigured'),
+      message: t('terminal:setup.alreadyConfigured'),
     };
   }
 
@@ -321,7 +321,7 @@ export async function terminalSetup(): Promise<TerminalSetupResult> {
   if (!terminal) {
     return {
       success: false,
-      message: i18next.t('terminal:setup.couldNotDetect'),
+      message: t('terminal:setup.couldNotDetect'),
     };
   }
 

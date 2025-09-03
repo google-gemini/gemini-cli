@@ -18,7 +18,7 @@ export const ConsoleSummaryDisplay: React.FC<ConsoleSummaryDisplayProps> = ({
   errorCount,
 }) => {
   const { t } = useTranslation('ui');
-  
+
   if (errorCount === 0) {
     return null;
   }
@@ -30,7 +30,8 @@ export const ConsoleSummaryDisplay: React.FC<ConsoleSummaryDisplayProps> = ({
     <Box>
       {errorCount > 0 && (
         <Text color={Colors.AccentRed}>
-          {errorIcon} {errorCount}{errorText}{' '}
+          {errorIcon} {errorCount}
+          {errorText}{' '}
           <Text color={Colors.Gray}>{t('console.ctrlOForDetails')}</Text>
         </Text>
       )}

@@ -319,7 +319,7 @@
   "autoAccept": {
     "acceptingEdits": "accepting edits",
     "shiftTabToggle": " (shift + tab to toggle)",
-    "yoloMode": "YOLO mode", 
+    "yoloMode": "YOLO mode",
     "ctrlYToggle": " (ctrl + y to toggle)"
   },
   "shellMode": {

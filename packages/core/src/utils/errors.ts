@@ -26,7 +26,10 @@ export function getErrorMessage(error: unknown): string {
   try {
     return String(error);
   } catch {
-    return getTranslatedErrorMessage('errors:core.getDetailsError', 'Failed to get error details');
+    return getTranslatedErrorMessage(
+      'errors:core.getDetailsError',
+      'Failed to get error details',
+    );
   }
 }
 

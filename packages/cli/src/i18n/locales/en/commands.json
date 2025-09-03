@@ -15,7 +15,7 @@
     "description": "manage IDE integration",
     "status": "check status of IDE integration",
     "install": "install required IDE companion",
-    "enable": "enable IDE integration", 
+    "enable": "enable IDE integration",
     "disable": "disable IDE integration"
   },
   "directory": {
@@ -53,7 +53,7 @@
     "copy": "Copy the last result or code snippet to clipboard",
     "corgi": "Toggles corgi mode.",
     "docs": "Open documentation in your browser",
-    "directory": "Switch working directory", 
+    "directory": "Switch working directory",
     "editor": "Configure external editor settings",
     "extensions": "Manage extensions",
     "help": "Show help information",
@@ -65,7 +65,7 @@
     "quit": "Exit the application",
     "restore": "Restore from backup",
     "settings": "Configure application settings",
-    "stats": "Show session statistics", 
+    "stats": "Show session statistics",
     "theme": "Change color theme",
     "tools": "Show available tools",
     "vim": "Toggle Vim mode",
@@ -82,7 +82,7 @@
       "prompt": "Prompt. Appended to input on stdin (if any).",
       "sandbox": "Run in sandbox?",
       "debug": "Run in debug mode?",
-      "allFiles": "Include ALL files in context?", 
+      "allFiles": "Include ALL files in context?",
       "showMemoryUsage": "Show memory usage in status bar",
       "checkpointing": "Enables checkpointing of file edits",
       "experimentalAcp": "Starts the agent in ACP mode",
@@ -157,7 +157,7 @@
     "tips": {
       "title": "💡 Tips:",
       "showDescriptions": "Use {{command}} to show server and tool descriptions",
-      "showSchema": "Use {{command}} to show tool parameter schemas", 
+      "showSchema": "Use {{command}} to show tool parameter schemas",
       "hideDescriptions": "Use {{command}} to hide descriptions",
       "authenticate": "Use {{command}} to authenticate with OAuth-enabled servers",
       "toggleDescriptions": "Press {{key}} to toggle tool descriptions on/off"

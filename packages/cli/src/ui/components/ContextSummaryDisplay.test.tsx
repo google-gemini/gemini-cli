@@ -206,10 +206,10 @@ describe('<ContextSummaryDisplay /> - Multi-language Support', () => {
   describe('Translation Key Fallback', () => {
     beforeEach(() => {
       // Configure mock to test fallback behavior
-      mockT.mockImplementation((key: string) => {
+      mockT.mockImplementation((key: string) => 
         // Simulate missing translations - return the key itself
-        return key;
-      });
+         key
+      );
     });
 
     it('should gracefully handle missing translations by showing translation keys', () => {

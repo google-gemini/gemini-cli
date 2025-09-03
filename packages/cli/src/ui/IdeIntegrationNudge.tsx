@@ -28,7 +28,7 @@ export function IdeIntegrationNudge({
   onComplete,
 }: IdeIntegrationNudgeProps) {
   const { t } = useTranslation('ui');
-  
+
   useKeypress(
     (key) => {
       if (key.name === 'escape') {

@@ -91,13 +91,19 @@ class ReadFileToolInvocation extends BaseToolInvocation<
         result.error.includes('ENOENT')
       ) {
         errorType = ToolErrorType.FILE_NOT_FOUND;
-        llmContent = getTranslatedErrorMessage('errors:core.fileNotFound', 'Could not read file because no file was found at the specified path.');
+        llmContent = getTranslatedErrorMessage(
+          'errors:core.fileNotFound',
+          'Could not read file because no file was found at the specified path.',
+        );
       } else if (
         result.error.includes('is a directory') ||
         result.error.includes('EISDIR')
       ) {
         errorType = ToolErrorType.INVALID_TOOL_PARAMS;
-        llmContent = getTranslatedErrorMessage('errors:core.pathIsDirectory', 'Could not read file because the provided path is a directory, not a file.');
+        llmContent = getTranslatedErrorMessage(
+          'errors:core.pathIsDirectory',
+          'Could not read file because the provided path is a directory, not a file.',
+        );
       } else if (
         result.error.includes('too large') ||
         result.error.includes('File size exceeds')
@@ -112,7 +118,12 @@ class ReadFileToolInvocation extends BaseToolInvocation<
 
       return {
         llmContent,
-        returnDisplay: result.returnDisplay || getTranslatedErrorMessage('errors:file.readError', 'Error reading file'),
+        returnDisplay:
+          result.returnDisplay ||
+          getTranslatedErrorMessage(
+            'errors:file.readError',
+            'Error reading file',
+          ),
         error: {
           message: result.error,
           type: errorType,
@@ -215,10 +226,16 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return `File path must be within one of the workspace directories: ${directories.join(', ')}`;
     }
     if (params.offset !== undefined && params.offset < 0) {
-      return getTranslatedErrorMessage('errors:core.offsetNonNegative', 'Offset must be a non-negative number');
+      return getTranslatedErrorMessage(
+        'errors:core.offsetNonNegative',
+        'Offset must be a non-negative number',
+      );
     }
     if (params.limit !== undefined && params.limit <= 0) {
-      return getTranslatedErrorMessage('errors:core.limitPositive', 'Limit must be a positive number');
+      return getTranslatedErrorMessage(
+        'errors:core.limitPositive',
+        'Limit must be a positive number',
+      );
     }
 
     const fileService = this.config.getFileService();

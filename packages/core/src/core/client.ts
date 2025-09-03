@@ -236,7 +236,14 @@ export class GeminiClient {
       },
       {
         role: 'model',
-        parts: [{ text: getTranslatedErrorMessage('messages:gotContext', 'Got it. Thanks for the context!') }],
+        parts: [
+          {
+            text: getTranslatedErrorMessage(
+              'messages:gotContext',
+              'Got it. Thanks for the context!',
+            ),
+          },
+        ],
       },
       ...(extraHistory ?? []),
     ];

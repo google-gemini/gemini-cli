@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import i18n from 'i18next';
+import i18n, { changeLanguage, t } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import fs from 'fs';
 import path from 'path';
@@ -46,6 +46,7 @@ const namespaces = [
   'feedback',
   'validation',
   'tools',
+  'settings',
 ];
 
 const resources = languages.reduce(
@@ -83,6 +84,7 @@ i18n.use(initReactI18next).init({
     'feedback',
     'validation',
     'tools',
+    'settings',
   ],
   defaultNS: 'help',
 
@@ -100,28 +102,40 @@ export { i18n as errorTranslator };
 export const initializeI18nWithSettings = (settings: LoadedSettings): void => {
   try {
     const settingsLang = settings.merged.language;
-    if (settingsLang && typeof settingsLang === 'string' && languages.includes(settingsLang)) {
-      i18n.changeLanguage(settingsLang);
+    if (
+      settingsLang &&
+      typeof settingsLang === 'string' &&
+      languages.includes(settingsLang)
+    ) {
+      changeLanguage(settingsLang);
     }
   } catch (error) {
     console.debug('[i18n] Failed to initialize language from settings:', error);
   }
 
   // Register error translator for core package
-  setErrorTranslator((key: string, fallback: string, params?: Record<string, string | number>) => {
-    try {
-      return i18n.t(key, { ...params, defaultValue: fallback });
-    } catch {
-      return fallback;
-    }
-  });
+  setErrorTranslator(
+    (
+      key: string,
+      fallback: string,
+      params?: Record<string, string | number>,
+    ) => {
+      try {
+        return t(key, { ...params, defaultValue: fallback });
+      } catch {
+        return fallback;
+      }
+    },
+  );
 };
 
 /**
  * @deprecated Use initializeI18nWithSettings instead
  * This function is kept for compatibility but should not be used in new code
  */
-export const initializeLanguageFromSettings = async (workspaceRoot?: string): Promise<void> => {
+export const initializeLanguageFromSettings = async (
+  workspaceRoot?: string,
+): Promise<void> => {
   try {
     const { loadSettings } = await import('../config/settings.js');
     const settings = loadSettings(workspaceRoot || process.cwd());
@@ -134,6 +148,6 @@ export const initializeLanguageFromSettings = async (workspaceRoot?: string): Pr
 export { languages };
 
 // Export t function for convenient usage
-export const t = i18n.t.bind(i18n);
+export { t };
 
 export default i18n;

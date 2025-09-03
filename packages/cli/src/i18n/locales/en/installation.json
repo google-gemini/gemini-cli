@@ -1,7 +1,7 @@
 {
   "gitClone": "Running from a local git clone. Please update with \"git pull\".",
   "npx": "Running via npx, update not applicable.",
-  "pnpx": "Running via pnpx, update not applicable.", 
+  "pnpx": "Running via pnpx, update not applicable.",
   "homebrew": "Installed via Homebrew. Please update with \"brew upgrade\".",
   "pnpm": "Installed with pnpm. Attempting to automatically update now...",
   "yarn": "Installed with yarn. Attempting to automatically update now...",

@@ -6,7 +6,7 @@
 
 import { render } from 'ink';
 import { MainComponent } from './ui/MainComponent.js';
-import i18n from './i18n/index.js';
+import i18n, { initializeI18nWithSettings } from './i18n/index.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
@@ -46,7 +46,6 @@ import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.j
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import { initializeI18nWithSettings } from './i18n/index.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -174,9 +173,7 @@ export async function main() {
   );
 
   if (argv.promptInteractive && !process.stdin.isTTY) {
-    console.error(
-      i18n.t('errors:cli.promptInteractiveNotSupported'),
-    );
+    console.error(i18n.t('errors:cli.promptInteractiveNotSupported'));
     process.exit(1);
   }
 

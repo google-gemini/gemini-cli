@@ -324,7 +324,6 @@ export class LoopDetectionService {
       .getHistory()
       .slice(-LLM_LOOP_CHECK_HISTORY_COUNT);
 
-
     const prompt = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
 
 An unproductive state is characterized by one or more of the following patterns over the last 5 or more assistant turns:

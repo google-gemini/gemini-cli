@@ -63,9 +63,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     >
       <Box flexDirection="column" marginBottom={1}>
         <Text bold>{t('folderTrust.title')}</Text>
-        <Text>
-          {t('folderTrust.description')}
-        </Text>
+        <Text>{t('folderTrust.description')}</Text>
       </Box>
 
       <RadioButtonSelect items={options} onSelect={onSelect} isFocused />

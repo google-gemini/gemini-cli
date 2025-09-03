@@ -154,7 +154,9 @@ describe('SettingsDialog', () => {
       const output = lastFrame();
       expect(output).toContain('Settings');
       expect(output).toContain('Apply to:');
-      expect(output).toContain('Use ↑↓ navigate, ←→ for options, space toggle, numbers edit, Tab switch');
+      expect(output).toContain(
+        'Use ↑↓ navigate, ←→ for options, space toggle, numbers edit, Tab switch',
+      );
     });
 
     it('should show settings list with default values', () => {

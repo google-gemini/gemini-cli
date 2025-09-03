@@ -128,8 +128,7 @@ export class McpPromptLoader implements ICommandLoader {
                 return {
                   type: 'message',
                   messageType: 'error',
-                  content:
-                    t('dialogs:prompts.emptyResponse'),
+                  content: t('dialogs:prompts.emptyResponse'),
                 };
               }
 

@@ -48,9 +48,7 @@ export function AuthInProgress({
       width="100%"
     >
       {timedOut ? (
-        <Text color={Colors.AccentRed}>
-          {t('ui:auth.timeout')}
-        </Text>
+        <Text color={Colors.AccentRed}>{t('ui:auth.timeout')}</Text>
       ) : (
         <Box>
           <Text>

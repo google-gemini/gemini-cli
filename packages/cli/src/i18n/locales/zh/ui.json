@@ -32,7 +32,7 @@
     "toolTime": "工具时间:",
     "modelUsage": "模型使用情况",
     "reqs": "请求数",
-    "inputTokens": "输入令牌", 
+    "inputTokens": "输入令牌",
     "outputTokens": "输出令牌"
   },
   "errors": {
@@ -178,7 +178,7 @@
     "file": "文件",
     "files": "文件",
     "openFile": "个打开文件",
-    "openFiles": "个打开文件", 
+    "openFiles": "个打开文件",
     "viewHint": "(按 ctrl+g 查看)"
   },
   "tips": {
@@ -313,7 +313,7 @@
   "autoAccept": {
     "acceptingEdits": "自动接受编辑",
     "shiftTabToggle": " (按 shift + tab 切换)",
-    "yoloMode": "YOLO 模式", 
+    "yoloMode": "YOLO 模式",
     "ctrlYToggle": " (按 ctrl + y 切换)"
   },
   "shellMode": {

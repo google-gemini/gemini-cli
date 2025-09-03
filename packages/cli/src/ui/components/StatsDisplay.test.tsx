@@ -13,7 +13,7 @@ import { SessionMetrics } from '../contexts/SessionContext.js';
 // Mock react-i18next
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: any) => {
+    t: (key: string, options?: Record<string, unknown>) => {
       // Mock translations with interpolation support
       const translations: Record<string, string> = {
         'sessionSummary.interactionSummary': 'Interaction Summary',
@@ -31,7 +31,8 @@ vi.mock('react-i18next', () => ({
         'sessionSummary.outputTokens': 'Output Tokens',
         'stats.savingsHighlight': 'Savings Highlight:',
         'stats.cacheEfficiencyMessage': `${options?.cachedTokens || '{{cachedTokens}}'} (${options?.percentage || '{{percentage}}'}%) of input tokens were served from the cache, reducing costs.`,
-        'stats.tokenBredownTip': '» Tip: For a full token breakdown, run `/stats model`.'
+        'stats.tokenBredownTip':
+          '» Tip: For a full token breakdown, run `/stats model`.',
       };
       return translations[key] || key;
     },

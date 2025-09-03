@@ -25,7 +25,7 @@ const getRateLimitErrorMessageGoogleFree = (
   getTranslatedErrorMessage(
     'quota.rateLimitDetected',
     `\nPossible quota limitations in place or slow response times detected. Switching to the ${fallbackModel} model for the rest of this session.`,
-    { fallbackModel }
+    { fallbackModel },
   );
 
 const getRateLimitErrorMessageGoogleProQuotaFree = (
@@ -35,13 +35,13 @@ const getRateLimitErrorMessageGoogleProQuotaFree = (
   getTranslatedErrorMessage(
     'quota.modelQuotaReached',
     `\nYou have reached your daily ${currentModel} quota limit. You will be switched to the ${fallbackModel} model for the rest of this session. To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist, or use /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`,
-    { currentModel, fallbackModel }
+    { currentModel, fallbackModel },
   );
 
 const getRateLimitErrorMessageGoogleGenericQuotaFree = () =>
   getTranslatedErrorMessage(
     'quota.dailyQuotaReached',
-    `\nYou have reached your daily quota limit. To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist, or use /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`
+    `\nYou have reached your daily quota limit. To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist, or use /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`,
   );
 
 // Legacy/Standard Tier message functions
@@ -51,7 +51,7 @@ const getRateLimitErrorMessageGooglePaid = (
   getTranslatedErrorMessage(
     'quota.rateLimitDetectedPaid',
     `\nPossible quota limitations in place or slow response times detected. Switching to the ${fallbackModel} model for the rest of this session. We appreciate you for choosing Gemini Code Assist and the Gemini CLI.`,
-    { fallbackModel }
+    { fallbackModel },
   );
 
 const getRateLimitErrorMessageGoogleProQuotaPaid = (
@@ -61,7 +61,7 @@ const getRateLimitErrorMessageGoogleProQuotaPaid = (
   getTranslatedErrorMessage(
     'quota.modelQuotaReachedPaid',
     `\nYou have reached your daily ${currentModel} quota limit. You will be switched to the ${fallbackModel} model for the rest of this session. We appreciate you for choosing Gemini Code Assist and the Gemini CLI. To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`,
-    { currentModel, fallbackModel }
+    { currentModel, fallbackModel },
   );
 
 const getRateLimitErrorMessageGoogleGenericQuotaPaid = (
@@ -70,15 +70,15 @@ const getRateLimitErrorMessageGoogleGenericQuotaPaid = (
   getTranslatedErrorMessage(
     'quota.dailyQuotaReachedPaid',
     `\nYou have reached your daily quota limit. We appreciate you for choosing Gemini Code Assist and the Gemini CLI. To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`,
-    { currentModel }
+    { currentModel },
   );
 const RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI = getTranslatedErrorMessage(
   'quota.waitAndRetryGemini',
-  '\nPlease wait and try again later. To increase your limits, request a quota increase through AI Studio, or switch to another /auth method'
+  '\nPlease wait and try again later. To increase your limits, request a quota increase through AI Studio, or switch to another /auth method',
 );
 const RATE_LIMIT_ERROR_MESSAGE_VERTEX = getTranslatedErrorMessage(
   'quota.waitAndRetryVertex',
-  '\nPlease wait and try again later. To increase your limits, request a quota increase through Vertex, or switch to another /auth method'
+  '\nPlease wait and try again later. To increase your limits, request a quota increase through Vertex, or switch to another /auth method',
 );
 const getRateLimitErrorMessageDefault = (
   fallbackModel: string = DEFAULT_GEMINI_FLASH_MODEL,
@@ -86,7 +86,7 @@ const getRateLimitErrorMessageDefault = (
   getTranslatedErrorMessage(
     'quota.rateLimitDefault',
     `\nPossible quota limitations in place or slow response times detected. Switching to the ${fallbackModel} model for the rest of this session.`,
-    { fallbackModel }
+    { fallbackModel },
   );
 
 function getRateLimitMessage(
@@ -141,7 +141,11 @@ export function parseAndFormatApiError(
   fallbackModel?: string,
 ): string {
   if (isStructuredError(error)) {
-    let text = getTranslatedErrorMessage('api.prefix', `[API Error: ${error.message}]`, { message: error.message });
+    let text = getTranslatedErrorMessage(
+      'api.prefix',
+      `[API Error: ${error.message}]`,
+      { message: error.message },
+    );
     if (error.status === 429) {
       text += getRateLimitMessage(
         authType,
@@ -158,7 +162,9 @@ export function parseAndFormatApiError(
   if (typeof error === 'string') {
     const jsonStart = error.indexOf('{');
     if (jsonStart === -1) {
-      return getTranslatedErrorMessage('api.prefix', `[API Error: ${error}]`, { message: error }); // Not a JSON error, return as is.
+      return getTranslatedErrorMessage('api.prefix', `[API Error: ${error}]`, {
+        message: error,
+      }); // Not a JSON error, return as is.
     }
 
     const jsonString = error.substring(jsonStart);
@@ -176,7 +182,11 @@ export function parseAndFormatApiError(
         } catch (_e) {
           // It's not a nested JSON error, so we just use the message as is.
         }
-        let text = getTranslatedErrorMessage('api.prefixWithStatus', `[API Error: ${finalMessage} (Status: ${parsedError.error.status})]`, { message: finalMessage, status: parsedError.error.status });
+        let text = getTranslatedErrorMessage(
+          'api.prefixWithStatus',
+          `[API Error: ${finalMessage} (Status: ${parsedError.error.status})]`,
+          { message: finalMessage, status: parsedError.error.status },
+        );
         if (parsedError.error.code === 429) {
           text += getRateLimitMessage(
             authType,
@@ -191,8 +201,13 @@ export function parseAndFormatApiError(
     } catch (_e) {
       // Not a valid JSON, fall through and return the original message.
     }
-    return getTranslatedErrorMessage('api.prefix', `[API Error: ${error}]`, { message: error });
+    return getTranslatedErrorMessage('api.prefix', `[API Error: ${error}]`, {
+      message: error,
+    });
   }
 
-  return getTranslatedErrorMessage('api.unknownError', '[API Error: An unknown error occurred.]');
+  return getTranslatedErrorMessage(
+    'api.unknownError',
+    '[API Error: An unknown error occurred.]',
+  );
 }

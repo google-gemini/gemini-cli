@@ -163,7 +163,11 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       const finalSuggestions = potentialSuggestions.map((cmd) => ({
         label: cmd.name,
         value: cmd.name,
-        description: getCommandDescription(cmd.name, cmd.description || '', leafCommand?.name),
+        description: getCommandDescription(
+          cmd.name,
+          cmd.description || '',
+          leafCommand?.name,
+        ),
       }));
 
       setSuggestions(finalSuggestions);

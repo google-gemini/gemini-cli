@@ -32,7 +32,7 @@
     "toolTime": "Temps outils:",
     "modelUsage": "Utilisation du modèle",
     "reqs": "Req",
-    "inputTokens": "Tokens d'entrée", 
+    "inputTokens": "Tokens d'entrée",
     "outputTokens": "Tokens de sortie"
   },
   "errors": {
@@ -44,7 +44,7 @@
     "phrases": [
       "Je me sens chanceux",
       "Expédition de l'excellence...",
-      "Remise des empattements...", 
+      "Remise des empattements...",
       "Navigation dans la moisissure visqueuse...",
       "Consultation des esprits numériques...",
       "Réticulation des splines...",
@@ -207,7 +207,7 @@
   "autoAccept": {
     "acceptingEdits": "accepter les modifications",
     "shiftTabToggle": " (shift + tab pour basculer)",
-    "yoloMode": "mode YOLO", 
+    "yoloMode": "mode YOLO",
     "ctrlYToggle": " (ctrl + y pour basculer)"
   },
   "shellMode": {

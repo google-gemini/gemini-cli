@@ -23,7 +23,7 @@ export const CompressionMessage: React.FC<CompressionDisplayProps> = ({
   compression,
 }) => {
   const { t } = useTranslation();
-  
+
   const text = compression.isPending
     ? t('commands:compression.title')
     : `Chat history compressed from ${compression.originalTokenCount ?? 'unknown'}` +

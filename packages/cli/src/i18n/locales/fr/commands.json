@@ -21,7 +21,7 @@
     "description": "gérer l'intégration IDE",
     "status": "vérifier le statut de l'intégration IDE",
     "install": "installer le compagnon IDE requis",
-    "enable": "activer l'intégration IDE", 
+    "enable": "activer l'intégration IDE",
     "disable": "désactiver l'intégration IDE"
   },
   "directory": {
@@ -59,7 +59,7 @@
     "copy": "Copier le dernier résultat ou extrait de code dans le presse-papiers",
     "corgi": "Active/désactive le mode corgi.",
     "docs": "Ouvrir la documentation dans votre navigateur",
-    "directory": "Changer le répertoire de travail", 
+    "directory": "Changer le répertoire de travail",
     "editor": "Configurer les paramètres d'éditeur externe",
     "extensions": "Gérer les extensions",
     "help": "Afficher les informations d'aide",
@@ -71,7 +71,7 @@
     "quit": "Quitter l'application",
     "restore": "Restaurer depuis la sauvegarde",
     "settings": "Configurer les paramètres de l'application",
-    "stats": "Afficher les statistiques de session", 
+    "stats": "Afficher les statistiques de session",
     "theme": "Changer le thème de couleur",
     "tools": "Afficher les outils disponibles",
     "vim": "Activer/désactiver le mode Vim",
