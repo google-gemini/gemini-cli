@@ -90,7 +90,7 @@ export async function activate(context: vscode.ExtensionContext) {
   log = createLogger(context, logger);
   log('Extension activated');
 
-  await checkForUpdates(context, log);
+  checkForUpdates(context, log);
 
   const diffContentProvider = new DiffContentProvider();
   const diffManager = new DiffManager(log, diffContentProvider);
