@@ -44,6 +44,8 @@ import {
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { runZedIntegration } from './zed-integration/zedIntegration.js';
+import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
@@ -144,8 +146,6 @@ const InitializingComponent = ({ initialTotal }: { initialTotal: number }) => {
     </Box>
   );
 };
-
-import { runZedIntegration } from './zed-integration/zedIntegration.js';
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
@@ -291,6 +291,16 @@ export async function main() {
   }
 
   await config.initialize();
+
+  // Cleanup sessions after config initialization
+  try {
+    await cleanupExpiredSessions(config, settings.merged);
+  } catch (error) {
+    // Don't let cleanup failures prevent CLI startup
+    if (config.getDebugMode()) {
+      console.debug('Session cleanup failed:', error);
+    }
+  }
 
   if (spinnerInstance) {
     // Small UX detail to show the completion message for a bit before unmounting.

@@ -133,6 +133,12 @@ export const useGeminiStream = (
             Date.now(),
           );
 
+          // Record tool calls with full metadata before sending responses
+          config
+            .getGeminiClient()
+            .getChat()
+            .recordCompletedToolCalls(completedToolCallsFromScheduler);
+
           // Handle tool response submission immediately when tools complete
           await handleCompletedTools(
             completedToolCallsFromScheduler as TrackedToolCall[],

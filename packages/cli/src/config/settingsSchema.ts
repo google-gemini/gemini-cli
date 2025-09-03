@@ -12,6 +12,7 @@ import type {
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
+import type { SessionRetentionSettings } from './settings.js';
 
 export interface SettingDefinition {
   type: 'boolean' | 'string' | 'number' | 'array' | 'object';
@@ -134,6 +135,55 @@ export const SETTINGS_SCHEMA = {
         default: false,
         description: 'Enable debug logging of keystrokes to the console.',
         showInDialog: true,
+      },
+      sessionRetention: {
+        type: 'object',
+        label: 'Session Retention',
+        category: 'General',
+        requiresRestart: false,
+        default: undefined as SessionRetentionSettings | undefined,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Session Cleanup',
+            category: 'General',
+            requiresRestart: false,
+            default: false,
+            description: 'Enable automatic session cleanup',
+            showInDialog: true,
+          },
+          maxAge: {
+            type: 'string',
+            label: 'Max Session Age',
+            category: 'General',
+            requiresRestart: false,
+            default: undefined as string | undefined,
+            description:
+              'Maximum age of sessions to keep (e.g., "30d", "7d", "24h", "1w")',
+            showInDialog: false,
+          },
+          maxCount: {
+            type: 'number',
+            label: 'Max Session Count',
+            category: 'General',
+            requiresRestart: false,
+            default: undefined as number | undefined,
+            description:
+              'Alternative: Maximum number of sessions to keep (most recent)',
+            showInDialog: false,
+          },
+          minRetention: {
+            type: 'string',
+            label: 'Min Retention Period',
+            category: 'General',
+            requiresRestart: false,
+            default: '1d',
+            description:
+              'Minimum retention period (safety limit, defaults to "1d")',
+            showInDialog: false,
+          },
+        },
+        description: 'Settings for automatic session cleanup.',
       },
     },
   },
