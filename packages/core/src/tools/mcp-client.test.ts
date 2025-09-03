@@ -23,6 +23,7 @@ import { AuthProviderType } from '../config/config.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { WorkspaceContext } from '../utils/workspaceContext.js';
+import type { CallableToolConfig } from '@google/genai';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -188,7 +189,63 @@ describe('mcp-client', () => {
       );
       consoleErrorSpy.mockRestore();
     });
+    it('should set tool timeout when discovering tools', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      const mcpTool = {
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'testFunctionWithTimeout',
+                description: 'a test function',
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool;
+      const mcpToTool = vi.mocked(GenAiLib.mcpToTool).mockReturnValue(mcpTool);
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+      } as unknown as ToolRegistry;
+
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+          timeout: 5000,
+        },
+        mockedToolRegistry,
+        {} as PromptRegistry,
+        {} as WorkspaceContext,
+        false,
+      );
+      await client.connect();
+      await client.discover();
+
+      const expectedConfig: CallableToolConfig = {
+        timeout: 5000
+      }
+
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+      expect(mcpToTool).toHaveBeenCalledOnce();
+      expect(mcpToTool).toHaveBeenCalledWith(
+        mockedClient, expectedConfig
+      )
+    });
   });
+
   describe('appendMcpServerCommand', () => {
     it('should do nothing if no MCP servers or command are configured', () => {
       const out = populateMcpServerCommand({}, undefined);
