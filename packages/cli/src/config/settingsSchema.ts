@@ -277,6 +277,15 @@ export const SETTINGS_SCHEMA = {
         description: 'Show citations for generated text in the chat.',
         showInDialog: true,
       },
+      customWittyPhrases: {
+        type: 'array',
+        label: 'Custom Witty Phrases',
+        category: 'UI',
+        requiresRestart: false,
+        default: [] as string[],
+        description: 'Custom witty phrases to display during loading.',
+        showInDialog: false,
+      },
       accessibility: {
         type: 'object',
         label: 'Accessibility',
@@ -648,7 +657,7 @@ export const SETTINGS_SCHEMA = {
         category: 'MCP',
         requiresRestart: true,
         default: undefined as string[] | undefined,
-        description: 'A whitelist of MCP servers to allow.',
+        description: 'A list of MCP servers to allow.',
         showInDialog: false,
       },
       excluded: {
@@ -657,7 +666,7 @@ export const SETTINGS_SCHEMA = {
         category: 'MCP',
         requiresRestart: true,
         default: undefined as string[] | undefined,
-        description: 'A blacklist of MCP servers to exclude.',
+        description: 'A list of MCP servers to exclude.',
         showInDialog: false,
       },
     },
