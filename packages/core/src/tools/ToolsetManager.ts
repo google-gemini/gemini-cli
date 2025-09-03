@@ -17,7 +17,7 @@ import { ShellTool } from './shell.js';
 import { MemoryTool } from './memoryTool.js';
 import { WebSearchTool } from './web-search.js';
 import { ExcelTool } from './excel-tool.js';
-// import { PDFTool } from './pdf.js';
+import { PDFTool } from './pdf-tool.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolClass = any;
@@ -44,7 +44,7 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     WebFetchTool,
     WebSearchTool,
     ExcelTool,
-    // PDFTool
+    PDFTool
   ],
   translator: [
     ReadFileTool,
