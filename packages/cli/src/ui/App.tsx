@@ -56,6 +56,7 @@ import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
+import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import process from 'node:process';
 import type { EditorType, Config, IdeContext } from '@google/gemini-cli-core';
 import {
@@ -368,6 +369,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         config.getFileService(),
         settings.merged,
         config.getExtensionContextFilePaths(),
+        config.getFolderTrust(),
         settings.merged.context?.importFormat || 'tree', // Use setting or default to 'tree'
         config.getFileFilteringOptions(),
       );
@@ -623,7 +625,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     shellModeActive,
   });
 
-  const [userMessages, setUserMessages] = useState<string[]>([]);
+  // Independent input history management (unaffected by /clear)
+  const inputHistoryStore = useInputHistoryStore();
 
   // Stable reference for cancel handler to avoid circular dependency
   const cancelHandlerRef = useRef<() => void>(() => {});
@@ -672,7 +675,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       return;
     }
 
-    const lastUserMessage = userMessages.at(-1);
+    const lastUserMessage = inputHistoryStore.inputHistory.at(-1);
     let textToSet = lastUserMessage || '';
 
     // Append queued messages if any exist
@@ -687,7 +690,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     }
   }, [
     buffer,
-    userMessages,
+    inputHistoryStore.inputHistory,
     getQueuedMessagesText,
     clearQueue,
     pendingHistoryItems,
@@ -696,9 +699,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   // Input handling - queue messages for processing
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
+      const trimmedValue = submittedValue.trim();
+      if (trimmedValue.length > 0) {
+        // Add to independent input history
+        inputHistoryStore.addInput(trimmedValue);
+      }
+      // Always add to message queue
       addMessage(submittedValue);
     },
-    [addMessage],
+    [addMessage, inputHistoryStore],
   );
 
   const handleIdePromptComplete = useCallback(
@@ -841,41 +850,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const logger = useLogger(config.storage);
 
+  // Initialize independent input history from logger
   useEffect(() => {
-    const fetchUserMessages = async () => {
-      const pastMessagesRaw = (await logger?.getPreviousUserMessages()) || []; // Newest first
-
-      const currentSessionUserMessages = history
-        .filter(
-          (item): item is HistoryItem & { type: 'user'; text: string } =>
-            item.type === 'user' &&
-            typeof item.text === 'string' &&
-            item.text.trim() !== '',
-        )
-        .map((item) => item.text)
-        .reverse(); // Newest first, to match pastMessagesRaw sorting
-
-      // Combine, with current session messages being more recent
-      const combinedMessages = [
-        ...currentSessionUserMessages,
-        ...pastMessagesRaw,
-      ];
-
-      // Deduplicate consecutive identical messages from the combined list (still newest first)
-      const deduplicatedMessages: string[] = [];
-      if (combinedMessages.length > 0) {
-        deduplicatedMessages.push(combinedMessages[0]); // Add the newest one unconditionally
-        for (let i = 1; i < combinedMessages.length; i++) {
-          if (combinedMessages[i] !== combinedMessages[i - 1]) {
-            deduplicatedMessages.push(combinedMessages[i]);
-          }
-        }
-      }
-      // Reverse to oldest first for useInputHistory
-      setUserMessages(deduplicatedMessages.reverse());
-    };
-    fetchUserMessages();
-  }, [history, logger]);
+    inputHistoryStore.initializeFromLogger(logger);
+  }, [logger, inputHistoryStore]);
 
   const isInputActive =
     (streamingState === StreamingState.Idle ||
@@ -1004,6 +982,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const placeholder = vimModeEnabled
     ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
     : '  Type your message or @path/to/file';
+
+  const hideContextSummary = settings.merged.ui?.hideContextSummary ?? false;
 
   return (
     <StreamingContext.Provider value={streamingState}>
@@ -1238,7 +1218,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 }
                 elapsedTime={elapsedTime}
               />
-
               {/* Display queued messages below loading indicator */}
               {messageQueue.length > 0 && (
                 <Box flexDirection="column" marginTop={1}>
@@ -1270,10 +1249,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   )}
                 </Box>
               )}
-
               <Box
                 marginTop={1}
-                justifyContent="space-between"
+                justifyContent={
+                  hideContextSummary ? 'flex-start' : 'space-between'
+                }
                 width="100%"
                 flexDirection={isNarrow ? 'column' : 'row'}
                 alignItems={isNarrow ? 'flex-start' : 'center'}
@@ -1292,7 +1272,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     </Text>
                   ) : showEscapePrompt ? (
                     <Text color={Colors.Gray}>Press Esc again to clear.</Text>
-                  ) : (
+                  ) : !hideContextSummary ? (
                     <ContextSummaryDisplay
                       ideContext={ideContextState}
                       geminiMdFileCount={geminiMdFileCount}
@@ -1301,9 +1281,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                       blockedMcpServers={config.getBlockedMcpServers()}
                       showToolDescriptions={showToolDescriptions}
                     />
-                  )}
+                  ) : null}
                 </Box>
-                <Box paddingTop={isNarrow ? 1 : 0}>
+                <Box
+                  paddingTop={isNarrow ? 1 : 0}
+                  marginLeft={hideContextSummary ? 1 : 2}
+                >
                   {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
                     !shellModeActive && (
                       <AutoAcceptIndicator
@@ -1313,7 +1296,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   {shellModeActive && <ShellModeIndicator />}
                 </Box>
               </Box>
-
               {showErrorDetails && (
                 <OverflowProvider>
                   <Box flexDirection="column">
@@ -1328,14 +1310,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   </Box>
                 </OverflowProvider>
               )}
-
               {isInputActive && (
                 <InputPrompt
                   buffer={buffer}
                   inputWidth={inputWidth}
                   suggestionsWidth={suggestionsWidth}
                   onSubmit={handleFinalSubmit}
-                  userMessages={userMessages}
+                  userMessages={inputHistoryStore.inputHistory}
                   onClearScreen={handleClearScreen}
                   config={config}
                   slashCommands={slashCommands}
@@ -1402,6 +1383,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               nightly={nightly}
               vimMode={vimModeEnabled ? vimMode : undefined}
               isTrustedFolder={isTrustedFolderState}
+              hideCWD={settings.merged.ui?.footer?.hideCWD}
+              hideSandboxStatus={settings.merged.ui?.footer?.hideSandboxStatus}
+              hideModelInfo={settings.merged.ui?.footer?.hideModelInfo}
             />
           )}
         </Box>
