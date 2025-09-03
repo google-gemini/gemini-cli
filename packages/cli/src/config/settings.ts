@@ -18,9 +18,31 @@ import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import type { Settings, MemoryImportFormat } from './settingsSchema.js';
+import {
+  type Settings,
+  type MemoryImportFormat,
+  SETTINGS_SCHEMA,
+  type MergeStrategy,
+  type SettingsSchema,
+  type SettingDefinition,
+} from './settingsSchema.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
-import { mergeWith } from 'lodash-es';
+import { customDeepMerge } from '../utils/deepMerge.js';
+
+function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
+  let current: SettingDefinition | undefined = undefined;
+  let currentSchema: SettingsSchema | undefined = SETTINGS_SCHEMA;
+
+  for (const key of path) {
+    if (!currentSchema || !currentSchema[key]) {
+      return undefined;
+    }
+    current = currentSchema[key];
+    currentSchema = current.properties;
+  }
+
+  return current?.mergeStrategy;
+}
 
 export type { Settings, MemoryImportFormat };
 
@@ -323,46 +345,14 @@ function mergeSettings(
   // 2. User Settings
   // 3. Workspace Settings
   // 4. System Settings (as overrides)
-  const customizer = (
-    objValue: unknown,
-    srcValue: unknown,
-    key: string,
-  ): unknown | undefined => {
-    // For mcpServers, we want to merge the list of servers, but if a server
-    // is defined in multiple places, the entire definition from the higher
-    // precedence source should win (replacement), not a deep merge. A
-    // shallow merge of the mcpServers objects achieves this.
-    if (key === 'mcpServers' && objValue && srcValue) {
-      return { ...(objValue as object), ...(srcValue as object) };
-    }
-
-    if (Array.isArray(objValue)) {
-      const srcArray = Array.isArray(srcValue) ? srcValue : [srcValue];
-      if (key === 'includeDirectories') {
-        return objValue.concat(srcArray);
-      }
-      if (
-        key === 'excludedEnvVars' ||
-        key === 'disabled' ||
-        key === 'workspacesWithMigrationNudge'
-      ) {
-        return [...new Set(objValue.concat(srcArray))];
-      }
-      // For other arrays, we want replacement behavior.
-      return srcValue as unknown[];
-    }
-    // Return undefined to let mergeWith handle default merging for other types.
-    return undefined;
-  };
-
-  return mergeWith(
+  return customDeepMerge(
+    getMergeStrategyForPath,
     {}, // Start with an empty object
     systemDefaults,
     user,
     safeWorkspaceWithoutFolderTrust,
     system,
-    customizer,
-  );
+  ) as Settings;
 }
 
 export class LoadedSettings {
@@ -639,7 +629,12 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   }
 
   // For the initial trust check, we can only use user and system settings.
-  const initialTrustCheckSettings = mergeWith({}, systemSettings, userSettings);
+  const initialTrustCheckSettings = customDeepMerge(
+    getMergeStrategyForPath,
+    {},
+    systemSettings,
+    userSettings,
+  );
   const isTrusted =
     isWorkspaceTrusted(initialTrustCheckSettings as Settings) ?? true;
 
