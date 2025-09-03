@@ -18,7 +18,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GCSTaskStore, NoOpTaskStore } from './gcs.js';
 import { logger } from '../utils/logger.js';
 import * as configModule from '../config/config.js';
-import * as metadataModule from '../metadata_types.js';
+import { getPersistedState, METADATA_KEY } from '../types.js';
 
 // Mock dependencies
 vi.mock('@google-cloud/storage');
@@ -53,10 +53,16 @@ vi.mock('../utils/logger.js', () => ({
 vi.mock('../config/config.js', () => ({
   setTargetDir: vi.fn(),
 }));
-vi.mock('../metadata_types');
 vi.mock('node:stream/promises', () => ({
   pipeline: vi.fn(),
 }));
+vi.mock('../types.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../types.js')>();
+  return {
+    ...actual,
+    getPersistedState: vi.fn(),
+  };
+});
 
 const mockStorage = Storage as MockedClass<typeof Storage>;
 const mockFse = fse as Mocked<typeof fse>;
@@ -66,8 +72,8 @@ const mockGzipSync = gzipSync as Mock;
 const mockGunzipSync = gunzipSync as Mock;
 const mockUuidv4 = uuidv4 as Mock;
 const mockSetTargetDir = configModule.setTargetDir as Mock;
-const mockGetPersistedState = metadataModule.getPersistedState as Mock;
-const METADATA_KEY = metadataModule.METADATA_KEY || '__persistedState';
+const mockGetPersistedState = getPersistedState as Mock;
+const TEST_METADATA_KEY = METADATA_KEY || '__persistedState';
 
 type MockWriteStream = {
   on: Mock<
@@ -228,7 +234,10 @@ describe('GCSTaskStore', () => {
       mockGunzipSync.mockReturnValue(
         Buffer.from(
           JSON.stringify({
-            [METADATA_KEY]: { _agentSettings: {}, _taskState: 'submitted' },
+            [TEST_METADATA_KEY]: {
+              _agentSettings: {},
+              _taskState: 'submitted',
+            },
             _contextId: 'ctx1',
           }),
         ),
@@ -282,7 +291,10 @@ describe('GCSTaskStore', () => {
       mockGunzipSync.mockReturnValue(
         Buffer.from(
           JSON.stringify({
-            [METADATA_KEY]: { _agentSettings: {}, _taskState: 'submitted' },
+            [TEST_METADATA_KEY]: {
+              _agentSettings: {},
+              _taskState: 'submitted',
+            },
             _contextId: 'ctx1',
           }),
         ),

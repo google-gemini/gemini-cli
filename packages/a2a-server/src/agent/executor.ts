@@ -19,15 +19,22 @@ import type {
 } from '@google/gemini-cli-core';
 import { GeminiEventType } from '@google/gemini-cli-core';
 import { v4 as uuidv4 } from 'uuid';
+
 import { logger } from '../utils/logger.js';
-import type { StateChange, AgentSettings } from '../types.js';
-import { CoderAgentEvent } from '../types.js';
+import type {
+  StateChange,
+  AgentSettings,
+  PersistedStateMetadata,
+} from '../types.js';
+import {
+  CoderAgentEvent,
+  getPersistedState,
+  setPersistedState,
+} from '../types.js';
 import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { Task } from './task.js';
-import type { PersistedStateMetadata } from '../metadata_types.js';
-import { getPersistedState, setPersistedState } from '../metadata_types.js';
 import { requestStorage } from '../http/requestStorage.js';
 
 /**
