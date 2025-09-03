@@ -169,7 +169,7 @@ describe('Trusted Folders Loading', () => {
     expect(mockFsWriteFileSync).toHaveBeenCalledWith(
       USER_TRUSTED_FOLDERS_PATH,
       JSON.stringify({ '/new/path': TrustLevel.TRUST_FOLDER }, null, 2),
-      'utf-8',
+      { encoding: 'utf-8', mode: 0o600 },
     );
   });
 });
