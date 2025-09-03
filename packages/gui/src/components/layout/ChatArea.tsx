@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { MessageList } from '@/components/chat/MessageList';
 import { MessageInput } from '@/components/chat/MessageInput';
 import { EmptyState } from '@/components/chat/EmptyState';
@@ -10,20 +10,19 @@ import { Button } from '@/components/ui/Button';
 export const ChatArea: React.FC = () => {
   const { sessions, activeSessionId } = useAppStore();
   const { isStreaming, isThinking, streamingMessage, error, setError } = useChatStore();
+  const messageInputRef = useRef<{ setMessage: (message: string) => void }>(null);
 
   const activeSession = sessions.find(session => session.id === activeSessionId);
 
-  if (!activeSession) {
-    return (
-      <div className="flex-1 flex flex-col">
-        <EmptyState />
-        <MessageInput disabled />
-      </div>
-    );
-  }
+  const handlePromptSelect = (prompt: string) => {
+    // Focus the message input and set the selected prompt
+    messageInputRef.current?.setMessage(prompt);
+  };
+
+  const showEmptyState = !activeSession || (activeSession && activeSession.messages.length === 0);
 
   return (
-    <div className="flex-1 flex flex-col h-full">
+    <div className="flex-1 flex flex-col overflow-hidden">
       {/* Error notification */}
       {error && (
         <div className="mx-4 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-3">
@@ -42,13 +41,18 @@ export const ChatArea: React.FC = () => {
         </div>
       )}
       
-      <MessageList
-        messages={activeSession.messages}
-        isStreaming={isStreaming}
-        isThinking={isThinking}
-        streamingContent={streamingMessage}
-      />
-      <MessageInput />
+      {showEmptyState ? (
+        <EmptyState onPromptSelect={handlePromptSelect} />
+      ) : (
+        <MessageList
+          messages={activeSession!.messages}
+          isStreaming={isStreaming}
+          isThinking={isThinking}
+          streamingContent={streamingMessage}
+        />
+      )}
+      
+      <MessageInput disabled={!activeSession} ref={messageInputRef} />
     </div>    
   );
 };

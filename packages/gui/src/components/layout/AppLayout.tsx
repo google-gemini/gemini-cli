@@ -11,7 +11,7 @@ export const AppLayout: React.FC = () => {
   // Note: Role and model loading is handled in App.tsx to avoid duplication
 
   return (
-    <div className="flex h-screen bg-background text-foreground">
+    <div className="flex h-full bg-background text-foreground overflow-hidden">
       <Sidebar />
       <div className={cn(
         "flex-1 flex flex-col transition-all duration-300 ease-in-out",

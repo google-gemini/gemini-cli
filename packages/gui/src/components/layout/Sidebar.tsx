@@ -8,6 +8,7 @@ import {
   Search,
   MoreHorizontal,
   Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -26,11 +27,13 @@ export const Sidebar: React.FC = () => {
     setActiveSession,
     addSession,
     removeSession,
+    clearAllSessions,
     updateSession,
     setSidebarCollapsed
   } = useAppStore();
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
 
   const filteredSessions = sessions.filter(session =>
     session.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -94,6 +97,20 @@ export const Sidebar: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to delete backend session:', error);
+    }
+  };
+
+  const handleDeleteAllSessions = async () => {
+    // Clear frontend store
+    clearAllSessions();
+    
+    // Notify backend to delete all sessions
+    try {
+      await multiModelService.deleteAllSessions();
+      console.log('All backend sessions deleted');
+      setShowDeleteAllConfirm(false);
+    } catch (error) {
+      console.error('Failed to delete all backend sessions:', error);
     }
   };
 
@@ -197,14 +214,27 @@ export const Sidebar: React.FC = () => {
 
       {/* Search */}
       <div className="px-4 pb-4">
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search conversations..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search conversations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          {sessions.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowDeleteAllConfirm(true)}
+              className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+              title="Delete all conversations"
+            >
+              <Trash2 size={16} />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -269,6 +299,36 @@ export const Sidebar: React.FC = () => {
           Settings
         </Button>
       </div>
+
+      {/* Delete All Confirmation Modal */}
+      {showDeleteAllConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setShowDeleteAllConfirm(false)} />
+          <div className="relative bg-card rounded-lg shadow-lg p-6 max-w-md w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0" />
+              <h3 className="text-lg font-semibold">Delete All Conversations</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-6">
+              This action will permanently delete all {sessions.length} conversation{sessions.length !== 1 ? 's' : ''} and cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="ghost"
+                onClick={() => setShowDeleteAllConfirm(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteAllSessions}
+              >
+                Delete All
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Send, StopCircle, Paperclip, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
@@ -12,12 +12,27 @@ interface MessageInputProps {
   disabled?: boolean;
 }
 
-export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) => {
+interface MessageInputRef {
+  setMessage: (message: string) => void;
+}
+
+export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ disabled = false }, ref) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   const { activeSessionId, updateSession } = useAppStore();
   const { isStreaming, isThinking, setStreaming, setThinking, setStreamingMessage, setError } = useChatStore();
+
+  useImperativeHandle(ref, () => ({
+    setMessage: (newMessage: string) => {
+      setMessage(newMessage);
+      // Focus the textarea after setting the message
+      setTimeout(() => {
+        textareaRef.current?.focus();
+        adjustTextareaHeight();
+      }, 0);
+    }
+  }), []);
 
   const adjustTextareaHeight = useCallback(() => {
     const textarea = textareaRef.current;
@@ -237,4 +252,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({ disabled = false }) 
       </div>
     </div>
   );
-};
+});
+
+MessageInput.displayName = 'MessageInput';
