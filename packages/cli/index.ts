@@ -10,6 +10,17 @@ import './src/gemini.js';
 import { main } from './src/gemini.js';
 import { FatalError } from '@google/gemini-cli-core';
 
+export {
+  loadSettings,
+  saveSettings,
+  SettingScope,
+  type Settings,
+} from './src/config/settings.js';
+export {
+  themeManager,
+  type ThemeDisplay,
+} from './src/ui/themes/theme-manager.js';
+
 // --- Global Entry Point ---
 main().catch((error) => {
   if (error instanceof FatalError) {
