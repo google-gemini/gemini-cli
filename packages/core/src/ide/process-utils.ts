@@ -60,6 +60,7 @@ async function getProcessInfo(pid: number): Promise<{
       };
     }
   } catch (_e) {
+    console.debug(`Failed to get process info for pid ${pid}:`, _e);
     return { parentPid: 0, name: '', command: '' };
   }
 }
