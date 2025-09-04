@@ -12,7 +12,10 @@ import { logLoopDetected } from '../telemetry/loggers.js';
 import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
-import { isFunctionCall, isFunctionResponse } from '../utils/messageInspectors.js';
+import {
+  isFunctionCall,
+  isFunctionResponse,
+} from '../utils/messageInspectors.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -344,13 +347,10 @@ export class LoopDetectionService {
     // A function response should follow a function call.
     // Continuously removes leading function responses from the beginning of history
     // until the first turn is not a function response.
-    while (
-      recentHistory.length > 0 &&
-      isFunctionResponse(recentHistory[0])
-    ) {
+    while (recentHistory.length > 0 && isFunctionResponse(recentHistory[0])) {
       recentHistory.shift();
     }
-    
+
     return recentHistory;
   }
 
@@ -359,8 +359,8 @@ export class LoopDetectionService {
       .getGeminiClient()
       .getHistory()
       .slice(-LLM_LOOP_CHECK_HISTORY_COUNT);
-    
-    const trimmedHistory = this.trimRecentHistory(recentHistory)
+
+    const trimmedHistory = this.trimRecentHistory(recentHistory);
 
     const prompt = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
 
