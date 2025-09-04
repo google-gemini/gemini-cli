@@ -167,6 +167,7 @@ The Gemini CLI uses a dedicated OAuth callback server that listens on port 7777.
 
 **For MCP Server Developers:**
 When configuring OAuth for your MCP server, please ensure your OAuth provider includes this redirect URI:
+
 ```
 http://localhost:7777/oauth/callback
 ```
