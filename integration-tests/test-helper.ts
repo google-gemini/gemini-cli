@@ -5,7 +5,6 @@
  */
 
 import { execSync, spawn } from 'node:child_process';
-import { parse } from 'shell-quote';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -182,7 +181,7 @@ export class TestRig {
       | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
     ...args: string[]
   ): Promise<string> {
-    let commandArgs = [this.bundlePath, '--yolo'];
+    const commandArgs = [this.bundlePath, '--yolo'];
     const execOptions: {
       cwd: string;
       encoding: 'utf-8';
