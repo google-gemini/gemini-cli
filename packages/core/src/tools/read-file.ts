@@ -174,6 +174,11 @@ export class ReadFileTool extends BaseDeclarativeTool<
               "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
             type: 'string',
           },
+          absolute_path: {
+            description:
+              "The absolute path to the file to read (legacy parameter name for backward compatibility). Use 'file_path' instead for consistency with other file system tools.",
+            type: 'string',
+          },
           offset: {
             description:
               "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
@@ -185,7 +190,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
             type: 'number',
           },
         },
-        required: ['file_path'],
         type: 'object',
       },
     );
@@ -194,9 +198,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: ReadFileToolParams,
   ): string | null {
-    const filePath = (params as any).file_path ?? params.absolute_path;
+    const filePath = params.file_path ?? params.absolute_path;
     if (!filePath || filePath.trim() === '') {
-      return "The 'file_path' parameter must be non-empty.";
+      return "A non-empty file path must be provided via 'file_path' or 'absolute_path'.";
     }
 
     if (!path.isAbsolute(filePath)) {
@@ -225,7 +229,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: ReadFileToolParams,
-  ): ToolInvocation<ReadFileToolInternalParams, ToolResult> {
+  ): ToolInvocation<ReadFileToolParams, ToolResult> {
     return new ReadFileToolInvocation(this.config, params);
   }
 }
