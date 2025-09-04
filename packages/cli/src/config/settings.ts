@@ -55,7 +55,6 @@ export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
 const MIGRATE_V2_OVERWRITE = false;
 
-// As defined in spec.md
 const MIGRATION_MAP: Record<string, string> = {
   accessibility: 'ui.accessibility',
   allowedTools: 'tools.allowed',
