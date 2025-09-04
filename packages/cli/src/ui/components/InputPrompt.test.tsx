@@ -1311,6 +1311,33 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('multiline rendering', () => {
+    it('should correctly render multiline input including blank lines', async () => {
+      const text = 'hello\n\nworld';
+      mockBuffer.text = text;
+      mockBuffer.lines = text.split('\n');
+      mockBuffer.viewportVisualLines = text.split('\n');
+      mockBuffer.allVisualLines = text.split('\n');
+      mockBuffer.visualCursor = [2, 5]; // cursor at the end of "world"
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      // Check that all lines, including the empty one, are rendered.
+      // This implicitly tests that the Box wrapper provides height for the empty line.
+      expect(frame).toContain('hello');
+      expect(frame).toContain(`world${chalk.inverse(' ')}`);
+
+      const outputLines = frame!.split('\n');
+      // The number of lines should be 2 for the border plus 3 for the content.
+      expect(outputLines.length).toBe(5);
+      unmount();
+    });
+  });
+
   describe('multiline paste', () => {
     it.each([
       {
