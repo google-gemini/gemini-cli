@@ -28,6 +28,9 @@ function mergeRecursively(
   path: string[] = [],
 ) {
   for (const key of Object.keys(source)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      continue;
+    }
     const newPath = [...path, key];
     const srcValue = source[key];
     const objValue = target[key];
