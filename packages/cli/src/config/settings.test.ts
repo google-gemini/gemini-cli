@@ -60,7 +60,7 @@ import {
   type Settings,
   loadEnvironment,
 } from './settings.js';
-import { GEMINI_DIR } from '@google/gemini-cli-core';
+import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
 // Use the (mocked) SETTINGS_DIRECTORY_NAME for consistency
@@ -125,6 +125,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           customThemes: {},
         },
@@ -145,7 +146,6 @@ describe('Settings Loading and Merging', () => {
         },
         security: {},
       });
-      expect(settings.errors.length).toBe(0);
     });
 
     it('should load system settings if only system file exists', () => {
@@ -179,6 +179,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...systemSettingsContent,
+        general: {},
         ui: {
           ...systemSettingsContent.ui,
           customThemes: {},
@@ -234,6 +235,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual({});
       expect(settings.merged).toEqual({
         ...userSettingsContent,
+        general: {},
         ui: {
           ...userSettingsContent.ui,
           customThemes: {},
@@ -294,6 +296,7 @@ describe('Settings Loading and Merging', () => {
           fileName: 'WORKSPACE_CONTEXT.md',
           includeDirectories: [],
         },
+        general: {},
         ui: {
           customThemes: {},
         },
@@ -308,79 +311,18 @@ describe('Settings Loading and Merging', () => {
         extensions: {
           disabled: [],
           workspacesWithMigrationNudge: [],
-        },
-        security: {},
-      });
-    });
-
-    it('should merge user and workspace settings, with workspace taking precedence', () => {
-      (mockFsExistsSync as Mock).mockReturnValue(true);
-      const userSettingsContent = {
-        ui: {
-          theme: 'dark',
-        },
-        tools: {
-          sandbox: false,
-        },
-        context: {
-          fileName: 'USER_CONTEXT.md',
-        },
-      };
-      const workspaceSettingsContent = {
-        tools: {
-          sandbox: true,
-          core: ['tool1'],
-        },
-        context: {
-          fileName: 'WORKSPACE_CONTEXT.md',
-        },
-      };
-
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
-            return JSON.stringify(userSettingsContent);
-          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
-            return JSON.stringify(workspaceSettingsContent);
-          return '';
-        },
-      );
-
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-
-      expect(settings.user.settings).toEqual(userSettingsContent);
-      expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
-      expect(settings.merged).toEqual({
-        ui: {
-          theme: 'dark',
-          customThemes: {},
-        },
-        tools: {
-          sandbox: true,
-          core: ['tool1'],
-        },
-        context: {
-          fileName: 'WORKSPACE_CONTEXT.md',
-          includeDirectories: [],
-        },
-        advanced: {
-          excludedEnvVars: [],
-        },
-        extensions: {
-          disabled: [],
-          workspacesWithMigrationNudge: [],
-        },
-        mcp: {},
-        mcpServers: {},
-        model: {
-          chatCompression: {},
         },
         security: {},
       });
     });
 
     it('should merge system, user and workspace settings, with system taking precedence over workspace, and workspace over user', () => {
-      (mockFsExistsSync as Mock).mockReturnValue(true);
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          p === getSystemSettingsPath() ||
+          p === USER_SETTINGS_PATH ||
+          p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
       const systemSettingsContent = {
         ui: {
           theme: 'system-theme',
@@ -435,6 +377,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toEqual({
+        general: {},
         ui: {
           theme: 'system-theme',
           customThemes: {},
@@ -541,6 +484,27 @@ describe('Settings Loading and Merging', () => {
         },
         security: {},
       });
+    });
+
+    it('should rewrite allowedTools to tools.allowed during migration', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const legacySettingsContent = {
+        allowedTools: ['fs', 'shell'],
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(legacySettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.tools?.allowed).toEqual(['fs', 'shell']);
+      expect((settings.merged as TestSettings)['allowedTools']).toBeUndefined();
     });
 
     it('should correctly merge and migrate legacy array properties from multiple scopes', () => {
@@ -674,6 +638,7 @@ describe('Settings Loading and Merging', () => {
         tools: {
           sandbox: false,
         },
+        general: {},
         ui: {
           customThemes: {},
           theme: 'system-theme',
@@ -841,7 +806,10 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should merge excludedProjectEnvVars with workspace taking precedence over user', () => {
-      (mockFsExistsSync as Mock).mockReturnValue(true);
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          p === USER_SETTINGS_PATH || p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
       const userSettingsContent = {
         general: {},
         advanced: { excludedEnvVars: ['DEBUG', 'NODE_ENV', 'USER_VAR'] },
@@ -882,7 +850,10 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should default contextFileName to undefined if not in any settings file', () => {
-      (mockFsExistsSync as Mock).mockReturnValue(true);
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          p === USER_SETTINGS_PATH || p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
       const userSettingsContent = { ui: { theme: 'dark' } };
       const workspaceSettingsContent = { tools: { sandbox: true } };
       (fs.readFileSync as Mock).mockImplementation(
@@ -958,7 +929,10 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should merge MCP servers correctly, with workspace taking precedence', () => {
-      (mockFsExistsSync as Mock).mockReturnValue(true);
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          p === USER_SETTINGS_PATH || p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
       const userSettingsContent = {
         mcpServers: {
           'user-server': {
@@ -1377,49 +1351,7 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-
-      // Check that settings are empty due to parsing errors
-      expect(settings.user.settings).toEqual({});
-      expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual({
-        ui: {
-          customThemes: {},
-        },
-        mcp: {},
-        mcpServers: {},
-        context: {
-          includeDirectories: [],
-        },
-        model: {
-          chatCompression: {},
-        },
-        advanced: {
-          excludedEnvVars: [],
-        },
-        extensions: {
-          disabled: [],
-          workspacesWithMigrationNudge: [],
-        },
-        security: {},
-      });
-
-      // Check that error objects are populated in settings.errors
-      expect(settings.errors).toBeDefined();
-      // Assuming both user and workspace files cause errors and are added in order
-      expect(settings.errors.length).toEqual(2);
-
-      const userError = settings.errors.find(
-        (e) => e.path === USER_SETTINGS_PATH,
-      );
-      expect(userError).toBeDefined();
-      expect(userError?.message).toBe(userReadError.message);
-
-      const workspaceError = settings.errors.find(
-        (e) => e.path === MOCK_WORKSPACE_SETTINGS_PATH,
-      );
-      expect(workspaceError).toBeDefined();
-      expect(workspaceError?.message).toBe(workspaceReadError.message);
+      expect(() => loadSettings(MOCK_WORKSPACE_DIR)).toThrow(FatalConfigError);
 
       // Restore JSON.parse mock if it was spied on specifically for this test
       vi.restoreAllMocks(); // Or more targeted restore if needed
@@ -1810,6 +1742,7 @@ describe('Settings Loading and Merging', () => {
         expect(settings.system.settings).toEqual(systemSettingsContent);
         expect(settings.merged).toEqual({
           ...systemSettingsContent,
+          general: {},
           ui: {
             ...systemSettingsContent.ui,
             customThemes: {},

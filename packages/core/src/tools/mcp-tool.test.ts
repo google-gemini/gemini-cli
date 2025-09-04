@@ -116,20 +116,6 @@ describe('DiscoveredMCPTool', () => {
       expect(tool.schema.parameters).toBeUndefined();
       expect(tool.schema.parametersJsonSchema).toEqual(inputSchema);
       expect(tool.serverToolName).toBe(serverToolName);
-      expect(tool.timeout).toBeUndefined();
-    });
-
-    it('should accept and store a custom timeout', () => {
-      const customTimeout = 5000;
-      const toolWithTimeout = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-        customTimeout,
-      );
-      expect(toolWithTimeout.timeout).toBe(customTimeout);
     });
   });
 
@@ -614,7 +600,6 @@ describe('DiscoveredMCPTool', () => {
         serverToolName,
         baseDescription,
         inputSchema,
-        undefined,
         true,
         undefined,
         { isTrustedFolder: () => true } as any,
@@ -784,7 +769,6 @@ describe('DiscoveredMCPTool', () => {
         serverToolName,
         baseDescription,
         inputSchema,
-        undefined,
         true, // trust = true
         undefined,
         mockConfig(true) as any, // isTrustedFolder = true
@@ -802,7 +786,6 @@ describe('DiscoveredMCPTool', () => {
         serverToolName,
         baseDescription,
         inputSchema,
-        undefined,
         true, // trust = true
         undefined,
         mockConfig(false) as any, // isTrustedFolder = false
@@ -822,7 +805,6 @@ describe('DiscoveredMCPTool', () => {
         serverToolName,
         baseDescription,
         inputSchema,
-        undefined,
         false, // trust = false
         undefined,
         mockConfig(true) as any, // isTrustedFolder = true
