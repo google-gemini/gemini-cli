@@ -251,6 +251,10 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** The required auth type (useful for enterprises).
   - **Default:** `undefined`
 
+- **`security.auth.enforcedOAuthDomain`** (string):
+  - **Description:** The required domain for oauth login (useful for enterprises).
+  - **Default:** `undefined`
+
 - **`security.auth.useExternal`** (boolean):
   - **Description:** Whether to use an external authentication flow.
   - **Default:** `undefined`
