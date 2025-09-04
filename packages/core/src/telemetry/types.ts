@@ -9,7 +9,7 @@ import type { Config } from '../config/config.js';
 import type { ApprovalMode } from '../config/config.js';
 import type { CompletedToolCall } from '../core/coreToolScheduler.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import type { DiffStat, FileDiff } from '../tools/tools.js';
+import type { FileDiff } from '../tools/tools.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   getDecisionFromOutcome,
@@ -163,8 +163,8 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       const diffStat = (call.response.resultDisplay as FileDiff).diffStat;
       if (diffStat) {
         this.metadata = {
-          ai_added_lines: diffStat.ai_added_lines,
-          ai_removed_lines: diffStat.ai_removed_lines,
+          model_added_lines: diffStat.model_added_lines,
+          model_removed_lines: diffStat.model_removed_lines,
           user_added_lines: diffStat.user_added_lines,
           user_removed_lines: diffStat.user_removed_lines,
         };
@@ -424,7 +424,6 @@ export class FileOperationEvent implements BaseTelemetryEvent {
   lines?: number;
   mimetype?: string;
   extension?: string;
-  diff_stat?: DiffStat;
   programming_language?: string;
 
   constructor(
@@ -433,7 +432,6 @@ export class FileOperationEvent implements BaseTelemetryEvent {
     lines?: number,
     mimetype?: string,
     extension?: string,
-    diff_stat?: DiffStat,
     programming_language?: string,
   ) {
     this['event.name'] = 'file_operation';
@@ -443,7 +441,6 @@ export class FileOperationEvent implements BaseTelemetryEvent {
     this.lines = lines;
     this.mimetype = mimetype;
     this.extension = extension;
-    this.diff_stat = diff_stat;
     this.programming_language = programming_language;
   }
 }

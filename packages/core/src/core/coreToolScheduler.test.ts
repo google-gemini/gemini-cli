@@ -184,6 +184,8 @@ describe('CoreToolScheduler', () => {
       getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -217,6 +219,8 @@ describe('CoreToolScheduler', () => {
       // Create mocked tool registry
       const mockConfig = {
         getToolRegistry: () => mockToolRegistry,
+        getUseSmartEdit: () => false,
+        getGeminiClient: () => null, // No client needed for these tests
       } as unknown as Config;
       const mockToolRegistry = {
         getAllToolNames: () => ['list_files', 'read_file', 'write_file'],
@@ -286,6 +290,8 @@ describe('CoreToolScheduler with payload', () => {
       getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -599,6 +605,8 @@ describe('CoreToolScheduler edit cancellation', () => {
         getProjectTempDir: () => '/tmp',
       },
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -695,6 +703,8 @@ describe('CoreToolScheduler YOLO mode', () => {
       getToolRegistry: () => mockToolRegistry,
       getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
+      getUseSmartEdit: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -794,6 +804,8 @@ describe('CoreToolScheduler request queueing', () => {
       getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -915,6 +927,8 @@ describe('CoreToolScheduler request queueing', () => {
       },
       getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
+      getUseSmartEdit: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -1005,6 +1019,8 @@ describe('CoreToolScheduler request queueing', () => {
       getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -1069,6 +1085,8 @@ describe('CoreToolScheduler request queueing', () => {
       },
       getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
+      getUseSmartEdit: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const testTool = new TestApprovalTool(mockConfig);

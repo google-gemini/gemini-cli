@@ -46,6 +46,8 @@ describe('executeToolCall', () => {
       },
       getTruncateToolOutputThreshold: () => 4_000_000,
       getTruncateToolOutputLines: () => 1000,
+      getUseSmartEdit: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     abortController = new AbortController();

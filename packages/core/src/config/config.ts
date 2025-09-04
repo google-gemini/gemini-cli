@@ -43,6 +43,7 @@ import {
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
+import { ideContext } from '../ide/ideContext.js';
 import type { Content } from '@google/genai';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
@@ -261,7 +262,7 @@ export class Config {
   private readonly folderTrustFeature: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
-  private ideClient!: IdeClient;
+
   private inFallbackMode = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
@@ -365,7 +366,7 @@ export class Config {
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ?? 4_000_000;
     this.truncateToolOutputLines = params.truncateToolOutputLines ?? 1000;
-    this.useSmartEdit = params.useSmartEdit ?? false;
+    this.useSmartEdit = params.useSmartEdit ?? true;
     this.extensionManagement = params.extensionManagement ?? false;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
@@ -389,7 +390,12 @@ export class Config {
       throw Error('Config was already initialized');
     }
     this.initialized = true;
-    this.ideClient = await IdeClient.getInstance();
+
+    if (this.getIdeMode()) {
+      await (await IdeClient.getInstance()).connect();
+      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
+    }
+
     // Initialize centralized FileDiscoveryService
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
@@ -756,25 +762,16 @@ export class Config {
     // restarts in the more common path. If the user chooses to mark the folder
     // as untrusted, the CLI will restart and we will have the trust value
     // reloaded.
+    const context = ideContext.getIdeContext();
+    if (context?.workspaceState?.isTrusted !== undefined) {
+      return context.workspaceState.isTrusted;
+    }
+
     return this.trustedFolder ?? true;
   }
 
   setIdeMode(value: boolean): void {
     this.ideMode = value;
-  }
-
-  async setIdeModeAndSyncConnection(value: boolean): Promise<void> {
-    this.ideMode = value;
-    if (value) {
-      await this.ideClient.connect();
-      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.SESSION));
-    } else {
-      await this.ideClient.disconnect();
-    }
-  }
-
-  getIdeClient(): IdeClient {
-    return this.ideClient;
   }
 
   /**
@@ -853,20 +850,22 @@ export class Config {
       const toolName = ToolClass.Name || className;
       const coreTools = this.getCoreTools();
       const excludeTools = this.getExcludeTools() || [];
+      // On some platforms, the className can be minified to _ClassName.
+      const normalizedClassName = className.replace(/^_+/, '');
 
       let isEnabled = true; // Enabled by default if coreTools is not set.
       if (coreTools) {
         isEnabled = coreTools.some(
           (tool) =>
-            tool === className ||
             tool === toolName ||
-            tool.startsWith(`${className}(`) ||
-            tool.startsWith(`${toolName}(`),
+            tool === normalizedClassName ||
+            tool.startsWith(`${toolName}(`) ||
+            tool.startsWith(`${normalizedClassName}(`),
         );
       }
 
       const isExcluded = excludeTools.some(
-        (tool) => tool === className || tool === toolName,
+        (tool) => tool === toolName || tool === normalizedClassName,
       );
 
       if (isExcluded) {
