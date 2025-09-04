@@ -443,8 +443,8 @@ export interface FileDiff {
 }
 
 export interface DiffStat {
-  ai_added_lines: number;
-  ai_removed_lines: number;
+  model_added_lines: number;
+  model_removed_lines: number;
   model_added_chars: number;
   model_removed_chars: number;
   user_added_lines: number;

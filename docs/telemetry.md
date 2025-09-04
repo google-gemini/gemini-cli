@@ -275,8 +275,8 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `lines` (Int, if applicable): Number of lines in the file.
     - `mimetype` (string, if applicable): Mimetype of the file.
     - `extension` (string, if applicable): File extension of the file.
-    - `ai_added_lines` (Int, if applicable): Number of lines added/changed by AI.
-    - `ai_removed_lines` (Int, if applicable): Number of lines removed/changed by AI.
+    - `model_added_lines` (Int, if applicable): Number of lines added/changed by the model.
+    - `model_removed_lines` (Int, if applicable): Number of lines removed/changed by the model.
     - `user_added_lines` (Int, if applicable): Number of lines added/changed by user in AI proposed changes.
     - `user_removed_lines` (Int, if applicable): Number of lines removed/changed by user in AI proposed changes.
     - `programming_language` (string, if applicable): The programming language of the file.
