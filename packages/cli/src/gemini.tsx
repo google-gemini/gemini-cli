@@ -39,7 +39,6 @@ import {
   logIdeConnection,
   IdeConnectionEvent,
   IdeConnectionType,
-  FatalConfigError,
   uiTelemetryService,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
@@ -173,7 +172,7 @@ export async function startInteractiveUI(
   config: Config,
   settings: LoadedSettings,
   startupWarnings: string[],
-  workspaceRoot: string,
+  workspaceRoot: string = process.cwd(),
 ) {
   const version = await getCliVersion();
   // Detect and enable Kitty keyboard protocol once at startup
@@ -209,21 +208,12 @@ export async function startInteractiveUI(
 
 export async function main() {
   setupUnhandledRejectionHandler();
-  const workspaceRoot = process.cwd();
-  const settings = loadSettings(workspaceRoot);
+  const settings = loadSettings();
 
   await cleanupCheckpoints();
-  if (settings.errors.length > 0) {
-    const errorMessages = settings.errors.map(
-      (error) => `Error in ${error.path}: ${error.message}`,
-    );
-    throw new FatalConfigError(
-      `${errorMessages.join('\n')}\nPlease fix the configuration file(s) and try again.`,
-    );
-  }
 
   const argv = await parseArguments(settings.merged);
-  const extensions = loadExtensions(workspaceRoot);
+  const extensions = loadExtensions();
   const config = await loadCliConfig(
     settings.merged,
     extensions,
@@ -398,12 +388,12 @@ export async function main() {
   let input = config.getQuestion();
   const startupWarnings = [
     ...(await getStartupWarnings()),
-    ...(await getUserStartupWarnings(workspaceRoot)),
+    ...(await getUserStartupWarnings()),
   ];
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {
-    await startInteractiveUI(config, settings, startupWarnings, workspaceRoot);
+    await startInteractiveUI(config, settings, startupWarnings);
     return;
   }
   // If not a TTY, read from stdin
@@ -435,6 +425,7 @@ export async function main() {
     settings.merged.security?.auth?.selectedType,
     settings.merged.security?.auth?.useExternal,
     config,
+    settings,
   );
 
   if (config.getDebugMode()) {
