@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Content } from '@google/genai';
 import { createHash } from 'node:crypto';
 import type { ServerGeminiStreamEvent } from '../core/turn.js';
 import { GeminiEventType } from '../core/turn.js';
@@ -11,6 +12,7 @@ import { logLoopDetected } from '../telemetry/loggers.js';
 import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
+import { isFunctionCall, isFunctionResponse } from '../utils/messageInspectors.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -328,11 +330,35 @@ export class LoopDetectionService {
     return originalChunk === currentChunk;
   }
 
+  private trimRecentHistory (recentHistory: Content[]): Content[] {
+  
+    // Removes the last part of the history if it is a function call.
+    // A function response should follow a function call to be valid.
+    if (
+      recentHistory.length > 0 &&
+      isFunctionCall(recentHistory[recentHistory.length - 1])
+    ) {
+      recentHistory.pop();
+    }
+
+    // Removes the first part of the history if it is a function response.
+    // A function response should be preceded by a function call to be valid.
+    if (
+      recentHistory.length > 0 &&
+      isFunctionResponse(recentHistory[0])
+    ) {
+      recentHistory.shift();
+    }
+    return recentHistory;
+  }
+
   private async checkForLoopWithLLM(signal: AbortSignal) {
-    const recentHistory = this.config
+    var recentHistory = this.config
       .getGeminiClient()
       .getHistory()
       .slice(-LLM_LOOP_CHECK_HISTORY_COUNT);
+    
+    recentHistory = this.trimRecentHistory(recentHistory)
 
     const prompt = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
 
