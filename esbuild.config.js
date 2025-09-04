@@ -24,11 +24,8 @@ const external = [
   '@lydell/node-pty-win32-arm64',
   '@lydell/node-pty-win32-x64',
   'node-fetch',
+  'react-devtools-core',
 ];
-
-if (process.env.DEV !== 'true') {
-  external.push('react-devtools-core');
-}
 
 esbuild
   .build({
