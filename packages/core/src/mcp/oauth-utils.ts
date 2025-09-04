@@ -135,6 +135,7 @@ export class OAuthUtils {
   ): MCPOAuthConfig {
     return {
       authorizationUrl: metadata.authorization_endpoint,
+      registrationUrl: metadata.registration_endpoint,
       tokenUrl: metadata.token_endpoint,
       scopes: metadata.scopes_supported || [],
     };
