@@ -11,13 +11,16 @@ import { RipGrepTool } from './ripGrep.js';
 import { GlobTool } from './glob.js';
 import { EditTool } from './edit.js';
 import { WriteFileTool } from './write-file.js';
-import { WebFetchTool } from './web-fetch.js';
+// import { WebFetchTool } from './web-fetch.js';
 import { ReadManyFilesTool } from './read-many-files.js';
 import { ShellTool } from './shell.js';
 import { MemoryTool } from './memoryTool.js';
-import { WebSearchTool } from './web-search.js';
+// import { WebSearchTool } from './web-search.js';
 import { ExcelTool } from './excel-tool.js';
 import { PDFTool } from './pdf-tool.js';
+import { ZipTool } from './zip-tool.js';
+import { FileTool } from './file-tool.js';
+import { WebTool } from './web-tool.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolClass = any;
@@ -39,24 +42,25 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     LSTool,
     ReadFileTool,
     WriteFileTool,
-    EditTool,
+    FileTool,
     ShellTool,
-    WebFetchTool,
-    WebSearchTool,
+    WebTool,
+    // WebSearchTool,
     ExcelTool,
-    PDFTool
+    PDFTool,
+    ZipTool
   ],
   translator: [
     ReadFileTool,
     WriteFileTool,
     EditTool,
-    WebSearchTool
+    // WebSearchTool
   ],
   creative_writer: [
     ReadFileTool,
     WriteFileTool,
     EditTool,
-    WebSearchTool
+    // WebSearchTool
   ],
   data_analyst: [
     ReadFileTool,
@@ -64,7 +68,7 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     EditTool,
     ShellTool,
     RipGrepTool,
-    WebSearchTool,
+    // WebSearchTool,
     ExcelTool
   ]
 };
