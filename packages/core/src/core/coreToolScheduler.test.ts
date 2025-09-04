@@ -167,6 +167,10 @@ describe('CoreToolScheduler', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
@@ -267,6 +271,10 @@ describe('CoreToolScheduler with payload', () => {
       getContentGeneratorConfig: () => ({
         model: 'test-model',
         authType: 'oauth-personal',
+      }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
       }),
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
@@ -576,6 +584,10 @@ describe('CoreToolScheduler edit cancellation', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
@@ -669,6 +681,10 @@ describe('CoreToolScheduler YOLO mode', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
@@ -760,6 +776,10 @@ describe('CoreToolScheduler request queueing', () => {
       getContentGeneratorConfig: () => ({
         model: 'test-model',
         authType: 'oauth-personal',
+      }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
       }),
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
@@ -880,6 +900,12 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 80,
+        terminalHeight: 24,
+      }),
+      getTerminalWidth: vi.fn(() => 80),
+      getTerminalHeight: vi.fn(() => 24),
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
@@ -961,6 +987,10 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
@@ -1023,6 +1053,10 @@ describe('CoreToolScheduler request queueing', () => {
       setApprovalMode: (mode: ApprovalMode) => {
         approvalMode = mode;
       },
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;

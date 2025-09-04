@@ -72,6 +72,7 @@ import {
   isProQuotaExceededError,
   isGenericQuotaExceededError,
   UserTierId,
+  ShellExecutionService,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import type { IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
@@ -233,6 +234,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [shellInputFocused, setShellInputFocused] = useState(false);
 
   const {
     showWorkspaceMigrationDialog,
@@ -577,6 +579,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   // Terminal and UI setup
   const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
+
   const isNarrow = isNarrowWidth(terminalWidth);
   const { stdin, setRawMode } = useStdin();
   const isInitialMount = useRef(true);
@@ -668,6 +671,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
     cancelOngoingRequest,
+    activeShellPtyId,
   } = useGeminiStream(
     config.getGeminiClient(),
     history,
@@ -684,6 +688,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setModelSwitchedFromQuotaError,
     refreshStatic,
     () => cancelHandlerRef.current(),
+    setShellInputFocused,
+    terminalWidth,
+    terminalHeight,
+    shellInputFocused,
   );
 
   const pendingHistoryItems = useMemo(
@@ -845,6 +853,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
+      } else if (keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS](key)) {
+        if (activeShellPtyId || shellInputFocused) {
+          setShellInputFocused((prev) => !prev);
+        }
       }
     },
     [
@@ -866,6 +878,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       handleSlashCommand,
       isAuthenticating,
       cancelOngoingRequest,
+      activeShellPtyId,
+      shellInputFocused,
       settings.merged.general?.debugKeystrokeLogging,
     ],
   );
@@ -930,10 +944,25 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       refreshStatic();
     }, 300);
 
+    config.setShellExecutionConfig({
+      terminalWidth: Math.floor(terminalWidth * 0.8),
+      terminalHeight: Math.floor(availableTerminalHeight - 10),
+      pager: settings.merged.tools?.shell?.pager,
+      showColor: settings.merged.tools?.shell?.showColor,
+    });
+
     return () => {
       clearTimeout(handler);
     };
-  }, [terminalWidth, terminalHeight, refreshStatic]);
+  }, [
+    terminalWidth,
+    terminalHeight,
+    availableTerminalHeight,
+    refreshStatic,
+    config,
+    settings.merged.tools?.shell?.showColor,
+    settings.merged.tools?.shell?.pager,
+  ]);
 
   useEffect(() => {
     if (streamingState === StreamingState.Idle && staticNeedsRefresh) {
@@ -961,6 +990,22 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const initialPrompt = useMemo(() => config.getQuestion(), [config]);
   const geminiClient = config.getGeminiClient();
+
+  useEffect(() => {
+    if (activeShellPtyId) {
+      ShellExecutionService.resizePty(
+        activeShellPtyId,
+        Math.floor(terminalWidth * 0.8),
+        Math.floor(availableTerminalHeight - 10),
+      );
+    }
+  }, [
+    terminalHeight,
+    terminalWidth,
+    availableTerminalHeight,
+    activeShellPtyId,
+    geminiClient,
+  ]);
 
   useEffect(() => {
     if (
@@ -1072,6 +1117,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 isPending={true}
                 config={config}
                 isFocused={!isEditorDialogOpen}
+                activeShellPtyId={activeShellPtyId}
+                shellInputFocused={shellInputFocused}
               />
             ))}
             <ShowMoreLines constrainHeight={constrainHeight} />
@@ -1245,22 +1292,24 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             />
           ) : (
             <>
-              <LoadingIndicator
-                thought={
-                  streamingState === StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.disableLoadingPhrases ||
-                  config.getScreenReader()
-                    ? undefined
-                    : thought
-                }
-                currentLoadingPhrase={
-                  config.getAccessibility()?.disableLoadingPhrases ||
-                  config.getScreenReader()
-                    ? undefined
-                    : currentLoadingPhrase
-                }
-                elapsedTime={elapsedTime}
-              />
+              {!shellInputFocused && (
+                <LoadingIndicator
+                  thought={
+                    streamingState === StreamingState.WaitingForConfirmation ||
+                    config.getAccessibility()?.disableLoadingPhrases ||
+                    config.getScreenReader()
+                      ? undefined
+                      : thought
+                  }
+                  currentLoadingPhrase={
+                    config.getAccessibility()?.disableLoadingPhrases ||
+                    config.getScreenReader()
+                      ? undefined
+                      : currentLoadingPhrase
+                  }
+                  elapsedTime={elapsedTime}
+                />
+              )}
               {/* Display queued messages below loading indicator */}
               {messageQueue.length > 0 && (
                 <Box flexDirection="column" marginTop={1}>
@@ -1370,6 +1419,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   focus={isFocused}
                   vimHandleInput={vimHandleInput}
                   placeholder={placeholder}
+                  isShellInputFocused={shellInputFocused}
                 />
               )}
             </>

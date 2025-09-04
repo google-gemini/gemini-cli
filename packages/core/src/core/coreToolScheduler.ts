@@ -892,8 +892,9 @@ export class CoreToolScheduler {
               }
             : undefined;
 
+        const shellExecutionConfig = this.config.getShellExecutionConfig();
         invocation
-          .execute(signal, liveOutputCallback)
+          .execute(signal, liveOutputCallback, shellExecutionConfig)
           .then(async (toolResult: ToolResult) => {
             if (signal.aborted) {
               this.setStatusInternal(

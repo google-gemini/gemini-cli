@@ -588,6 +588,36 @@ export const SETTINGS_SCHEMA = {
           'Use node-pty for shell command execution. Fallback to child_process still applies.',
         showInDialog: true,
       },
+      shell: {
+        type: 'object',
+        label: 'Shell',
+        category: 'Tools',
+        requiresRestart: false,
+        default: {},
+        description: 'Settings for shell execution.',
+        showInDialog: false,
+        properties: {
+          pager: {
+            type: 'string',
+            label: 'Pager',
+            category: 'Tools',
+            requiresRestart: false,
+            default: undefined as string | undefined,
+            description:
+              'The pager command to use for shell output. Defaults to `cat`.',
+            showInDialog: true,
+          },
+          showColor: {
+            type: 'boolean',
+            label: 'Show Color',
+            category: 'Tools',
+            requiresRestart: false,
+            default: true,
+            description: 'Show color in shell output.',
+            showInDialog: true,
+          },
+        },
+      },
       autoAccept: {
         type: 'boolean',
         label: 'Auto Accept',

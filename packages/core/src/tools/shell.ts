@@ -24,7 +24,10 @@ import {
 } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
-import type { ShellOutputEvent } from '../services/shellExecutionService.js';
+import type {
+  ShellExecutionConfig,
+  ShellOutputEvent,
+} from '../services/shellExecutionService.js';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import {
@@ -97,8 +100,7 @@ class ShellToolInvocation extends BaseToolInvocation<
   async execute(
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
-    terminalColumns?: number,
-    terminalRows?: number,
+    shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<ToolResult> {
     const strippedCommand = stripShellWrapper(this.params.command);
 
@@ -151,9 +153,7 @@ class ShellToolInvocation extends BaseToolInvocation<
               if (isBinaryStream) break;
               cumulativeOutput = event.chunk;
               currentDisplayOutput = cumulativeOutput;
-              if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                shouldUpdate = true;
-              }
+              shouldUpdate = true;
               break;
             case 'binary_detected':
               isBinaryStream = true;
@@ -182,8 +182,7 @@ class ShellToolInvocation extends BaseToolInvocation<
         },
         signal,
         this.config.getShouldUseNodePtyShell(),
-        terminalColumns,
-        terminalRows,
+        shellExecutionConfig ?? {},
       );
 
       const result = await resultPromise;

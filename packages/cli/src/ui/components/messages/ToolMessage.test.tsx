@@ -12,6 +12,20 @@ import { StreamingState, ToolCallStatus } from '../../types.js';
 import { Text } from 'ink';
 import { StreamingContext } from '../../contexts/StreamingContext.js';
 
+vi.mock('../TerminalOutput.js', () => ({
+  TerminalOutput: function MockTerminalOutput({
+    cursor,
+  }: {
+    cursor: { x: number; y: number } | null;
+  }) {
+    return (
+      <Text>
+        MockCursor:({cursor?.x},{cursor?.y})
+      </Text>
+    );
+  },
+}));
+
 // Mock child components or utilities if they are complex or have side effects
 vi.mock('../GeminiRespondingSpinner.js', () => ({
   GeminiRespondingSpinner: ({

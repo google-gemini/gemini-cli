@@ -16,6 +16,7 @@ import type {
   SandboxConfig,
   GeminiClient,
   AuthType,
+  ShellExecutionConfig,
 } from '@google/gemini-cli-core';
 import {
   ApprovalMode,
@@ -28,7 +29,7 @@ import process from 'node:process';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import type { ConsoleMessageItem } from './types.js';
-import { StreamingState } from './types.js';
+import { StreamingState, ToolCallStatus } from './types.js';
 import { Tips } from './components/Tips.js';
 import type { UpdateObject } from './utils/updateCheck.js';
 import { checkForUpdates } from './utils/updateCheck.js';
@@ -94,6 +95,10 @@ interface MockServerConfig {
   getGeminiClient: Mock<() => GeminiClient | undefined>;
   getUserTier: Mock<() => Promise<string | undefined>>;
   getIdeClient: Mock<() => { getCurrentIde: Mock<() => string | undefined> }>;
+  getShellExecutionConfig: Mock<
+    () => { terminalWidth: number; terminalHeight: number }
+  >;
+  setShellExecutionConfig: Mock<(config: ShellExecutionConfig) => void>;
   getScreenReader: Mock<() => boolean>;
 }
 
@@ -191,6 +196,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
           getConnectionStatus: vi.fn(() => 'connected'),
         })),
         isTrustedFolder: vi.fn(() => true),
+        getShellExecutionConfig: vi.fn(() => ({
+          terminalWidth: 80,
+          terminalHeight: 24,
+        })),
+        setShellExecutionConfig: vi.fn(),
         getScreenReader: vi.fn(() => false),
         getFolderTrustFeature: vi.fn(() => false),
         getFolderTrust: vi.fn(() => false),
@@ -220,6 +230,7 @@ vi.mock('./hooks/useGeminiStream', () => ({
     initError: null,
     pendingHistoryItems: [],
     thought: null,
+    activeShellPtyId: null,
   })),
 }));
 
@@ -1584,6 +1595,7 @@ describe('App UI', () => {
         initError: null,
         pendingHistoryItems: [],
         thought: 'Processing...',
+        activeShellPtyId: null,
       });
 
       const { lastFrame, unmount } = renderWithProviders(
@@ -1740,6 +1752,41 @@ describe('App UI', () => {
       await waitFor(() => {
         expect(lastFrame()).not.toContain('some text');
       });
+    });
+  });
+
+  describe('activeShellPtyId', () => {
+    it('should pass activeShellPtyId to HistoryItemDisplay', () => {
+      const mockPtyId = 12345;
+      vi.mocked(useGeminiStream).mockReturnValue({
+        streamingState: StreamingState.Responding,
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'shell-123',
+                name: 'Shell Command',
+                status: ToolCallStatus.Executing,
+                ptyId: mockPtyId,
+              },
+            ],
+          },
+        ],
+        thought: 'Running command...',
+        activeShellPtyId: mockPtyId,
+      });
+
+      const { unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
     });
   });
 });
