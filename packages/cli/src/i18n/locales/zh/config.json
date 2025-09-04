@@ -3,9 +3,24 @@
     "showMemoryUsage": "在状态栏中显示内存使用情况",
     "checkpoint": "启用文件编辑检查点功能",
     "experimentalAcp": "以 ACP 模式启动代理",
-    "listExtensions": "列出所有可用扩展并退出"
+    "listExtensions": "列出所有可用扩展并退出",
+    "approvalMode": "设置批准模式：default（提示批准）、auto_edit（自动批准编辑工具）、yolo（自动批准所有工具）",
+    "includeDirectories": "要包含在工作区中的其他目录（逗号分隔或多个 --include-directories）"
   },
   "validation": {
     "yoloApprovalMode": "不能同时使用 --yolo (-y) 和 --approval-mode。请改用 --approval-mode=yolo。"
+  },
+  "deprecation": {
+    "allFilesDeprecated": "请使用 --all-files。我们将在未来几周内移除 --all_files。",
+    "showMemoryUsageDeprecated": "请使用 --show-memory-usage。我们将在未来几周内移除 --show_memory_usage。"
+  },
+  "auth": {
+    "vertexRequirement": "使用 Vertex AI 时，您必须指定以下任一选项：\n",
+    "vertexOption1": "• GOOGLE_CLOUD_PROJECT 和 GOOGLE_CLOUD_LOCATION 环境变量。\n",
+    "vertexOption2": "• GOOGLE_API_KEY 环境变量（如果使用 express 模式）。\n",
+    "updateEnvironment": "更新您的环境变量并重试（使用 .env 文件无需重新加载）！"
+  },
+  "gitService": {
+    "checkpointingRequiresGit": "检查点功能已启用，但未安装 Git。请安装 Git 或禁用检查点功能以继续。"
   }
 }

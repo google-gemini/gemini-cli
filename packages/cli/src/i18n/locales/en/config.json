@@ -18,6 +18,8 @@
   },
   "auth": {
     "vertexRequirement": "When using Vertex AI, you must specify either:\n",
+    "vertexOption1": "• GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment variables.\n",
+    "vertexOption2": "• GOOGLE_API_KEY environment variable (if using express mode).\n",
     "updateEnvironment": "Update your environment and try again (no reload needed if using .env)!"
   },
   "gitService": {

@@ -3,9 +3,24 @@
     "showMemoryUsage": "Mostrar uso de memoria en la barra de estado",
     "checkpoint": "Habilita puntos de control de ediciones de archivos",
     "experimentalAcp": "Inicia el agente en modo ACP",
-    "listExtensions": "Listar todas las extensiones disponibles y salir."
+    "listExtensions": "Listar todas las extensiones disponibles y salir.",
+    "approvalMode": "Establecer el modo de aprobación: default (solicitar aprobación), auto_edit (aprobar automáticamente herramientas de edición), yolo (aprobar automáticamente todas las herramientas)",
+    "includeDirectories": "Directorios adicionales para incluir en el espacio de trabajo (separados por comas o múltiples --include-directories)"
   },
   "validation": {
     "yoloApprovalMode": "No se pueden usar --yolo (-y) y --approval-mode juntos. Usa --approval-mode=yolo en su lugar."
+  },
+  "deprecation": {
+    "allFilesDeprecated": "Usa --all-files en su lugar. Eliminaremos --all_files en las próximas semanas.",
+    "showMemoryUsageDeprecated": "Usa --show-memory-usage en su lugar. Eliminaremos --show_memory_usage en las próximas semanas."
+  },
+  "auth": {
+    "vertexRequirement": "Al usar Vertex AI, debe especificar cualquiera de las siguientes opciones:\n",
+    "vertexOption1": "• Variables de entorno GOOGLE_CLOUD_PROJECT y GOOGLE_CLOUD_LOCATION.\n",
+    "vertexOption2": "• Variable de entorno GOOGLE_API_KEY (si usa modo express).\n",
+    "updateEnvironment": "¡Actualiza tu entorno e inténtalo de nuevo (no es necesario recargar si usas .env)!"
+  },
+  "gitService": {
+    "checkpointingRequiresGit": "Los puntos de control están habilitados, pero Git no está instalado. Por favor instala Git o deshabilita los puntos de control para continuar."
   }
 }

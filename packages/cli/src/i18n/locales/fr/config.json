@@ -3,9 +3,24 @@
     "showMemoryUsage": "Afficher l'utilisation de la mémoire dans la barre d'état",
     "checkpoint": "Active les points de contrôle des modifications de fichiers",
     "experimentalAcp": "Démarre l'agent en mode ACP",
-    "listExtensions": "Lister toutes les extensions disponibles et quitter."
+    "listExtensions": "Lister toutes les extensions disponibles et quitter.",
+    "approvalMode": "Définir le mode d'approbation : default (demander l'approbation), auto_edit (approuver automatiquement les outils d'édition), yolo (approuver automatiquement tous les outils)",
+    "includeDirectories": "Répertoires supplémentaires à inclure dans l'espace de travail (séparés par des virgules ou plusieurs --include-directories)"
   },
   "validation": {
     "yoloApprovalMode": "Impossible d'utiliser à la fois --yolo (-y) et --approval-mode. Utilisez --approval-mode=yolo à la place."
+  },
+  "deprecation": {
+    "allFilesDeprecated": "Utilisez --all-files à la place. Nous supprimerons --all_files dans les semaines à venir.",
+    "showMemoryUsageDeprecated": "Utilisez --show-memory-usage à la place. Nous supprimerons --show_memory_usage dans les semaines à venir."
+  },
+  "auth": {
+    "vertexRequirement": "Lors de l'utilisation de Vertex AI, vous devez spécifier l'une des options suivantes :\n",
+    "vertexOption1": "• Variables d'environnement GOOGLE_CLOUD_PROJECT et GOOGLE_CLOUD_LOCATION.\n",
+    "vertexOption2": "• Variable d'environnement GOOGLE_API_KEY (si vous utilisez le mode express).\n",
+    "updateEnvironment": "Mettez à jour votre environnement et réessayez (pas besoin de recharger si vous utilisez .env) !"
+  },
+  "gitService": {
+    "checkpointingRequiresGit": "Les points de contrôle sont activés, mais Git n'est pas installé. Veuillez installer Git ou désactiver les points de contrôle pour continuer."
   }
 }

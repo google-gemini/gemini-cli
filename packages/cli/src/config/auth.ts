@@ -32,8 +32,8 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     if (!hasVertexProjectLocationConfig && !hasGoogleApiKey) {
       return (
         t('config:auth.vertexRequirement') +
-        '• GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION environment variables.\n' +
-        '• GOOGLE_API_KEY environment variable (if using express mode).\n' +
+        t('config:auth.vertexOption1') +
+        t('config:auth.vertexOption2') +
         t('config:auth.updateEnvironment')
       );
     }
