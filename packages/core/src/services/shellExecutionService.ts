@@ -246,7 +246,17 @@ export class ShellExecutionService {
         const abortHandler = async () => {
           if (child.pid && !exited) {
             if (isWindows) {
-              cpSpawn('taskkill', ['/pid', child.pid.toString(), '/f', '/t']);
+              // Wait for taskkill to complete to ensure the process is terminated
+              // before the main promise resolves, fixing a race condition.
+              await new Promise<void>((resolve) => {
+                const killer = cpSpawn('taskkill', [
+                  '/pid',
+                  child.pid!.toString(),
+                  '/f',
+                  '/t',
+                ]);
+                killer.on('exit', () => resolve());
+              });
             } else {
               try {
                 process.kill(-child.pid, 'SIGTERM');
