@@ -12,6 +12,7 @@ import * as fs from 'node:fs';
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 const TMP_DIR_NAME = 'tmp';
+const STATIC_PROJECT_HASH_SALT = 'gemini-secure-salt-v1'; // Change this seed value if desired
 
 export class Storage {
   private readonly targetDir: string;
@@ -79,7 +80,13 @@ export class Storage {
   }
 
   private getFilePathHash(filePath: string): string {
-    return crypto.createHash('sha256').update(filePath).digest('hex');
+    // Use PBKDF2 with a fixed salt for deterministic, but expensive, hashing
+    const salt = STATIC_PROJECT_HASH_SALT;
+    const iterations = 100_000;
+    const keylen = 32; // 32 bytes = 64 hex chars, matches SHA256 output
+    const digest = 'sha256';
+    const hashBuffer = crypto.pbkdf2Sync(filePath, salt, iterations, keylen, digest);
+    return hashBuffer.toString('hex');
   }
 
   getHistoryDir(): string {
