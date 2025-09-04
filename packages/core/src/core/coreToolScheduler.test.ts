@@ -1271,12 +1271,20 @@ describe('truncateAndSaveToFile', () => {
     expect(result.content).toContain(expectedTruncated);
   });
 
-  it('should truncate content by characters when content has few lines', async () => {
-    const content = 'a'.repeat(2_000_000); // Single very long line
+  it('should wrap and truncate content when content has few but long lines', async () => {
+    const content = 'a'.repeat(200_000); // A single very long line
     const callId = 'test-call-id';
     const projectTempDir = '/tmp';
+    const wrapWidth = 120;
 
     mockWriteFile.mockResolvedValue(undefined);
+
+    // Manually wrap the content to generate the expected file content
+    const wrappedLines: string[] = [];
+    for (let i = 0; i < content.length; i += wrapWidth) {
+      wrappedLines.push(content.substring(i, i + wrapWidth));
+    }
+    const expectedFileContent = wrappedLines.join('\n');
 
     const result = await truncateAndSaveToFile(
       content,
@@ -1289,16 +1297,18 @@ describe('truncateAndSaveToFile', () => {
     expect(result.outputFile).toBe(
       path.join(projectTempDir, `${callId}.output`),
     );
+    // Check that the file was written with the wrapped content
     expect(mockWriteFile).toHaveBeenCalledWith(
       path.join(projectTempDir, `${callId}.output`),
-      content,
+      expectedFileContent,
     );
 
-    // Should contain last THRESHOLD characters
-    const expectedTruncated = content.slice(-THRESHOLD);
+    // Should contain the last TRUNCATE_LINES lines of the wrapped content
+    const expectedTruncated = wrappedLines.slice(-TRUNCATE_LINES).join('\n');
     expect(result.content).toContain(
       'Tool output was too large and has been truncated',
     );
+    expect(result.content).toContain('Truncated part of the output:');
     expect(result.content).toContain(expectedTruncated);
   });
 
@@ -1325,11 +1335,19 @@ describe('truncateAndSaveToFile', () => {
   });
 
   it('should save to correct file path with call ID', async () => {
-    const content = 'a'.repeat(2_000_000);
+    const content = 'a'.repeat(200_000);
     const callId = 'unique-call-123';
     const projectTempDir = '/custom/temp/dir';
+    const wrapWidth = 120;
 
     mockWriteFile.mockResolvedValue(undefined);
+
+    // Manually wrap the content to generate the expected file content
+    const wrappedLines: string[] = [];
+    for (let i = 0; i < content.length; i += wrapWidth) {
+      wrappedLines.push(content.substring(i, i + wrapWidth));
+    }
+    const expectedFileContent = wrappedLines.join('\n');
 
     const result = await truncateAndSaveToFile(
       content,
@@ -1341,7 +1359,10 @@ describe('truncateAndSaveToFile', () => {
 
     const expectedPath = path.join(projectTempDir, `${callId}.output`);
     expect(result.outputFile).toBe(expectedPath);
-    expect(mockWriteFile).toHaveBeenCalledWith(expectedPath, content);
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expectedPath,
+      expectedFileContent,
+    );
   });
 
   it('should include helpful instructions in truncated message', async () => {
@@ -1372,11 +1393,19 @@ describe('truncateAndSaveToFile', () => {
   });
 
   it('should sanitize callId to prevent path traversal', async () => {
-    const content = 'a'.repeat(2_000_000);
+    const content = 'a'.repeat(200_000);
     const callId = '../../../../../etc/passwd';
     const projectTempDir = '/tmp/safe_dir';
+    const wrapWidth = 120;
 
     mockWriteFile.mockResolvedValue(undefined);
+
+    // Manually wrap the content to generate the expected file content
+    const wrappedLines: string[] = [];
+    for (let i = 0; i < content.length; i += wrapWidth) {
+      wrappedLines.push(content.substring(i, i + wrapWidth));
+    }
+    const expectedFileContent = wrappedLines.join('\n');
 
     await truncateAndSaveToFile(
       content,
@@ -1387,6 +1416,9 @@ describe('truncateAndSaveToFile', () => {
     );
 
     const expectedPath = path.join(projectTempDir, 'passwd.output');
-    expect(mockWriteFile).toHaveBeenCalledWith(expectedPath, content);
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expectedPath,
+      expectedFileContent,
+    );
   });
 });

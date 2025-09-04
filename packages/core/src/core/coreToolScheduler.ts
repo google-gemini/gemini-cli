@@ -257,23 +257,33 @@ export async function truncateAndSaveToFile(
     return { content };
   }
 
-  const lines = content.split('\n');
-  let truncatedContent: string;
+  let lines = content.split('\n');
+  let fileContent = content;
 
-  // Determine the truncated content for display based on its structure.
-  if (lines.length > truncateLines) {
-    // Content has many lines; truncate by line count.
-    truncatedContent = lines.slice(-truncateLines).join('\n');
-  } else {
-    // Content has few lines (or one very long line); truncate by character count.
-    truncatedContent = content.slice(-threshold);
+  // If the content is long but has few lines, wrap it to enable line-based truncation.
+  if (lines.length <= truncateLines) {
+    const wrapWidth = 120; // A reasonable width for wrapping.
+    const wrappedLines: string[] = [];
+    for (const line of lines) {
+      if (line.length > wrapWidth) {
+        for (let i = 0; i < line.length; i += wrapWidth) {
+          wrappedLines.push(line.substring(i, i + wrapWidth));
+        }
+      } else {
+        wrappedLines.push(line);
+      }
+    }
+    lines = wrappedLines;
+    fileContent = lines.join('\n');
   }
+
+  const truncatedContent = lines.slice(-truncateLines).join('\n');
 
   // Sanitize callId to prevent path traversal.
   const safeFileName = `${path.basename(callId)}.output`;
   const outputFile = path.join(projectTempDir, safeFileName);
   try {
-    await fs.writeFile(outputFile, content);
+    await fs.writeFile(outputFile, fileContent);
 
     return {
       content: `Tool output was too large and has been truncated.
