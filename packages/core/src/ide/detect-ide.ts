@@ -101,7 +101,7 @@ function verifyVSCode(
   if (ide !== DetectedIde.VSCode) {
     return ide;
   }
-  if (ideProcessInfo.command.toLowerCase().includes('code')) {
+  if (ideProcessInfo.command?.toLowerCase().includes('code')) {
     return DetectedIde.VSCode;
   }
   return DetectedIde.VSCodeFork;
