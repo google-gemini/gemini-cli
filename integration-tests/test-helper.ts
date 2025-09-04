@@ -182,7 +182,7 @@ export class TestRig {
       | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
     ...args: string[]
   ): Promise<string> {
-    let command = `node ${this.bundlePath} --yolo`;
+    let commandArgs = [this.bundlePath, '--yolo'];
     const execOptions: {
       cwd: string;
       encoding: 'utf-8';
@@ -193,25 +193,22 @@ export class TestRig {
     };
 
     if (typeof promptOrOptions === 'string') {
-      command += ` --prompt ${JSON.stringify(promptOrOptions)}`;
+      commandArgs.push('--prompt', promptOrOptions);
     } else if (
       typeof promptOrOptions === 'object' &&
       promptOrOptions !== null
     ) {
       if (promptOrOptions.prompt) {
-        command += ` --prompt ${JSON.stringify(promptOrOptions.prompt)}`;
+        commandArgs.push('--prompt', promptOrOptions.prompt);
       }
       if (promptOrOptions.stdin) {
         execOptions.input = promptOrOptions.stdin;
       }
     }
 
-    command += ` ${args.join(' ')}`;
+    commandArgs.push(...args);
 
-    const commandArgs = parse(command);
-    const node = commandArgs.shift() as string;
-
-    const child = spawn(node, commandArgs as string[], {
+    const child = spawn('node', commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
     });
