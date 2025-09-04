@@ -29,7 +29,7 @@ import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
-import { tokenLimit } from './tokenLimits.js';
+import { tokenLimit, getOutputTokenLimit } from './tokenLimits.js';
 import type {
   ContentGenerator,
   ContentGeneratorConfig,
@@ -111,12 +111,6 @@ const COMPRESSION_TOKEN_THRESHOLD = 0.7;
  * means that only the last 30% of the chat history will be kept after compression.
  */
 const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
-
-/**
- * Maximum value allowed by the Gemini API for maxOutputTokens.
- * This is used to cap the token limit during chat compression.
- */
-const MAX_COMPRESSION_OUTPUT_TOKENS = 65535;
 
 export class GeminiClient {
   private chat?: GeminiChat;
@@ -861,7 +855,7 @@ export class GeminiClient {
           systemInstruction: { text: getCompressionPrompt() },
           maxOutputTokens: Math.min(
             originalTokenCount,
-            MAX_COMPRESSION_OUTPUT_TOKENS,
+            getOutputTokenLimit(this.config.getModel()),
           ),
         },
       },
