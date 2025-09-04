@@ -80,6 +80,7 @@ export interface CliArgs {
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
   sessionSummary: string | undefined;
+  promptWords: string[] | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -89,7 +90,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
     )
-    .command('$0', 'Launch Gemini CLI', (yargsInstance) =>
+    .command('$0 [promptWords...]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
         .option('model', {
           alias: 'm',
@@ -277,8 +278,18 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           'all-files',
           'Use @ includes in the application instead. This flag will be removed in a future version.',
         )
+        .deprecateOption(
+          'prompt',
+          'Use the positional prompt instead. This flag will be removed in a future version.',
+        )
         .check((argv) => {
-          if (argv.prompt && argv['promptInteractive']) {
+          const promptWords = argv['promptWords'] as string[] | undefined;
+          if (argv['prompt'] && promptWords && promptWords.length > 0) {
+            throw new Error(
+              'Cannot use both a positional prompt and the --prompt (-p) flag together',
+            );
+          }
+          if (argv['prompt'] && argv['promptInteractive']) {
             throw new Error(
               'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
             );
@@ -439,7 +450,8 @@ export async function loadCliConfig(
   );
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
-  const question = argv.promptInteractive || argv.prompt || '';
+  const question =
+    argv.promptInteractive || argv.prompt || (argv.promptWords || []).join(' ');
 
   // Determine approval mode with backward compatibility
   let approvalMode: ApprovalMode;
@@ -580,14 +592,7 @@ export async function loadCliConfig(
       outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
     },
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
-    // Git-aware file filtering settings
-    fileFiltering: {
-      respectGitIgnore: settings.context?.fileFiltering?.respectGitIgnore,
-      respectGeminiIgnore: settings.context?.fileFiltering?.respectGeminiIgnore,
-      enableRecursiveFileSearch:
-        settings.context?.fileFiltering?.enableRecursiveFileSearch,
-      disableFuzzySearch: settings.context?.fileFiltering?.disableFuzzySearch,
-    },
+    fileFiltering: settings.context?.fileFiltering,
     checkpointing:
       argv.checkpointing || settings.general?.checkpointing?.enabled,
     proxy:
