@@ -123,6 +123,8 @@ export interface LoadHistoryActionReturn {
 export interface SubmitPromptActionReturn {
   type: 'submit_prompt';
   content: PartListUnion;
+  promptName?: string;
+  promptArgs?: Record<string, unknown>;
 }
 
 /**

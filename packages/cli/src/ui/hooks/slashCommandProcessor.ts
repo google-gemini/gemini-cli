@@ -417,9 +417,31 @@ export const useSlashCommandProcessor = (
                   return { type: 'handled' };
 
                 case 'submit_prompt':
+                  if (result.promptName) {
+                    let promptContent = '';
+                    if (typeof result.content === 'string') {
+                      try {
+                        // Prompts from an MCP source are JSON-stringified strings.
+                        promptContent = JSON.parse(result.content);
+                      } catch {
+                        // Fallback to using the content as is if not valid JSON.
+                        promptContent = result.content;
+                      }
+                    }
+                    addItem(
+                      {
+                        type: MessageType.GEMINI,
+                        text: `Executing prompt "${result.promptName}"...`,
+                        details: promptContent,
+                      },
+                      Date.now(),
+                    );
+                  }
                   return {
                     type: 'submit_prompt',
                     content: result.content,
+                    promptName: result.promptName,
+                    promptArgs: result.promptArgs,
                   };
                 case 'confirm_shell_commands': {
                   const { outcome, approvedCommands } = await new Promise<{

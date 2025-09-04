@@ -48,6 +48,7 @@ export enum Command {
   SHOW_ERROR_DETAILS = 'showErrorDetails',
   TOGGLE_TOOL_DESCRIPTIONS = 'toggleToolDescriptions',
   TOGGLE_IDE_CONTEXT_DETAIL = 'toggleIDEContextDetail',
+  TOGGLE_MCP_PROMPT_DETAIL = 'toggleMcpPromptDetail',
   QUIT = 'quit',
   EXIT = 'exit',
   SHOW_MORE_LINES = 'showMoreLines',
@@ -156,6 +157,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
   [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],
+  // Original: key.ctrl && key.name === 'g'
+  [Command.TOGGLE_MCP_PROMPT_DETAIL]: [{ key: 'p', ctrl: true }],
 
   // Shell commands
   [Command.REVERSE_SEARCH]: [{ key: 'r', ctrl: true }],
