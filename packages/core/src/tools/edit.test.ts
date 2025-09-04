@@ -476,7 +476,20 @@ describe('EditTool', () => {
       expect(result.llmContent).toMatch(/Created new file/);
       expect(fs.existsSync(newFilePath)).toBe(true);
       expect(fs.readFileSync(newFilePath, 'utf8')).toBe(fileContent);
-      expect(result.returnDisplay).toBe(`Created ${newFileName}`);
+
+      const display = result.returnDisplay as FileDiff;
+      expect(display.fileDiff).toMatch(/\+Content for the new file\./);
+      expect(display.fileName).toBe(newFileName);
+      expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
+        model_added_lines: 1,
+        model_removed_lines: 0,
+        model_added_chars: 25,
+        model_removed_chars: 0,
+        user_added_lines: 0,
+        user_removed_lines: 0,
+        user_added_chars: 0,
+        user_removed_chars: 0,
+      });
     });
 
     it('should return error if old_string is not found in file', async () => {
