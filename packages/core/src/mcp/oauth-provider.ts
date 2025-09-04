@@ -85,13 +85,19 @@ interface PKCEParams {
   state: string;
 }
 
+const REDIRECT_PORT = 7777;
+const REDIRECT_PATH = '/oauth/callback';
+const HTTP_OK = 200;
+
 /**
  * Provider for handling OAuth authentication for MCP servers.
  */
 export class MCPOAuthProvider {
-  private static readonly REDIRECT_PORT = 7777;
-  private static readonly REDIRECT_PATH = '/oauth/callback';
-  private static readonly HTTP_OK = 200;
+  private readonly tokenStorage: MCPOAuthTokenStorage;
+
+  constructor(tokenStorage: MCPOAuthTokenStorage = new MCPOAuthTokenStorage()) {
+    this.tokenStorage = tokenStorage;
+  }
 
   /**
    * Register a client dynamically with the OAuth server.
@@ -100,13 +106,12 @@ export class MCPOAuthProvider {
    * @param config OAuth configuration
    * @returns The registered client information
    */
-  private static async registerClient(
+  private async registerClient(
     registrationUrl: string,
     config: MCPOAuthConfig,
   ): Promise<OAuthClientRegistrationResponse> {
     const redirectUri =
-      config.redirectUri ||
-      `http://localhost:${this.REDIRECT_PORT}${this.REDIRECT_PATH}`;
+      config.redirectUri || `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
 
     const registrationRequest: OAuthClientRegistrationRequest = {
       client_name: 'Gemini CLI MCP Client',
@@ -142,7 +147,7 @@ export class MCPOAuthProvider {
    * @param mcpServerUrl The MCP server URL
    * @returns OAuth configuration if discovered, null otherwise
    */
-  private static async discoverOAuthFromMCPServer(
+  private async discoverOAuthFromMCPServer(
     mcpServerUrl: string,
   ): Promise<MCPOAuthConfig | null> {
     // Use the full URL with path preserved for OAuth discovery
@@ -154,7 +159,7 @@ export class MCPOAuthProvider {
    *
    * @returns PKCE parameters including code verifier, challenge, and state
    */
-  private static generatePKCEParams(): PKCEParams {
+  private generatePKCEParams(): PKCEParams {
     // Generate code verifier (43-128 characters)
     const codeVerifier = crypto.randomBytes(32).toString('base64url');
 
@@ -176,19 +181,16 @@ export class MCPOAuthProvider {
    * @param expectedState The state parameter to validate
    * @returns Promise that resolves with the authorization code
    */
-  private static async startCallbackServer(
+  private async startCallbackServer(
     expectedState: string,
   ): Promise<OAuthAuthorizationResponse> {
     return new Promise((resolve, reject) => {
       const server = http.createServer(
         async (req: http.IncomingMessage, res: http.ServerResponse) => {
           try {
-            const url = new URL(
-              req.url!,
-              `http://localhost:${this.REDIRECT_PORT}`,
-            );
+            const url = new URL(req.url!, `http://localhost:${REDIRECT_PORT}`);
 
-            if (url.pathname !== this.REDIRECT_PATH) {
+            if (url.pathname !== REDIRECT_PATH) {
               res.writeHead(404);
               res.end('Not found');
               return;
@@ -199,7 +201,7 @@ export class MCPOAuthProvider {
             const error = url.searchParams.get('error');
 
             if (error) {
-              res.writeHead(this.HTTP_OK, { 'Content-Type': 'text/html' });
+              res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
               res.end(`
               <html>
                 <body>
@@ -230,7 +232,7 @@ export class MCPOAuthProvider {
             }
 
             // Send success response to browser
-            res.writeHead(this.HTTP_OK, { 'Content-Type': 'text/html' });
+            res.writeHead(HTTP_OK, { 'Content-Type': 'text/html' });
             res.end(`
             <html>
               <body>
@@ -251,10 +253,8 @@ export class MCPOAuthProvider {
       );
 
       server.on('error', reject);
-      server.listen(this.REDIRECT_PORT, () => {
-        console.log(
-          `OAuth callback server listening on port ${this.REDIRECT_PORT}`,
-        );
+      server.listen(REDIRECT_PORT, () => {
+        console.log(`OAuth callback server listening on port ${REDIRECT_PORT}`);
       });
 
       // Timeout after 5 minutes
@@ -276,14 +276,13 @@ export class MCPOAuthProvider {
    * @param mcpServerUrl The MCP server URL to use as the resource parameter
    * @returns The authorization URL
    */
-  private static buildAuthorizationUrl(
+  private buildAuthorizationUrl(
     config: MCPOAuthConfig,
     pkceParams: PKCEParams,
     mcpServerUrl?: string,
   ): string {
     const redirectUri =
-      config.redirectUri ||
-      `http://localhost:${this.REDIRECT_PORT}${this.REDIRECT_PATH}`;
+      config.redirectUri || `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
 
     const params = new URLSearchParams({
       client_id: config.clientId!,
@@ -333,15 +332,14 @@ export class MCPOAuthProvider {
    * @param mcpServerUrl The MCP server URL to use as the resource parameter
    * @returns The token response
    */
-  private static async exchangeCodeForToken(
+  private async exchangeCodeForToken(
     config: MCPOAuthConfig,
     code: string,
     codeVerifier: string,
     mcpServerUrl?: string,
   ): Promise<OAuthTokenResponse> {
     const redirectUri =
-      config.redirectUri ||
-      `http://localhost:${this.REDIRECT_PORT}${this.REDIRECT_PATH}`;
+      config.redirectUri || `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
 
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -458,7 +456,7 @@ export class MCPOAuthProvider {
    * @param mcpServerUrl The MCP server URL to use as the resource parameter
    * @returns The new token response
    */
-  static async refreshAccessToken(
+  async refreshAccessToken(
     config: MCPOAuthConfig,
     refreshToken: string,
     tokenUrl: string,
@@ -579,7 +577,7 @@ export class MCPOAuthProvider {
    * @param mcpServerUrl Optional MCP server URL for OAuth discovery
    * @returns The obtained OAuth token
    */
-  static async authenticate(
+  async authenticate(
     serverName: string,
     config: MCPOAuthConfig,
     mcpServerUrl?: string,
@@ -790,7 +788,7 @@ export class MCPOAuthProvider {
 
     // Save token
     try {
-      await MCPOAuthTokenStorage.saveToken(
+      await this.tokenStorage.saveToken(
         serverName,
         token,
         config.clientId,
@@ -800,7 +798,7 @@ export class MCPOAuthProvider {
       console.log('Authentication successful! Token saved.');
 
       // Verify token was saved
-      const savedToken = await MCPOAuthTokenStorage.getToken(serverName);
+      const savedToken = await this.tokenStorage.getToken(serverName);
       if (savedToken && savedToken.token && savedToken.token.accessToken) {
         const tokenPreview =
           savedToken.token.accessToken.length > 20
@@ -827,12 +825,12 @@ export class MCPOAuthProvider {
    * @param config OAuth configuration
    * @returns A valid access token or null if not authenticated
    */
-  static async getValidToken(
+  async getValidToken(
     serverName: string,
     config: MCPOAuthConfig,
   ): Promise<string | null> {
     console.debug(`Getting valid token for server: ${serverName}`);
-    const credentials = await MCPOAuthTokenStorage.getToken(serverName);
+    const credentials = await this.tokenStorage.getToken(serverName);
 
     if (!credentials) {
       console.debug(`No credentials found for server: ${serverName}`);
@@ -841,11 +839,11 @@ export class MCPOAuthProvider {
 
     const { token } = credentials;
     console.debug(
-      `Found token for server: ${serverName}, expired: ${MCPOAuthTokenStorage.isTokenExpired(token)}`,
+      `Found token for server: ${serverName}, expired: ${this.tokenStorage.isTokenExpired(token)}`,
     );
 
     // Check if token is expired
-    if (!MCPOAuthTokenStorage.isTokenExpired(token)) {
+    if (!this.tokenStorage.isTokenExpired(token)) {
       console.debug(`Returning valid token for server: ${serverName}`);
       return token.accessToken;
     }
@@ -874,7 +872,7 @@ export class MCPOAuthProvider {
           newToken.expiresAt = Date.now() + newTokenResponse.expires_in * 1000;
         }
 
-        await MCPOAuthTokenStorage.saveToken(
+        await this.tokenStorage.saveToken(
           serverName,
           newToken,
           config.clientId,
@@ -886,7 +884,7 @@ export class MCPOAuthProvider {
       } catch (error) {
         console.error(`Failed to refresh token: ${getErrorMessage(error)}`);
         // Remove invalid token
-        await MCPOAuthTokenStorage.removeToken(serverName);
+        await this.tokenStorage.removeToken(serverName);
       }
     }
 
