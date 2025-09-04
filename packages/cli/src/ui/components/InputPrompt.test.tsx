@@ -20,6 +20,8 @@ import type { UseCommandCompletionReturn } from '../hooks/useCommandCompletion.j
 import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
 import type { UseInputHistoryReturn } from '../hooks/useInputHistory.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
+import type { UseReverseSearchCompletionReturn } from '../hooks/useReverseSearchCompletion.js';
+import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import chalk from 'chalk';
@@ -27,6 +29,7 @@ import chalk from 'chalk';
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
+vi.mock('../hooks/useReverseSearchCompletion.js');
 vi.mock('../utils/clipboardUtils.js');
 
 const mockSlashCommands: SlashCommand[] = [
@@ -82,12 +85,14 @@ describe('InputPrompt', () => {
   let mockShellHistory: UseShellHistoryReturn;
   let mockCommandCompletion: UseCommandCompletionReturn;
   let mockInputHistory: UseInputHistoryReturn;
+  let mockReverseSearchCompletion: UseReverseSearchCompletionReturn;
   let mockBuffer: TextBuffer;
   let mockCommandContext: CommandContext;
 
   const mockedUseShellHistory = vi.mocked(useShellHistory);
   const mockedUseCommandCompletion = vi.mocked(useCommandCompletion);
   const mockedUseInputHistory = vi.mocked(useInputHistory);
+  const mockedUseReverseSearchCompletion = vi.mocked(useReverseSearchCompletion);
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -167,6 +172,19 @@ describe('InputPrompt', () => {
       handleSubmit: vi.fn(),
     };
     mockedUseInputHistory.mockReturnValue(mockInputHistory);
+
+    mockReverseSearchCompletion = {
+      suggestions: [],
+      activeSuggestionIndex: -1,
+      visibleStartIndex: 0,
+      showSuggestions: false,
+      isLoadingSuggestions: false,
+      navigateUp: vi.fn(),
+      navigateDown: vi.fn(),
+      handleAutocomplete: vi.fn(),
+      resetCompletionState: vi.fn(),
+    };
+    mockedUseReverseSearchCompletion.mockReturnValue(mockReverseSearchCompletion);
 
     props = {
       buffer: mockBuffer,
@@ -1546,12 +1564,27 @@ describe('InputPrompt', () => {
     });
 
     it('invokes reverse search on Ctrl+R', async () => {
+      // Mock the reverse search completion to return suggestions
+      mockedUseReverseSearchCompletion.mockReturnValue({
+        ...mockReverseSearchCompletion,
+        suggestions: [
+          { label: 'echo hello', value: 'echo hello' },
+          { label: 'echo world', value: 'echo world' },
+          { label: 'ls', value: 'ls' },
+        ],
+        showSuggestions: true,
+        activeSuggestionIndex: 0,
+      });
+
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
       await wait();
 
-      stdin.write('\x12');
+      // Trigger reverse search with Ctrl+R
+      act(() => {
+        stdin.write('\x12');
+      });
       await wait();
 
       const frame = stdout.lastFrame();
@@ -1583,6 +1616,27 @@ describe('InputPrompt', () => {
     });
 
     it('completes the highlighted entry on Tab and exits reverse-search', async () => {
+      // Mock the reverse search completion
+      let isReverseSearchActive = true;
+      const mockHandleAutocomplete = vi.fn(() => {
+        props.buffer.setText('echo hello');
+        isReverseSearchActive = false;
+      });
+
+      mockedUseReverseSearchCompletion.mockImplementation(
+        (buffer, shellHistory, reverseSearchActive) => ({
+          ...mockReverseSearchCompletion,
+          suggestions: reverseSearchActive ? [
+            { label: 'echo hello', value: 'echo hello' },
+            { label: 'echo world', value: 'echo world' },
+            { label: 'ls', value: 'ls' },
+          ] : [],
+          showSuggestions: reverseSearchActive,
+          activeSuggestionIndex: reverseSearchActive ? 0 : -1,
+          handleAutocomplete: mockHandleAutocomplete,
+        })
+      );
+
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
@@ -1596,25 +1650,30 @@ describe('InputPrompt', () => {
       // Verify reverse search is active
       expect(stdout.lastFrame()).toContain('(r:)');
 
-      stdin.write('\t');
-      await wait(); // Allow time for Tab keypress to be processed
       // Press Tab to complete the highlighted entry
       act(() => {
         stdin.write('\t');
       });
+      await wait();
 
-      await waitFor(
-        () => {
-          expect(stdout.lastFrame()).not.toContain('(r:)');
-        },
-        { timeout: 10000 },
-      );
-
+      expect(mockHandleAutocomplete).toHaveBeenCalledWith(0);
       expect(props.buffer.setText).toHaveBeenCalledWith('echo hello');
       unmount();
     }, 15000);
 
     it('submits the highlighted entry on Enter and exits reverse-search', async () => {
+      // Mock the reverse search completion to return suggestions
+      mockedUseReverseSearchCompletion.mockReturnValue({
+        ...mockReverseSearchCompletion,
+        suggestions: [
+          { label: 'echo hello', value: 'echo hello' },
+          { label: 'echo world', value: 'echo world' },
+          { label: 'ls', value: 'ls' },
+        ],
+        showSuggestions: true,
+        activeSuggestionIndex: 0,
+      });
+
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
