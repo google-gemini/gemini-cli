@@ -40,8 +40,6 @@ jobs:
           # Docker tests are not supported on macOS or Windows
           - os: 'macos-latest'
             sandbox: 'sandbox:docker'
-          - os: 'gemini-cli-windows-16-core'
-            sandbox: 'sandbox:docker'
 
     steps:
       - name: 'Checkout (fork)'
