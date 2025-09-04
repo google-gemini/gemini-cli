@@ -260,7 +260,7 @@ export class Config {
   private readonly folderTrustFeature: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
-  private ideClient!: IdeClient;
+
   private inFallbackMode = false;
   private readonly maxSessionTurns: number;
   private readonly listExtensions: boolean;
@@ -383,7 +383,12 @@ export class Config {
       throw Error('Config was already initialized');
     }
     this.initialized = true;
-    this.ideClient = await IdeClient.getInstance();
+
+    if (this.getIdeMode()) {
+      await (await IdeClient.getInstance()).connect();
+      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
+    }
+
     // Initialize centralized FileDiscoveryService
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
@@ -760,20 +765,6 @@ export class Config {
 
   setIdeMode(value: boolean): void {
     this.ideMode = value;
-  }
-
-  async setIdeModeAndSyncConnection(value: boolean): Promise<void> {
-    this.ideMode = value;
-    if (value) {
-      await this.ideClient.connect();
-      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.SESSION));
-    } else {
-      await this.ideClient.disconnect();
-    }
-  }
-
-  getIdeClient(): IdeClient {
-    return this.ideClient;
   }
 
   /**

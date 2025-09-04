@@ -313,7 +313,7 @@ describe('ShellTool', () => {
         // Send a second chunk. THIS event triggers the update with the CUMULATIVE content.
         mockShellOutputCallback({
           type: 'data',
-          chunk: 'hello world',
+          chunk: 'world',
         });
 
         // It should have been called once now with the combined output.
