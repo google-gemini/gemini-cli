@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync, spawn } from 'node:child_process';
+import { execSync, execFileSync, spawn } from 'node:child_process';
 
 export type EditorType =
   | 'vscode'
@@ -183,7 +183,6 @@ export async function openDiff(
         return new Promise((resolve, reject) => {
           const childProcess = spawn(diffCommand.command, diffCommand.args, {
             stdio: 'inherit',
-            shell: true,
           });
 
           childProcess.on('close', (code) => {
@@ -205,10 +204,10 @@ export async function openDiff(
         // Use execSync for terminal-based editors
         const command =
           process.platform === 'win32'
-            ? `${diffCommand.command} ${diffCommand.args.join(' ')}`
-            : `${diffCommand.command} ${diffCommand.args.map((arg) => `"${arg}"`).join(' ')}`;
+            ? (() => { /* Windows: use execFileSync with args */ return {cmd: diffCommand.command, args: diffCommand.args}; })()
+            : (() => { /* Unix: use execFileSync with args */ return {cmd: diffCommand.command, args: diffCommand.args}; })();
         try {
-          execSync(command, {
+          execFileSync(command.cmd, command.args, {
             stdio: 'inherit',
             encoding: 'utf8',
           });

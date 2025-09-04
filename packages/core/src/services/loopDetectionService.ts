@@ -176,7 +176,7 @@ export class LoopDetectionService {
       /(^|\n)\s*[*-+]\s/.test(content) || /(^|\n)\s*\d+\.\s/.test(content);
     const hasHeading = /(^|\n)#+\s/.test(content);
     const hasBlockquote = /(^|\n)>\s/.test(content);
-    const isDivider = /^[+-_=*\u2500-\u257F]+$/.test(content);
+    const isDivider = /^[+\-_=*\u2500-\u257F]+$/.test(content);
 
     if (
       numFences ||
