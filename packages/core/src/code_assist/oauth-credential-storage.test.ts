@@ -8,7 +8,7 @@ import { type Credentials } from 'google-auth-library';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OAuthCredentialStorage } from './oauth-credential-storage.js';
 import { HybridTokenStorage } from '../mcp/token-storage/hybrid-token-storage.js';
-import type {OAuthCredentials} from '../mcp/token-storage/types.js';
+import type { OAuthCredentials } from '../mcp/token-storage/types.js';
 
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -115,6 +115,30 @@ describe('OAuthCredentialStorage', () => {
         'Failed to load OAuth credentials',
       );
     });
+
+    it('should throw an error if read file fails', async () => {
+      vi.spyOn(storage, 'getCredentials').mockResolvedValue(null);
+      vi.spyOn(fs, 'readFile').mockRejectedValue(
+        new Error('Permission denied'),
+      );
+
+      await expect(oauthStorage.loadCredentials()).rejects.toThrow(
+        'Failed to load OAuth credentials',
+      );
+    });
+
+    it('should not throw error if migration file removal failed', async () => {
+      vi.spyOn(storage, 'getCredentials').mockResolvedValue(null);
+      vi.spyOn(fs, 'readFile').mockResolvedValue(
+        JSON.stringify(mockCredentials),
+      );
+      vi.spyOn(oauthStorage, 'saveCredentials').mockResolvedValue(undefined);
+      vi.spyOn(fs, 'rm').mockRejectedValue(new Error('Deletion failed'));
+
+      const result = await oauthStorage.loadCredentials();
+
+      expect(result).toEqual(mockCredentials);
+    });
   });
 
   describe('saveCredentials', () => {
@@ -163,57 +187,6 @@ describe('OAuthCredentialStorage', () => {
 
       await expect(oauthStorage.clearCredentials()).rejects.toThrow(
         'Failed to clear OAuth credentials',
-      );
-    });
-  });
-
-  describe('migrateFromFileStorage', () => {
-    it('should migrate credentials from old file and save to new storage', async () => {
-      vi.spyOn(fs, 'readFile').mockResolvedValue(
-        JSON.stringify(mockCredentials),
-      );
-      vi.spyOn(oauthStorage, 'saveCredentials').mockResolvedValue(undefined);
-
-      const result = await oauthStorage['migrateFromFileStorage']();
-
-      expect(fs.readFile).toHaveBeenCalledWith(oldFilePath, 'utf-8');
-      expect(oauthStorage.saveCredentials).toHaveBeenCalledWith(
-        mockCredentials,
-      );
-      expect(fs.rm).toHaveBeenCalledWith(oldFilePath, { force: true });
-      expect(result).toEqual(mockCredentials);
-    });
-
-    it('should return null if old file does not exist (ENOENT error)', async () => {
-      vi.spyOn(fs, 'readFile').mockRejectedValue({
-        code: 'ENOENT',
-      });
-
-      const result = await oauthStorage['migrateFromFileStorage']();
-
-      expect(result).toBeNull();
-      expect(fs.rm).not.toHaveBeenCalled(); // Should not try to remove if file didn't exist
-    });
-
-    it('should throw error for other readFile errors', async () => {
-      vi.spyOn(fs, 'readFile').mockRejectedValue(
-        new Error('Permission denied'),
-      );
-
-      await expect(oauthStorage['migrateFromFileStorage']()).rejects.toThrow(
-        'Permission denied',
-      );
-    });
-
-    it('should not throw error if old file removal fails after successful migration', async () => {
-      vi.spyOn(fs, 'readFile').mockResolvedValue(
-        JSON.stringify(mockCredentials),
-      );
-      vi.spyOn(oauthStorage, 'saveCredentials').mockResolvedValue(undefined);
-      vi.spyOn(fs, 'rm').mockRejectedValue(new Error('Deletion failed'));
-
-      await expect(oauthStorage['migrateFromFileStorage']()).resolves.toEqual(
-        mockCredentials,
       );
     });
   });
