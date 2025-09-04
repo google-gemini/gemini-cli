@@ -472,8 +472,8 @@ describe('EditTool', () => {
       expect(display.fileDiff).toMatch(/\+Content for the new file\./);
       expect(display.fileName).toBe(newFileName);
       expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
-        ai_added_lines: 1,
-        ai_removed_lines: 0,
+        model_added_lines: 1,
+        model_removed_lines: 0,
         model_added_chars: 25,
         model_removed_chars: 0,
         user_added_lines: 0,
