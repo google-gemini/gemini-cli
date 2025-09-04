@@ -60,9 +60,16 @@ jobs:
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
           node-version: '${{ matrix.node-version }}'
-          cache: 'npm'
+
+      - name: 'Cache node_modules'
+        id: cache-nodemodules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json') }}
 
       - name: 'Install dependencies'
+        if: steps.cache-nodemodules.outputs.cache-hit != 'true'
         run: |-
           npm ci
 
