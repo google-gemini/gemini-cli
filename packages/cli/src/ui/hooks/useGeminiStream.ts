@@ -650,6 +650,9 @@ export const useGeminiStream = (
             // before we add loop detected message to history
             loopDetectedRef.current = true;
             break;
+          case ServerGeminiEventType.Retry:
+            // Will add the missing logic later
+            break;
           default: {
             // enforces exhaustive switch-case
             const unreachable: never = event;

@@ -60,7 +60,7 @@ const WARNING_CHECKS: readonly WarningCheck[] = [
 ];
 
 export async function getUserStartupWarnings(
-  workspaceRoot: string,
+  workspaceRoot: string = process.cwd(),
 ): Promise<string[]> {
   const results = await Promise.all(
     WARNING_CHECKS.map((check) => check.check(workspaceRoot)),
