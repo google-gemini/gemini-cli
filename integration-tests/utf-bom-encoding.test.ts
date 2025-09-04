@@ -138,5 +138,4 @@ d('BOM end-to-end integration', () => {
     // keywords that are very likely to be in the response.
     expect(lower.includes('gemini')).toBeTruthy();
   });
-  });
 });
