@@ -81,6 +81,6 @@ jobs:
           KEEP_OUTPUT: 'true'
           SANDBOX: '${{ matrix.sandbox }}'
           VERBOSE: 'true'
-        shell: bash
+        shell: 'bash'
         run: |-
           npm run "test:integration:${SANDBOX}"
