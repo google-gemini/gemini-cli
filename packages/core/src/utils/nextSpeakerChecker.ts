@@ -48,7 +48,7 @@ export async function checkNextSpeaker(
   // that when passed back up to the endpoint will break subsequent calls. An example of this is when the model decides
   // to respond with an empty part collection if you were to send that message back to the server it will respond with
   // a 400 indicating that model part collections MUST have content.
-  const curatedHistory = chat.getHistory(/* curated */ true);
+  const curatedHistory = chat.getHistory({ curated: true });
 
   // Ensure there's a model response to analyze
   if (curatedHistory.length === 0) {
