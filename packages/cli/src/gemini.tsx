@@ -36,9 +36,6 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
-  logIdeConnection,
-  IdeConnectionEvent,
-  IdeConnectionType,
   uiTelemetryService,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
@@ -287,11 +284,6 @@ export async function main() {
     await new Promise((f) => setTimeout(f, 100));
     spinnerInstance.clear();
     spinnerInstance.unmount();
-  }
-
-  if (config.getIdeMode()) {
-    await config.getIdeClient().connect();
-    logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
   }
 
   // Load custom themes from settings

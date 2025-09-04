@@ -10,7 +10,17 @@ const mockFixLLMEditWithInstruction = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 
-import { IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
+
+vi.mock('../ide/ide-client.js', () => ({
+  IdeClient: {
+    getInstance: vi.fn(),
+  },
+  IDEConnectionStatus: {
+    Connected: 'connected',
+    Disconnected: 'disconnected',
+  },
+}));
 
 vi.mock('../utils/llm-edit-fixer.js', () => ({
   FixLLMEditWithInstruction: mockFixLLMEditWithInstruction,
@@ -75,7 +85,6 @@ describe('SmartEditTool', () => {
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
       getFileSystemService: () => new StandardFileSystemService(),
-      getIdeClient: () => undefined,
       getIdeMode: () => false,
       getApiKey: () => 'test-api-key',
       getModel: () => 'test-model',
@@ -449,8 +458,8 @@ describe('SmartEditTool', () => {
           status: IDEConnectionStatus.Connected,
         }),
       };
+      vi.mocked(IdeClient.getInstance).mockResolvedValue(ideClient);
       (mockConfig as any).getIdeMode = () => true;
-      (mockConfig as any).getIdeClient = () => ideClient;
     });
 
     it('should call ideClient.openDiff and update params on confirmation', async () => {
