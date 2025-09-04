@@ -277,7 +277,7 @@ export async function main() {
     );
   }
 
-  await config.initialize();
+  // await config.initialize();
 
   if (spinnerInstance) {
     // Small UX detail to show the completion message for a bit before unmounting.

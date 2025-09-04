@@ -168,9 +168,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
   const [currentIDE, setCurrentIDE] = useState<DetectedIde | undefined>();
+  const [isConfigInitialized, setConfigInitialized] = useState(false);
 
   useEffect(() => {
     (async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await config.initialize();
       const ideClient = await IdeClient.getInstance();
       setCurrentIDE(ideClient.getCurrentIde());
     })();
@@ -344,14 +347,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     handleAuthSelect,
     isAuthenticating,
     cancelAuthentication,
-  } = useAuthCommand(settings, setAuthError, config);
+  } = useAuthCommand(settings, setAuthError, config, isConfigInitialized);
 
   useEffect(() => {
     if (
       settings.merged.security?.auth?.enforcedType &&
       settings.merged.security?.auth.selectedType &&
       settings.merged.security?.auth.enforcedType !==
-        settings.merged.security?.auth.selectedType
+      settings.merged.security?.auth.selectedType
     ) {
       setAuthError(
         `Authentication is enforced to be ${settings.merged.security?.auth.enforcedType}, but you are currently using ${settings.merged.security?.auth.selectedType}.`,
@@ -674,7 +677,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const inputHistoryStore = useInputHistoryStore();
 
   // Stable reference for cancel handler to avoid circular dependency
-  const cancelHandlerRef = useRef<() => void>(() => {});
+  const cancelHandlerRef = useRef<() => void>(() => { });
 
   const {
     streamingState,
@@ -706,12 +709,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
   );
 
+  const canSubmitQueries =
+    streamingState === StreamingState.Idle && isConfigInitialized;
+
   // Message queue for handling input during streaming
   const { messageQueue, addMessage, clearQueue, getQueuedMessagesText } =
-    useMessageQueue({
-      streamingState,
-      submitQuery,
-    });
+    useMessageQueue({ canSubmitQueries, submitQuery });
 
   // Update the cancel handler with message queue support
   cancelHandlerRef.current = useCallback(() => {
@@ -1263,14 +1266,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               <LoadingIndicator
                 thought={
                   streamingState === StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.disableLoadingPhrases ||
-                  config.getScreenReader()
+                    config.getAccessibility()?.disableLoadingPhrases ||
+                    config.getScreenReader()
                     ? undefined
                     : thought
                 }
                 currentLoadingPhrase={
                   config.getAccessibility()?.disableLoadingPhrases ||
-                  config.getScreenReader()
+                    config.getScreenReader()
                     ? undefined
                     : currentLoadingPhrase
                 }
@@ -1367,6 +1370,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     <ShowMoreLines constrainHeight={constrainHeight} />
                   </Box>
                 </OverflowProvider>
+              )}
+              {!isConfigInitialized && (
+                <Box marginTop={1}>
+                  <Text color={Colors.AccentRed}>
+                    Derp
+                  </Text>
+                </Box>
               )}
               {isInputActive && (
                 <InputPrompt

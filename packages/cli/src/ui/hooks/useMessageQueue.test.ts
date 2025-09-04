@@ -7,7 +7,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useMessageQueue } from './useMessageQueue.js';
-import { StreamingState } from '../types.js';
 
 describe('useMessageQueue', () => {
   let mockSubmitQuery: ReturnType<typeof vi.fn>;
@@ -25,7 +24,7 @@ describe('useMessageQueue', () => {
   it('should initialize with empty queue', () => {
     const { result } = renderHook(() =>
       useMessageQueue({
-        streamingState: StreamingState.Idle,
+        canSubmitQueries: true,
         submitQuery: mockSubmitQuery,
       }),
     );
@@ -37,7 +36,7 @@ describe('useMessageQueue', () => {
   it('should add messages to queue', () => {
     const { result } = renderHook(() =>
       useMessageQueue({
-        streamingState: StreamingState.Responding,
+        canSubmitQueries: false,
         submitQuery: mockSubmitQuery,
       }),
     );
@@ -56,7 +55,7 @@ describe('useMessageQueue', () => {
   it('should filter out empty messages', () => {
     const { result } = renderHook(() =>
       useMessageQueue({
-        streamingState: StreamingState.Responding,
+        canSubmitQueries: false,
         submitQuery: mockSubmitQuery,
       }),
     );
@@ -77,7 +76,7 @@ describe('useMessageQueue', () => {
   it('should clear queue', () => {
     const { result } = renderHook(() =>
       useMessageQueue({
-        streamingState: StreamingState.Responding,
+        canSubmitQueries: false,
         submitQuery: mockSubmitQuery,
       }),
     );
@@ -98,7 +97,7 @@ describe('useMessageQueue', () => {
   it('should return queued messages as text with double newlines', () => {
     const { result } = renderHook(() =>
       useMessageQueue({
-        streamingState: StreamingState.Responding,
+        canSubmitQueries: false,
         submitQuery: mockSubmitQuery,
       }),
     );
@@ -116,13 +115,13 @@ describe('useMessageQueue', () => {
 
   it('should auto-submit queued messages when transitioning to Idle', () => {
     const { result, rerender } = renderHook(
-      ({ streamingState }) =>
+      ({ canSubmitQueries }) =>
         useMessageQueue({
-          streamingState,
+          canSubmitQueries,
           submitQuery: mockSubmitQuery,
         }),
       {
-        initialProps: { streamingState: StreamingState.Responding },
+        initialProps: { canSubmitQueries: false },
       },
     );
 
@@ -135,7 +134,7 @@ describe('useMessageQueue', () => {
     expect(result.current.messageQueue).toEqual(['Message 1', 'Message 2']);
 
     // Transition to Idle
-    rerender({ streamingState: StreamingState.Idle });
+    rerender({ canSubmitQueries: true });
 
     expect(mockSubmitQuery).toHaveBeenCalledWith('Message 1\n\nMessage 2');
     expect(result.current.messageQueue).toEqual([]);
@@ -143,60 +142,36 @@ describe('useMessageQueue', () => {
 
   it('should not auto-submit when queue is empty', () => {
     const { rerender } = renderHook(
-      ({ streamingState }) =>
+      ({ canSubmitQueries }) =>
         useMessageQueue({
-          streamingState,
+          canSubmitQueries,
           submitQuery: mockSubmitQuery,
         }),
       {
-        initialProps: { streamingState: StreamingState.Responding },
+        initialProps: { canSubmitQueries: false },
       },
     );
 
     // Transition to Idle with empty queue
-    rerender({ streamingState: StreamingState.Idle });
+    rerender({ canSubmitQueries: true });
 
     expect(mockSubmitQuery).not.toHaveBeenCalled();
-  });
-
-  it('should not auto-submit when not transitioning to Idle', () => {
-    const { result, rerender } = renderHook(
-      ({ streamingState }) =>
-        useMessageQueue({
-          streamingState,
-          submitQuery: mockSubmitQuery,
-        }),
-      {
-        initialProps: { streamingState: StreamingState.Responding },
-      },
-    );
-
-    // Add messages
-    act(() => {
-      result.current.addMessage('Message 1');
-    });
-
-    // Transition to WaitingForConfirmation (not Idle)
-    rerender({ streamingState: StreamingState.WaitingForConfirmation });
-
-    expect(mockSubmitQuery).not.toHaveBeenCalled();
-    expect(result.current.messageQueue).toEqual(['Message 1']);
   });
 
   it('should handle multiple state transitions correctly', () => {
     const { result, rerender } = renderHook(
-      ({ streamingState }) =>
+      ({ canSubmitQueries }) =>
         useMessageQueue({
-          streamingState,
+          canSubmitQueries,
           submitQuery: mockSubmitQuery,
         }),
       {
-        initialProps: { streamingState: StreamingState.Idle },
+        initialProps: { canSubmitQueries: true },
       },
     );
 
     // Start responding
-    rerender({ streamingState: StreamingState.Responding });
+    rerender({ canSubmitQueries: false });
 
     // Add messages while responding
     act(() => {
@@ -204,13 +179,13 @@ describe('useMessageQueue', () => {
     });
 
     // Go back to idle - should submit
-    rerender({ streamingState: StreamingState.Idle });
+    rerender({ canSubmitQueries: true });
 
     expect(mockSubmitQuery).toHaveBeenCalledWith('First batch');
     expect(result.current.messageQueue).toEqual([]);
 
     // Start responding again
-    rerender({ streamingState: StreamingState.Responding });
+    rerender({ canSubmitQueries: false });
 
     // Add more messages
     act(() => {
@@ -218,7 +193,7 @@ describe('useMessageQueue', () => {
     });
 
     // Go back to idle - should submit again
-    rerender({ streamingState: StreamingState.Idle });
+    rerender({ canSubmitQueries: true });
 
     expect(mockSubmitQuery).toHaveBeenCalledWith('Second batch');
     expect(mockSubmitQuery).toHaveBeenCalledTimes(2);
