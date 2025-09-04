@@ -359,7 +359,7 @@ export class Config {
     this.useRipgrep = params.useRipgrep ?? false;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
-    this.useSmartEdit = params.useSmartEdit ?? false;
+    this.useSmartEdit = params.useSmartEdit ?? true;
     this.extensionManagement = params.extensionManagement ?? false;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
@@ -844,20 +844,22 @@ export class Config {
       const toolName = ToolClass.Name || className;
       const coreTools = this.getCoreTools();
       const excludeTools = this.getExcludeTools() || [];
+      // On some platforms, the className can be minified to _ClassName.
+      const normalizedClassName = className.replace(/^_+/, '');
 
       let isEnabled = true; // Enabled by default if coreTools is not set.
       if (coreTools) {
         isEnabled = coreTools.some(
           (tool) =>
-            tool === className ||
             tool === toolName ||
-            tool.startsWith(`${className}(`) ||
-            tool.startsWith(`${toolName}(`),
+            tool === normalizedClassName ||
+            tool.startsWith(`${toolName}(`) ||
+            tool.startsWith(`${normalizedClassName}(`),
         );
       }
 
       const isExcluded = excludeTools.some(
-        (tool) => tool === className || tool === toolName,
+        (tool) => tool === toolName || tool === normalizedClassName,
       );
 
       if (isExcluded) {
