@@ -10,7 +10,17 @@ const mockEnsureCorrectEdit = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 
-import { IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
+
+vi.mock('../ide/ide-client.js', () => ({
+  IdeClient: {
+    getInstance: vi.fn(),
+  },
+  IDEConnectionStatus: {
+    Connected: 'connected',
+    Disconnected: 'disconnected',
+  },
+}));
 
 vi.mock('../utils/editCorrector.js', () => ({
   ensureCorrectEdit: mockEnsureCorrectEdit,
@@ -70,7 +80,6 @@ describe('EditTool', () => {
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
       getFileSystemService: () => new StandardFileSystemService(),
-      getIdeClient: () => undefined,
       getIdeMode: () => false,
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
       // Add other properties/methods of Config if EditTool uses them
@@ -878,8 +887,8 @@ describe('EditTool', () => {
           status: IDEConnectionStatus.Connected,
         }),
       };
+      vi.mocked(IdeClient.getInstance).mockResolvedValue(ideClient);
       (mockConfig as any).getIdeMode = () => true;
-      (mockConfig as any).getIdeClient = () => ideClient;
     });
 
     it('should call ideClient.openDiff and update params on confirmation', async () => {
