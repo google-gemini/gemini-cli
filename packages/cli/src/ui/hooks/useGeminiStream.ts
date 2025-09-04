@@ -7,15 +7,15 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import type {
   Config,
-  GeminiClient,
-  ServerGeminiStreamEvent as GeminiEvent,
-  ServerGeminiContentEvent as ContentEvent,
-  ServerGeminiErrorEvent as ErrorEvent,
-  ServerGeminiChatCompressedEvent,
-  ServerGeminiFinishedEvent,
-  ToolCallRequestInfo,
   EditorType,
+  GeminiClient,
+  ServerGeminiChatCompressedEvent,
+  ServerGeminiContentEvent as ContentEvent,
+  ServerGeminiFinishedEvent,
+  ServerGeminiStreamEvent as GeminiEvent,
   ThoughtSummary,
+  ToolCallRequestInfo,
+  GeminiErrorEventValue,
 } from '@google/gemini-cli-core';
 import {
   GeminiEventType as ServerGeminiEventType,
@@ -31,6 +31,8 @@ import {
   ConversationFinishedEvent,
   ApprovalMode,
   parseAndFormatApiError,
+  getCodeAssistServer,
+  UserTierId,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -60,11 +62,21 @@ import {
 } from './useReactToolScheduler.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
+import type { LoadedSettings } from '../../config/settings.js';
 
 enum StreamProcessingStatus {
   Completed,
   UserCancelled,
   Error,
+}
+
+function showCitations(settings: LoadedSettings, config: Config): boolean {
+  const enabled = settings?.merged?.ui?.showCitations;
+  if (enabled !== undefined) {
+    return enabled;
+  }
+  const server = getCodeAssistServer(config);
+  return (server && server.userTier !== UserTierId.FREE) ?? false;
 }
 
 /**
@@ -76,6 +88,7 @@ export const useGeminiStream = (
   history: HistoryItem[],
   addItem: UseHistoryManagerReturn['addItem'],
   config: Config,
+  settings: LoadedSettings,
   onDebugMessage: (message: string) => void,
   handleSlashCommand: (
     cmd: PartListUnion,
@@ -463,7 +476,7 @@ export const useGeminiStream = (
   );
 
   const handleErrorEvent = useCallback(
-    (eventValue: ErrorEvent['value'], userMessageTimestamp: number) => {
+    (eventValue: GeminiErrorEventValue, userMessageTimestamp: number) => {
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
@@ -486,9 +499,27 @@ export const useGeminiStream = (
     [addItem, pendingHistoryItemRef, setPendingHistoryItem, config, setThought],
   );
 
+  const handleCitationEvent = useCallback(
+    (text: string, userMessageTimestamp: number) => {
+      if (!showCitations(settings, config)) {
+        return;
+      }
+
+      if (pendingHistoryItemRef.current) {
+        addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+        setPendingHistoryItem(null);
+      }
+      addItem({ type: MessageType.INFO, text }, userMessageTimestamp);
+    },
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings, config],
+  );
+
   const handleFinishedEvent = useCallback(
     (event: ServerGeminiFinishedEvent, userMessageTimestamp: number) => {
-      const finishReason = event.value;
+      const finishReason = event.value.reason;
+      if (!finishReason) {
+        return;
+      }
 
       const finishReasonMessages: Record<FinishReason, string | undefined> = {
         [FinishReason.FINISH_REASON_UNSPECIFIED]: undefined,
@@ -611,10 +642,16 @@ export const useGeminiStream = (
               userMessageTimestamp,
             );
             break;
+          case ServerGeminiEventType.Citation:
+            handleCitationEvent(event.value, userMessageTimestamp);
+            break;
           case ServerGeminiEventType.LoopDetected:
             // handle later because we want to move pending history to history
             // before we add loop detected message to history
             loopDetectedRef.current = true;
+            break;
+          case ServerGeminiEventType.Retry:
+            // Will add the missing logic later
             break;
           default: {
             // enforces exhaustive switch-case
@@ -636,6 +673,7 @@ export const useGeminiStream = (
       handleChatCompressionEvent,
       handleFinishedEvent,
       handleMaxSessionTurnsEvent,
+      handleCitationEvent,
     ],
   );
 

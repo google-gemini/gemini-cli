@@ -9,89 +9,39 @@ import type {
   TaskStatusUpdateEvent,
   SendStreamingMessageSuccessResponse,
 } from '@a2a-js/sdk';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
-} from '@google/gemini-cli-core';
-import type {
-  ToolCallConfirmationDetails,
-  ToolResult,
-  ToolInvocation,
-} from '@google/gemini-cli-core';
+import { ApprovalMode } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
 import { expect, vi } from 'vitest';
 
-export const mockOnUserConfirmForToolConfirmation = vi.fn();
-
-export class MockToolInvocation extends BaseToolInvocation<object, ToolResult> {
-  constructor(
-    private readonly tool: MockTool,
-    params: object,
-  ) {
-    super(params);
-  }
-
-  getDescription(): string {
-    return JSON.stringify(this.params);
-  }
-
-  override shouldConfirmExecute(
-    abortSignal: AbortSignal,
-  ): Promise<ToolCallConfirmationDetails | false> {
-    return this.tool.shouldConfirmExecute(this.params, abortSignal);
-  }
-
-  execute(
-    signal: AbortSignal,
-    updateOutput?: (output: string) => void,
-    terminalColumns?: number,
-    terminalRows?: number,
-  ): Promise<ToolResult> {
-    return this.tool.execute(
-      this.params,
-      signal,
-      updateOutput,
-      terminalColumns,
-      terminalRows,
-    );
-  }
-}
-
-// TODO: dedup with gemini-cli, add shouldConfirmExecute() support in core
-export class MockTool extends BaseDeclarativeTool<object, ToolResult> {
-  constructor(
-    name: string,
-    displayName: string,
-    canUpdateOutput = false,
-    isOutputMarkdown = false,
-    shouldConfirmExecute?: () => Promise<ToolCallConfirmationDetails | false>,
-  ) {
-    super(
-      name,
-      displayName,
-      'A mock tool for testing',
-      Kind.Other,
-      {},
-      isOutputMarkdown,
-      canUpdateOutput,
-    );
-
-    if (shouldConfirmExecute) {
-      this.shouldConfirmExecute.mockImplementation(shouldConfirmExecute);
-    } else {
-      // Default to no confirmation needed
-      this.shouldConfirmExecute.mockResolvedValue(false);
-    }
-  }
-
-  execute = vi.fn();
-  shouldConfirmExecute = vi.fn();
-
-  protected createInvocation(
-    params: object,
-  ): ToolInvocation<object, ToolResult> {
-    return new MockToolInvocation(this, params);
-  }
+export function createMockConfig(
+  overrides: Partial<Config> = {},
+): Partial<Config> {
+  const mockConfig = {
+    getToolRegistry: vi.fn().mockReturnValue({
+      getTool: vi.fn(),
+      getAllToolNames: vi.fn().mockReturnValue([]),
+    }),
+    getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+    getIdeMode: vi.fn().mockReturnValue(false),
+    getAllowedTools: vi.fn().mockReturnValue([]),
+    getWorkspaceContext: vi.fn().mockReturnValue({
+      isPathWithinWorkspace: () => true,
+    }),
+    getTargetDir: () => '/test',
+    getGeminiClient: vi.fn(),
+    getDebugMode: vi.fn().mockReturnValue(false),
+    getContentGeneratorConfig: vi.fn().mockReturnValue({ model: 'gemini-pro' }),
+    getModel: vi.fn().mockReturnValue('gemini-pro'),
+    getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
+    setFlashFallbackHandler: vi.fn(),
+    initialize: vi.fn().mockResolvedValue(undefined),
+    getProxy: vi.fn().mockReturnValue(undefined),
+    getHistory: vi.fn().mockReturnValue([]),
+    getEmbeddingModel: vi.fn().mockReturnValue('text-embedding-004'),
+    getSessionId: vi.fn().mockReturnValue('test-session-id'),
+    ...overrides,
+  };
+  return mockConfig;
 }
 
 export function createStreamMessageRequest(

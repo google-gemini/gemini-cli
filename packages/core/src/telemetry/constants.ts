@@ -24,7 +24,7 @@ export const EVENT_INVALID_CHUNK = 'gemini_cli.chat.invalid_chunk';
 export const EVENT_CONTENT_RETRY = 'gemini_cli.chat.content_retry';
 export const EVENT_CONTENT_RETRY_FAILURE =
   'gemini_cli.chat.content_retry_failure';
-
+export const EVENT_FILE_OPERATION = 'gemini_cli.file_operation';
 export const METRIC_TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
 export const METRIC_TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
 export const METRIC_API_REQUEST_COUNT = 'gemini_cli.api.request.count';

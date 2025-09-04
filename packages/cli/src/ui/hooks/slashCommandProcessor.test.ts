@@ -86,8 +86,6 @@ import {
   SlashCommandStatus,
   ToolConfirmationOutcome,
   makeFakeConfig,
-  ToolConfirmationOutcome,
-  type IdeClient,
 } from '@google/gemini-cli-core';
 
 function createTestCommand(
@@ -111,11 +109,6 @@ describe('useSlashCommandProcessor', () => {
   const mockSetQuittingMessages = vi.fn();
 
   const mockConfig = makeFakeConfig({});
-  vi.spyOn(mockConfig, 'getIdeClient').mockReturnValue({
-    addStatusChangeListener: vi.fn(),
-    removeStatusChangeListener: vi.fn(),
-  } as unknown as IdeClient);
-
   const mockSettings = {} as LoadedSettings;
 
   beforeEach(() => {
@@ -415,6 +408,44 @@ describe('useSlashCommandProcessor', () => {
         { type: 'user', text: 'old prompt' },
         expect.any(Number),
       );
+    });
+
+    it('should strip thoughts when handling "load_history" action', async () => {
+      const mockSetHistory = vi.fn();
+      const mockGeminiClient = {
+        setHistory: mockSetHistory,
+      };
+      vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockGeminiClient as any,
+      );
+
+      const historyWithThoughts = [
+        {
+          role: 'model',
+          parts: [{ text: 'response', thoughtSignature: 'CikB...' }],
+        },
+      ];
+      const command = createTestCommand({
+        name: 'loadwiththoughts',
+        action: vi.fn().mockResolvedValue({
+          type: 'load_history',
+          history: [{ type: MessageType.MODEL, text: 'response' }],
+          clientHistory: historyWithThoughts,
+        }),
+      });
+
+      const result = setupProcessorHook([command]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/loadwiththoughts');
+      });
+
+      expect(mockSetHistory).toHaveBeenCalledTimes(1);
+      expect(mockSetHistory).toHaveBeenCalledWith(historyWithThoughts, {
+        stripThoughts: true,
+      });
     });
 
     describe('with fake timers', () => {

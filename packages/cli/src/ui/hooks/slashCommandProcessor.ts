@@ -17,6 +17,7 @@ import {
   SlashCommandStatus,
   ToolConfirmationOutcome,
   Storage,
+  IdeClient,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
@@ -215,15 +216,20 @@ export const useSlashCommandProcessor = (
       return;
     }
 
-    const ideClient = config.getIdeClient();
     const listener = () => {
       reloadCommands();
     };
 
-    ideClient.addStatusChangeListener(listener);
+    (async () => {
+      const ideClient = await IdeClient.getInstance();
+      ideClient.addStatusChangeListener(listener);
+    })();
 
     return () => {
-      ideClient.removeStatusChangeListener(listener);
+      (async () => {
+        const ideClient = await IdeClient.getInstance();
+        ideClient.removeStatusChangeListener(listener);
+      })();
     };
   }, [config, reloadCommands]);
 
@@ -393,9 +399,9 @@ export const useSlashCommandProcessor = (
                     }
                   }
                 case 'load_history': {
-                  await config
+                  config
                     ?.getGeminiClient()
-                    ?.setHistory(result.clientHistory);
+                    ?.setHistory(result.clientHistory, { stripThoughts: true });
                   fullCommandContext.ui.clear();
                   result.history.forEach((item, index) => {
                     fullCommandContext.ui.addItem(item, index);

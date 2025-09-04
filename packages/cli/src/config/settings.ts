@@ -8,7 +8,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { homedir, platform } from 'node:os';
 import * as dotenv from 'dotenv';
+import process from 'node:process';
 import {
+  FatalConfigError,
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
   Storage,
@@ -17,8 +19,31 @@ import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import type { Settings, MemoryImportFormat } from './settingsSchema.js';
-import { mergeWith } from 'lodash-es';
+import {
+  type Settings,
+  type MemoryImportFormat,
+  SETTINGS_SCHEMA,
+  type MergeStrategy,
+  type SettingsSchema,
+  type SettingDefinition,
+} from './settingsSchema.js';
+import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
+import { customDeepMerge } from '../utils/deepMerge.js';
+
+function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
+  let current: SettingDefinition | undefined = undefined;
+  let currentSchema: SettingsSchema | undefined = SETTINGS_SCHEMA;
+
+  for (const key of path) {
+    if (!currentSchema || !currentSchema[key]) {
+      return undefined;
+    }
+    current = currentSchema[key];
+    currentSchema = current.properties;
+  }
+
+  return current?.mergeStrategy;
+}
 
 export type { Settings, MemoryImportFormat };
 
@@ -30,54 +55,67 @@ export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
 const MIGRATE_V2_OVERWRITE = false;
 
-// As defined in spec.md
 const MIGRATION_MAP: Record<string, string> = {
-  preferredEditor: 'general.preferredEditor',
-  vimMode: 'general.vimMode',
+  accessibility: 'ui.accessibility',
+  allowedTools: 'tools.allowed',
+  allowMCPServers: 'mcp.allowed',
+  autoAccept: 'tools.autoAccept',
+  autoConfigureMaxOldSpaceSize: 'advanced.autoConfigureMemory',
+  bugCommand: 'advanced.bugCommand',
+  chatCompression: 'model.chatCompression',
+  checkpointing: 'general.checkpointing',
+  coreTools: 'tools.core',
+  contextFileName: 'context.fileName',
+  customThemes: 'ui.customThemes',
+  debugKeystrokeLogging: 'general.debugKeystrokeLogging',
   disableAutoUpdate: 'general.disableAutoUpdate',
   disableUpdateNag: 'general.disableUpdateNag',
-  checkpointing: 'general.checkpointing',
-  theme: 'ui.theme',
-  customThemes: 'ui.customThemes',
+  dnsResolutionOrder: 'advanced.dnsResolutionOrder',
+  enablePromptCompletion: 'general.enablePromptCompletion',
+  enforcedAuthType: 'security.auth.enforcedType',
+  excludeTools: 'tools.exclude',
+  excludeMCPServers: 'mcp.excluded',
+  excludedProjectEnvVars: 'advanced.excludedEnvVars',
+  extensionManagement: 'advanced.extensionManagement',
+  extensions: 'extensions',
+  fileFiltering: 'context.fileFiltering',
+  folderTrustFeature: 'security.folderTrust.featureEnabled',
+  folderTrust: 'security.folderTrust.enabled',
+  hasSeenIdeIntegrationNudge: 'ide.hasSeenNudge',
   hideWindowTitle: 'ui.hideWindowTitle',
   hideTips: 'ui.hideTips',
   hideBanner: 'ui.hideBanner',
   hideFooter: 'ui.hideFooter',
+  hideCWD: 'ui.footer.hideCWD',
+  hideSandboxStatus: 'ui.footer.hideSandboxStatus',
+  hideModelInfo: 'ui.footer.hideModelInfo',
+  hideContextSummary: 'ui.hideContextSummary',
   showMemoryUsage: 'ui.showMemoryUsage',
   showLineNumbers: 'ui.showLineNumbers',
-  accessibility: 'ui.accessibility',
+  showCitations: 'ui.showCitations',
   ideMode: 'ide.enabled',
-  hasSeenIdeIntegrationNudge: 'ide.hasSeenNudge',
-  usageStatisticsEnabled: 'privacy.usageStatisticsEnabled',
-  telemetry: 'telemetry',
-  model: 'model.name',
-  maxSessionTurns: 'model.maxSessionTurns',
-  summarizeToolOutput: 'model.summarizeToolOutput',
-  chatCompression: 'model.chatCompression',
-  skipNextSpeakerCheck: 'model.skipNextSpeakerCheck',
-  contextFileName: 'context.fileName',
-  memoryImportFormat: 'context.importFormat',
-  memoryDiscoveryMaxDirs: 'context.discoveryMaxDirs',
   includeDirectories: 'context.includeDirectories',
   loadMemoryFromIncludeDirectories: 'context.loadFromIncludeDirectories',
-  fileFiltering: 'context.fileFiltering',
+  maxSessionTurns: 'model.maxSessionTurns',
+  mcpServers: 'mcpServers',
+  mcpServerCommand: 'mcp.serverCommand',
+  memoryImportFormat: 'context.importFormat',
+  memoryDiscoveryMaxDirs: 'context.discoveryMaxDirs',
+  model: 'model.name',
+  preferredEditor: 'general.preferredEditor',
   sandbox: 'tools.sandbox',
+  selectedAuthType: 'security.auth.selectedType',
   shouldUseNodePtyShell: 'tools.usePty',
-  coreTools: 'tools.core',
-  excludeTools: 'tools.exclude',
+  skipNextSpeakerCheck: 'model.skipNextSpeakerCheck',
+  summarizeToolOutput: 'model.summarizeToolOutput',
+  telemetry: 'telemetry',
+  theme: 'ui.theme',
   toolDiscoveryCommand: 'tools.discoveryCommand',
   toolCallCommand: 'tools.callCommand',
-  mcpServerCommand: 'mcp.serverCommand',
-  allowMCPServers: 'mcp.allowed',
-  excludeMCPServers: 'mcp.excluded',
-  folderTrustFeature: 'security.folderTrust.featureEnabled',
-  folderTrust: 'security.folderTrust.enabled',
-  selectedAuthType: 'security.auth.selectedType',
+  usageStatisticsEnabled: 'privacy.usageStatisticsEnabled',
   useExternalAuth: 'security.auth.useExternal',
-  autoConfigureMaxOldSpaceSize: 'advanced.autoConfigureMemory',
-  dnsResolutionOrder: 'advanced.dnsResolutionOrder',
-  excludedProjectEnvVars: 'advanced.excludedEnvVars',
-  bugCommand: 'advanced.bugCommand',
+  useRipgrep: 'tools.useRipgrep',
+  vimMode: 'general.vimMode',
 };
 
 export function getSystemSettingsPath(): string {
@@ -160,8 +198,27 @@ function setNestedProperty(
   current[lastKey] = value;
 }
 
-function needsMigration(settings: Record<string, unknown>): boolean {
-  return !('general' in settings);
+export function needsMigration(settings: Record<string, unknown>): boolean {
+  // A file needs migration if it contains any top-level key that is moved to a
+  // nested location in V2.
+  const hasV1Keys = Object.entries(MIGRATION_MAP).some(([v1Key, v2Path]) => {
+    if (v1Key === v2Path || !(v1Key in settings)) {
+      return false;
+    }
+    // If a key exists that is both a V1 key and a V2 container (like 'model'),
+    // we need to check the type. If it's an object, it's a V2 container and not
+    // a V1 key that needs migration.
+    if (
+      KNOWN_V2_CONTAINERS.has(v1Key) &&
+      typeof settings[v1Key] === 'object' &&
+      settings[v1Key] !== null
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  return hasV1Keys;
 }
 
 function migrateSettingsToV2(
@@ -282,7 +339,6 @@ function mergeSettings(
       }
     : {
         ...restOfWorkspace,
-        security: {},
       };
 
   // Settings are merged with the following precedence (last one wins for
@@ -291,106 +347,14 @@ function mergeSettings(
   // 2. User Settings
   // 3. Workspace Settings
   // 4. System Settings (as overrides)
-  //
-  // For properties that are arrays (e.g., includeDirectories), the arrays
-  // are concatenated. For objects (e.g., customThemes), they are merged.
-  return {
-    ...systemDefaults,
-    ...user,
-    ...safeWorkspaceWithoutFolderTrust,
-    ...system,
-    ui: {
-      ...(systemDefaults.ui || {}),
-      ...(user.ui || {}),
-      ...(safeWorkspaceWithoutFolderTrust.ui || {}),
-      ...(system.ui || {}),
-      customThemes: {
-        ...(systemDefaults.ui?.customThemes || {}),
-        ...(user.ui?.customThemes || {}),
-        ...(safeWorkspaceWithoutFolderTrust.ui?.customThemes || {}),
-        ...(system.ui?.customThemes || {}),
-      },
-    },
-    security: {
-      ...(systemDefaults.security || {}),
-      ...(user.security || {}),
-      ...(safeWorkspaceWithoutFolderTrust.security || {}),
-      ...(system.security || {}),
-    },
-    mcp: {
-      ...(systemDefaults.mcp || {}),
-      ...(user.mcp || {}),
-      ...(safeWorkspaceWithoutFolderTrust.mcp || {}),
-      ...(system.mcp || {}),
-    },
-    mcpServers: {
-      ...(systemDefaults.mcpServers || {}),
-      ...(user.mcpServers || {}),
-      ...(safeWorkspaceWithoutFolderTrust.mcpServers || {}),
-      ...(system.mcpServers || {}),
-    },
-    context: {
-      ...(systemDefaults.context || {}),
-      ...(user.context || {}),
-      ...(safeWorkspaceWithoutFolderTrust.context || {}),
-      ...(system.context || {}),
-      includeDirectories: [
-        ...(systemDefaults.context?.includeDirectories || []),
-        ...(user.context?.includeDirectories || []),
-        ...(safeWorkspaceWithoutFolderTrust.context?.includeDirectories || []),
-        ...(system.context?.includeDirectories || []),
-      ],
-    },
-    model: {
-      ...(systemDefaults.model || {}),
-      ...(user.model || {}),
-      ...(safeWorkspaceWithoutFolderTrust.model || {}),
-      ...(system.model || {}),
-      chatCompression: {
-        ...(systemDefaults.model?.chatCompression || {}),
-        ...(user.model?.chatCompression || {}),
-        ...(safeWorkspaceWithoutFolderTrust.model?.chatCompression || {}),
-        ...(system.model?.chatCompression || {}),
-      },
-    },
-    advanced: {
-      ...(systemDefaults.advanced || {}),
-      ...(user.advanced || {}),
-      ...(safeWorkspaceWithoutFolderTrust.advanced || {}),
-      ...(system.advanced || {}),
-      excludedEnvVars: [
-        ...new Set([
-          ...(systemDefaults.advanced?.excludedEnvVars || []),
-          ...(user.advanced?.excludedEnvVars || []),
-          ...(safeWorkspaceWithoutFolderTrust.advanced?.excludedEnvVars || []),
-          ...(system.advanced?.excludedEnvVars || []),
-        ]),
-      ],
-    },
-    extensions: {
-      ...(systemDefaults.extensions || {}),
-      ...(user.extensions || {}),
-      ...(safeWorkspaceWithoutFolderTrust.extensions || {}),
-      ...(system.extensions || {}),
-      disabled: [
-        ...new Set([
-          ...(systemDefaults.extensions?.disabled || []),
-          ...(user.extensions?.disabled || []),
-          ...(safeWorkspaceWithoutFolderTrust.extensions?.disabled || []),
-          ...(system.extensions?.disabled || []),
-        ]),
-      ],
-      workspacesWithMigrationNudge: [
-        ...new Set([
-          ...(systemDefaults.extensions?.workspacesWithMigrationNudge || []),
-          ...(user.extensions?.workspacesWithMigrationNudge || []),
-          ...(safeWorkspaceWithoutFolderTrust.extensions
-            ?.workspacesWithMigrationNudge || []),
-          ...(system.extensions?.workspacesWithMigrationNudge || []),
-        ]),
-      ],
-    },
-  };
+  return customDeepMerge(
+    getMergeStrategyForPath,
+    {}, // Start with an empty object
+    systemDefaults,
+    user,
+    safeWorkspaceWithoutFolderTrust,
+    system,
+  ) as Settings;
 }
 
 export class LoadedSettings {
@@ -399,7 +363,6 @@ export class LoadedSettings {
     systemDefaults: SettingsFile,
     user: SettingsFile,
     workspace: SettingsFile,
-    errors: SettingsError[],
     isTrusted: boolean,
     migratedInMemorScopes: Set<SettingScope>,
   ) {
@@ -407,7 +370,6 @@ export class LoadedSettings {
     this.systemDefaults = systemDefaults;
     this.user = user;
     this.workspace = workspace;
-    this.errors = errors;
     this.isTrusted = isTrusted;
     this.migratedInMemorScopes = migratedInMemorScopes;
     this._merged = this.computeMergedSettings();
@@ -417,7 +379,6 @@ export class LoadedSettings {
   readonly systemDefaults: SettingsFile;
   readonly user: SettingsFile;
   readonly workspace: SettingsFile;
-  readonly errors: SettingsError[];
   readonly isTrusted: boolean;
   readonly migratedInMemorScopes: Set<SettingScope>;
 
@@ -458,48 +419,6 @@ export class LoadedSettings {
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
   }
-}
-
-function resolveEnvVarsInString(value: string): string {
-  const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
-  return value.replace(envVarRegex, (match, varName1, varName2) => {
-    const varName = varName1 || varName2;
-    if (process && process.env && typeof process.env[varName] === 'string') {
-      return process.env[varName]!;
-    }
-    return match;
-  });
-}
-
-function resolveEnvVarsInObject<T>(obj: T): T {
-  if (
-    obj === null ||
-    obj === undefined ||
-    typeof obj === 'boolean' ||
-    typeof obj === 'number'
-  ) {
-    return obj;
-  }
-
-  if (typeof obj === 'string') {
-    return resolveEnvVarsInString(obj) as unknown as T;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map((item) => resolveEnvVarsInObject(item)) as unknown as T;
-  }
-
-  if (typeof obj === 'object') {
-    const newObj = { ...obj } as T;
-    for (const key in newObj) {
-      if (Object.prototype.hasOwnProperty.call(newObj, key)) {
-        newObj[key] = resolveEnvVarsInObject(newObj[key]);
-      }
-    }
-    return newObj;
-  }
-
-  return obj;
 }
 
 function findEnvFile(startDir: string): string | null {
@@ -553,34 +472,16 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   }
 }
 
-export function loadEnvironment(settings?: Settings): void {
+export function loadEnvironment(settings: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
+
+  if (!isWorkspaceTrusted(settings)) {
+    return;
+  }
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
     setUpCloudShellEnvironment(envFilePath);
-  }
-
-  // If no settings provided, try to load workspace settings for exclusions
-  let resolvedSettings = settings;
-  if (!resolvedSettings) {
-    const workspaceSettingsPath = new Storage(
-      process.cwd(),
-    ).getWorkspaceSettingsPath();
-    try {
-      if (fs.existsSync(workspaceSettingsPath)) {
-        const workspaceContent = fs.readFileSync(
-          workspaceSettingsPath,
-          'utf-8',
-        );
-        const parsedWorkspaceSettings = JSON.parse(
-          stripJsonComments(workspaceContent),
-        ) as Settings;
-        resolvedSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
-      }
-    } catch (_e) {
-      // Ignore errors loading workspace settings
-    }
   }
 
   if (envFilePath) {
@@ -591,8 +492,7 @@ export function loadEnvironment(settings?: Settings): void {
       const parsedEnv = dotenv.parse(envFileContent);
 
       const excludedVars =
-        resolvedSettings?.advanced?.excludedEnvVars ||
-        DEFAULT_EXCLUDED_ENV_VARS;
+        settings?.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
       const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
 
       for (const key in parsedEnv) {
@@ -618,7 +518,9 @@ export function loadEnvironment(settings?: Settings): void {
  * Loads settings from user and workspace directories.
  * Project settings override user settings.
  */
-export function loadSettings(workspaceDir: string): LoadedSettings {
+export function loadSettings(
+  workspaceDir: string = process.cwd(),
+): LoadedSettings {
   let systemSettings: Settings = {};
   let systemDefaultSettings: Settings = {};
   let userSettings: Settings = {};
@@ -667,7 +569,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
 
         let settingsObject = rawSettings as Record<string, unknown>;
         if (needsMigration(settingsObject)) {
-          console.error(`Legacy settings file detected at: ${filePath}`);
           const migratedSettings = migrateSettingsToV2(settingsObject);
           if (migratedSettings) {
             if (MIGRATE_V2_OVERWRITE) {
@@ -678,9 +579,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
                   JSON.stringify(migratedSettings, null, 2),
                   'utf-8',
                 );
-                console.log(
-                  `Successfully migrated and saved settings file: ${filePath}`,
-                );
               } catch (e) {
                 console.error(
                   `Error migrating settings file on disk: ${getErrorMessage(
@@ -689,9 +587,6 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
                 );
               }
             } else {
-              console.log(
-                `Successfully migrated settings for ${filePath} in-memory for the current session.`,
-              );
               migratedInMemorScopes.add(scope);
             }
             settingsObject = migratedSettings;
@@ -735,7 +630,12 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   }
 
   // For the initial trust check, we can only use user and system settings.
-  const initialTrustCheckSettings = mergeWith({}, systemSettings, userSettings);
+  const initialTrustCheckSettings = customDeepMerge(
+    getMergeStrategyForPath,
+    {},
+    systemSettings,
+    userSettings,
+  );
   const isTrusted =
     isWorkspaceTrusted(initialTrustCheckSettings as Settings) ?? true;
 
@@ -758,7 +658,17 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
   workspaceSettings = resolveEnvVarsInObject(workspaceSettings);
 
   // Create LoadedSettings first
-  const loadedSettings = new LoadedSettings(
+
+  if (settingsErrors.length > 0) {
+    const errorMessages = settingsErrors.map(
+      (error) => `Error in ${error.path}: ${error.message}`,
+    );
+    throw new FatalConfigError(
+      `${errorMessages.join('\n')}\nPlease fix the configuration file(s) and try again.`,
+    );
+  }
+
+  return new LoadedSettings(
     {
       path: systemSettingsPath,
       settings: systemSettings,
@@ -775,12 +685,9 @@ export function loadSettings(workspaceDir: string): LoadedSettings {
       path: workspaceSettingsPath,
       settings: workspaceSettings,
     },
-    settingsErrors,
     isTrusted,
     migratedInMemorScopes,
   );
-
-  return loadedSettings;
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {

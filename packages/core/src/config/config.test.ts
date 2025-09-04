@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ConfigParameters, SandboxConfig } from './config.js';
 import { Config, ApprovalMode } from './config.js';
@@ -99,6 +99,16 @@ vi.mock('../services/gitService.js', () => {
   GitServiceMock.prototype.initialize = vi.fn();
   return { GitService: GitServiceMock };
 });
+
+vi.mock('../ide/ide-client.js', () => ({
+  IdeClient: {
+    getInstance: vi.fn().mockResolvedValue({
+      getConnectionStatus: vi.fn(),
+      initialize: vi.fn(),
+      shutdown: vi.fn(),
+    }),
+  },
+}));
 
 describe('Server Config (config.ts)', () => {
   const MODEL = 'gemini-pro';
@@ -661,73 +671,135 @@ describe('Server Config (config.ts)', () => {
       ).mock.calls.some((call) => call[0] instanceof vi.mocked(ReadFileTool));
       expect(wasReadFileToolRegistered).toBe(false);
     });
+
+    describe('with minified tool class names', () => {
+      beforeEach(() => {
+        Object.defineProperty(
+          vi.mocked(ShellTool).prototype.constructor,
+          'name',
+          {
+            value: '_ShellTool',
+            configurable: true,
+          },
+        );
+      });
+
+      afterEach(() => {
+        Object.defineProperty(
+          vi.mocked(ShellTool).prototype.constructor,
+          'name',
+          {
+            value: 'ShellTool',
+          },
+        );
+      });
+
+      it('should register a tool if coreTools contains the non-minified class name', async () => {
+        const params: ConfigParameters = {
+          ...baseParams,
+          coreTools: ['ShellTool'],
+        };
+        const config = new Config(params);
+        await config.initialize();
+
+        const registerToolMock = (
+          (await vi.importMock('../tools/tool-registry')) as {
+            ToolRegistry: { prototype: { registerTool: Mock } };
+          }
+        ).ToolRegistry.prototype.registerTool;
+
+        const wasShellToolRegistered = (
+          registerToolMock as Mock
+        ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
+        expect(wasShellToolRegistered).toBe(true);
+      });
+
+      it('should not register a tool if excludeTools contains the non-minified class name', async () => {
+        const params: ConfigParameters = {
+          ...baseParams,
+          coreTools: undefined, // all tools enabled by default
+          excludeTools: ['ShellTool'],
+        };
+        const config = new Config(params);
+        await config.initialize();
+
+        const registerToolMock = (
+          (await vi.importMock('../tools/tool-registry')) as {
+            ToolRegistry: { prototype: { registerTool: Mock } };
+          }
+        ).ToolRegistry.prototype.registerTool;
+
+        const wasShellToolRegistered = (
+          registerToolMock as Mock
+        ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
+        expect(wasShellToolRegistered).toBe(false);
+      });
+
+      it('should register a tool if coreTools contains an argument-specific pattern with the non-minified class name', async () => {
+        const params: ConfigParameters = {
+          ...baseParams,
+          coreTools: ['ShellTool(git status)'],
+        };
+        const config = new Config(params);
+        await config.initialize();
+
+        const registerToolMock = (
+          (await vi.importMock('../tools/tool-registry')) as {
+            ToolRegistry: { prototype: { registerTool: Mock } };
+          }
+        ).ToolRegistry.prototype.registerTool;
+
+        const wasShellToolRegistered = (
+          registerToolMock as Mock
+        ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
+        expect(wasShellToolRegistered).toBe(true);
+      });
+    });
   });
 });
 
 describe('setApprovalMode with folder trust', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+  };
+
   it('should throw an error when setting YOLO mode in an untrusted folder', () => {
-    const config = new Config({
-      sessionId: 'test',
-      targetDir: '.',
-      debugMode: false,
-      model: 'test-model',
-      cwd: '.',
-      trustedFolder: false, // Untrusted
-    });
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
     expect(() => config.setApprovalMode(ApprovalMode.YOLO)).toThrow(
       'Cannot enable privileged approval modes in an untrusted folder.',
     );
   });
 
   it('should throw an error when setting AUTO_EDIT mode in an untrusted folder', () => {
-    const config = new Config({
-      sessionId: 'test',
-      targetDir: '.',
-      debugMode: false,
-      model: 'test-model',
-      cwd: '.',
-      trustedFolder: false, // Untrusted
-    });
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
     expect(() => config.setApprovalMode(ApprovalMode.AUTO_EDIT)).toThrow(
       'Cannot enable privileged approval modes in an untrusted folder.',
     );
   });
 
   it('should NOT throw an error when setting DEFAULT mode in an untrusted folder', () => {
-    const config = new Config({
-      sessionId: 'test',
-      targetDir: '.',
-      debugMode: false,
-      model: 'test-model',
-      cwd: '.',
-      trustedFolder: false, // Untrusted
-    });
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(false);
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
   });
 
   it('should NOT throw an error when setting any mode in a trusted folder', () => {
-    const config = new Config({
-      sessionId: 'test',
-      targetDir: '.',
-      debugMode: false,
-      model: 'test-model',
-      cwd: '.',
-      trustedFolder: true, // Trusted
-    });
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
     expect(() => config.setApprovalMode(ApprovalMode.YOLO)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.AUTO_EDIT)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
   });
 
   it('should NOT throw an error when setting any mode if trustedFolder is undefined', () => {
-    const config = new Config({
-      sessionId: 'test',
-      targetDir: '.',
-      debugMode: false,
-      model: 'test-model',
-      cwd: '.',
-      trustedFolder: undefined, // Undefined
-    });
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true); // isTrustedFolder defaults to true
     expect(() => config.setApprovalMode(ApprovalMode.YOLO)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.AUTO_EDIT)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();

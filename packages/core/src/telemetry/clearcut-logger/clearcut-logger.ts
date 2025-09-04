@@ -465,8 +465,8 @@ export class ClearcutLogger {
 
     if (event.metadata) {
       const metadataMapping: { [key: string]: EventMetadataKey } = {
-        ai_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
-        ai_removed_lines: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
+        model_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
+        model_removed_lines: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
         user_added_lines: EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
         user_removed_lines: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
       };
@@ -515,28 +515,6 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROGRAMMING_LANGUAGE,
         value: event.programming_language,
       });
-    }
-
-    if (event.diff_stat) {
-      const metadataMapping: { [key: string]: EventMetadataKey } = {
-        ai_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
-        ai_removed_lines: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
-        user_added_lines: EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
-        user_removed_lines: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
-      };
-
-      for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {
-        if (
-          event.diff_stat[key as keyof typeof event.diff_stat] !== undefined
-        ) {
-          data.push({
-            gemini_cli_key,
-            value: JSON.stringify(
-              event.diff_stat[key as keyof typeof event.diff_stat],
-            ),
-          });
-        }
-      }
     }
 
     const logEvent = this.createLogEvent(EventNames.FILE_OPERATION, data);
@@ -888,6 +866,16 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
         value: process.platform,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_NODE_VERSION,
+        value: process.versions.node,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
+        value: safeJsonStringify([
+          { smart_edit_enabled: this.config?.getUseSmartEdit() ?? false },
+        ]),
       },
     ];
     return [...data, ...defaultLogMetadata];
