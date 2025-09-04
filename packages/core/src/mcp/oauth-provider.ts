@@ -93,7 +93,11 @@ const HTTP_OK = 200;
  * Provider for handling OAuth authentication for MCP servers.
  */
 export class MCPOAuthProvider {
-  private readonly tokenStorage = new MCPOAuthTokenStorage();
+  private readonly tokenStorage: MCPOAuthTokenStorage;
+
+  constructor(tokenStorage: MCPOAuthTokenStorage = new MCPOAuthTokenStorage()) {
+    this.tokenStorage = tokenStorage;
+  }
 
   /**
    * Register a client dynamically with the OAuth server.
@@ -107,8 +111,7 @@ export class MCPOAuthProvider {
     config: MCPOAuthConfig,
   ): Promise<OAuthClientRegistrationResponse> {
     const redirectUri =
-      config.redirectUri ||
-      `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
+      config.redirectUri || `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
 
     const registrationRequest: OAuthClientRegistrationRequest = {
       client_name: 'Gemini CLI MCP Client',
@@ -185,10 +188,7 @@ export class MCPOAuthProvider {
       const server = http.createServer(
         async (req: http.IncomingMessage, res: http.ServerResponse) => {
           try {
-            const url = new URL(
-              req.url!,
-              `http://localhost:${REDIRECT_PORT}`,
-            );
+            const url = new URL(req.url!, `http://localhost:${REDIRECT_PORT}`);
 
             if (url.pathname !== REDIRECT_PATH) {
               res.writeHead(404);
@@ -254,9 +254,7 @@ export class MCPOAuthProvider {
 
       server.on('error', reject);
       server.listen(REDIRECT_PORT, () => {
-        console.log(
-          `OAuth callback server listening on port ${REDIRECT_PORT}`,
-        );
+        console.log(`OAuth callback server listening on port ${REDIRECT_PORT}`);
       });
 
       // Timeout after 5 minutes
@@ -284,8 +282,7 @@ export class MCPOAuthProvider {
     mcpServerUrl?: string,
   ): string {
     const redirectUri =
-      config.redirectUri ||
-      `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
+      config.redirectUri || `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
 
     const params = new URLSearchParams({
       client_id: config.clientId!,
@@ -342,8 +339,7 @@ export class MCPOAuthProvider {
     mcpServerUrl?: string,
   ): Promise<OAuthTokenResponse> {
     const redirectUri =
-      config.redirectUri ||
-      `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
+      config.redirectUri || `http://localhost:${REDIRECT_PORT}${REDIRECT_PATH}`;
 
     const params = new URLSearchParams({
       grant_type: 'authorization_code',

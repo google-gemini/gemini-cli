@@ -365,7 +365,7 @@ async function handleAutomaticOAuth(
     console.log(
       `Starting OAuth authentication for server '${mcpServerName}'...`,
     );
-    const authProvider = new MCPOAuthProvider();
+    const authProvider = new MCPOAuthProvider(new MCPOAuthTokenStorage());
     await authProvider.authenticate(mcpServerName, oauthAuthConfig, serverUrl);
 
     console.log(
@@ -899,7 +899,7 @@ export async function connectToMcpServer(
         const tokenStorage = new MCPOAuthTokenStorage();
         const credentials = await tokenStorage.getToken(mcpServerName);
         if (credentials) {
-          const authProvider = new MCPOAuthProvider();
+          const authProvider = new MCPOAuthProvider(tokenStorage);
           const hasStoredTokens = await authProvider.getValidToken(
             mcpServerName,
             {
@@ -984,7 +984,7 @@ export async function connectToMcpServer(
           const tokenStorage = new MCPOAuthTokenStorage();
           const credentials = await tokenStorage.getToken(mcpServerName);
           if (credentials) {
-            const authProvider = new MCPOAuthProvider();
+            const authProvider = new MCPOAuthProvider(tokenStorage);
             const accessToken = await authProvider.getValidToken(
               mcpServerName,
               {
@@ -1059,7 +1059,7 @@ export async function connectToMcpServer(
           const tokenStorage = new MCPOAuthTokenStorage();
           const credentials = await tokenStorage.getToken(mcpServerName);
           if (credentials) {
-            const authProvider = new MCPOAuthProvider();
+            const authProvider = new MCPOAuthProvider(tokenStorage);
             const hasStoredTokens = await authProvider.getValidToken(
               mcpServerName,
               {
@@ -1117,7 +1117,9 @@ export async function connectToMcpServer(
               console.log(
                 `Starting OAuth authentication for server '${mcpServerName}'...`,
               );
-              const authProvider = new MCPOAuthProvider();
+              const authProvider = new MCPOAuthProvider(
+                new MCPOAuthTokenStorage(),
+              );
               await authProvider.authenticate(
                 mcpServerName,
                 oauthAuthConfig,
@@ -1128,7 +1130,7 @@ export async function connectToMcpServer(
               const tokenStorage = new MCPOAuthTokenStorage();
               const credentials = await tokenStorage.getToken(mcpServerName);
               if (credentials) {
-                const authProvider = new MCPOAuthProvider();
+                const authProvider = new MCPOAuthProvider(tokenStorage);
                 const accessToken = await authProvider.getValidToken(
                   mcpServerName,
                   {
@@ -1264,7 +1266,8 @@ export async function createTransport(
   let hasOAuthConfig = mcpServerConfig.oauth?.enabled;
 
   if (hasOAuthConfig && mcpServerConfig.oauth) {
-    const authProvider = new MCPOAuthProvider();
+    const tokenStorage = new MCPOAuthTokenStorage();
+    const authProvider = new MCPOAuthProvider(tokenStorage);
     accessToken = await authProvider.getValidToken(
       mcpServerName,
       mcpServerConfig.oauth,
@@ -1285,7 +1288,7 @@ export async function createTransport(
     const tokenStorage = new MCPOAuthTokenStorage();
     const credentials = await tokenStorage.getToken(mcpServerName);
     if (credentials) {
-      const authProvider = new MCPOAuthProvider();
+      const authProvider = new MCPOAuthProvider(tokenStorage);
       accessToken = await authProvider.getValidToken(mcpServerName, {
         // Pass client ID if available
         clientId: credentials.clientId,

@@ -20,6 +20,7 @@ import {
   MCPServerStatus,
   mcpServerRequiresOAuth,
   getErrorMessage,
+  MCPOAuthTokenStorage,
 } from '@google/gemini-cli-core';
 
 const COLOR_GREEN = '\u001b[32m';
@@ -386,7 +387,7 @@ const authCommand: SlashCommand = {
 
       // Pass the MCP server URL for OAuth discovery
       const mcpServerUrl = server.httpUrl || server.url;
-      const authProvider = new MCPOAuthProvider();
+      const authProvider = new MCPOAuthProvider(new MCPOAuthTokenStorage());
       await authProvider.authenticate(serverName, oauthConfig, mcpServerUrl);
 
       context.ui.addItem(
