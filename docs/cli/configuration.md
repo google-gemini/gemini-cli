@@ -145,12 +145,12 @@ Settings are organized into categories. All settings should be placed within the
   - **Default:** `-1`
 
 - **`model.summarizeToolOutput`** (object):
-  - **Description:** Settings for summarizing tool output.
+  - **Description:** Enables or disables the summarization of tool output. You can specify the token budget for the summarization using the `tokenBudget` setting. Note: Currently only the `run_shell_command` tool is supported. For example `{"run_shell_command": {"tokenBudget": 2000}}`
   - **Default:** `undefined`
 
-- **`model.chatCompression`** (object):
-  - **Description:** Chat compression settings.
-  - **Default:** `undefined`
+- **`model.chatCompression.contextPercentageThreshold`** (number):
+  - **Description:** Sets the threshold for chat history compression as a percentage of the model's total token limit. This is a value between 0 and 1 that applies to both automatic compression and the manual `/compress` command. For example, a value of `0.6` will trigger compression when the chat history exceeds 60% of the token limit.
+  - **Default:** `0.7`
 
 - **`model.skipNextSpeakerCheck`** (boolean):
   - **Description:** Skip the next speaker check.
@@ -175,7 +175,7 @@ Settings are organized into categories. All settings should be placed within the
   - **Default:** `[]`
 
 - **`context.loadFromIncludeDirectories`** (boolean):
-  - **Description:** Whether to load memory files from include directories.
+  - **Description:** Controls the behavior of the `/memory refresh` command. If set to `true`, `GEMINI.md` files should be loaded from all directories that are added. If set to `false`, `GEMINI.md` should only be loaded from the current directory.
   - **Default:** `false`
 
 - **`context.fileFiltering.respectGitIgnore`** (boolean):
@@ -187,7 +187,7 @@ Settings are organized into categories. All settings should be placed within the
   - **Default:** `true`
 
 - **`context.fileFiltering.enableRecursiveFileSearch`** (boolean):
-  - **Description:** Enable recursive file search functionality.
+  - **Description:** Whether to enable searching recursively for filenames under the current tree when completing `@` prefixes in the prompt.
   - **Default:** `true`
 
 #### `tools`
@@ -201,11 +201,15 @@ Settings are organized into categories. All settings should be placed within the
   - **Default:** `false`
 
 - **`tools.core`** (array of strings):
-  - **Description:** Paths to core tool definitions.
+  - **Description:** This can be used to restrict the set of built-in tools [with an allowlist](./enterprise.md#restricting-tool-access). See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools. The match semantics are the same as `tools.allowed`.
   - **Default:** `undefined`
 
 - **`tools.exclude`** (array of strings):
   - **Description:** Tool names to exclude from discovery.
+  - **Default:** `undefined`
+
+- **`tools.allowed`** (array of strings):
+  - **Description:** A list of tool names that will bypass the confirmation dialog. This is useful for tools that you trust and use frequently. For example, `["run_shell_command(git)", "run_shell_command(npm test)"]` will skip the confirmation dialog to run any `git` and `npm test` commands. See [Shell Tool command restrictions](../tools/shell.md#command-restrictions) for details on prefix matching, command chaining, etc.
   - **Default:** `undefined`
 
 - **`tools.discoveryCommand`** (string):
@@ -213,7 +217,10 @@ Settings are organized into categories. All settings should be placed within the
   - **Default:** `undefined`
 
 - **`tools.callCommand`** (string):
-  - **Description:** Command to run for tool calls.
+  - **Description:** Defines a custom shell command for calling a specific tool that was discovered using `tools.discoveryCommand`. The shell command must meet the following criteria:
+    - It must take function `name` (exactly as in [function declaration](https://ai.google.dev/gemini-api/docs/function-calling#function-declarations)) as first command line argument.
+    - It must read function arguments as JSON on `stdin`, analogous to [`functionCall.args`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functioncall).
+    - It must return function output as JSON on `stdout`, analogous to [`functionResponse.response.content`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functionresponse).
   - **Default:** `undefined`
 
 #### `mcp`
@@ -240,6 +247,10 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** The currently selected authentication type.
   - **Default:** `undefined`
 
+- **`security.auth.enforcedType`** (string):
+  - **Description:** The required auth type (useful for enterprises).
+  - **Default:** `undefined`
+
 - **`security.auth.useExternal`** (boolean):
   - **Description:** Whether to use an external authentication flow.
   - **Default:** `undefined`
@@ -262,42 +273,39 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Configuration for the bug report command.
   - **Default:** `undefined`
 
-#### Top-Level Settings
+#### `mcpServers`
 
-The following settings remain at the top level of the `settings.json` file.
+Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools. Gemini CLI attempts to connect to each configured MCP server to discover available tools. If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts. Note that the system might strip certain schema properties from MCP tool definitions for compatibility. At least one of `command`, `url`, or `httpUrl` must be provided. If multiple are specified, the order of precedence is `httpUrl`, then `url`, then `command`.
 
-- **`mcpServers`** (object):
-  - **Description:** Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools. Gemini CLI attempts to connect to each configured MCP server to discover available tools. If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts. Note that the system might strip certain schema properties from MCP tool definitions for compatibility. At least one of `command`, `url`, or `httpUrl` must be provided. If multiple are specified, the order of precedence is `httpUrl`, then `url`, then `command`.
-  - **Default:** `{}`
-  - **Properties:**
-    - **`<SERVER_NAME>`** (object): The server parameters for the named server.
-      - `command` (string, optional): The command to execute to start the MCP server via standard I/O.
-      - `args` (array of strings, optional): Arguments to pass to the command.
-      - `env` (object, optional): Environment variables to set for the server process.
-      - `cwd` (string, optional): The working directory in which to start the server.
-      - `url` (string, optional): The URL of an MCP server that uses Server-Sent Events (SSE) for communication.
-      - `httpUrl` (string, optional): The URL of an MCP server that uses streamable HTTP for communication.
-      - `headers` (object, optional): A map of HTTP headers to send with requests to `url` or `httpUrl`.
-      - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
-      - `trust` (boolean, optional): Trust this server and bypass all tool call confirmations.
-      - `description` (string, optional): A brief description of the server, which may be used for display purposes.
-      - `includeTools` (array of strings, optional): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (allowlist behavior). If not specified, all tools from the server are enabled by default.
-      - `excludeTools` (array of strings, optional): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
+- **`mcpServers.<SERVER_NAME>`** (object): The server parameters for the named server.
+  - `command` (string, optional): The command to execute to start the MCP server via standard I/O.
+  - `args` (array of strings, optional): Arguments to pass to the command.
+  - `env` (object, optional): Environment variables to set for the server process.
+  - `cwd` (string, optional): The working directory in which to start the server.
+  - `url` (string, optional): The URL of an MCP server that uses Server-Sent Events (SSE) for communication.
+  - `httpUrl` (string, optional): The URL of an MCP server that uses streamable HTTP for communication.
+  - `headers` (object, optional): A map of HTTP headers to send with requests to `url` or `httpUrl`.
+  - `timeout` (number, optional): Timeout in milliseconds for requests to this MCP server.
+  - `trust` (boolean, optional): Trust this server and bypass all tool call confirmations.
+  - `description` (string, optional): A brief description of the server, which may be used for display purposes.
+  - `includeTools` (array of strings, optional): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (allowlist behavior). If not specified, all tools from the server are enabled by default.
+  - `excludeTools` (array of strings, optional): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
 
-- **`telemetry`** (object)
-  - **Description:** Configures logging and metrics collection for Gemini CLI. For more information, see [Telemetry](../telemetry.md).
-  - **Default:** `undefined`
-  - **Properties:**
-    - **`enabled`** (boolean): Whether or not telemetry is enabled.
-    - **`target`** (string): The destination for collected telemetry. Supported values are `local` and `gcp`.
-    - **`otlpEndpoint`** (string): The endpoint for the OTLP Exporter.
-    - **`otlpProtocol`** (string): The protocol for the OTLP Exporter (`grpc` or `http`).
-    - **`logPrompts`** (boolean): Whether or not to include the content of user prompts in the logs.
-    - **`outfile`** (string): The file to write telemetry to when `target` is `local`.
+#### `telemetry`
+
+Configures logging and metrics collection for Gemini CLI. For more information, see [Telemetry](../telemetry.md).
+
+- **Properties:**
+  - **`enabled`** (boolean): Whether or not telemetry is enabled.
+  - **`target`** (string): The destination for collected telemetry. Supported values are `local` and `gcp`.
+  - **`otlpEndpoint`** (string): The endpoint for the OTLP Exporter.
+  - **`otlpProtocol`** (string): The protocol for the OTLP Exporter (`grpc` or `http`).
+  - **`logPrompts`** (boolean): Whether or not to include the content of user prompts in the logs.
+  - **`outfile`** (string): The file to write telemetry to when `target` is `local`.
 
 ### Example `settings.json`
 
-Here is an example of a `settings.json` file with the new nested structure:
+Here is an example of a `settings.json` file with the nested structure, new as of v0.3.0:
 
 ```json
 {
@@ -490,7 +498,7 @@ Arguments passed directly when running the CLI can override other configurations
   - 5 directories can be added at maximum.
   - Example: `--include-directories /path/to/project1,/path/to/project2` or `--include-directories /path/to/project1 --include-directories /path/to/project2`
 - **`--screen-reader`**:
-  - Enables screen reader mode for accessibility.
+  - Enables screen reader mode, which adjusts the TUI for better compatibility with screen readers.
 - **`--version`**:
   - Displays the version of the CLI.
 
