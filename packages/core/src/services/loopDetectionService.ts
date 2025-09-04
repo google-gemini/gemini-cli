@@ -332,7 +332,7 @@ export class LoopDetectionService {
 
   private trimRecentHistory(recentHistory: Content[]): Content[] {
     // A function response must be preceded by a function call.
-    // Continuously remove dangling function calls from the end of the history
+    // Continuously removes dangling function calls from the end of the history
     // until the last turn is not a function call.
     while (
       recentHistory.length > 0 &&
@@ -341,8 +341,8 @@ export class LoopDetectionService {
       recentHistory.pop();
     }
 
-    // Similarly, a function response must follow a function call.
-    // Continuously remove leading function responses that don't have a preceding call
+    // A function response must follow a function call.
+    // Continuously removes leading function responses from the beginning of history
     // until the first turn is not a function response.
     while (
       recentHistory.length > 0 &&
