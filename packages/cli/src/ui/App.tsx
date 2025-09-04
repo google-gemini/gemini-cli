@@ -306,6 +306,17 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder);
 
+  const showTips =
+    !isFolderTrustDialogOpen &&
+    !settings.merged.ui?.hideTips &&
+    !config.getScreenReader();
+
+  useEffect(() => {
+    // When the folder trust dialog is about to open/close, we need to force a refresh
+    // of the static content to ensure the Tips are hidden/shown correctly.
+    refreshStatic();
+  }, [isFolderTrustDialogOpen, refreshStatic]);
+
   const { needsRestart: ideNeedsRestart } = useIdeTrustListener(config);
   useEffect(() => {
     if (ideNeedsRestart) {
@@ -1038,9 +1049,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               {!(
                 settings.merged.ui?.hideBanner || config.getScreenReader()
               ) && <Header version={version} nightly={nightly} />}
-              {!(settings.merged.ui?.hideTips || config.getScreenReader()) && (
-                <Tips config={config} />
-              )}
+              {showTips && <Tips config={config} />}
             </Box>,
             ...history.map((h) => (
               <HistoryItemDisplay
