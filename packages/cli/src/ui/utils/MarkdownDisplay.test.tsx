@@ -23,8 +23,8 @@ describe('<MarkdownDisplay />', () => {
     { path: '', settings: {} },
     { path: '', settings: {} },
     { path: '', settings: {} },
-    [],
     true,
+    new Set(),
   );
 
   beforeEach(() => {
@@ -224,10 +224,10 @@ Another paragraph.
     const settings = new LoadedSettings(
       { path: '', settings: {} },
       { path: '', settings: {} },
-      { path: '', settings: { showLineNumbers: false } },
+      { path: '', settings: { ui: { showLineNumbers: false } } },
       { path: '', settings: {} },
-      [],
       true,
+      new Set(),
     );
 
     const { lastFrame } = render(

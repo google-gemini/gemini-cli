@@ -399,22 +399,7 @@ export function saveModifiedSettings(
     const isDefaultValue = value === getDefaultValue(settingKey);
 
     if (existsInOriginalFile || !isDefaultValue) {
-      // This is tricky because setValue only works on top-level keys.
-      // We need to set the whole parent object.
-      const [parentKey] = path;
-      if (parentKey) {
-        const newParentValue = setPendingSettingValueAny(
-          settingKey,
-          value,
-          loadedSettings.forScope(scope).settings,
-        )[parentKey as keyof Settings];
-
-        loadedSettings.setValue(
-          scope,
-          parentKey as keyof Settings,
-          newParentValue,
-        );
-      }
+      loadedSettings.setValue(scope, settingKey, value);
     }
   });
 }

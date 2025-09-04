@@ -27,6 +27,7 @@ import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './hooks/useAuthCommand.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
+import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
@@ -56,6 +57,7 @@ import { DetailedMessagesDisplay } from './components/DetailedMessagesDisplay.js
 import { HistoryItemDisplay } from './components/HistoryItemDisplay.js';
 import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
+import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import process from 'node:process';
 import type { EditorType, Config, IdeContext } from '@google/gemini-cli-core';
 import {
@@ -70,6 +72,7 @@ import {
   isProQuotaExceededError,
   isGenericQuotaExceededError,
   UserTierId,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import type { IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { IdeIntegrationNudge } from './IdeIntegrationNudge.js';
@@ -100,11 +103,13 @@ import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { SettingsDialog } from './components/SettingsDialog.js';
+import { ProQuotaDialog } from './components/ProQuotaDialog.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
 import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
 import { WorkspaceMigrationDialog } from './components/WorkspaceMigrationDialog.js';
+import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 // Maximum number of queued messages to display in UI to prevent performance issues
@@ -134,7 +139,9 @@ export const AppWrapper = (props: AppProps) => {
     <KeypressProvider
       kittyProtocolEnabled={kittyProtocolStatus.enabled}
       config={props.config}
-      debugKeystrokeLogging={props.settings.merged.debugKeystrokeLogging}
+      debugKeystrokeLogging={
+        props.settings.merged.general?.debugKeystrokeLogging
+      }
     >
       <SessionStatsProvider>
         <VimModeProvider settings={props.settings}>
@@ -161,7 +168,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const shouldShowIdePrompt =
     currentIDE &&
     !config.getIdeMode() &&
-    !settings.merged.hasSeenIdeIntegrationNudge &&
+    !settings.merged.ide?.hasSeenNudge &&
     !idePromptAnswered;
 
   useEffect(() => {
@@ -200,7 +207,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [footerHeight, setFooterHeight] = useState<number>(0);
   const [corgiMode, setCorgiMode] = useState(false);
   const [isTrustedFolderState, setIsTrustedFolder] = useState(
-    config.isTrustedFolder(),
+    isWorkspaceTrusted(settings.merged),
   );
   const [currentModel, setCurrentModel] = useState(config.getModel());
   const [shellModeActive, setShellModeActive] = useState(false);
@@ -224,13 +231,20 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     IdeContext | undefined
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
+  const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+
   const {
     showWorkspaceMigrationDialog,
     workspaceExtensions,
     onWorkspaceMigrationDialogOpen,
     onWorkspaceMigrationDialogClose,
   } = useWorkspaceMigration(settings);
+
+  const [isProQuotaDialogOpen, setIsProQuotaDialogOpen] = useState(false);
+  const [proQuotaDialogResolver, setProQuotaDialogResolver] = useState<
+    ((value: boolean) => void) | null
+  >(null);
 
   useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
@@ -292,6 +306,23 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder);
 
+  const { needsRestart: ideNeedsRestart } = useIdeTrustListener(config);
+  useEffect(() => {
+    if (ideNeedsRestart) {
+      // IDE trust changed, force a restart.
+      setShowIdeRestartPrompt(true);
+    }
+  }, [ideNeedsRestart]);
+
+  useKeypress(
+    (key) => {
+      if (key.name === 'r' || key.name === 'R') {
+        process.exit(0);
+      }
+    },
+    { isActive: showIdeRestartPrompt },
+  );
+
   const {
     isAuthDialogOpen,
     openAuthDialog,
@@ -301,16 +332,32 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   } = useAuthCommand(settings, setAuthError, config);
 
   useEffect(() => {
-    if (settings.merged.selectedAuthType && !settings.merged.useExternalAuth) {
-      const error = validateAuthMethod(settings.merged.selectedAuthType);
+    if (
+      settings.merged.security?.auth?.enforcedType &&
+      settings.merged.security?.auth.selectedType &&
+      settings.merged.security?.auth.enforcedType !==
+        settings.merged.security?.auth.selectedType
+    ) {
+      setAuthError(
+        `Authentication is enforced to be ${settings.merged.security?.auth.enforcedType}, but you are currently using ${settings.merged.security?.auth.selectedType}.`,
+      );
+      openAuthDialog();
+    } else if (
+      settings.merged.security?.auth?.selectedType &&
+      !settings.merged.security?.auth?.useExternal
+    ) {
+      const error = validateAuthMethod(
+        settings.merged.security.auth.selectedType,
+      );
       if (error) {
         setAuthError(error);
         openAuthDialog();
       }
     }
   }, [
-    settings.merged.selectedAuthType,
-    settings.merged.useExternalAuth,
+    settings.merged.security?.auth?.selectedType,
+    settings.merged.security?.auth?.enforcedType,
+    settings.merged.security?.auth?.useExternal,
     openAuthDialog,
     setAuthError,
   ]);
@@ -345,14 +392,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     try {
       const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
         process.cwd(),
-        settings.merged.loadMemoryFromIncludeDirectories
+        settings.merged.context?.loadMemoryFromIncludeDirectories
           ? config.getWorkspaceContext().getDirectories()
           : [],
         config.getDebugMode(),
         config.getFileService(),
         settings.merged,
         config.getExtensionContextFilePaths(),
-        settings.merged.memoryImportFormat || 'tree', // Use setting or default to 'tree'
+        config.getFolderTrust(),
+        settings.merged.context?.importFormat || 'tree', // Use setting or default to 'tree'
         config.getFileFilteringOptions(),
       );
 
@@ -408,6 +456,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       fallbackModel: string,
       error?: unknown,
     ): Promise<boolean> => {
+      // Check if we've already switched to the fallback model
+      if (config.isInFallbackMode()) {
+        // If we're already in fallback mode, don't show the dialog again
+        return false;
+      }
+
       let message: string;
 
       if (
@@ -422,11 +476,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         if (error && isProQuotaExceededError(error)) {
           if (isPaidTier) {
             message = `⚡ You have reached your daily ${currentModel} quota limit.
-⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
+⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
 ⚡ To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
           } else {
             message = `⚡ You have reached your daily ${currentModel} quota limit.
-⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
+⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
 ⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
 ⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
 ⚡ You can switch authentication methods by typing /auth`;
@@ -468,6 +522,40 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           Date.now(),
         );
 
+        // For Pro quota errors, show the dialog and wait for user's choice
+        if (error && isProQuotaExceededError(error)) {
+          // Set the flag to prevent tool continuation
+          setModelSwitchedFromQuotaError(true);
+          // Set global quota error flag to prevent Flash model calls
+          config.setQuotaErrorOccurred(true);
+
+          // Show the ProQuotaDialog and wait for user's choice
+          const shouldContinueWithFallback = await new Promise<boolean>(
+            (resolve) => {
+              setIsProQuotaDialogOpen(true);
+              setProQuotaDialogResolver(() => resolve);
+            },
+          );
+
+          // If user chose to continue with fallback, we don't need to stop the current prompt
+          if (shouldContinueWithFallback) {
+            // Switch to fallback model for future use
+            config.setModel(fallbackModel);
+            config.setFallbackMode(true);
+            logFlashFallback(
+              config,
+              new FlashFallbackEvent(
+                config.getContentGeneratorConfig().authType!,
+              ),
+            );
+            return true; // Continue with current prompt using fallback model
+          }
+
+          // If user chose to authenticate, stop current prompt
+          return false;
+        }
+
+        // For other quota errors, automatically switch to fallback model
         // Set the flag to prevent tool continuation
         setModelSwitchedFromQuotaError(true);
         // Set global quota error flag to prevent Flash model calls
@@ -510,7 +598,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, []);
 
   const getPreferredEditor = useCallback(() => {
-    const editorType = settings.merged.preferredEditor;
+    const editorType = settings.merged.general?.preferredEditor;
     const isValidEditor = isEditorAvailable(editorType);
     if (!isValidEditor) {
       openEditorDialog();
@@ -567,7 +655,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     shellModeActive,
   });
 
-  const [userMessages, setUserMessages] = useState<string[]>([]);
+  // Independent input history management (unaffected by /clear)
+  const inputHistoryStore = useInputHistoryStore();
 
   // Stable reference for cancel handler to avoid circular dependency
   const cancelHandlerRef = useRef<() => void>(() => {});
@@ -585,6 +674,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     history,
     addItem,
     config,
+    settings,
     setDebugMessage,
     handleSlashCommand,
     shellModeActive,
@@ -616,7 +706,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       return;
     }
 
-    const lastUserMessage = userMessages.at(-1);
+    const lastUserMessage = inputHistoryStore.inputHistory.at(-1);
     let textToSet = lastUserMessage || '';
 
     // Append queued messages if any exist
@@ -631,7 +721,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     }
   }, [
     buffer,
-    userMessages,
+    inputHistoryStore.inputHistory,
     getQueuedMessagesText,
     clearQueue,
     pendingHistoryItems,
@@ -640,9 +730,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   // Input handling - queue messages for processing
   const handleFinalSubmit = useCallback(
     (submittedValue: string) => {
+      const trimmedValue = submittedValue.trim();
+      if (trimmedValue.length > 0) {
+        // Add to independent input history
+        inputHistoryStore.addInput(trimmedValue);
+      }
+      // Always add to message queue
       addMessage(submittedValue);
     },
-    [addMessage],
+    [addMessage, inputHistoryStore],
   );
 
   const handleIdePromptComplete = useCallback(
@@ -672,8 +768,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
-  const { elapsedTime, currentLoadingPhrase } =
-    useLoadingIndicator(streamingState);
+  const { elapsedTime, currentLoadingPhrase } = useLoadingIndicator(
+    streamingState,
+    settings.merged.ui?.customWittyPhrases,
+  );
   const showAutoAcceptIndicator = useAutoAcceptIndicator({
     config,
     addItem,
@@ -706,7 +804,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const handleGlobalKeypress = useCallback(
     (key: Key) => {
       // Debug log keystrokes if enabled
-      if (settings.merged.debugKeystrokeLogging) {
+      if (settings.merged.general?.debugKeystrokeLogging) {
         console.log('[DEBUG] Keystroke:', JSON.stringify(key));
       }
 
@@ -773,7 +871,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       handleSlashCommand,
       isAuthenticating,
       cancelOngoingRequest,
-      settings.merged.debugKeystrokeLogging,
+      settings.merged.general?.debugKeystrokeLogging,
     ],
   );
 
@@ -789,47 +887,17 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const logger = useLogger(config.storage);
 
+  // Initialize independent input history from logger
   useEffect(() => {
-    const fetchUserMessages = async () => {
-      const pastMessagesRaw = (await logger?.getPreviousUserMessages()) || []; // Newest first
-
-      const currentSessionUserMessages = history
-        .filter(
-          (item): item is HistoryItem & { type: 'user'; text: string } =>
-            item.type === 'user' &&
-            typeof item.text === 'string' &&
-            item.text.trim() !== '',
-        )
-        .map((item) => item.text)
-        .reverse(); // Newest first, to match pastMessagesRaw sorting
-
-      // Combine, with current session messages being more recent
-      const combinedMessages = [
-        ...currentSessionUserMessages,
-        ...pastMessagesRaw,
-      ];
-
-      // Deduplicate consecutive identical messages from the combined list (still newest first)
-      const deduplicatedMessages: string[] = [];
-      if (combinedMessages.length > 0) {
-        deduplicatedMessages.push(combinedMessages[0]); // Add the newest one unconditionally
-        for (let i = 1; i < combinedMessages.length; i++) {
-          if (combinedMessages[i] !== combinedMessages[i - 1]) {
-            deduplicatedMessages.push(combinedMessages[i]);
-          }
-        }
-      }
-      // Reverse to oldest first for useInputHistory
-      setUserMessages(deduplicatedMessages.reverse());
-    };
-    fetchUserMessages();
-  }, [history, logger]);
+    inputHistoryStore.initializeFromLogger(logger);
+  }, [logger, inputHistoryStore]);
 
   const isInputActive =
     (streamingState === StreamingState.Idle ||
       streamingState === StreamingState.Responding) &&
     !initError &&
-    !isProcessing;
+    !isProcessing &&
+    !isProQuotaDialogOpen;
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -889,12 +957,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const branchName = useGitBranchName(config.getTargetDir());
 
   const contextFileNames = useMemo(() => {
-    const fromSettings = settings.merged.contextFileName;
+    const fromSettings = settings.merged.context?.fileName;
     if (fromSettings) {
       return Array.isArray(fromSettings) ? fromSettings : [fromSettings];
     }
     return getAllGeminiMdFilenames();
-  }, [settings.merged.contextFileName]);
+  }, [settings.merged.context?.fileName]);
 
   const initialPrompt = useMemo(() => config.getQuestion(), [config]);
   const geminiClient = config.getGeminiClient();
@@ -952,6 +1020,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
     : '  Type your message or @path/to/file';
 
+  const hideContextSummary = settings.merged.ui?.hideContextSummary ?? false;
+
   return (
     <StreamingContext.Provider value={streamingState}>
       <Box flexDirection="column" width="90%">
@@ -970,10 +1040,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           key={staticKey}
           items={[
             <Box flexDirection="column" key="header">
-              {!(settings.merged.hideBanner || config.getScreenReader()) && (
-                <Header version={version} nightly={nightly} />
-              )}
-              {!(settings.merged.hideTips || config.getScreenReader()) && (
+              {!(
+                settings.merged.ui?.hideBanner || config.getScreenReader()
+              ) && <Header version={version} nightly={nightly} />}
+              {!(settings.merged.ui?.hideTips || config.getScreenReader()) && (
                 <Tips config={config} />
               )}
             </Box>,
@@ -1042,6 +1112,42 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               ide={currentIDE}
               onComplete={handleIdePromptComplete}
             />
+          ) : isProQuotaDialogOpen ? (
+            <ProQuotaDialog
+              currentModel={config.getModel()}
+              fallbackModel={DEFAULT_GEMINI_FLASH_MODEL}
+              onChoice={(choice) => {
+                setIsProQuotaDialogOpen(false);
+                if (!proQuotaDialogResolver) return;
+
+                const resolveValue = choice !== 'auth';
+                proQuotaDialogResolver(resolveValue);
+                setProQuotaDialogResolver(null);
+
+                if (choice === 'auth') {
+                  openAuthDialog();
+                } else {
+                  addItem(
+                    {
+                      type: MessageType.INFO,
+                      text: 'Switched to fallback model. Tip: Press Ctrl+P to recall your previous prompt and submit it again if you wish.',
+                    },
+                    Date.now(),
+                  );
+                }
+              }}
+            />
+          ) : showIdeRestartPrompt ? (
+            <Box
+              borderStyle="round"
+              borderColor={Colors.AccentYellow}
+              paddingX={1}
+            >
+              <Text color={Colors.AccentYellow}>
+                Workspace trust has changed. Press &apos;r&apos; to restart
+                Gemini to apply the changes.
+              </Text>
+            </Box>
           ) : isFolderTrustDialogOpen ? (
             <FolderTrustDialog
               onSelect={handleFolderTrustSelect}
@@ -1160,7 +1266,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 }
                 elapsedTime={elapsedTime}
               />
-
               {/* Display queued messages below loading indicator */}
               {messageQueue.length > 0 && (
                 <Box flexDirection="column" marginTop={1}>
@@ -1192,10 +1297,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   )}
                 </Box>
               )}
-
               <Box
                 marginTop={1}
-                justifyContent="space-between"
+                justifyContent={
+                  hideContextSummary ? 'flex-start' : 'space-between'
+                }
                 width="100%"
                 flexDirection={isNarrow ? 'column' : 'row'}
                 alignItems={isNarrow ? 'flex-start' : 'center'}
@@ -1214,7 +1320,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     </Text>
                   ) : showEscapePrompt ? (
                     <Text color={Colors.Gray}>Press Esc again to clear.</Text>
-                  ) : (
+                  ) : !hideContextSummary ? (
                     <ContextSummaryDisplay
                       ideContext={ideContextState}
                       geminiMdFileCount={geminiMdFileCount}
@@ -1223,9 +1329,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                       blockedMcpServers={config.getBlockedMcpServers()}
                       showToolDescriptions={showToolDescriptions}
                     />
-                  )}
+                  ) : null}
                 </Box>
-                <Box paddingTop={isNarrow ? 1 : 0}>
+                <Box
+                  paddingTop={isNarrow ? 1 : 0}
+                  marginLeft={hideContextSummary ? 1 : 2}
+                >
                   {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
                     !shellModeActive && (
                       <AutoAcceptIndicator
@@ -1235,7 +1344,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   {shellModeActive && <ShellModeIndicator />}
                 </Box>
               </Box>
-
               {showErrorDetails && (
                 <OverflowProvider>
                   <Box flexDirection="column">
@@ -1250,14 +1358,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   </Box>
                 </OverflowProvider>
               )}
-
               {isInputActive && (
                 <InputPrompt
                   buffer={buffer}
                   inputWidth={inputWidth}
                   suggestionsWidth={suggestionsWidth}
                   onSubmit={handleFinalSubmit}
-                  userMessages={userMessages}
+                  userMessages={inputHistoryStore.inputHistory}
                   onClearScreen={handleClearScreen}
                   config={config}
                   slashCommands={slashCommands}
@@ -1305,7 +1412,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               )}
             </Box>
           )}
-          {!settings.merged.hideFooter && (
+          {!settings.merged.ui?.hideFooter && (
             <Footer
               model={currentModel}
               targetDir={config.getTargetDir()}
@@ -1317,13 +1424,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               showErrorDetails={showErrorDetails}
               showMemoryUsage={
                 config.getDebugMode() ||
-                settings.merged.showMemoryUsage ||
+                settings.merged.ui?.showMemoryUsage ||
                 false
               }
               promptTokenCount={sessionStats.lastPromptTokenCount}
               nightly={nightly}
               vimMode={vimModeEnabled ? vimMode : undefined}
               isTrustedFolder={isTrustedFolderState}
+              hideCWD={settings.merged.ui?.footer?.hideCWD}
+              hideSandboxStatus={settings.merged.ui?.footer?.hideSandboxStatus}
+              hideModelInfo={settings.merged.ui?.footer?.hideModelInfo}
             />
           )}
         </Box>

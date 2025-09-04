@@ -16,6 +16,12 @@ export const STREAM_DEBOUNCE_MS = 100;
 
 export const SHELL_COMMAND_NAME = 'Shell Command';
 
-export const SCREEN_READER_USER_PREFIX = 'User: ';
-
-export const SCREEN_READER_MODEL_PREFIX = 'Model: ';
+// Tool status symbols used in ToolMessage component
+export const TOOL_STATUS = {
+  SUCCESS: '✓',
+  PENDING: 'o',
+  EXECUTING: '⊷',
+  CONFIRMING: '?',
+  CANCELED: '-',
+  ERROR: 'x',
+} as const;

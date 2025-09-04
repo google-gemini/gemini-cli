@@ -21,7 +21,7 @@ import {
   ListRootsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
-import type { MCPServerConfig } from '../config/config.js';
+import type { Config, MCPServerConfig } from '../config/config.js';
 import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
@@ -146,13 +146,13 @@ export class McpClient {
   /**
    * Discovers tools and prompts from the MCP server.
    */
-  async discover(): Promise<void> {
+  async discover(cliConfig: Config): Promise<void> {
     if (this.status !== MCPServerStatus.CONNECTED) {
       throw new Error('Client is not connected.');
     }
 
     const prompts = await this.discoverPrompts();
-    const tools = await this.discoverTools();
+    const tools = await this.discoverTools(cliConfig);
 
     if (prompts.length === 0 && tools.length === 0) {
       throw new Error('No prompts or tools found on the server.');
@@ -191,8 +191,13 @@ export class McpClient {
     return createTransport(this.serverName, this.serverConfig, this.debugMode);
   }
 
-  private async discoverTools(): Promise<DiscoveredMCPTool[]> {
-    return discoverTools(this.serverName, this.serverConfig, this.client);
+  private async discoverTools(cliConfig: Config): Promise<DiscoveredMCPTool[]> {
+    return discoverTools(
+      this.serverName,
+      this.serverConfig,
+      this.client,
+      cliConfig,
+    );
   }
 
   private async discoverPrompts(): Promise<Prompt[]> {
@@ -445,6 +450,7 @@ export async function discoverMcpTools(
   promptRegistry: PromptRegistry,
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
+  cliConfig: Config,
 ): Promise<void> {
   mcpDiscoveryState = MCPDiscoveryState.IN_PROGRESS;
   try {
@@ -459,6 +465,7 @@ export async function discoverMcpTools(
           promptRegistry,
           debugMode,
           workspaceContext,
+          cliConfig,
         ),
     );
     await Promise.all(discoveryPromises);
@@ -504,6 +511,7 @@ export async function connectAndDiscover(
   promptRegistry: PromptRegistry,
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
+  cliConfig: Config,
 ): Promise<void> {
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
@@ -531,6 +539,7 @@ export async function connectAndDiscover(
       mcpServerName,
       mcpServerConfig,
       mcpClient,
+      cliConfig,
     );
 
     // If we have neither prompts nor tools, it's a failed discovery
@@ -632,9 +641,12 @@ export async function discoverTools(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   mcpClient: Client,
+  cliConfig: Config,
 ): Promise<DiscoveredMCPTool[]> {
   try {
-    const mcpCallableTool = mcpToTool(mcpClient);
+    const mcpCallableTool = mcpToTool(mcpClient, {
+      timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+    });
     const tool = await mcpCallableTool.tool();
 
     if (!Array.isArray(tool.functionDeclarations)) {
@@ -665,8 +677,9 @@ export async function discoverTools(
             funcDecl.name!,
             funcDecl.description ?? '',
             funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
-            mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
             mcpServerConfig.trust,
+            undefined,
+            cliConfig,
           ),
         );
       } catch (error) {
@@ -858,18 +871,6 @@ export async function connectToMcpServer(
     unlistenDirectories?.();
     unlistenDirectories = undefined;
   };
-
-  // patch Client.callTool to use request timeout as genai McpCallTool.callTool does not do it
-  // TODO: remove this hack once GenAI SDK does callTool with request options
-  if ('callTool' in mcpClient) {
-    const origCallTool = mcpClient.callTool.bind(mcpClient);
-    mcpClient.callTool = function (params, resultSchema, options) {
-      return origCallTool(params, resultSchema, {
-        ...options,
-        timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-      });
-    };
-  }
 
   try {
     const transport = await createTransport(
