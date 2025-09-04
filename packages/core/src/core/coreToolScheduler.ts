@@ -277,7 +277,11 @@ export async function truncateAndSaveToFile(
     fileContent = lines.join('\n');
   }
 
-  const truncatedContent = lines.slice(-truncateLines).join('\n');
+  const half = Math.floor(truncateLines / 2);
+  const beginning = lines.slice(0, half);
+  const end = lines.slice(-half);
+  const truncatedContent =
+    beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
 
   // Sanitize callId to prevent path traversal.
   const safeFileName = `${path.basename(callId)}.output`;
@@ -292,9 +296,9 @@ To read the complete output, use the ${ReadFileTool.Name} tool with the absolute
 - ${ReadFileTool.Name} tool with offset=0, limit=100 to see the first 100 lines
 - ${ReadFileTool.Name} tool with offset=N to skip N lines from the beginning
 - ${ReadFileTool.Name} tool with limit=M to read only M lines at a time
+The truncated output below shows the beginning and end of the content. The marker '... [CONTENT TRUNCATED] ...' indicates where content was removed.
 This allows you to efficiently examine different parts of the output without loading the entire file.
 Truncated part of the output:
-...
 ${truncatedContent}`,
       outputFile,
     };

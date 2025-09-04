@@ -1239,7 +1239,7 @@ describe('truncateAndSaveToFile', () => {
 
   it('should truncate content by lines when content has many lines', async () => {
     // Create content that exceeds 100,000 character threshold with many lines
-    const lines = Array(2000).fill('x'.repeat(1000)); // 1000 chars per line * 2000 lines = 2,000,000 chars
+    const lines = Array(2000).fill('x'.repeat(100)); // 100 chars per line * 2000 lines = 200,000 chars
     const content = lines.join('\n');
     const callId = 'test-call-id';
     const projectTempDir = '/tmp';
@@ -1262,8 +1262,13 @@ describe('truncateAndSaveToFile', () => {
       content,
     );
 
-    // Should contain last 1000 lines
-    const expectedTruncated = lines.slice(-TRUNCATE_LINES).join('\n');
+    // Should contain the first and last 500 lines
+    const half = Math.floor(TRUNCATE_LINES / 2);
+    const beginning = lines.slice(0, half);
+    const end = lines.slice(-half);
+    const expectedTruncated =
+      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
+
     expect(result.content).toContain(
       'Tool output was too large and has been truncated',
     );
@@ -1303,8 +1308,12 @@ describe('truncateAndSaveToFile', () => {
       expectedFileContent,
     );
 
-    // Should contain the last TRUNCATE_LINES lines of the wrapped content
-    const expectedTruncated = wrappedLines.slice(-TRUNCATE_LINES).join('\n');
+    // Should contain the first and last TRUNCATE_LINES / 2 lines of the wrapped content
+    const half = Math.floor(TRUNCATE_LINES / 2);
+    const beginning = wrappedLines.slice(0, half);
+    const end = wrappedLines.slice(-half);
+    const expectedTruncated =
+      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
     expect(result.content).toContain(
       'Tool output was too large and has been truncated',
     );
