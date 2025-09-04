@@ -351,7 +351,7 @@ function mergeSettings(
     getMergeStrategyForPath,
     {}, // Start with an empty object
     systemDefaults,
-    user,    
+    user,
     safeWorkspaceWithoutFolderTrust,
     system,
   ) as Settings;

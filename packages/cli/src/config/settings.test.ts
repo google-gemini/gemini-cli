@@ -518,9 +518,6 @@ describe('Settings Loading and Merging', () => {
         ui: {
           theme: 'system-theme',
         },
-        general: {},
-        privacy: {},
-        ide: {},
       });
     });
 
