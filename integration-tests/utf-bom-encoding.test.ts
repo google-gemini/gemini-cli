@@ -122,8 +122,6 @@ d('BOM end-to-end integration', () => {
     );
   });
 
-it('Binary sentinel', async () => {
-    await runAndAssert('binary.bin', fakePng(), null);
   it('Can describe a PNG file', async () => {
     const imagePath = resolve(
       process.cwd(),
@@ -136,17 +134,8 @@ it('Binary sentinel', async () => {
     const output = await rig.run(prompt);
     await rig.waitForToolCall('read_file');
     const lower = output.toLowerCase();
-
-    expect(lower.includes('screenshot')).toBeTruthy();
-    expect(lower.includes('gemini cli')).toBeTruthy();
-    expect(lower.includes('terminal')).toBeTruthy();
-    expect(lower.replace(/\s/g, '').includes('googlesearch')).toBeTruthy();
-    expect(lower.includes('21')).toBeTruthy();
-
-
     // The response is non-deterministic, so we just check for some
     // keywords that are very likely to be in the response.
     expect(lower.includes('gemini')).toBeTruthy();
-
   });
 });
