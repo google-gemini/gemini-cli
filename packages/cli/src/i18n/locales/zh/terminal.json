@@ -1,0 +1,17 @@
+{
+  "setup": {
+    "alreadyConfigured": "您的终端已配置为多行输入的最佳体验（Shift+Enter 和 Ctrl+Enter）。",
+    "couldNotDetect": "无法检测终端类型。支持的终端：VS Code、Cursor 和 Windsurf。",
+    "restartRequired": "\\n\\n请重启您的终端以使更改生效。",
+    "failed": "配置终端失败：{{error}}"
+  },
+  "loading": {
+    "dialUpTone": "正在等待拨号音结束...",
+    "humorometer": "正在重新校准幽默测量仪。",
+    "otherLoadingScreen": "我的另一个加载界面更有趣。",
+    "enhancing": "增强中... 增强中... 仍在加载。",
+    "turnOffAndOn": "您试过关闭再打开吗？（指加载界面，不是我。）",
+    "additionalPylons": "正在建造额外的能量塔...",
+    "newLineCtrlJ": "换行？那是 Ctrl+J。"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "errors": {
+    "notGitRepository": "Impossible de déterminer le dépôt GitHub. /setup-github doit être exécuté depuis un dépôt git."
+  }
+}

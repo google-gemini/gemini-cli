@@ -1,0 +1,17 @@
+{
+  "setup": {
+    "alreadyConfigured": "Votre terminal est déjà configuré pour une expérience optimale avec la saisie multiligne (Shift+Entrée et Ctrl+Entrée).",
+    "couldNotDetect": "Impossible de détecter le type de terminal. Terminaux supportés : VS Code, Cursor et Windsurf.",
+    "restartRequired": "\\n\\nVeuillez redémarrer votre terminal pour que les modifications prennent effet.",
+    "failed": "Échec de la configuration du terminal : {{error}}"
+  },
+  "loading": {
+    "dialUpTone": "J'attends juste que la tonalité de numérotation se termine...",
+    "humorometer": "Recalibrage de l'humour-o-mètre.",
+    "otherLoadingScreen": "Mon autre écran de chargement est encore plus drôle.",
+    "enhancing": "Amélioration... Amélioration... Toujours en cours de chargement.",
+    "turnOffAndOn": "Avez-vous essayé de l'éteindre et de le rallumer ? (L'écran de chargement, pas moi.)",
+    "additionalPylons": "Construction de pylônes supplémentaires...",
+    "newLineCtrlJ": "Nouvelle ligne ? C'est Ctrl+J."
+  }
+}
