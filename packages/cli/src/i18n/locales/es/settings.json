@@ -99,6 +99,9 @@
     "respectGeminiIgnore": "Respetar archivos .geminiignore al buscar.",
     "shouldUseNodePtyShell": "Usar node-pty para ejecución de comandos shell. Todavía se aplica la recuperación child_process."
   },
+  "language": {
+    "useEnvironment": "Usar GEMINI_LANG (Variable de Entorno)"
+  },
   "languageOptions": {
     "english": "English",
     "spanish": "Español",

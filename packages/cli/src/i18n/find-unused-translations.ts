@@ -59,6 +59,20 @@ interface UnusedTranslationReport {
   potentialOrphans: TranslationKey[];
 }
 
+interface CoverageReport {
+  languages: Map<string, LanguageCoverage>;
+  totalKeys: number;
+  referenceLanguage: string;
+}
+
+interface LanguageCoverage {
+  language: string;
+  totalKeys: number;
+  availableKeys: number;
+  missingKeys: string[];
+  coveragePercentage: number;
+}
+
 class UnusedTranslationFinder {
   private translationKeys: TranslationKey[] = [];
   private codebaseContent: string = '';
@@ -373,6 +387,210 @@ class UnusedTranslationFinder {
     };
   }
 
+  async generateCoverageReport(): Promise<CoverageReport> {
+    console.log('🔍 Analyzing translation coverage...');
+
+    const localesDir = path.join('packages/cli/src/i18n/locales');
+    const referenceLanguage = 'en'; // English as reference
+    const supportedLanguages = fs
+      .readdirSync(localesDir)
+      .filter(item => fs.statSync(path.join(localesDir, item)).isDirectory())
+      .sort();
+
+    // Get all keys from reference language (English)
+    const referenceKeys = new Set<string>();
+    const referenceDir = path.join(localesDir, referenceLanguage);
+    const referenceFiles = fs
+      .readdirSync(referenceDir)
+      .filter(file => file.endsWith('.json'));
+
+    for (const file of referenceFiles) {
+      const namespace = file.replace('.json', '');
+      const filePath = path.join(referenceDir, file);
+      const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      const keys = this.getTranslationKeysLocal(content);
+      keys.forEach(key => referenceKeys.add(`${namespace}:${key}`));
+    }
+
+    const totalKeys = referenceKeys.size;
+    const languageCoverages = new Map<string, LanguageCoverage>();
+
+    // Analyze each language
+    for (const lang of supportedLanguages) {
+      const langDir = path.join(localesDir, lang);
+      const availableKeys = new Set<string>();
+      const missingKeys: string[] = [];
+
+      // Get all available keys for this language
+      try {
+        const langFiles = fs
+          .readdirSync(langDir)
+          .filter(file => file.endsWith('.json'));
+
+        for (const file of langFiles) {
+          const namespace = file.replace('.json', '');
+          const filePath = path.join(langDir, file);
+          
+          if (fs.existsSync(filePath)) {
+            try {
+              const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+              const keys = this.getTranslationKeysLocal(content);
+              keys.forEach(key => availableKeys.add(`${namespace}:${key}`));
+            } catch (error) {
+              console.warn(`⚠️  Could not parse ${lang}/${file}: ${error}`);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️  Could not read directory ${lang}: ${error}`);
+      }
+
+      // Find missing keys
+      referenceKeys.forEach(key => {
+        if (!availableKeys.has(key)) {
+          missingKeys.push(key);
+        }
+      });
+
+      const coverage: LanguageCoverage = {
+        language: lang,
+        totalKeys,
+        availableKeys: availableKeys.size,
+        missingKeys,
+        coveragePercentage: (availableKeys.size / totalKeys) * 100,
+      };
+
+      languageCoverages.set(lang, coverage);
+    }
+
+    return {
+      languages: languageCoverages,
+      totalKeys,
+      referenceLanguage,
+    };
+  }
+
+  private getTranslationKeysLocal(
+    obj: Record<string, unknown>,
+    prefix = '',
+  ): string[] {
+    const keys: string[] = [];
+
+    for (const key in obj) {
+      const fullKey = prefix ? `${prefix}.${key}` : key;
+
+      if (
+        typeof obj[key] === 'object' &&
+        obj[key] !== null &&
+        !Array.isArray(obj[key])
+      ) {
+        keys.push(
+          ...this.getTranslationKeysLocal(
+            obj[key] as Record<string, unknown>,
+            fullKey,
+          ),
+        );
+      } else {
+        keys.push(fullKey);
+      }
+    }
+
+    return keys;
+  }
+
+  generateCoverageReportOutput(report: CoverageReport): string {
+    let output = '';
+
+    // Markdown Header
+    output += '# Translation Coverage Report\n\n';
+    output += `**Generated**: ${new Date().toISOString()}\n\n`;
+
+    // Summary table
+    output += '## Coverage Summary\n\n';
+    output += '| Language | Coverage | Keys | Status |\n';
+    output += '|----------|----------|------|---------|\n';
+
+    const sortedLanguages = Array.from(report.languages.entries()).sort(
+      ([, a], [, b]) => b.coveragePercentage - a.coveragePercentage,
+    );
+
+    for (const [lang, coverage] of sortedLanguages) {
+      const percentage = coverage.coveragePercentage.toFixed(1);
+      const status = coverage.coveragePercentage === 100 ? '✅ Complete' : `⚠️  ${coverage.missingKeys.length} missing`;
+      const flag = this.getLanguageFlag(lang);
+      const name = this.getLanguageName(lang);
+      
+      output += `| ${flag} ${name} (${lang}) | ${percentage}% | ${coverage.availableKeys}/${coverage.totalKeys} | ${status} |\n`;
+    }
+
+    // Missing keys details (only for incomplete languages)
+    const incompleteLanguages = sortedLanguages.filter(([, coverage]) => coverage.missingKeys.length > 0);
+    
+    if (incompleteLanguages.length > 0) {
+      output += '\n## Missing Keys by Language\n\n';
+      
+      for (const [lang, coverage] of incompleteLanguages) {
+        const flag = this.getLanguageFlag(lang);
+        const name = this.getLanguageName(lang);
+        
+        output += `### ${flag} ${name} (${lang}) - ${coverage.missingKeys.length} missing keys\n\n`;
+        
+        // Show first 10 missing keys
+        const sampleMissing = coverage.missingKeys.slice(0, 10);
+        output += '```\n';
+        sampleMissing.forEach(key => {
+          output += `${key}\n`;
+        });
+        
+        if (coverage.missingKeys.length > 10) {
+          output += `... and ${coverage.missingKeys.length - 10} more\n`;
+        }
+        output += '```\n\n';
+      }
+    }
+
+    // Progress indicators
+    output += '## Progress Overview\n\n';
+    for (const [lang, coverage] of sortedLanguages) {
+      const flag = this.getLanguageFlag(lang);
+      const name = this.getLanguageName(lang);
+      const percentage = Math.round(coverage.coveragePercentage);
+      const progressBar = this.generateProgressBar(percentage);
+      
+      output += `**${flag} ${name}**: ${progressBar} ${percentage}%\n\n`;
+    }
+
+    return output;
+  }
+
+  private generateProgressBar(percentage: number): string {
+    const totalBars = 20;
+    const filledBars = Math.round((percentage / 100) * totalBars);
+    const emptyBars = totalBars - filledBars;
+    
+    return '█'.repeat(filledBars) + '░'.repeat(emptyBars);
+  }
+
+  private getLanguageFlag(lang: string): string {
+    const flags: Record<string, string> = {
+      en: '🇺🇸',
+      zh: '🇨🇳', 
+      es: '🇪🇸',
+      fr: '🇫🇷',
+    };
+    return flags[lang] || '🏳️';
+  }
+
+  private getLanguageName(lang: string): string {
+    const names: Record<string, string> = {
+      en: 'English',
+      zh: 'Chinese', 
+      es: 'Spanish',
+      fr: 'French',
+    };
+    return names[lang] || lang.toUpperCase();
+  }
+
   generateDetailedReport(report: UnusedTranslationReport): string {
     let output = '';
 
@@ -443,38 +661,57 @@ class UnusedTranslationFinder {
 
 async function main() {
   try {
+    const args = process.argv.slice(2);
+    const showCoverage = args.includes('--coverage');
+
     const finder = new UnusedTranslationFinder();
-    const report = await finder.findUnusedTranslations();
 
-    console.log('\n📊 Analysis Results:');
-    console.log(`   📚 Total keys: ${report.totalKeys}`);
-    console.log(
-      `   ✅ Used keys: ${report.usedKeys} (${((report.usedKeys / report.totalKeys) * 100).toFixed(1)}%)`,
-    );
-    console.log(
-      `   ❌ Unused keys: ${report.unusedKeys} (${((report.unusedKeys / report.totalKeys) * 100).toFixed(1)}%)`,
-    );
-
-    if (report.unusedKeys > 0) {
-      console.log('\n📋 Unused keys by namespace:');
-      for (const [namespace, keys] of report.unusedByNamespace.entries()) {
-        console.log(`   ${namespace}: ${keys.length} unused`);
-      }
-    }
-
-    // Generate detailed report
-    const detailedReport = finder.generateDetailedReport(report);
-    const outputFile = 'unused-translations-report.md';
-    fs.writeFileSync(outputFile, detailedReport, 'utf-8');
-
-    console.log(`\n📋 Detailed report generated: ${outputFile}`);
-
-    if (report.unusedKeys === 0) {
-      console.log('\n🎉 All translation keys are being used! Clean codebase.');
+    if (showCoverage) {
+      // Generate coverage report
+      const coverageReport = await finder.generateCoverageReport();
+      const coverageOutput = finder.generateCoverageReportOutput(coverageReport);
+      
+      console.log('\n' + coverageOutput);
+      
+      // Also save to file
+      const coverageFile = 'translation-coverage-report.md';
+      fs.writeFileSync(coverageFile, coverageOutput, 'utf-8');
+      console.log(`\nCoverage report saved to: ${coverageFile}`);
+      
     } else {
+      // Generate unused translations report (existing functionality)
+      const report = await finder.findUnusedTranslations();
+
+      console.log('\n📊 Analysis Results:');
+      console.log(`   📚 Total keys: ${report.totalKeys}`);
       console.log(
-        `\n💡 Consider reviewing and cleaning up ${report.unusedKeys} unused translation keys.`,
+        `   ✅ Used keys: ${report.usedKeys} (${((report.usedKeys / report.totalKeys) * 100).toFixed(1)}%)`,
       );
+      console.log(
+        `   ❌ Unused keys: ${report.unusedKeys} (${((report.unusedKeys / report.totalKeys) * 100).toFixed(1)}%)`,
+      );
+
+      if (report.unusedKeys > 0) {
+        console.log('\n📋 Unused keys by namespace:');
+        for (const [namespace, keys] of report.unusedByNamespace.entries()) {
+          console.log(`   ${namespace}: ${keys.length} unused`);
+        }
+      }
+
+      // Generate detailed report
+      const detailedReport = finder.generateDetailedReport(report);
+      const outputFile = 'unused-translations-report.md';
+      fs.writeFileSync(outputFile, detailedReport, 'utf-8');
+
+      console.log(`\n📋 Detailed report generated: ${outputFile}`);
+
+      if (report.unusedKeys === 0) {
+        console.log('\n🎉 All translation keys are being used! Clean codebase.');
+      } else {
+        console.log(
+          `\n💡 Consider reviewing and cleaning up ${report.unusedKeys} unused translation keys.`,
+        );
+      }
     }
   } catch (error) {
     console.error('❌ Error analyzing translations:', error);

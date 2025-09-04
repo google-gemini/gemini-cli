@@ -97,21 +97,81 @@ i18n.use(initReactI18next).init({
 export { i18n as errorTranslator };
 
 /**
- * Initialize i18n language using official settings system
+ * Detect language from environment variables
+ * Supports both GEMINI_LANG (Gemini-specific) and standard Unix LANG/LC_ALL
+ */
+const detectLanguageFromEnv = (): string | null => {
+  // 1. Check Gemini-specific environment variable first
+  const geminiLang = process.env['GEMINI_LANG'];
+  if (geminiLang && languages.includes(geminiLang)) {
+    return geminiLang;
+  }
+
+  // 2. Check standard Unix environment variables
+  const systemLocale = process.env['LANG'] || process.env['LC_ALL'] || '';
+  if (systemLocale) {
+    // Extract language code from locale format (e.g., zh_CN.UTF-8 → zh)
+    const langCode = systemLocale.split('.')[0].split('_')[0];
+    
+    // Handle special cases
+    if (langCode === 'C' || langCode === 'POSIX') {
+      return 'en'; // C locale defaults to English
+    }
+    
+    // Return if supported language
+    if (languages.includes(langCode)) {
+      return langCode;
+    }
+  }
+
+  return null; // No valid language detected from environment
+};
+
+/**
+ * Initialize i18n language using official settings system with environment variable support
  * This should be called from main() after settings are loaded
+ * 
+ * Priority order:
+ * 1. Settings file (highest)
+ * 2. GEMINI_LANG environment variable
+ * 3. LANG/LC_ALL environment variables
+ * 4. Default 'en' (lowest)
  */
 export const initializeI18nWithSettings = (settings: LoadedSettings): void => {
   try {
+    let selectedLanguage = 'en'; // Default fallback
+
+    // 1. Check settings file first (highest priority)
     const settingsLang = settings.merged.language;
     if (
       settingsLang &&
       typeof settingsLang === 'string' &&
+      settingsLang !== '' && // Empty string means use environment variables
       languages.includes(settingsLang)
     ) {
-      changeLanguage(settingsLang);
+      selectedLanguage = settingsLang;
+    } else {
+      // 2. If no explicit language setting or empty string, check environment variables
+      const envLang = detectLanguageFromEnv();
+      if (envLang) {
+        selectedLanguage = envLang;
+      }
+    }
+
+    // Apply the selected language
+    changeLanguage(selectedLanguage);
+    
+    // Debug log for language detection
+    if (process.env['DEBUG']) {
+      console.debug(`[i18n] Language initialized: ${selectedLanguage}`);
+      console.debug(`[i18n] Settings language: ${settingsLang || 'none'}`);
+      console.debug(`[i18n] GEMINI_LANG: ${process.env['GEMINI_LANG'] || 'none'}`);
+      console.debug(`[i18n] LANG: ${process.env['LANG'] || 'none'}`);
     }
   } catch (error) {
-    console.debug('[i18n] Failed to initialize language from settings:', error);
+    console.debug('[i18n] Failed to initialize language:', error);
+    // Ensure we fall back to English on any error
+    changeLanguage('en');
   }
 
   // Register error translator for core package

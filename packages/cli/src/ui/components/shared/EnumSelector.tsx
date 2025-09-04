@@ -52,16 +52,14 @@ export function EnumSelector({
       >
         {canScrollLeft ? '◀' : ' '}
       </Text>
-      <Box minWidth={2} />
-      <Box minWidth={12} justifyContent="center">
-        <Text
-          color={isActive ? Colors.AccentGreen : Colors.Foreground}
-          bold={isActive}
-        >
-          {currentOption.label}
-        </Text>
-      </Box>
-      <Box minWidth={2} />
+      <Text> </Text>
+      <Text
+        color={isActive ? Colors.AccentGreen : Colors.Foreground}
+        bold={isActive}
+      >
+        {currentOption.label}
+      </Text>
+      <Text> </Text>
       <Text
         color={isActive && canScrollRight ? Colors.AccentGreen : Colors.Gray}
       >
