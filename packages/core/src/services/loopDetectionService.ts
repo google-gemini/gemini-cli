@@ -330,35 +330,37 @@ export class LoopDetectionService {
     return originalChunk === currentChunk;
   }
 
-  private trimRecentHistory (recentHistory: Content[]): Content[] {
-  
-    // Removes the last part of the history if it is a function call.
-    // A function response should follow a function call to be valid.
-    if (
+  private trimRecentHistory(recentHistory: Content[]): Content[] {
+    // A function response must be preceded by a function call.
+    // Continuously remove dangling function calls from the end of the history
+    // until the last turn is not a function call.
+    while (
       recentHistory.length > 0 &&
       isFunctionCall(recentHistory[recentHistory.length - 1])
     ) {
       recentHistory.pop();
     }
 
-    // Removes the first part of the history if it is a function response.
-    // A function response should be preceded by a function call to be valid.
-    if (
+    // Similarly, a function response must follow a function call.
+    // Continuously remove leading function responses that don't have a preceding call
+    // until the first turn is not a function response.
+    while (
       recentHistory.length > 0 &&
       isFunctionResponse(recentHistory[0])
     ) {
       recentHistory.shift();
     }
+    
     return recentHistory;
   }
 
   private async checkForLoopWithLLM(signal: AbortSignal) {
-    var recentHistory = this.config
+    const recentHistory = this.config
       .getGeminiClient()
       .getHistory()
       .slice(-LLM_LOOP_CHECK_HISTORY_COUNT);
     
-    recentHistory = this.trimRecentHistory(recentHistory)
+    const trimmedHistory = this.trimRecentHistory(recentHistory)
 
     const prompt = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
 
@@ -373,7 +375,7 @@ For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distin
 
 Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state.`;
     const contents = [
-      ...recentHistory,
+      ...trimmedHistory,
       { role: 'user', parts: [{ text: prompt }] },
     ];
     const schema: Record<string, unknown> = {
