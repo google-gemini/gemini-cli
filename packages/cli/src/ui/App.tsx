@@ -1191,6 +1191,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 settings={settings}
                 onSelect={() => closeSettingsDialog()}
                 onRestartRequest={() => process.exit(0)}
+                availableTerminalHeight={
+                  constrainHeight
+                    ? terminalHeight - staticExtraHeight
+                    : undefined
+                }
               />
             </Box>
           ) : isAuthenticating ? (
