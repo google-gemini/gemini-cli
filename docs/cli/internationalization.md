@@ -43,9 +43,38 @@ The `language` setting can be configured in any of the [configuration file locat
 - Project settings: `.gemini/settings.json`
 - System settings: Platform-specific system directory
 
-### Through Environment Variables
+### Through Environment Variables (Automatic Detection)
 
-You can use environment variables in your settings file for dynamic configuration:
+Gemini CLI can automatically detect your preferred language from environment variables. To enable this:
+
+1. Go to `/settings` → Language → Select "Use GEMINI_LANG (Environment Variable)"
+2. Or set `"language": ""` in your `settings.json` file
+3. Set one of the following environment variables:
+
+```bash
+# Gemini-specific language setting (highest priority)
+export GEMINI_LANG=zh
+
+# Standard Unix locale variables (fallback)
+export LANG=zh_CN.UTF-8
+export LC_ALL=zh_CN.UTF-8
+```
+
+**Priority order:**
+1. **Settings file** (explicit language selection) - Highest
+2. **GEMINI_LANG** environment variable
+3. **LANG/LC_ALL** environment variables  
+4. **Default** (`en`) - Lowest
+
+**Locale format support:**
+- `zh_CN.UTF-8` → `zh` (Chinese)
+- `es_ES.UTF-8` → `es` (Spanish)
+- `fr_FR.UTF-8` → `fr` (French)
+- `C.UTF-8` or `POSIX` → `en` (English)
+
+### Manual Environment Variable Configuration
+
+You can also use environment variables in your settings file for dynamic configuration:
 
 ```json
 {
@@ -125,13 +154,52 @@ The internationalization system in Gemini CLI:
 - Provides **type safety** for translation keys
 - Enables **hot reloading** for immediate language switching
 
+## Development Tools
+
+### Translation Coverage Report
+
+For maintainers and contributors, Gemini CLI includes a coverage analysis tool to track translation completeness across all supported languages:
+
+```bash
+# Generate a detailed coverage report (Markdown format)
+npx tsx src/i18n/find-unused-translations.ts --coverage
+```
+
+This command generates `translation-coverage-report.md` with:
+
+- **Coverage Summary**: Table showing completion percentage for each language
+- **Missing Keys**: Detailed list of untranslated keys by language  
+- **Progress Visualization**: ASCII progress bars for each language
+- **Status Indicators**: Visual completion status (✅ Complete / ⚠️ Missing)
+
+**Example output:**
+```markdown
+| Language | Coverage | Keys | Status |
+|----------|----------|------|---------|
+| 🇺🇸 English (en) | 100.0% | 689/689 | ✅ Complete |
+| 🇨🇳 Chinese (zh) | 97.5% | 672/689 | ⚠️  21 missing |
+| 🇪🇸 Spanish (es) | 95.1% | 655/689 | ⚠️  38 missing |
+```
+
+### Unused Translation Detection
+
+To find potentially unused translation keys:
+
+```bash
+# Generate unused translation report  
+npx tsx src/i18n/find-unused-translations.ts
+```
+
+This helps maintain clean translation files by identifying orphaned keys.
+
 ## Contributing Translations
 
 We welcome contributions to improve and expand language support in Gemini CLI. If you'd like to help with translations:
 
-1. **Report Issues**: If you find translation errors or missing text, please [open an issue](https://github.com/google-gemini/gemini-cli/issues)
-2. **Community Contributions**: Join discussions about internationalization improvements
-3. **New Languages**: Help us prioritize new language support by expressing interest in the community
+1. **Check Coverage**: Run the coverage report to see what needs translation
+2. **Report Issues**: If you find translation errors or missing text, please [open an issue](https://github.com/google-gemini/gemini-cli/issues)
+3. **Community Contributions**: Join discussions about internationalization improvements
+4. **New Languages**: Help us prioritize new language support by expressing interest in the community
 
 ## Troubleshooting
 
