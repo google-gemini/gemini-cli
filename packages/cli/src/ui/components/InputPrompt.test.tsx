@@ -92,7 +92,9 @@ describe('InputPrompt', () => {
   const mockedUseShellHistory = vi.mocked(useShellHistory);
   const mockedUseCommandCompletion = vi.mocked(useCommandCompletion);
   const mockedUseInputHistory = vi.mocked(useInputHistory);
-  const mockedUseReverseSearchCompletion = vi.mocked(useReverseSearchCompletion);
+  const mockedUseReverseSearchCompletion = vi.mocked(
+    useReverseSearchCompletion,
+  );
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -184,7 +186,9 @@ describe('InputPrompt', () => {
       handleAutocomplete: vi.fn(),
       resetCompletionState: vi.fn(),
     };
-    mockedUseReverseSearchCompletion.mockReturnValue(mockReverseSearchCompletion);
+    mockedUseReverseSearchCompletion.mockReturnValue(
+      mockReverseSearchCompletion,
+    );
 
     props = {
       buffer: mockBuffer,
@@ -1617,24 +1621,24 @@ describe('InputPrompt', () => {
 
     it('completes the highlighted entry on Tab and exits reverse-search', async () => {
       // Mock the reverse search completion
-      let isReverseSearchActive = true;
       const mockHandleAutocomplete = vi.fn(() => {
         props.buffer.setText('echo hello');
-        isReverseSearchActive = false;
       });
 
       mockedUseReverseSearchCompletion.mockImplementation(
         (buffer, shellHistory, reverseSearchActive) => ({
           ...mockReverseSearchCompletion,
-          suggestions: reverseSearchActive ? [
-            { label: 'echo hello', value: 'echo hello' },
-            { label: 'echo world', value: 'echo world' },
-            { label: 'ls', value: 'ls' },
-          ] : [],
+          suggestions: reverseSearchActive
+            ? [
+                { label: 'echo hello', value: 'echo hello' },
+                { label: 'echo world', value: 'echo world' },
+                { label: 'ls', value: 'ls' },
+              ]
+            : [],
           showSuggestions: reverseSearchActive,
           activeSuggestionIndex: reverseSearchActive ? 0 : -1,
           handleAutocomplete: mockHandleAutocomplete,
-        })
+        }),
       );
 
       const { stdin, stdout, unmount } = renderWithProviders(
