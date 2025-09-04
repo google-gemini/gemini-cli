@@ -14,6 +14,32 @@ import type { NextSpeakerResponse } from './nextSpeakerChecker.js';
 import { checkNextSpeaker } from './nextSpeakerChecker.js';
 import { GeminiChat } from '../core/geminiChat.js';
 
+// Mock fs module to prevent actual file system operations during tests
+const mockFileSystem = new Map<string, string>();
+
+vi.mock('node:fs', () => {
+  const fsModule = {
+    mkdirSync: vi.fn(),
+    writeFileSync: vi.fn((path: string, data: string) => {
+      mockFileSystem.set(path, data);
+    }),
+    readFileSync: vi.fn((path: string) => {
+      if (mockFileSystem.has(path)) {
+        return mockFileSystem.get(path);
+      }
+      throw Object.assign(new Error('ENOENT: no such file or directory'), {
+        code: 'ENOENT',
+      });
+    }),
+    existsSync: vi.fn((path: string) => mockFileSystem.has(path)),
+  };
+
+  return {
+    default: fsModule,
+    ...fsModule,
+  };
+});
+
 // Mock GeminiClient and Config constructor
 vi.mock('../core/client.js');
 vi.mock('../config/config.js');
@@ -63,6 +89,17 @@ describe('checkNextSpeaker', () => {
       undefined,
       undefined,
     );
+
+    // Mock the methods that ChatRecordingService needs
+    mockConfigInstance.getSessionId = vi
+      .fn()
+      .mockReturnValue('test-session-id');
+    mockConfigInstance.getProjectRoot = vi
+      .fn()
+      .mockReturnValue('/test/project/root');
+    mockConfigInstance.storage = {
+      getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+    };
 
     mockGeminiClient = new GeminiClient(mockConfigInstance);
 

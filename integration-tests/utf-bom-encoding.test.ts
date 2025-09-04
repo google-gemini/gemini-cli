@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { writeFileSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { TestRig } from './test-helper.js';
 
 // Windows skip (Option A: avoid infra scope)
@@ -49,10 +49,6 @@ const utf32BE = (s: string) => {
   });
   return Buffer.concat([bom, payload]);
 };
-
-// Minimal binary sentinel (PNG header only)
-const fakePng = () =>
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 let rig: TestRig;
 let dir: string;
@@ -126,7 +122,20 @@ d('BOM end-to-end integration', () => {
     );
   });
 
-  it('Binary sentinel', async () => {
-    await runAndAssert('image.png', fakePng(), null);
+  it('Can describe a PNG file', async () => {
+    const imagePath = resolve(
+      process.cwd(),
+      'docs/assets/gemini-screenshot.png',
+    );
+    const imageContent = readFileSync(imagePath);
+    const filename = 'gemini-screenshot.png';
+    writeFileSync(join(dir, filename), imageContent);
+    const prompt = `What is shown in the image ${filename}?`;
+    const output = await rig.run(prompt);
+    await rig.waitForToolCall('read_file');
+    const lower = output.toLowerCase();
+    // The response is non-deterministic, so we just check for some
+    // keywords that are very likely to be in the response.
+    expect(lower.includes('gemini')).toBeTruthy();
   });
 });

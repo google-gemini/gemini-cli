@@ -258,16 +258,9 @@ describe('Telemetry Metrics', () => {
       });
     });
 
-    it('should include diffStat when provided', () => {
+    it('should record file operation without diffStat', () => {
       initializeMetricsModule(mockConfig);
       mockCounterAddFn.mockClear();
-
-      const diffStat = {
-        ai_added_lines: 5,
-        ai_removed_lines: 2,
-        user_added_lines: 3,
-        user_removed_lines: 1,
-      };
 
       recordFileOperationMetricModule(
         mockConfig,
@@ -275,20 +268,15 @@ describe('Telemetry Metrics', () => {
         undefined,
         undefined,
         undefined,
-        diffStat,
       );
 
       expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
         'session.id': 'test-session-id',
         operation: FileOperation.UPDATE,
-        ai_added_lines: 5,
-        ai_removed_lines: 2,
-        user_added_lines: 3,
-        user_removed_lines: 1,
       });
     });
 
-    it('should not include diffStat attributes when diffStat is not provided', () => {
+    it('should record minimal file operation when optional parameters are undefined', () => {
       initializeMetricsModule(mockConfig);
       mockCounterAddFn.mockClear();
 
@@ -310,16 +298,9 @@ describe('Telemetry Metrics', () => {
       });
     });
 
-    it('should handle diffStat with all zero values', () => {
+    it('should not include diffStat attributes when diffStat is not provided', () => {
       initializeMetricsModule(mockConfig);
       mockCounterAddFn.mockClear();
-
-      const diffStat = {
-        ai_added_lines: 0,
-        ai_removed_lines: 0,
-        user_added_lines: 0,
-        user_removed_lines: 0,
-      };
 
       recordFileOperationMetricModule(
         mockConfig,
@@ -327,16 +308,11 @@ describe('Telemetry Metrics', () => {
         undefined,
         undefined,
         undefined,
-        diffStat,
       );
 
       expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
         'session.id': 'test-session-id',
         operation: FileOperation.UPDATE,
-        ai_added_lines: 0,
-        ai_removed_lines: 0,
-        user_added_lines: 0,
-        user_removed_lines: 0,
       });
     });
   });

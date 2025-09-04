@@ -4,27 +4,60 @@ on:
   push:
     branches:
       - 'main'
+  # This will run for PRs from the base repository, providing secrets.
+  pull_request:
+    branches:
+      - 'main'
+      - 'release/**'
+  # This will run for PRs from forks when a label is added.
+  pull_request_target:
+    types: ['labeled']
   merge_group:
 
 jobs:
-  e2e-test-linux:
-    name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
-    runs-on: 'ubuntu-latest'
+  e2e-test:
+    name: 'E2E Test (${{ matrix.os }}) - ${{ matrix.sandbox }}'
+    # This condition ensures the job runs for pushes to main, merge groups,
+    # PRs from the base repo, OR PRs from forks with the correct label.
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'merge_group' ||
+      (github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event.label.name == 'maintainer:e2e:ok')
+    runs-on: '${{ matrix.os }}'
     strategy:
+      fail-fast: false
       matrix:
+        os:
+          - 'ubuntu-latest'
+          - 'macos-latest'
+          - 'gemini-cli-windows-16-core'
         sandbox:
           - 'sandbox:none'
           - 'sandbox:docker'
         node-version:
           - '20.x'
-          - '22.x'
-          - '24.x'
+        exclude:
+          # Docker tests are not supported on macOS or Windows
+          - os: 'macos-latest'
+            sandbox: 'sandbox:docker'
+          - os: 'gemini-cli-windows-16-core'
+            sandbox: 'sandbox:docker'
+
     steps:
-      - name: 'Checkout'
+      - name: 'Checkout (fork)'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        if: "github.event_name == 'pull_request_target'"
+        with:
+          ref: '${{ github.event.pull_request.head.sha }}'
+          repository: '${{ github.event.pull_request.head.repo.full_name }}'
+
+      - name: 'Checkout (internal)'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        if: "github.event_name != 'pull_request_target'"
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
           node-version: '${{ matrix.node-version }}'
           cache: 'npm'
@@ -39,17 +72,8 @@ jobs:
 
       - name: 'Set up Docker'
         if: |-
-          ${{ matrix.sandbox == 'sandbox:docker' }}
+          matrix.os == 'ubuntu-latest' && matrix.sandbox == 'sandbox:docker'
         uses: 'docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435' # ratchet:docker/setup-buildx-action@v3
-
-      - name: 'Set up Podman'
-        if: |-
-          ${{ matrix.sandbox == 'sandbox:podman' }}
-        uses: 'redhat-actions/podman-login@4934294ad0449894bcd1e9f191899d7292469603' # ratchet:redhat-actions/podman-login@v1
-        with:
-          registry: 'docker.io'
-          username: '${{ secrets.DOCKERHUB_USERNAME }}'
-          password: '${{ secrets.DOCKERHUB_TOKEN }}'
 
       - name: 'Run E2E tests'
         env:
@@ -59,30 +83,3 @@ jobs:
           VERBOSE: 'true'
         run: |-
           npm run "test:integration:${SANDBOX}"
-
-  e2e-test-macos:
-    name: 'E2E Test - macOS'
-    runs-on: 'macos-latest'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
-
-      - name: 'Set up Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
-      - name: 'Install dependencies'
-        run: |-
-          npm ci
-
-      - name: 'Build project'
-        run: |-
-          npm run build
-
-      - name: 'Run E2E tests'
-        env:
-          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
-        run: |-
-          npm run test:e2e

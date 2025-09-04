@@ -38,7 +38,7 @@ async function addMcpServer(
   } = options;
   const settingsScope =
     scope === 'user' ? SettingScope.User : SettingScope.Workspace;
-  const settings = loadSettings(process.cwd());
+  const settings = loadSettings();
 
   let newServer: Partial<MCPServerConfig> = {};
 

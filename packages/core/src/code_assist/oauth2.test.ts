@@ -520,6 +520,363 @@ describe('oauth2', () => {
     });
   });
 
+  describe('error handling', () => {
+    it('should handle browser launch failure with FatalAuthenticationError', async () => {
+      const mockError = new Error('Browser launch failed');
+      (open as Mock).mockRejectedValue(mockError);
+
+      const mockOAuth2Client = {
+        generateAuthUrl: vi.fn().mockReturnValue('https://example.com/auth'),
+        on: vi.fn(),
+      } as unknown as OAuth2Client;
+      (OAuth2Client as unknown as Mock).mockImplementation(
+        () => mockOAuth2Client,
+      );
+
+      await expect(
+        getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig),
+      ).rejects.toThrow('Failed to open browser: Browser launch failed');
+    });
+
+    it('should handle authentication timeout with proper error message', async () => {
+      const mockAuthUrl = 'https://example.com/auth';
+      const mockOAuth2Client = {
+        generateAuthUrl: vi.fn().mockReturnValue(mockAuthUrl),
+        on: vi.fn(),
+      } as unknown as OAuth2Client;
+      (OAuth2Client as unknown as Mock).mockImplementation(
+        () => mockOAuth2Client,
+      );
+
+      (open as Mock).mockImplementation(async () => ({ on: vi.fn() }) as never);
+
+      const mockHttpServer = {
+        listen: vi.fn(),
+        close: vi.fn(),
+        on: vi.fn(),
+        address: () => ({ port: 3000 }),
+      };
+      (http.createServer as Mock).mockImplementation(
+        () => mockHttpServer as unknown as http.Server,
+      );
+
+      // Mock setTimeout to trigger timeout immediately
+      const originalSetTimeout = global.setTimeout;
+      global.setTimeout = vi.fn(
+        (callback) => (callback(), {} as unknown as NodeJS.Timeout),
+      ) as unknown as typeof setTimeout;
+
+      await expect(
+        getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig),
+      ).rejects.toThrow(
+        'Authentication timed out after 5 minutes. The browser tab may have gotten stuck in a loading state. Please try again or use NO_BROWSER=true for manual authentication.',
+      );
+
+      global.setTimeout = originalSetTimeout;
+    });
+
+    it('should handle OAuth callback errors with descriptive messages', async () => {
+      const mockAuthUrl = 'https://example.com/auth';
+      const mockOAuth2Client = {
+        generateAuthUrl: vi.fn().mockReturnValue(mockAuthUrl),
+        on: vi.fn(),
+      } as unknown as OAuth2Client;
+      (OAuth2Client as unknown as Mock).mockImplementation(
+        () => mockOAuth2Client,
+      );
+
+      (open as Mock).mockImplementation(async () => ({ on: vi.fn() }) as never);
+
+      let requestCallback!: http.RequestListener;
+      let serverListeningCallback: (value: unknown) => void;
+      const serverListeningPromise = new Promise(
+        (resolve) => (serverListeningCallback = resolve),
+      );
+
+      const mockHttpServer = {
+        listen: vi.fn((_port: number, _host: string, callback?: () => void) => {
+          if (callback) callback();
+          serverListeningCallback(undefined);
+        }),
+        close: vi.fn(),
+        on: vi.fn(),
+        address: () => ({ port: 3000 }),
+      };
+      (http.createServer as Mock).mockImplementation((cb) => {
+        requestCallback = cb;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      const clientPromise = getOauthClient(
+        AuthType.LOGIN_WITH_GOOGLE,
+        mockConfig,
+      );
+      await serverListeningPromise;
+
+      // Test OAuth error with description
+      const mockReq = {
+        url: '/oauth2callback?error=access_denied&error_description=User+denied+access',
+      } as http.IncomingMessage;
+      const mockRes = {
+        writeHead: vi.fn(),
+        end: vi.fn(),
+      } as unknown as http.ServerResponse;
+
+      await expect(async () => {
+        await requestCallback(mockReq, mockRes);
+        await clientPromise;
+      }).rejects.toThrow(
+        'Google OAuth error: access_denied. User denied access',
+      );
+    });
+
+    it('should handle OAuth error without description', async () => {
+      const mockAuthUrl = 'https://example.com/auth';
+      const mockOAuth2Client = {
+        generateAuthUrl: vi.fn().mockReturnValue(mockAuthUrl),
+        on: vi.fn(),
+      } as unknown as OAuth2Client;
+      (OAuth2Client as unknown as Mock).mockImplementation(
+        () => mockOAuth2Client,
+      );
+
+      (open as Mock).mockImplementation(async () => ({ on: vi.fn() }) as never);
+
+      let requestCallback!: http.RequestListener;
+      let serverListeningCallback: (value: unknown) => void;
+      const serverListeningPromise = new Promise(
+        (resolve) => (serverListeningCallback = resolve),
+      );
+
+      const mockHttpServer = {
+        listen: vi.fn((_port: number, _host: string, callback?: () => void) => {
+          if (callback) callback();
+          serverListeningCallback(undefined);
+        }),
+        close: vi.fn(),
+        on: vi.fn(),
+        address: () => ({ port: 3000 }),
+      };
+      (http.createServer as Mock).mockImplementation((cb) => {
+        requestCallback = cb;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      const clientPromise = getOauthClient(
+        AuthType.LOGIN_WITH_GOOGLE,
+        mockConfig,
+      );
+      await serverListeningPromise;
+
+      // Test OAuth error without description
+      const mockReq = {
+        url: '/oauth2callback?error=server_error',
+      } as http.IncomingMessage;
+      const mockRes = {
+        writeHead: vi.fn(),
+        end: vi.fn(),
+      } as unknown as http.ServerResponse;
+
+      await expect(async () => {
+        await requestCallback(mockReq, mockRes);
+        await clientPromise;
+      }).rejects.toThrow(
+        'Google OAuth error: server_error. No additional details provided',
+      );
+    });
+
+    it('should handle token exchange failure with descriptive error', async () => {
+      const mockAuthUrl = 'https://example.com/auth';
+      const mockCode = 'test-code';
+      const mockState = 'test-state';
+
+      const mockOAuth2Client = {
+        generateAuthUrl: vi.fn().mockReturnValue(mockAuthUrl),
+        getToken: vi.fn().mockRejectedValue(new Error('Token exchange failed')),
+        on: vi.fn(),
+      } as unknown as OAuth2Client;
+      (OAuth2Client as unknown as Mock).mockImplementation(
+        () => mockOAuth2Client,
+      );
+
+      vi.spyOn(crypto, 'randomBytes').mockReturnValue(mockState as never);
+      (open as Mock).mockImplementation(async () => ({ on: vi.fn() }) as never);
+
+      let requestCallback!: http.RequestListener;
+      let serverListeningCallback: (value: unknown) => void;
+      const serverListeningPromise = new Promise(
+        (resolve) => (serverListeningCallback = resolve),
+      );
+
+      const mockHttpServer = {
+        listen: vi.fn((_port: number, _host: string, callback?: () => void) => {
+          if (callback) callback();
+          serverListeningCallback(undefined);
+        }),
+        close: vi.fn(),
+        on: vi.fn(),
+        address: () => ({ port: 3000 }),
+      };
+      (http.createServer as Mock).mockImplementation((cb) => {
+        requestCallback = cb;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      const clientPromise = getOauthClient(
+        AuthType.LOGIN_WITH_GOOGLE,
+        mockConfig,
+      );
+      await serverListeningPromise;
+
+      const mockReq = {
+        url: `/oauth2callback?code=${mockCode}&state=${mockState}`,
+      } as http.IncomingMessage;
+      const mockRes = {
+        writeHead: vi.fn(),
+        end: vi.fn(),
+      } as unknown as http.ServerResponse;
+
+      await expect(async () => {
+        await requestCallback(mockReq, mockRes);
+        await clientPromise;
+      }).rejects.toThrow(
+        'Failed to exchange authorization code for tokens: Token exchange failed',
+      );
+    });
+
+    it('should handle fetchAndCacheUserInfo failure gracefully', async () => {
+      const mockAuthUrl = 'https://example.com/auth';
+      const mockCode = 'test-code';
+      const mockState = 'test-state';
+      const mockTokens = {
+        access_token: 'test-access-token',
+        refresh_token: 'test-refresh-token',
+      };
+
+      const mockOAuth2Client = {
+        generateAuthUrl: vi.fn().mockReturnValue(mockAuthUrl),
+        getToken: vi.fn().mockResolvedValue({ tokens: mockTokens }),
+        setCredentials: vi.fn(),
+        getAccessToken: vi
+          .fn()
+          .mockResolvedValue({ token: 'test-access-token' }),
+        on: vi.fn(),
+      } as unknown as OAuth2Client;
+      (OAuth2Client as unknown as Mock).mockImplementation(
+        () => mockOAuth2Client,
+      );
+
+      vi.spyOn(crypto, 'randomBytes').mockReturnValue(mockState as never);
+      (open as Mock).mockImplementation(async () => ({ on: vi.fn() }) as never);
+
+      // Mock fetch to fail
+      (global.fetch as Mock).mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+      } as unknown as Response);
+
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      let requestCallback!: http.RequestListener;
+      let serverListeningCallback: (value: unknown) => void;
+      const serverListeningPromise = new Promise(
+        (resolve) => (serverListeningCallback = resolve),
+      );
+
+      const mockHttpServer = {
+        listen: vi.fn((_port: number, _host: string, callback?: () => void) => {
+          if (callback) callback();
+          serverListeningCallback(undefined);
+        }),
+        close: vi.fn(),
+        on: vi.fn(),
+        address: () => ({ port: 3000 }),
+      };
+      (http.createServer as Mock).mockImplementation((cb) => {
+        requestCallback = cb;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      const clientPromise = getOauthClient(
+        AuthType.LOGIN_WITH_GOOGLE,
+        mockConfig,
+      );
+      await serverListeningPromise;
+
+      const mockReq = {
+        url: `/oauth2callback?code=${mockCode}&state=${mockState}`,
+      } as http.IncomingMessage;
+      const mockRes = {
+        writeHead: vi.fn(),
+        end: vi.fn(),
+      } as unknown as http.ServerResponse;
+
+      await requestCallback(mockReq, mockRes);
+      const client = await clientPromise;
+
+      // Authentication should succeed even if fetchAndCacheUserInfo fails
+      expect(client).toBe(mockOAuth2Client);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to fetch user info:',
+        500,
+        'Internal Server Error',
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should handle user code authentication failure with descriptive error', async () => {
+      const mockConfigWithNoBrowser = {
+        getNoBrowser: () => true,
+        getProxy: () => 'http://test.proxy.com:8080',
+        isBrowserLaunchSuppressed: () => true,
+      } as unknown as Config;
+
+      const mockOAuth2Client = {
+        generateCodeVerifierAsync: vi.fn().mockResolvedValue({
+          codeChallenge: 'test-challenge',
+          codeVerifier: 'test-verifier',
+        }),
+        generateAuthUrl: vi.fn().mockReturnValue('https://example.com/auth'),
+        getToken: vi
+          .fn()
+          .mockRejectedValue(new Error('Invalid authorization code')),
+        on: vi.fn(),
+      } as unknown as OAuth2Client;
+      (OAuth2Client as unknown as Mock).mockImplementation(
+        () => mockOAuth2Client,
+      );
+
+      const mockReadline = {
+        question: vi.fn((_query, callback) => callback('invalid-code')),
+        close: vi.fn(),
+      };
+      (readline.createInterface as Mock).mockReturnValue(mockReadline);
+
+      const consoleLogSpy = vi
+        .spyOn(console, 'log')
+        .mockImplementation(() => {});
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      await expect(
+        getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfigWithNoBrowser),
+      ).rejects.toThrow('Failed to authenticate with user code.');
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to authenticate with authorization code:',
+        'Invalid authorization code',
+      );
+
+      consoleLogSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
   describe('clearCachedCredentialFile', () => {
     it('should clear cached credentials and Google account', async () => {
       const cachedCreds = { refresh_token: 'test-token' };

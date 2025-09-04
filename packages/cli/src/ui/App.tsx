@@ -27,6 +27,7 @@ import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './hooks/useAuthCommand.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
+import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
@@ -230,6 +231,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     IdeContext | undefined
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
+  const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   const {
@@ -304,6 +306,23 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder);
 
+  const { needsRestart: ideNeedsRestart } = useIdeTrustListener(config);
+  useEffect(() => {
+    if (ideNeedsRestart) {
+      // IDE trust changed, force a restart.
+      setShowIdeRestartPrompt(true);
+    }
+  }, [ideNeedsRestart]);
+
+  useKeypress(
+    (key) => {
+      if (key.name === 'r' || key.name === 'R') {
+        process.exit(0);
+      }
+    },
+    { isActive: showIdeRestartPrompt },
+  );
+
   const {
     isAuthDialogOpen,
     openAuthDialog,
@@ -314,6 +333,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   useEffect(() => {
     if (
+      settings.merged.security?.auth?.enforcedType &&
+      settings.merged.security?.auth.selectedType &&
+      settings.merged.security?.auth.enforcedType !==
+        settings.merged.security?.auth.selectedType
+    ) {
+      setAuthError(
+        `Authentication is enforced to be ${settings.merged.security?.auth.enforcedType}, but you are currently using ${settings.merged.security?.auth.selectedType}.`,
+      );
+      openAuthDialog();
+    } else if (
       settings.merged.security?.auth?.selectedType &&
       !settings.merged.security?.auth?.useExternal
     ) {
@@ -327,6 +356,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     }
   }, [
     settings.merged.security?.auth?.selectedType,
+    settings.merged.security?.auth?.enforcedType,
     settings.merged.security?.auth?.useExternal,
     openAuthDialog,
     setAuthError,
@@ -737,8 +767,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
-  const { elapsedTime, currentLoadingPhrase } =
-    useLoadingIndicator(streamingState);
+  const { elapsedTime, currentLoadingPhrase } = useLoadingIndicator(
+    streamingState,
+    settings.merged.ui?.customWittyPhrases,
+  );
   const showAutoAcceptIndicator = useAutoAcceptIndicator({ config, addItem });
 
   const handleExit = useCallback(
@@ -983,6 +1015,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
     : '  Type your message or @path/to/file';
 
+  const hideContextSummary = settings.merged.ui?.hideContextSummary ?? false;
+
   return (
     <StreamingContext.Provider value={streamingState}>
       <Box flexDirection="column" width="90%">
@@ -1098,6 +1132,17 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 }
               }}
             />
+          ) : showIdeRestartPrompt ? (
+            <Box
+              borderStyle="round"
+              borderColor={Colors.AccentYellow}
+              paddingX={1}
+            >
+              <Text color={Colors.AccentYellow}>
+                Workspace trust has changed. Press &apos;r&apos; to restart
+                Gemini to apply the changes.
+              </Text>
+            </Box>
           ) : isFolderTrustDialogOpen ? (
             <FolderTrustDialog
               onSelect={handleFolderTrustSelect}
@@ -1216,7 +1261,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 }
                 elapsedTime={elapsedTime}
               />
-
               {/* Display queued messages below loading indicator */}
               {messageQueue.length > 0 && (
                 <Box flexDirection="column" marginTop={1}>
@@ -1248,10 +1292,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   )}
                 </Box>
               )}
-
               <Box
                 marginTop={1}
-                justifyContent="space-between"
+                justifyContent={
+                  hideContextSummary ? 'flex-start' : 'space-between'
+                }
                 width="100%"
                 flexDirection={isNarrow ? 'column' : 'row'}
                 alignItems={isNarrow ? 'flex-start' : 'center'}
@@ -1270,7 +1315,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     </Text>
                   ) : showEscapePrompt ? (
                     <Text color={Colors.Gray}>Press Esc again to clear.</Text>
-                  ) : (
+                  ) : !hideContextSummary ? (
                     <ContextSummaryDisplay
                       ideContext={ideContextState}
                       geminiMdFileCount={geminiMdFileCount}
@@ -1279,9 +1324,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                       blockedMcpServers={config.getBlockedMcpServers()}
                       showToolDescriptions={showToolDescriptions}
                     />
-                  )}
+                  ) : null}
                 </Box>
-                <Box paddingTop={isNarrow ? 1 : 0}>
+                <Box
+                  paddingTop={isNarrow ? 1 : 0}
+                  marginLeft={hideContextSummary ? 1 : 2}
+                >
                   {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
                     !shellModeActive && (
                       <AutoAcceptIndicator
@@ -1291,7 +1339,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   {shellModeActive && <ShellModeIndicator />}
                 </Box>
               </Box>
-
               {showErrorDetails && (
                 <OverflowProvider>
                   <Box flexDirection="column">
@@ -1306,7 +1353,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                   </Box>
                 </OverflowProvider>
               )}
-
               {isInputActive && (
                 <InputPrompt
                   buffer={buffer}
@@ -1380,6 +1426,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               nightly={nightly}
               vimMode={vimModeEnabled ? vimMode : undefined}
               isTrustedFolder={isTrustedFolderState}
+              hideCWD={settings.merged.ui?.footer?.hideCWD}
+              hideSandboxStatus={settings.merged.ui?.footer?.hideSandboxStatus}
+              hideModelInfo={settings.merged.ui?.footer?.hideModelInfo}
             />
           )}
         </Box>

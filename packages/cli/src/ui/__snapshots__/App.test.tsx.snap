@@ -6,14 +6,14 @@ exports[`App UI > should render correctly with the prompt input box 1`] = `
 ╭────────────────────────────────────────────────────────────────────────────────────────╮
 │ >   Type your message or @path/to/file                                                 │
 ╰────────────────────────────────────────────────────────────────────────────────────────╯
-/test/dir                no sandbox (see /docs)                  model (100% context left)"
+/test/dir               no sandbox (see /docs)                 model (100% context left)"
 `;
 
 exports[`App UI > should render the initial UI correctly 1`] = `
 " I'm Feeling Lucky (esc to cancel, 0s)
 
 
-/test/dir                no sandbox (see /docs)                  model (100% context left)"
+/test/dir               no sandbox (see /docs)                 model (100% context left)"
 `;
 
 exports[`App UI > when in a narrow terminal > should render with a column layout 1`] = `
@@ -27,5 +27,5 @@ dir
 
 no sandbox (see /docs)
 
-model (100% context left)| ✖ 5 errors (ctrl+o for details)"
+model (100% context left)  | ✖ 5 errors (ctrl+o for details)"
 `;

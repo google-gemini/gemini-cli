@@ -10,17 +10,7 @@ import type {
   SendStreamingMessageSuccessResponse,
 } from '@a2a-js/sdk';
 import { ApprovalMode } from '@google/gemini-cli-core';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
-} from '@google/gemini-cli-core';
-import type {
-  Config,
-  ToolCallConfirmationDetails,
-  ToolResult,
-  ToolInvocation,
-} from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
 import { expect, vi } from 'vitest';
 
 export function createMockConfig(
@@ -53,79 +43,6 @@ export function createMockConfig(
     ...overrides,
   };
   return mockConfig;
-}
-
-export const mockOnUserConfirmForToolConfirmation = vi.fn();
-
-export class MockToolInvocation extends BaseToolInvocation<object, ToolResult> {
-  constructor(
-    private readonly tool: MockTool,
-    params: object,
-  ) {
-    super(params);
-  }
-
-  getDescription(): string {
-    return JSON.stringify(this.params);
-  }
-
-  override shouldConfirmExecute(
-    abortSignal: AbortSignal,
-  ): Promise<ToolCallConfirmationDetails | false> {
-    return this.tool.shouldConfirmExecute(this.params, abortSignal);
-  }
-
-  execute(
-    signal: AbortSignal,
-    updateOutput?: (output: string) => void,
-    terminalColumns?: number,
-    terminalRows?: number,
-  ): Promise<ToolResult> {
-    return this.tool.execute(
-      this.params,
-      signal,
-      updateOutput,
-      terminalColumns,
-      terminalRows,
-    );
-  }
-}
-
-// TODO: dedup with gemini-cli, add shouldConfirmExecute() support in core
-export class MockTool extends BaseDeclarativeTool<object, ToolResult> {
-  constructor(
-    name: string,
-    displayName: string,
-    canUpdateOutput = false,
-    isOutputMarkdown = false,
-    shouldConfirmExecute?: () => Promise<ToolCallConfirmationDetails | false>,
-  ) {
-    super(
-      name,
-      displayName,
-      'A mock tool for testing',
-      Kind.Other,
-      {},
-      isOutputMarkdown,
-      canUpdateOutput,
-    );
-
-    if (shouldConfirmExecute) {
-      this.shouldConfirmExecute.mockImplementation(shouldConfirmExecute);
-    } else {
-      // Default to no confirmation needed
-      this.shouldConfirmExecute.mockResolvedValue(false);
-    }
-  }
-
-  execute = vi.fn();
-  shouldConfirmExecute = vi.fn();
-
-  protected createInvocation(
-    params: object,
-  ): ToolInvocation<object, ToolResult> {
-    return new MockToolInvocation(this, params);
-  }
 }
 
 export function createStreamMessageRequest(

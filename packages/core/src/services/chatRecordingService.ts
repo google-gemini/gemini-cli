@@ -11,7 +11,10 @@ import { getProjectHash } from '../utils/paths.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import type { PartListUnion } from '@google/genai';
+import type {
+  PartListUnion,
+  GenerateContentResponseUsageMetadata,
+} from '@google/genai';
 
 /**
  * Token usage summary for a message or conversation.
@@ -31,7 +34,7 @@ export interface TokensSummary {
 export interface BaseMessageRecord {
   id: string;
   timestamp: string;
-  content: string;
+  content: PartListUnion;
 }
 
 /**
@@ -178,7 +181,7 @@ export class ChatRecordingService {
 
   private newMessage(
     type: ConversationRecordExtra['type'],
-    content: string,
+    content: PartListUnion,
   ): MessageRecord {
     return {
       id: randomUUID(),
@@ -193,22 +196,12 @@ export class ChatRecordingService {
    */
   recordMessage(message: {
     type: ConversationRecordExtra['type'];
-    content: string;
-    append?: boolean;
+    content: PartListUnion;
   }): void {
     if (!this.conversationFile) return;
 
     try {
       this.updateConversation((conversation) => {
-        if (message.append) {
-          const lastMsg = this.getLastMessage(conversation);
-          if (lastMsg && lastMsg.type === message.type) {
-            lastMsg.content += message.content;
-            return;
-          }
-        }
-        // We're not appending, or we are appending but the last message's type is not the same as
-        // the specified type, so just create a new message.
         const msg = this.newMessage(message.type, message.content);
         if (msg.type === 'gemini') {
           // If it's a new Gemini message then incorporate any queued thoughts.
@@ -243,27 +236,28 @@ export class ChatRecordingService {
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      if (this.config.getDebugMode()) {
-        console.error('Error saving thought:', error);
-        throw error;
-      }
+      console.error('Error saving thought:', error);
+      throw error;
     }
   }
 
   /**
    * Updates the tokens for the last message in the conversation (which should be by Gemini).
    */
-  recordMessageTokens(tokens: {
-    input: number;
-    output: number;
-    cached: number;
-    thoughts?: number;
-    tool?: number;
-    total: number;
-  }): void {
+  recordMessageTokens(
+    respUsageMetadata: GenerateContentResponseUsageMetadata,
+  ): void {
     if (!this.conversationFile) return;
 
     try {
+      const tokens = {
+        input: respUsageMetadata.promptTokenCount ?? 0,
+        output: respUsageMetadata.candidatesTokenCount ?? 0,
+        cached: respUsageMetadata.cachedContentTokenCount ?? 0,
+        thoughts: respUsageMetadata.thoughtsTokenCount ?? 0,
+        tool: respUsageMetadata.toolUsePromptTokenCount ?? 0,
+        total: respUsageMetadata.totalTokenCount ?? 0,
+      };
       this.updateConversation((conversation) => {
         const lastMsg = this.getLastMessage(conversation);
         // If the last message already has token info, it's because this new token info is for a
@@ -283,9 +277,22 @@ export class ChatRecordingService {
 
   /**
    * Adds tool calls to the last message in the conversation (which should be by Gemini).
+   * This method enriches tool calls with metadata from the ToolRegistry.
    */
   recordToolCalls(toolCalls: ToolCallRecord[]): void {
     if (!this.conversationFile) return;
+
+    // Enrich tool calls with metadata from the ToolRegistry
+    const toolRegistry = this.config.getToolRegistry();
+    const enrichedToolCalls = toolCalls.map((toolCall) => {
+      const toolInstance = toolRegistry.getTool(toolCall.name);
+      return {
+        ...toolCall,
+        displayName: toolInstance?.displayName || toolCall.name,
+        description: toolInstance?.description || '',
+        renderOutputAsMarkdown: toolInstance?.isOutputMarkdown || false,
+      };
+    });
 
     try {
       this.updateConversation((conversation) => {
@@ -309,7 +316,7 @@ export class ChatRecordingService {
             // resulting message's type, and so it thinks that toolCalls may
             // not be present.  Confirming the type here satisfies it.
             type: 'gemini' as const,
-            toolCalls,
+            toolCalls: enrichedToolCalls,
             thoughts: this.queuedThoughts,
             model: this.config.getModel(),
           };
@@ -346,7 +353,7 @@ export class ChatRecordingService {
           });
 
           // Add any new tools calls that aren't in the message yet.
-          for (const toolCall of toolCalls) {
+          for (const toolCall of enrichedToolCalls) {
             const existingToolCall = lastMsg.toolCalls.find(
               (tc) => tc.id === toolCall.id,
             );

@@ -181,6 +181,90 @@ src/*.tmp
       expect(() => parser.isIgnored('/node_modules')).not.toThrow();
       expect(parser.isIgnored('/node_modules')).toBe(false);
     });
+
+    it('should handle backslash-prefixed files without crashing', () => {
+      expect(() => parser.isIgnored('\\backslash-file-test.txt')).not.toThrow();
+      expect(parser.isIgnored('\\backslash-file-test.txt')).toBe(false);
+    });
+
+    it('should handle files with absolute-like names', () => {
+      expect(() => parser.isIgnored('/backslash-file-test.txt')).not.toThrow();
+      expect(parser.isIgnored('/backslash-file-test.txt')).toBe(false);
+    });
+  });
+
+  describe('nested .gitignore files', () => {
+    beforeEach(async () => {
+      await setupGitRepo();
+      // Root .gitignore
+      await createTestFile('.gitignore', 'root-ignored.txt');
+      // Nested .gitignore 1
+      await createTestFile('a/.gitignore', '/b\nc');
+      // Nested .gitignore 2
+      await createTestFile('a/d/.gitignore', 'e.txt\nf/g');
+    });
+
+    it('should handle nested .gitignore files correctly', async () => {
+      parser.loadGitRepoPatterns();
+
+      // From root .gitignore
+      expect(parser.isIgnored('root-ignored.txt')).toBe(true);
+      expect(parser.isIgnored('a/root-ignored.txt')).toBe(true);
+
+      // From a/.gitignore: /b
+      expect(parser.isIgnored('a/b')).toBe(true);
+      expect(parser.isIgnored('b')).toBe(false);
+      expect(parser.isIgnored('a/x/b')).toBe(false);
+
+      // From a/.gitignore: c
+      expect(parser.isIgnored('a/c')).toBe(true);
+      expect(parser.isIgnored('a/x/y/c')).toBe(true);
+      expect(parser.isIgnored('c')).toBe(false);
+
+      // From a/d/.gitignore: e.txt
+      expect(parser.isIgnored('a/d/e.txt')).toBe(true);
+      expect(parser.isIgnored('a/d/x/e.txt')).toBe(true);
+      expect(parser.isIgnored('a/e.txt')).toBe(false);
+
+      // From a/d/.gitignore: f/g
+      expect(parser.isIgnored('a/d/f/g')).toBe(true);
+      expect(parser.isIgnored('a/f/g')).toBe(false);
+    });
+
+    it('should correctly transform patterns from nested gitignore files', () => {
+      parser.loadGitRepoPatterns();
+      const patterns = parser.getPatterns();
+
+      // From root .gitignore
+      expect(patterns).toContain('root-ignored.txt');
+
+      // From a/.gitignore
+      expect(patterns).toContain('/a/b'); // /b becomes /a/b
+      expect(patterns).toContain('/a/**/c'); // c becomes /a/**/c
+
+      // From a/d/.gitignore
+      expect(patterns).toContain('/a/d/**/e.txt'); // e.txt becomes /a/d/**/e.txt
+      expect(patterns).toContain('/a/d/f/g'); // f/g becomes /a/d/f/g
+    });
+  });
+
+  describe('precedence rules', () => {
+    it('should prioritize root .gitignore over .git/info/exclude', async () => {
+      await setupGitRepo();
+      // Exclude all .log files
+      await createTestFile(path.join('.git', 'info', 'exclude'), '*.log');
+      // But make an exception in the root .gitignore
+      await createTestFile('.gitignore', '!important.log');
+
+      parser.loadGitRepoPatterns();
+
+      expect(parser.isIgnored('some.log')).toBe(true);
+      expect(parser.isIgnored('important.log')).toBe(false);
+      expect(parser.isIgnored(path.join('subdir', 'some.log'))).toBe(true);
+      expect(parser.isIgnored(path.join('subdir', 'important.log'))).toBe(
+        false,
+      );
+    });
   });
 
   describe('getIgnoredPatterns', () => {

@@ -62,7 +62,7 @@ try {
 } catch (e) {
   console.warn('ERROR: could not detect sandbox container command');
   console.error(e);
-  process.exit(1);
+  process.exit(process.env.CI ? 1 : 0);
 }
 
 if (sandboxCommand === 'sandbox-exec') {
