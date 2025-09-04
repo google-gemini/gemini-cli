@@ -13,7 +13,6 @@ import type {
   ToolInvocation,
   ToolLocation,
   ToolResult,
-  ToolResultDisplay,
 } from './tools.js';
 import { BaseDeclarativeTool, Kind, ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
@@ -362,7 +361,6 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         .getFileSystemService()
         .writeTextFile(this.params.file_path, editData.newContent);
 
-      let displayResult: ToolResultDisplay;
       const fileName = path.basename(this.params.file_path);
       const originallyProposedContent =
         this.params.ai_proposed_content || editData.newContent;
@@ -373,27 +371,21 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         editData.newContent,
       );
 
-      if (editData.isNewFile) {
-        displayResult = `Created ${shortenPath(makeRelative(this.params.file_path, this.config.getTargetDir()))}`;
-      } else {
-        // Generate diff for display, even though core logic doesn't technically need it
-        // The CLI wrapper will use this part of the ToolResult
-        const fileDiff = Diff.createPatch(
-          fileName,
-          editData.currentContent ?? '', // Should not be null here if not isNewFile
-          editData.newContent,
-          'Current',
-          'Proposed',
-          DEFAULT_DIFF_OPTIONS,
-        );
-        displayResult = {
-          fileDiff,
-          fileName,
-          originalContent: editData.currentContent,
-          newContent: editData.newContent,
-          diffStat,
-        };
-      }
+      const fileDiff = Diff.createPatch(
+        fileName,
+        editData.currentContent ?? '', // Should not be null here if not isNewFile
+        editData.newContent,
+        'Current',
+        'Proposed',
+        DEFAULT_DIFF_OPTIONS,
+      );
+      const displayResult = {
+        fileDiff,
+        fileName,
+        originalContent: editData.currentContent,
+        newContent: editData.newContent,
+        diffStat,
+      };
 
       // Log file operation for telemetry (without diff_stat to avoid double-counting)
       const mimetype = getSpecificMimeType(this.params.file_path);
