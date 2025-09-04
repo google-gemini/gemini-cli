@@ -15,6 +15,7 @@ import type {
   Part,
   Tool,
 } from '@google/genai';
+import { toParts } from '../code_assist/converter.js';
 import { createUserContent } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import type { ContentGenerator } from './contentGenerator.js';
@@ -23,16 +24,32 @@ import type { Config } from '../config/config.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
+import type { CompletedToolCall } from './coreToolScheduler.js';
 import {
   logContentRetry,
   logContentRetryFailure,
   logInvalidChunk,
 } from '../telemetry/loggers.js';
+import { ChatRecordingService } from '../services/chatRecordingService.js';
 import {
   ContentRetryEvent,
   ContentRetryFailureEvent,
   InvalidChunkEvent,
 } from '../telemetry/types.js';
+import { isFunctionResponse } from '../utils/messageInspectors.js';
+import { partListUnionToString } from './geminiRequest.js';
+
+export enum StreamEventType {
+  /** A regular content chunk from the API. */
+  CHUNK = 'chunk',
+  /** A signal that a retry is about to happen. The UI should discard any partial
+   * content from the attempt that just failed. */
+  RETRY = 'retry',
+}
+
+export type StreamEvent =
+  | { type: StreamEventType.CHUNK; value: GenerateContentResponse }
+  | { type: StreamEventType.RETRY };
 
 /**
  * Options for retrying due to invalid content from the model.
@@ -151,6 +168,7 @@ export class GeminiChat {
   // A promise to represent the current state of the message being sent to the
   // model.
   private sendPromise: Promise<void> = Promise.resolve();
+  private readonly chatRecordingService: ChatRecordingService;
 
   constructor(
     private readonly config: Config,
@@ -159,6 +177,8 @@ export class GeminiChat {
     private history: Content[] = [],
   ) {
     validateHistory(history);
+    this.chatRecordingService = new ChatRecordingService(config);
+    this.chatRecordingService.initialize();
   }
 
   /**
@@ -237,6 +257,18 @@ export class GeminiChat {
   ): Promise<GenerateContentResponse> {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
+
+    // Record user input - capture complete message with all parts (text, files, images, etc.)
+    // but skip recording function responses (tool call results) as they should be stored in tool call records
+    if (!isFunctionResponse(userContent)) {
+      const userMessage = Array.isArray(params.message)
+        ? params.message
+        : [params.message];
+      this.chatRecordingService.recordMessage({
+        type: 'user',
+        content: userMessage,
+      });
+    }
     const requestContents = this.getHistory(true).concat(userContent);
 
     let response: GenerateContentResponse;
@@ -340,7 +372,7 @@ export class GeminiChat {
   async sendMessageStream(
     params: SendMessageParameters,
     prompt_id: string,
-  ): Promise<AsyncGenerator<GenerateContentResponse>> {
+  ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
     let streamDoneResolver: () => void;
@@ -350,6 +382,19 @@ export class GeminiChat {
     this.sendPromise = streamDonePromise;
 
     const userContent = createUserContent(params.message);
+
+    // Record user input - capture complete message with all parts (text, files, images, etc.)
+    // but skip recording function responses (tool call results) as they should be stored in tool call records
+    if (!isFunctionResponse(userContent)) {
+      const userMessage = Array.isArray(params.message)
+        ? params.message
+        : [params.message];
+      const userMessageContent = partListUnionToString(toParts(userMessage));
+      this.chatRecordingService.recordMessage({
+        type: 'user',
+        content: userMessageContent,
+      });
+    }
 
     // Add user content to history ONCE before any attempts.
     this.history.push(userContent);
@@ -367,6 +412,10 @@ export class GeminiChat {
           attempt++
         ) {
           try {
+            if (attempt > 0) {
+              yield { type: StreamEventType.RETRY };
+            }
+
             const stream = await self.makeApiCallAndProcessStream(
               requestContents,
               params,
@@ -375,7 +424,7 @@ export class GeminiChat {
             );
 
             for await (const chunk of stream) {
-              yield chunk;
+              yield { type: StreamEventType.CHUNK, value: chunk };
             }
 
             lastError = null;
@@ -562,14 +611,34 @@ export class GeminiChat {
     userInput: Content,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
-    let isStreamInvalid = false;
     let hasReceivedAnyChunk = false;
+    let hasToolCall = false;
+    let lastChunk: GenerateContentResponse | null = null;
+
+    let isStreamInvalid = false;
+    let firstInvalidChunkEncountered = false;
+    let validChunkAfterInvalidEncountered = false;
 
     for await (const chunk of streamResponse) {
       hasReceivedAnyChunk = true;
+      lastChunk = chunk;
+
       if (isValidResponse(chunk)) {
+        if (firstInvalidChunkEncountered) {
+          // A valid chunk appeared *after* an invalid one.
+          validChunkAfterInvalidEncountered = true;
+        }
+
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
+          if (content.parts.some((part) => part.thought)) {
+            // Record thoughts
+            this.recordThoughtFromContent(content);
+          }
+          if (content.parts.some((part) => part.functionCall)) {
+            hasToolCall = true;
+          }
+          // Always add parts - thoughts will be filtered out later in recordHistory
           modelResponseParts.push(...content.parts);
         }
       } else {
@@ -578,14 +647,57 @@ export class GeminiChat {
           new InvalidChunkEvent('Invalid chunk received from stream.'),
         );
         isStreamInvalid = true;
+        firstInvalidChunkEncountered = true;
       }
-      yield chunk;
+
+      // Record token usage if this chunk has usageMetadata
+      if (chunk.usageMetadata) {
+        this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
+      }
+
+      yield chunk; // Yield every chunk to the UI immediately.
     }
 
-    if (isStreamInvalid || !hasReceivedAnyChunk) {
-      throw new EmptyStreamError(
-        'Model stream was invalid or completed without valid content.',
-      );
+    if (!hasReceivedAnyChunk) {
+      throw new EmptyStreamError('Model stream completed without any chunks.');
+    }
+
+    // --- FIX: The entire validation block was restructured for clarity and correctness ---
+    // Only apply complex validation if an invalid chunk was actually found.
+    if (isStreamInvalid) {
+      // Fail immediately if an invalid chunk was not the absolute last chunk.
+      if (validChunkAfterInvalidEncountered) {
+        throw new EmptyStreamError(
+          'Model stream had invalid intermediate chunks without a tool call.',
+        );
+      }
+
+      if (!hasToolCall) {
+        // If the *only* invalid part was the last chunk, we still check its finish reason.
+        const finishReason = lastChunk?.candidates?.[0]?.finishReason;
+        const isSuccessfulFinish =
+          finishReason === 'STOP' || finishReason === 'MAX_TOKENS';
+        if (!isSuccessfulFinish) {
+          throw new EmptyStreamError(
+            'Model stream ended with an invalid chunk and a failed finish reason.',
+          );
+        }
+      }
+    }
+
+    // Record model response text from the collected parts
+    if (modelResponseParts.length > 0) {
+      const responseText = modelResponseParts
+        .filter((part) => part.text && !part.thought)
+        .map((part) => part.text)
+        .join('');
+
+      if (responseText.trim()) {
+        this.chatRecordingService.recordMessage({
+          type: 'gemini',
+          content: responseText,
+        });
+      }
     }
 
     // Bundle all streamed parts into a single Content object
@@ -697,7 +809,64 @@ export class GeminiChat {
       this.history.push({ role: 'model', parts: [] });
     }
   }
+
+  /**
+   * Gets the chat recording service instance.
+   */
+  getChatRecordingService(): ChatRecordingService {
+    return this.chatRecordingService;
+  }
+
+  /**
+   * Records completed tool calls with full metadata.
+   * This is called by external components when tool calls complete, before sending responses to Gemini.
+   */
+  recordCompletedToolCalls(toolCalls: CompletedToolCall[]): void {
+    const toolCallRecords = toolCalls.map((call) => {
+      const resultDisplayRaw = call.response?.resultDisplay;
+      const resultDisplay =
+        typeof resultDisplayRaw === 'string' ? resultDisplayRaw : undefined;
+
+      return {
+        id: call.request.callId,
+        name: call.request.name,
+        args: call.request.args,
+        result: call.response?.responseParts || null,
+        status: call.status as 'error' | 'success' | 'cancelled',
+        timestamp: new Date().toISOString(),
+        resultDisplay,
+      };
+    });
+
+    this.chatRecordingService.recordToolCalls(toolCallRecords);
+  }
+
+  /**
+   * Extracts and records thought from thought content.
+   */
+  private recordThoughtFromContent(content: Content): void {
+    if (!content.parts || content.parts.length === 0) {
+      return;
+    }
+
+    const thoughtPart = content.parts[0];
+    if (thoughtPart.text) {
+      // Extract subject and description using the same logic as turn.ts
+      const rawText = thoughtPart.text;
+      const subjectStringMatches = rawText.match(/\*\*(.*?)\*\*/s);
+      const subject = subjectStringMatches
+        ? subjectStringMatches[1].trim()
+        : '';
+      const description = rawText.replace(/\*\*(.*?)\*\*/s, '').trim();
+
+      this.chatRecordingService.recordThought({
+        subject,
+        description,
+      });
+    }
+  }
 }
+
 /** Visible for Testing */
 export function isSchemaDepthError(errorMessage: string): boolean {
   return errorMessage.includes('maximum schema depth exceeded');

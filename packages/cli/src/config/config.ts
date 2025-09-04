@@ -38,6 +38,7 @@ import { annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
+import { appEvents } from '../utils/events.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
@@ -77,6 +78,9 @@ export interface CliArgs {
   proxy: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
+  useSmartEdit: boolean | undefined;
+  sessionSummary: string | undefined;
+  promptWords: string[] | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -86,7 +90,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
     )
-    .command('$0', 'Launch Gemini CLI', (yargsInstance) =>
+    .command('$0 [promptWords...]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
         .option('model', {
           alias: 'm',
@@ -226,9 +230,66 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description: 'Enable screen reader mode for accessibility.',
           default: false,
         })
-
+        .option('session-summary', {
+          type: 'string',
+          description: 'File to write session summary to.',
+        })
+        .deprecateOption(
+          'telemetry',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-target',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-otlp-endpoint',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-otlp-protocol',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-log-prompts',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'telemetry-outfile',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'show-memory-usage',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'sandbox-image',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'proxy',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'checkpointing',
+          'Use settings.json instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'all-files',
+          'Use @ includes in the application instead. This flag will be removed in a future version.',
+        )
+        .deprecateOption(
+          'prompt',
+          'Use the positional prompt instead. This flag will be removed in a future version.',
+        )
         .check((argv) => {
-          if (argv.prompt && argv['promptInteractive']) {
+          const promptWords = argv['promptWords'] as string[] | undefined;
+          if (argv['prompt'] && promptWords && promptWords.length > 0) {
+            throw new Error(
+              'Cannot use both a positional prompt and the --prompt (-p) flag together',
+            );
+          }
+          if (argv['prompt'] && argv['promptInteractive']) {
             throw new Error(
               'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
             );
@@ -284,6 +345,7 @@ export async function loadHierarchicalGeminiMemory(
   fileService: FileDiscoveryService,
   settings: Settings,
   extensionContextFilePaths: string[] = [],
+  folderTrust: boolean,
   memoryImportFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
 ): Promise<{ memoryContent: string; fileCount: number }> {
@@ -309,6 +371,7 @@ export async function loadHierarchicalGeminiMemory(
     debugMode,
     fileService,
     extensionContextFilePaths,
+    folderTrust,
     memoryImportFormat,
     fileFilteringOptions,
     settings.context?.discoveryMaxDirs,
@@ -332,11 +395,8 @@ export async function loadCliConfig(
 
   const ideMode = settings.ide?.enabled ?? false;
 
-  const folderTrustFeature =
-    settings.security?.folderTrust?.featureEnabled ?? false;
-  const folderTrustSetting = settings.security?.folderTrust?.enabled ?? true;
-  const folderTrust = folderTrustFeature && folderTrustSetting;
-  const trustedFolder = isWorkspaceTrusted(settings);
+  const folderTrust = settings.security?.folderTrust?.enabled ?? false;
+  const trustedFolder = isWorkspaceTrusted(settings) ?? true;
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -384,12 +444,14 @@ export async function loadCliConfig(
     fileService,
     settings,
     extensionContextFilePaths,
+    trustedFolder,
     memoryImportFormat,
     fileFiltering,
   );
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
-  const question = argv.promptInteractive || argv.prompt || '';
+  const question =
+    argv.promptInteractive || argv.prompt || (argv.promptWords || []).join(' ');
 
   // Determine approval mode with backward compatibility
   let approvalMode: ApprovalMode;
@@ -530,14 +592,7 @@ export async function loadCliConfig(
       outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
     },
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
-    // Git-aware file filtering settings
-    fileFiltering: {
-      respectGitIgnore: settings.context?.fileFiltering?.respectGitIgnore,
-      respectGeminiIgnore: settings.context?.fileFiltering?.respectGeminiIgnore,
-      enableRecursiveFileSearch:
-        settings.context?.fileFiltering?.enableRecursiveFileSearch,
-      disableFuzzySearch: settings.context?.fileFiltering?.disableFuzzySearch,
-    },
+    fileFiltering: settings.context?.fileFiltering,
     checkpointing:
       argv.checkpointing || settings.general?.checkpointing?.enabled,
     proxy:
@@ -560,7 +615,6 @@ export async function loadCliConfig(
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
     chatCompression: settings.model?.chatCompression,
-    folderTrustFeature,
     folderTrust,
     interactive,
     trustedFolder,
@@ -568,6 +622,8 @@ export async function loadCliConfig(
     shouldUseNodePtyShell: settings.tools?.usePty,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
+    eventEmitter: appEvents,
+    useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
   });
 }
 

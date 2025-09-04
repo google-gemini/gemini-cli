@@ -15,7 +15,7 @@ import type {
   ToolMcpConfirmationDetails,
   Config,
 } from '@google/gemini-cli-core';
-import { ToolConfirmationOutcome } from '@google/gemini-cli-core';
+import { IdeClient, ToolConfirmationOutcome } from '@google/gemini-cli-core';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
@@ -43,10 +43,10 @@ export const ToolConfirmationMessage: React.FC<
 
   const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
     if (confirmationDetails.type === 'edit') {
-      const ideClient = config.getIdeClient();
       if (config.getIdeMode()) {
         const cliOutcome =
           outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
+        const ideClient = await IdeClient.getInstance();
         await ideClient?.resolveDiffFromCli(
           confirmationDetails.filePath,
           cliOutcome,
@@ -56,7 +56,7 @@ export const ToolConfirmationMessage: React.FC<
     onConfirm(outcome);
   };
 
-  const isTrustedFolder = config.isTrustedFolder() !== false;
+  const isTrustedFolder = config.isTrustedFolder();
 
   useKeypress(
     (key) => {

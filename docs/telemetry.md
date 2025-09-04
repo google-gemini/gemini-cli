@@ -47,7 +47,9 @@ The following code can be added to your workspace (`.gemini/settings.json`) or u
     "enabled": true,
     "target": "gcp"
   },
-  "sandbox": false
+  "tools": {
+    "sandbox": false
+  }
 }
 ```
 
@@ -193,6 +195,20 @@ Logs are timestamped records of specific events. The following events are logged
     - `error_type` (if applicable)
     - `metadata` (if applicable, dictionary of string -> any)
 
+- `gemini_cli.file_operation`: This event occurs for each file operation.
+  - **Attributes**:
+    - `tool_name` (string)
+    - `operation` (string: "create", "read", "update")
+    - `lines` (int, if applicable)
+    - `mimetype` (string, if applicable)
+    - `extension` (string, if applicable)
+    - `programming_language` (string, if applicable)
+    - `diff_stat` (json string, if applicable): A JSON string with the following members:
+      - `ai_added_lines` (int)
+      - `ai_removed_lines` (int)
+      - `user_added_lines` (int)
+      - `user_removed_lines` (int)
+
 - `gemini_cli.api_request`: This event occurs when making a request to Gemini API.
   - **Attributes**:
     - `model`
@@ -273,8 +289,8 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `lines` (Int, if applicable): Number of lines in the file.
     - `mimetype` (string, if applicable): Mimetype of the file.
     - `extension` (string, if applicable): File extension of the file.
-    - `ai_added_lines` (Int, if applicable): Number of lines added/changed by AI.
-    - `ai_removed_lines` (Int, if applicable): Number of lines removed/changed by AI.
+    - `model_added_lines` (Int, if applicable): Number of lines added/changed by the model.
+    - `model_removed_lines` (Int, if applicable): Number of lines removed/changed by the model.
     - `user_added_lines` (Int, if applicable): Number of lines added/changed by user in AI proposed changes.
     - `user_removed_lines` (Int, if applicable): Number of lines removed/changed by user in AI proposed changes.
     - `programming_language` (string, if applicable): The programming language of the file.
