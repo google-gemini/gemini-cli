@@ -50,6 +50,7 @@
     "https-proxy-agent": "^7.0.6",
     "ignore": "^7.0.0",
     "marked": "^15.0.12",
+    "mime": "4.0.7",
     "mnemonist": "^0.40.3",
     "open": "^10.1.2",
     "picomatch": "^4.0.1",
