@@ -21,7 +21,7 @@ import type {
 } from './subagent.js';
 import { Config } from '../config/config.js';
 import type { ConfigParameters } from '../config/config.js';
-import { GeminiChat } from './geminiChat.js';
+import { GeminiChat, StreamEventType } from './geminiChat.js';
 import { createContentGenerator } from './contentGenerator.js';
 import { getEnvironmentContext } from '../utils/environmentContext.js';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
@@ -33,6 +33,7 @@ import type {
   FunctionCall,
   FunctionDeclaration,
   GenerateContentConfig,
+  GenerateContentResponse,
 } from '@google/genai';
 import { ToolErrorType } from '../tools/tool-error.js';
 
@@ -73,18 +74,33 @@ const createMockStream = (
   functionCallsList: Array<FunctionCall[] | 'stop'>,
 ) => {
   let index = 0;
-  return vi.fn().mockImplementation(() => {
+  // This mock now returns a Promise that resolves to the async generator,
+  // matching the new signature for sendMessageStream.
+  return vi.fn().mockImplementation(async () => {
     const response = functionCallsList[index] || 'stop';
     index++;
+
     return (async function* () {
-      if (response === 'stop') {
-        // When stopping, the model might return text, but the subagent logic primarily cares about the absence of functionCalls.
-        yield { text: 'Done.' };
-      } else if (response.length > 0) {
-        yield { functionCalls: response };
+      let mockResponseValue: Partial<GenerateContentResponse>;
+
+      if (response === 'stop' || response.length === 0) {
+        // Simulate a text response for stop/empty conditions.
+        mockResponseValue = {
+          candidates: [{ content: { parts: [{ text: 'Done.' }] } }],
+        };
       } else {
-        yield { text: 'Done.' }; // Handle empty array also as stop
+        // Simulate a tool call response.
+        mockResponseValue = {
+          candidates: [], // Good practice to include for safety.
+          functionCalls: response,
+        };
       }
+
+      // The stream must now yield a StreamEvent object of type CHUNK.
+      yield {
+        type: StreamEventType.CHUNK,
+        value: mockResponseValue as GenerateContentResponse,
+      };
     })();
   });
 };
