@@ -264,13 +264,12 @@ function visitBoxRow(element: React.ReactNode): Row {
 
   if (enableDebugLog) {
     const boxProps = element.props as {
-      children?: React.ReactNode | undefined;
+      children?: React.ReactNode;
       readonly flexDirection?:
         | 'row'
         | 'column'
         | 'row-reverse'
-        | 'column-reverse'
-        | undefined;
+        | 'column-reverse';
     };
     // Ensure the Box has no props other than the default ones and key.
     let maxExpectedProps = 4;

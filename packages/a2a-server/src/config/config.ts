@@ -22,10 +22,10 @@ import {
   DEFAULT_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 
-import { logger } from './logger.js';
+import { logger } from '../utils/logger.js';
 import type { Settings } from './settings.js';
 import type { Extension } from './extension.js';
-import { type AgentSettings, CoderAgentEvent } from './types.js';
+import { type AgentSettings, CoderAgentEvent } from '../types.js';
 
 export async function loadConfig(
   settings: Settings,
@@ -79,10 +79,10 @@ export async function loadConfig(
     false,
     fileService,
     extensionContextFilePaths,
+    true, /// TODO: Wire up folder trust logic here.
   );
   configParams.userMemory = memoryContent;
   configParams.geminiMdFileCount = fileCount;
-
   const config = new Config({
     ...configParams,
   });
