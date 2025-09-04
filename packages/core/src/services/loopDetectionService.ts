@@ -341,7 +341,7 @@ export class LoopDetectionService {
       recentHistory.pop();
     }
 
-    // A function response must follow a function call.
+    // A function response should follow a function call.
     // Continuously removes leading function responses from the beginning of history
     // until the first turn is not a function response.
     while (
