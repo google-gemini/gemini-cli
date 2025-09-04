@@ -222,11 +222,6 @@ export function SettingsDialog({
     pendingSettings,
     selectedScope,
     settings,
-    setModifiedSettings,
-    setRestartRequiredSettings,
-    setGlobalPendingChanges,
-    setPendingSettings,
-    setShowRestartPrompt,
     vimEnabled,
     toggleVimEnabled,
   ]);
@@ -381,10 +376,12 @@ export function SettingsDialog({
     RESTART_PROMPT_HEIGHT;
 
   let showScopeSelection = true;
+  let includePadding = true;
 
   // Remove content that can be omitted if it exceeds available height
   if (totalFixedHeight > currentAvailableTerminalHeight) {
     totalFixedHeight -= DIALOG_PADDING;
+    includePadding = false;
   }
 
   if (totalFixedHeight > currentAvailableTerminalHeight) {
@@ -703,7 +700,10 @@ export function SettingsDialog({
       borderStyle="round"
       borderColor={Colors.Gray}
       flexDirection="row"
-      padding={1}
+      paddingTop={includePadding ? 1 : 0}
+      paddingBottom={includePadding ? 1 : 0}
+      paddingLeft={1}
+      paddingRight={1}
       width="100%"
       height="100%"
     >
