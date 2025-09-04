@@ -59,7 +59,12 @@ import { ContextSummaryDisplay } from './components/ContextSummaryDisplay.js';
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import process from 'node:process';
-import type { EditorType, Config, IdeContext } from '@google/gemini-cli-core';
+import type {
+  EditorType,
+  Config,
+  IdeContext,
+  DetectedIde,
+} from '@google/gemini-cli-core';
 import {
   ApprovalMode,
   getAllGeminiMdFilenames,
@@ -73,6 +78,7 @@ import {
   isGenericQuotaExceededError,
   UserTierId,
   DEFAULT_GEMINI_FLASH_MODEL,
+  IdeClient,
 } from '@google/gemini-cli-core';
 import type { IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { IdeIntegrationNudge } from './IdeIntegrationNudge.js';
@@ -161,10 +167,19 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { history, addItem, clearItems, loadHistory } = useHistory();
 
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
-  const currentIDE = config.getIdeClient().getCurrentIde();
+  const [currentIDE, setCurrentIDE] = useState<DetectedIde | undefined>();
+
   useEffect(() => {
-    registerCleanup(() => config.getIdeClient().disconnect());
+    (async () => {
+      const ideClient = await IdeClient.getInstance();
+      setCurrentIDE(ideClient.getCurrentIde());
+    })();
+    registerCleanup(async () => {
+      const ideClient = await IdeClient.getInstance();
+      ideClient.disconnect();
+    });
   }, [config]);
+
   const shouldShowIdePrompt =
     currentIDE &&
     !config.getIdeMode() &&
@@ -306,7 +321,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder);
 
-  const { needsRestart: ideNeedsRestart } = useIdeTrustListener(config);
+  const { needsRestart: ideNeedsRestart } = useIdeTrustListener();
   useEffect(() => {
     if (ideNeedsRestart) {
       // IDE trust changed, force a restart.
@@ -333,6 +348,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   useEffect(() => {
     if (
+      settings.merged.security?.auth?.enforcedType &&
+      settings.merged.security?.auth.selectedType &&
+      settings.merged.security?.auth.enforcedType !==
+        settings.merged.security?.auth.selectedType
+    ) {
+      setAuthError(
+        `Authentication is enforced to be ${settings.merged.security?.auth.enforcedType}, but you are currently using ${settings.merged.security?.auth.selectedType}.`,
+      );
+      openAuthDialog();
+    } else if (
       settings.merged.security?.auth?.selectedType &&
       !settings.merged.security?.auth?.useExternal
     ) {
@@ -346,6 +371,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     }
   }, [
     settings.merged.security?.auth?.selectedType,
+    settings.merged.security?.auth?.enforcedType,
     settings.merged.security?.auth?.useExternal,
     openAuthDialog,
     setAuthError,

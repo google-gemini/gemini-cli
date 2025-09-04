@@ -10,7 +10,17 @@ const mockEnsureCorrectEdit = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 
-import { IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
+
+vi.mock('../ide/ide-client.js', () => ({
+  IdeClient: {
+    getInstance: vi.fn(),
+  },
+  IDEConnectionStatus: {
+    Connected: 'connected',
+    Disconnected: 'disconnected',
+  },
+}));
 
 vi.mock('../utils/editCorrector.js', () => ({
   ensureCorrectEdit: mockEnsureCorrectEdit,
@@ -70,7 +80,6 @@ describe('EditTool', () => {
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
       getFileSystemService: () => new StandardFileSystemService(),
-      getIdeClient: () => undefined,
       getIdeMode: () => false,
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
       // Add other properties/methods of Config if EditTool uses them
@@ -528,10 +537,14 @@ describe('EditTool', () => {
       expect(display.fileDiff).toMatch(/\+new text\n\+new text\n\+new text/);
       expect(display.fileName).toBe(testFile);
       expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
-        ai_added_lines: 3,
-        ai_removed_lines: 3,
+        model_added_lines: 3,
+        model_removed_lines: 3,
+        model_added_chars: 24,
+        model_removed_chars: 24,
         user_added_lines: 0,
         user_removed_lines: 0,
+        user_added_chars: 0,
+        user_removed_chars: 0,
       });
     });
 
@@ -589,10 +602,14 @@ describe('EditTool', () => {
         /User modified the `new_string` content/,
       );
       expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
-        ai_added_lines: 1,
-        ai_removed_lines: 1,
+        model_added_lines: 1,
+        model_removed_lines: 1,
+        model_added_chars: 7,
+        model_removed_chars: 8,
         user_added_lines: 1,
         user_removed_lines: 1,
+        user_added_chars: 8,
+        user_removed_chars: 7,
       });
     });
 
@@ -870,8 +887,8 @@ describe('EditTool', () => {
           status: IDEConnectionStatus.Connected,
         }),
       };
+      vi.mocked(IdeClient.getInstance).mockResolvedValue(ideClient);
       (mockConfig as any).getIdeMode = () => true;
-      (mockConfig as any).getIdeClient = () => ideClient;
     });
 
     it('should call ideClient.openDiff and update params on confirmation', async () => {
