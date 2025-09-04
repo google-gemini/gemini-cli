@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { type Credentials } from 'google-auth-library';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OAuthCredentialStorage } from './oauth-credential-storage.js';
 import { HybridTokenStorage } from '../mcp/token-storage/hybrid-token-storage.js';
+import type {OAuthCredentials} from '../mcp/token-storage/types.js';
 
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -27,7 +29,7 @@ describe('OAuthCredentialStorage', () => {
   let storage: HybridTokenStorage;
   let oauthStorage: OAuthCredentialStorage;
 
-  const mockCredentials = {
+  const mockCredentials: Credentials = {
     access_token: 'mock_access_token',
     refresh_token: 'mock_refresh_token',
     expiry_date: Date.now() + 3600 * 1000,
@@ -35,14 +37,14 @@ describe('OAuthCredentialStorage', () => {
     scope: 'email profile',
   };
 
-  const mockMcpCredentials = {
+  const mockMcpCredentials: OAuthCredentials = {
     serverName: 'main-account',
     token: {
       accessToken: 'mock_access_token',
       refreshToken: 'mock_refresh_token',
       tokenType: 'Bearer',
       scope: 'email profile',
-      expiresAt: mockCredentials.expiry_date,
+      expiresAt: mockCredentials.expiry_date!,
     },
     updatedAt: expect.any(Number),
   };
@@ -123,7 +125,7 @@ describe('OAuthCredentialStorage', () => {
     });
 
     it('should throw an error if access_token is missing', async () => {
-      const invalidCredentials = {
+      const invalidCredentials: Credentials = {
         ...mockCredentials,
         access_token: undefined,
       };
