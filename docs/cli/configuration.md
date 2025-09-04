@@ -90,6 +90,10 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Hide the window title bar.
   - **Default:** `false`
 
+- **`showStatusInTitle`** (boolean):
+  - **Description:** Shows the current operational status of the CLI in the terminal window's title.
+  - **Default:** `false`
+
 - **`ui.hideTips`** (boolean):
   - **Description:** Hide helpful tips in the UI.
   - **Default:** `false`

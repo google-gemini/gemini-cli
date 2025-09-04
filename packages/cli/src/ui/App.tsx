@@ -889,6 +889,39 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     isActive: true,
   });
 
+  const originalTitleRef = useRef(process.title);
+  const lastTitleRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Respect both showStatusInTitle and hideWindowTitle settings
+    if (!settings.merged.showStatusInTitle || settings.merged.hideWindowTitle)
+      return;
+
+    let title;
+    if (streamingState === StreamingState.Idle) {
+      title = originalTitleRef.current;
+    } else {
+      const statusText = thought?.subject;
+      title = statusText || originalTitleRef.current;
+    }
+
+    // Pad the title to a fixed width to prevent taskbar icon resizing.
+    const paddedTitle = title.padEnd(80, ' ');
+
+    // Only update the title if it's different from the last value we set
+    if (lastTitleRef.current !== paddedTitle) {
+      lastTitleRef.current = paddedTitle;
+      stdout.write(`\x1b]2;${paddedTitle}\x07`);
+    }
+    // Note: We don't need to reset the window title on exit because Gemini CLI is already doing that elsewhere 
+  }, [
+    streamingState,
+    thought,
+    settings.merged.showStatusInTitle,
+    settings.merged.hideWindowTitle,
+    stdout,
+  ]);
+
   useEffect(() => {
     if (config) {
       setGeminiMdFileCount(config.getGeminiMdFileCount());
