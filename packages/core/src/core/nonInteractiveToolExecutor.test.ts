@@ -12,7 +12,12 @@ import type {
   ToolResult,
   Config,
 } from '../index.js';
-import { ToolErrorType, ApprovalMode } from '../index.js';
+import {
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+  ToolErrorType,
+  ApprovalMode,
+} from '../index.js';
 import type { Part } from '@google/genai';
 import { MockTool } from '../test-utils/tools.js';
 
@@ -44,8 +49,9 @@ describe('executeToolCall', () => {
       storage: {
         getProjectTempDir: () => '/tmp',
       },
-      getTruncateToolOutputThreshold: () => 4_000_000,
-      getTruncateToolOutputLines: () => 1000,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;

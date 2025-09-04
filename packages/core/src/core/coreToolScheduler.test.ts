@@ -21,6 +21,8 @@ import type {
   ToolRegistry,
 } from '../index.js';
 import {
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   BaseDeclarativeTool,
   BaseToolInvocation,
   ToolConfirmationOutcome,
@@ -32,10 +34,6 @@ import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-const DEFAULT_TRUNCATE_THRESHOLD = 4_000_000;
-const DEFAULT_TRUNCATE_LINES = 1000;
-
-// Mock fs for testing
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
 }));
@@ -181,8 +179,9 @@ describe('CoreToolScheduler', () => {
       storage: {
         getProjectTempDir: () => '/tmp',
       },
-      getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
@@ -287,8 +286,9 @@ describe('CoreToolScheduler with payload', () => {
       storage: {
         getProjectTempDir: () => '/tmp',
       },
-      getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
@@ -701,8 +701,9 @@ describe('CoreToolScheduler YOLO mode', () => {
         getProjectTempDir: () => '/tmp',
       },
       getToolRegistry: () => mockToolRegistry,
-      getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
@@ -801,8 +802,9 @@ describe('CoreToolScheduler request queueing', () => {
       storage: {
         getProjectTempDir: () => '/tmp',
       },
-      getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
@@ -925,8 +927,9 @@ describe('CoreToolScheduler request queueing', () => {
       storage: {
         getProjectTempDir: () => '/tmp',
       },
-      getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
@@ -1016,8 +1019,9 @@ describe('CoreToolScheduler request queueing', () => {
       storage: {
         getProjectTempDir: () => '/tmp',
       },
-      getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
@@ -1083,8 +1087,9 @@ describe('CoreToolScheduler request queueing', () => {
       storage: {
         getProjectTempDir: () => '/tmp',
       },
-      getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_THRESHOLD,
-      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_LINES,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;

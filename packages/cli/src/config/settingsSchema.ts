@@ -11,6 +11,10 @@ import type {
   AuthType,
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
+import {
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+} from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 
 export enum MergeStrategy {
@@ -659,7 +663,7 @@ export const SETTINGS_SCHEMA = {
         label: 'Tool Output Truncation Threshold',
         category: 'General',
         requiresRestart: false,
-        default: 4_000_000,
+        default: DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
         description:
           'Truncate tool output if it is larger than this many characters. Set to -1 to disable.',
         showInDialog: true,
@@ -669,7 +673,7 @@ export const SETTINGS_SCHEMA = {
         label: 'Tool Output Truncation Lines',
         category: 'General',
         requiresRestart: false,
-        default: 1_000,
+        default: DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
         description: 'The number of lines to keep when truncating tool output.',
         showInDialog: true,
       },
