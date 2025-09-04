@@ -749,7 +749,7 @@ describe('Settings Loading and Merging', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
       );
-      const userSettingsContent = { telemetry: true };
+      const userSettingsContent = { telemetry: { enabled: true } };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
           if (p === USER_SETTINGS_PATH)
@@ -758,14 +758,14 @@ describe('Settings Loading and Merging', () => {
         },
       );
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.telemetry).toBe(true);
+      expect(settings.merged.telemetry?.enabled).toBe(true);
     });
 
     it('should load telemetry setting from workspace settings', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === MOCK_WORKSPACE_SETTINGS_PATH,
       );
-      const workspaceSettingsContent = { telemetry: false };
+      const workspaceSettingsContent = { telemetry: { enabled: false } };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
           if (p === MOCK_WORKSPACE_SETTINGS_PATH)
@@ -774,13 +774,13 @@ describe('Settings Loading and Merging', () => {
         },
       );
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.telemetry).toBe(false);
+      expect(settings.merged.telemetry?.enabled).toBe(false);
     });
 
     it('should prioritize workspace telemetry setting over user setting', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
-      const userSettingsContent = { telemetry: true };
-      const workspaceSettingsContent = { telemetry: false };
+      const userSettingsContent = { telemetry: { enabled: true } };
+      const workspaceSettingsContent = { telemetry: { enabled: false } };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
           if (p === USER_SETTINGS_PATH)
@@ -791,7 +791,7 @@ describe('Settings Loading and Merging', () => {
         },
       );
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.telemetry).toBe(false);
+      expect(settings.merged.telemetry?.enabled).toBe(false);
     });
 
     it('should have telemetry as undefined if not in any settings file', () => {
