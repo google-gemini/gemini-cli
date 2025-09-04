@@ -4,15 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  type Mock,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { ShellTool, EditTool, WriteFileTool } from '@google/gemini-cli-core';
@@ -723,6 +715,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         '/path/to/ext3/context1.md',
         '/path/to/ext3/context2.md',
       ],
+      true,
       'tree',
       {
         respectGitIgnore: false,
@@ -1491,40 +1484,6 @@ describe('loadCliConfig model selection', () => {
   });
 });
 
-describe('loadCliConfig folderTrustFeature', () => {
-  const originalArgv = process.argv;
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
-    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
-  });
-
-  afterEach(() => {
-    process.argv = originalArgv;
-    vi.unstubAllEnvs();
-    vi.restoreAllMocks();
-  });
-
-  it('should be false by default', async () => {
-    process.argv = ['node', 'script.js'];
-    const settings: Settings = {};
-    const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFolderTrustFeature()).toBe(false);
-  });
-
-  it('should be true when settings.folderTrustFeature is true', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = {
-      security: { folderTrust: { featureEnabled: true } },
-    };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFolderTrustFeature()).toBe(true);
-  });
-});
-
 describe('loadCliConfig folderTrust', () => {
   const originalArgv = process.argv;
 
@@ -1540,12 +1499,11 @@ describe('loadCliConfig folderTrust', () => {
     vi.restoreAllMocks();
   });
 
-  it('should be false if folderTrustFeature is false and folderTrust is false', async () => {
+  it('should be false when folderTrust is false', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = {
       security: {
         folderTrust: {
-          featureEnabled: false,
           enabled: false,
         },
       },
@@ -1555,49 +1513,26 @@ describe('loadCliConfig folderTrust', () => {
     expect(config.getFolderTrust()).toBe(false);
   });
 
-  it('should be false if folderTrustFeature is true and folderTrust is false', async () => {
+  it('should be true when folderTrust is true', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {
       security: {
         folderTrust: {
-          featureEnabled: true,
-          enabled: false,
-        },
-      },
-    };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFolderTrust()).toBe(false);
-  });
-
-  it('should be false if folderTrustFeature is false and folderTrust is true', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = {
-      security: {
-        folderTrust: {
-          featureEnabled: false,
-          enabled: true,
-        },
-      },
-    };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFolderTrust()).toBe(false);
-  });
-
-  it('should be true when folderTrustFeature is true and folderTrust is true', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = {
-      security: {
-        folderTrust: {
-          featureEnabled: true,
           enabled: true,
         },
       },
     };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getFolderTrust()).toBe(true);
+  });
+
+  it('should be false by default', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFolderTrust()).toBe(false);
   });
 });
 
@@ -1959,7 +1894,7 @@ describe('loadCliConfig approval mode', () => {
   });
 });
 
-describe('loadCliConfig trustedFolder', () => {
+describe('loadCliConfig fileFiltering', () => {
   const originalArgv = process.argv;
 
   beforeEach(() => {
@@ -1975,304 +1910,88 @@ describe('loadCliConfig trustedFolder', () => {
     vi.restoreAllMocks();
   });
 
-  const testCases = [
-    // Cases where folderTrustFeature is false (feature disabled)
+  const testCases: Array<{
+    property: keyof NonNullable<Settings['fileFiltering']>;
+    getter: (config: ServerConfig.Config) => boolean;
+    value: boolean;
+  }> = [
     {
-      folderTrustFeature: false,
-      folderTrust: true,
-      isWorkspaceTrusted: true,
-      expectedFolderTrust: false,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature disabled, folderTrust true, workspace trusted -> behave as trusted',
+      property: 'disableFuzzySearch',
+      getter: (c) => c.getFileFilteringDisableFuzzySearch(),
+      value: true,
     },
     {
-      folderTrustFeature: false,
-      folderTrust: true,
-      isWorkspaceTrusted: false,
-      expectedFolderTrust: false,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature disabled, folderTrust true, workspace not trusted -> behave as trusted',
+      property: 'disableFuzzySearch',
+      getter: (c) => c.getFileFilteringDisableFuzzySearch(),
+      value: false,
     },
     {
-      folderTrustFeature: false,
-      folderTrust: false,
-      isWorkspaceTrusted: true,
-      expectedFolderTrust: false,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature disabled, folderTrust false, workspace trusted -> behave as trusted',
-    },
-
-    // Cases where folderTrustFeature is true but folderTrust setting is false
-    {
-      folderTrustFeature: true,
-      folderTrust: false,
-      isWorkspaceTrusted: true,
-      expectedFolderTrust: false,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature on, folderTrust false, workspace trusted -> behave as trusted',
+      property: 'respectGitIgnore',
+      getter: (c) => c.getFileFilteringRespectGitIgnore(),
+      value: true,
     },
     {
-      folderTrustFeature: true,
-      folderTrust: false,
-      isWorkspaceTrusted: false,
-      expectedFolderTrust: false,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature on, folderTrust false, workspace not trusted -> behave as trusted',
-    },
-
-    // Cases where feature is fully enabled (folderTrustFeature and folderTrust are true)
-    {
-      folderTrustFeature: true,
-      folderTrust: true,
-      isWorkspaceTrusted: true,
-      expectedFolderTrust: true,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature on, folderTrust on, workspace trusted -> is trusted',
+      property: 'respectGitIgnore',
+      getter: (c) => c.getFileFilteringRespectGitIgnore(),
+      value: false,
     },
     {
-      folderTrustFeature: true,
-      folderTrust: true,
-      isWorkspaceTrusted: false,
-      expectedFolderTrust: true,
-      expectedIsTrustedFolder: false,
-      description:
-        'feature on, folderTrust on, workspace NOT trusted -> is NOT trusted',
+      property: 'respectGeminiIgnore',
+      getter: (c) => c.getFileFilteringRespectGeminiIgnore(),
+      value: true,
     },
     {
-      folderTrustFeature: true,
-      folderTrust: true,
-      isWorkspaceTrusted: undefined,
-      expectedFolderTrust: true,
-      expectedIsTrustedFolder: undefined,
-      description:
-        'feature on, folderTrust on, workspace trust unknown -> is unknown',
+      property: 'respectGeminiIgnore',
+      getter: (c) => c.getFileFilteringRespectGeminiIgnore(),
+      value: false,
+    },
+    {
+      property: 'enableRecursiveFileSearch',
+      getter: (c) => c.getEnableRecursiveFileSearch(),
+      value: true,
+    },
+    {
+      property: 'enableRecursiveFileSearch',
+      getter: (c) => c.getEnableRecursiveFileSearch(),
+      value: false,
     },
   ];
 
-  for (const {
-    folderTrustFeature,
-    folderTrust,
-    isWorkspaceTrusted: mockTrustValue,
-    expectedFolderTrust,
-    expectedIsTrustedFolder,
-    description,
-  } of testCases) {
-    it(`should be correct for: ${description}`, async () => {
-      (isWorkspaceTrusted as Mock).mockImplementation((settings: Settings) => {
-        const folderTrustFeature =
-          settings.security?.folderTrust?.featureEnabled ?? false;
-        const folderTrustSetting =
-          settings.security?.folderTrust?.enabled ?? true;
-        const folderTrustEnabled = folderTrustFeature && folderTrustSetting;
-
-        if (!folderTrustEnabled) {
-          return true;
-        }
-        return mockTrustValue; // This is the part that comes from the test case
-      });
-      const argv = await parseArguments({} as Settings);
+  it.each(testCases)(
+    'should pass $property from settings to config when $value',
+    async ({ property, getter, value }) => {
       const settings: Settings = {
-        security: {
-          folderTrust: {
-            featureEnabled: folderTrustFeature,
-            enabled: folderTrust,
-          },
+        context: {
+          fileFiltering: { [property]: value },
         },
       };
+      const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(getter(config)).toBe(value);
+    },
+  );
+});
 
-      expect(config.getFolderTrust()).toBe(expectedFolderTrust);
-      expect(config.isTrustedFolder()).toBe(expectedIsTrustedFolder);
-    });
-  }
+describe('parseArguments with positional prompt', () => {
+  const originalArgv = process.argv;
 
-  describe('GEMINI_SAFE_TRUST_DEFAULT MCP server security tests', () => {
-    let originalEnv: string | undefined;
-    let mockIsWorkspaceTrusted: Mock;
+  afterEach(() => {
+    process.argv = originalArgv;
+  });
 
-    beforeEach(() => {
-      originalEnv = process.env['GEMINI_SAFE_TRUST_DEFAULT'];
-      mockIsWorkspaceTrusted = vi.mocked(isWorkspaceTrusted);
-    });
+  it('should throw an error when both a positional prompt and the --prompt flag are used', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      'positional',
+      'prompt',
+      '--prompt',
+      'test prompt',
+    ];
 
-    afterEach(() => {
-      if (originalEnv !== undefined) {
-        process.env['GEMINI_SAFE_TRUST_DEFAULT'] = originalEnv;
-      } else {
-        delete process.env['GEMINI_SAFE_TRUST_DEFAULT'];
-      }
-      mockIsWorkspaceTrusted.mockRestore();
-    });
-
-    it('should include MCP servers when workspace is trusted and GEMINI_SAFE_TRUST_DEFAULT is not set', async () => {
-      delete process.env['GEMINI_SAFE_TRUST_DEFAULT'];
-      mockIsWorkspaceTrusted.mockReturnValue(true);
-
-      const settings: Settings = {
-        security: {
-          folderTrust: {
-            featureEnabled: true,
-            enabled: true,
-          },
-        },
-        mcpServers: {
-          'test-server': {
-            command: 'test-command',
-            args: ['arg1'],
-          },
-        },
-      };
-
-      const argv = await parseArguments({} as Settings);
-      const config = await loadCliConfig(settings, [], 'test-session', argv);
-
-      expect(config.getMcpServers()).toHaveProperty('test-server');
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
     });
 
-    it('should exclude MCP servers when GEMINI_SAFE_TRUST_DEFAULT=1 and folder trust is disabled', async () => {
-      process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
-      mockIsWorkspaceTrusted.mockReturnValue(true);
-
-      const settings: Settings = {
-        security: {
-          folderTrust: {
-            featureEnabled: false, // Trust feature disabled
-            enabled: true,
-          },
-        },
-        mcpServers: {
-          'test-server': {
-            command: 'test-command',
-            args: ['arg1'],
-          },
-        },
-      };
-
-      const argv = await parseArguments({} as Settings);
-      const config = await loadCliConfig(settings, [], 'test-session', argv);
-
-      expect(config.getMcpServers()).not.toHaveProperty('test-server');
-    });
-
-    it('should include MCP servers when GEMINI_SAFE_TRUST_DEFAULT=1 but explicit trust rules allow it', async () => {
-      process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
-      mockIsWorkspaceTrusted.mockReturnValue(true);
-
-      const settings: Settings = {
-        security: {
-          folderTrust: {
-            featureEnabled: true, // Trust feature enabled
-            enabled: true,
-          },
-        },
-        mcpServers: {
-          'test-server': {
-            command: 'test-command',
-            args: ['arg1'],
-          },
-        },
-      };
-
-      const argv = await parseArguments({} as Settings);
-      const config = await loadCliConfig(settings, [], 'test-session', argv);
-
-      expect(config.getMcpServers()).toHaveProperty('test-server');
-    });
-
-    it('should handle different GEMINI_SAFE_TRUST_DEFAULT values for MCP servers', async () => {
-      const testCases = [
-        { value: '1', shouldInclude: false },
-        { value: '0', shouldInclude: true },
-        { value: 'true', shouldInclude: true },
-        { value: 'false', shouldInclude: true },
-        { value: '', shouldInclude: true },
-      ];
-
-      for (const testCase of testCases) {
-        process.env['GEMINI_SAFE_TRUST_DEFAULT'] = testCase.value;
-        mockIsWorkspaceTrusted.mockReturnValue(true);
-
-        const settings: Settings = {
-          security: {
-            folderTrust: {
-              featureEnabled: testCase.value === '1' ? false : true,
-              enabled: true,
-            },
-          },
-          mcpServers: {
-            'test-server': {
-              command: 'test-command',
-              args: ['arg1'],
-            },
-          },
-        };
-
-        const argv = await parseArguments({} as Settings);
-        const config = await loadCliConfig(settings, [], 'test-session', argv);
-
-        if (testCase.shouldInclude) {
-          expect(config.getMcpServers()).toHaveProperty('test-server');
-        } else {
-          expect(config.getMcpServers()).not.toHaveProperty('test-server');
-        }
-      }
-    });
-
-    it('should prioritize explicit trust settings over GEMINI_SAFE_TRUST_DEFAULT for MCP servers', async () => {
-      process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
-      mockIsWorkspaceTrusted.mockReturnValue(true);
-
-      const settings: Settings = {
-        security: {
-          folderTrust: {
-            featureEnabled: true, // Explicit trust enabled
-            enabled: true,
-          },
-        },
-        mcpServers: {
-          'test-server': {
-            command: 'test-command',
-            args: ['arg1'],
-          },
-        },
-      };
-
-      const argv = await parseArguments({} as Settings);
-      const config = await loadCliConfig(settings, [], 'test-session', argv);
-
-      // Even with GEMINI_SAFE_TRUST_DEFAULT=1, explicit trust should work
-      expect(config.getMcpServers()).toHaveProperty('test-server');
-    });
-
-    it('should maintain MCP server security when both conditions are untrusted', async () => {
-      process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
-      mockIsWorkspaceTrusted.mockReturnValue(false);
-
-      const settings: Settings = {
-        security: {
-          folderTrust: {
-            featureEnabled: false,
-            enabled: false,
-          },
-        },
-        mcpServers: {
-          'test-server': {
-            command: 'test-command',
-            args: ['arg1'],
-          },
-        },
-      };
-
-      const argv = await parseArguments({} as Settings);
-      const config = await loadCliConfig(settings, [], 'test-session', argv);
-
-      expect(config.getMcpServers()).not.toHaveProperty('test-server');
-    });
   });
 });

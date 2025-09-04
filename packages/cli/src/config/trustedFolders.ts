@@ -7,7 +7,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { homedir } from 'node:os';
-import { getErrorMessage, isWithinRoot } from '@google/gemini-cli-core';
+import {
+  getErrorMessage,
+  isWithinRoot,
+  getIdeTrust,
+} from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
 
@@ -146,7 +150,7 @@ export function saveTrustedFolders(
     fs.writeFileSync(
       trustedFoldersFile.path,
       JSON.stringify(trustedFoldersFile.config, null, 2),
-      'utf-8',
+      { encoding: 'utf-8', mode: 0o600 },
     );
   } catch (error) {
     console.error('Error saving trusted folders file:', error);
@@ -155,19 +159,9 @@ export function saveTrustedFolders(
 
 /** Is folder trust feature enabled per the current applied settings */
 export function isFolderTrustEnabled(settings: Settings): boolean {
-  const folderTrustFeature =
-    settings.security?.folderTrust?.featureEnabled ?? false;
-  const folderTrustSetting = settings.security?.folderTrust?.enabled ?? true;
-  return folderTrustFeature && folderTrustSetting;
+  const folderTrustSetting = settings.security?.folderTrust?.enabled ?? false;
+  return folderTrustSetting;
 }
-
-export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
-  if (!isFolderTrustEnabled(settings)) {
-    // If the folder trust feature isn't explicitly enabled, default behavior is
-    // backward compatible (trusted) unless hardened default is requested via env.
-    // Set GEMINI_SAFE_TRUST_DEFAULT=1 to default to untrusted.
-    return process.env['GEMINI_SAFE_TRUST_DEFAULT'] === '1' ? false : true;
-  }
 
   const folders = loadTrustedFolders();
 
@@ -180,4 +174,18 @@ export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
   }
 
   return folders.isPathTrusted(process.cwd());
+}
+
+export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
+  if (!isFolderTrustEnabled(settings)) {
+    return true;
+  }
+
+  const ideTrust = getIdeTrust();
+  if (ideTrust !== undefined) {
+    return ideTrust;
+  }
+
+  // Fall back to the local user configuration
+  return getWorkspaceTrustFromLocalConfig();
 }

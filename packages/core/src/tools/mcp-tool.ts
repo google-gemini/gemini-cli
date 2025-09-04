@@ -19,6 +19,7 @@ import {
 } from './tools.js';
 import type { CallableTool, FunctionCall, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
+import type { Config } from '../config/config.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -67,9 +68,9 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     readonly serverName: string,
     readonly serverToolName: string,
     readonly displayName: string,
-    readonly timeout?: number,
     readonly trust?: boolean,
     params: ToolParams = {},
+    private readonly cliConfig?: Config,
   ) {
     super(params);
   }
@@ -80,7 +81,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     const serverAllowListKey = this.serverName;
     const toolAllowListKey = `${this.serverName}.${this.serverToolName}`;
 
-    if (this.trust) {
+    if (this.cliConfig?.isTrustedFolder() && this.trust) {
       return false; // server is trusted, no confirmation needed
     }
 
@@ -180,9 +181,9 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     readonly serverToolName: string,
     description: string,
     override readonly parameterSchema: unknown,
-    readonly timeout?: number,
     readonly trust?: boolean,
     nameOverride?: string,
+    private readonly cliConfig?: Config,
   ) {
     super(
       nameOverride ?? generateValidName(serverToolName),
@@ -202,9 +203,9 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.serverToolName,
       this.description,
       this.parameterSchema,
-      this.timeout,
       this.trust,
       `${this.serverName}__${this.serverToolName}`,
+      this.cliConfig,
     );
   }
 
@@ -216,9 +217,9 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.serverName,
       this.serverToolName,
       this.displayName,
-      this.timeout,
       this.trust,
       params,
+      this.cliConfig,
     );
   }
 }

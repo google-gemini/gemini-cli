@@ -98,20 +98,6 @@ describe('DiscoveredMCPTool', () => {
       expect(tool.schema.parameters).toBeUndefined();
       expect(tool.schema.parametersJsonSchema).toEqual(inputSchema);
       expect(tool.serverToolName).toBe(serverToolName);
-      expect(tool.timeout).toBeUndefined();
-    });
-
-    it('should accept and store a custom timeout', () => {
-      const customTimeout = 5000;
-      const toolWithTimeout = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        inputSchema,
-        customTimeout,
-      );
-      expect(toolWithTimeout.timeout).toBe(customTimeout);
     });
   });
 
@@ -596,8 +582,9 @@ describe('DiscoveredMCPTool', () => {
         serverToolName,
         baseDescription,
         inputSchema,
-        undefined,
         true,
+        undefined,
+        { isTrustedFolder: () => true } as any,
       );
       const invocation = trustedTool.build({ param: 'mock' });
       expect(
@@ -744,6 +731,67 @@ describe('DiscoveredMCPTool', () => {
           'Confirmation details or onConfirm not in expected format',
         );
       }
+    });
+  });
+
+  describe('shouldConfirmExecute with folder trust', () => {
+    const mockConfig = (isTrusted: boolean | undefined) => ({
+      isTrustedFolder: () => isTrusted,
+    });
+
+    it('should return false if trust is true and folder is trusted', async () => {
+      const trustedTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+        true, // trust = true
+        undefined,
+        mockConfig(true) as any, // isTrustedFolder = true
+      );
+      const invocation = trustedTool.build({ param: 'mock' });
+      expect(
+        await invocation.shouldConfirmExecute(new AbortController().signal),
+      ).toBe(false);
+    });
+
+    it('should return confirmation details if trust is true but folder is not trusted', async () => {
+      const trustedTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+        true, // trust = true
+        undefined,
+        mockConfig(false) as any, // isTrustedFolder = false
+      );
+      const invocation = trustedTool.build({ param: 'mock' });
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      expect(confirmation).toHaveProperty('type', 'mcp');
+    });
+
+    it('should return confirmation details if trust is false, even if folder is trusted', async () => {
+      const untrustedTool = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        inputSchema,
+        false, // trust = false
+        undefined,
+        mockConfig(true) as any, // isTrustedFolder = true
+      );
+      const invocation = untrustedTool.build({ param: 'mock' });
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      expect(confirmation).not.toBe(false);
+      expect(confirmation).toHaveProperty('type', 'mcp');
     });
   });
 
