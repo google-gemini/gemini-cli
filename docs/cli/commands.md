@@ -36,7 +36,7 @@ Slash commands provide meta-level control over the CLI itself.
   - **Keyboard shortcut:** Press **Ctrl+L** at any time to perform a clear action.
 
 - **`/compress [instructions]`**
-  - **Description:** Replace the entire chat context with a summary. This saves on tokens used for future tasks while retaining a high level summary of what has happened. You can optionally provide instructions on how the compression should be performed.
+  - **Description:** Replace the entire chat context with a summary. This saves on tokens used for future tasks while retaining a high level summary of what has happened. You can optionally provide instructions to guide the summary, for example, by focusing the summary on key decisions, important code snippets, or unresolved questions.
 
 - **`/copy`**
   - **Description:** Copies the last output produced by Gemini CLI to your clipboard, for easy sharing or reuse.
@@ -126,7 +126,7 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/vim`**
   - **Description:** Toggle vim mode on or off. When vim mode is enabled, the input area supports vim-style navigation and editing commands in both NORMAL and INSERT modes.
   - **Features:**
-    - **NORMAL mode:** Navigate with `h`, `j`, `k`, `l`; jump by words with `w`, `b`, `e`; go to line start/end with `0`, `$`, `^`; go to specific lines with `G` (or `gg` for first line)
+    - **NORMAL mode:** Navigate with `h`, `j`, `k`, `l`; jump by words with `w`, `b`, `e`; go to line start/end with `0`, `, `^`; go to specific lines with `G` (or `gg` for first line)
     - **INSERT mode:** Standard text input with escape to return to NORMAL mode
     - **Editing commands:** Delete with `x`, change with `c`, insert with `i`, `a`, `o`, `O`; complex operations like `dd`, `cc`, `dw`, `cw`
     - **Count support:** Prefix commands with numbers (e.g., `3h`, `5w`, `10G`)
@@ -154,7 +154,8 @@ If a command in the project directory has the same name as a command in the user
 
 #### Naming and Namespacing
 
-The name of a command is determined by its file path relative to its `commands` directory. Subdirectories are used to create namespaced commands, with the path separator (`/` or `\`) being converted to a colon (`:`).
+The name of a command is determined by its file path relative to its `commands` directory. Subdirectories are used to create namespaced commands, with the path separator (`/` or `
+`) being converted to a colon (`:`).
 
 - A file at `~/.gemini/commands/test.toml` becomes the command `/test`.
 - A file at `<project>/.gemini/commands/git/commit.toml` becomes the namespaced command `/git:commit`.
