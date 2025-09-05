@@ -17,7 +17,7 @@ interface EnumSelectorProps {
 }
 
 /**
- * A left-right scrolling selector for enum values, similar to Claude Code's notification selector
+ * A left-right scrolling selector for enum values
  */
 export function EnumSelector({
   options,
