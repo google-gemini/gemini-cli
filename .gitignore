@@ -43,3 +43,8 @@ packages/vscode-ide-companion/*.vsix
 
 # GHA credentials
 gha-creds-*.json
+
+# .NET build outputs
+packages/core/dotnet-processor/bin/
+packages/core/dotnet-processor/obj/
+packages/core/temp/
