@@ -4,6 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { useSlashCommandProcessor } from './slashCommandProcessor.js';
+import type {
+  CommandContext,
+  ConfirmShellCommandsActionReturn,
+  SlashCommand,
+} from '../commands/types.js';
+import { CommandKind } from '../commands/types.js';
+import type { LoadedSettings } from '../../config/settings.js';
+import { MessageType } from '../types.js';
+import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
+import { FileCommandLoader } from '../../services/FileCommandLoader.js';
+import { McpPromptLoader } from '../../services/McpPromptLoader.js';
+import {
+  type GeminiClient,
+  SlashCommandStatus,
+  ToolConfirmationOutcome,
+  makeFakeConfig,
+} from '@google/gemini-cli-core';
+
 const { logSlashCommand } = vi.hoisted(() => ({
   logSlashCommand: vi.fn(),
 }));
@@ -68,26 +89,6 @@ vi.mock('../../utils/cleanup.js', () => ({
   runExitCleanup: mockRunExitCleanup,
 }));
 
-import { act, renderHook, waitFor } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
-import { useSlashCommandProcessor } from './slashCommandProcessor.js';
-import type {
-  CommandContext,
-  ConfirmShellCommandsActionReturn,
-  SlashCommand,
-} from '../commands/types.js';
-import { CommandKind } from '../commands/types.js';
-import type { LoadedSettings } from '../../config/settings.js';
-import { MessageType } from '../types.js';
-import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
-import { FileCommandLoader } from '../../services/FileCommandLoader.js';
-import { McpPromptLoader } from '../../services/McpPromptLoader.js';
-import {
-  SlashCommandStatus,
-  ToolConfirmationOutcome,
-  makeFakeConfig,
-} from '@google/gemini-cli-core';
-
 function createTestCommand(
   overrides: Partial<SlashCommand>,
   kind: CommandKind = CommandKind.BUILT_IN,
@@ -113,7 +114,7 @@ describe('useSlashCommandProcessor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (vi.mocked(BuiltinCommandLoader) as Mock).mockClear();
+    vi.mocked(BuiltinCommandLoader).mockClear();
     mockBuiltinLoadCommands.mockResolvedValue([]);
     mockFileLoadCommands.mockResolvedValue([]);
     mockMcpLoadCommands.mockResolvedValue([]);
@@ -391,6 +392,12 @@ describe('useSlashCommandProcessor', () => {
     });
 
     it('should handle "load_history" action', async () => {
+      const mockClient = {
+        setHistory: vi.fn(),
+        stripThoughtsFromHistory: vi.fn(),
+      } as unknown as GeminiClient;
+      vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(mockClient);
+
       const command = createTestCommand({
         name: 'load',
         action: vi.fn().mockResolvedValue({
@@ -414,14 +421,11 @@ describe('useSlashCommandProcessor', () => {
     });
 
     it('should strip thoughts when handling "load_history" action', async () => {
-      const mockSetHistory = vi.fn();
-      const mockGeminiClient = {
-        setHistory: mockSetHistory,
-      };
-      vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        mockGeminiClient as any,
-      );
+      const mockClient = {
+        setHistory: vi.fn(),
+        stripThoughtsFromHistory: vi.fn(),
+      } as unknown as GeminiClient;
+      vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(mockClient);
 
       const historyWithThoughts = [
         {
@@ -445,10 +449,8 @@ describe('useSlashCommandProcessor', () => {
         await result.current.handleSlashCommand('/loadwiththoughts');
       });
 
-      expect(mockSetHistory).toHaveBeenCalledTimes(1);
-      expect(mockSetHistory).toHaveBeenCalledWith(historyWithThoughts, {
-        stripThoughts: true,
-      });
+      expect(mockClient.setHistory).toHaveBeenCalledTimes(1);
+      expect(mockClient.stripThoughtsFromHistory).toHaveBeenCalledWith();
     });
 
     it('should handle a "quit" action', async () => {
