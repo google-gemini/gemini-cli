@@ -1135,6 +1135,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 setProQuotaDialogResolver(null);
 
                 if (choice === 'auth') {
+                  cancelOngoingRequest?.();
                   openAuthDialog();
                 } else {
                   addItem(
