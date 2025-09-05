@@ -145,10 +145,6 @@ export function SettingsDialog({
               {} as Settings,
             );
 
-            console.log(
-              `[DEBUG SettingsDialog] Saving ${key} immediately with value:`,
-              newValue,
-            );
             saveModifiedSettings(
               immediateSettings,
               immediateSettingsObject,
@@ -195,12 +191,6 @@ export function SettingsDialog({
             setModifiedSettings((prev) => {
               const updated = new Set(prev).add(key);
               const needsRestart = hasRestartRequiredSettings(updated);
-              console.log(
-                `[DEBUG SettingsDialog] Modified settings:`,
-                Array.from(updated),
-                'Needs restart:',
-                needsRestart,
-              );
               if (needsRestart) {
                 setShowRestartPrompt(true);
                 setRestartRequiredSettings((prevRestart) =>
@@ -370,7 +360,7 @@ export function SettingsDialog({
   currentAvailableTerminalHeight -= BOTTOM_HELP_TEXT_HEIGHT; // Reserve space for help text
 
   // More aggressive threshold - hide scope selection in compact terminals
-  const COMPACT_HEIGHT_THRESHOLD = 16;
+  const COMPACT_HEIGHT_THRESHOLD = 24;
 
   let totalFixedHeight =
     DIALOG_PADDING +
