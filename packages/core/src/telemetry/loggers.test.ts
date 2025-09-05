@@ -29,6 +29,7 @@ import {
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
   EVENT_MALFORMED_JSON_RESPONSE,
+  EVENT_FILE_OPERATION,
 } from './constants.js';
 import {
   logApiRequest,
@@ -39,6 +40,7 @@ import {
   logFlashFallback,
   logChatCompression,
   logMalformedJsonResponse,
+  logFileOperation,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -50,8 +52,10 @@ import {
   FlashFallbackEvent,
   MalformedJsonResponseEvent,
   makeChatCompressionEvent,
+  FileOperationEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
+import { FileOperation } from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect } from 'vitest';
 import type { GenerateContentResponseUsageMetadata } from '@google/genai';
@@ -888,6 +892,64 @@ describe('loggers', () => {
           model: 'test-model',
         },
       });
+    });
+  });
+
+  describe('logFileOperation', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getTargetDir: () => 'target-dir',
+      getUsageStatisticsEnabled: () => true,
+      getTelemetryEnabled: () => true,
+      getTelemetryLogPromptsEnabled: () => true,
+    } as Config;
+
+    const mockMetrics = {
+      recordFileOperationMetric: vi.fn(),
+    };
+
+    beforeEach(() => {
+      vi.spyOn(metrics, 'recordFileOperationMetric').mockImplementation(
+        mockMetrics.recordFileOperationMetric,
+      );
+    });
+
+    it('should log a file operation event', () => {
+      const event = new FileOperationEvent(
+        'test-tool',
+        FileOperation.READ,
+        10,
+        'text/plain',
+        '.txt',
+        'typescript',
+      );
+
+      logFileOperation(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'File operation: read. Lines: 10.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_FILE_OPERATION,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          tool_name: 'test-tool',
+          operation: 'read',
+          lines: 10,
+          mimetype: 'text/plain',
+          extension: '.txt',
+          programming_language: 'typescript',
+        },
+      });
+
+      expect(mockMetrics.recordFileOperationMetric).toHaveBeenCalledWith(
+        mockConfig,
+        'read',
+        10,
+        'text/plain',
+        '.txt',
+        'typescript',
+      );
     });
   });
 });
