@@ -288,17 +288,19 @@ jobs:
 
             const issueNumber = parseInt(process.env.ISSUE_NUMBER);
             const explanation = parsedLabels.explanation || '';
+            const labelsToSet = parsedLabels.labels_to_set || [];
+            labelsToSet.push('status/bot-triaged');
 
             // Set labels based on triage result
-            if (parsedLabels.labels_to_set && parsedLabels.labels_to_set.length > 0) {
+            if (labelsToSet.length > 0) {
               await github.rest.issues.setLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issueNumber,
-                labels: parsedLabels.labels_to_set
+                labels: labelsToSet
               });
               const explanationInfo = explanation ? ` - ${explanation}` : '';
-              core.info(`Successfully set labels for #${issueNumber}: ${parsedLabels.labels_to_set.join(', ')}${explanationInfo}`);
+              core.info(`Successfully set labels for #${issueNumber}: ${labelsToSet.join(', ')}${explanationInfo}`);
             } else {
               // If no labels to set, leave the issue as is
               const explanationInfo = explanation ? ` - ${explanation}` : '';
