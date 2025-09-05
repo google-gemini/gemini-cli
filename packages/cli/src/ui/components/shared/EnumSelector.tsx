@@ -26,17 +26,23 @@ export function EnumSelector({
   onValueChange,
 }: EnumSelectorProps): React.JSX.Element {
   const [currentIndex, setCurrentIndex] = useState(() => {
+    if (!options || options.length === 0) return 0;
     const index = options.findIndex((option) => option.value === currentValue);
     return index >= 0 ? index : 0;
   });
 
   // Update index when currentValue changes externally
   useEffect(() => {
+    if (!options || options.length === 0) return;
     const index = options.findIndex((option) => option.value === currentValue);
-    if (index >= 0) {
-      setCurrentIndex(index);
-    }
+    // Always update index, defaulting to 0 if value not found
+    setCurrentIndex(index >= 0 ? index : 0);
   }, [currentValue, options]);
+
+  // Guard against empty options array
+  if (!options || options.length === 0) {
+    return <Box />;
+  }
 
   // Left/right navigation is handled by parent component
   // This component is purely for display
