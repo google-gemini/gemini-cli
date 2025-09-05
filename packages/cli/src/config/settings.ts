@@ -67,6 +67,7 @@ const MIGRATION_MAP: Record<string, string> = {
   coreTools: 'tools.core',
   contextFileName: 'context.fileName',
   customThemes: 'ui.customThemes',
+  customWittyPhrases: 'ui.customWittyPhrases',
   debugKeystrokeLogging: 'general.debugKeystrokeLogging',
   disableAutoUpdate: 'general.disableAutoUpdate',
   disableUpdateNag: 'general.disableUpdateNag',
@@ -246,7 +247,24 @@ function migrateSettingsToV2(
 
   // Carry over any unrecognized keys
   for (const remainingKey of flatKeys) {
-    v2Settings[remainingKey] = flatSettings[remainingKey];
+    const existingValue = v2Settings[remainingKey];
+    const newValue = flatSettings[remainingKey];
+
+    if (
+      typeof existingValue === 'object' &&
+      existingValue !== null &&
+      !Array.isArray(existingValue) &&
+      typeof newValue === 'object' &&
+      newValue !== null &&
+      !Array.isArray(newValue)
+    ) {
+      v2Settings[remainingKey] = {
+        ...(newValue as Record<string, unknown>),
+        ...(existingValue as Record<string, unknown>),
+      };
+    } else {
+      v2Settings[remainingKey] = newValue;
+    }
   }
 
   return v2Settings;
