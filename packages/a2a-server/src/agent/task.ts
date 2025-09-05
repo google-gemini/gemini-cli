@@ -509,7 +509,8 @@ export class Task {
     if (oldString === '' && !isNewFile) {
       return currentContent;
     }
-    return currentContent.replaceAll(oldString, newString);
+    // Use split/join to ensure replacement
+    return currentContent.split(oldString).join(newString);
   }
 
   async scheduleToolCalls(
