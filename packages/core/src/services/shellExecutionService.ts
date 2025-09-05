@@ -224,17 +224,10 @@ export class ShellExecutionService {
           const combinedOutput =
             stdout + (stderr ? (stdout ? separator : '') + stderr : '');
 
-          // On Windows, taskkill might not result in a non-zero exit code for
-          // certain commands (like `choice`). If we requested an abort and the
-          // process exits with code 0, we'll manually set it to 1 to indicate
-          // that it did not exit cleanly.
-          const exitCode =
-            isWindows && abortSignal.aborted && code === 0 ? 1 : code;
-
           resolve({
             rawOutput: finalBuffer,
             output: combinedOutput.trim(),
-            exitCode,
+            exitCode: code,
             signal: signal ? os.constants.signals[signal] : null,
             error,
             aborted: abortSignal.aborted,
@@ -253,17 +246,7 @@ export class ShellExecutionService {
         const abortHandler = async () => {
           if (child.pid && !exited) {
             if (isWindows) {
-              // Wait for taskkill to complete to ensure the process is terminated
-              // before the main promise resolves, fixing a race condition.
-              await new Promise<void>((resolve) => {
-                const killer = cpSpawn('taskkill', [
-                  '/pid',
-                  child.pid!.toString(),
-                  '/f',
-                  '/t',
-                ]);
-                killer.on('exit', () => resolve());
-              });
+              cpSpawn('taskkill', ['/pid', child.pid.toString(), '/f', '/t']);
             } else {
               try {
                 process.kill(-child.pid, 'SIGTERM');
