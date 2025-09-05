@@ -385,8 +385,13 @@ export class Config {
     this.initialized = true;
 
     if (this.getIdeMode()) {
-      await (await IdeClient.getInstance()).connect();
-      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
+      const ide = await IdeClient.getInstance();
+      if (ide.currentIde) {
+        await (await IdeClient.getInstance()).connect();
+        logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
+      } else {
+        this.setIdeMode(false);
+      }    
     }
 
     // Initialize centralized FileDiscoveryService
