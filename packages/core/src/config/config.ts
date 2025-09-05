@@ -110,6 +110,10 @@ export const DEFAULT_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
   respectGitIgnore: true,
   respectGeminiIgnore: true,
 };
+
+export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 4_000_000;
+export const DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES = 1000;
+
 export class MCPServerConfig {
   constructor(
     // For stdio transport
@@ -210,6 +214,8 @@ export interface ConfigParameters {
   skipNextSpeakerCheck?: boolean;
   extensionManagement?: boolean;
   enablePromptCompletion?: boolean;
+  truncateToolOutputThreshold?: number;
+  truncateToolOutputLines?: number;
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
 }
@@ -284,6 +290,8 @@ export class Config {
   private readonly skipNextSpeakerCheck: boolean;
   private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
+  private readonly truncateToolOutputThreshold: number;
+  private readonly truncateToolOutputLines: number;
   private initialized: boolean = false;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
@@ -359,6 +367,11 @@ export class Config {
     this.useRipgrep = params.useRipgrep ?? false;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
+    this.truncateToolOutputThreshold =
+      params.truncateToolOutputThreshold ??
+      DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
+    this.truncateToolOutputLines =
+      params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
@@ -807,6 +820,14 @@ export class Config {
 
   getEnablePromptCompletion(): boolean {
     return this.enablePromptCompletion;
+  }
+
+  getTruncateToolOutputThreshold(): number {
+    return this.truncateToolOutputThreshold;
+  }
+
+  getTruncateToolOutputLines(): number {
+    return this.truncateToolOutputLines;
   }
 
   getUseSmartEdit(): boolean {
