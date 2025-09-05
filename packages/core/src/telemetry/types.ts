@@ -133,6 +133,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   error_type?: string;
   prompt_id: string;
   tool_type: 'native' | 'mcp';
+  mcp_server_name?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
 
@@ -149,10 +150,12 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     this.error = call.response.error?.message;
     this.error_type = call.response.errorType;
     this.prompt_id = call.request.prompt_id;
-    this.tool_type =
-      typeof call.tool !== 'undefined' && call.tool instanceof DiscoveredMCPTool
-        ? 'mcp'
-        : 'native';
+    if (typeof call.tool !== 'undefined' && call.tool instanceof DiscoveredMCPTool) {
+      this.tool_type = 'mcp';
+      this.mcp_server_name = call.tool.serverName;
+    } else {
+      this.tool_type = 'native';
+    }
 
     if (
       call.status === 'success' &&
