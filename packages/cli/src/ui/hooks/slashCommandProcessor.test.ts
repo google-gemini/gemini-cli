@@ -220,6 +220,18 @@ describe('useSlashCommandProcessor', () => {
       expect(fileAction).toHaveBeenCalledTimes(1);
       expect(builtinAction).not.toHaveBeenCalled();
     });
+
+    it('should not include hidden commands in the command list', async () => {
+      const visibleCommand = createTestCommand({ name: 'visible' });
+      const hiddenCommand = createTestCommand({ name: 'hidden', hidden: true });
+      const result = setupProcessorHook([visibleCommand, hiddenCommand]);
+
+      await waitFor(() => {
+        expect(result.current.slashCommands).toHaveLength(1);
+      });
+
+      expect(result.current.slashCommands[0].name).toBe('visible');
+    });
   });
 
   describe('Command Execution Logic', () => {

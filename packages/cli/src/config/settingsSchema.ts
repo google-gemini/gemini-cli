@@ -843,7 +843,7 @@ export const SETTINGS_SCHEMA = {
         label: 'Extension Management',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enable extension management features.',
         showInDialog: false,
       },
