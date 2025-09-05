@@ -277,9 +277,9 @@ export async function truncateAndSaveToFile(
     fileContent = lines.join('\n');
   }
 
-  const half = Math.floor(truncateLines / 2);
-  const beginning = lines.slice(0, half);
-  const end = lines.slice(-half);
+  const head = Math.floor(truncateLines / 5);
+  const beginning = lines.slice(0, head);
+  const end = lines.slice(-(truncateLines - head));
   const truncatedContent =
     beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
 

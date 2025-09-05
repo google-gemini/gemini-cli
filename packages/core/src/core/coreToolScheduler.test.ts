@@ -1262,10 +1262,10 @@ describe('truncateAndSaveToFile', () => {
       content,
     );
 
-    // Should contain the first and last 500 lines
-    const half = Math.floor(TRUNCATE_LINES / 2);
-    const beginning = lines.slice(0, half);
-    const end = lines.slice(-half);
+    // Should contain the first and last lines with 1/5 head and 4/5 tail
+    const head = Math.floor(TRUNCATE_LINES / 5);
+    const beginning = lines.slice(0, head);
+    const end = lines.slice(-(TRUNCATE_LINES - head));
     const expectedTruncated =
       beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
 
@@ -1308,10 +1308,10 @@ describe('truncateAndSaveToFile', () => {
       expectedFileContent,
     );
 
-    // Should contain the first and last TRUNCATE_LINES / 2 lines of the wrapped content
-    const half = Math.floor(TRUNCATE_LINES / 2);
-    const beginning = wrappedLines.slice(0, half);
-    const end = wrappedLines.slice(-half);
+    // Should contain the first and last lines with 1/5 head and 4/5 tail of the wrapped content
+    const head = Math.floor(TRUNCATE_LINES / 5);
+    const beginning = wrappedLines.slice(0, head);
+    const end = wrappedLines.slice(-(TRUNCATE_LINES - head));
     const expectedTruncated =
       beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
     expect(result.content).toContain(
