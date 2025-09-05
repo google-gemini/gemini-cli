@@ -32,6 +32,7 @@ import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
+import { useMemoryMonitor } from './hooks/useMemoryMonitor.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { Header } from './components/Header.js';
 import { LoadingIndicator } from './components/LoadingIndicator.js';
@@ -165,6 +166,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { stdout } = useStdout();
   const nightly = version.includes('nightly');
   const { history, addItem, clearItems, loadHistory } = useHistory();
+  useMemoryMonitor({ addItem });
 
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
   const [currentIDE, setCurrentIDE] = useState<DetectedIde | undefined>();
