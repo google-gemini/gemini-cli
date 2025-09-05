@@ -365,11 +365,8 @@ async function handleAutomaticOAuth(
     console.log(
       `Starting OAuth authentication for server '${mcpServerName}'...`,
     );
-    await MCPOAuthProvider.authenticate(
-      mcpServerName,
-      oauthAuthConfig,
-      serverUrl,
-    );
+    const authProvider = new MCPOAuthProvider(new MCPOAuthTokenStorage());
+    await authProvider.authenticate(mcpServerName, oauthAuthConfig, serverUrl);
 
     console.log(
       `OAuth authentication successful for server '${mcpServerName}'`,
@@ -644,7 +641,9 @@ export async function discoverTools(
   cliConfig: Config,
 ): Promise<DiscoveredMCPTool[]> {
   try {
-    const mcpCallableTool = mcpToTool(mcpClient);
+    const mcpCallableTool = mcpToTool(mcpClient, {
+      timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
+    });
     const tool = await mcpCallableTool.tool();
 
     if (!Array.isArray(tool.functionDeclarations)) {
@@ -675,7 +674,6 @@ export async function discoverTools(
             funcDecl.name!,
             funcDecl.description ?? '',
             funcDecl.parametersJsonSchema ?? { type: 'object', properties: {} },
-            mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
             mcpServerConfig.trust,
             undefined,
             cliConfig,
@@ -871,18 +869,6 @@ export async function connectToMcpServer(
     unlistenDirectories = undefined;
   };
 
-  // patch Client.callTool to use request timeout as genai McpCallTool.callTool does not do it
-  // TODO: remove this hack once GenAI SDK does callTool with request options
-  if ('callTool' in mcpClient) {
-    const origCallTool = mcpClient.callTool.bind(mcpClient);
-    mcpClient.callTool = function (params, resultSchema, options) {
-      return origCallTool(params, resultSchema, {
-        ...options,
-        timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
-      });
-    };
-  }
-
   try {
     const transport = await createTransport(
       mcpServerName,
@@ -910,9 +896,11 @@ export async function connectToMcpServer(
 
       if (!shouldTriggerOAuth) {
         // For SSE servers without explicit OAuth config, if a token was found but rejected, report it accurately.
-        const credentials = await MCPOAuthTokenStorage.getToken(mcpServerName);
+        const tokenStorage = new MCPOAuthTokenStorage();
+        const credentials = await tokenStorage.getCredentials(mcpServerName);
         if (credentials) {
-          const hasStoredTokens = await MCPOAuthProvider.getValidToken(
+          const authProvider = new MCPOAuthProvider(tokenStorage);
+          const hasStoredTokens = await authProvider.getValidToken(
             mcpServerName,
             {
               // Pass client ID if available
@@ -993,10 +981,11 @@ export async function connectToMcpServer(
 
           // Get the valid token - we need to create a proper OAuth config
           // The token should already be available from the authentication process
-          const credentials =
-            await MCPOAuthTokenStorage.getToken(mcpServerName);
+          const tokenStorage = new MCPOAuthTokenStorage();
+          const credentials = await tokenStorage.getCredentials(mcpServerName);
           if (credentials) {
-            const accessToken = await MCPOAuthProvider.getValidToken(
+            const authProvider = new MCPOAuthProvider(tokenStorage);
+            const accessToken = await authProvider.getValidToken(
               mcpServerName,
               {
                 // Pass client ID if available
@@ -1067,10 +1056,11 @@ export async function connectToMcpServer(
           mcpServerConfig.httpUrl || mcpServerConfig.oauth?.enabled;
 
         if (!shouldTryDiscovery) {
-          const credentials =
-            await MCPOAuthTokenStorage.getToken(mcpServerName);
+          const tokenStorage = new MCPOAuthTokenStorage();
+          const credentials = await tokenStorage.getCredentials(mcpServerName);
           if (credentials) {
-            const hasStoredTokens = await MCPOAuthProvider.getValidToken(
+            const authProvider = new MCPOAuthProvider(tokenStorage);
+            const hasStoredTokens = await authProvider.getValidToken(
               mcpServerName,
               {
                 // Pass client ID if available
@@ -1127,17 +1117,22 @@ export async function connectToMcpServer(
               console.log(
                 `Starting OAuth authentication for server '${mcpServerName}'...`,
               );
-              await MCPOAuthProvider.authenticate(
+              const authProvider = new MCPOAuthProvider(
+                new MCPOAuthTokenStorage(),
+              );
+              await authProvider.authenticate(
                 mcpServerName,
                 oauthAuthConfig,
                 authServerUrl,
               );
 
               // Retry connection with OAuth token
+              const tokenStorage = new MCPOAuthTokenStorage();
               const credentials =
-                await MCPOAuthTokenStorage.getToken(mcpServerName);
+                await tokenStorage.getCredentials(mcpServerName);
               if (credentials) {
-                const accessToken = await MCPOAuthProvider.getValidToken(
+                const authProvider = new MCPOAuthProvider(tokenStorage);
+                const accessToken = await authProvider.getValidToken(
                   mcpServerName,
                   {
                     // Pass client ID if available
@@ -1272,7 +1267,9 @@ export async function createTransport(
   let hasOAuthConfig = mcpServerConfig.oauth?.enabled;
 
   if (hasOAuthConfig && mcpServerConfig.oauth) {
-    accessToken = await MCPOAuthProvider.getValidToken(
+    const tokenStorage = new MCPOAuthTokenStorage();
+    const authProvider = new MCPOAuthProvider(tokenStorage);
+    accessToken = await authProvider.getValidToken(
       mcpServerName,
       mcpServerConfig.oauth,
     );
@@ -1289,9 +1286,11 @@ export async function createTransport(
     }
   } else {
     // Check if we have stored OAuth tokens for this server (from previous authentication)
-    const credentials = await MCPOAuthTokenStorage.getToken(mcpServerName);
+    const tokenStorage = new MCPOAuthTokenStorage();
+    const credentials = await tokenStorage.getCredentials(mcpServerName);
     if (credentials) {
-      accessToken = await MCPOAuthProvider.getValidToken(mcpServerName, {
+      const authProvider = new MCPOAuthProvider(tokenStorage);
+      accessToken = await authProvider.getValidToken(mcpServerName, {
         // Pass client ID if available
         clientId: credentials.clientId,
       });
