@@ -44,6 +44,7 @@ export enum EventNames {
   API_ERROR = 'api_error',
   END_SESSION = 'end_session',
   FLASH_FALLBACK = 'flash_fallback',
+  RIPGREP_FALLBACK = 'ripgrep_fallback',
   LOOP_DETECTED = 'loop_detected',
   NEXT_SPEAKER_CHECK = 'next_speaker_check',
   SLASH_COMMAND = 'slash_command',
@@ -626,6 +627,13 @@ export class ClearcutLogger {
 
   logFlashFallbackEvent(): void {
     this.enqueueLogEvent(this.createLogEvent(EventNames.FLASH_FALLBACK, []));
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
+  }
+
+  logRipgrepFallbackEvent(): void {
+    this.enqueueLogEvent(this.createLogEvent(EventNames.RIPGREP_FALLBACK, []));
     this.flushToClearcut().catch((error) => {
       console.debug('Error flushing to Clearcut:', error);
     });
