@@ -36,9 +36,19 @@ async function addMcpServer(
     includeTools,
     excludeTools,
   } = options;
+
+  const settings = loadSettings(process.cwd());
+  const inHome = settings.workspace.path === settings.user.path;
+
+  if (scope === 'project' && inHome) {
+    console.error(
+      'Error: Please use --scope user to edit settings in the home directory.',
+    );
+    process.exit(1);
+  }
+
   const settingsScope =
     scope === 'user' ? SettingScope.User : SettingScope.Workspace;
-  const settings = loadSettings();
 
   let newServer: Partial<MCPServerConfig> = {};
 
@@ -107,7 +117,7 @@ async function addMcpServer(
   const isExistingServer = !!mcpServers[name];
   if (isExistingServer) {
     console.log(
-      `MCP server "${name}" is already configured within ${scope} settings.`,
+      `MCP server "${name}" is already configured within ${settingsScope} settings.`,
     );
   }
 
@@ -116,10 +126,10 @@ async function addMcpServer(
   settings.setValue(settingsScope, 'mcpServers', mcpServers);
 
   if (isExistingServer) {
-    console.log(`MCP server "${name}" updated in ${scope} settings.`);
+    console.log(`MCP server "${name}" updated in ${settingsScope} settings.`);
   } else {
     console.log(
-      `MCP server "${name}" added to ${scope} settings. (${transport})`,
+      `MCP server "${name}" added to ${settingsScope} settings. (${transport})`,
     );
   }
 }
