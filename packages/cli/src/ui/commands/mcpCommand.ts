@@ -143,7 +143,7 @@ const getMcpStatus = async (
           '@google/gemini-cli-core'
         );
         const tokenStorage = new MCPOAuthTokenStorage();
-        const hasToken = await tokenStorage.getToken(serverName);
+        const hasToken = await tokenStorage.getCredentials(serverName);
         if (hasToken) {
           const isExpired = tokenStorage.isTokenExpired(hasToken.token);
           if (isExpired) {
