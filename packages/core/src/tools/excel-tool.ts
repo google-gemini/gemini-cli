@@ -1442,13 +1442,13 @@ export class ExcelTool extends BaseDeclarativeTool<ExcelParams, ExcelResult> {
     super(
       'excel',
       'Excel & CSV Operations', 
-      'Excel/CSV file management: read/write Excel/CSV data & formulas, styling, validation, row/col operations, merge cells, sheets. CSV operations: csvRead (file=csv_path), csvExport (IMPORTANT: file=source_excel_path, sheet=sheet_name, automatically generates CSV filename), csvImport (file=target_excel_path, sourceFile=csv_path)',
+      'Excel/CSV file management: read/write Excel/CSV data & formulas, styling, validation, row/col operations, merge cells, sheets. IMPORTANT: Only supports modern Excel (.xlsx) format - does NOT support legacy .xls format. CSV operations: csvRead (file=csv_path), csvExport (IMPORTANT: file=source_excel_path, sheet=sheet_name, automatically generates CSV filename), csvImport (file=target_excel_path, sourceFile=csv_path)',
       Kind.Other,
       {
         type: 'object',
         required: ['file', 'op'],
         properties: {
-          file: { type: 'string', description: 'File path: Excel file for most operations (including csvExport), CSV file ONLY for csvRead' },
+          file: { type: 'string', description: 'File path: Excel file for most operations (including csvExport), CSV file ONLY for csvRead. IMPORTANT: Only .xlsx format supported - NOT .xls' },
           op: { 
             type: 'string', 
             enum: ['read', 'write', 'create', 'listSheets', 'copySheet', 'style', 'validate', 'rows', 'cols', 'merge', 'addSheet', 'editSheet', 'deleteSheet', 'comment', 'csvRead', 'csvExport', 'csvImport'],
