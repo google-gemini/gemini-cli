@@ -416,9 +416,9 @@ describe('GeminiChat', () => {
       expect(modelTurn?.parts![0]!.functionCall).toBeDefined();
     });
 
-    it('should succeed if the stream ends with an empty part but has a valid finishReason', async () => {
-      // 1. Mock a stream that ends with an invalid part but has a 'STOP' finish reason.
-      const streamWithValidFinish = (async function* () {
+    it('should fail if the stream ends with an empty part and has no finishReason', async () => {
+      // 1. Mock a stream that ends with an invalid part and has no finish reason.
+      const streamWithNoFinish = (async function* () {
         yield {
           candidates: [
             {
@@ -429,7 +429,7 @@ describe('GeminiChat', () => {
             },
           ],
         } as unknown as GenerateContentResponse;
-        // This second chunk is invalid, but the finishReason should save it from retrying.
+        // This second chunk is invalid and has no finishReason, so it should fail.
         yield {
           candidates: [
             {
@@ -437,21 +437,19 @@ describe('GeminiChat', () => {
                 role: 'model',
                 parts: [{ text: '' }],
               },
-              finishReason: 'STOP',
             },
           ],
         } as unknown as GenerateContentResponse;
       })();
 
       vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
-        streamWithValidFinish,
+        streamWithNoFinish,
       );
 
-      // 2. Action & Assert: The stream should complete successfully because the valid
-      // finishReason overrides the invalid final chunk.
+      // 2. Action & Assert: The stream should fail because there's no finish reason.
       const stream = await chat.sendMessageStream(
         { message: 'test message' },
-        'prompt-id-valid-finish-empty-end',
+        'prompt-id-no-finish-empty-end',
       );
       await expect(
         (async () => {
@@ -459,14 +457,7 @@ describe('GeminiChat', () => {
             /* consume stream */
           }
         })(),
-      ).resolves.not.toThrow();
-
-      // 3. Verify history was recorded correctly
-      const history = chat.getHistory();
-      expect(history.length).toBe(2);
-      const modelTurn = history[1]!;
-      expect(modelTurn?.parts?.length).toBe(1); // The empty part is discarded
-      expect(modelTurn?.parts![0]!.text).toBe('Initial content...');
+      ).rejects.toThrow(EmptyStreamError);
     });
     it('should not consolidate text into a part that also contains a functionCall', async () => {
       // 1. Mock the API to stream a malformed part followed by a valid text part.
@@ -542,7 +533,10 @@ describe('GeminiChat', () => {
         // as the important part is consolidating what comes after.
         yield {
           candidates: [
-            { content: { role: 'model', parts: [{ text: ' World!' }] } },
+            {
+              content: { role: 'model', parts: [{ text: ' World!' }] },
+              finishReason: 'STOP',
+            },
           ],
         } as unknown as GenerateContentResponse;
       })();
@@ -645,6 +639,7 @@ describe('GeminiChat', () => {
                   { text: 'This is the visible text that should not be lost.' },
                 ],
               },
+              finishReason: 'STOP',
             },
           ],
         } as unknown as GenerateContentResponse;
@@ -705,7 +700,10 @@ describe('GeminiChat', () => {
       const emptyStreamResponse = (async function* () {
         yield {
           candidates: [
-            { content: { role: 'model', parts: [{ thought: true }] } },
+            {
+              content: { role: 'model', parts: [{ thought: true }] },
+              finishReason: 'STOP',
+            },
           ],
         } as unknown as GenerateContentResponse;
       })();
@@ -975,7 +973,12 @@ describe('GeminiChat', () => {
           // Second attempt (the retry): A minimal valid stream.
           (async function* () {
             yield {
-              candidates: [{ content: { parts: [{ text: 'Success' }] } }],
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Success' }] },
+                  finishReason: 'STOP',
+                },
+              ],
             } as unknown as GenerateContentResponse;
           })(),
         );
@@ -1012,7 +1015,10 @@ describe('GeminiChat', () => {
           (async function* () {
             yield {
               candidates: [
-                { content: { parts: [{ text: 'Successful response' }] } },
+                {
+                  content: { parts: [{ text: 'Successful response' }] },
+                  finishReason: 'STOP',
+                },
               ],
             } as unknown as GenerateContentResponse;
           })(),
@@ -1123,7 +1129,12 @@ describe('GeminiChat', () => {
         // Second attempt succeeds
         (async function* () {
           yield {
-            candidates: [{ content: { parts: [{ text: 'Second answer' }] } }],
+            candidates: [
+              {
+                content: { parts: [{ text: 'Second answer' }] },
+                finishReason: 'STOP',
+              },
+            ],
           } as unknown as GenerateContentResponse;
         })(),
       );
@@ -1272,6 +1283,7 @@ describe('GeminiChat', () => {
                   content: {
                     parts: [{ text: 'Successful response after empty' }],
                   },
+                  finishReason: 'STOP',
                 },
               ],
             } as unknown as GenerateContentResponse;
@@ -1333,13 +1345,23 @@ describe('GeminiChat', () => {
       } as unknown as GenerateContentResponse;
       await firstStreamContinuePromise; // Pause the stream
       yield {
-        candidates: [{ content: { parts: [{ text: ' part 2' }] } }],
+        candidates: [
+          {
+            content: { parts: [{ text: ' part 2' }] },
+            finishReason: 'STOP',
+          },
+        ],
       } as unknown as GenerateContentResponse;
     })();
 
     const secondStreamGenerator = (async function* () {
       yield {
-        candidates: [{ content: { parts: [{ text: 'second response' }] } }],
+        candidates: [
+          {
+            content: { parts: [{ text: 'second response' }] },
+            finishReason: 'STOP',
+          },
+        ],
       } as unknown as GenerateContentResponse;
     })();
 
@@ -1424,6 +1446,7 @@ describe('GeminiChat', () => {
                 content: {
                   parts: [{ text: 'Successful final response' }],
                 },
+                finishReason: 'STOP',
               },
             ],
           } as unknown as GenerateContentResponse;
