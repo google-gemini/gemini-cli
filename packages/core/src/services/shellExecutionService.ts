@@ -224,10 +224,17 @@ export class ShellExecutionService {
           const combinedOutput =
             stdout + (stderr ? (stdout ? separator : '') + stderr : '');
 
+          // On Windows, taskkill might not result in a non-zero exit code for
+          // certain commands (like `choice`). If we requested an abort and the
+          // process exits with code 0, we'll manually set it to 1 to indicate
+          // that it did not exit cleanly.
+          const exitCode =
+            isWindows && abortSignal.aborted && code === 0 ? 1 : code;
+
           resolve({
             rawOutput: finalBuffer,
             output: combinedOutput.trim(),
-            exitCode: code,
+            exitCode,
             signal: signal ? os.constants.signals[signal] : null,
             error,
             aborted: abortSignal.aborted,
