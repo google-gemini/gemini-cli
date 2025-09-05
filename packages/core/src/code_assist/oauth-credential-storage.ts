@@ -50,7 +50,8 @@ export class OAuthCredentialStorage {
 
       // Fallback: Try to migrate from old file-based storage
       return await this.migrateFromFileStorage();
-    } catch (_error: unknown) {
+    } catch (error: unknown) {
+      console.error(error);
       throw new Error('Failed to load OAuth credentials');
     }
   }
@@ -89,7 +90,8 @@ export class OAuthCredentialStorage {
       // Also try to remove the old file if it exists
       const oldFilePath = path.join(os.homedir(), GEMINI_DIR, OAUTH_FILE);
       await fs.rm(oldFilePath, { force: true }).catch(() => {});
-    } catch (_error: unknown) {
+    } catch (error: unknown) {
+      console.error(error);
       throw new Error('Failed to clear OAuth credentials');
     }
   }
