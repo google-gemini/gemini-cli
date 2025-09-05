@@ -28,6 +28,7 @@ import {
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
+  FEEDBACK_CONTENT_MAX_LENGTH,
   EVENT_MALFORMED_JSON_RESPONSE,
   EVENT_FILE_OPERATION,
 } from './constants.js';
@@ -38,6 +39,7 @@ import {
   logUserPrompt,
   logToolCall,
   logFlashFallback,
+  logResearchFeedback,
   logChatCompression,
   logMalformedJsonResponse,
   logFileOperation,
@@ -50,6 +52,7 @@ import {
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  makeResearchFeedbackEvent,
   MalformedJsonResponseEvent,
   makeChatCompressionEvent,
   FileOperationEvent,
@@ -864,6 +867,48 @@ describe('loggers', () => {
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
       });
+    });
+  });
+
+  describe('logResearchFeedback', () => {
+    it('should handle multi-byte character truncation correctly', () => {
+      // Clear any previous mock calls
+      mockLogger.emit.mockClear();
+
+      const mockConfig = makeFakeConfig({
+        sessionId: 'test-session-id',
+        usageStatisticsEnabled: false, // Disable ClearcutLogger to focus on OpenTelemetry
+      });
+
+      // Test string with an emoji at the truncation boundary
+      const feedbackBase = 'A'.repeat(FEEDBACK_CONTENT_MAX_LENGTH - 1) + '👍'; // This string is exactly FEEDBACK_CONTENT_MAX_LENGTH characters long
+      const feedbackToTruncate = feedbackBase + 'extra content'; // This string will be truncated
+
+      const event = makeResearchFeedbackEvent({
+        feedback_type: 'conversational',
+        feedback_content: feedbackToTruncate,
+        survey_responses: undefined,
+        user_id: 'user@example.com',
+      });
+
+      logResearchFeedback(mockConfig, event);
+
+      // Verify the logger was called with properly truncated content
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Research feedback: conversational',
+        attributes: {
+          'session.id': 'test-session-id',
+          feedback_type: 'conversational',
+          feedback_content: feedbackBase,
+          user_id: 'user@example.com',
+          'event.name': 'gemini_cli.research_feedback',
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+        },
+      });
+
+      // Additional verification that Unicode characters are preserved correctly after truncation
+      expect(Array.from(feedbackBase).length).toBe(FEEDBACK_CONTENT_MAX_LENGTH);
+      expect(feedbackBase.endsWith('👍')).toBe(true);
     });
   });
 
