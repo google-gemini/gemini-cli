@@ -83,7 +83,7 @@ export interface CliArgs {
   promptWords: string[] | undefined;
 }
 
-export async function parseArguments(settings: Settings): Promise<CliArgs> {
+export async function parseArguments(): Promise<CliArgs> {
   const yargsInstance = yargs(hideBin(process.argv))
     .locale('en')
     .scriptName('gemini')
@@ -303,11 +303,8 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         }),
     )
     // Register MCP subcommands
-    .command(mcpCommand);
-
-  if (settings?.experimental?.extensionManagement ?? false) {
-    yargsInstance.command(extensionsCommand);
-  }
+    .command(mcpCommand)
+    .command(extensionsCommand);
 
   yargsInstance
     .version(await getCliVersion()) // This will enable the --version flag based on package.json

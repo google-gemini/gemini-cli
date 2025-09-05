@@ -76,7 +76,6 @@ const MIGRATION_MAP: Record<string, string> = {
   excludeTools: 'tools.exclude',
   excludeMCPServers: 'mcp.excluded',
   excludedProjectEnvVars: 'advanced.excludedEnvVars',
-  extensionManagement: 'advanced.extensionManagement',
   extensions: 'extensions',
   fileFiltering: 'context.fileFiltering',
   folderTrustFeature: 'security.folderTrust.featureEnabled',

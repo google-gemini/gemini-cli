@@ -209,7 +209,7 @@ export async function main() {
 
   await cleanupCheckpoints();
 
-  const argv = await parseArguments(settings.merged);
+  const argv = await parseArguments();
   const extensions = loadExtensions();
   const config = await loadCliConfig(
     settings.merged,

@@ -832,17 +832,7 @@ export const SETTINGS_SCHEMA = {
     default: {},
     description: 'Setting to enable experimental features',
     showInDialog: false,
-    properties: {
-      extensionManagement: {
-        type: 'boolean',
-        label: 'Extension Management',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: false,
-        description: 'Enable extension management features.',
-        showInDialog: false,
-      },
-    },
+    properties: {},
   },
 
   extensions: {
