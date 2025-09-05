@@ -443,6 +443,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       commands.filter(
         (cmd) =>
           cmd.description &&
+          !cmd.hidden &&
           (cmd.name.toLowerCase().startsWith(partial.toLowerCase()) ||
             cmd.altNames?.some((alt) =>
               alt.toLowerCase().startsWith(partial.toLowerCase()),

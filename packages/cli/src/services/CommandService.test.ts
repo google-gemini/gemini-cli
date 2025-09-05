@@ -349,4 +349,36 @@ describe('CommandService', () => {
     expect(deployExtension).toBeDefined();
     expect(deployExtension?.description).toBe('[gcp] Deploy to Google Cloud');
   });
+
+  it('should filter out hidden commands', async () => {
+    const visibleCommand = createMockCommand('visible', CommandKind.BUILT_IN);
+    const hiddenCommand = {
+      ...createMockCommand('hidden', CommandKind.BUILT_IN),
+      hidden: true,
+    };
+    const initiallyVisibleCommand = createMockCommand(
+      'initially-visible',
+      CommandKind.BUILT_IN,
+    );
+    const hiddenOverrideCommand = {
+      ...createMockCommand('initially-visible', CommandKind.FILE),
+      hidden: true,
+    };
+
+    const mockLoader = new MockCommandLoader([
+      visibleCommand,
+      hiddenCommand,
+      initiallyVisibleCommand,
+      hiddenOverrideCommand,
+    ]);
+
+    const service = await CommandService.create(
+      [mockLoader],
+      new AbortController().signal,
+    );
+
+    const commands = service.getCommands();
+    expect(commands).toHaveLength(1);
+    expect(commands[0].name).toBe('visible');
+  });
 });
