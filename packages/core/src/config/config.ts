@@ -212,6 +212,7 @@ export interface ConfigParameters {
   enablePromptCompletion?: boolean;
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
+  messageQueueMode?: 'wait_for_idle' | 'wait_for_response';
 }
 
 export class Config {
@@ -289,6 +290,7 @@ export class Config {
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useSmartEdit: boolean;
+  private readonly messageQueueMode: 'wait_for_idle' | 'wait_for_response';
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -365,6 +367,7 @@ export class Config {
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
+    this.messageQueueMode = params.messageQueueMode ?? 'wait_for_idle';
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -811,6 +814,10 @@ export class Config {
 
   getUseSmartEdit(): boolean {
     return this.useSmartEdit;
+  }
+
+  getMessageQueueMode(): 'wait_for_idle' | 'wait_for_response' {
+    return this.messageQueueMode;
   }
 
   async getGitService(): Promise<GitService> {

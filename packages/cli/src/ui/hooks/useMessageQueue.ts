@@ -10,6 +10,7 @@ import { StreamingState } from '../types.js';
 export interface UseMessageQueueOptions {
   streamingState: StreamingState;
   submitQuery: (query: string) => void;
+  messageQueueMode: 'wait_for_idle' | 'wait_for_response';
 }
 
 export interface UseMessageQueueReturn {
@@ -27,6 +28,7 @@ export interface UseMessageQueueReturn {
 export function useMessageQueue({
   streamingState,
   submitQuery,
+  messageQueueMode,
 }: UseMessageQueueOptions): UseMessageQueueReturn {
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
 
@@ -51,14 +53,21 @@ export function useMessageQueue({
 
   // Process queued messages when streaming becomes idle
   useEffect(() => {
-    if (streamingState === StreamingState.Idle && messageQueue.length > 0) {
+    const isIdle = streamingState === StreamingState.Idle;
+    const isWaiting = streamingState === StreamingState.WaitingForConfirmation;
+
+    const shouldSubmit =
+      (messageQueueMode === 'wait_for_idle' && isIdle) ||
+      (messageQueueMode === 'wait_for_response' && (isIdle || isWaiting));
+
+    if (shouldSubmit && messageQueue.length > 0) {
       // Combine all messages with double newlines for clarity
       const combinedMessage = messageQueue.join('\n\n');
       // Clear the queue and submit
       setMessageQueue([]);
       submitQuery(combinedMessage);
     }
-  }, [streamingState, messageQueue, submitQuery]);
+  }, [streamingState, messageQueue, submitQuery, messageQueueMode]);
 
   return {
     messageQueue,

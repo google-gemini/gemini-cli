@@ -148,6 +148,16 @@ export const SETTINGS_SCHEMA = {
         description: 'Enable debug logging of keystrokes to the console.',
         showInDialog: true,
       },
+      messageQueueMode: {
+        type: 'string',
+        label: 'Message Queue Mode',
+        category: 'General',
+        requiresRestart: false,
+        default: 'wait_for_idle',
+        description:
+          'Determines when queued messages are sent. Can be "wait_for_idle" (after tools finish) or "wait_for_response" (after AI responds).',
+        showInDialog: true,
+      },
     },
   },
 

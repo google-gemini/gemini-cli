@@ -624,6 +624,7 @@ export async function loadCliConfig(
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     eventEmitter: appEvents,
     useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
+    messageQueueMode: settings.general?.messageQueueMode ?? 'wait_for_idle',
   });
 }
 

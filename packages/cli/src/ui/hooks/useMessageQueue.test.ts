@@ -27,6 +27,7 @@ describe('useMessageQueue', () => {
       useMessageQueue({
         streamingState: StreamingState.Idle,
         submitQuery: mockSubmitQuery,
+        messageQueueMode: 'wait_for_idle',
       }),
     );
 
@@ -39,6 +40,7 @@ describe('useMessageQueue', () => {
       useMessageQueue({
         streamingState: StreamingState.Responding,
         submitQuery: mockSubmitQuery,
+        messageQueueMode: 'wait_for_idle',
       }),
     );
 
@@ -58,6 +60,7 @@ describe('useMessageQueue', () => {
       useMessageQueue({
         streamingState: StreamingState.Responding,
         submitQuery: mockSubmitQuery,
+        messageQueueMode: 'wait_for_idle',
       }),
     );
 
@@ -79,6 +82,7 @@ describe('useMessageQueue', () => {
       useMessageQueue({
         streamingState: StreamingState.Responding,
         submitQuery: mockSubmitQuery,
+        messageQueueMode: 'wait_for_idle',
       }),
     );
 
@@ -100,6 +104,7 @@ describe('useMessageQueue', () => {
       useMessageQueue({
         streamingState: StreamingState.Responding,
         submitQuery: mockSubmitQuery,
+        messageQueueMode: 'wait_for_idle',
       }),
     );
 
@@ -120,6 +125,7 @@ describe('useMessageQueue', () => {
         useMessageQueue({
           streamingState,
           submitQuery: mockSubmitQuery,
+          messageQueueMode: 'wait_for_idle',
         }),
       {
         initialProps: { streamingState: StreamingState.Responding },
@@ -147,6 +153,7 @@ describe('useMessageQueue', () => {
         useMessageQueue({
           streamingState,
           submitQuery: mockSubmitQuery,
+          messageQueueMode: 'wait_for_idle',
         }),
       {
         initialProps: { streamingState: StreamingState.Responding },
@@ -165,6 +172,7 @@ describe('useMessageQueue', () => {
         useMessageQueue({
           streamingState,
           submitQuery: mockSubmitQuery,
+          messageQueueMode: 'wait_for_idle',
         }),
       {
         initialProps: { streamingState: StreamingState.Responding },
@@ -189,6 +197,7 @@ describe('useMessageQueue', () => {
         useMessageQueue({
           streamingState,
           submitQuery: mockSubmitQuery,
+          messageQueueMode: 'wait_for_idle',
         }),
       {
         initialProps: { streamingState: StreamingState.Idle },
@@ -222,5 +231,63 @@ describe('useMessageQueue', () => {
 
     expect(mockSubmitQuery).toHaveBeenCalledWith('Second batch');
     expect(mockSubmitQuery).toHaveBeenCalledTimes(2);
+  });
+
+  describe("with messageQueueMode = 'wait_for_response'", () => {
+    it('should auto-submit queued messages when transitioning to WaitingForConfirmation', () => {
+      const { result, rerender } = renderHook(
+        ({ streamingState }) =>
+          useMessageQueue({
+            streamingState,
+            submitQuery: mockSubmitQuery,
+            messageQueueMode: 'wait_for_response',
+          }),
+        {
+          initialProps: { streamingState: StreamingState.Responding },
+        },
+      );
+
+      // Add some messages
+      act(() => {
+        result.current.addMessage('Message 1');
+        result.current.addMessage('Message 2');
+      });
+
+      expect(result.current.messageQueue).toEqual(['Message 1', 'Message 2']);
+
+      // Transition to WaitingForConfirmation
+      rerender({ streamingState: StreamingState.WaitingForConfirmation });
+
+      expect(mockSubmitQuery).toHaveBeenCalledWith('Message 1\n\nMessage 2');
+      expect(result.current.messageQueue).toEqual([]);
+    });
+
+    it('should auto-submit queued messages when transitioning to Idle', () => {
+      const { result, rerender } = renderHook(
+        ({ streamingState }) =>
+          useMessageQueue({
+            streamingState,
+            submitQuery: mockSubmitQuery,
+            messageQueueMode: 'wait_for_response',
+          }),
+        {
+          initialProps: { streamingState: StreamingState.Responding },
+        },
+      );
+
+      // Add some messages
+      act(() => {
+        result.current.addMessage('Message 1');
+        result.current.addMessage('Message 2');
+      });
+
+      expect(result.current.messageQueue).toEqual(['Message 1', 'Message 2']);
+
+      // Transition to Idle
+      rerender({ streamingState: StreamingState.Idle });
+
+      expect(mockSubmitQuery).toHaveBeenCalledWith('Message 1\n\nMessage 2');
+      expect(result.current.messageQueue).toEqual([]);
+    });
   });
 });

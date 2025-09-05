@@ -711,6 +711,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     useMessageQueue({
       streamingState,
       submitQuery,
+      messageQueueMode:
+        settings.merged.general?.messageQueueMode ?? 'wait_for_idle',
     });
 
   // Update the cancel handler with message queue support
