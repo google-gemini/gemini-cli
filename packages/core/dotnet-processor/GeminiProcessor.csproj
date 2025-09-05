@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PublishSingleFile>true</PublishSingleFile>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <AssemblyName>GeminiProcessor</AssemblyName>
+    <PublishTrimmed>false</PublishTrimmed>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- Copy the published single-file executable to the dist directory after publish -->
+  <Target Name="PostPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <SourceFiles Include="$(PublishDir)GeminiProcessor.exe" />
+      <TargetDir Include="$(ProjectDir)../dist/dotnet-processor/bin/Debug/net8.0/win-x64/" />
+    </ItemGroup>
+    <MakeDir Directories="@(TargetDir)" />
+    <Copy SourceFiles="@(SourceFiles)" DestinationFolder="@(TargetDir)" />
+  </Target>
+
+</Project>
