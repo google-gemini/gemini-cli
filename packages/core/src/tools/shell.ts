@@ -77,7 +77,7 @@ class ShellToolInvocation extends BaseToolInvocation<
     );
 
     if (commandsToConfirm.length === 0) {
-      return false; // already approved and whitelisted
+      return false; // already approved and allowlisted
     }
 
     const confirmationDetails: ToolExecuteConfirmationDetails = {
@@ -132,6 +132,7 @@ class ShellToolInvocation extends BaseToolInvocation<
       );
 
       let cumulativeOutput = '';
+      let outputChunks: string[] = [cumulativeOutput];
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
 
@@ -149,9 +150,11 @@ class ShellToolInvocation extends BaseToolInvocation<
           switch (event.type) {
             case 'data':
               if (isBinaryStream) break;
-              cumulativeOutput = event.chunk;
-              currentDisplayOutput = cumulativeOutput;
+              outputChunks.push(event.chunk);
               if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
+                cumulativeOutput = outputChunks.join('');
+                outputChunks = [cumulativeOutput];
+                currentDisplayOutput = cumulativeOutput;
                 shouldUpdate = true;
               }
               break;

@@ -30,6 +30,7 @@ import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { tokenLimit } from './tokenLimits.js';
+import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import type {
   ContentGenerator,
   ContentGeneratorConfig,
@@ -220,6 +221,10 @@ export class GeminiClient {
 
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
+  }
+
+  getChatRecordingService(): ChatRecordingService | undefined {
+    return this.chat?.getChatRecordingService();
   }
 
   async addDirectoryContext(): Promise<void> {
@@ -582,12 +587,9 @@ export class GeminiClient {
     contents: Content[],
     schema: Record<string, unknown>,
     abortSignal: AbortSignal,
-    model?: string,
+    model: string,
     config: GenerateContentConfig = {},
   ): Promise<Record<string, unknown>> {
-    // Use current model from config instead of hardcoded Flash model
-    const modelToUse =
-      model || this.config.getModel() || DEFAULT_GEMINI_FLASH_MODEL;
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
@@ -600,7 +602,7 @@ export class GeminiClient {
       const apiCall = () =>
         this.getContentGenerator().generateContent(
           {
-            model: modelToUse,
+            model,
             config: {
               ...requestConfig,
               systemInstruction,
@@ -637,7 +639,7 @@ export class GeminiClient {
       if (text.startsWith(prefix) && text.endsWith(suffix)) {
         logMalformedJsonResponse(
           this.config,
-          new MalformedJsonResponseEvent(modelToUse),
+          new MalformedJsonResponseEvent(model),
         );
         text = text
           .substring(prefix.length, text.length - suffix.length)
@@ -691,9 +693,8 @@ export class GeminiClient {
     contents: Content[],
     generationConfig: GenerateContentConfig,
     abortSignal: AbortSignal,
-    model?: string,
+    model: string,
   ): Promise<GenerateContentResponse> {
-    const modelToUse = model ?? this.config.getModel();
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
       ...generationConfig,
@@ -712,7 +713,7 @@ export class GeminiClient {
       const apiCall = () =>
         this.getContentGenerator().generateContent(
           {
-            model: modelToUse,
+            model,
             config: requestConfig,
             contents,
           },
@@ -732,7 +733,7 @@ export class GeminiClient {
 
       await reportError(
         error,
-        `Error generating content via API with model ${modelToUse}.`,
+        `Error generating content via API with model ${model}.`,
         {
           requestContents: contents,
           requestConfig: configToUse,
@@ -740,7 +741,7 @@ export class GeminiClient {
         'generateContent-api',
       );
       throw new Error(
-        `Failed to generate content with model ${modelToUse}: ${getErrorMessage(error)}`,
+        `Failed to generate content with model ${model}: ${getErrorMessage(error)}`,
       );
     }
   }

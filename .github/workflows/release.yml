@@ -228,4 +228,4 @@ jobs:
           gh issue create \
             --title "Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')" \
             --body "The release workflow failed. See the full run for details: ${DETAILS_URL}" \
-            --label "kind/bug,release-failure"
+            --label "kind/bug,release-failure,priority/p0"

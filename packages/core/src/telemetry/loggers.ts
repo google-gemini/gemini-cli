@@ -26,6 +26,7 @@ import {
   EVENT_INVALID_CHUNK,
   EVENT_CONTENT_RETRY,
   EVENT_CONTENT_RETRY_FAILURE,
+  EVENT_FILE_OPERATION,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -188,13 +189,40 @@ export function logFileOperation(
   ClearcutLogger.getInstance(config)?.logFileOperationEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    'event.name': EVENT_FILE_OPERATION,
+    'event.timestamp': new Date().toISOString(),
+    tool_name: event.tool_name,
+    operation: event.operation,
+  };
+
+  if (event.lines) {
+    attributes['lines'] = event.lines;
+  }
+  if (event.mimetype) {
+    attributes['mimetype'] = event.mimetype;
+  }
+  if (event.extension) {
+    attributes['extension'] = event.extension;
+  }
+  if (event.programming_language) {
+    attributes['programming_language'] = event.programming_language;
+  }
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `File operation: ${event.operation}. Lines: ${event.lines}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+
   recordFileOperationMetric(
     config,
     event.operation,
     event.lines,
     event.mimetype,
     event.extension,
-    event.diff_stat,
     event.programming_language,
   );
 }

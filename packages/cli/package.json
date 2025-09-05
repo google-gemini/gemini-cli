@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.2.2",
+  "version": "0.3.1",
   "description": "Gemini CLI",
   "repository": {
     "type": "git",
@@ -25,25 +25,24 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.2.2"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.3.1"
   },
   "dependencies": {
     "@google/gemini-cli-core": "file:../core",
-    "@google/genai": "1.13.0",
+    "@google/genai": "1.16.0",
     "@iarna/toml": "^2.2.5",
     "@modelcontextprotocol/sdk": "^1.15.1",
     "@types/update-notifier": "^6.0.8",
     "command-exists": "^1.2.9",
     "diff": "^7.0.0",
     "dotenv": "^17.1.0",
+    "fzf": "^0.5.2",
     "glob": "^10.4.1",
     "highlight.js": "^11.11.1",
     "ink": "^6.2.3",
     "ink-gradient": "^3.0.0",
     "ink-spinner": "^5.0.0",
-    "lodash-es": "^4.17.21",
     "lowlight": "^3.3.0",
-    "mime-types": "^3.0.1",
     "open": "^10.1.2",
     "react": "^19.1.0",
     "read-package-up": "^11.0.0",
@@ -64,7 +63,6 @@
     "@types/command-exists": "^1.2.3",
     "@types/diff": "^7.0.2",
     "@types/dotenv": "^6.1.1",
-    "@types/lodash-es": "^4.17.12",
     "@types/node": "^20.11.24",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

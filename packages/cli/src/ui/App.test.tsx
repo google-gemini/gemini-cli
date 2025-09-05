@@ -93,7 +93,6 @@ interface MockServerConfig {
   getAllGeminiMdFilenames: Mock<() => string[]>;
   getGeminiClient: Mock<() => GeminiClient | undefined>;
   getUserTier: Mock<() => Promise<string | undefined>>;
-  getIdeClient: Mock<() => { getCurrentIde: Mock<() => string | undefined> }>;
   getScreenReader: Mock<() => boolean>;
 }
 
@@ -157,7 +156,22 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getProjectRoot: vi.fn(() => opts.targetDir),
         getEnablePromptCompletion: vi.fn(() => false),
         getGeminiClient: vi.fn(() => ({
+          isInitialized: vi.fn(() => true),
           getUserTier: vi.fn(),
+          getChatRecordingService: vi.fn(() => ({
+            initialize: vi.fn(),
+            recordMessage: vi.fn(),
+            recordMessageTokens: vi.fn(),
+            recordToolCalls: vi.fn(),
+          })),
+          getChat: vi.fn(() => ({
+            getChatRecordingService: vi.fn(() => ({
+              initialize: vi.fn(),
+              recordMessage: vi.fn(),
+              recordMessageTokens: vi.fn(),
+              recordToolCalls: vi.fn(),
+            })),
+          })),
         })),
         getCheckpointingEnabled: vi.fn(() => opts.checkpointing ?? true),
         getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
@@ -167,13 +181,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getIdeMode: vi.fn(() => true),
         getWorkspaceContext: vi.fn(() => ({
           getDirectories: vi.fn(() => []),
-        })),
-        getIdeClient: vi.fn(() => ({
-          getCurrentIde: vi.fn(() => 'vscode'),
-          getDetectedIdeDisplayName: vi.fn(() => 'VSCode'),
-          addStatusChangeListener: vi.fn(),
-          removeStatusChangeListener: vi.fn(),
-          getConnectionStatus: vi.fn(() => 'connected'),
         })),
         isTrustedFolder: vi.fn(() => true),
         getScreenReader: vi.fn(() => false),
@@ -193,6 +200,15 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     MCPServerConfig: actualCore.MCPServerConfig,
     getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
     ideContext: ideContextMock,
+    IdeClient: {
+      getInstance: vi.fn().mockResolvedValue({
+        getCurrentIde: vi.fn(() => 'vscode'),
+        getDetectedIdeDisplayName: vi.fn(() => 'VSCode'),
+        addStatusChangeListener: vi.fn(),
+        removeStatusChangeListener: vi.fn(),
+        getConnectionStatus: vi.fn(() => 'connected'),
+      }),
+    },
     isGitRepository: vi.fn(),
   };
 });
@@ -224,6 +240,12 @@ vi.mock('./hooks/useFolderTrust', () => ({
     isFolderTrustDialogOpen: false,
     handleFolderTrustSelect: vi.fn(),
     isRestarting: false,
+  })),
+}));
+
+vi.mock('./hooks/useIdeTrustListener', () => ({
+  useIdeTrustListener: vi.fn(() => ({
+    needsRestart: false,
   })),
 }));
 
@@ -321,7 +343,6 @@ describe('App UI', () => {
       systemDefaultsFile,
       userSettingsFile,
       workspaceSettingsFile,
-      [],
       true,
       new Set(),
     );
@@ -651,6 +672,42 @@ describe('App UI', () => {
     expect(lastFrame()).toContain(
       'Using: 1 open file (ctrl+g to view) | 1 GEMINI.md file',
     );
+  });
+
+  it('should not display context summary when hideContextSummary is true', async () => {
+    mockSettings = createMockSettings({
+      workspace: {
+        ui: { hideContextSummary: true },
+      },
+    });
+    vi.mocked(ideContext.getIdeContext).mockReturnValue({
+      workspaceState: {
+        openFiles: [
+          {
+            path: '/path/to/my-file.ts',
+            isActive: true,
+            selectedText: 'hello',
+            timestamp: 0,
+          },
+        ],
+      },
+    });
+    mockConfig.getGeminiMdFileCount.mockReturnValue(1);
+    mockConfig.getAllGeminiMdFilenames.mockReturnValue(['GEMINI.md']);
+
+    const { lastFrame, unmount } = renderWithProviders(
+      <App
+        config={mockConfig as unknown as ServerConfig}
+        settings={mockSettings}
+        version={mockVersion}
+      />,
+    );
+    currentUnmount = unmount;
+    await Promise.resolve();
+    const output = lastFrame();
+    expect(output).not.toContain('Using:');
+    expect(output).not.toContain('open file');
+    expect(output).not.toContain('GEMINI.md file');
   });
 
   it('should display default "GEMINI.md" in footer when contextFileName is not set and count is 1', async () => {
@@ -1004,7 +1061,7 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      expect(lastFrame()).toContain("I'm Feeling Lucky (esc to cancel");
+      expect(lastFrame()).toContain('(esc to cancel');
     });
 
     it('should display a message if NO_COLOR is set', async () => {
@@ -1019,7 +1076,7 @@ describe('App UI', () => {
       );
       currentUnmount = unmount;
 
-      expect(lastFrame()).toContain("I'm Feeling Lucky (esc to cancel");
+      expect(lastFrame()).toContain('(esc to cancel');
       expect(lastFrame()).not.toContain('Select Theme');
     });
   });

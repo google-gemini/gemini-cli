@@ -443,7 +443,6 @@ ${finalExclusionPatternsForDescription
               lines,
               mimetype,
               path.extname(filePath),
-              undefined,
               programming_language,
             ),
           );

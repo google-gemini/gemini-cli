@@ -224,11 +224,11 @@ export class UiTelemetryService extends EventEmitter {
 
     // Aggregate line count data from metadata
     if (event.metadata) {
-      if (event.metadata['ai_added_lines'] !== undefined) {
-        files.totalLinesAdded += event.metadata['ai_added_lines'];
+      if (event.metadata['model_added_lines'] !== undefined) {
+        files.totalLinesAdded += event.metadata['model_added_lines'];
       }
-      if (event.metadata['ai_removed_lines'] !== undefined) {
-        files.totalLinesRemoved += event.metadata['ai_removed_lines'];
+      if (event.metadata['model_removed_lines'] !== undefined) {
+        files.totalLinesRemoved += event.metadata['model_removed_lines'];
       }
     }
   }

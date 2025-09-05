@@ -133,7 +133,7 @@ describe('ShellExecutionService', () => {
 
       expect(onOutputEventMock).toHaveBeenCalledWith({
         type: 'data',
-        chunk: 'file1.txt',
+        chunk: 'file1.txt\n',
       });
     });
 

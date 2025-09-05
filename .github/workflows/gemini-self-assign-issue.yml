@@ -50,7 +50,8 @@ jobs:
 
             // Search for open issues already assigned to the commenter in this repo
             const { data: assignedIssues } = await github.rest.search.issuesAndPullRequests({
-              q: `is:issue repo:${owner}/${repo} assignee:${commenter} is:open`
+              q: `is:issue repo:${owner}/${repo} assignee:${commenter} is:open`,
+              advanced_search: true
             });
 
             if (assignedIssues.total_count >= MAX_ISSUES_ASSIGNED) {

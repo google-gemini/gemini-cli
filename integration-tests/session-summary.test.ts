@@ -31,7 +31,7 @@ describe('session-summary flag', () => {
     const summary = JSON.parse(summaryContent);
 
     expect(summary).toBeDefined();
-    expect(summary.models).toBeDefined();
-    expect(summary.tools).toBeDefined();
+    expect(summary.sessionMetrics.models).toBeDefined();
+    expect(summary.sessionMetrics.tools).toBeDefined();
   });
 });

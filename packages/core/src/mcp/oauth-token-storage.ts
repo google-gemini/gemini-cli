@@ -19,14 +19,14 @@ export class MCPOAuthTokenStorage {
    *
    * @returns The full path to the token storage file
    */
-  private static getTokenFilePath(): string {
+  private getTokenFilePath(): string {
     return Storage.getMcpOAuthTokensPath();
   }
 
   /**
    * Ensure the config directory exists.
    */
-  private static async ensureConfigDir(): Promise<void> {
+  private async ensureConfigDir(): Promise<void> {
     const configDir = path.dirname(this.getTokenFilePath());
     await fs.mkdir(configDir, { recursive: true });
   }
@@ -36,7 +36,7 @@ export class MCPOAuthTokenStorage {
    *
    * @returns A map of server names to credentials
    */
-  static async loadTokens(): Promise<Map<string, OAuthCredentials>> {
+  async loadTokens(): Promise<Map<string, OAuthCredentials>> {
     const tokenMap = new Map<string, OAuthCredentials>();
 
     try {
@@ -68,7 +68,7 @@ export class MCPOAuthTokenStorage {
    * @param tokenUrl Optional token URL used for this token
    * @param mcpServerUrl Optional MCP server URL
    */
-  static async saveToken(
+  async saveToken(
     serverName: string,
     token: OAuthToken,
     clientId?: string,
@@ -113,7 +113,7 @@ export class MCPOAuthTokenStorage {
    * @param serverName The name of the MCP server
    * @returns The stored credentials or null if not found
    */
-  static async getToken(serverName: string): Promise<OAuthCredentials | null> {
+  async getToken(serverName: string): Promise<OAuthCredentials | null> {
     const tokens = await this.loadTokens();
     return tokens.get(serverName) || null;
   }
@@ -123,7 +123,7 @@ export class MCPOAuthTokenStorage {
    *
    * @param serverName The name of the MCP server
    */
-  static async removeToken(serverName: string): Promise<void> {
+  async removeToken(serverName: string): Promise<void> {
     const tokens = await this.loadTokens();
 
     if (tokens.delete(serverName)) {
@@ -153,7 +153,7 @@ export class MCPOAuthTokenStorage {
    * @param token The token to check
    * @returns True if the token is expired
    */
-  static isTokenExpired(token: OAuthToken): boolean {
+  isTokenExpired(token: OAuthToken): boolean {
     if (!token.expiresAt) {
       return false; // No expiry, assume valid
     }
@@ -166,7 +166,7 @@ export class MCPOAuthTokenStorage {
   /**
    * Clear all stored MCP OAuth tokens.
    */
-  static async clearAllTokens(): Promise<void> {
+  async clearAllTokens(): Promise<void> {
     try {
       const tokenFile = this.getTokenFilePath();
       await fs.unlink(tokenFile);
