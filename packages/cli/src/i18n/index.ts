@@ -98,16 +98,10 @@ export { i18n as errorTranslator };
 
 /**
  * Detect language from environment variables
- * Supports both GEMINI_LANG (Gemini-specific) and standard Unix LANG/LC_ALL
+ * Supports standard Unix LANG/LC_ALL environment variables
  */
 export const detectLanguageFromEnv = (): string | null => {
-  // 1. Check Gemini-specific environment variable first
-  const geminiLang = process.env['GEMINI_LANG'];
-  if (geminiLang && languages.includes(geminiLang)) {
-    return geminiLang;
-  }
-
-  // 2. Check standard Unix environment variables
+  // Check standard Unix environment variables
   const systemLocale = process.env['LANG'] || process.env['LC_ALL'] || '';
   if (systemLocale) {
     // Extract language code from locale format (e.g., zh_CN.UTF-8 → zh)
@@ -133,9 +127,8 @@ export const detectLanguageFromEnv = (): string | null => {
  * 
  * Priority order:
  * 1. Settings file (highest)
- * 2. GEMINI_LANG environment variable
- * 3. LANG/LC_ALL environment variables
- * 4. Default 'en' (lowest)
+ * 2. LANG/LC_ALL environment variables
+ * 3. Default 'en' (lowest)
  */
 export const initializeI18nWithSettings = (settings: LoadedSettings): void => {
   try {
@@ -165,8 +158,8 @@ export const initializeI18nWithSettings = (settings: LoadedSettings): void => {
     if (process.env['DEBUG']) {
       console.debug(`[i18n] Language initialized: ${selectedLanguage}`);
       console.debug(`[i18n] Settings language: ${settingsLang || 'none'}`);
-      console.debug(`[i18n] GEMINI_LANG: ${process.env['GEMINI_LANG'] || 'none'}`);
       console.debug(`[i18n] LANG: ${process.env['LANG'] || 'none'}`);
+      console.debug(`[i18n] LC_ALL: ${process.env['LC_ALL'] || 'none'}`);
     }
   } catch (error) {
     console.debug('[i18n] Failed to initialize language:', error);

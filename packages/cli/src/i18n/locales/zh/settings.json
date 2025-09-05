@@ -100,7 +100,7 @@
     "shouldUseNodePtyShell": "使用 node-pty 进行 shell 命令执行。仍然适用 child_process 回退。"
   },
   "language": {
-    "useEnvironment": "使用 GEMINI_LANG（环境变量）"
+    "useEnvironment": "环境变量"
   },
   "languageOptions": {
     "english": "English",

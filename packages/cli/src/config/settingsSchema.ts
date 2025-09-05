@@ -120,7 +120,7 @@ export const SETTINGS_SCHEMA = {
     description: () => i18n.t('settings:descriptions.language'),
     showInDialog: true,
     options: [
-      { label: 'Use GEMINI_LANG (Environment Variable)', value: '__ENV__' },
+      { label: 'By ENV', value: '__ENV__' },
       { label: 'English', value: 'en' },
       { label: '中文', value: 'zh' },
       { label: 'Español', value: 'es' },

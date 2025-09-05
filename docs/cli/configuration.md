@@ -310,7 +310,7 @@ In addition to a project settings file, a project's `.gemini` directory can cont
   - **Description:** Sets the interface language for Gemini CLI. When set, all UI elements, commands, help text, and messages will be displayed in the selected language. The language setting is persisted across sessions and can be changed through the `/settings` command. If not set in settings, the CLI will automatically detect language from environment variables (see Environment Variables section for details).
   - **Default:** `"en"` (English)
   - **Supported languages:** `"en"` (English), `"zh"` (Chinese Simplified), `"fr"` (French), `"es"` (Spanish)
-  - **Priority order:** Settings file → `GEMINI_LANG` environment variable → `LANG`/`LC_ALL` environment variables → Default (`"en"`)
+  - **Priority order:** Settings file → `LANG`/`LC_ALL` environment variables → Default (`"en"`)
   - **Example:**
     ```json
     "language": "zh"
@@ -422,11 +422,6 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 - **`CODE_ASSIST_ENDPOINT`**:
   - Specifies the endpoint for the code assist server.
   - This is useful for development and testing.
-- **`GEMINI_LANG`** (string):
-  - **Description:** Sets the interface language for Gemini CLI specifically, without affecting system-wide locale settings.
-  - **Supported values:** `"en"`, `"zh"`, `"fr"`, `"es"`
-  - **Priority:** Takes precedence over `LANG` and `LC_ALL` but is overridden by the `language` setting in `settings.json`
-  - **Example:** `export GEMINI_LANG=zh`
 - **`LANG`** and **`LC_ALL`** (Unix standard locale variables):
   - **Description:** Standard Unix environment variables for system locale. Gemini CLI automatically detects the language from these variables when no explicit language setting is configured.
   - **Format:** `language_COUNTRY.encoding` (e.g., `zh_CN.UTF-8`, `es_ES.UTF-8`)

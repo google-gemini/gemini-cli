@@ -100,7 +100,7 @@
     "shouldUseNodePtyShell": "Utiliser node-pty pour l'exécution de commandes shell. La repli sur child_process s'applique toujours."
   },
   "language": {
-    "useEnvironment": "Utiliser GEMINI_LANG (Variable d'Environnement)"
+    "useEnvironment": "Par ENV"
   },
   "languageOptions": {
     "english": "English",

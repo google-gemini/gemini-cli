@@ -47,24 +47,20 @@ The `language` setting can be configured in any of the [configuration file locat
 
 Gemini CLI can automatically detect your preferred language from environment variables. To enable this:
 
-1. Go to `/settings` → Language → Select "Use GEMINI_LANG (Environment Variable)"
+1. Go to `/settings` → Language → Select "By ENV"
 2. Or set `"language": ""` in your `settings.json` file
 3. Set one of the following environment variables:
 
 ```bash
-# Gemini-specific language setting (highest priority)
-export GEMINI_LANG=zh
-
-# Standard Unix locale variables (fallback)
+# Standard Unix locale variables
 export LANG=zh_CN.UTF-8
 export LC_ALL=zh_CN.UTF-8
 ```
 
 **Priority order:**
 1. **Settings file** (explicit language selection) - Highest
-2. **GEMINI_LANG** environment variable
-3. **LANG/LC_ALL** environment variables  
-4. **Default** (`en`) - Lowest
+2. **LANG/LC_ALL** environment variables
+3. **Default** (`en`) - Lowest
 
 **Locale format support:**
 - `zh_CN.UTF-8` → `zh` (Chinese)
