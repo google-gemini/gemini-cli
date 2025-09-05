@@ -17,8 +17,6 @@ interface InstallArgs {
   path?: string;
 }
 
-const ORG_REPO_REGEX = /^[a-zA-Z0-9-]+\/[\w.-]+$/;
-
 export async function handleInstall(args: InstallArgs) {
   try {
     let installMetadata: ExtensionInstallMetadata;
@@ -34,15 +32,8 @@ export async function handleInstall(args: InstallArgs) {
           source,
           type: 'git',
         };
-      } else if (ORG_REPO_REGEX.test(source)) {
-        installMetadata = {
-          source: `https://github.com/${source}.git`,
-          type: 'git',
-        };
       } else {
-        throw new Error(
-          `The source "${source}" is not a valid URL or "org/repo" format.`,
-        );
+        throw new Error(`The source "${source}" is not a valid URL format.`);
       }
     } else if (args.path) {
       installMetadata = {
@@ -66,12 +57,11 @@ export async function handleInstall(args: InstallArgs) {
 
 export const installCommand: CommandModule = {
   command: 'install [--source | --path ]',
-  describe:
-    'Installs an extension from a git repository (URL or "org/repo") or a local path.',
+  describe: 'Installs an extension from a git repository or a local path.',
   builder: (yargs) =>
     yargs
       .option('source', {
-        describe: 'The git URL or "org/repo" of the extension to install.',
+        describe: 'The git URL of the extension to install.',
         type: 'string',
       })
       .option('path', {
