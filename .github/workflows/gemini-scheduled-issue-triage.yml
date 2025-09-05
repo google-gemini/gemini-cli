@@ -286,15 +286,18 @@ jobs:
                 continue;
               }
 
-              if (entry.labels_to_add && entry.labels_to_add.length > 0) {
+              const labelsToAdd = entry.labels_to_add || [];
+              labelsToAdd.push('status/bot-triaged');
+
+              if (labelsToAdd.length > 0) {
                 await github.rest.issues.addLabels({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: issueNumber,
-                  labels: entry.labels_to_add
+                  labels: labelsToAdd
                 });
                 const explanation = entry.explanation ? ` - ${entry.explanation}` : '';
-                core.info(`Successfully added labels for #${issueNumber}: ${entry.labels_to_add.join(', ')}${explanation}`);
+                core.info(`Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}${explanation}`);
               }
 
               if (entry.labels_to_remove && entry.labels_to_remove.length > 0) {
