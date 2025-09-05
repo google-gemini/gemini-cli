@@ -12,9 +12,9 @@ Rather than creating a new protocol, this specification builds upon the existing
 
 Recent work integrating Gemini CLI with clients like Zed and Gemini Code Assist’s agent mode has highlighted the need for a robust, standard communication protocol. Standardizing on A2A provides several key advantages:
 
--   **Solid Foundation**: Provides a robust, open standard that ensures a stable, predictable, and consistent integration experience across different IDEs and client surfaces.
--   **Extensibility**: Creates a flexible foundation to support new tools and workflows as they emerge.
--   **Ecosystem Alignment**: Aligns Gemini CLI with a growing industry standard, fostering broader interoperability.
+- **Solid Foundation**: Provides a robust, open standard that ensures a stable, predictable, and consistent integration experience across different IDEs and client surfaces.
+- **Extensibility**: Creates a flexible foundation to support new tools and workflows as they emerge.
+- **Ecosystem Alignment**: Aligns Gemini CLI with a growing industry standard, fostering broader interoperability.
 
 ## 2. Communication Flow
 
@@ -79,8 +79,8 @@ All real-time updates from the agent (including its thoughts, tool calls, and si
 
 Each Event contains a `Message` object, which holds the content in one of two formats:
 
--   **TextPart**: Used for standard text messages. This part requires no custom schema.
--   **DataPart**: Used for complex, structured objects. Tool Calls and Thoughts are sent this way, each using their respective schemas defined below.
+- **TextPart**: Used for standard text messages. This part requires no custom schema.
+- **DataPart**: Used for complex, structured objects. Tool Calls and Thoughts are sent this way, each using their respective schemas defined below.
 
 **Tool Calls**
 
@@ -119,19 +119,19 @@ message ToolCall {
 
   // The structured input params provided by the LLM for tool invocation.
   google.protobuf.Struct input_parameters = 5;
-  
-  // String containing the real-time output from the tool as it executes (primarily designed for shell output). 
+
+  // String containing the real-time output from the tool as it executes (primarily designed for shell output).
   // During streaming the entire string is replaced on each update
   optional string live_content = 6;
-  
-  // The final result of the tool (used to replace live_content when applicable) 
+
+  // The final result of the tool (used to replace live_content when applicable)
   oneof result {
     // The output on tool success
     ToolOutput output = 7;
     // The error details if the tool failed
     ErrorDetails error = 8;
   }
-  
+
   // If the tool requires user confirmation, this field will be populated while status is PENDING
   optional ConfirmationRequest confirmation_request = 9;
 }
@@ -161,7 +161,7 @@ message ToolOutput {
 message ErrorDetails {
   // User facing error message
   string message = 1;
-  // Optional agent-specific error type or category (e.g. read_content_failure, grep_execution_error, mcp_tool_error) 
+  // Optional agent-specific error type or category (e.g. read_content_failure, grep_execution_error, mcp_tool_error)
   optional string type = 2;
   // Optional status code
   optional int32 status_code = 3;
@@ -203,7 +203,7 @@ message FileDiff {
   string file_name = 1;
   // The absolute path to the file to modify
   string file_path = 2;
-  // The original content, if the file exists 
+  // The original content, if the file exists
   optional string old_content = 3;
   string new_content = 4;
   // Pre-formatted diff string for display
@@ -218,7 +218,7 @@ message McpDetails {
   string tool_name = 2;
 }
 
-// Generic catch-all for ToolCall requests that don't fit other types 
+// Generic catch-all for ToolCall requests that don't fit other types
 message GenericDetails {
   // Description of the action requiring confirmation
   string description = 1;
@@ -400,19 +400,19 @@ This approach enforces a strict separation of concerns: the A2A `development-too
 
 1.  **Client -> Server**: The client sends a `message/stream` request containing the initial prompt and configuration in an `AgentSettings` object.
 2.  **Server -> Client**: SSE stream begins.
-    -   **Event 1**: The server sends a `Task` object with `status.state: 'submitted'` and the new `taskId`.
-    -   **Event 2**: The server sends a `TaskStatusUpdateEvent` with the metadata `kind` set to `'STATE_CHANGE'` and `status.state` set to `'working'`.
+    - **Event 1**: The server sends a `Task` object with `status.state: 'submitted'` and the new `taskId`.
+    - **Event 2**: The server sends a `TaskStatusUpdateEvent` with the metadata `kind` set to `'STATE_CHANGE'` and `status.state` set to `'working'`.
 3.  **Agent Logic**: The agent processes the prompt and decides to call the `write_file` tool, which requires user confirmation.
 4.  **Server -> Client**:
-    -   **Event 3**: The server sends a `TaskStatusUpdateEvent`. The metadata `kind` is `'TOOL_CALL_UPDATE'`, and the `DataPart` contains a `ToolCall` object with its `status` as `'PENDING'` and a populated `confirmation_request`.
-    -   **Event 4**: The server sends a final `TaskStatusUpdateEvent` for this exchange. The metadata `kind` is `'STATE_CHANGE'`, the `status.state` is `'input-required'`, and `final` is `true`. The stream for this request ends.
+    - **Event 3**: The server sends a `TaskStatusUpdateEvent`. The metadata `kind` is `'TOOL_CALL_UPDATE'`, and the `DataPart` contains a `ToolCall` object with its `status` as `'PENDING'` and a populated `confirmation_request`.
+    - **Event 4**: The server sends a final `TaskStatusUpdateEvent` for this exchange. The metadata `kind` is `'STATE_CHANGE'`, the `status.state` is `'input-required'`, and `final` is `true`. The stream for this request ends.
 5.  **Client**: The client UI renders the confirmation prompt based on the `ToolCall` object from Event 3. The user clicks "Approve."
 6.  **Client -> Server**: The client sends a new `message/stream` request. It includes the `taskId` from the ongoing task and a `DataPart` containing a `ToolCallConfirmation` object (e.g., `{"tool_call_id": "...", "selected_option_id": "proceed_once"}`).
 7.  **Server -> Client**: A new SSE stream begins for the second request.
-    -   **Event 1**: The server sends a `TaskStatusUpdateEvent` with `kind: 'TOOL_CALL_UPDATE'`, containing the `ToolCall` object with its `status` now set to `'EXECUTING'`.
-    -   **Event 2**: After the tool runs, the server sends another `TaskStatusUpdateEvent` with `kind: 'TOOL_CALL_UPDATE'`, containing the `ToolCall` with its `status` as `'SUCCEEDED'`.
+    - **Event 1**: The server sends a `TaskStatusUpdateEvent` with `kind: 'TOOL_CALL_UPDATE'`, containing the `ToolCall` object with its `status` now set to `'EXECUTING'`.
+    - **Event 2**: After the tool runs, the server sends another `TaskStatusUpdateEvent` with `kind: 'TOOL_CALL_UPDATE'`, containing the `ToolCall` with its `status` as `'SUCCEEDED'`.
 8.  **Agent Logic**: The agent receives the successful tool result and generates a final textual response.
 9.  **Server -> Client**:
-    -   **Event 3**: The server sends a `TaskStatusUpdateEvent` with `kind: 'TEXT_CONTENT'` and a `TextPart` containing the agent's final answer.
-    -   **Event 4**: The server sends the final `TaskStatusUpdateEvent`. The `kind` is `'STATE_CHANGE'`, the `status.state` is `'completed'`, and `final` is `true`. The stream ends.
+    - **Event 3**: The server sends a `TaskStatusUpdateEvent` with `kind: 'TEXT_CONTENT'` and a `TextPart` containing the agent's final answer.
+    - **Event 4**: The server sends the final `TaskStatusUpdateEvent`. The `kind` is `'STATE_CHANGE'`, the `status.state` is `'completed'`, and `final` is `true`. The stream ends.
 10. **Client**: The client displays the final answer. The task is now complete but can be continued by sending another message with the same `taskId`.
