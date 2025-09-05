@@ -723,7 +723,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           ) : (
             linesToRender
               .map((lineText, visualIdxInRenderedSet) => {
-                const tokens = parseInputForHighlighting(lineText);
+                const tokens = parseInputForHighlighting(
+                  lineText,
+                  visualIdxInRenderedSet,
+                );
                 const cursorVisualRow =
                   cursorVisualRowAbsolute - scrollVisualRow;
                 const isOnCursorLine =
@@ -784,7 +787,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 ) {
                   if (!currentLineGhost) {
                     renderedLine.push(
-                      <Text key="cursor-end">{chalk.inverse(' ')}</Text>,
+                      <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
+                        {chalk.inverse(' ')}
+                      </Text>,
                     );
                   }
                 }
@@ -796,15 +801,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   currentLineGhost;
 
                 return (
-                  <Text key={`line-${visualIdxInRenderedSet}`}>
-                    {renderedLine}
-                    {showCursorBeforeGhost && chalk.inverse(' ')}
-                    {currentLineGhost && (
-                      <Text color={theme.text.secondary}>
-                        {currentLineGhost}
-                      </Text>
-                    )}
-                  </Text>
+                  <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
+                    <Text>
+                      {renderedLine}
+                      {showCursorBeforeGhost && chalk.inverse(' ')}
+                      {currentLineGhost && (
+                        <Text color={theme.text.secondary}>
+                          {currentLineGhost}
+                        </Text>
+                      )}
+                    </Text>
+                  </Box>
                 );
               })
               .concat(
