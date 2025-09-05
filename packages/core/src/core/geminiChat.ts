@@ -614,21 +614,14 @@ export class GeminiChat {
     let hasReceivedAnyChunk = false;
     let hasToolCall = false;
     let lastChunk: GenerateContentResponse | null = null;
-
-    let isStreamInvalid = false;
-    let firstInvalidChunkEncountered = false;
-    let validChunkAfterInvalidEncountered = false;
+    let lastChunkIsInvalid = false;
 
     for await (const chunk of streamResponse) {
       hasReceivedAnyChunk = true;
       lastChunk = chunk;
 
       if (isValidResponse(chunk)) {
-        if (firstInvalidChunkEncountered) {
-          // A valid chunk appeared *after* an invalid one.
-          validChunkAfterInvalidEncountered = true;
-        }
-
+        lastChunkIsInvalid = false;
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
           if (content.parts.some((part) => part.thought)) {
@@ -646,8 +639,7 @@ export class GeminiChat {
           this.config,
           new InvalidChunkEvent('Invalid chunk received from stream.'),
         );
-        isStreamInvalid = true;
-        firstInvalidChunkEncountered = true;
+        lastChunkIsInvalid = true;
       }
 
       // Record token usage if this chunk has usageMetadata
@@ -662,27 +654,22 @@ export class GeminiChat {
       throw new EmptyStreamError('Model stream completed without any chunks.');
     }
 
-    // --- FIX: The entire validation block was restructured for clarity and correctness ---
-    // Only apply complex validation if an invalid chunk was actually found.
-    if (isStreamInvalid) {
-      // Fail immediately if an invalid chunk was not the absolute last chunk.
-      if (validChunkAfterInvalidEncountered) {
-        throw new EmptyStreamError(
-          'Model stream had invalid intermediate chunks without a tool call.',
-        );
-      }
+    const hasFinishReason = lastChunk?.candidates?.some(
+      (candidate) => candidate.finishReason,
+    );
 
-      if (!hasToolCall) {
-        // If the *only* invalid part was the last chunk, we still check its finish reason.
-        const finishReason = lastChunk?.candidates?.[0]?.finishReason;
-        const isSuccessfulFinish =
-          finishReason === 'STOP' || finishReason === 'MAX_TOKENS';
-        if (!isSuccessfulFinish) {
-          throw new EmptyStreamError(
-            'Model stream ended with an invalid chunk and a failed finish reason.',
-          );
-        }
-      }
+    // --- FIX: The entire validation block was restructured for clarity and correctness ---
+    // Stream validation logic: A stream is considered successful if:
+    // 1. There's a tool call (tool calls can end without explicit finish reasons), OR
+    // 2. Both conditions are met: last chunk is valid AND any candidate has a finish reason
+    //
+    // We throw an error only when there's no tool call AND either:
+    // - The last chunk is invalid, OR
+    // - No candidate in the last chunk has a finish reason
+    if (!hasToolCall && (lastChunkIsInvalid || !hasFinishReason)) {
+      throw new EmptyStreamError(
+        'Model stream ended with an invalid chunk or missing finish reason.',
+      );
     }
 
     // Record model response text from the collected parts
