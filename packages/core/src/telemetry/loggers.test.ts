@@ -878,7 +878,7 @@ describe('loggers', () => {
         'tool description',
         {
           type: 'object',
-          properties: { 
+          properties: {
             arg1: { type: 'string' },
             arg2: { type: 'number' },
           },
@@ -890,7 +890,7 @@ describe('loggers', () => {
         status: 'success',
         request: {
           name: 'mock_mcp_tool',
-          args: {'arg1': 'value1', 'arg2': 2},
+          args: { arg1: 'value1', arg2: 2 },
           callId: 'test-call-id',
           isClientInitiated: true,
           prompt_id: 'prompt-id',
