@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../../colors.js';
-import { SettingOption } from '../../../config/settingsSchema.js';
+import type { SettingOption } from '../../../config/settingsSchema.js';
 
 interface EnumSelectorProps {
   options: readonly SettingOption[];
@@ -55,7 +55,7 @@ export function EnumSelector({
       <Text
         color={isActive && canScrollLeft ? Colors.AccentGreen : Colors.Gray}
       >
-        {canScrollLeft ? '◀' : ' '}
+        {canScrollLeft ? '←' : ' '}
       </Text>
       <Text> </Text>
       <Text
@@ -68,7 +68,7 @@ export function EnumSelector({
       <Text
         color={isActive && canScrollRight ? Colors.AccentGreen : Colors.Gray}
       >
-        {canScrollRight ? '▶' : ' '}
+        {canScrollRight ? '→' : ' '}
       </Text>
     </Box>
   );
