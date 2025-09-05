@@ -74,3 +74,14 @@ For example, if both a user and the `gcp` extension define a `deploy` command:
 
 - `/deploy` - Executes the user's deploy command
 - `/gcp.deploy` - Executes the extension's deploy command (marked with `[gcp]` tag)
+
+# Variables
+
+Gemini CLI extensions allow variable substitution in `gemini-extension.json`. This can be useful if e.g., you need the current directory to run an MCP server using `"cwd": "${extensionPath}${/}run.ts"`.
+
+**Supported variables:**
+
+| variable                   | description                                                                                                                                                     |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `${extensionPath}`         | The fully-qualified path of the extension in the user's filesystem e.g., '/Users/username/.gemini/extensions/example-extension'. This will not unwrap symlinks. |
+| `${/} or ${pathSeparator}` | The path separator (differs per OS).                                                                                                                            |

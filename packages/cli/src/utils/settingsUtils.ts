@@ -4,12 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Settings, SettingScope, LoadedSettings } from '../config/settings.js';
-import {
-  SETTINGS_SCHEMA,
+import type {
+  Settings,
+  SettingScope,
+  LoadedSettings,
+} from '../config/settings.js';
+import type {
   SettingDefinition,
   SettingsSchema,
 } from '../config/settingsSchema.js';
+import { SETTINGS_SCHEMA } from '../config/settingsSchema.js';
 
 // The schema is now nested, but many parts of the UI and logic work better
 // with a flattened structure and dot-notation keys. This section flattens the
@@ -91,7 +95,10 @@ export function getRestartRequiredSettings(): string[] {
 /**
  * Recursively gets a value from a nested object using a key path array.
  */
-function getNestedValue(obj: Record<string, unknown>, path: string[]): unknown {
+export function getNestedValue(
+  obj: Record<string, unknown>,
+  path: string[],
+): unknown {
   const [first, ...rest] = path;
   if (!first || !(first in obj)) {
     return undefined;
@@ -333,6 +340,20 @@ export function setPendingSettingValue(
 }
 
 /**
+ * Generic setter: Set a setting value (boolean, number, string, etc.) in the pending settings
+ */
+export function setPendingSettingValueAny(
+  key: string,
+  value: unknown,
+  pendingSettings: Settings,
+): Settings {
+  const path = key.split('.');
+  const newSettings = structuredClone(pendingSettings);
+  setNestedValue(newSettings, path, value);
+  return newSettings;
+}
+
+/**
  * Check if any modified settings require a restart
  */
 export function hasRestartRequiredSettings(
@@ -378,24 +399,7 @@ export function saveModifiedSettings(
     const isDefaultValue = value === getDefaultValue(settingKey);
 
     if (existsInOriginalFile || !isDefaultValue) {
-      // This is tricky because setValue only works on top-level keys.
-      // We need to set the whole parent object.
-      const [parentKey] = path;
-      if (parentKey) {
-        // Ensure value is a boolean for setPendingSettingValue
-        const booleanValue = typeof value === 'boolean' ? value : false;
-        const newParentValue = setPendingSettingValue(
-          settingKey,
-          booleanValue,
-          loadedSettings.forScope(scope).settings,
-        )[parentKey as keyof Settings];
-
-        loadedSettings.setValue(
-          scope,
-          parentKey as keyof Settings,
-          newParentValue,
-        );
-      }
+      loadedSettings.setValue(scope, settingKey, value);
     }
   });
 }
@@ -431,11 +435,12 @@ export function getDisplayValue(
   const isChangedFromDefault =
     typeof defaultValue === 'boolean' ? value !== defaultValue : value === true;
   const isInModifiedSettings = modifiedSettings.has(key);
-  const hasPendingChanges =
-    pendingSettings && settingExistsInScope(key, pendingSettings);
 
-  // Add * indicator when value differs from default, is in modified settings, or has pending changes
-  if (isChangedFromDefault || isInModifiedSettings || hasPendingChanges) {
+  // Mark as modified if setting exists in current scope OR is in modified settings
+  if (settingExistsInScope(key, settings) || isInModifiedSettings) {
+    return `${valueString}*`; // * indicates setting is set in current scope
+  }
+  if (isChangedFromDefault || isInModifiedSettings) {
     return `${valueString}*`; // * indicates changed from default value
   }
 

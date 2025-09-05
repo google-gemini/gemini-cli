@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   Content,
   CountTokensParameters,
   CountTokensResponse,
@@ -19,26 +19,18 @@ import {
   ApiResponseEvent,
   ApiErrorEvent,
 } from '../telemetry/types.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import {
   logApiError,
   logApiRequest,
   logApiResponse,
 } from '../telemetry/loggers.js';
-import { ContentGenerator } from './contentGenerator.js';
+import type { ContentGenerator } from './contentGenerator.js';
 import { toContents } from '../code_assist/converter.js';
+import { isStructuredError } from '../utils/quotaErrorDetection.js';
 
 interface StructuredError {
   status: number;
-}
-
-export function isStructuredError(error: unknown): error is StructuredError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'status' in error &&
-    typeof (error as StructuredError).status === 'number'
-  );
 }
 
 /**
@@ -49,6 +41,10 @@ export class LoggingContentGenerator implements ContentGenerator {
     private readonly wrapped: ContentGenerator,
     private readonly config: Config,
   ) {}
+
+  getWrapped(): ContentGenerator {
+    return this.wrapped;
+  }
 
   private logApiRequest(
     contents: Content[],
@@ -64,6 +60,7 @@ export class LoggingContentGenerator implements ContentGenerator {
 
   private _logApiResponse(
     durationMs: number,
+    model: string,
     prompt_id: string,
     usageMetadata?: GenerateContentResponseUsageMetadata,
     responseText?: string,
@@ -71,7 +68,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     logApiResponse(
       this.config,
       new ApiResponseEvent(
-        this.config.getModel(),
+        model,
         durationMs,
         prompt_id,
         this.config.getContentGeneratorConfig()?.authType,
@@ -84,6 +81,7 @@ export class LoggingContentGenerator implements ContentGenerator {
   private _logApiError(
     durationMs: number,
     error: unknown,
+    model: string,
     prompt_id: string,
   ): void {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -92,7 +90,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     logApiError(
       this.config,
       new ApiErrorEvent(
-        this.config.getModel(),
+        model,
         errorMessage,
         durationMs,
         prompt_id,
@@ -116,6 +114,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       const durationMs = Date.now() - startTime;
       this._logApiResponse(
         durationMs,
+        response.modelVersion || '',
         userPromptId,
         response.usageMetadata,
         JSON.stringify(response),
@@ -123,7 +122,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       return response;
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, userPromptId);
+      this._logApiError(durationMs, error, req.model, userPromptId);
       throw error;
     }
   }
@@ -140,7 +139,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       stream = await this.wrapped.generateContentStream(req, userPromptId);
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, userPromptId);
+      this._logApiError(durationMs, error, req.model, userPromptId);
       throw error;
     }
 
@@ -153,9 +152,12 @@ export class LoggingContentGenerator implements ContentGenerator {
     userPromptId: string,
   ): AsyncGenerator<GenerateContentResponse> {
     let lastResponse: GenerateContentResponse | undefined;
+    const responses: GenerateContentResponse[] = [];
+
     let lastUsageMetadata: GenerateContentResponseUsageMetadata | undefined;
     try {
       for await (const response of stream) {
+        responses.push(response);
         lastResponse = response;
         if (response.usageMetadata) {
           lastUsageMetadata = response.usageMetadata;
@@ -164,16 +166,22 @@ export class LoggingContentGenerator implements ContentGenerator {
       }
     } catch (error) {
       const durationMs = Date.now() - startTime;
-      this._logApiError(durationMs, error, userPromptId);
+      this._logApiError(
+        durationMs,
+        error,
+        responses[0]?.modelVersion || '',
+        userPromptId,
+      );
       throw error;
     }
     const durationMs = Date.now() - startTime;
     if (lastResponse) {
       this._logApiResponse(
         durationMs,
+        responses[0]?.modelVersion || '',
         userPromptId,
         lastUsageMetadata,
-        JSON.stringify(lastResponse),
+        JSON.stringify(responses),
       );
     }
   }

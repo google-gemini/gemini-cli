@@ -4,22 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   CountTokensResponse,
   GenerateContentResponse,
   GenerateContentParameters,
   CountTokensParameters,
   EmbedContentResponse,
   EmbedContentParameters,
-  GoogleGenAI,
 } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 
-import { UserTierId } from '../code_assist/types.js';
+import type { UserTierId } from '../code_assist/types.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
-import { getInstallationId } from '../utils/user_id.js';
+import { InstallationManager } from '../utils/installationManager.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -53,8 +53,8 @@ export type ContentGeneratorConfig = {
   model: string;
   apiKey?: string;
   vertexai?: boolean;
-  authType?: AuthType | undefined;
-  proxy?: string | undefined;
+  authType?: AuthType;
+  proxy?: string;
 };
 
 export function createContentGeneratorConfig(
@@ -136,7 +136,8 @@ export async function createContentGenerator(
   ) {
     let headers: Record<string, string> = { ...baseHeaders };
     if (gcConfig?.getUsageStatisticsEnabled()) {
-      const installationId = getInstallationId();
+      const installationManager = new InstallationManager();
+      const installationId = installationManager.getInstallationId();
       headers = {
         ...headers,
         'x-gemini-api-privileged-user-id': `${installationId}`,

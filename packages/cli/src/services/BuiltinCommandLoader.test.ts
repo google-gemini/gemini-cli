@@ -22,7 +22,7 @@ vi.mock('../ui/commands/restoreCommand.js', () => ({
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { BuiltinCommandLoader } from './BuiltinCommandLoader.js';
-import { Config } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
 import { CommandKind } from '../ui/commands/types.js';
 
 import { ideCommand } from '../ui/commands/ideCommand.js';
@@ -64,7 +64,7 @@ describe('BuiltinCommandLoader', () => {
     vi.clearAllMocks();
     mockConfig = { some: 'config' } as unknown as Config;
 
-    ideCommandMock.mockReturnValue({
+    ideCommandMock.mockResolvedValue({
       name: 'ide',
       description: 'IDE command',
       kind: CommandKind.BUILT_IN,
@@ -81,7 +81,7 @@ describe('BuiltinCommandLoader', () => {
     await loader.loadCommands(new AbortController().signal);
 
     expect(ideCommandMock).toHaveBeenCalledTimes(1);
-    expect(ideCommandMock).toHaveBeenCalledWith(mockConfig);
+    expect(ideCommandMock).toHaveBeenCalledWith();
     expect(restoreCommandMock).toHaveBeenCalledTimes(1);
     expect(restoreCommandMock).toHaveBeenCalledWith(mockConfig);
   });
@@ -105,7 +105,7 @@ describe('BuiltinCommandLoader', () => {
     const loader = new BuiltinCommandLoader(null);
     await loader.loadCommands(new AbortController().signal);
     expect(ideCommandMock).toHaveBeenCalledTimes(1);
-    expect(ideCommandMock).toHaveBeenCalledWith(null);
+    expect(ideCommandMock).toHaveBeenCalledWith();
     expect(restoreCommandMock).toHaveBeenCalledTimes(1);
     expect(restoreCommandMock).toHaveBeenCalledWith(null);
   });

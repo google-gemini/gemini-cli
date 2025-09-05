@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn } from 'node:child_process';
 import { parse } from 'shell-quote';
-import { mkdirSync, writeFileSync, readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { env } from 'process';
-import fs from 'fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { env } from 'node:process';
+import fs from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -93,7 +93,9 @@ export function validateModelOutput(
 
     if (missingContent.length > 0) {
       console.warn(
-        `Warning: LLM did not include expected content in response: ${missingContent.join(', ')}.`,
+        `Warning: LLM did not include expected content in response: ${missingContent.join(
+          ', ',
+        )}.`,
         'This is not ideal but not a test failure.',
       );
       console.warn(
@@ -141,10 +143,7 @@ export class TestRig {
     mkdirSync(geminiDir, { recursive: true });
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
-    const telemetryPath =
-      env.GEMINI_SANDBOX && env.GEMINI_SANDBOX !== 'false'
-        ? join(this.testDir, 'telemetry.log') // Absolute path in test directory
-        : env.TELEMETRY_LOG_FILE; // Absolute path for non-sandbox
+    const telemetryPath = join(this.testDir, 'telemetry.log'); // Always use test directory for telemetry
 
     const settings = {
       telemetry: {
@@ -178,7 +177,9 @@ export class TestRig {
   }
 
   run(
-    promptOrOptions: string | { prompt?: string; stdin?: string },
+    promptOrOptions:
+      | string
+      | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
     ...args: string[]
   ): Promise<string> {
     let command = `node ${this.bundlePath} --yolo`;
@@ -222,7 +223,13 @@ export class TestRig {
     if (execOptions.input) {
       child.stdin!.write(execOptions.input);
     }
-    child.stdin!.end();
+
+    if (
+      typeof promptOrOptions === 'object' &&
+      !promptOrOptions.stdinDoesNotEnd
+    ) {
+      child.stdin!.end();
+    }
 
     child.stdout!.on('data', (data: Buffer) => {
       stdout += data;
@@ -250,7 +257,7 @@ export class TestRig {
           if (env.GEMINI_SANDBOX === 'podman') {
             // Remove telemetry JSON objects from output
             // They are multi-line JSON objects that start with { and contain telemetry fields
-            const lines = result.split('\n');
+            const lines = result.split(EOL);
             const filteredLines = [];
             let inTelemetryObject = false;
             let braceDepth = 0;
@@ -322,11 +329,8 @@ export class TestRig {
   }
 
   async waitForTelemetryReady() {
-    // In sandbox mode, telemetry is written to a relative path in the test directory
-    const logFilePath =
-      env.GEMINI_SANDBOX && env.GEMINI_SANDBOX !== 'false'
-        ? join(this.testDir!, 'telemetry.log')
-        : env.TELEMETRY_LOG_FILE;
+    // Telemetry is always written to the test directory
+    const logFilePath = join(this.testDir!, 'telemetry.log');
 
     if (!logFilePath) return;
 
@@ -344,6 +348,52 @@ export class TestRig {
       },
       2000, // 2 seconds max - reduced since telemetry should flush on exit now
       100, // check every 100ms
+    );
+  }
+
+  async waitForTelemetryEvent(eventName: string, timeout?: number) {
+    if (!timeout) {
+      timeout = this.getDefaultTimeout();
+    }
+
+    await this.waitForTelemetryReady();
+
+    return this.poll(
+      () => {
+        const logFilePath = join(this.testDir!, 'telemetry.log');
+
+        if (!logFilePath || !fs.existsSync(logFilePath)) {
+          return false;
+        }
+
+        const content = readFileSync(logFilePath, 'utf-8');
+        const jsonObjects = content
+          .split(/}\n{/)
+          .map((obj, index, array) => {
+            // Add back the braces we removed during split
+            if (index > 0) obj = '{' + obj;
+            if (index < array.length - 1) obj = obj + '}';
+            return obj.trim();
+          })
+          .filter((obj) => obj);
+
+        for (const jsonStr of jsonObjects) {
+          try {
+            const logData = JSON.parse(jsonStr);
+            if (
+              logData.attributes &&
+              logData.attributes['event.name'] === `gemini_cli.${eventName}`
+            ) {
+              return true;
+            }
+          } catch {
+            // ignore
+          }
+        }
+        return false;
+      },
+      timeout,
+      100,
     );
   }
 
@@ -468,7 +518,7 @@ export class TestRig {
     // If no matches found with the simple pattern, try the JSON parsing approach
     // in case the format changes
     if (logs.length === 0) {
-      const lines = stdout.split('\n');
+      const lines = stdout.split(EOL);
       let currentObject = '';
       let inObject = false;
       let braceDepth = 0;
@@ -566,11 +616,8 @@ export class TestRig {
       }
     }
 
-    // In sandbox mode, telemetry is written to a relative path in the test directory
-    const logFilePath =
-      env.GEMINI_SANDBOX && env.GEMINI_SANDBOX !== 'false'
-        ? join(this.testDir!, 'telemetry.log')
-        : env.TELEMETRY_LOG_FILE;
+    // Telemetry is always written to the test directory
+    const logFilePath = join(this.testDir!, 'telemetry.log');
 
     if (!logFilePath) {
       console.warn(`TELEMETRY_LOG_FILE environment variable not set`);
@@ -587,7 +634,7 @@ export class TestRig {
     // Split the content into individual JSON objects
     // They are separated by "}\n{"
     const jsonObjects = content
-      .split(/}\s*\n\s*{/)
+      .split(/}\n{/)
       .map((obj, index, array) => {
         // Add back the braces we removed during split
         if (index > 0) obj = '{' + obj;
@@ -626,14 +673,47 @@ export class TestRig {
       } catch (e) {
         // Skip objects that aren't valid JSON
         if (env.VERBOSE === 'true') {
-          console.error(
-            'Failed to parse telemetry object:',
-            (e as Error).message,
-          );
+          console.error('Failed to parse telemetry object:', e);
         }
       }
     }
 
     return logs;
+  }
+
+  readLastApiRequest(): Record<string, unknown> | null {
+    // Telemetry is always written to the test directory
+    const logFilePath = join(this.testDir!, 'telemetry.log');
+
+    if (!logFilePath || !fs.existsSync(logFilePath)) {
+      return null;
+    }
+
+    const content = readFileSync(logFilePath, 'utf-8');
+    const jsonObjects = content
+      .split(/}\n{/)
+      .map((obj, index, array) => {
+        if (index > 0) obj = '{' + obj;
+        if (index < array.length - 1) obj = obj + '}';
+        return obj.trim();
+      })
+      .filter((obj) => obj);
+
+    let lastApiRequest = null;
+
+    for (const jsonStr of jsonObjects) {
+      try {
+        const logData = JSON.parse(jsonStr);
+        if (
+          logData.attributes &&
+          logData.attributes['event.name'] === 'gemini_cli.api_request'
+        ) {
+          lastApiRequest = logData;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return lastApiRequest;
   }
 }
