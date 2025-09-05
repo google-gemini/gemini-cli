@@ -11,9 +11,10 @@ import {
   vi,
   beforeEach,
   afterEach,
-  type Mock,
+  type MockInstance,
 } from 'vitest';
 import {
+  main,
   setupUnhandledRejectionHandler,
   validateDnsResolutionOrder,
   startInteractiveUI,
@@ -162,7 +163,9 @@ describe('gemini.tsx main function', () => {
 });
 
 describe('gemini.tsx main function kitty protocol', () => {
-  let setRawModeSpy: Mock;
+  let setRawModeSpy: MockInstance<
+    (mode: boolean) => NodeJS.ReadStream & { fd: 0 }
+  >;
 
   beforeEach(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -170,7 +173,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (process.stdin as any).setRawMode = vi.fn();
     }
-    setRawModeSpy = vi.spyOn(process.stdin, 'setRawMode' as never);
+    setRawModeSpy = vi.spyOn(process.stdin, 'setRawMode');
   });
 
   it('should call setRawMode and detectAndEnableKittyProtocol when isInteractive is true', async () => {
@@ -202,7 +205,36 @@ describe('gemini.tsx main function kitty protocol', () => {
       },
       setValue: vi.fn(),
     } as never);
-    vi.mocked(parseArguments).mockResolvedValue({ sessionSummary: null });
+    vi.mocked(parseArguments).mockResolvedValue({
+      model: undefined,
+      sandbox: undefined,
+      sandboxImage: undefined,
+      debug: undefined,
+      prompt: undefined,
+      promptInteractive: undefined,
+      allFiles: undefined,
+      showMemoryUsage: undefined,
+      yolo: undefined,
+      approvalMode: undefined,
+      telemetry: undefined,
+      checkpointing: undefined,
+      telemetryTarget: undefined,
+      telemetryOtlpEndpoint: undefined,
+      telemetryOtlpProtocol: undefined,
+      telemetryLogPrompts: undefined,
+      telemetryOutfile: undefined,
+      allowedMcpServerNames: undefined,
+      allowedTools: undefined,
+      experimentalAcp: undefined,
+      extensions: undefined,
+      listExtensions: undefined,
+      proxy: undefined,
+      includeDirectories: undefined,
+      screenReader: undefined,
+      useSmartEdit: undefined,
+      sessionSummary: undefined,
+      promptWords: undefined,
+    });
 
     await main();
 
