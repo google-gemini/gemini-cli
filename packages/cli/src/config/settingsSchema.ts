@@ -13,6 +13,17 @@ import type {
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 
+export enum MergeStrategy {
+  // Replace the old value with the new value. This is the default.
+  REPLACE = 'replace',
+  // Concatenate arrays.
+  CONCAT = 'concat',
+  // Merge arrays, ensuring unique values.
+  UNION = 'union',
+  // Shallow merge objects.
+  SHALLOW_MERGE = 'shallow_merge',
+}
+
 export interface SettingDefinition {
   type: 'boolean' | 'string' | 'number' | 'array' | 'object';
   label: string;
@@ -25,6 +36,7 @@ export interface SettingDefinition {
   key?: string;
   properties?: SettingsSchema;
   showInDialog?: boolean;
+  mergeStrategy?: MergeStrategy;
 }
 
 export interface SettingsSchema {
@@ -49,6 +61,7 @@ export const SETTINGS_SCHEMA = {
     default: {} as Record<string, MCPServerConfig>,
     description: 'Configuration for MCP servers.',
     showInDialog: false,
+    mergeStrategy: MergeStrategy.SHALLOW_MERGE,
   },
 
   general: {
@@ -277,6 +290,15 @@ export const SETTINGS_SCHEMA = {
         description: 'Show citations for generated text in the chat.',
         showInDialog: true,
       },
+      customWittyPhrases: {
+        type: 'array',
+        label: 'Custom Witty Phrases',
+        category: 'UI',
+        requiresRestart: false,
+        default: [] as string[],
+        description: 'Custom witty phrases to display during loading.',
+        showInDialog: false,
+      },
       accessibility: {
         type: 'object',
         label: 'Accessibility',
@@ -300,7 +322,7 @@ export const SETTINGS_SCHEMA = {
             label: 'Screen Reader Mode',
             category: 'UI',
             requiresRestart: true,
-            default: false,
+            default: undefined as boolean | undefined,
             description:
               'Render output in plain-text to be more screen reader accessible',
             showInDialog: true,
@@ -424,7 +446,7 @@ export const SETTINGS_SCHEMA = {
         label: 'Skip Next Speaker Check',
         category: 'Model',
         requiresRestart: false,
-        default: false,
+        default: true,
         description: 'Skip the next speaker check.',
         showInDialog: true,
       },
@@ -476,6 +498,7 @@ export const SETTINGS_SCHEMA = {
         description:
           'Additional directories to include in the workspace context. Missing directories will be skipped with a warning.',
         showInDialog: false,
+        mergeStrategy: MergeStrategy.CONCAT,
       },
       loadMemoryFromIncludeDirectories: {
         type: 'boolean',
@@ -565,6 +588,16 @@ export const SETTINGS_SCHEMA = {
           'Use node-pty for shell command execution. Fallback to child_process still applies.',
         showInDialog: true,
       },
+      autoAccept: {
+        type: 'boolean',
+        label: 'Auto Accept',
+        category: 'Tools',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).',
+        showInDialog: true,
+      },
       core: {
         type: 'array',
         label: 'Core Tools',
@@ -648,7 +681,7 @@ export const SETTINGS_SCHEMA = {
         category: 'MCP',
         requiresRestart: true,
         default: undefined as string[] | undefined,
-        description: 'A whitelist of MCP servers to allow.',
+        description: 'A list of MCP servers to allow.',
         showInDialog: false,
       },
       excluded: {
@@ -657,7 +690,7 @@ export const SETTINGS_SCHEMA = {
         category: 'MCP',
         requiresRestart: true,
         default: undefined as string[] | undefined,
-        description: 'A blacklist of MCP servers to exclude.',
+        description: 'A list of MCP servers to exclude.',
         showInDialog: false,
       },
     },
@@ -718,6 +751,16 @@ export const SETTINGS_SCHEMA = {
             description: 'The currently selected authentication type.',
             showInDialog: false,
           },
+          enforcedType: {
+            type: 'string',
+            label: 'Enforced Auth Type',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as AuthType | undefined,
+            description:
+              'The required auth type. If this does not match the selected auth type, the user will be prompted to re-authenticate.',
+            showInDialog: false,
+          },
           useExternal: {
             type: 'boolean',
             label: 'Use External Auth',
@@ -767,6 +810,7 @@ export const SETTINGS_SCHEMA = {
         default: ['DEBUG', 'DEBUG_MODE'] as string[],
         description: 'Environment variables to exclude from project context.',
         showInDialog: false,
+        mergeStrategy: MergeStrategy.UNION,
       },
       bugCommand: {
         type: 'object',
@@ -794,7 +838,7 @@ export const SETTINGS_SCHEMA = {
         label: 'Extension Management',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enable extension management features.',
         showInDialog: false,
       },
@@ -818,6 +862,7 @@ export const SETTINGS_SCHEMA = {
         default: [] as string[],
         description: 'List of disabled extensions.',
         showInDialog: false,
+        mergeStrategy: MergeStrategy.UNION,
       },
       workspacesWithMigrationNudge: {
         type: 'array',
@@ -828,6 +873,7 @@ export const SETTINGS_SCHEMA = {
         description:
           'List of workspaces for which the migration nudge has been shown.',
         showInDialog: false,
+        mergeStrategy: MergeStrategy.UNION,
       },
     },
   },
