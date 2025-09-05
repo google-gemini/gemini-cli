@@ -96,8 +96,8 @@ describe('ShellExecutionService programmatic integration tests', () => {
   );
 
   it('should abort a running process', async () => {
-    // A command that runs for a bit. 'sleep' on unix, 'timeout' on windows.
-    const command = process.platform === 'win32' ? 'timeout /t 20' : 'sleep 20';
+    // A command that runs for a bit.
+    const command = 'node -e "setTimeout(() => {}, 20000)"';
     const onOutputEvent = vi.fn();
     const abortController = new AbortController();
 
