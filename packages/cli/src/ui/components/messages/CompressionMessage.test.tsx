@@ -5,11 +5,9 @@
  */
 
 import { render } from 'ink-testing-library';
-import type {
-  CompressionDisplayProps} from './CompressionMessage.js';
-import {
-  CompressionMessage
-} from './CompressionMessage.js';
+import type { CompressionDisplayProps } from './CompressionMessage.js';
+import { CompressionMessage } from './CompressionMessage.js';
+import { CompressionStatus } from '@google/gemini-cli-core';
 import type { CompressionProps } from '../../types.js';
 import { describe, it, expect } from 'vitest';
 
@@ -21,6 +19,7 @@ describe('<CompressionMessage />', () => {
       isPending: false,
       originalTokenCount: null,
       newTokenCount: null,
+      compressionStatus: CompressionStatus.COMPRESSED,
       ...overrides,
     },
   });
@@ -41,6 +40,7 @@ describe('<CompressionMessage />', () => {
         isPending: false,
         originalTokenCount: 100,
         newTokenCount: 50,
+        compressionStatus: CompressionStatus.COMPRESSED,
       });
       const { lastFrame } = render(<CompressionMessage {...props} />);
       const output = lastFrame();
@@ -62,12 +62,15 @@ describe('<CompressionMessage />', () => {
           isPending: false,
           originalTokenCount: original,
           newTokenCount: newTokens,
+          compressionStatus: CompressionStatus.COMPRESSED,
         });
         const { lastFrame } = render(<CompressionMessage {...props} />);
         const output = lastFrame();
 
         expect(output).toContain('✦');
-        expect(output).toContain(`compressed from ${original} to ${newTokens} tokens`);
+        expect(output).toContain(
+          `compressed from ${original} to ${newTokens} tokens`,
+        );
         expect(output).not.toContain('Skipping compression');
         expect(output).not.toContain('did not reduce size');
       });
@@ -80,6 +83,8 @@ describe('<CompressionMessage />', () => {
         isPending: false,
         originalTokenCount: 50,
         newTokenCount: 75,
+        compressionStatus:
+          CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
       });
       const { lastFrame } = render(<CompressionMessage {...props} />);
       const output = lastFrame();
@@ -95,6 +100,8 @@ describe('<CompressionMessage />', () => {
         isPending: false,
         originalTokenCount: 50,
         newTokenCount: 50,
+        compressionStatus:
+          CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
       });
       const { lastFrame } = render(<CompressionMessage {...props} />);
       const output = lastFrame();
@@ -130,6 +137,7 @@ describe('<CompressionMessage />', () => {
           isPending: false,
           originalTokenCount: original,
           newTokenCount: newTokens,
+          compressionStatus: CompressionStatus.COMPRESSED,
         });
         const { lastFrame } = render(<CompressionMessage {...props} />);
         const output = lastFrame();
@@ -150,6 +158,8 @@ describe('<CompressionMessage />', () => {
           isPending: false,
           originalTokenCount: original,
           newTokenCount: newTokens,
+          compressionStatus:
+            CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
         });
         const { lastFrame } = render(<CompressionMessage {...props} />);
         const output = lastFrame();
@@ -173,13 +183,13 @@ describe('<CompressionMessage />', () => {
           isPending: false,
           originalTokenCount: original,
           newTokenCount: newTokens,
+          compressionStatus:
+            CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
         });
         const { lastFrame } = render(<CompressionMessage {...props} />);
         const output = lastFrame();
 
-        expect(output).toContain(
-          'compression did not reduce size',
-        );
+        expect(output).toContain('compression did not reduce size');
         expect(output).not.toContain('compressed from');
         expect(output).not.toContain('Compression was not beneficial');
       });
