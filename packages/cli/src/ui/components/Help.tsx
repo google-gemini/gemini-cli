@@ -64,27 +64,31 @@ export const Help: React.FC<Help> = ({ commands }) => (
     <Text bold color={Colors.Foreground}>
       Commands:
     </Text>
-    {commands.map((command: SlashCommand) => (
-      <Box key={command.name} flexDirection="column">
-        <Text color={Colors.Foreground}>
-          <Text bold color={Colors.AccentPurple}>
-            {' '}
-            /{command.name}
-          </Text>
-          {command.description && ' - ' + command.description}
-        </Text>
-        {command.subCommands &&
-          command.subCommands.map((subCommand) => (
-            <Text key={subCommand.name} color={Colors.Foreground}>
-              <Text bold color={Colors.AccentPurple}>
-                {'   '}
-                {subCommand.name}
-              </Text>
-              {subCommand.description && ' - ' + subCommand.description}
+    {commands
+      .filter((command) => command.description && !command.hidden)
+      .map((command: SlashCommand) => (
+        <Box key={command.name} flexDirection="column">
+          <Text color={Colors.Foreground}>
+            <Text bold color={Colors.AccentPurple}>
+              {' '}
+              /{command.name}
             </Text>
-          ))}
-      </Box>
-    ))}
+            {command.description && ' - ' + command.description}
+          </Text>
+          {command.subCommands &&
+            command.subCommands
+              .filter((subCommand) => !subCommand.hidden)
+              .map((subCommand) => (
+                <Text key={subCommand.name} color={Colors.Foreground}>
+                  <Text bold color={Colors.AccentPurple}>
+                    {'   '}
+                    {subCommand.name}
+                  </Text>
+                  {subCommand.description && ' - ' + subCommand.description}
+                </Text>
+              ))}
+        </Box>
+      ))}
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
         {' '}
