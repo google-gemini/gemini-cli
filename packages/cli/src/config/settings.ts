@@ -28,7 +28,7 @@ import {
   getSettingsSchema,
 } from './settingsSchema.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
-import { customDeepMerge } from '../utils/deepMerge.js';
+import { customDeepMerge, type MergeableObject } from '../utils/deepMerge.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
@@ -258,10 +258,14 @@ function migrateSettingsToV2(
       newValue !== null &&
       !Array.isArray(newValue)
     ) {
-      v2Settings[remainingKey] = {
-        ...(newValue as Record<string, unknown>),
-        ...(existingValue as Record<string, unknown>),
-      };
+      const pathAwareGetStrategy = (path: string[]) =>
+        getMergeStrategyForPath([remainingKey, ...path]);
+      v2Settings[remainingKey] = customDeepMerge(
+        pathAwareGetStrategy,
+        {},
+        newValue as MergeableObject,
+        existingValue as MergeableObject,
+      );
     } else {
       v2Settings[remainingKey] = newValue;
     }
