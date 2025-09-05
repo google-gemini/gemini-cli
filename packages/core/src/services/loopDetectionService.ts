@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Content } from '@google/genai';
 import { createHash } from 'node:crypto';
 import type { ServerGeminiStreamEvent } from '../core/turn.js';
 import { GeminiEventType } from '../core/turn.js';
@@ -11,6 +12,10 @@ import { logLoopDetected } from '../telemetry/loggers.js';
 import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
+import {
+  isFunctionCall,
+  isFunctionResponse,
+} from '../utils/messageInspectors.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -328,11 +333,34 @@ export class LoopDetectionService {
     return originalChunk === currentChunk;
   }
 
+  private trimRecentHistory(recentHistory: Content[]): Content[] {
+    // A function response must be preceded by a function call.
+    // Continuously removes dangling function calls from the end of the history
+    // until the last turn is not a function call.
+    while (
+      recentHistory.length > 0 &&
+      isFunctionCall(recentHistory[recentHistory.length - 1])
+    ) {
+      recentHistory.pop();
+    }
+
+    // A function response should follow a function call.
+    // Continuously removes leading function responses from the beginning of history
+    // until the first turn is not a function response.
+    while (recentHistory.length > 0 && isFunctionResponse(recentHistory[0])) {
+      recentHistory.shift();
+    }
+
+    return recentHistory;
+  }
+
   private async checkForLoopWithLLM(signal: AbortSignal) {
     const recentHistory = this.config
       .getGeminiClient()
       .getHistory()
       .slice(-LLM_LOOP_CHECK_HISTORY_COUNT);
+
+    const trimmedHistory = this.trimRecentHistory(recentHistory);
 
     const prompt = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
 
@@ -347,7 +375,7 @@ For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distin
 
 Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state.`;
     const contents = [
-      ...recentHistory,
+      ...trimmedHistory,
       { role: 'user', parts: [{ text: prompt }] },
     ];
     const schema: Record<string, unknown> = {
