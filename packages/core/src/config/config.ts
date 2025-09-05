@@ -288,7 +288,7 @@ export class Config {
   private readonly useRipgrep: boolean;
   private readonly shouldUseNodePtyShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
-  private readonly extensionManagement: boolean;
+  private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private readonly truncateToolOutputLines: number;
@@ -373,7 +373,7 @@ export class Config {
     this.truncateToolOutputLines =
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.useSmartEdit = params.useSmartEdit ?? true;
-    this.extensionManagement = params.extensionManagement ?? false;
+    this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
