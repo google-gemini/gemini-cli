@@ -13,6 +13,7 @@ import importPlugin from 'eslint-plugin-import';
 import vitest from '@vitest/eslint-plugin';
 import globals from 'globals';
 import licenseHeader from 'eslint-plugin-license-header';
+import inclusiveLanguage from 'eslint-plugin-inclusive-language';
 import path from 'node:path';
 import url from 'node:url';
 
@@ -239,6 +240,15 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': 'off',
       '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
+    files: ['**/*.{js,ts,tsx}'],
+    plugins: {
+      'inclusive-language': inclusiveLanguage,
+    },
+    rules: {
+      'inclusive-language/use-inclusive-words': 'error',
     },
   },
   // Prettier config must be last

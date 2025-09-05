@@ -73,6 +73,7 @@
     "eslint": "^9.24.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-inclusive-language": "^2.2.1",
     "eslint-plugin-license-header": "^0.8.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
