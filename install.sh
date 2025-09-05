@@ -54,7 +54,7 @@ if [[ ! -d /opt/android-studio ]]; then
   sudo mkdir -p /opt
   sudo tar -xzf /tmp/android-studio.tar.gz -C /opt
   sudo mv /opt/android-studio-* /opt/android-studio
-  sudo chmod -R a+rwx /opt/android-studio
+  sudo chmod -R a=rx,u+w /opt/android-studio
   echo "$EMOJI_CHECK Android Studio instalado"
 else
   echo "$EMOJI_SKIP Android Studio ya presente"
