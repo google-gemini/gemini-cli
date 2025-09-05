@@ -11,6 +11,7 @@ import * as fs from 'node:fs';
 
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
+export const OAUTH_FILE = 'oauth_creds.json';
 const TMP_DIR_NAME = 'tmp';
 
 export class Storage {
@@ -71,7 +72,7 @@ export class Storage {
   }
 
   static getOAuthCredsPath(): string {
-    return path.join(Storage.getGlobalGeminiDir(), 'oauth_creds.json');
+    return path.join(Storage.getGlobalGeminiDir(), OAUTH_FILE);
   }
 
   getProjectRoot(): string {
