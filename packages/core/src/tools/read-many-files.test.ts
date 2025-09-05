@@ -24,8 +24,8 @@ import * as glob from 'glob';
 
 vi.mock('glob', { spy: true });
 
-vi.mock('mime-types', () => {
-  const lookup = (filename: string) => {
+vi.mock('mime', () => {
+  const getType = (filename: string) => {
     if (filename.endsWith('.ts') || filename.endsWith('.js')) {
       return 'text/plain';
     }
@@ -45,9 +45,9 @@ vi.mock('mime-types', () => {
   };
   return {
     default: {
-      lookup,
+      getType,
     },
-    lookup,
+    getType,
   };
 });
 

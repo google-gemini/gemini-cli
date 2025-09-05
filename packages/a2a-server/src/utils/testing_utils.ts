@@ -24,7 +24,6 @@ export function createMockConfig(
     getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     getIdeMode: vi.fn().mockReturnValue(false),
     getAllowedTools: vi.fn().mockReturnValue([]),
-    getIdeClient: vi.fn(),
     getWorkspaceContext: vi.fn().mockReturnValue({
       isPathWithinWorkspace: () => true,
     }),

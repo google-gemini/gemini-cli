@@ -9,7 +9,15 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import type { Mock } from 'vitest';
 import { vi } from 'vitest';
 import type { Key } from './KeypressContext.js';
-import { KeypressProvider, useKeypressContext } from './KeypressContext.js';
+import {
+  KeypressProvider,
+  useKeypressContext,
+  DRAG_COMPLETION_TIMEOUT_MS,
+  // CSI_END_O,
+  // SS3_END,
+  SINGLE_QUOTE,
+  DOUBLE_QUOTE,
+} from './KeypressContext.js';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
 
@@ -736,6 +744,214 @@ describe('KeypressContext - Kitty Protocol', () => {
       expect(keyHandler).toHaveBeenCalledTimes(1);
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'delete' }),
+      );
+    });
+  });
+});
+
+describe('Drag and Drop Handling', () => {
+  let stdin: MockStdin;
+  const mockSetRawMode = vi.fn();
+
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <KeypressProvider kittyProtocolEnabled={true}>{children}</KeypressProvider>
+  );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    stdin = new MockStdin();
+    (useStdin as Mock).mockReturnValue({
+      stdin,
+      setRawMode: mockSetRawMode,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe('drag start by quotes', () => {
+    it('should start collecting when single quote arrives and not broadcast immediately', async () => {
+      const keyHandler = vi.fn();
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: SINGLE_QUOTE,
+        });
+      });
+
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
+
+    it('should start collecting when double quote arrives and not broadcast immediately', async () => {
+      const keyHandler = vi.fn();
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: DOUBLE_QUOTE,
+        });
+      });
+
+      expect(keyHandler).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('drag collection and completion', () => {
+    it('should collect single character inputs during drag mode', async () => {
+      const keyHandler = vi.fn();
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Start by single quote
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: SINGLE_QUOTE,
+        });
+      });
+
+      // Send single character
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'a',
+        });
+      });
+
+      // Character should not be immediately broadcast
+      expect(keyHandler).not.toHaveBeenCalled();
+
+      // Fast-forward to completion timeout
+      act(() => {
+        vi.advanceTimersByTime(DRAG_COMPLETION_TIMEOUT_MS + 10);
+      });
+
+      // Should broadcast the collected path as paste (includes starting quote)
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: '',
+          paste: true,
+          sequence: `${SINGLE_QUOTE}a`,
+        }),
+      );
+    });
+
+    it('should collect multiple characters and complete on timeout', async () => {
+      const keyHandler = vi.fn();
+
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+
+      act(() => {
+        result.current.subscribe(keyHandler);
+      });
+
+      // Start by single quote
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: SINGLE_QUOTE,
+        });
+      });
+
+      // Send multiple characters
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'p',
+        });
+      });
+
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'a',
+        });
+      });
+
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 't',
+        });
+      });
+
+      act(() => {
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: 'h',
+        });
+      });
+
+      // Characters should not be immediately broadcast
+      expect(keyHandler).not.toHaveBeenCalled();
+
+      // Fast-forward to completion timeout
+      act(() => {
+        vi.advanceTimersByTime(DRAG_COMPLETION_TIMEOUT_MS + 10);
+      });
+
+      // Should broadcast the collected path as paste (includes starting quote)
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: '',
+          paste: true,
+          sequence: `${SINGLE_QUOTE}path`,
+        }),
       );
     });
   });
