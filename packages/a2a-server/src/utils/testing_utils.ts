@@ -9,8 +9,12 @@ import type {
   TaskStatusUpdateEvent,
   SendStreamingMessageSuccessResponse,
 } from '@a2a-js/sdk';
-import { ApprovalMode } from '@google/gemini-cli-core';
-import type { Config } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+} from '@google/gemini-cli-core';
+import type { Config, Storage } from '@google/gemini-cli-core';
 import { expect, vi } from 'vitest';
 
 export function createMockConfig(
@@ -28,6 +32,12 @@ export function createMockConfig(
       isPathWithinWorkspace: () => true,
     }),
     getTargetDir: () => '/test',
+    storage: {
+      getProjectTempDir: () => '/tmp',
+    } as Storage,
+    getTruncateToolOutputThreshold: () =>
+      DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+    getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
     getGeminiClient: vi.fn(),
     getDebugMode: vi.fn().mockReturnValue(false),
     getContentGeneratorConfig: vi.fn().mockReturnValue({ model: 'gemini-pro' }),
