@@ -25,7 +25,9 @@ describe('extensions install command', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);
     expect(() =>
       validationParser.parse('install --source some-url --path /some/path'),
-    ).toThrow('Arguments source and path are mutually exclusive');
+    ).toThrow(
+      'Arguments --source and --path are mutually exclusive. Please provide only one.',
+    );
   });
 });
 
