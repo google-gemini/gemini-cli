@@ -234,6 +234,141 @@ const ThinkingSection: React.FC<{ thinkingSections: string[] }> = ({ thinkingSec
   );
 };
 
+// Component to display tool calls with expandable parameters
+const ToolCallDisplay: React.FC<{ toolCall: any }> = ({ toolCall }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const formatArguments = (args: any, truncate = true) => {
+    if (!args || typeof args !== 'object') return '';
+    
+    const entries = Object.entries(args);
+    if (entries.length === 0) return '';
+    
+    if (truncate) {
+      // Show abbreviated version
+      const limitedEntries = entries.slice(0, 3);
+      const formatted = limitedEntries.map(([key, value]) => {
+        if (typeof value === 'string' && value.length > 30) {
+          return `${key}: "${value.slice(0, 27)}..."`;
+        }
+        return `${key}: ${JSON.stringify(value)}`;
+      }).join(', ');
+      
+      const hasMore = entries.length > 3;
+      return hasMore ? `${formatted}, ...` : formatted;
+    } else {
+      // Show full version
+      return entries.map(([key, value]) => {
+        return `${key}: ${JSON.stringify(value)}`;
+      }).join(', ');
+    }
+  };
+
+  const hasComplexArgs = toolCall.arguments && Object.keys(toolCall.arguments).length > 3;
+  const hasLongValues = toolCall.arguments && Object.values(toolCall.arguments).some(
+    (value: any) => typeof value === 'string' && value.length > 30
+  );
+  const shouldShowExpand = hasComplexArgs || hasLongValues;
+
+  return (
+    <div className="mb-2 last:mb-0">
+      <div className="bg-muted/50 rounded-lg overflow-hidden">
+        <div className="flex items-center">
+          <div className="flex-1 text-xs font-mono bg-muted rounded px-2 py-1">
+            {toolCall.name}({formatArguments(toolCall.arguments, !isExpanded)})
+          </div>
+          {shouldShowExpand && (
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="px-2 py-1 text-muted-foreground hover:text-foreground transition-colors"
+              title={isExpanded ? "Show less" : "Show all parameters"}
+            >
+              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </button>
+          )}
+        </div>
+        
+        {isExpanded && toolCall.arguments && (
+          <div className="border-t border-border/50 bg-background/50 px-2 py-1">
+            <div className="text-xs font-mono">
+              <div className="text-muted-foreground mb-1">Full parameters:</div>
+              <pre className="whitespace-pre-wrap text-foreground">
+                {JSON.stringify(toolCall.arguments, null, 2)}
+              </pre>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {toolCall.result && (
+        <div className="text-xs mt-1 pl-2 border-l-2 border-border">
+          {toolCall.result}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Component to display tool responses with expandable content
+const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ toolResponse }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const formatColors = {
+    harmony: 'bg-purple-50 border-purple-200 text-purple-800 dark:bg-purple-950 dark:border-purple-800 dark:text-purple-200',
+    openai: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-200',
+    gemini: 'bg-sky-50 border-sky-200 text-sky-800 dark:bg-sky-950 dark:border-sky-800 dark:text-sky-200',
+    qwen: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-200',
+    unknown: 'bg-slate-50 border-slate-200 text-slate-700 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300'
+  };
+  
+  const formatLabels = {
+    harmony: 'Tool',
+    openai: 'Tool',
+    gemini: 'Tool',
+    qwen: 'Tool',
+    unknown: 'Tool'
+  };
+
+  // Check if content is long enough to warrant collapsing
+  const isLongContent = toolResponse.content.length > 200;
+  const shouldShowExpand = isLongContent;
+  
+  // Get preview content (first 150 characters)
+  const previewContent = isLongContent && !isExpanded 
+    ? toolResponse.content.slice(0, 150) + '...'
+    : toolResponse.content;
+
+  return (
+    <div className="flex justify-center">
+      <div className={cn("border rounded-lg overflow-hidden text-sm max-w-2xl", formatColors[toolResponse.format])}>
+        <div className="px-3 py-2">
+          <div className="font-semibold text-xs mb-1 flex items-center gap-2">
+            <span>{formatLabels[toolResponse.format]}</span>
+            <span className="font-mono text-xs opacity-70">{toolResponse.toolName}</span>
+            {toolResponse.toolCallId && (
+              <span className="font-mono text-xs opacity-50">#{toolResponse.toolCallId.slice(-6)}</span>
+            )}
+            {shouldShowExpand && (
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="ml-auto px-1 py-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                title={isExpanded ? "Show less" : "Show full response"}
+              >
+                {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              </button>
+            )}
+          </div>
+          {(Markdown as any)({ 
+            remarkPlugins: [remarkGfm], 
+            rehypePlugins: [rehypeHighlight], 
+            children: previewContent 
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface MessageBubbleProps {
   message: ChatMessage;
   isStreaming?: boolean;
@@ -257,41 +392,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
   }
 
   if (isTool && toolResponse) {
-    const parsed = toolResponse; // Use the already parsed result
-    const formatColors = {
-      harmony: 'bg-purple-50 border-purple-200 text-purple-800',
-      openai: 'bg-green-50 border-green-200 text-green-800',
-      gemini: 'bg-blue-50 border-blue-200 text-blue-800',
-      qwen: 'bg-orange-50 border-orange-200 text-orange-800',
-      unknown: 'bg-gray-50 border-gray-200 text-gray-800'
-    };
-    
-    const formatLabels = {
-      harmony: 'Tool',
-      openai: 'Tool',
-      gemini: 'Tool',
-      qwen: 'Tool',
-      unknown: 'Tool'
-    };
-
-    return (
-      <div className="flex justify-center">
-        <div className={cn("border rounded-lg px-3 py-2 text-sm max-w-2xl", formatColors[parsed.format])}>
-          <div className="font-semibold text-xs mb-1 flex items-center gap-2">
-            <span>{formatLabels[parsed.format]}</span>
-            <span className="font-mono text-xs opacity-70">{parsed.toolName}</span>
-            {parsed.toolCallId && (
-              <span className="font-mono text-xs opacity-50">#{parsed.toolCallId.slice(-6)}</span>
-            )}
-          </div>
-          {(Markdown as any)({ 
-            remarkPlugins: [remarkGfm], 
-            rehypePlugins: [rehypeHighlight], 
-            children: parsed.content 
-          })}
-        </div>
-      </div>
-    );
+    return <ToolResponseDisplay toolResponse={toolResponse} />;
   }
 
   return (
@@ -406,38 +507,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
             {message.toolCalls && message.toolCalls.length > 0 && (
               <div className="mt-3 pt-3 border-t border-border/50">
                 <div className="text-xs text-muted-foreground mb-2">Tool Calls:</div>
-                {message.toolCalls.map((toolCall, index) => {
-                  const formatArguments = (args: any) => {
-                    if (!args || typeof args !== 'object') return '';
-                    
-                    // Show key parameters in a readable format
-                    const entries = Object.entries(args).slice(0, 3); // Show first 3 params
-                    if (entries.length === 0) return '';
-                    
-                    const formatted = entries.map(([key, value]) => {
-                      if (typeof value === 'string' && value.length > 30) {
-                        return `${key}: "${value.slice(0, 27)}..."`;
-                      }
-                      return `${key}: ${JSON.stringify(value)}`;
-                    }).join(', ');
-                    
-                    const hasMore = Object.keys(args).length > 3;
-                    return hasMore ? `${formatted}, ...` : formatted;
-                  };
-                  
-                  return (
-                    <div key={index} className="mb-2 last:mb-0">
-                      <div className="text-xs font-mono bg-muted rounded px-2 py-1">
-                        {toolCall.name}({formatArguments(toolCall.arguments)})
-                      </div>
-                      {toolCall.result && (
-                        <div className="text-xs mt-1 pl-2 border-l-2 border-border">
-                          {toolCall.result}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {message.toolCalls.map((toolCall, index) => (
+                  <ToolCallDisplay key={index} toolCall={toolCall} />
+                ))}
               </div>
             )}
 

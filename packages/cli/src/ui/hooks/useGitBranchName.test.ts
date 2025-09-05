@@ -12,7 +12,7 @@ import { useGitBranchName } from './useGitBranchName.js';
 import { fs, vol } from 'memfs'; // For mocking fs
 import { EventEmitter } from 'node:events';
 import { exec as mockExec, type ChildProcess } from 'node:child_process';
-import type { FSWatcher } from 'memfs/lib/volume.js';
+import type { FSWatcher } from 'memfs/lib/node/volume.js';
 
 // Mock child_process
 vi.mock('child_process');
