@@ -53,11 +53,6 @@ const HTML_CLEANING_SELECTORS = [
   { selector: 'style', format: 'skip' },
 ];
 
-// function extractUrls(text: string): string[] {
-//   const urlRegex = /(https?:\/\/[^\s]+)/g;
-//   return text.match(urlRegex) || [];
-// }
-
 function convertGitHubUrl(url: string): string {
   if (url.includes('github.com') && url.includes('/blob/')) {
     return url
@@ -65,6 +60,128 @@ function convertGitHubUrl(url: string): string {
       .replace('/blob/', '/');
   }
   return url;
+}
+
+// Helper function to match filename patterns (supports wildcards)
+function matchesPattern(filename: string, pattern: string): boolean {
+  if (!pattern) return true;
+  
+  // Convert wildcard pattern to regex
+  const regexPattern = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape special regex chars
+    .replace(/\*/g, '.*')                 // Convert * to .*
+    .replace(/\?/g, '.');                 // Convert ? to .
+  
+  const regex = new RegExp(`^${regexPattern}$`, 'i');
+  return regex.test(filename);
+}
+
+// Helper function to extract and filter links from HTML
+function extractLinksFromHtml(
+  html: string, 
+  baseUrl: string,
+  options: {
+    selector?: string;
+    pattern?: string;
+    extensions?: string[];
+  } = {}
+): { url: string; filename: string; text?: string }[] {
+  const { selector = 'a[href]', pattern, extensions } = options;
+  
+  // Enhanced HTML parsing to support CSS selectors
+  const links: { url: string; filename: string; text?: string }[] = [];
+  
+  // For now, we'll use regex with enhanced selector support
+  let linkRegex: RegExp;
+  
+  if (selector === 'a[href]' || !selector) {
+    // Default: all links with href - fixed to handle nested HTML content
+    linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi;
+  } else if (selector.includes('[download]')) {
+    // Links with download attribute - fixed to handle nested HTML content
+    linkRegex = /<a[^>]*download[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi;
+  } else if (selector.includes('.')) {
+    // Class-based selector (simplified) - fixed to handle nested HTML content
+    const className = selector.replace(/^a\./, '').replace(/\[.*\]/, '');
+    linkRegex = new RegExp(`<a[^>]*class=["'][^"']*${className}[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>`, 'gi');
+  } else {
+    // Fallback to default - fixed to handle nested HTML content
+    linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi;
+  }
+  
+  let match;
+  while ((match = linkRegex.exec(html)) !== null) {
+    let url = match[1];
+    const linkContent = match[2]?.trim(); // This might contain HTML like <img...>
+    
+    // Extract text from HTML content
+    let linkText = '';
+    if (linkContent) {
+      // Remove HTML tags and get text content
+      linkText = linkContent.replace(/<[^>]*>/g, '').trim();
+      // If no text content, try to extract alt text from images
+      if (!linkText) {
+        const altMatch = linkContent.match(/alt=["']([^"']*)["']/i);
+        if (altMatch) {
+          linkText = altMatch[1];
+        }
+      }
+    }
+    
+    // Skip non-file links (like javascript:, mailto:, #anchors)
+    if (url.startsWith('javascript:') || url.startsWith('mailto:') || url.startsWith('#')) {
+      continue;
+    }
+    
+    // Convert relative URLs to absolute
+    if (url.startsWith('/')) {
+      const baseUrlObj = new URL(baseUrl);
+      url = `${baseUrlObj.origin}${url}`;
+    } else if (!url.startsWith('http')) {
+      url = new URL(url, baseUrl).href;
+    }
+    
+    // Extract filename from URL
+    let filename = '';
+    try {
+      const urlObj = new URL(url);
+      filename = urlObj.pathname.split('/').pop() || '';
+      
+      // Remove query parameters from filename
+      filename = filename.split('?')[0];
+      
+      // If no filename in path, try to extract from query params or use link text
+      if (!filename && linkText) {
+        // Try to extract filename from link text if it looks like a file
+        const textMatch = linkText.match(/([^\/\\]+\.[a-zA-Z0-9]{1,6})$/);
+        if (textMatch) {
+          filename = textMatch[1];
+        }
+      }
+    } catch {
+      continue; // Skip invalid URLs
+    }
+    
+    // Skip if no filename
+    if (!filename) continue;
+    
+    // Apply pattern filter
+    if (pattern && !matchesPattern(filename, pattern)) {
+      continue;
+    }
+    
+    // Apply extension filter
+    if (extensions && extensions.length > 0) {
+      const hasMatchingExt = extensions.some(ext => 
+        filename.toLowerCase().endsWith(ext.toLowerCase())
+      );
+      if (!hasMatchingExt) continue;
+    }
+    
+    links.push({ url, filename, text: linkText });
+  }
+  
+  return links;
 }
 
 // Helper function to create fetch with both timeout and external signal
@@ -119,12 +236,32 @@ interface WebParams {
   output?: string;
   /** Maximum results for batch operations */
   limit?: number;
+  /** Offset for batch operations (skip first N results) */
+  offset?: number;
   /** Pattern for validation */
   pattern?: string;
   /** Custom headers */
   headers?: Record<string, string>;
   /** Follow redirects */
   followRedirects?: boolean;
+  
+  // Enhanced fetch operation parameters
+  /** Extract links from page (for fetch operation) */
+  extractLinks?: boolean;
+  /** Filter links by filename pattern (wildcards supported: stock_val*, *.xlsx) */
+  linkPattern?: string;
+  /** Filter links by file extensions */
+  linkExtensions?: string[];
+  /** CSS selector for link extraction (default: 'a[href]') */
+  linkSelector?: string;
+  
+  // Enhanced batch operation parameters  
+  /** Batch operation type ('fetch' or 'save') */
+  operation?: 'fetch' | 'save';
+  /** Output directory for batch save operations */
+  outputDir?: string;
+  /** Strategy for handling filename conflicts */
+  nameConflictStrategy?: 'overwrite' | 'rename' | 'skip';
 }
 
 interface WebResult extends ToolResult {
@@ -215,7 +352,7 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
   }
 
   private async fetchContent(signal: AbortSignal): Promise<WebResult> {
-    const { url } = this.params;
+    const { url, extractLinks, linkPattern, linkExtensions, linkSelector } = this.params;
     
     if (!url) {
       throw new Error('URL required for fetch operation');
@@ -231,25 +368,35 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
       }
 
       const contentType = response.headers.get('content-type') || '';
+      const html = await response.text();
       let content: string;
+      let extractedLinks: { url: string; filename: string; text?: string }[] | undefined;
+
+      // If extractLinks is requested, extract and filter links
+      if (extractLinks && contentType.includes('text/html')) {
+        extractedLinks = extractLinksFromHtml(html, processedUrl, {
+          selector: linkSelector,
+          pattern: linkPattern,
+          extensions: linkExtensions,
+        });
+      }
 
       if (contentType.includes('text/html')) {
-        const html = await response.text();
         content = convert(html, {
           wordwrap: false,
           selectors: [
             ...HTML_CLEANING_SELECTORS,
-            { selector: 'a', options: { ignoreHref: true } },
+            { selector: 'a', options: { ignoreHref: !extractLinks } }, // Keep links if extractLinks is true
             { selector: 'img', format: 'skip' },
           ],
         });
       } else {
-        content = await response.text();
+        content = html;
       }
 
       content = content.substring(0, MAX_CONTENT_LENGTH);
 
-      return {
+      const result: WebResult = {
         success: true,
         op: 'fetch',
         url: processedUrl,
@@ -259,6 +406,16 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
         llmContent: `web(fetch): Retrieved content from ${processedUrl}\n\n${content}`,
         returnDisplay: `web(fetch): Fetched ${content.length} chars from ${processedUrl}`,
       };
+
+      // Add extracted links to result if requested
+      if (extractedLinks) {
+        result.extracted = extractedLinks;
+        result.llmContent += `\n\nExtracted ${extractedLinks.length} matching links:\n` + 
+          extractedLinks.map(link => `- ${link.filename}: ${link.url}`).join('\n');
+        result.returnDisplay += `, found ${extractedLinks.length} matching links`;
+      }
+
+      return result;
     } catch (error) {
       const errorMessage = `Fetch failed for ${processedUrl}: ${getErrorMessage(error)}`;
       return {
@@ -382,15 +539,88 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
   }
 
   private async batchProcess(signal: AbortSignal): Promise<WebResult> {
-    const { urls, limit = 10 } = this.params;
+    const { 
+      url, 
+      urls, 
+      limit = 50, // Increased default limit for batch downloads
+      offset = 0, // Start from beginning by default
+      operation = 'fetch', 
+      outputDir, 
+      nameConflictStrategy = 'rename',
+      linkPattern,
+      linkExtensions,
+      linkSelector
+    } = this.params;
     
-    if (!urls?.length) {
-      throw new Error('URLs array required for batch operation');
+    let processUrls: string[];
+    
+    if (urls?.length) {
+      // Direct URLs provided
+      processUrls = urls.slice(offset, offset + limit);
+    } else if (url && (linkPattern || linkExtensions)) {
+      // Single URL with link discovery - need to fetch and extract links first
+      try {
+        const response = await fetchWithSignal(url, URL_FETCH_TIMEOUT_MS, signal);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch page: HTTP ${response.status} ${response.statusText}`);
+        }
+        
+        const html = await response.text();
+        const extractedLinks = extractLinksFromHtml(html, url, {
+          selector: linkSelector,
+          pattern: linkPattern,
+          extensions: linkExtensions,
+        });
+        
+        if (extractedLinks.length === 0) {
+          return {
+            success: false,
+            op: 'batch',
+            error: {
+              message: `No matching links found for pattern "${linkPattern}" on ${url}`,
+              type: 'NO_LINKS_FOUND' as any,
+            },
+            llmContent: `web(batch): No links found matching pattern "${linkPattern}" on ${url}`,
+            returnDisplay: `web(batch): No matching links found`,
+          };
+        }
+        
+        processUrls = extractedLinks.map(link => link.url).slice(offset, offset + limit);
+      } catch (error) {
+        const errorMessage = getErrorMessage(error);
+        return {
+          success: false,
+          op: 'batch',
+          error: {
+            message: `Failed to discover links from ${url}: ${errorMessage}`,
+            type: 'LINK_DISCOVERY_FAILED' as any,
+          },
+          llmContent: `web(batch): Link discovery failed: ${errorMessage}`,
+          returnDisplay: `web(batch): Link discovery failed`,
+        };
+      }
+    } else {
+      throw new Error('Either urls array or url with linkPattern/linkExtensions required for batch operation');
     }
-
-    const processUrls = urls.slice(0, limit);
-    const results: Array<{ url: string; success: boolean; content?: string; error?: string; status?: number }> = [];
+    const results: Array<{ 
+      url: string; 
+      success: boolean; 
+      content?: string; 
+      error?: string; 
+      status?: number;
+      filename?: string;
+      saved?: boolean;
+    }> = [];
     const errors: string[] = [];
+
+    // Create output directory if batch save is requested
+    if (operation === 'save' && outputDir) {
+      try {
+        await fs.mkdir(outputDir, { recursive: true });
+      } catch (error) {
+        throw new Error(`Failed to create output directory ${outputDir}: ${getErrorMessage(error)}`);
+      }
+    }
 
     for (const url of processUrls) {
       if (signal.aborted) break;
@@ -402,22 +632,67 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
         if (response.ok) {
           const contentType = response.headers.get('content-type') || '';
           let content: string;
-          
-          if (contentType.includes('text/html')) {
-            const html = await response.text();
-            content = convert(html, {
-              wordwrap: false,
-              selectors: HTML_CLEANING_SELECTORS,
-            }).substring(0, 1000); // Limit per URL for batch
+          let filename: string | undefined;
+          let saved = false;
+
+          if (operation === 'save' && outputDir) {
+            // For save operation, handle as binary or text file
+            const isBinaryFile = this.isBinaryContentType(contentType);
+            filename = this.generateFileNameFromUrl(processedUrl);
+            filename = this.adjustFileExtension(filename, contentType);
+
+            let finalPath = path.join(outputDir, filename);
+
+            // Handle filename conflicts
+            if (nameConflictStrategy === 'rename' && existsSync(finalPath)) {
+              const ext = path.extname(filename);
+              const base = path.basename(filename, ext);
+              let counter = 1;
+              do {
+                filename = `${base}_${counter}${ext}`;
+                finalPath = path.join(outputDir, filename);
+                counter++;
+              } while (existsSync(finalPath));
+            } else if (nameConflictStrategy === 'skip' && existsSync(finalPath)) {
+              results.push({ 
+                url: processedUrl, 
+                success: true, 
+                filename,
+                saved: false,
+                status: response.status 
+              });
+              continue;
+            }
+
+            if (isBinaryFile) {
+              const buffer = await response.arrayBuffer();
+              await fs.writeFile(finalPath, Buffer.from(buffer));
+            } else {
+              const text = await response.text();
+              await fs.writeFile(finalPath, text, 'utf-8');
+            }
+            saved = true;
+            content = `Saved to ${finalPath}`;
           } else {
-            const text = await response.text();
-            content = text.substring(0, 1000);
+            // For fetch operation, get content summary
+            if (contentType.includes('text/html')) {
+              const html = await response.text();
+              content = convert(html, {
+                wordwrap: false,
+                selectors: HTML_CLEANING_SELECTORS,
+              }).substring(0, 1000); // Limit per URL for batch
+            } else {
+              const text = await response.text();
+              content = text.substring(0, 1000);
+            }
           }
           
           results.push({ 
             url: processedUrl, 
             success: true, 
             content,
+            filename,
+            saved,
             status: response.status 
           });
         } else {
@@ -438,12 +713,62 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
     }
 
     const successCount = results.filter(r => r.success).length;
-    const batchSummary = `web(batch): Processed ${results.length} URLs, ${successCount} successful`;
+    const savedCount = results.filter(r => r.saved).length;
     
-    const contentSummary = results
-      .filter(r => r.success && r.content)
-      .map(r => `\n=== ${r.url} ===\n${r.content}`)
-      .join('\n');
+    // Calculate total available and processing status
+    let totalAvailable = processUrls.length;
+    if (url && (linkPattern || linkExtensions)) {
+      // For link discovery, we need to get the total count before slicing
+      try {
+        const response = await fetchWithSignal(url, URL_FETCH_TIMEOUT_MS, signal);
+        if (response.ok) {
+          const html = await response.text();
+          const allLinks = extractLinksFromHtml(html, url, {
+            selector: linkSelector,
+            pattern: linkPattern,
+            extensions: linkExtensions,
+          });
+          totalAvailable = allLinks.length;
+        }
+      } catch {
+        // If we can't get total, use current batch size
+        totalAvailable = processUrls.length;
+      }
+    }
+    
+    const isComplete = (offset + results.length) >= totalAvailable;
+    const remainingCount = Math.max(0, totalAvailable - (offset + results.length));
+    
+    let batchSummary: string;
+    if (operation === 'save') {
+      batchSummary = `web(batch-save): Processed ${results.length} URLs (${offset + 1}-${offset + results.length} of ${totalAvailable}), ${successCount} successful, ${savedCount} files saved to ${outputDir}`;
+      if (!isComplete) {
+        batchSummary += `. ${remainingCount} files remaining. Use offset=${offset + results.length} to continue.`;
+      } else {
+        batchSummary += `. All files processed.`;
+      }
+    } else {
+      batchSummary = `web(batch): Processed ${results.length} URLs (${offset + 1}-${offset + results.length} of ${totalAvailable}), ${successCount} successful`;
+      if (!isComplete) {
+        batchSummary += `. ${remainingCount} URLs remaining. Use offset=${offset + results.length} to continue.`;
+      } else {
+        batchSummary += `. All URLs processed.`;
+      }
+    }
+    
+    const contentSummary = operation === 'save' 
+      ? results
+          .filter(r => r.success && r.filename)
+          .map(r => {
+            const filename = r.filename || 'unknown';
+            const fullPath = outputDir ? path.resolve(outputDir, filename) : filename;
+            return `\n- ${fullPath}: ${r.saved ? 'saved successfully' : 'skipped (already exists)'}`;
+          })
+          .join('')
+      : results
+          .filter(r => r.success && r.content)
+          .map(r => `\n=== ${r.url} ===\n${r.content}`)
+          .join('\n');
 
     return {
       success: successCount > 0,
@@ -542,12 +867,14 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
     if (!url) {
       throw new Error('URL required for save operation');
     }
-    
-    if (!output) {
-      throw new Error('Output file path required for save operation');
-    }
 
     const processedUrl = convertGitHubUrl(url);
+    
+    // Auto-generate filename from URL if output not provided
+    let finalOutputPath = output;
+    if (!finalOutputPath) {
+      finalOutputPath = this.generateFileNameFromUrl(processedUrl);
+    }
 
     try {
       const response = await fetchWithSignal(processedUrl, URL_FETCH_TIMEOUT_MS, signal);
@@ -557,45 +884,213 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
       }
 
       const contentType = response.headers.get('content-type') || '';
-      let content: string;
-
-      if (contentType.includes('text/html')) {
-        const html = await response.text();
-        content = convert(html, {
-          wordwrap: false,
-          selectors: HTML_CLEANING_SELECTORS,
-        });
-      } else {
-        content = await response.text();
-      }
+      
+      // Detect if this is a binary file
+      const isBinaryFile = this.isBinaryContentType(contentType);
+      
+      // Auto-adjust file extension based on content type if needed
+      finalOutputPath = this.adjustFileExtension(finalOutputPath, contentType);
 
       // Ensure directory exists
-      const dir = path.dirname(output);
+      const dir = path.dirname(finalOutputPath);
       if (!existsSync(dir)) {
         await fs.mkdir(dir, { recursive: true });
       }
 
-      await fs.writeFile(output, content, 'utf8');
+      if (isBinaryFile) {
+        // Handle binary files
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        await fs.writeFile(finalOutputPath, buffer);
+        
+        return {
+          success: true,
+          op: 'save',
+          url: processedUrl,
+          saved: finalOutputPath,
+          status: response.status,
+          headers: Object.fromEntries(response.headers.entries()),
+          llmContent: `web(save): Downloaded binary file from ${processedUrl} to ${finalOutputPath} (${buffer.length} bytes, ${contentType})`,
+          returnDisplay: `web(save): Downloaded ${path.basename(finalOutputPath)} (${this.formatFileSize(buffer.length)}, ${this.getFileTypeFromContentType(contentType)})`,
+        };
+      } else {
+        // Handle text files
+        let content: string;
+        
+        if (contentType.includes('text/html')) {
+          const html = await response.text();
+          content = convert(html, {
+            wordwrap: false,
+            selectors: HTML_CLEANING_SELECTORS,
+          });
+        } else {
+          content = await response.text();
+        }
 
-      return {
-        success: true,
-        op: 'save',
-        url: processedUrl,
-        saved: output,
-        status: response.status,
-        llmContent: `web(save): Saved content from ${processedUrl} to ${output} (${content.length} chars)`,
-        returnDisplay: `web(save): Saved ${path.basename(output)} (${content.length} chars)`,
-      };
+        await fs.writeFile(finalOutputPath, content, 'utf8');
+
+        return {
+          success: true,
+          op: 'save',
+          url: processedUrl,
+          saved: finalOutputPath,
+          status: response.status,
+          headers: Object.fromEntries(response.headers.entries()),
+          llmContent: `web(save): Saved text content from ${processedUrl} to ${finalOutputPath} (${content.length} chars, ${contentType})`,
+          returnDisplay: `web(save): Saved ${path.basename(finalOutputPath)} (${this.formatFileSize(content.length)}, ${this.getFileTypeFromContentType(contentType)})`,
+        };
+      }
     } catch (error) {
       const errorMessage = `Save failed: ${getErrorMessage(error)}`;
       return {
         success: false,
         op: 'save',
         url: processedUrl,
+        saved: finalOutputPath,
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
       };
     }
+  }
+
+  private generateFileNameFromUrl(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      const pathname = urlObj.pathname;
+      
+      // Extract just the filename from the path (last segment)
+      const segments = pathname.split('/').filter(segment => segment.length > 0);
+      let fileName = segments[segments.length - 1] || '';
+      
+      // Remove query parameters if they exist
+      fileName = fileName.split('?')[0];
+      
+      // If no filename found, use domain name
+      if (!fileName) {
+        fileName = urlObj.hostname.replace(/[^a-zA-Z0-9.-]/g, '_');
+        if (!path.extname(fileName)) {
+          fileName += '.html';
+        }
+      }
+      
+      // Clean up invalid filename characters but preserve the filename structure
+      fileName = fileName.replace(/[/\\:*?"<>|]/g, '_');
+      
+      // If still no extension, add .html as default for web content
+      if (!path.extname(fileName)) {
+        fileName += '.html';
+      }
+      
+      return fileName;
+    } catch {
+      // If URL parsing fails, create a timestamp-based filename
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      return `downloaded_${timestamp}.html`;
+    }
+  }
+
+  private isBinaryContentType(contentType: string): boolean {
+    const binaryTypes = [
+      'image/', 'video/', 'audio/', 'application/pdf', 'application/zip',
+      'application/x-zip-compressed', 'application/octet-stream',
+      'application/msword', 'application/vnd.ms-excel', 'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument',
+      'application/x-rar-compressed', 'application/x-tar', 'application/gzip',
+      'application/x-7z-compressed', 'application/vnd.adobe.flash',
+      'application/x-shockwave-flash', 'application/java-archive',
+      'application/x-executable', 'application/x-msdos-program',
+      'application/vnd.android.package-archive'
+    ];
+    
+    return binaryTypes.some(type => contentType.toLowerCase().includes(type.toLowerCase()));
+  }
+
+  private adjustFileExtension(filePath: string, contentType: string): string {
+    const currentExt = path.extname(filePath).toLowerCase();
+    const expectedExt = this.getExtensionFromContentType(contentType);
+    
+    // If file has no extension or wrong extension, adjust it
+    if (!currentExt && expectedExt) {
+      return filePath + expectedExt;
+    }
+    
+    // Map of common content-type to extension mismatches to fix
+    const extensionMap: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/gif': '.gif',
+      'image/webp': '.webp',
+      'image/svg+xml': '.svg',
+      'application/pdf': '.pdf',
+      'application/zip': '.zip',
+      'application/json': '.json',
+      'text/javascript': '.js',
+      'text/css': '.css',
+      'text/html': '.html',
+      'text/plain': '.txt',
+      'application/xml': '.xml',
+      'text/xml': '.xml',
+    };
+    
+    for (const [mimeType, ext] of Object.entries(extensionMap)) {
+      if (contentType.includes(mimeType) && currentExt !== ext) {
+        return filePath.replace(/\.[^.]*$/, '') + ext;
+      }
+    }
+    
+    return filePath;
+  }
+
+  private getExtensionFromContentType(contentType: string): string {
+    const mimeToExt: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png', 
+      'image/gif': '.gif',
+      'image/webp': '.webp',
+      'image/svg+xml': '.svg',
+      'application/pdf': '.pdf',
+      'application/zip': '.zip',
+      'application/json': '.json',
+      'text/javascript': '.js',
+      'text/css': '.css', 
+      'text/html': '.html',
+      'text/plain': '.txt',
+      'application/xml': '.xml',
+      'text/xml': '.xml',
+      'video/mp4': '.mp4',
+      'audio/mpeg': '.mp3',
+      'audio/wav': '.wav',
+    };
+    
+    for (const [mimeType, ext] of Object.entries(mimeToExt)) {
+      if (contentType.includes(mimeType)) {
+        return ext;
+      }
+    }
+    
+    return '';
+  }
+
+  private getFileTypeFromContentType(contentType: string): string {
+    if (contentType.includes('image/')) return 'Image';
+    if (contentType.includes('video/')) return 'Video';
+    if (contentType.includes('audio/')) return 'Audio';
+    if (contentType.includes('application/pdf')) return 'PDF';
+    if (contentType.includes('application/zip')) return 'ZIP';
+    if (contentType.includes('text/html')) return 'HTML';
+    if (contentType.includes('text/plain')) return 'Text';
+    if (contentType.includes('application/json')) return 'JSON';
+    if (contentType.includes('text/css')) return 'CSS';
+    if (contentType.includes('text/javascript')) return 'JavaScript';
+    return contentType.split('/')[0] || 'File';
+  }
+
+  private formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 }
 
@@ -606,7 +1101,7 @@ export class WebTool extends BaseDeclarativeTool<WebParams, WebResult> {
     super(
       WebTool.Name,
       'Web Tool',
-      'Web operations: fetch (get content), extract (links/images/metadata/tables), batch (multiple URLs), validate (check status/response time), save (download to file). Supports GitHub URLs, custom headers.',
+      'Web operations: fetch (get content, discover links), extract (links/images/metadata/tables), batch (process multiple URLs OR discover and download files from single page), validate (check URLs), save (download files). For batch downloads: use url + linkPattern + outputDir to find and download matching files from a webpage.',
       Kind.Fetch,
       {
         type: 'object',
@@ -615,16 +1110,16 @@ export class WebTool extends BaseDeclarativeTool<WebParams, WebResult> {
           op: {
             type: 'string',
             enum: ['fetch', 'extract', 'batch', 'validate', 'save'],
-            description: 'Operation: fetch (get content), extract (structured data), batch (multiple URLs), validate (check URLs), save (download)',
+            description: 'Operation: fetch (get content, discover links), extract (structured data), batch (multiple URLs OR single URL with link discovery and batch download), validate (check URLs), save (download single file)',
           },
           url: {
             type: 'string',
-            description: 'Target URL (supports GitHub blob URLs)',
+            description: 'Target URL (supports GitHub blob URLs). For batch operation: page URL to discover links from when used with linkPattern/linkExtensions',
           },
           urls: {
             type: 'array',
             items: { type: 'string' },
-            description: 'Multiple URLs for batch/validate operations',
+            description: 'Multiple URLs for batch/validate operations. Optional for batch if using url with link discovery',
           },
           extract: {
             type: 'string',
@@ -641,7 +1136,11 @@ export class WebTool extends BaseDeclarativeTool<WebParams, WebResult> {
           },
           limit: {
             type: 'number',
-            description: 'Maximum URLs to process in batch operation (default: 10)',
+            description: 'Maximum URLs to process in batch operation (default: 50, set to higher value like 100 for large batches)',
+          },
+          offset: {
+            type: 'number',
+            description: 'Skip first N URLs in batch operation (default: 0). Use for pagination: offset=0 limit=50 for first 50, offset=50 limit=50 for next 50, etc.',
           },
           pattern: {
             type: 'string',
@@ -654,6 +1153,39 @@ export class WebTool extends BaseDeclarativeTool<WebParams, WebResult> {
           followRedirects: {
             type: 'boolean',
             description: 'Follow HTTP redirects (default: true)',
+          },
+          // Enhanced fetch operation parameters
+          extractLinks: {
+            type: 'boolean',
+            description: 'Extract and filter links from page content (for fetch operation)',
+          },
+          linkPattern: {
+            type: 'string',
+            description: 'Filter links by filename pattern (wildcards supported: stock_val*, *.xlsx)',
+          },
+          linkExtensions: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Filter links by file extensions (e.g., [".xlsx", ".xls"])',
+          },
+          linkSelector: {
+            type: 'string',
+            description: 'CSS selector for link extraction (default: "a[href]")',
+          },
+          // Enhanced batch operation parameters
+          operation: {
+            type: 'string',
+            enum: ['fetch', 'save'],
+            description: 'Batch operation type: fetch (content summary) or save (download files to directory). Use "save" for downloading files',
+          },
+          outputDir: {
+            type: 'string',
+            description: 'Output directory for batch save operations. Required when operation=save. Example: "tmp" or "/path/to/downloads"',
+          },
+          nameConflictStrategy: {
+            type: 'string',
+            enum: ['overwrite', 'rename', 'skip'],
+            description: 'Handle filename conflicts: overwrite existing, rename with counter, or skip',
           },
         },
       },
@@ -679,7 +1211,15 @@ export class WebTool extends BaseDeclarativeTool<WebParams, WebResult> {
         }
         break;
       case 'batch':
-        if (!urls?.length) return 'batch operation requires urls array';
+        // Batch supports two modes:
+        // 1. Direct URLs: requires urls array
+        // 2. Link discovery: requires url + (linkPattern OR linkExtensions)
+        if (!urls?.length && !url) {
+          return 'batch operation requires either urls array or url parameter';
+        }
+        if (url && !urls?.length && !params.linkPattern && !params.linkExtensions) {
+          return 'batch operation with single url requires linkPattern or linkExtensions for link discovery';
+        }
         break;
       case 'validate':
         if (!url && !urls?.length) return 'validate operation requires url or urls parameter';
