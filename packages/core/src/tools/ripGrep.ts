@@ -8,15 +8,33 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { EOL } from 'node:os';
 import { spawn } from 'node:child_process';
-import { rgPath } from '@lvce-editor/ripgrep';
+import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
+import { fileExists } from '../utils/fileUtils.js';
+import { Storage } from '../config/storage.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
+
+function getRgPath() {
+  return path.join(Storage.getGlobalBinDir(), 'rg');
+}
+
+/**
+ * Checks if `rg` exists, if not then attempt to download it.
+ */
+export async function canUseRipgrep(): Promise<boolean> {
+  if (await fileExists(getRgPath())) {
+    return true;
+  }
+
+  await downloadRipGrep(Storage.getGlobalBinDir());
+  return await fileExists(getRgPath());
+}
 
 /**
  * Parameters for the GrepTool
@@ -293,7 +311,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
     try {
       const output = await new Promise<string>((resolve, reject) => {
-        const child = spawn(rgPath, rgArgs, {
+        const child = spawn(getRgPath(), rgArgs, {
           windowsHide: true,
         });
 
