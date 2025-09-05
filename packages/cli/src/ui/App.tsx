@@ -108,7 +108,9 @@ import { OverflowProvider } from './contexts/OverflowContext.js';
 import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
+import { usePermissionsCommand } from './hooks/usePermissionsCommand.js';
 import { SettingsDialog } from './components/SettingsDialog.js';
+import { PermissionsDialog } from './components/PermissionsDialog.js';
 import { ProQuotaDialog } from './components/ProQuotaDialog.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
@@ -317,6 +319,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
+  const {
+    isPermissionsDialogOpen,
+    openPermissionsDialog,
+    closePermissionsDialog,
+  } = usePermissionsCommand();
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder);
@@ -656,6 +663,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setQuittingMessages,
     openPrivacyNotice,
     openSettingsDialog,
+    openPermissionsDialog,
     toggleVimEnabled,
     setIsProcessing,
     setGeminiMdFileCount,
@@ -1207,6 +1215,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 settings={settings}
                 onSelect={() => closeSettingsDialog()}
                 onRestartRequest={() => process.exit(0)}
+              />
+            </Box>
+          ) : isPermissionsDialogOpen ? (
+            <Box flexDirection="column">
+              <PermissionsDialog
+                config={config}
+                onClose={() => closePermissionsDialog()}
               />
             </Box>
           ) : isAuthenticating ? (

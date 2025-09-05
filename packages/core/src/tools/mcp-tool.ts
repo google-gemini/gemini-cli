@@ -11,6 +11,7 @@ import type {
   ToolMcpConfirmationDetails,
   ToolResult,
 } from './tools.js';
+import type { PermissionRepository } from '../permissions/PermissionRepository.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -57,11 +58,18 @@ type McpContentBlock =
   | McpResourceBlock
   | McpResourceLinkBlock;
 
-class DiscoveredMCPToolInvocation extends BaseToolInvocation<
+export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ToolParams,
   ToolResult
 > {
-  private static readonly allowlist: Set<string> = new Set();
+  private static permissionRepo: PermissionRepository | null = null;
+
+  /**
+   * Sets the global permission repository for all MCP tool invocations
+   */
+  static setPermissionRepository(repo: PermissionRepository): void {
+    DiscoveredMCPToolInvocation.permissionRepo = repo;
+  }
 
   constructor(
     private readonly mcpTool: CallableTool,
@@ -73,6 +81,11 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     private readonly cliConfig?: Config,
   ) {
     super(params);
+    if (!DiscoveredMCPToolInvocation.permissionRepo) {
+      throw new Error(
+        'PermissionRepository must be set before creating MCP tool invocations',
+      );
+    }
   }
 
   override async shouldConfirmExecute(
@@ -85,10 +98,19 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       return false; // server is trusted, no confirmation needed
     }
 
-    if (
-      DiscoveredMCPToolInvocation.allowlist.has(serverAllowListKey) ||
-      DiscoveredMCPToolInvocation.allowlist.has(toolAllowListKey)
-    ) {
+    // Check if server or tool is already allowed
+    const serverAllowed =
+      await DiscoveredMCPToolInvocation.permissionRepo!.isAllowed(
+        'mcp',
+        serverAllowListKey,
+      );
+    const toolAllowed =
+      await DiscoveredMCPToolInvocation.permissionRepo!.isAllowed(
+        'mcp',
+        toolAllowListKey,
+      );
+
+    if (serverAllowed || toolAllowed) {
       return false; // server and/or tool already allowlisted
     }
 
@@ -100,9 +122,15 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       toolDisplayName: this.displayName, // Display global registry name exposed to model and user
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
-          DiscoveredMCPToolInvocation.allowlist.add(serverAllowListKey);
+          await DiscoveredMCPToolInvocation.permissionRepo!.grant(
+            'mcp',
+            serverAllowListKey,
+          );
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysTool) {
-          DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
+          await DiscoveredMCPToolInvocation.permissionRepo!.grant(
+            'mcp',
+            toolAllowListKey,
+          );
         }
       },
     };
@@ -168,6 +196,43 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
 
   getDescription(): string {
     return safeJsonStringify(this.params);
+  }
+
+  /**
+   * Gets all MCP permissions in the allowlist for permission management
+   * @deprecated Use PermissionRepository directly instead
+   */
+  static async getAllowedMcpPermissions(): Promise<string[]> {
+    if (!DiscoveredMCPToolInvocation.permissionRepo) {
+      return [];
+    }
+    const allPermissions =
+      await DiscoveredMCPToolInvocation.permissionRepo.getAllGranted();
+    const mcpPermissions = allPermissions.get('mcp');
+    return mcpPermissions ? Array.from(mcpPermissions) : [];
+  }
+
+  /**
+   * Removes a specific MCP permission from the allowlist
+   * @deprecated Use PermissionRepository directly instead
+   */
+  static async revokeMcpPermission(permission: string): Promise<void> {
+    if (DiscoveredMCPToolInvocation.permissionRepo) {
+      await DiscoveredMCPToolInvocation.permissionRepo.revoke(
+        'mcp',
+        permission,
+      );
+    }
+  }
+
+  /**
+   * Clears all MCP permissions
+   * @deprecated Use PermissionRepository directly instead
+   */
+  static async clearAllMcpPermissions(): Promise<void> {
+    if (DiscoveredMCPToolInvocation.permissionRepo) {
+      await DiscoveredMCPToolInvocation.permissionRepo.revokeAllForTool('mcp');
+    }
   }
 }
 

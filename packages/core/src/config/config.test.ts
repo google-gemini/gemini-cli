@@ -65,6 +65,12 @@ vi.mock('../tools/web-fetch');
 vi.mock('../tools/read-many-files');
 vi.mock('../tools/memoryTool', () => ({
   MemoryTool: vi.fn(),
+  MemoryToolInvocation: class MemoryToolInvocation {
+    static setPermissionRepository = vi.fn();
+    static getAllowedMemoryPermissions = vi.fn().mockResolvedValue([]);
+    static revokeMemoryPermission = vi.fn().mockResolvedValue(undefined);
+    static clearAllMemoryPermissions = vi.fn().mockResolvedValue(undefined);
+  },
   setGeminiMdFilename: vi.fn(),
   getCurrentGeminiMdFilename: vi.fn(() => 'GEMINI.md'), // Mock the original filename
   DEFAULT_CONTEXT_FILENAME: 'GEMINI.md',
