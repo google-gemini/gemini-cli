@@ -798,7 +798,7 @@ export class MCPOAuthProvider {
       console.log('Authentication successful! Token saved.');
 
       // Verify token was saved
-      const savedToken = await this.tokenStorage.getToken(serverName);
+      const savedToken = await this.tokenStorage.getCredentials(serverName);
       if (savedToken && savedToken.token && savedToken.token.accessToken) {
         const tokenPreview =
           savedToken.token.accessToken.length > 20
@@ -830,7 +830,7 @@ export class MCPOAuthProvider {
     config: MCPOAuthConfig,
   ): Promise<string | null> {
     console.debug(`Getting valid token for server: ${serverName}`);
-    const credentials = await this.tokenStorage.getToken(serverName);
+    const credentials = await this.tokenStorage.getCredentials(serverName);
 
     if (!credentials) {
       console.debug(`No credentials found for server: ${serverName}`);
@@ -884,7 +884,7 @@ export class MCPOAuthProvider {
       } catch (error) {
         console.error(`Failed to refresh token: ${getErrorMessage(error)}`);
         // Remove invalid token
-        await this.tokenStorage.removeToken(serverName);
+        await this.tokenStorage.deleteCredentials(serverName);
       }
     }
 
