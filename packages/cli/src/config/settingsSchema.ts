@@ -116,11 +116,11 @@ export const SETTINGS_SCHEMA = {
     label: () => i18n.t('settings:labels.language'),
     category: 'UI',
     requiresRestart: false,
-    default: '' as string, // Empty string means use environment variables
+    default: '__ENV__' as string, // __ENV__ means use environment variables
     description: () => i18n.t('settings:descriptions.language'),
     showInDialog: true,
     options: [
-      { label: 'Use GEMINI_LANG (Environment Variable)', value: '' },
+      { label: 'Use GEMINI_LANG (Environment Variable)', value: '__ENV__' },
       { label: 'English', value: 'en' },
       { label: '中文', value: 'zh' },
       { label: 'Español', value: 'es' },

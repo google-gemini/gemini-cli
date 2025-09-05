@@ -146,12 +146,12 @@ export const initializeI18nWithSettings = (settings: LoadedSettings): void => {
     if (
       settingsLang &&
       typeof settingsLang === 'string' &&
-      settingsLang !== '' && // Empty string means use environment variables
+      settingsLang !== '__ENV__' && // __ENV__ means use environment variables
       languages.includes(settingsLang)
     ) {
       selectedLanguage = settingsLang;
     } else {
-      // 2. If no explicit language setting or empty string, check environment variables
+      // 2. If no explicit language setting or __ENV__, check environment variables
       const envLang = detectLanguageFromEnv();
       if (envLang) {
         selectedLanguage = envLang;

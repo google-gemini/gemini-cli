@@ -347,12 +347,12 @@ export function SettingsDialog({
   // Get sorted options for specific settings (language gets special treatment)
   const getSortedOptions = (settingKey: string, options: readonly SettingOption[]) => {
     if (settingKey === 'language') {
-      // Sort language options: environment variable (empty string) first, then alphabetically
+      // Sort language options: __ENV__ (environment variable) first, then alphabetically
       return [...options].sort((a, b) => {
-        // Empty values (environment variable) always come first
-        if (a.value === '' && b.value !== '') return -1;
-        if (b.value === '' && a.value !== '') return 1;
-        // Both empty or both non-empty, sort alphabetically
+        // __ENV__ (environment variable) always comes first
+        if (a.value === '__ENV__' && b.value !== '__ENV__') return -1;
+        if (b.value === '__ENV__' && a.value !== '__ENV__') return 1;
+        // Both __ENV__ or both regular values, sort alphabetically
         return a.value.localeCompare(b.value);
       });
     }
