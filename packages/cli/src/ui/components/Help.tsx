@@ -65,7 +65,7 @@ export const Help: React.FC<Help> = ({ commands }) => (
       Commands:
     </Text>
     {commands
-      .filter((command) => command.description)
+      .filter((command) => command.description && !command.hidden)
       .map((command: SlashCommand) => (
         <Box key={command.name} flexDirection="column">
           <Text color={Colors.Foreground}>
