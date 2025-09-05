@@ -36,6 +36,7 @@ import {
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { useTranslation, switchLanguage } from '../../i18n/useTranslation.js';
+import { SettingOption } from '../../config/settingsSchema.js';
 import chalk from 'chalk';
 import { cpSlice, cpLen } from '../utils/textUtils.js';
 
@@ -343,6 +344,22 @@ export function SettingsDialog({
     setFocusSection('settings');
   };
 
+  // Get sorted options for specific settings (language gets special treatment)
+  const getSortedOptions = (settingKey: string, options: readonly SettingOption[]) => {
+    if (settingKey === 'language') {
+      // Sort language options: environment variable (empty string) first, then alphabetically
+      return [...options].sort((a, b) => {
+        // Empty values (environment variable) always come first
+        if (a.value === '' && b.value !== '') return -1;
+        if (b.value === '' && a.value !== '') return 1;
+        // Both empty or both non-empty, sort alphabetically
+        return a.value.localeCompare(b.value);
+      });
+    }
+    // For other settings, return as-is (no special sorting)
+    return [...options];
+  };
+
   const handleEnumNavigation = async (
     settingKey: string,
     direction: 'left' | 'right',
@@ -352,23 +369,26 @@ export function SettingsDialog({
       return;
     }
 
+    // Apply custom sorting using shared function
+    const optionsToUse = getSortedOptions(settingKey, definition.options);
+
     const currentValue = getNestedValue(pendingSettings, settingKey.split('.'));
     const currentStringValue =
       typeof currentValue === 'string' ? currentValue : String(currentValue);
-    const currentIndex = definition.options.findIndex(
+    const currentIndex = optionsToUse.findIndex(
       (opt) => opt.value === currentStringValue,
     );
 
     let newIndex;
     if (direction === 'left') {
       newIndex =
-        currentIndex > 0 ? currentIndex - 1 : definition.options.length - 1;
+        currentIndex > 0 ? currentIndex - 1 : optionsToUse.length - 1;
     } else {
       newIndex =
-        currentIndex < definition.options.length - 1 ? currentIndex + 1 : 0;
+        currentIndex < optionsToUse.length - 1 ? currentIndex + 1 : 0;
     }
 
-    const newValue = definition.options[newIndex].value;
+    const newValue = optionsToUse[newIndex].value;
 
     // Update pending settings
     setPendingSettings((prev) =>
@@ -780,7 +800,7 @@ export function SettingsDialog({
                 <Box minWidth={3} />
                 {item.type === 'enum' ? (
                   <EnumSelector
-                    options={getSettingDefinition(item.value)?.options || []}
+                    options={getSortedOptions(item.value, getSettingDefinition(item.value)?.options || [])}
                     currentValue={
                       typeof getNestedValue(
                         pendingSettings,

@@ -100,7 +100,7 @@ export { i18n as errorTranslator };
  * Detect language from environment variables
  * Supports both GEMINI_LANG (Gemini-specific) and standard Unix LANG/LC_ALL
  */
-const detectLanguageFromEnv = (): string | null => {
+export const detectLanguageFromEnv = (): string | null => {
   // 1. Check Gemini-specific environment variable first
   const geminiLang = process.env['GEMINI_LANG'];
   if (geminiLang && languages.includes(geminiLang)) {

@@ -13,7 +13,15 @@ export const useTranslation = (namespace = 'help') =>
 // Language switching utility for CLI environment
 export const switchLanguage = async (lng: string): Promise<boolean> => {
   try {
-    await i18n.changeLanguage(lng);
+    // Handle empty string (environment variable setting)
+    if (lng === '') {
+      const { detectLanguageFromEnv } = await import('./index.js');
+      const envLang = detectLanguageFromEnv();
+      const actualLanguage = envLang || 'en';
+      await i18n.changeLanguage(actualLanguage);
+    } else {
+      await i18n.changeLanguage(lng);
+    }
     return true;
   } catch (error) {
     console.error('Failed to switch language:', error);
