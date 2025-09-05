@@ -47,6 +47,7 @@ import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { writeFileSync } from 'node:fs';
+import { getInstallationInfo } from './utils/installationInfo.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -189,7 +190,12 @@ export async function startInteractiveUI(
     { exitOnCtrlC: false, isScreenReaderEnabled: config.getScreenReader() },
   );
 
-  checkForUpdates()
+  const installationInfo = getInstallationInfo(
+    config.getProjectRoot(),
+    settings.merged.general?.disableAutoUpdate ?? false,
+  );
+
+  checkForUpdates(installationInfo)
     .then((info) => {
       handleAutoUpdate(info, settings, config.getProjectRoot());
     })
