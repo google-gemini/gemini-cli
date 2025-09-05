@@ -387,7 +387,7 @@ export class Config {
     if (this.getIdeMode()) {
       const ide = await IdeClient.getInstance();
       if (ide.currentIde) {
-        await (await IdeClient.getInstance()).connect();
+        await ide.connect();
         logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
       } else {
         this.setIdeMode(false);
