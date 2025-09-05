@@ -37,9 +37,9 @@
     "@types/fs-extra": "^11.0.4",
     "@types/supertest": "^6.0.3",
     "@types/tar": "^6.1.13",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.1.0",
     "supertest": "^7.1.4",
-    "typescript": "^5.3.3",
+    "typescript": "^5.8.3",
     "vitest": "^3.1.1"
   },
   "engines": {
