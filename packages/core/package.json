@@ -22,7 +22,7 @@
   "dependencies": {
     "@google/genai": "1.13.0",
     "@lvce-editor/ripgrep": "^1.6.0",
-    "@modelcontextprotocol/sdk": "^1.11.0",
+    "@modelcontextprotocol/sdk": "^1.15.1",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "^0.203.0",
     "@opentelemetry/exporter-logs-otlp-http": "^0.203.0",
@@ -89,7 +89,7 @@
     "@types/pdfkit": "^0.13.4",
     "@types/picomatch": "^4.0.1",
     "@types/ws": "^8.5.10",
-    "typescript": "^5.3.3",
+    "typescript": "^5.8.3",
     "vitest": "^3.1.1"
   },
   "engines": {
