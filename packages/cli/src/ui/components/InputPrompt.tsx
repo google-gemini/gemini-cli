@@ -72,6 +72,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Refs for robust IME submission handling
+  const bufferRef = useRef(buffer);
+  const imeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSubmittingRef = useRef(false);
+
+  useEffect(() => {
+    bufferRef.current = buffer;
+  }, [buffer]);
+
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
   );
@@ -124,11 +133,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
   }, [showEscapePrompt, onEscapePromptChange]);
 
-  // Clear escape prompt timer on unmount
+  // Clear timers on unmount
   useEffect(
     () => () => {
       if (escapeTimerRef.current) {
         clearTimeout(escapeTimerRef.current);
+      }
+      if (imeTimeoutRef.current) {
+        clearTimeout(imeTimeoutRef.current);
       }
     },
     [],
@@ -142,9 +154,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
-      onSubmit(submittedValue);
       resetCompletionState();
       resetReverseSearchCompletionState();
+      onSubmit(submittedValue);
     },
     [
       onSubmit,
@@ -155,6 +167,30 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       resetReverseSearchCompletionState,
     ],
   );
+
+  const handleSubmitAndClearRef = useRef(handleSubmitAndClear);
+  useEffect(() => {
+    handleSubmitAndClearRef.current = handleSubmitAndClear;
+  }, [handleSubmitAndClear]);
+
+  // Unified deferred submission function for IME and consistency
+  const deferAndSubmit = useCallback((value?: string) => {
+    if (isSubmittingRef.current) return;
+    if (imeTimeoutRef.current) clearTimeout(imeTimeoutRef.current);
+
+    isSubmittingRef.current = true;
+
+    imeTimeoutRef.current = setTimeout(() => {
+      try {
+        const textToSubmit =
+          value !== undefined ? value : bufferRef.current.text;
+        handleSubmitAndClearRef.current(textToSubmit);
+      } finally {
+        imeTimeoutRef.current = null;
+        isSubmittingRef.current = false;
+      }
+    }, 50);
+  }, []);
 
   const customSetTextAndResetCompletionSignal = useCallback(
     (newText: string) => {
@@ -239,6 +275,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      if (isSubmittingRef.current) {
+        return;
+      }
+
       /// We want to handle paste even when not focused to support drag and drop.
       if (!focus && !key.paste) {
         return;
@@ -272,6 +312,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (keyMatchers[Command.ESCAPE](key)) {
+        if (imeTimeoutRef.current) {
+          clearTimeout(imeTimeoutRef.current);
+          imeTimeoutRef.current = null;
+          isSubmittingRef.current = false;
+          return;
+        }
+
         if (reverseSearchActive) {
           setReverseSearchActive(false);
           reverseSearchCompletion.resetCompletionState();
@@ -361,7 +408,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             showSuggestions && activeSuggestionIndex > -1
               ? suggestions[activeSuggestionIndex].value
               : buffer.text;
-          handleSubmitAndClear(textToSubmit);
+          deferAndSubmit(textToSubmit);
           reverseSearchCompletion.resetCompletionState();
           setReverseSearchActive(false);
           return;
@@ -378,7 +425,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // If the command is a perfect match, pressing enter should execute it.
       if (completion.isPerfectMatch && keyMatchers[Command.RETURN](key)) {
-        handleSubmitAndClear(buffer.text);
+        deferAndSubmit();
         return;
       }
 
@@ -467,7 +514,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.backspace();
             buffer.newline();
           } else {
-            handleSubmitAndClear(buffer.text);
+            deferAndSubmit();
           }
         }
         return;
@@ -546,7 +593,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       setShellModeActive,
       onClearScreen,
       inputHistory,
-      handleSubmitAndClear,
       shellHistory,
       reverseSearchCompletion,
       handleClipboardImage,
@@ -558,6 +604,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,
+      deferAndSubmit,
     ],
   );
 
