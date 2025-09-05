@@ -13,7 +13,7 @@ Rather than creating a new protocol, this specification builds upon the existing
 Recent work integrating Gemini CLI with clients like Zed and Gemini Code Assist’s agent mode has highlighted the need for a robust, standard communication protocol. Standardizing on A2A provides several key advantages:
 
 -   **Solid Foundation**: Provides a robust, open standard that ensures a stable, predictable, and consistent integration experience across different IDEs and client surfaces.
--   **Extensibility**: Creates a flexible foundation to support new developer-focused tools and workflows as they emerge.
+-   **Extensibility**: Creates a flexible foundation to support new tools and workflows as they emerge.
 -   **Ecosystem Alignment**: Aligns Gemini CLI with a growing industry standard, fostering broader interoperability.
 
 ## 2. Communication Flow
