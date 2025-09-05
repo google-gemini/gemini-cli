@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { homedir } from 'node:os';
 import {
+  GEMINI_DIR,
   getErrorMessage,
   isWithinRoot,
   getIdeTrust,
@@ -16,8 +17,7 @@ import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
 
 export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
-export const SETTINGS_DIRECTORY_NAME = '.gemini';
-export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
+export const USER_SETTINGS_DIR = path.join(homedir(), GEMINI_DIR);
 export const USER_TRUSTED_FOLDERS_PATH = path.join(
   USER_SETTINGS_DIR,
   TRUSTED_FOLDERS_FILENAME,

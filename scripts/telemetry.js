@@ -9,10 +9,11 @@
 import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
+import { GEMINI_DIR } from '../packages/core/dist/src/utils/paths.js';
 
 const projectRoot = join(import.meta.dirname, '..');
 
-const SETTINGS_DIRECTORY_NAME = '.gemini';
+const SETTINGS_DIRECTORY_NAME = GEMINI_DIR;
 const USER_SETTINGS_DIR = join(
   process.env.HOME || process.env.USERPROFILE || process.env.HOMEPATH || '',
   SETTINGS_DIRECTORY_NAME,

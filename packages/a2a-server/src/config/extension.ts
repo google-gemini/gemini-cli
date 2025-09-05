@@ -7,12 +7,13 @@
 // Copied exactly from packages/cli/src/config/extension.ts, last PR #1026
 
 import type { MCPServerConfig } from '@google/gemini-cli-core';
+import { GEMINI_DIR } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { logger } from '../utils/logger.js';
 
-export const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
+export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 
 export interface Extension {

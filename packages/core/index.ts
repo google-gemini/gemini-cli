@@ -20,3 +20,4 @@ export {
 export { getIdeTrust } from './src/utils/ide-trust.js';
 export { makeFakeConfig } from './src/test-utils/config.js';
 export * from './src/utils/pathReader.js';
+export { GEMINI_DIR } from './src/utils/paths.js';
