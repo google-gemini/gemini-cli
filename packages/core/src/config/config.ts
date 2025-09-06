@@ -192,6 +192,7 @@ export interface ConfigParameters {
   cwd: string;
   fileDiscoveryService?: FileDiscoveryService;
   includeDirectories?: string[];
+  version: string;
   bugCommand?: BugCommandSettings;
   model: string;
   extensionContextFilePaths?: string[];
@@ -280,6 +281,7 @@ export class Config {
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
+  private readonly version: string;
   private readonly experimentalZedIntegration: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly chatCompression: ChatCompressionSettings | undefined;
@@ -300,6 +302,7 @@ export class Config {
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
+    this.version = params.version;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
@@ -572,6 +575,9 @@ export class Config {
 
   getMcpServers(): Record<string, MCPServerConfig> | undefined {
     return this.mcpServers;
+  }
+  getVersion(): string {
+    return this.version;
   }
 
   getUserMemory(): string {

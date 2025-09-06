@@ -383,6 +383,7 @@ export async function loadCliConfig(
   extensions: Extension[],
   sessionId: string,
   argv: CliArgs,
+  version?: string,
   cwd: string = process.cwd(),
 ): Promise<Config> {
   const debugMode =
@@ -614,6 +615,7 @@ export async function loadCliConfig(
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
+    version: version || (await getCliVersion()),
     chatCompression: settings.model?.chatCompression,
     folderTrust,
     interactive,

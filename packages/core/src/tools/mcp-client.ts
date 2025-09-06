@@ -446,6 +446,7 @@ export async function discoverMcpTools(
   toolRegistry: ToolRegistry,
   promptRegistry: PromptRegistry,
   debugMode: boolean,
+  version: string,
   workspaceContext: WorkspaceContext,
   cliConfig: Config,
 ): Promise<void> {
@@ -461,6 +462,7 @@ export async function discoverMcpTools(
           toolRegistry,
           promptRegistry,
           debugMode,
+          version,
           workspaceContext,
           cliConfig,
         ),
@@ -507,6 +509,7 @@ export async function connectAndDiscover(
   toolRegistry: ToolRegistry,
   promptRegistry: PromptRegistry,
   debugMode: boolean,
+  version: string,
   workspaceContext: WorkspaceContext,
   cliConfig: Config,
 ): Promise<void> {
@@ -518,6 +521,7 @@ export async function connectAndDiscover(
       mcpServerName,
       mcpServerConfig,
       debugMode,
+      version,
       workspaceContext,
     );
 
@@ -817,11 +821,12 @@ export async function connectToMcpServer(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
+  version: string,
   workspaceContext: WorkspaceContext,
 ): Promise<Client> {
   const mcpClient = new Client({
-    name: 'gemini-cli-mcp-client',
-    version: '0.0.1',
+    name: 'gemini-cli',
+    version: version,
   });
 
   mcpClient.registerCapabilities({
