@@ -189,6 +189,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     resetReverseSearchCompletionState,
   ]);
 
+  const insertAtOffsetWithAutoSpaces = useCallback((offset: number, insertText: string): void => {
+    const cpsAround = toCodePoints(buffer.text);
+    let textToInsert = insertText;
+    const charBefore = offset > 0 ? cpsAround[offset - 1] : '';
+    const charAfter = offset < cpsAround.length ? cpsAround[offset] : '';
+    if (charBefore && charBefore !== ' ' && charBefore !== '\n') textToInsert = ' ' + textToInsert;
+    if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) textToInsert = textToInsert + ' ';
+    buffer.replaceRangeByOffset(offset, offset, textToInsert);
+  }, [buffer]);
+
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
     try {
@@ -209,27 +219,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           const [row, col] = buffer.cursor;
 
           // Calculate offset from row/col
-          let offset = 0;
-          for (let i = 0; i < row; i++) {
-            offset += buffer.lines[i].length + 1; // +1 for newline
-          }
-          offset += col;
+          const offset = logicalPosToOffset(buffer.lines, row, col);
 
-          // Add spaces around the path if needed
-          let textToInsert = insertText;
-          const charBefore = offset > 0 ? currentText[offset - 1] : '';
-          const charAfter =
-            offset < currentText.length ? currentText[offset] : '';
-
-          if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
-            textToInsert = ' ' + textToInsert;
-          }
-          if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
-            textToInsert = textToInsert + ' ';
-          }
-
-          // Insert at cursor position
-          buffer.replaceRangeByOffset(offset, offset, textToInsert);
+          // Insert at cursor position with auto spaces
+          insertAtOffsetWithAutoSpaces(offset, insertText);
         }
       }
     } catch (error) {
