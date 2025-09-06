@@ -5,6 +5,7 @@
  */
 
 import type { Config } from '../config/config.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import type { VSCodeTheme, ColorPalette } from './theme-types.js';
 
 /**
@@ -59,6 +60,7 @@ Return a JSON object with { "themeType": "light" | "dark" }.`;
         [{ role: 'user', parts: [{ text: themeTypePrompt }] }],
         THEME_TYPE_SCHEMA,
         signal,
+        DEFAULT_GEMINI_FLASH_MODEL,
       )) as unknown as { themeType?: 'light' | 'dark' };
       themeType = themeTypeResult?.themeType === 'light' ? 'light' : 'dark';
     } catch (e) {
@@ -135,6 +137,7 @@ Return a JSON object matching the provided schema with exactly these keys.`;
         [{ role: 'user', parts: [{ text: palettePrompt }] }],
         PALETTE_SCHEMA,
         signal,
+        DEFAULT_GEMINI_FLASH_MODEL,
       )) as unknown as ColorPalette;
       palette = result;
     } catch (e) {
