@@ -36,9 +36,21 @@ async function addMcpServer(
     includeTools,
     excludeTools,
   } = options;
-  const settingsScope =
-    scope === 'user' ? SettingScope.User : SettingScope.Workspace;
-  const settings = loadSettings();
+
+  const settings = loadSettings(process.cwd());
+  const inHome = settings.workspace.path === settings.user.path;
+
+  if (scope === 'project' && inHome) {
+    console.error(
+      'Error: Cannot use --scope project when running from the home directory.',
+    );
+    process.exit(1);
+  }
+
+  let settingsScope = SettingScope.Workspace;
+  if (scope === 'user' || (scope === 'auto' && inHome)) {
+    settingsScope = SettingScope.User;
+  }
 
   let newServer: Partial<MCPServerConfig> = {};
 
@@ -107,7 +119,7 @@ async function addMcpServer(
   const isExistingServer = !!mcpServers[name];
   if (isExistingServer) {
     console.log(
-      `MCP server "${name}" is already configured within ${scope} settings.`,
+      `MCP server "${name}" is already configured within ${settingsScope} settings.`,
     );
   }
 
@@ -116,10 +128,10 @@ async function addMcpServer(
   settings.setValue(settingsScope, 'mcpServers', mcpServers);
 
   if (isExistingServer) {
-    console.log(`MCP server "${name}" updated in ${scope} settings.`);
+    console.log(`MCP server "${name}" updated in ${settingsScope} settings.`);
   } else {
     console.log(
-      `MCP server "${name}" added to ${scope} settings. (${transport})`,
+      `MCP server "${name}" added to ${settingsScope} settings. (${transport})`,
     );
   }
 }
@@ -148,8 +160,8 @@ export const addCommand: CommandModule = {
         alias: 's',
         describe: 'Configuration scope (user or project)',
         type: 'string',
-        default: 'project',
-        choices: ['user', 'project'],
+        default: 'auto',
+        choices: ['user', 'project', 'auto'],
       })
       .option('transport', {
         alias: 't',
