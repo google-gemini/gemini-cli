@@ -12,38 +12,56 @@ import * as path from 'node:path';
 const execAsync = promisify(exec);
 
 /**
- * Checks if the system clipboard contains an image (macOS only for now)
+ * Checks if the system clipboard contains an image
  * @returns true if clipboard contains an image
  */
 export async function clipboardHasImage(): Promise<boolean> {
-  if (process.platform !== 'darwin') {
-    return false;
+  if (process.platform === 'darwin') {
+    try {
+      // Use osascript to check clipboard type
+      const { stdout } = await execAsync(
+        `osascript -e 'clipboard info' 2>/dev/null | grep -qE "«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»" && echo "true" || echo "false"`,
+        { shell: '/bin/bash' },
+      );
+      return stdout.trim() === 'true';
+    } catch {
+      return false;
+    }
+  } else if (process.platform === 'win32') {
+    try {
+      // Use PowerShell to check if clipboard contains an image
+      const { stdout } = await execAsync(
+        `powershell -command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::ContainsImage()"`,
+        { shell: 'powershell.exe' },
+      );
+      return stdout.trim().toLowerCase() === 'true';
+    } catch {
+      return false;
+    }
+  } else if (process.platform === 'linux') {
+    try {
+      // Use xclip to check clipboard content type
+      const { stdout } = await execAsync(
+        `xclip -selection clipboard -t TARGETS -o 2>/dev/null | grep -qE "image/png|image/jpeg|image/gif|image/tiff" && echo "true" || echo "false"`,
+        { shell: '/bin/bash' },
+      );
+      return stdout.trim() === 'true';
+    } catch {
+      return false;
+    }
   }
 
-  try {
-    // Use osascript to check clipboard type
-    const { stdout } = await execAsync(
-      `osascript -e 'clipboard info' 2>/dev/null | grep -qE "«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»" && echo "true" || echo "false"`,
-      { shell: '/bin/bash' },
-    );
-    return stdout.trim() === 'true';
-  } catch {
-    return false;
-  }
+  return false;
 }
 
 /**
- * Saves the image from clipboard to a temporary file (macOS only for now)
+ * Saves the image from clipboard to a temporary file
  * @param targetDir The target directory to create temp files within
  * @returns The path to the saved image file, or null if no image or error
  */
 export async function saveClipboardImage(
   targetDir?: string,
 ): Promise<string | null> {
-  if (process.platform !== 'darwin') {
-    return null;
-  }
-
   try {
     // Create a temporary directory for clipboard images within the target directory
     // This avoids security restrictions on paths outside the target directory
@@ -51,62 +69,136 @@ export async function saveClipboardImage(
     const tempDir = path.join(baseDir, '.gemini-clipboard');
     await fs.mkdir(tempDir, { recursive: true });
 
-    // Generate a unique filename with timestamp
-    const timestamp = new Date().getTime();
-
-    // Try different image formats in order of preference
-    const formats = [
-      { class: 'PNGf', extension: 'png' },
-      { class: 'JPEG', extension: 'jpg' },
-      { class: 'TIFF', extension: 'tiff' },
-      { class: 'GIFf', extension: 'gif' },
-    ];
-
-    for (const format of formats) {
-      const tempFilePath = path.join(
-        tempDir,
-        `clipboard-${timestamp}.${format.extension}`,
+    // Generate a unique filename with counter
+    let counter = 1;
+    try {
+      const files = await fs.readdir(tempDir);
+      const clipboardFiles = files.filter(
+        (f) => f.startsWith('clipboard-') && f.match(/clipboard-(\d+)\./),
       );
+      if (clipboardFiles.length > 0) {
+        const numbers = clipboardFiles.map((f) => {
+          const match = f.match(/clipboard-(\d+)\./);
+          return match ? parseInt(match[1], 10) : 0;
+        });
+        counter = Math.max(...numbers) + 1;
+      }
+    } catch {
+      // Directory doesn't exist yet or can't read, use counter 1
+    }
 
-      // Try to save clipboard as this format
-      const script = `
-        try
-          set imageData to the clipboard as «class ${format.class}»
-          set fileRef to open for access POSIX file "${tempFilePath}" with write permission
-          write imageData to fileRef
-          close access fileRef
-          return "success"
-        on error errMsg
-          try
-            close access POSIX file "${tempFilePath}"
+    if (process.platform === 'darwin') {
+      // Try different image formats in order of preference
+      const formats = [
+        { class: 'PNGf', extension: 'png' },
+        { class: 'JPEG', extension: 'jpg' },
+        { class: 'TIFF', extension: 'tiff' },
+        { class: 'GIFf', extension: 'gif' },
+      ];
+
+      for (const format of formats) {
+        const tempFilePath = path.join(
+          tempDir,
+          `clipboard-${counter}.${format.extension}`,
+        );
+
+        // Try to save clipboard as this format
+        const escapedTempFilePath = tempFilePath
+          .replace(/\\/g, '\\\\')
+          .replace(/"/g, '\\"');
+        const script = `
+           try
+            set imageData to the clipboard as «class ${format.class}»
+            set fileRef to open for access POSIX file "${escapedTempFilePath}" with write permission
+            write imageData to fileRef
+            close access fileRef
+            return "success"
+          on error errMsg
+            try
+              close access POSIX file "${escapedTempFilePath}"
+            end try
+            return "error"
           end try
-          return "error"
-        end try
+        `;
+
+        const { stdout } = await execAsync(`osascript -e '${script}'`);
+
+        if (stdout.trim() === 'success') {
+          // Verify the file was created and has content
+          try {
+            const stats = await fs.stat(tempFilePath);
+            if (stats.size > 0) {
+              return tempFilePath;
+            }
+          } catch {
+            // File doesn't exist, continue to next format
+          }
+        }
+
+        // Clean up failed attempt
+        try {
+          await fs.unlink(tempFilePath);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    } else if (process.platform === 'win32') {
+      // Use PowerShell to save clipboard image
+      const tempFilePath = path.join(tempDir, `clipboard-${counter}.png`);
+      // In PowerShell, a single quote within a single-quoted string is escaped by doubling it.
+      const escapedPath = tempFilePath.replace(/'/g, "''");
+      const powershellCommand = `
+        Add-Type -AssemblyName System.Windows.Forms;
+        Add-Type -AssemblyName System.Drawing;
+        $img = [System.Windows.Forms.Clipboard]::GetImage();
+        if ($img) {
+          $img.Save('${escapedPath}', [System.Drawing.Imaging.ImageFormat]::Png);
+          Write-Host "success";
+        } else {
+          Write-Host "no_image";
+        }
       `;
 
-      const { stdout } = await execAsync(`osascript -e '${script}'`);
+      const { stdout } = await execAsync(
+        `powershell -command "${powershellCommand}"`,
+        {
+          shell: 'powershell.exe',
+        },
+      );
 
       if (stdout.trim() === 'success') {
-        // Verify the file was created and has content
         try {
           const stats = await fs.stat(tempFilePath);
           if (stats.size > 0) {
             return tempFilePath;
           }
         } catch {
-          // File doesn't exist, continue to next format
+          // File doesn't exist
         }
       }
+    } else if (process.platform === 'linux') {
+      // Use xclip to save clipboard image
+      const tempFilePath = path.join(tempDir, `clipboard-${counter}.png`);
+      // Escape characters that have special meaning inside double quotes in bash.
+      const escapedPath = tempFilePath.replace(/(["`$\\])/g, '\\$1');
+      const { stdout } = await execAsync(
+        `xclip -selection clipboard -t image/png -o > "${escapedPath}" 2>/dev/null && echo "success" || echo "error"`,
+        { shell: '/bin/bash' },
+      );
 
-      // Clean up failed attempt
-      try {
-        await fs.unlink(tempFilePath);
-      } catch {
-        // Ignore cleanup errors
+      if (stdout.trim() === 'success') {
+        try {
+          const stats = await fs.stat(tempFilePath);
+          if (stats.size > 0) {
+            return tempFilePath;
+          }
+        } catch {
+          // File doesn't exist
+        }
       }
     }
 
-    // No format worked
+    // No format worked or unsupported platform
     return null;
   } catch (error) {
     console.error('Error saving clipboard image:', error);

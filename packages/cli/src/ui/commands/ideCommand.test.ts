@@ -20,6 +20,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     IdeClient: {
       getInstance: vi.fn(),
     },
+    ideContext: {
+      getIdeContext: vi.fn(),
+    },
+    DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD: 4_000_000,
   };
 });
 

@@ -97,6 +97,7 @@ vi.mock('@google/gemini-cli-core', async () => {
       respectGitIgnore: true,
       respectGeminiIgnore: true,
     },
+    DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD: 4_000_000,
   };
 });
 
