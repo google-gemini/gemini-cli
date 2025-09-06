@@ -63,26 +63,22 @@ export class ProviderConfigManager {
 
   private loadProviderConfigs(): void {
     // 设置 Gemini 配置（非默认）
-    const geminiApiKey = process.env['GEMINI_API_KEY'];
+    // Note: API keys are now managed by AuthManager, not stored in provider configs
     const geminiConfig: ModelProviderConfig = {
       type: ModelProviderType.GEMINI,
-      apiKey: geminiApiKey,
       model: 'gemini-2.5-flash',
       isDefault: false,
       displayName: 'Google Gemini'
     };
     this.providerConfigs.set(ModelProviderType.GEMINI, geminiConfig);
 
-    const openaiApiKey = process.env['OPENAI_API_KEY'];
-    if (openaiApiKey) {
-      const openaiConfig: ModelProviderConfig = {
-        type: ModelProviderType.OPENAI,
-        apiKey: openaiApiKey,
-        model: 'gpt-4',
-        displayName: 'OpenAI GPT'
-      };
-      this.providerConfigs.set(ModelProviderType.OPENAI, openaiConfig);
-    }
+    // OpenAI configuration (API key managed by AuthManager)
+    const openaiConfig: ModelProviderConfig = {
+      type: ModelProviderType.OPENAI,
+      model: 'gpt-4',
+      displayName: 'OpenAI GPT'
+    };
+    this.providerConfigs.set(ModelProviderType.OPENAI, openaiConfig);
 
     // 设置 LM Studio 为默认提供商
     const lmStudioUrl = process.env['LM_STUDIO_URL'] || 'http://127.0.0.1:1234/v1';

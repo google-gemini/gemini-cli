@@ -33,14 +33,14 @@ export class ModelProviderFactory {
 
     switch (config.type) {
       case ModelProviderType.OPENAI:
-        config.apiKey = process.env['OPENAI_API_KEY']
+        // OpenAIProvider will get authentication from AuthManager internally
         provider = new OpenAIProvider(config, configInstance);
         break;
       case ModelProviderType.LM_STUDIO:
         provider = new LMStudioProvider(config, configInstance);
         break;
         case ModelProviderType.GEMINI:
-        config.apiKey = process.env['GEMINI_API_KEY']
+        // GeminiProvider will get authentication from AuthManager internally
         provider = new GeminiProvider(config, configInstance);
         break;
       case ModelProviderType.ANTHROPIC:

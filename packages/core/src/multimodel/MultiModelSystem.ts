@@ -162,6 +162,12 @@ export class MultiModelSystem {
    * Initialize the MultiModelSystem
    */
   async initialize(): Promise<void> {
+    // Initialize AuthManager with default API key preferences for providers that only support API keys
+    const { AuthManager } = await import('../auth/AuthManager.js');
+    const authManager = AuthManager.getInstance();
+    authManager.setConfig(this.config);
+    authManager.initializeDefaultApiKeyAuth();
+
     // Initialize the default provider if one is configured
     if (this.currentProvider) {
       await this.getOrCreateProvider(this.currentProvider);
@@ -428,7 +434,7 @@ export class MultiModelSystem {
       try {
         let models: string[] = [];
         
-        // Route to static provider methods
+        // Route to static provider methods with authentication
         switch (config!.type) {
           case 'openai':
             models = await OpenAIProvider.getAvailableModels();
@@ -464,6 +470,13 @@ export class MultiModelSystem {
 
   getSupportedProviders(): ModelProviderType[] {
     return ModelProviderFactory.getSupportedProviders();
+  }
+
+  /**
+   * Get the current config instance
+   */
+  getConfig(): Config {
+    return this.config;
   }
 
   private getProviderKey(config: ModelProviderConfig): string {
