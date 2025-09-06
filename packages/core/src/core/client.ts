@@ -29,7 +29,7 @@ import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
-import { tokenLimit } from './tokenLimits.js';
+import { tokenLimit, getOutputTokenLimit } from './tokenLimits.js';
 import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import type {
   ContentGenerator,
@@ -858,7 +858,10 @@ export class GeminiClient {
         },
         config: {
           systemInstruction: { text: getCompressionPrompt() },
-          maxOutputTokens: originalTokenCount,
+          maxOutputTokens: Math.min(
+            originalTokenCount,
+            getOutputTokenLimit(this.config.getModel()),
+          ),
         },
       },
       prompt_id,
