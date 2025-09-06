@@ -77,7 +77,7 @@ Settings are organized into categories. All settings should be placed within the
   - **Default:** `false`
 
 - **`general.messageQueueMode`** (string):
-  - **Description:** Determines when queued messages are sent. Can be `wait_for_idle` (after tools finish) or `wait_for_response` (after AI responds).
+  - **Description:** Determines when queued messages are sent. Can be "Wait for Idle" (after tools finish) or "Wait for Response" (after AI responds).
   - **Default:** `wait_for_idle`
 
 #### `ui`

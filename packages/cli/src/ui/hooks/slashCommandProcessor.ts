@@ -56,6 +56,7 @@ export const useSlashCommandProcessor = (
   toggleVimEnabled: () => Promise<boolean>,
   setIsProcessing: (isProcessing: boolean) => void,
   setGeminiMdFileCount: (count: number) => void,
+  openModelDialog: () => void,
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<readonly SlashCommand[]>([]);
@@ -388,6 +389,9 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'settings':
                       openSettingsDialog();
+                      return { type: 'handled' };
+                    case 'model':
+                      openModelDialog();
                       return { type: 'handled' };
                     case 'help':
                       return { type: 'handled' };

@@ -155,7 +155,7 @@ export const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: 'wait_for_idle',
         description:
-          'Determines when queued messages are sent. Can be "wait_for_idle" (after tools finish) or "wait_for_response" (after AI responds).',
+          'Determines when queued messages are sent: "Wait for Idle" (after tools finish) or "Wait for Response" (after AI responds).',
         showInDialog: true,
       },
     },

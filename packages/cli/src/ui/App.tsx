@@ -41,12 +41,14 @@ import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
 import { AuthDialog } from './components/AuthDialog.js';
+import { ModelDialog } from './components/ModelDialog.js';
 import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { FolderTrustDialog } from './components/FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
 import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
 import { Colors } from './colors.js';
+import { MessageQueueIndicator } from './components/MessageQueueIndicator.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import type { LoadedSettings } from '../config/settings.js';
 import { SettingScope } from '../config/settings.js';
@@ -168,6 +170,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
   const [currentIDE, setCurrentIDE] = useState<DetectedIde | undefined>();
+  // Local state for message queue mode to ensure re-renders when it changes
+  const [messageQueueMode, setMessageQueueMode] = useState<'wait_for_idle' | 'wait_for_response'>(
+    settings.merged.general?.messageQueueMode ?? 'wait_for_idle'
+  );
 
   useEffect(() => {
     (async () => {
@@ -179,6 +185,12 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       ideClient.disconnect();
     });
   }, [config]);
+
+  // Listen for changes to message queue mode setting
+  useEffect(() => {
+    const newMode = settings.merged.general?.messageQueueMode ?? 'wait_for_idle';
+    setMessageQueueMode(newMode);
+  }, [settings.merged.general?.messageQueueMode]);
 
   const shouldShowIdePrompt =
     currentIDE &&
@@ -317,6 +329,20 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
+
+  const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
+
+  const handleModelSelect = useCallback((modelName: string) => {
+    config.setModel(modelName);
+    setIsModelDialogOpen(false);
+    addItem(
+      {
+        type: MessageType.INFO,
+        text: `Switched to model: ${modelName}`,
+      },
+      Date.now(),
+    );
+  }, [config, addItem]);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder);
@@ -634,6 +660,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     toggleVimEnabled,
   } = useVimMode();
 
+  const openModelDialog = useCallback(() => {
+    setIsModelDialogOpen(true);
+  }, []);
+
   const {
     handleSlashCommand,
     slashCommands,
@@ -659,6 +689,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     toggleVimEnabled,
     setIsProcessing,
     setGeminiMdFileCount,
+    openModelDialog,
   );
 
   const buffer = useTextBuffer({
@@ -751,10 +782,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         // Add to independent input history
         inputHistoryStore.addInput(trimmedValue);
       }
+      // Execute slash commands immediately (do not queue), so UI commands work during streaming
+      if (trimmedValue.startsWith('/') || trimmedValue.startsWith('?')) {
+        void handleSlashCommand(trimmedValue);
+        return;
+      }
       // Always add to message queue
       addMessage(submittedValue);
     },
-    [addMessage, inputHistoryStore],
+    [addMessage, inputHistoryStore, handleSlashCommand],
   );
 
   const handleIdePromptComplete = useCallback(
@@ -843,6 +879,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       ) {
         // Show IDE status when in IDE mode and context is available.
         handleSlashCommand('/ide status');
+      } else if (keyMatchers[Command.TOGGLE_MESSAGE_QUEUE_MODE](key)) {
+        const current = messageQueueMode;
+        const next = current === 'wait_for_idle' ? 'wait_for_response' : 'wait_for_idle';
+        setMessageQueueMode(next); // Update local state immediately for UI responsiveness
+        settings.setValue(SettingScope.User, 'general.messageQueueMode', next);
+        addItem({ type: MessageType.INFO, text: `Message Queue Mode: ${next}` }, Date.now());
+        return;
       } else if (keyMatchers[Command.QUIT](key)) {
         // When authenticating, let AuthInProgress component handle Ctrl+C.
         if (isAuthenticating) {
@@ -909,7 +952,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       streamingState === StreamingState.Responding) &&
     !initError &&
     !isProcessing &&
-    !isProQuotaDialogOpen;
+    !isProQuotaDialogOpen &&
+    !isModelDialogOpen;
 
   const handleClearScreen = useCallback(() => {
     clearItems();
@@ -987,6 +1031,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       !isAuthDialogOpen &&
       !isThemeDialogOpen &&
       !isEditorDialogOpen &&
+      !isModelDialogOpen &&
       !showPrivacyNotice &&
       geminiClient?.isInitialized?.()
     ) {
@@ -1000,6 +1045,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     isAuthDialogOpen,
     isThemeDialogOpen,
     isEditorDialogOpen,
+    isModelDialogOpen,
     showPrivacyNotice,
     geminiClient,
   ]);
@@ -1211,6 +1257,13 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 onRestartRequest={() => process.exit(0)}
               />
             </Box>
+          ) : isModelDialogOpen ? (
+            <Box flexDirection="column">
+              <ModelDialog
+                onSelect={handleModelSelect}
+                currentModel={currentModel}
+              />
+            </Box>
           ) : isAuthenticating ? (
             <>
               <AuthInProgress
@@ -1355,6 +1408,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                       />
                     )}
                   {shellModeActive && <ShellModeIndicator />}
+                  {!shellModeActive && (
+                    <MessageQueueIndicator mode={messageQueueMode} />
+                  )}
                 </Box>
               </Box>
               {showErrorDetails && (

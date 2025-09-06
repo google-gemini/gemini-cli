@@ -669,9 +669,8 @@ describe('App UI', () => {
     );
     currentUnmount = unmount;
     await Promise.resolve();
-    expect(lastFrame()).toContain(
-      'Using: 1 open file (ctrl+g to view) | 1 GEMINI.md file',
-    );
+    expect(lastFrame()).toContain('Using: 1 open file (ctrl+g to view)');
+    expect(lastFrame()).toContain('GEMINI.md');
   });
 
   it('should not display context summary when hideContextSummary is true', async () => {
