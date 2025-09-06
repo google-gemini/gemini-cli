@@ -178,22 +178,38 @@ export async function saveClipboardImage(
       }
     } else if (process.platform === 'linux') {
       // Use xclip to save clipboard image
-      const tempFilePath = path.join(tempDir, `clipboard-${counter}.png`);
-      // Escape characters that have special meaning inside double quotes in bash.
-      const escapedPath = tempFilePath.replace(/(["`$\\])/g, '\\$1');
-      const { stdout } = await execAsync(
-        `xclip -selection clipboard -t image/png -o > "${escapedPath}" 2>/dev/null && echo "success" || echo "error"`,
-        { shell: '/bin/bash' },
-      );
+      const formats = [
+        { type: 'image/png', extension: 'png' },
+        { type: 'image/jpeg', extension: 'jpg' },
+        { type: 'image/gif', extension: 'gif' },
+        { type: 'image/tiff', extension: 'tiff' },
+      ];
 
-      if (stdout.trim() === 'success') {
+      for (const format of formats) {
+        const tempFilePath = path.join(
+          tempDir,
+          `clipboard-${counter}.${format.extension}`,
+        );
+        // Escape characters that have special meaning inside double quotes in bash.
+        const escapedPath = tempFilePath.replace(/(["`$\\])/g, '\\$1');
         try {
-          const stats = await fs.stat(tempFilePath);
-          if (stats.size > 0) {
-            return tempFilePath;
+          const { stdout } = await execAsync(
+            `xclip -selection clipboard -t ${format.type} -o > "${escapedPath}" 2>/dev/null && echo "success" || echo "error"`,
+            { shell: '/bin/bash' },
+          );
+
+          if (stdout.trim() === 'success') {
+            const stats = await fs.stat(tempFilePath);
+            if (stats.size > 0) {
+              return tempFilePath;
+            }
           }
+          // If successful but file is empty, or command failed, try to clean up.
+          await fs.unlink(tempFilePath).catch(() => {
+            /* ignore */
+          });
         } catch {
-          // File doesn't exist
+          // Ignore errors and try next format. A failed command might not create a file.
         }
       }
     }
