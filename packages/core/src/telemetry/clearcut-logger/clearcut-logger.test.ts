@@ -322,6 +322,7 @@ describe('ClearcutLogger', () => {
       },
       {
         env: {
+          CURSOR_TRACE_ID: '',
           TERM_PROGRAM: 'vscode',
           GITHUB_SHA: undefined,
           MONOSPACE_ENV: '',
@@ -330,6 +331,7 @@ describe('ClearcutLogger', () => {
       },
       {
         env: {
+          CURSOR_TRACE_ID: '',
           MONOSPACE_ENV: 'true',
           GITHUB_SHA: undefined,
           TERM_PROGRAM: 'vscode',
@@ -338,6 +340,7 @@ describe('ClearcutLogger', () => {
       },
       {
         env: {
+          CURSOR_TRACE_ID: '',
           __COG_BASHRC_SOURCED: 'true',
           GITHUB_SHA: undefined,
           TERM_PROGRAM: 'vscode',
@@ -346,6 +349,7 @@ describe('ClearcutLogger', () => {
       },
       {
         env: {
+          CURSOR_TRACE_ID: '',
           CLOUD_SHELL: 'true',
           GITHUB_SHA: undefined,
           TERM_PROGRAM: 'vscode',

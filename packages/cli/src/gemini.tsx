@@ -37,6 +37,10 @@ import {
   AuthType,
   getOauthClient,
   uiTelemetryService,
+  recordStartupPerformance,
+  isPerformanceMonitoringActive,
+  startGlobalMemoryMonitoring,
+  recordCurrentMemoryUsage,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -233,20 +237,78 @@ export async function startInteractiveUI(
   registerCleanup(() => instance.unmount());
 }
 
+/**
+ * Utility function to track startup performance with less verbose syntax
+ */
+async function trackStartupPerformance<T>(
+  operation: () => Promise<T>,
+  phase: string,
+  config?: Config,
+  attributes?: Record<string, string | number | boolean>,
+): Promise<T> {
+  if (!isPerformanceMonitoringActive()) {
+    return operation();
+  }
+
+  const start = performance.now();
+  const result = await operation();
+  const duration = performance.now() - start;
+
+  if (config) {
+    recordStartupPerformance(config, phase, duration, attributes);
+  }
+
+  // Add Chrome DevTools integration for debug builds
+  if (process.env['NODE_ENV'] === 'development') {
+    performance.mark(`${phase}-start`);
+    performance.mark(`${phase}-end`);
+    performance.measure(phase, `${phase}-start`, `${phase}-end`);
+  }
+
+  return result;
+}
+
 export async function main() {
   setupUnhandledRejectionHandler();
-  const settings = loadSettings();
+  const startupStart = performance.now();
+  const workspaceRoot = process.cwd();
 
+  // Settings loading phase
+  const settingsStart = performance.now();
+  const settings = loadSettings(workspaceRoot);
+  const settingsEnd = performance.now();
+  const settingsDuration = settingsEnd - settingsStart;
+
+  // Cleanup phase
+  const cleanupStart = performance.now();
   await cleanupCheckpoints();
+  const cleanupEnd = performance.now();
+  const cleanupDuration = cleanupEnd - cleanupStart;
 
   const argv = await parseArguments(settings.merged);
-  const extensions = loadExtensions();
+
+  // Extensions loading phase
+  const extensionsStart = performance.now();
+  const extensions = loadExtensions(workspaceRoot);
+  const extensionsEnd = performance.now();
+  const extensionsDuration = extensionsEnd - extensionsStart;
+
+  // CLI config loading phase
+  const configStart = performance.now();
   const config = await loadCliConfig(
     settings.merged,
     extensions,
     sessionId,
     argv,
   );
+  const configEnd = performance.now();
+  const configDuration = configEnd - configStart;
+
+  // Initialize memory monitoring if performance monitoring is enabled
+  if (isPerformanceMonitoringActive()) {
+    startGlobalMemoryMonitoring(config, 10000); // Monitor every 10 seconds
+    recordCurrentMemoryUsage(config, 'startup_post_config');
+  }
 
   const wasRaw = process.stdin.isRaw;
   let kittyProtocolDetectionComplete: Promise<boolean> | undefined;
@@ -327,6 +389,28 @@ export async function main() {
 
   await config.initialize();
 
+  // File service initialization phase
+  const fileServiceStart = performance.now();
+  config.getFileService();
+  const fileServiceEnd = performance.now();
+  const fileServiceDuration = fileServiceEnd - fileServiceStart;
+
+  // Git service initialization phase
+  let gitServiceDuration = 0;
+  if (config.getCheckpointingEnabled()) {
+    const gitServiceStart = performance.now();
+    try {
+      await config.getGitService();
+    } catch (err) {
+      // Log a warning if the git service fails to initialize, so the user knows checkpointing may not work.
+      console.warn(
+        `Warning: Could not initialize git service. Checkpointing may not be available. Error: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    const gitServiceEnd = performance.now();
+    gitServiceDuration = gitServiceEnd - gitServiceStart;
+  }
+
   if (spinnerInstance) {
     // Small UX detail to show the completion message for a bit before unmounting.
     await new Promise((f) => setTimeout(f, 100));
@@ -337,6 +421,8 @@ export async function main() {
   // Load custom themes from settings
   themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
 
+  // Theme loading phase
+  const themeStart = performance.now();
   if (settings.merged.ui?.theme) {
     if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
@@ -344,6 +430,8 @@ export async function main() {
       console.warn(`Warning: Theme "${settings.merged.ui?.theme}" not found.`);
     }
   }
+  const themeEnd = performance.now();
+  const themeDuration = themeEnd - themeStart;
 
   const initializationResult = await initializeApp(config, settings);
 
@@ -360,13 +448,27 @@ export async function main() {
       ) {
         // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
         try {
+          const authStart = performance.now();
           const err = validateAuthMethod(
-            settings.merged.security.auth.selectedType,
+            settings.merged.security?.auth?.selectedType,
           );
           if (err) {
             throw new Error(err);
           }
-          await config.refreshAuth(settings.merged.security.auth.selectedType);
+          await config.refreshAuth(
+            settings.merged.security?.auth?.selectedType,
+          );
+          const authEnd = performance.now();
+          const authDuration = authEnd - authStart;
+
+          // Record authentication performance if monitoring is active
+          if (isPerformanceMonitoringActive()) {
+            recordStartupPerformance(config, 'authentication', authDuration, {
+              auth_type: String(
+                settings.merged.security?.auth?.selectedType ?? 'unset',
+              ),
+            });
+          }
         } catch (err) {
           console.error('Error authenticating:', err);
           process.exit(1);
@@ -402,7 +504,15 @@ export async function main() {
 
       const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
 
-      await start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs);
+      await trackStartupPerformance(
+        () => start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs),
+        'sandbox_setup',
+        config,
+        {
+          sandbox_command: sandboxConfig.command,
+        },
+      );
+
       process.exit(0);
     } else {
       // Not in a sandbox and not entering one, so relaunch with additional
@@ -413,6 +523,9 @@ export async function main() {
       }
     }
   }
+
+  // Initialize config before any authentication or UI operations
+  await config.initialize();
 
   if (
     settings.merged.security?.auth?.selectedType ===
@@ -430,8 +543,44 @@ export async function main() {
   let input = config.getQuestion();
   const startupWarnings = [
     ...(await getStartupWarnings()),
-    ...(await getUserStartupWarnings()),
+    ...(await getUserStartupWarnings(workspaceRoot)),
   ];
+
+  // Record all startup performance metrics if monitoring is active
+  if (isPerformanceMonitoringActive()) {
+    recordStartupPerformance(config, 'settings_loading', settingsDuration, {
+      settings_sources: 3, // system + user + workspace
+    });
+
+    recordStartupPerformance(config, 'cleanup', cleanupDuration);
+
+    recordStartupPerformance(config, 'extensions_loading', extensionsDuration, {
+      extensions_count: extensions.length,
+    });
+
+    recordStartupPerformance(config, 'config_loading', configDuration, {
+      auth_type: String(
+        settings.merged.security?.auth?.selectedType ?? 'unset',
+      ),
+      telemetry_enabled: config.getTelemetryEnabled(),
+    });
+
+    recordStartupPerformance(config, 'file_service_init', fileServiceDuration);
+
+    if (gitServiceDuration > 0) {
+      recordStartupPerformance(config, 'git_service_init', gitServiceDuration);
+    }
+
+    recordStartupPerformance(config, 'theme_loading', themeDuration, {
+      theme_name: settings.merged.ui?.theme ?? 'unset',
+    });
+
+    const totalStartupDuration = performance.now() - startupStart;
+    recordStartupPerformance(config, 'total_startup', totalStartupDuration, {
+      is_tty: process.stdin.isTTY,
+      has_question: (input?.length ?? 0) > 0,
+    });
+  }
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {

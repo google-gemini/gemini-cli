@@ -196,6 +196,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       getExperimentalZedIntegration: () => false,
       getScreenReader: () => false,
       getGeminiMdFileCount: () => 0,
+      getFileService: vi.fn(() => ({})),
+      getCheckpointingEnabled: vi.fn(() => false),
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
       errors: [],
