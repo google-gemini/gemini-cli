@@ -347,6 +347,31 @@ describe('useSlashCompletion', () => {
 
       expect(result.current.suggestions).toHaveLength(0);
     });
+
+    it('should not suggest hidden commands', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'visible',
+          description: 'A visible command',
+        }),
+        createTestCommand({
+          name: 'hidden',
+          description: 'A hidden command',
+          hidden: true,
+        }),
+      ];
+      const { result } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions.length).toBe(1);
+      expect(result.current.suggestions[0].label).toBe('visible');
+    });
   });
 
   describe('Sub-Commands', () => {
