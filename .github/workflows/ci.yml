@@ -392,3 +392,4 @@ jobs:
           pattern: './bundle/**/*.{js,sb}'
           minimum-change-threshold: '1000'
           compression: 'none'
+          clean-script: 'clean'

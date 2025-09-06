@@ -4,9 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  vi,
+  type Mock,
+} from 'vitest';
 import type { RipGrepToolParams } from './ripGrep.js';
-import { RipGrepTool } from './ripGrep.js';
+import { canUseRipgrep, RipGrepTool } from './ripGrep.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import os, { EOL } from 'node:os';
@@ -14,10 +22,24 @@ import type { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
+import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
+import { fileExists } from '../utils/fileUtils.js';
 
-// Mock @lvce-editor/ripgrep for testing
-vi.mock('@lvce-editor/ripgrep', () => ({
-  rgPath: '/mock/rg/path',
+// Mock dependencies for canUseRipgrep
+vi.mock('@joshua.litt/get-ripgrep', () => ({
+  downloadRipGrep: vi.fn(),
+}));
+vi.mock('../utils/fileUtils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/fileUtils.js')>();
+  return {
+    ...actual,
+    fileExists: vi.fn(),
+  };
+});
+vi.mock('../config/storage.js', () => ({
+  Storage: {
+    getGlobalBinDir: vi.fn().mockReturnValue('/mock/bin/dir'),
+  },
 }));
 
 // Mock child_process for ripgrep calls
@@ -26,6 +48,54 @@ vi.mock('child_process', () => ({
 }));
 
 const mockSpawn = vi.mocked(spawn);
+
+describe('canUseRipgrep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return true if ripgrep already exists', async () => {
+    (fileExists as Mock).mockResolvedValue(true);
+    const result = await canUseRipgrep();
+    expect(result).toBe(true);
+    expect(fileExists).toHaveBeenCalledWith(path.join('/mock/bin/dir', 'rg'));
+    expect(downloadRipGrep).not.toHaveBeenCalled();
+  });
+
+  it('should download ripgrep and return true if it does not exist initially', async () => {
+    (fileExists as Mock)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    (downloadRipGrep as Mock).mockResolvedValue(undefined);
+
+    const result = await canUseRipgrep();
+
+    expect(result).toBe(true);
+    expect(fileExists).toHaveBeenCalledTimes(2);
+    expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
+  });
+
+  it('should return false if download fails and file does not exist', async () => {
+    (fileExists as Mock).mockResolvedValue(false);
+    (downloadRipGrep as Mock).mockResolvedValue(undefined);
+
+    const result = await canUseRipgrep();
+
+    expect(result).toBe(false);
+    expect(fileExists).toHaveBeenCalledTimes(2);
+    expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
+  });
+
+  it('should propagate errors from downloadRipGrep', async () => {
+    const error = new Error('Download failed');
+    (fileExists as Mock).mockResolvedValue(false);
+    (downloadRipGrep as Mock).mockRejectedValue(error);
+
+    await expect(canUseRipgrep()).rejects.toThrow(error);
+    expect(fileExists).toHaveBeenCalledTimes(1);
+    expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
+  });
+});
 
 // Helper function to create mock spawn implementations
 function createMockSpawn(
