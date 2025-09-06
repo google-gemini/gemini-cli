@@ -9,13 +9,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
-import stringWidth from 'string-width';
 import { unescapePath } from '@google/gemini-cli-core';
 import {
   toCodePoints,
   cpLen,
   cpSlice,
   stripUnsafeCharacters,
+  getCachedStringWidth,
 } from '../../utils/textUtils.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
@@ -495,6 +495,7 @@ export const replaceRangeInternal = (
       Math.min(finalCursorCol, cpLen(newLines[finalCursorRow] || '')),
     ),
     preferredCol: null,
+    layoutVersion: state.layoutVersion + 1,
   };
 };
 
@@ -670,7 +671,7 @@ function calculateVisualLayout(
         // Iterate through code points to build the current visual line (chunk)
         for (let i = currentPosInLogLine; i < codePointsInLogLine.length; i++) {
           const char = codePointsInLogLine[i];
-          const charVisualWidth = stringWidth(char);
+          const charVisualWidth = getCachedStringWidth(char);
 
           if (currentChunkVisualWidth + charVisualWidth > viewportWidth) {
             // Character would exceed viewport width
@@ -857,6 +858,8 @@ export interface TextBufferState {
   clipboard: string | null;
   selectionAnchor: [number, number] | null;
   viewportWidth: number;
+  layoutVersion: number;
+  skipLayoutUpdate?: boolean;
 }
 
 const historyLimit = 100;
@@ -877,6 +880,12 @@ export const pushUndo = (currentState: TextBufferState): TextBufferState => {
 export type TextBufferAction =
   | { type: 'set_text'; payload: string; pushToUndo?: boolean }
   | { type: 'insert'; payload: string }
+  | {
+      type: 'batch_insert';
+      payload: string;
+      skipUndo?: boolean;
+      skipLayoutUpdate?: boolean;
+    }
   | { type: 'backspace' }
   | {
       type: 'move';
@@ -904,6 +913,7 @@ export type TextBufferAction =
   | { type: 'move_to_offset'; payload: { offset: number } }
   | { type: 'create_undo_snapshot' }
   | { type: 'set_viewport_width'; payload: number }
+  | { type: 'set_layout_update_mode'; payload: { enabled: boolean } }
   | { type: 'vim_delete_word_forward'; payload: { count: number } }
   | { type: 'vim_delete_word_backward'; payload: { count: number } }
   | { type: 'vim_delete_word_end'; payload: { count: number } }
@@ -967,6 +977,7 @@ export function textBufferReducer(
         cursorRow: lastNewLineIndex,
         cursorCol: cpLen(lines[lastNewLineIndex] ?? ''),
         preferredCol: null,
+        layoutVersion: nextState.layoutVersion + 1,
       };
     }
 
@@ -1009,7 +1020,70 @@ export function textBufferReducer(
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
         preferredCol: null,
+        layoutVersion: nextState.layoutVersion + 1,
       };
+    }
+
+    case 'batch_insert': {
+      const nextState = action.skipUndo ? state : pushUndoLocal(state);
+
+      const rawText = action.payload
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
+
+      const str = stripUnsafeCharacters(rawText);
+
+      if (!str) return nextState;
+
+      const newLines = [...nextState.lines];
+      const currentLineContent = newLines[nextState.cursorRow] ?? '';
+      const before = cpSlice(currentLineContent, 0, nextState.cursorCol);
+      const after = cpSlice(currentLineContent, nextState.cursorCol);
+
+      const insertParts = str.split('\n');
+
+      // Check if we should skip layout update
+      const shouldSkipLayout = action.skipLayoutUpdate === true;
+
+      if (insertParts.length === 1) {
+        // Single line insertion
+        newLines[nextState.cursorRow] = before + insertParts[0] + after;
+        return {
+          ...nextState,
+          lines: newLines,
+          cursorCol: cpLen(before) + cpLen(insertParts[0]),
+          preferredCol: null,
+          layoutVersion: shouldSkipLayout
+            ? nextState.layoutVersion
+            : nextState.layoutVersion + 1,
+          skipLayoutUpdate: shouldSkipLayout,
+        };
+      } else {
+        // Multi-line insertion
+        const firstLine = before + insertParts[0];
+        const lastLine = insertParts[insertParts.length - 1] + after;
+        const middleLines = insertParts.slice(1, -1);
+
+        newLines.splice(
+          nextState.cursorRow,
+          1,
+          firstLine,
+          ...middleLines,
+          lastLine,
+        );
+
+        return {
+          ...nextState,
+          lines: newLines,
+          cursorRow: nextState.cursorRow + insertParts.length - 1,
+          cursorCol: cpLen(insertParts[insertParts.length - 1]),
+          preferredCol: null,
+          layoutVersion: shouldSkipLayout
+            ? nextState.layoutVersion
+            : nextState.layoutVersion + 1,
+          skipLayoutUpdate: shouldSkipLayout,
+        };
+      }
     }
 
     case 'backspace': {
@@ -1044,6 +1118,7 @@ export function textBufferReducer(
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
         preferredCol: null,
+        layoutVersion: nextState.layoutVersion + 1,
       };
     }
 
@@ -1051,7 +1126,15 @@ export function textBufferReducer(
       if (action.payload === state.viewportWidth) {
         return state;
       }
-      return { ...state, viewportWidth: action.payload };
+      return {
+        ...state,
+        viewportWidth: action.payload,
+        layoutVersion: state.layoutVersion + 1,
+      };
+    }
+
+    case 'set_layout_update_mode': {
+      return { ...state, skipLayoutUpdate: !action.payload.enabled };
     }
 
     case 'move': {
@@ -1214,14 +1297,24 @@ export function textBufferReducer(
         newLines[cursorRow] =
           cpSlice(lineContent, 0, cursorCol) +
           cpSlice(lineContent, cursorCol + 1);
-        return { ...nextState, lines: newLines, preferredCol: null };
+        return {
+          ...nextState,
+          lines: newLines,
+          preferredCol: null,
+          layoutVersion: nextState.layoutVersion + 1,
+        };
       } else if (cursorRow < lines.length - 1) {
         const nextState = pushUndoLocal(state);
         const nextLineContent = currentLine(cursorRow + 1);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = lineContent + nextLineContent;
         newLines.splice(cursorRow + 1, 1);
-        return { ...nextState, lines: newLines, preferredCol: null };
+        return {
+          ...nextState,
+          lines: newLines,
+          preferredCol: null,
+          layoutVersion: nextState.layoutVersion + 1,
+        };
       }
       return state;
     }
@@ -1282,18 +1375,24 @@ export function textBufferReducer(
         const nextLineContent = currentLine(cursorRow + 1);
         newLines[cursorRow] = lineContent + nextLineContent;
         newLines.splice(cursorRow + 1, 1);
+        return {
+          ...nextState,
+          lines: newLines,
+          preferredCol: null,
+          layoutVersion: nextState.layoutVersion + 1,
+        };
       } else {
         const nextWordStart = findNextWordStartInLine(lineContent, cursorCol);
         const end = nextWordStart === null ? lineLen : nextWordStart;
         newLines[cursorRow] =
           cpSlice(lineContent, 0, cursorCol) + cpSlice(lineContent, end);
+        return {
+          ...nextState,
+          lines: newLines,
+          preferredCol: null,
+          layoutVersion: nextState.layoutVersion + 1,
+        };
       }
-
-      return {
-        ...nextState,
-        lines: newLines,
-        preferredCol: null,
-      };
     }
 
     case 'kill_line_right': {
@@ -1303,7 +1402,11 @@ export function textBufferReducer(
         const nextState = pushUndoLocal(state);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = cpSlice(lineContent, 0, cursorCol);
-        return { ...nextState, lines: newLines };
+        return {
+          ...nextState,
+          lines: newLines,
+          layoutVersion: nextState.layoutVersion + 1,
+        };
       } else if (cursorRow < lines.length - 1) {
         // Act as a delete
         const nextState = pushUndoLocal(state);
@@ -1311,7 +1414,12 @@ export function textBufferReducer(
         const newLines = [...nextState.lines];
         newLines[cursorRow] = lineContent + nextLineContent;
         newLines.splice(cursorRow + 1, 1);
-        return { ...nextState, lines: newLines, preferredCol: null };
+        return {
+          ...nextState,
+          lines: newLines,
+          preferredCol: null,
+          layoutVersion: nextState.layoutVersion + 1,
+        };
       }
       return state;
     }
@@ -1328,6 +1436,7 @@ export function textBufferReducer(
           lines: newLines,
           cursorCol: 0,
           preferredCol: null,
+          layoutVersion: nextState.layoutVersion + 1,
         };
       }
       return state;
@@ -1469,6 +1578,8 @@ export function useTextBuffer({
       clipboard: null,
       selectionAnchor: null,
       viewportWidth: viewport.width,
+      layoutVersion: 0,
+      skipLayoutUpdate: false,
     };
   }, [initialText, initialCursorOffset, viewport.width]);
 
@@ -1477,11 +1588,41 @@ export function useTextBuffer({
 
   const text = useMemo(() => lines.join('\n'), [lines]);
 
-  const visualLayout = useMemo(
-    () =>
-      calculateVisualLayout(lines, [cursorRow, cursorCol], state.viewportWidth),
-    [lines, cursorRow, cursorCol, state.viewportWidth],
-  );
+  useEffect(() => {
+    if (state.skipLayoutUpdate) {
+      const timer = setTimeout(() => {
+        dispatch({
+          type: 'set_layout_update_mode',
+          payload: { enabled: true },
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [state.skipLayoutUpdate]);
+
+  const visualLayout = useMemo(() => {
+    // Skip layout calculation during batch operations for performance
+    if (state.skipLayoutUpdate) {
+      return {
+        visualLines: [''],
+        visualCursor: [0, 0] as [number, number],
+        logicalToVisualMap: [[]] as Array<Array<[number, number]>>,
+        visualToLogicalMap: [[0, 0]] as Array<[number, number]>,
+      };
+    }
+    return calculateVisualLayout(
+      lines,
+      [cursorRow, cursorCol],
+      state.viewportWidth,
+    );
+  }, [
+    lines,
+    cursorRow,
+    cursorCol,
+    state.viewportWidth,
+    state.skipLayoutUpdate,
+  ]);
 
   const { visualLines, visualCursor } = visualLayout;
 
@@ -1516,6 +1657,35 @@ export function useTextBuffer({
     (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
       if (/[\n\r]/.test(ch)) {
         dispatch({ type: 'insert', payload: ch });
+        return;
+      }
+
+      // Batch insert for large text (paste or >1000 chars)
+      if (paste || ch.length > 1000) {
+        const minLengthToInferAsDragDrop = 3;
+        if (
+          ch.length >= minLengthToInferAsDragDrop &&
+          !shellModeActive &&
+          paste
+        ) {
+          let potentialPath = ch.trim();
+          const quoteMatch = potentialPath.match(/^'(.*)'$/);
+          if (quoteMatch) {
+            potentialPath = quoteMatch[1];
+          }
+
+          potentialPath = potentialPath.trim();
+          if (isValidPath(unescapePath(potentialPath))) {
+            ch = `@${potentialPath} `;
+          }
+        }
+
+        dispatch({
+          type: 'batch_insert',
+          payload: ch,
+          skipUndo: false,
+          skipLayoutUpdate: true,
+        });
         return;
       }
 

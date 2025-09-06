@@ -5,12 +5,12 @@
  */
 
 import { renderWithProviders } from '../../../test-utils/render.js';
-import { waitFor } from '@testing-library/react';
+import { act } from '@testing-library/react';
 import {
   RadioButtonSelect,
   type RadioSelectItem,
 } from './RadioButtonSelect.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const ITEMS: Array<RadioSelectItem<string>> = [
   { label: 'Option 1', value: 'one' },
@@ -101,13 +101,24 @@ describe('<RadioButtonSelect />', () => {
 });
 
 describe('keyboard navigation', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   it('should call onSelect when "enter" is pressed', () => {
     const onSelect = vi.fn();
     const { stdin } = renderWithProviders(
       <RadioButtonSelect items={ITEMS} onSelect={onSelect} />,
     );
 
-    stdin.write('\r');
+    act(() => {
+      stdin.write('\r');
+      // Advance timers to process batched events
+      vi.runAllTimers();
+    });
 
     expect(onSelect).toHaveBeenCalledWith('one');
   });
@@ -145,13 +156,19 @@ describe('keyboard navigation', () => {
         />,
       );
 
-      stdin.write('\u001B[B'); // Down arrow
-
-      await waitFor(() => {
-        expect(lastFrame()).toContain('● 2. Option 2');
+      act(() => {
+        stdin.write('\u001B[B'); // Down arrow
+        // Advance timers to process events
+        vi.runAllTimers();
       });
 
-      stdin.write('\r');
+      expect(lastFrame()).toContain('● 2. Option 2');
+
+      act(() => {
+        stdin.write('\r');
+        // Advance timers to process batched events
+        vi.runAllTimers();
+      });
 
       expect(onSelect).toHaveBeenCalledWith('two');
     });
@@ -167,13 +184,19 @@ describe('keyboard navigation', () => {
         />,
       );
 
-      stdin.write('\u001B[A'); // Up arrow
-
-      await waitFor(() => {
-        expect(lastFrame()).toContain('● 1. Option 1');
+      act(() => {
+        stdin.write('\u001B[A'); // Up arrow
+        // Advance timers to process events
+        vi.runAllTimers();
       });
 
-      stdin.write('\r');
+      expect(lastFrame()).toContain('● 1. Option 1');
+
+      act(() => {
+        stdin.write('\r');
+        // Advance timers to process batched events
+        vi.runAllTimers();
+      });
 
       expect(onSelect).toHaveBeenCalledWith('one');
     });

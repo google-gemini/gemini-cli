@@ -120,7 +120,9 @@ export function KeypressProvider({
       setRawMode(true);
     }
 
-    const keypressStream = new PassThrough();
+    const keypressStream = new PassThrough({
+      highWaterMark: 64 * 1024,
+    });
     let usePassthrough = false;
     const nodeMajorVersion = parseInt(process.versions.node.split('.')[0], 10);
     if (
@@ -136,6 +138,56 @@ export function KeypressProvider({
     let kittySequenceBuffer = '';
     let backslashTimeout: NodeJS.Timeout | null = null;
     let waitingForEnterAfterBackslash = false;
+    let rl: readline.Interface | null = null;
+
+    const eventQueue: Key[] = [];
+    let queueStartIndex = 0;
+    let batchTimeout: NodeJS.Timeout | null = null;
+    const BATCH_SIZE = 50;
+    const BATCH_DELAY = 8;
+
+    let lastInputTime = 0;
+    let rapidInputCount = 0;
+    let smartPasteTimeout: NodeJS.Timeout | null = null;
+    let rapidInputBuffer: string[] = [];
+    const RAPID_INPUT_THRESHOLD = 10;
+    const RAPID_INPUT_COUNT_TRIGGER = 20;
+
+    const flushEventQueue = () => {
+      // Check if there are events to process
+      if (queueStartIndex >= eventQueue.length) {
+        // Reset when we've processed everything
+        eventQueue.length = 0;
+        queueStartIndex = 0;
+        batchTimeout = null;
+        return;
+      }
+
+      // Process next batch without splice
+      const endIndex = Math.min(
+        queueStartIndex + BATCH_SIZE,
+        eventQueue.length,
+      );
+      for (let i = queueStartIndex; i < endIndex; i++) {
+        const event = eventQueue[i];
+        for (const handler of subscribers) {
+          handler(event);
+        }
+      }
+
+      queueStartIndex = endIndex;
+
+      // Check if we need to continue processing
+      if (queueStartIndex >= eventQueue.length) {
+        // All processed, reset
+        eventQueue.length = 0;
+        queueStartIndex = 0;
+        batchTimeout = null;
+      } else {
+        // More to process, schedule next batch
+        batchTimeout = setTimeout(flushEventQueue, BATCH_DELAY);
+      }
+    };
 
     // Parse a single complete kitty sequence from the start (prefix) of the
     // buffer and return both the Key and the number of characters consumed.
@@ -381,28 +433,102 @@ export function KeypressProvider({
       return null;
     };
 
-    const broadcast = (key: Key) => {
-      for (const handler of subscribers) {
-        handler(key);
+    const broadcast = (key: Key, immediate = false) => {
+      // Immediate broadcast for critical events (Ctrl+C, paste complete, etc.)
+      if (immediate || key.paste || (key.ctrl && key.name === 'c')) {
+        for (const handler of subscribers) {
+          handler(key);
+        }
+        return;
+      }
+
+      // Batch non-critical events for performance
+      eventQueue.push(key);
+      if (!batchTimeout) {
+        batchTimeout = setTimeout(flushEventQueue, BATCH_DELAY);
       }
     };
 
     const handleKeypress = (_: unknown, key: Key) => {
+      // Smart paste detection fallback
+      const now = Date.now();
+      if (!isPaste && !key.ctrl && key.sequence && key.sequence.length > 0) {
+        if (now - lastInputTime < RAPID_INPUT_THRESHOLD) {
+          rapidInputCount++;
+          rapidInputBuffer.push(key.sequence);
+          if (rapidInputCount >= RAPID_INPUT_COUNT_TRIGGER) {
+            // Detected rapid input, likely a paste without bracketed paste mode
+            isPaste = true;
+            if (rl) {
+              rl.pause();
+            }
+            pasteBuffer = Buffer.from(rapidInputBuffer.join(''));
+            rapidInputBuffer = [];
+            // Clear any existing timeout
+            if (smartPasteTimeout) {
+              clearTimeout(smartPasteTimeout);
+            }
+            // Set a timeout to auto-end paste mode
+            smartPasteTimeout = setTimeout(() => {
+              if (isPaste) {
+                isPaste = false;
+                broadcast(
+                  {
+                    name: '',
+                    ctrl: false,
+                    meta: false,
+                    shift: false,
+                    paste: true,
+                    sequence: pasteBuffer.toString(),
+                  },
+                  true,
+                );
+                pasteBuffer = Buffer.alloc(0);
+                if (rl) {
+                  rl.resume();
+                }
+              }
+              smartPasteTimeout = null;
+            }, 100);
+            return;
+          }
+        } else {
+          rapidInputCount = 0;
+          rapidInputBuffer = [];
+        }
+        lastInputTime = now;
+      }
+
       if (key.name === 'paste-start') {
         isPaste = true;
+        rapidInputCount = 0;
+        rapidInputBuffer = [];
+        // Pause readline during paste to prevent event storm
+        if (rl) {
+          rl.pause();
+        }
         return;
       }
       if (key.name === 'paste-end') {
         isPaste = false;
-        broadcast({
-          name: '',
-          ctrl: false,
-          meta: false,
-          shift: false,
-          paste: true,
-          sequence: pasteBuffer.toString(),
-        });
+        rapidInputCount = 0;
+        rapidInputBuffer = [];
+        broadcast(
+          {
+            name: '',
+            ctrl: false,
+            meta: false,
+            shift: false,
+            paste: true,
+            sequence: pasteBuffer.toString(),
+          },
+          true,
+        ); // Immediate broadcast for paste
         pasteBuffer = Buffer.alloc(0);
+        // Resume readline after paste
+        if (rl) {
+          rl.resume();
+        }
         return;
       }
 
@@ -654,7 +780,6 @@ export function KeypressProvider({
       }
     };
 
-    let rl: readline.Interface;
     if (usePassthrough) {
       rl = readline.createInterface({
         input: keypressStream,
@@ -687,6 +812,19 @@ export function KeypressProvider({
       if (backslashTimeout) {
         clearTimeout(backslashTimeout);
         backslashTimeout = null;
+      }
+
+      // Clear batch timeout and flush pending events
+      if (batchTimeout) {
+        clearTimeout(batchTimeout);
+        batchTimeout = null;
+        flushEventQueue(); // Process any remaining events
+      }
+
+      // Clear smart paste timeout
+      if (smartPasteTimeout) {
+        clearTimeout(smartPasteTimeout);
+        smartPasteTimeout = null;
       }
 
       // Flush any pending paste data to avoid data loss on exit.

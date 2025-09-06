@@ -25,7 +25,11 @@ vi.mock('ink', async (importOriginal) => {
 // Mock the 'readline' module
 vi.mock('readline', () => {
   const mockedReadline = {
-    createInterface: vi.fn().mockReturnValue({ close: vi.fn() }),
+    createInterface: vi.fn().mockReturnValue({
+      close: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+    }),
     // The paste workaround involves replacing stdin with a PassThrough stream.
     // This mock ensures that when emitKeypressEvents is called on that
     // stream, we simulate the 'keypress' events that the hook expects.
@@ -111,6 +115,7 @@ describe('useKeypress', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
     stdin = new MockStdin();
     (useStdin as vi.Mock).mockReturnValue({
       stdin,
@@ -122,6 +127,7 @@ describe('useKeypress', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     Object.defineProperty(process.versions, 'node', {
       value: originalNodeVersion,
       configurable: true,
@@ -152,6 +158,8 @@ describe('useKeypress', () => {
   ])('should listen for keypress when active for key $key.name', ({ key }) => {
     renderHook(() => useKeypress(onKeypress, { isActive: true }), { wrapper });
     act(() => stdin.pressKey(key));
+    // Advance timers to process batched events
+    act(() => vi.runAllTimers());
     expect(onKeypress).toHaveBeenCalledWith(expect.objectContaining(key));
   });
 
@@ -179,6 +187,8 @@ describe('useKeypress', () => {
     renderHook(() => useKeypress(onKeypress, { isActive: true }), { wrapper });
     const key = { name: 'return', sequence: '\x1B\r' };
     act(() => stdin.pressKey(key));
+    // Advance timers to process batched events
+    act(() => vi.runAllTimers());
     expect(onKeypress).toHaveBeenCalledWith(
       expect.objectContaining({ ...key, meta: true, paste: false }),
     );
@@ -234,6 +244,8 @@ describe('useKeypress', () => {
 
       const keyA = { name: 'a', sequence: 'a' };
       act(() => stdin.pressKey(keyA));
+      // Advance timers to process batched events
+      act(() => vi.runAllTimers());
       expect(onKeypress).toHaveBeenCalledWith(
         expect.objectContaining({ ...keyA, paste: false }),
       );
@@ -246,6 +258,8 @@ describe('useKeypress', () => {
 
       const keyB = { name: 'b', sequence: 'b' };
       act(() => stdin.pressKey(keyB));
+      // Advance timers to process batched events
+      act(() => vi.runAllTimers());
       expect(onKeypress).toHaveBeenCalledWith(
         expect.objectContaining({ ...keyB, paste: false }),
       );
