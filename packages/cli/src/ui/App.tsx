@@ -644,6 +644,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
     cancelOngoingRequest,
+    handleApprovalModeChange,
   } = useGeminiStream(
     config.getGeminiClient(),
     history,
@@ -747,7 +748,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     streamingState,
     settings.merged.ui?.customWittyPhrases,
   );
-  const showAutoAcceptIndicator = useAutoAcceptIndicator({ config, addItem });
+  const showAutoAcceptIndicator = useAutoAcceptIndicator({
+    config,
+    addItem,
+    onApprovalModeChange: handleApprovalModeChange,
+  });
 
   const handleExit = useCallback(
     (
