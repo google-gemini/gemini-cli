@@ -18,7 +18,6 @@ import * as actualNodeFs from 'node:fs'; // For setup/teardown
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-// eslint-disable-next-line import/no-internal-modules
 import mime from 'mime/lite';
 
 import {

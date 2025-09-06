@@ -422,14 +422,18 @@ export async function main() {
           if (err) {
             throw new Error(err);
           }
-          await config.refreshAuth(settings.merged.security?.auth?.selectedType);
+          await config.refreshAuth(
+            settings.merged.security?.auth?.selectedType,
+          );
           const authEnd = performance.now();
           const authDuration = authEnd - authStart;
 
           // Record authentication performance if monitoring is active
           if (isPerformanceMonitoringActive()) {
             recordStartupPerformance(config, 'authentication', authDuration, {
-              auth_type: settings.merged.security?.auth?.selectedType,
+              auth_type: String(
+                settings.merged.security?.auth?.selectedType ?? 'unset',
+              ),
             });
           }
         } catch (err) {
@@ -522,7 +526,9 @@ export async function main() {
     });
 
     recordStartupPerformance(config, 'config_loading', configDuration, {
-      auth_type: settings.merged.security?.auth?.selectedType,
+      auth_type: String(
+        settings.merged.security?.auth?.selectedType ?? 'unset',
+      ),
       telemetry_enabled: config.getTelemetryEnabled(),
     });
 
@@ -533,7 +539,7 @@ export async function main() {
     }
 
     recordStartupPerformance(config, 'theme_loading', themeDuration, {
-      theme_name: settings.merged.ui?.theme,
+      theme_name: settings.merged.ui?.theme ?? 'unset',
     });
 
     const totalStartupDuration = performance.now() - startupStart;
