@@ -377,6 +377,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       openEditorDialog,
       openPrivacyNotice: () => setShowPrivacyNotice(true),
       openSettingsDialog,
+      openModelDialog: () => setIsModelDialogOpen(true),
       quit: (messages: HistoryItem[]) => {
         setQuittingMessages(messages);
         setTimeout(async () => {
@@ -392,6 +393,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       openThemeDialog,
       openEditorDialog,
       openSettingsDialog,
+      setIsModelDialogOpen,
       setQuittingMessages,
       setDebugMessage,
       setShowPrivacyNotice,
@@ -990,7 +992,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isSettingsDialogOpen,
       isFolderTrustDialogOpen,
       showPrivacyNotice,
-      settings.merged.general?.debugKeystrokeLogging,
+      historyManager,
+      settings,
     ],
   );
 
@@ -1268,7 +1271,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       onWorkspaceMigrationDialogClose,
       handleProQuotaChoice,
       config,
-      historyManager.addItem,
+      historyManager,
     ],
   );
 
