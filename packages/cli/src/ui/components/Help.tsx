@@ -7,7 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import type { SlashCommand } from '../commands/types.js';
+import { type SlashCommand, CommandKind } from '../commands/types.js';
 
 interface Help {
   commands: readonly SlashCommand[];
@@ -64,33 +64,42 @@ export const Help: React.FC<Help> = ({ commands }) => (
     <Text bold color={Colors.Foreground}>
       Commands:
     </Text>
-    {commands.map((command: SlashCommand) => (
-      <Box key={command.name} flexDirection="column">
-        <Text color={Colors.Foreground}>
-          <Text bold color={Colors.AccentPurple}>
-            {' '}
-            /{command.name}
-          </Text>
-          {command.description && ' - ' + command.description}
-        </Text>
-        {command.subCommands &&
-          command.subCommands.map((subCommand) => (
-            <Text key={subCommand.name} color={Colors.Foreground}>
-              <Text bold color={Colors.AccentPurple}>
-                {'   '}
-                {subCommand.name}
-              </Text>
-              {subCommand.description && ' - ' + subCommand.description}
+    {commands
+      .filter((command) => command.description)
+      .map((command: SlashCommand) => (
+        <Box key={command.name} flexDirection="column">
+          <Text color={Colors.Foreground}>
+            <Text bold color={Colors.AccentPurple}>
+              {' '}
+              /{command.name}
             </Text>
-          ))}
-      </Box>
-    ))}
+            {command.kind === CommandKind.MCP_PROMPT && (
+              <Text color={Colors.Gray}> [MCP]</Text>
+            )}
+            {command.description && ' - ' + command.description}
+          </Text>
+          {command.subCommands &&
+            command.subCommands.map((subCommand) => (
+              <Text key={subCommand.name} color={Colors.Foreground}>
+                <Text bold color={Colors.AccentPurple}>
+                  {'   '}
+                  {subCommand.name}
+                </Text>
+                {subCommand.description && ' - ' + subCommand.description}
+              </Text>
+            ))}
+        </Box>
+      ))}
     <Text color={Colors.Foreground}>
       <Text bold color={Colors.AccentPurple}>
         {' '}
         !{' '}
       </Text>
       - shell command
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text color={Colors.Gray}>[MCP]</Text> - Model Context Protocol command
+      (from external servers)
     </Text>
 
     <Box height={1} />
