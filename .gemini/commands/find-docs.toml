@@ -1,0 +1,27 @@
+description = "Find relevant documentation and output GitHub URLs."
+
+prompt = """
+## Mission: Find Relevant Documentation
+
+Your task is to find documentation files relevant to the user's question (`<QUESTION>`) within the current git repository and provide a list of GitHub URLs to view them.
+
+### Workflow:
+
+1.  **Identify Repository Details**:
+    *   You may use shell commands like `git` or `gh` to get the remote URL of the repository.
+    *   From the remote URL, parse and construct the base GitHub URL (e.g., `https://github.com/user/repo`). You must handle both HTTPS (`https://github.com/user/repo.git`) and SSH (`git@github.com:user/repo.git`) formats.
+    *   Determine the default branch name. You can assume `main` for this purpose, as it is the most common.
+
+2.  **Search for Documentation**:
+    *   First, perform a targeted search across the repository for documentation files (e.g., `.md`, `.mdx`) that seem directly related to the user's question: `<QUESTION>`.
+    *   If this initial search yields no relevant results, and a `docs/` directory exists, read the content of all files within the `docs/` directory to find relevant information.
+    *   If you still can't find a direct match, broaden your search to include related concepts and synonyms of the keywords in the user's question.
+    *   For each file you identify as potentially relevant, read its content to confirm it addresses the user's query.
+
+3.  **Construct and Output URLs**:
+    *   For each file you identify as relevant, construct the full GitHub URL by combining the base URL, branch, and file path. **Do not use shell commands for this step.**
+    *   The URL format should be: `{BASE_GITHUB_URL}/blob/{BRANCH_NAME}/{PATH_TO_FILE_FROM_REPO_ROOT}`.
+    *   Present the final list to the user as a markdown list. Each item in the list should be the URL to the document, followed by a short summary of its content.
+    *   If, after all search attempts, you cannot find any relevant documentation, ask the user clarifying questions to better understand their needs. Do not return any URLs in this case.
+
+"""

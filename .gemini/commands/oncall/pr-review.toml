@@ -1,0 +1,47 @@
+description = "Review a specific pull request"
+
+prompt = """
+## Mission: Comprehensive Pull Request Review
+
+Today, our mission is to meticulously review community pull requests (PRs) for this project. We will proceed systematically, evaluating each candidate PR for its quality, adherence to standards, and readiness for merging.
+
+### Workflow:
+
+1.  **PR Preparation & Initial Assessment**:
+    * **You will check out the designated PR (`<PR_NUMBER>`)** into a temporary branch.
+    * **Execute the preflight checks (`npm run preflight`)**. This includes building, linting, and running all unit tests.
+    * Analyze the output of these preflight checks, noting any failures, warnings, or linting issues.
+
+2.  **In-Depth Code Review**:
+    * **Your primary role is to conduct a thorough and in-depth code review** of the changes introduced in the PR. Focus your analysis on the following criteria:
+        * **Correctness**: Does the code achieve its stated purpose without bugs or logical errors?
+        * **Maintainability**: Is the code clean, well-structured, and easy to understand and modify in the future? Consider factors like code clarity, modularity, and adherence to established design patterns.
+        * **Readability**: Is the code well-commented (where necessary) and consistently formatted according to our project's coding style guidelines?
+        * **Efficiency**: Are there any obvious performance bottlenecks or resource inefficiencies introduced by the changes?
+        * **Security**: Are there any potential security vulnerabilities or insecure coding practices?
+        * **Edge Cases and Error Handling**: Does the code appropriately handle edge cases and potential errors?
+        * **Testability**: Is the new or modified code adequately covered by tests (even if preflight checks pass)? Suggest additional test cases that would improve coverage or robustness.
+    * Based on your analysis, you will determine if the PR is **safe to merge**.
+
+3.  **Reviewing Previous Feedback**:
+    * **Access and examine the PR's history** to identify any **outstanding requests or unresolved comments from previous reviews**. Incorporate these into your current review and explicitly highlight if they have been adequately addressed in the current state of the PR.
+
+4.  **Decision and Output Generation**:
+    * **If the PR is deemed safe to merge** (after your comprehensive review and considering previous feedback):
+        * Draft a **friendly, concise, and professional approval message**.
+        * **The approval message should:**
+            * Clearly state that the PR is approved.
+            * Briefly acknowledge the quality or value of the contribution (e.g., "Great work on X feature!" or "Appreciate the fix for Y issue!").
+            * **Do NOT mention the preflight checks or unit testing**, as these are internal processes.
+            * Be suitable for public display on GitHub.
+    * **If the PR is NOT safe to merge**:
+        * Provide a **clear, constructive, and detailed summary of the issues found**.
+        * Suggest **specific actionable changes** required for the PR to become merge-ready.
+        * Ensure the feedback is professional and encourages the contributor.
+
+### Post-PR Action:
+
+* After providing your review and decision for the current PR, I will wait for you to perform any manual testing you wish to do. Please let me know when you are finished.
+* Once you have confirmed that you are done, I will switch to the `main` branch, clean up the local branch, and perform a pull to ensure we are synchronized with the latest upstream changes for the next review.
+
+"""
