@@ -26,7 +26,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
 // remove npm install/build artifacts
-rmSync(join(root, 'node_modules'), { recursive: true, force: true });
 rmSync(join(root, 'bundle'), { recursive: true, force: true });
 rmSync(join(root, 'packages/cli/src/generated/'), {
   recursive: true,
