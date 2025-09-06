@@ -31,8 +31,15 @@ describe('themeCommand', () => {
     });
   });
 
-  it('should have the correct name and description', () => {
+  it('should have the correct name and updated description', () => {
     expect(themeCommand.name).toBe('theme');
-    expect(themeCommand.description).toBe('change the theme');
+    expect(themeCommand.description).toBe('manage and select themes');
+  });
+
+  it('should expose list and install subcommands', () => {
+    expect(themeCommand.subCommands?.map((c) => c.name).sort()).toEqual([
+      'install',
+      'list',
+    ]);
   });
 });

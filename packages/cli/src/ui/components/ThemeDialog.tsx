@@ -4,11 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
-import { useCallback, useState } from 'react';
-import { Box, Text } from 'ink';
+import React, { useCallback, useState, useEffect } from 'react';
+import { Box, Text, useInput } from 'ink';
 import { Colors } from '../colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
+import {
+  type CombinedThemes,
+  loadFileBasedThemes,
+} from '../themes/theme-loader.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
@@ -18,11 +21,14 @@ import {
   getScopeItems,
   getScopeMessageForSetting,
 } from '../../utils/dialogScopeUtils.js';
-import { useKeypress } from '../hooks/useKeypress.js';
+// Removed unused useKeypress import
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
-  onSelect: (themeName: string | undefined, scope: SettingScope) => void;
+  onSelect: (
+    themeName: string | undefined,
+    scope: SettingScope,
+  ) => void | Promise<void>;
 
   /** Callback function when a theme is highlighted */
   onHighlight: (themeName: string | undefined) => void;
@@ -48,17 +54,74 @@ export function ThemeDialog({
     string | undefined
   >(settings.merged.ui?.theme || DEFAULT_THEME.name);
 
+
+  // State for combined themes (settings + file-based)
+  const [combinedThemes, setCombinedThemes] = useState<CombinedThemes | null>(
+    null,
+  );
+  const [_isLoadingThemes, setIsLoadingThemes] = useState(true);
+
+  // Load themes from merged settings plus file-based storage (single catalog)
+  useEffect(() => {
+    const loadThemes = async () => {
+      try {
+        const mergedSettingsThemes = settings.merged.ui?.customThemes || {};
+        const fileThemes = await loadFileBasedThemes();
+
+        const allThemes = {
+          ...mergedSettingsThemes,
+          ...fileThemes,
+        };
+
+        setCombinedThemes({
+          settingsThemes: mergedSettingsThemes,
+          fileThemes,
+          allThemes,
+        });
+
+        // Update the theme manager with the combined themes so it can find file-based themes
+        await themeManager.loadCustomThemes(allThemes);
+      } catch (error) {
+        console.warn('Failed to load combined themes:', error);
+        const mergedSettingsThemes = settings.merged.ui?.customThemes || {};
+        setCombinedThemes({
+          settingsThemes: mergedSettingsThemes,
+          fileThemes: {},
+          allThemes: mergedSettingsThemes,
+        });
+      } finally {
+        setIsLoadingThemes(false);
+      }
+    };
+
+    loadThemes();
+    // Only reload when the custom theme collections actually change
+  }, [
+    settings.user.settings.ui?.customThemes,
+    settings.workspace.settings.ui?.customThemes,
+    settings.system.settings.ui?.customThemes,
+    settings.merged.ui?.customThemes,
+  ]);
+
+  // Generate theme items from combined sources
+  const allCustomThemes = combinedThemes?.allThemes || {};
   // Generate theme items filtered by selected scope
+  // For User scope, show user settings + file-based themes
+  // For other scopes, show all themes (settings + file-based)
   const customThemes =
     selectedScope === SettingScope.User
-      ? settings.user.settings.ui?.customThemes || {}
-      : settings.merged.ui?.customThemes || {};
+      ? {
+        ...(settings.user.settings.ui?.customThemes || {}),
+        ...(combinedThemes?.fileThemes || {}),
+      }
+      : allCustomThemes;
   const builtInThemes = themeManager
     .getAvailableThemes()
     .filter((theme) => theme.type !== 'custom');
   const customThemeNames = Object.keys(customThemes);
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-  // Generate theme items
+
+  // Generate theme items with source indication
   const themeItems = [
     ...builtInThemes.map((theme) => ({
       label: theme.name,
@@ -66,28 +129,56 @@ export function ThemeDialog({
       themeNameDisplay: theme.name,
       themeTypeDisplay: capitalize(theme.type),
     })),
-    ...customThemeNames.map((name) => ({
-      label: name,
-      value: name,
-      themeNameDisplay: name,
-      themeTypeDisplay: 'Custom',
-    })),
+    ...customThemeNames.map((name) => {
+      // Determine granular source for display
+      const fromFile = combinedThemes?.fileThemes[name] !== undefined;
+      const fromUser = !!settings.user.settings.ui?.customThemes?.[name];
+      const fromWorkspace = !!settings.workspace.settings.ui?.customThemes?.[name];
+      const fromSystem = !!settings.system.settings.ui?.customThemes?.[name];
+
+      const sources: string[] = [];
+      if (fromFile) sources.push('File');
+      if (fromUser) sources.push('User');
+      if (fromWorkspace) sources.push('Workspace');
+      if (fromSystem) sources.push('System');
+
+      const typeDisplay =
+        sources.length > 0 ? `Custom (${sources.join(', ')})` : 'Custom';
+
+      return {
+        label: name,
+        value: name,
+        themeNameDisplay: name,
+        themeTypeDisplay: typeDisplay,
+      };
+    }),
   ];
-  const [selectInputKey, setSelectInputKey] = useState(Date.now());
+
 
   // Find the index of the selected theme, but only if it exists in the list
   const selectedThemeName = settings.merged.ui?.theme || DEFAULT_THEME.name;
   const initialThemeIndex = themeItems.findIndex(
     (item) => item.value === selectedThemeName,
   );
+
   // If not found, fall back to the first theme
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
+
+  // Update select key when themes are loaded to force re-initialization with correct index
+  const [selectInputKey, setSelectInputKey] = useState(Date.now());
+
+  // Update the select key when combined themes change to re-initialize with correct index
+  useEffect(() => {
+    if (combinedThemes) {
+      setSelectInputKey(Date.now());
+    }
+  }, [combinedThemes]);
 
   const scopeItems = getScopeItems();
 
   const handleThemeSelect = useCallback(
-    (themeName: string) => {
-      onSelect(themeName, selectedScope);
+    async (themeName: string) => {
+      await onSelect(themeName, selectedScope);
     },
     [onSelect, selectedScope],
   );
@@ -114,17 +205,15 @@ export function ThemeDialog({
     'theme',
   );
 
-  useKeypress(
-    (key) => {
-      if (key.name === 'tab') {
-        setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
-      }
-      if (key.name === 'escape') {
-        onSelect(undefined, selectedScope);
-      }
-    },
-    { isActive: true },
-  );
+  useInput((input, key) => {
+    if (key.tab) {
+      setFocusedSection((prev) => (prev === 'theme' ? 'scope' : 'theme'));
+    }
+    if (key.escape) {
+      // Cancel: restore previously active theme by signaling undefined
+      onSelect(undefined, selectedScope);
+    }
+  });
 
   // Generate scope message for theme setting
   const otherScopeModifiedMessage = getScopeMessageForSetting(
@@ -144,8 +233,8 @@ export function ThemeDialog({
   const colorizeCodeWidth = Math.max(
     Math.floor(
       (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
-        PREVIEW_PANE_WIDTH_PERCENTAGE *
-        PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+      PREVIEW_PANE_WIDTH_PERCENTAGE *
+      PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
     ),
     1,
   );
@@ -224,17 +313,21 @@ export function ThemeDialog({
             {currentFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
             <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
           </Text>
-          <RadioButtonSelect
-            key={selectInputKey}
-            items={themeItems}
-            initialIndex={safeInitialThemeIndex}
-            onSelect={handleThemeSelect}
-            onHighlight={handleThemeHighlight}
-            isFocused={currentFocusedSection === 'theme'}
-            maxItemsToShow={8}
-            showScrollArrows={true}
-            showNumbers={currentFocusedSection === 'theme'}
-          />
+          {combinedThemes ? (
+            <RadioButtonSelect
+              key={selectInputKey}
+              items={themeItems}
+              initialIndex={safeInitialThemeIndex}
+              onSelect={handleThemeSelect}
+              onHighlight={handleThemeHighlight}
+              isFocused={currentFocusedSection === 'theme'}
+              maxItemsToShow={8}
+              showScrollArrows={true}
+              showNumbers={currentFocusedSection === 'theme'}
+            />
+          ) : (
+            <Text color={Colors.Gray}>Loading themes...</Text>
+          )}
 
           {/* Scope Selection */}
           {showScopeSelection && (
