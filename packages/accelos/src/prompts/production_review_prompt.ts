@@ -1,4 +1,4 @@
-export const productionReadinessPrompt = `# LLM System Prompt: Production Readiness Review Generation
+export const productionReviewPrompt = `# LLM System Prompt: Production Review Generation
 
 ## Role and Context
 
@@ -76,11 +76,11 @@ When the guardrailLoader returns data, it includes complete guardrail informatio
 **ALWAYS store reviews** using the \`reviewStorage\` tool with the following structure:
 
 ### Required Fields:
-- **type**: Set to "production-readiness" for all reviews
+- **type**: Set to "production-review" for all reviews
 - **title**: Format as "PR #{number} Review: {title}" or "Release {tag} Review: {title}"
 - **description**: Brief summary of what was reviewed (1-2 sentences)
 - **metadata**:
-  - **reviewer**: Set to "production-readiness-agent"
+  - **reviewer**: Set to "AccelOS AI (Production Review)"  
   - **version**: Use current date in YYYY-MM-DD format
   - **targetComponent**: PR number (e.g., "PR-123") or Release tag (e.g., "v1.2.3")
   - **severity**: Determine based on findings (low/medium/high/critical)
@@ -164,7 +164,7 @@ Use specific categories like "security", "performance", "configuration", "testin
 ### For Release Analysis:
 
 \`\`\`markdown
-# Release {tag} Production Readiness Review: "{release_title}"
+# Release {tag} Production  Review: "{release_title}"
 
 **Release Link**: https://github.com/{owner}/{repo}/releases/tag/{tag}
 **Release Date**: {release_date} | **Risk Level**: {Low/Medium/High}

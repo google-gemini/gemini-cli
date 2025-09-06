@@ -5,7 +5,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 const ListReviewsQuerySchema = z.object({
-  type: z.enum(['production-readiness', 'code-quality', 'security', 'performance']).optional(),
+  type: z.enum(['production-review', 'code-quality', 'security', 'performance']).optional(),
   severity: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),

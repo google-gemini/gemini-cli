@@ -9,7 +9,7 @@ export const reviewLoaderTool = createTool({
   id: 'load-reviews',
   description: 'Load production-review agent assessments from the data/reviews directory with filtering and pagination',
   inputSchema: z.object({
-    type: z.enum(['production-readiness', 'code-quality', 'security', 'performance']).optional()
+    type: z.enum(['production-review', 'code-quality', 'security', 'performance']).optional()
       .describe('Filter by review type'),
     severity: z.enum(['low', 'medium', 'high', 'critical']).optional()
       .describe('Filter by severity level'),

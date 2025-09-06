@@ -7,7 +7,7 @@ import { defaultConfig, getCompatiblePaths } from '../config.js';
 // Review assessment schema
 export const ReviewAssessmentSchema = z.object({
   id: z.string(),
-  type: z.enum(['production-readiness', 'code-quality', 'security', 'performance']),
+  type: z.enum(['production-review', 'code-quality', 'security', 'performance']),
   title: z.string(),
   description: z.string(),
   createdAt: z.string(),

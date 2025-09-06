@@ -95,7 +95,7 @@ async function testPRCreationWorkflow() {
   console.log('\nTo test with the production agent:');
   console.log('1. Start the Mastra server: npm run dev:server');
   console.log('2. Open the Swagger UI at http://localhost:4111/swagger');
-  console.log('3. Test the production-readiness-agent with prompt: "Create a PR for review REVIEW-2025-01-13-sample"');
+  console.log('3. Test the production-reviewent with prompt: "Create a PR for review REVIEW-2025-01-13-sample"');
 }
 
 // Run the test

@@ -1,12 +1,12 @@
 {
   "id": "REVIEW-2025-01-13-sample",
-  "type": "production-readiness",
-  "title": "Sample Production Readiness Review",
+  "type": "production-review
+  "title": "Sample Production  Review",
   "description": "A sample review to test the new review storage functionality",
   "createdAt": "2025-01-13T10:00:00.000Z",
   "updatedAt": "2025-01-13T10:00:00.000Z",
   "metadata": {
-    "reviewer": "production-review-agent",
+    "reviewer": "production-review",
     "version": "1.0.0",
     "targetComponent": "data-restructure-implementation",
     "severity": "medium"

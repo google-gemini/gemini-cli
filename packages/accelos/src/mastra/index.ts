@@ -17,6 +17,8 @@ import {
   claudeCodeTool,
   ekgCrudTool,
   prCreationWorkflowTool,
+  incidentStorageTool,
+  loadIncidentTool,
 } from '../tools/index.js';
 import {
   codeReviewWorkflow,
@@ -28,9 +30,9 @@ import { GuardrailStore } from '../tools/shared-guardrail-store.js';
 import { Neo4jStore } from '../tools/shared-neo4j-store.js';
 import * as dotenv from 'dotenv';
 import { githubTools, githubWorkflowTools } from '../mcp/github-mcp-client.js';
-import { productionReadinessPrompt } from '../prompts/production_readiness_prompt.js';
+import { productionReviewPrompt } from '../prompts/production_review_prompt.js';
 import { guardrailAgentPrompt } from '../prompts/guardrail_agent_prompt.js';
-import { githubWorkflowDebuggerPrompt } from '../prompts/github_workflow_debugger_prompt.js';
+import { incidentResponsePrompt } from '../prompts/incident_response_prompt.js';
 import { Memory } from '@mastra/memory';
 import { LibSQLStore } from '@mastra/libsql';
 import { createStreamingSSEHandler } from '../api/streaming-sse.js';
@@ -43,6 +45,10 @@ import {
   createReviewsListHandler,
   createReviewByIdHandler,
 } from '../api/reviews.js';
+import {
+  createIncidentsListHandler,
+  createIncidentByIdHandler,
+} from '../api/incidents.js';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -58,6 +64,7 @@ async function initializeDirectoryStructure() {
     const dataDir =
       process.env.ACCELOS_DATA_DIRECTORY_PATH || './.accelos/data';
     const reviewsDir = path.join(dataDir, 'reviews');
+    const incidentsDir = path.join(dataDir, 'incidents');
     const guardrailsFile = path.join(dataDir, 'guardrails.json');
 
     // Create main data directory if it doesn't exist
@@ -74,6 +81,14 @@ async function initializeDirectoryStructure() {
       console.log(`📁 Created reviews directory: ${reviewsDir}`);
     } else {
       console.log(`📁 Reviews directory already exists: ${reviewsDir}`);
+    }
+
+    // Create incidents subdirectory if it doesn't exist
+    if (!existsSync(incidentsDir)) {
+      await fs.mkdir(incidentsDir, { recursive: true });
+      console.log(`📁 Created incidents directory: ${incidentsDir}`);
+    } else {
+      console.log(`📁 Incidents directory already exists: ${incidentsDir}`);
     }
 
     // Create empty guardrails.json if it doesn't exist
@@ -211,6 +226,16 @@ const reviewsListRoute = registerApiRoute('/accelos/reviews-list', {
 const reviewByIdRoute = registerApiRoute('/accelos/reviews/:id', {
   method: 'GET',
   handler: await createReviewByIdHandler(),
+});
+
+const incidentsListRoute = registerApiRoute('/accelos/incidents', {
+  method: 'GET',
+  handler: await createIncidentsListHandler(),
+});
+
+const incidentByIdRoute = registerApiRoute('/accelos/incidents/:id', {
+  method: 'GET',
+  handler: await createIncidentByIdHandler(),
 });
 
 // Streaming test HTML route
@@ -389,7 +414,7 @@ const accelosAnthropicAgent = new Agent({
   },
 });
 
-// Filter GitHub MCP tools to only include readonly operations for production readiness reviews
+// Filter GitHub MCP tools to only include readonly operations for production reviews
 const readonlyGithubTools = Object.fromEntries(
   Object.entries(githubTools).filter(([key]) => {
     // Keep tools that start with readonly patterns
@@ -409,9 +434,9 @@ const readonlyGithubTools = Object.fromEntries(
   })
 );
 
-const productionReadinessAgent = new Agent({
-    name: 'production-readiness-agent',
-    instructions: productionReadinessPrompt,
+const productionReviewAgent = new Agent({
+    name: 'production-review-agent',
+    instructions: productionReviewPrompt,
     model: anthropic('claude-3-7-sonnet-20250219'),
     defaultGenerateOptions: {
       maxSteps: 500,
@@ -443,17 +468,19 @@ const guardrailAgent = new Agent({
   memory,
 });
 
-// Create GitHub Workflow Debugger Agent for Mastra
-const githubWorkflowDebuggerAgent = new Agent({
-  name: 'github-workflow-debugger',
-  instructions: githubWorkflowDebuggerPrompt,
-  model: anthropic('claude-3-5-sonnet-20241022'),
+// Create Incident Response Agent for Mastra
+const incidentResponseAgent = new Agent({
+  name: 'incident-response-agent',
+  instructions: incidentResponsePrompt,
+  model: anthropic('claude-4-sonnet-20250514'),
   defaultGenerateOptions: {
     maxSteps: 100,
   },
   tools: {
     claudeCode: claudeCodeTool,
     ekg: ekgCrudTool,
+    incidentStorage: incidentStorageTool,
+    loadIncidents: loadIncidentTool,
     ...githubWorkflowTools,
   },
   memory,
@@ -464,9 +491,9 @@ export const mastra = new Mastra({
     'accelos-google': accelosGoogleAgent,
     'accelos-openai': accelosOpenAIAgent,
     'accelos-anthropic': accelosAnthropicAgent,
-    'guardrail-agent': guardrailAgent,
-    'production-readiness-agent': productionReadinessAgent,
-    'github-workflow-debugger': githubWorkflowDebuggerAgent,
+    'guardrails': guardrailAgent,
+    'production-review': productionReviewAgent,
+    'incident-response': incidentResponseAgent,
   },
   workflows: {
     'code-review-workflow': codeReviewWorkflow,
@@ -509,6 +536,8 @@ export const mastra = new Mastra({
       guardrailByIdRoute,
       reviewsListRoute,
       reviewByIdRoute,
+      incidentsListRoute,
+      incidentByIdRoute,
       streamingTestRoute,
     ],
   },

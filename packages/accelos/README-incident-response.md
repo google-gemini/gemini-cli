@@ -1,10 +1,10 @@
-# GitHub Workflow Debugger Agent
+# Incident Response Agent Agent
 
-A specialized Mastra agent for analyzing GitHub Actions workflow failures and providing debugging insights and fix suggestions.
+A specialized Mastra agent for analyzing GitHub Actions workflow failures and providing incident response insights and fix suggestions.
 
 ## Overview
 
-The GitHub Workflow Debugger Agent is available through Mastra and leverages GitHub MCP (Model Context Protocol) tools to analyze failed GitHub Actions workflows and provide actionable debugging recommendations.
+The Incident Response Agent Agent is available through Mastra and leverages GitHub MCP (Model Context Protocol) tools to analyze failed GitHub Actions workflows and provide actionable incident response recommendations.
 
 ## Features
 
@@ -17,7 +17,7 @@ The GitHub Workflow Debugger Agent is available through Mastra and leverages Git
 
 ## Usage
 
-The GitHub Workflow Debugger Agent is available only through Mastra. There are two ways to use it:
+The Incident Response Agent Agent is available only through Mastra. There are two ways to use it:
 
 ### Method 1: Mastra Playground (Recommended)
 
@@ -32,7 +32,7 @@ The GitHub Workflow Debugger Agent is available only through Mastra. There are t
    http://localhost:4111
    ```
 
-3. **Select Agent**: Choose "github-workflow-debugger" from the agent list
+3. **Select Agent**: Choose "incident-response-agent" from the agent list
 
 4. **Try Example Prompts**:
    ```
@@ -48,8 +48,8 @@ The GitHub Workflow Debugger Agent is available only through Mastra. There are t
 ```typescript
 import { mastra } from '@accelos/workflow-debugger';
 
-// Get the GitHub Workflow Debugger agent
-const workflowDebuggerAgent = mastra.getAgent('github-workflow-debugger');
+// Get the Incident Response Agent agent
+const workflowDebuggerAgent = mastra.getAgent('incident-response-agent');
 
 if (workflowDebuggerAgent) {
   const prompt = `
@@ -59,7 +59,7 @@ if (workflowDebuggerAgent) {
     Workflow Run ID: 123456
     URL: https://github.com/owner/repo/actions/runs/123456
     
-    Please investigate what went wrong and provide debugging recommendations.
+    Please investigate what went wrong and provide incident response recommendations.
   `;
   
   const result = await workflowDebuggerAgent.generate(prompt);
@@ -105,9 +105,9 @@ No additional configuration is required - the agent is ready to use through Mast
 
 See the [examples directory](./src/examples/) for comprehensive usage examples:
 
-- `workflow-debugger-example.ts` - Complete usage examples
+- `incident-response-agent-example.ts` - Complete usage examples
 - Common error scenarios and their fixes
-- Interactive debugging sessions
+- Interactive incident response sessions
 
 ## GitHub MCP Integration
 
@@ -193,7 +193,7 @@ npm test
 
 The test suite covers:
 - Agent initialization with different providers
-- Workflow debugging scenarios
+- Workflow incident response scenarios
 - Error handling and edge cases
 - URL parsing and validation
 - Configuration management

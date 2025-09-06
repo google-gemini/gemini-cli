@@ -12,7 +12,7 @@ import { reviewToPRStreamingWorkflow } from '../workflows/review-to-pr-streaming
  * PR Creation Workflow Tool
  * 
  * This tool wraps the review-to-pr-streaming-workflow to make it available
- * as a tool for the production-readiness-agent, enabling users to request
+ * as a tool for the production-reviewent, enabling users to request
  * PR creation through natural language.
  */
 export const prCreationWorkflowTool = createTool({

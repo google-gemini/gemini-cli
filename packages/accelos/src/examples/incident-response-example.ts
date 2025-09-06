@@ -1,20 +1,20 @@
 /**
- * GitHub Workflow Debugger Agent Usage Examples
+ * Incident Response Agent Usage Examples
  * 
- * This file demonstrates how to use the GitHub Workflow Debugger Agent
- * through Mastra to analyze workflow failures and get debugging recommendations.
+ * This file demonstrates how to use the Incident Response Agent
+ * through Mastra to analyze workflow failures and get incident response recommendations.
  */
 
 import { mastra } from '../mastra/index.js';
 
-// GitHub Workflow Debugger Agent is available through Mastra
+// Incident Response Agent is available through Mastra
 // You can access it at: http://localhost:4111 (Mastra Playground)
 // Or programmatically through the Mastra API
 
 /**
  * Example 1: Using Mastra Playground (Recommended)
  */
-function debugWorkflowByPlayground() {
+function incidentResponseByPlayground() {
   console.log('🔍 Example 1: Using Mastra Playground');
   
   console.log('1. Start the Mastra server:');
@@ -23,7 +23,7 @@ function debugWorkflowByPlayground() {
   console.log('2. Open the Mastra Playground:');
   console.log('   http://localhost:4111');
   console.log('');
-  console.log('3. Select the "github-workflow-debugger" agent');
+  console.log('3. Select the "incident-response" agent');
   console.log('');
   console.log('4. Try prompts like:');
   console.log('   "Analyze this workflow failure: https://github.com/owner/repo/actions/runs/123456"');
@@ -34,16 +34,16 @@ function debugWorkflowByPlayground() {
 /**
  * Example 2: Programmatic Usage via Mastra API
  */
-async function debugWorkflowProgrammatically() {
+async function incidentResponseProgrammatically() {
   console.log('\n🔍 Example 2: Programmatic usage via Mastra API');
   
   try {
     console.log('Using Mastra agent programmatically:');
     
-    // Get the GitHub Workflow Debugger agent from Mastra
-    const workflowDebuggerAgent = mastra.getAgent('github-workflow-debugger');
+    // Get the Incident Response agent from Mastra
+    const incidentResponseAgent = mastra.getAgent('incident-response');
     
-    if (workflowDebuggerAgent) {
+    if (incidentResponseAgent) {
       const prompt = `
         Analyze this GitHub Actions workflow failure:
         
@@ -51,16 +51,16 @@ async function debugWorkflowProgrammatically() {
         Workflow Run ID: 123456
         URL: https://github.com/owner/repo/actions/runs/123456
         
-        Please investigate what went wrong and provide debugging recommendations.
+        Please investigate what went wrong and provide incident response recommendations.
       `;
       
       console.log('Sending prompt to agent...');
-      const result = await workflowDebuggerAgent.generate(prompt);
+      const result = await incidentResponseAgent.generate(prompt);
       
       console.log('📊 Agent Response:');
       console.log(result.text || 'No response received');
     } else {
-      console.error('❌ GitHub Workflow Debugger agent not found in Mastra');
+      console.error('❌ Incident Response agent not found in Mastra');
     }
   } catch (error) {
     console.error('❌ Error:', error);
@@ -71,7 +71,7 @@ async function debugWorkflowProgrammatically() {
  * Example 3: Common Error Debugging Prompts
  */
 function getCommonErrorPrompts() {
-  console.log('\n🔧 Example 3: Common error debugging prompts for Mastra');
+  console.log('\n🔧 Example 3: Common error incident response prompts for Mastra');
   
   const commonErrorPrompts = [
     {
@@ -128,7 +128,7 @@ function getCommonErrorPrompts() {
  * Example 4: EKG-Enhanced Workflow Debugging Prompts
  */
 function getEkgEnhancedPrompts() {
-  console.log('\n🕸️  Example 4: EKG-Enhanced workflow debugging prompts');
+  console.log('\n🕸️  Example 4: EKG-Enhanced workflow incident response prompts');
   
   const ekgPrompts = [
     {
@@ -171,7 +171,7 @@ function getEkgEnhancedPrompts() {
     }
   ];
   
-  console.log('These prompts leverage the EKG tool for system-aware debugging:');
+  console.log('These prompts leverage the EKG tool for system-aware incident response:');
   
   ekgPrompts.forEach((example, index) => {
     console.log(`\n${index + 1}. ${example.category}:`);
@@ -244,19 +244,19 @@ async function ekgToolUsageExamples() {
     console.log(`   Query: ${JSON.stringify(query.example, null, 2)}`);
   });
   
-  console.log('\n💡 The agent can use these queries to provide rich context for workflow debugging!');
+  console.log('\n💡 The agent can use these queries to provide rich context for workflow incident response!');
 }
 
 /**
  * Main execution function
  */
 async function main() {
-  console.log('🚀 GitHub Workflow Debugger Agent - Mastra Usage Examples\n');
-  console.log('The GitHub Workflow Debugger is now available through Mastra only.\n');
+  console.log('🚀 Incident Response Agent - Mastra Usage Examples\n');
+  console.log('The Incident Response Agent is now available through Mastra only.\n');
   
   try {
-    debugWorkflowByPlayground();
-    await debugWorkflowProgrammatically();
+    incidentResponseByPlayground();
+    await incidentResponseProgrammatically();
     getCommonErrorPrompts();
     getEkgEnhancedPrompts();
     ekgToolUsageExamples();
@@ -266,7 +266,7 @@ async function main() {
     console.log('\n🎯 Next Steps:');
     console.log('1. Start Mastra server: npm run dev');
     console.log('2. Open playground: http://localhost:4111');
-    console.log('3. Select "github-workflow-debugger" agent');
+    console.log('3. Select "incident-response" agent');
     console.log('4. Try the example prompts above!');
   } catch (error) {
     console.error('\n❌ Example execution failed:', error);
@@ -286,7 +286,7 @@ function demonstrateConfiguration() {
         llmProvider: 'openai',
         model: 'gpt-4',
         apiKey: 'your-openai-api-key',
-        systemPrompt: 'You are a GitHub Actions debugging expert.'
+        systemPrompt: 'You are a GitHub Actions incident response expert.'
       }
     },
     {
@@ -317,8 +317,8 @@ function demonstrateConfiguration() {
 
 // Export functions for external use
 export {
-  debugWorkflowByPlayground,
-  debugWorkflowProgrammatically,
+  incidentResponseByPlayground,
+  incidentResponseProgrammatically,
   getCommonErrorPrompts,
   getEkgEnhancedPrompts,
   ekgToolUsageExamples,

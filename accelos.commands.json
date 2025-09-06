@@ -14,14 +14,14 @@
     {
       "name": "init",
       "description": "Initialize a new Accelos project or workspace",
-      "command": "../a0/scripts/agentic-ekg.sh",
+      "command": "/Users/sidchoudhury/accelos/a0/scripts/agentic-ekg.sh",
       "arguments": [
         "--workflow",
         "ekg_generation",
         "--repo-path",
-        "/Users/utkarshohm/projects/accelos/posthog",
+        "/Users/sidchoudhury/topcorp/posthog",
         "--output-dir",
-        "/Users/utkarshohm/projects/accelos/accelos-cli/dist/.accelos/ekg"
+        "/Users/sidchoudhury/topcorp/posthog/.accelos/ekg"
       ],
       "options": {}
     },

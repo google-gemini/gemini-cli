@@ -46,6 +46,7 @@ export function getDataPaths(dataDir: string) {
     rcaDirectory: process.env.RCA_DIRECTORY_PATH || path.join(dataDir, 'RCA'),
     guardrailsFile: path.join(dataDir, 'guardrails.json'),
     reviewsDirectory: path.join(dataDir, 'reviews'),
+    incidentsDirectory: path.join(dataDir, 'incidents'),
   };
 }
 
@@ -59,5 +60,6 @@ export function getCompatiblePaths(config: AccelosConfig) {
     rcaDirectory: dataPaths.rcaDirectory,
     guardrailsFile: config.guardrailFilePath || dataPaths.guardrailsFile,
     reviewsDirectory: dataPaths.reviewsDirectory,
+    incidentsDirectory: dataPaths.incidentsDirectory,
   };
 }
