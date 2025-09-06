@@ -749,62 +749,63 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           ) : (
             linesToRender
               .map((lineText, visualIdxInRenderedSet) => {
+                const absVisualIdx = visualIdxInRenderedSet + scrollVisualRow;
+                const [logicalLineIdx, logicalStartCol] = buffer
+                  .visualToLogicalMap[absVisualIdx] ?? [0, 0];
+
+                const logicalLineText = buffer.lines[logicalLineIdx] || '';
                 const tokens = parseInputForHighlighting(
-                  lineText,
-                  visualIdxInRenderedSet,
+                  logicalLineText,
+                  logicalLineIdx,
                 );
+
                 const cursorVisualRow =
                   cursorVisualRowAbsolute - scrollVisualRow;
                 const isOnCursorLine =
                   focus && visualIdxInRenderedSet === cursorVisualRow;
 
                 const renderedLine: React.ReactNode[] = [];
-                let charCount = 0;
-
-                tokens.forEach((token, tokenIdx) => {
-                  let display = token.text;
-                  if (isOnCursorLine) {
-                    const relativeVisualColForHighlight =
-                      cursorVisualColAbsolute;
-                    const tokenStart = charCount;
-                    const tokenEnd = tokenStart + cpLen(token.text);
-
-                    if (
-                      relativeVisualColForHighlight >= tokenStart &&
-                      relativeVisualColForHighlight < tokenEnd
-                    ) {
-                      const charToHighlight = cpSlice(
-                        token.text,
-                        relativeVisualColForHighlight - tokenStart,
-                        relativeVisualColForHighlight - tokenStart + 1,
-                      );
-                      const highlighted = chalk.inverse(charToHighlight);
-                      display =
-                        cpSlice(
-                          token.text,
-                          0,
-                          relativeVisualColForHighlight - tokenStart,
-                        ) +
-                        highlighted +
-                        cpSlice(
-                          token.text,
-                          relativeVisualColForHighlight - tokenStart + 1,
-                        );
+                const logicalMaskLength = cpLen(logicalLineText);
+                const highlightMask: boolean[] = new Array(
+                  logicalMaskLength,
+                ).fill(false);
+                let runningOffset = 0;
+                for (const token of tokens) {
+                  const len = cpLen(token.text);
+                  const shouldColor =
+                    token.type === 'command' || token.type === 'file';
+                  if (shouldColor) {
+                    for (let j = 0; j < len; j++) {
+                      const idx = runningOffset + j;
+                      if (idx >= 0 && idx < highlightMask.length) {
+                        highlightMask[idx] = true;
+                      }
                     }
-                    charCount = tokenEnd;
                   }
-
+                  runningOffset += len; // Advance the running offset for every token, even non-highlighted ones.
+                }
+                const chars = toCodePoints(lineText);
+                for (let i = 0; i < chars.length; i++) {
+                  const ch = chars[i]!;
+                  const logicalCol = logicalStartCol + i;
                   const color =
-                    token.type === 'command' || token.type === 'file'
+                    logicalCol >= 0 &&
+                    logicalCol < highlightMask.length &&
+                    highlightMask[logicalCol]
                       ? theme.text.accent
                       : undefined;
 
+                  const isCursorChar =
+                    isOnCursorLine && i === cursorVisualColAbsolute;
+                  const display = isCursorChar ? chalk.inverse(ch) : ch;
+
                   renderedLine.push(
-                    <Text key={`token-${tokenIdx}`} color={color}>
+                    <Text key={`ch-${absVisualIdx}-${i}`} color={color}>
                       {display}
                     </Text>,
                   );
-                });
+                }
+
                 const currentLineGhost = isOnCursorLine ? inlineGhost : '';
 
                 if (

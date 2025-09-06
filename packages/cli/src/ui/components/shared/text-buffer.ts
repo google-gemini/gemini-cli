@@ -1483,7 +1483,7 @@ export function useTextBuffer({
     [lines, cursorRow, cursorCol, state.viewportWidth],
   );
 
-  const { visualLines, visualCursor } = visualLayout;
+  const { visualLines, visualCursor, visualToLogicalMap } = visualLayout;
 
   const [visualScrollRow, setVisualScrollRow] = useState<number>(0);
 
@@ -1885,7 +1885,7 @@ export function useTextBuffer({
     viewportVisualLines: renderedVisualLines,
     visualCursor,
     visualScrollRow,
-
+    visualToLogicalMap,
     setText,
     insert,
     newline,
@@ -1960,7 +1960,7 @@ export interface TextBuffer {
   viewportVisualLines: string[]; // The subset of visual lines to be rendered based on visualScrollRow and viewport.height
   visualCursor: [number, number]; // Visual cursor [row, col] relative to the start of all visualLines
   visualScrollRow: number; // Scroll position for visual lines (index of the first visible visual line)
-
+  visualToLogicalMap: Array<[number, number]>; // For each visual line, its [logicalLineIndex, startColInLogical]
   // Actions
 
   /**
