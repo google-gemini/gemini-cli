@@ -428,8 +428,11 @@ describe('Settings Loading and Merging', () => {
         '/workspace/dir',
       ]);
 
-      // Verify excludeTools are overwritten by workspace
-      expect(settings.merged.tools?.exclude).toEqual(['workspace-tool']);
+      // Verify excludeTools are concatenated and de-duped
+      expect(settings.merged.tools?.exclude).toEqual([
+        'user-tool',
+        'workspace-tool',
+      ]);
 
       // Verify excludedProjectEnvVars are concatenated and de-duped
       expect(settings.merged.advanced?.excludedEnvVars).toEqual(
