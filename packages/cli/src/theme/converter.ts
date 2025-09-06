@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { VSCodeTheme, CustomTheme } from './theme-types.js';
+import type { VSCodeTheme, CustomTheme } from './types.js';
 
 /**
  * Converts a VS Code theme to a Gemini CLI custom theme

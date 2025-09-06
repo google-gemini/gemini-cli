@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { VSCodeTheme, VSCodeTokenColor } from './theme-types.js';
-import { extractVsixContent } from './vsix-utils.js';
+import type { VSCodeTheme, VSCodeTokenColor } from './types.js';
+import { extractVsixContent } from './utils/vsix.js';
 
 /**
  * Attempt to parse potentially non-strict VS Code theme JSON (comments, trailing commas).
@@ -76,7 +76,7 @@ export async function downloadVsix(
   vsixUrl: string,
   _signal: AbortSignal,
 ): Promise<Buffer> {
-  const { fetchWithTimeout } = await import('../utils/fetch.js');
+  const { fetchWithTimeout } = await import('@google/gemini-cli-core');
   const response = await fetchWithTimeout(vsixUrl, 30000); // 30 second timeout
 
   if (!response.ok) {

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { CustomTheme } from './theme-types.js';
+import type { CustomTheme } from './types.js';
 import { promises as fsPromises } from 'fs';
 import * as path from 'path';
 import * as os from 'os';
