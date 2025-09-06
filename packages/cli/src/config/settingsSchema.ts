@@ -47,6 +47,11 @@ export interface SettingsSchema {
   [key: string]: SettingDefinition;
 }
 
+export interface SettingOption {
+  label: string;
+  value: string;
+}
+
 export type MemoryImportFormat = 'tree' | 'flat';
 export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
 
