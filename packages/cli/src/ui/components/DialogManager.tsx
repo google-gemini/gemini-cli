@@ -149,7 +149,7 @@ export const DialogManager = () => {
     return (
       <AuthInProgress
         onTimeout={() => {
-          /* This is now handled in AppContainer */
+          uiActions.onAuthError('Authentication cancelled.');
         }}
       />
     );
