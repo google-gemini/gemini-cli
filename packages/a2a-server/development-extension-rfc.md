@@ -53,6 +53,11 @@ The `development-tool` extension establishes a communication contract for workfl
 
 The agent card `uri` field contains an embedded semantic version. The client must extract this version to determine compatibility with the agent extension using the compatibility logic defined in Semantic Versioning 2.0.0 spec.
 
+**Transports**
+In addition to the standard A2A transport protocols, agents with the development-tool extension may also support local inter-process communication. The implementation is platform dependent but may include anonymous pipes, named pipes, or unix domain sockets. The message encoding for all local IPC transports must be JSON-RPC.
+
+For half-duplex transports, the canonical ordering of messages is determined by the JSON-RPC id sequence.
+
 ### 3.2 Schema Definitions
 
 This section defines the schemas for the `development-tool` A2A extension, organized by their function within the communication flow. Note that all custom objects included in the `metadata` field (e.g. `Message.metadata`) must be keyed by the unique URI that points to that extension’s spec to prevent naming collisions with other extensions.
