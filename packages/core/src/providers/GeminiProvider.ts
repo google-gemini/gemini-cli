@@ -26,19 +26,120 @@ import type {
 
 
 export class GeminiProvider extends BaseModelProvider {
-  private googleAI: GoogleGenAI;
-  private generativeModel: Models;
+  private googleAI?: GoogleGenAI;
+  private generativeModel?: Models;
+  private codeAssistServer?: any; // CodeAssistServer for OAuth
 
   constructor(config: ModelProviderConfig, configInstance?: Config) {
     super(config, configInstance);
     
-    if (!config.apiKey) {
-      throw new Error('API key is required for Gemini provider');
+    // Don't initialize GoogleGenAI in constructor - we'll create it dynamically with proper credentials
+    this.googleAI = undefined;
+    this.generativeModel = undefined;
+    this.codeAssistServer = undefined;
+  }
+
+  /**
+   * Get authentication headers based on user's preferred authentication method
+   */
+  private async getAuthHeaders(): Promise<{ [key: string]: string }> {
+    try {
+      const { AuthManager } = await import('../auth/AuthManager.js');
+      const authManager = AuthManager.getInstance();
+      if (this.configInstance) {
+        authManager.setConfig(this.configInstance);
+      }
+      
+      const credentials = await authManager.getAccessCredentials('gemini');
+      
+      if (credentials?.accessToken) {
+        // User chose OAuth - use Bearer token
+        return { 'Authorization': `Bearer ${credentials.accessToken}` };
+      } else if (credentials?.apiKey) {
+        // User chose API key - use x-goog-api-key header
+        return { 'x-goog-api-key': credentials.apiKey };
+      } else {
+        throw new Error('No Gemini credentials available. Please authenticate first.');
+      }
+    } catch (error) {
+      throw new Error(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Initialize GoogleGenAI client with proper credentials or OAuth client
+   */
+  private async initializeGoogleAI(): Promise<void> {
+    try {
+      const { AuthManager } = await import('../auth/AuthManager.js');
+      const authManager = AuthManager.getInstance();
+      if (this.configInstance) {
+        authManager.setConfig(this.configInstance);
+      }
+      
+      const credentials = await authManager.getAccessCredentials('gemini');
+      
+      if (credentials?.accessToken) {
+        // User chose OAuth - use Code Assist Server pattern like CLI does
+        console.log('[GeminiProvider] Initializing with OAuth via Code Assist Server');
+        
+        // Get OAuth client from AuthManager
+        const oauthClient = await this.getOAuthClient();
+        
+        // Set up user data (project ID and tier) like CLI does
+        const { setupUser } = await import('../code_assist/setup.js');
+        const userData = await setupUser(oauthClient);
+        
+        console.log(`[GeminiProvider] User setup complete - Project ID: ${userData.projectId}, Tier: ${userData.userTier}`);
+        
+        // Create Code Assist Server for OAuth requests with proper user data
+        const { CodeAssistServer } = await import('../code_assist/server.js');
+        this.codeAssistServer = new CodeAssistServer(
+          oauthClient,
+          userData.projectId,
+          { headers: { 'User-Agent': 'GeminiCLI-GUI/1.0.0' } },
+          `gui_session_${Date.now()}`, // sessionId
+          userData.userTier
+        );
+        
+        // Don't use GoogleGenAI for OAuth, use CodeAssistServer instead
+        this.googleAI = undefined;
+        this.generativeModel = undefined;
+      } else if (credentials?.apiKey) {
+        // User chose API key - use GoogleGenAI client
+        console.log('[GeminiProvider] Initializing GoogleGenAI with API key');
+        this.googleAI = new GoogleGenAI({ 
+          apiKey: credentials.apiKey 
+        });
+        this.generativeModel = this.googleAI.models;
+        this.codeAssistServer = undefined;
+      } else {
+        throw new Error('No Gemini credentials available. Please authenticate first.');
+      }
+    } catch (error) {
+      throw new Error(`Failed to initialize GoogleGenAI: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get OAuth client from AuthManager (similar to CLI pattern)
+   */
+  private async getOAuthClient(): Promise<any> {
+    const { AuthManager } = await import('../auth/AuthManager.js');
+    const authManager = AuthManager.getInstance();
+    
+    // Get the OAuth client that AuthManager has cached
+    const authStatuses = (authManager as any).oauthClients;
+    const oauthClient = authStatuses?.get('gemini');
+    
+    if (!oauthClient) {
+      // If no cached client, create one using the same method as CLI
+      const { getOauthClient } = await import('../code_assist/oauth2.js');
+      const { AuthType } = await import('../core/contentGenerator.js');
+      return await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, this.configInstance!);
     }
     
-    // Initialize Google AI client - following contentGenerator.ts pattern
-    this.googleAI = new GoogleGenAI({ apiKey: config.apiKey });
-    this.generativeModel = this.googleAI.models;
+    return oauthClient;
   }
 
   async initialize(): Promise<void> {
@@ -51,13 +152,21 @@ export class GeminiProvider extends BaseModelProvider {
 
   async testConnection(): Promise<boolean> {
     try {
-      // Test with a minimal message using the generative model
-      const result = await this.generativeModel.generateContent({
-        model: this.config.model,
-        contents: [{ role: 'user', parts: [{ text: 'test' }] }],
-        config: {}
-      });
-      return !!result;
+      // Get auth headers first
+      const authHeaders = await this.getAuthHeaders();
+      
+      // Test with a simple API call
+      const response = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models',
+        {
+          headers: {
+            ...authHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return response.ok;
     } catch (error) {
       console.error('Gemini connection test failed:', error);
       return false;
@@ -123,6 +232,12 @@ export class GeminiProvider extends BaseModelProvider {
     } catch (error) {
       // Log detailed error information for debugging
       console.error(`[GeminiProvider] sendMessage failed:`, error);
+      
+      // Check for 429 quota exceeded errors
+      if (this.is429QuotaError(error)) {
+        const quotaError = this.createQuotaExceededError(error);
+        throw quotaError;
+      }
       
       // If it's a 400 error related to function calls, log the request details
       if (error instanceof Error && error.message.includes('function response parts') || 
@@ -199,6 +314,16 @@ export class GeminiProvider extends BaseModelProvider {
       // Log detailed error information for debugging
       console.error(`[GeminiProvider] sendMessageStream failed:`, error);
       
+      // Check for 429 quota exceeded errors
+      if (this.is429QuotaError(error)) {
+        const quotaError = this.createQuotaExceededError(error);
+        yield {
+          type: 'error',
+          error: quotaError
+        };
+        return;
+      }
+      
       // If it's a 400 error related to function calls, log the request details
       if (error instanceof Error && error.message.includes('function response parts') || 
           error instanceof Error && error.message.includes('function call parts')) {
@@ -217,19 +342,93 @@ export class GeminiProvider extends BaseModelProvider {
   }
 
 
-  static async getAvailableModels(apiKey?: string): Promise<string[]> {
-    // Get API key from environment if not provided
-    const geminiApiKey = apiKey || process.env['GEMINI_API_KEY'];
-    
-    if (!geminiApiKey || geminiApiKey === '') {
-      throw new Error('GeminiProvider: API key is required to fetch available models');
+  async countTokens(messages: UniversalMessage[]): Promise<{ totalTokens: number }> {
+    try {
+      // Initialize authentication client (GoogleGenAI or CodeAssistServer)
+      await this.initializeGoogleAI();
+      
+      // Convert messages to Gemini format
+      const geminiData = this.convertToGeminiMessages(messages);
+      
+      // Use different counting approach based on authentication type
+      if (this.codeAssistServer) {
+        // OAuth authentication - use CodeAssistServer
+        console.log('[GeminiProvider] Counting tokens using CodeAssistServer');
+        const result = await this.codeAssistServer.countTokens({
+          model: this.config.model,
+          contents: geminiData.contents
+        });
+        return { totalTokens: result.totalTokens || 0 };
+      } else if (this.generativeModel) {
+        // API key authentication - use GoogleGenAI
+        console.log('[GeminiProvider] Counting tokens using GoogleGenAI');
+        const result = await this.generativeModel.countTokens({
+          model: this.config.model,
+          contents: geminiData.contents
+        });
+        return { totalTokens: result.totalTokens || 0 };
+      } else {
+        throw new Error('No authentication client available for token counting');
+      }
+    } catch (error) {
+      console.error('[GeminiProvider] Token counting failed:', error);
+      // Return 0 as fallback to prevent compression failures
+      return { totalTokens: 0 };
     }
+  }
 
+  static async getAvailableModels(): Promise<string[]> {
+    try {
+      // Get auth headers from AuthManager
+      const { AuthManager } = await import('../auth/AuthManager.js');
+      const authManager = AuthManager.getInstance();
+      
+      const credentials = await authManager.getAccessCredentials('gemini');
+      
+      if (credentials?.accessToken) {
+        // OAuth: Use predefined models (like CLI does)
+        console.log('[GeminiProvider] Using OAuth - returning predefined model list');
+        return await this.getPredefinedModels();
+      } else if (credentials?.apiKey) {
+        // API Key: Fetch from Google API
+        console.log('[GeminiProvider] Using API key - fetching models from Google API');
+        try {
+          return await this.fetchModelsFromAPI({ 'x-goog-api-key': credentials.apiKey });
+        } catch (apiError) {
+          console.warn('[GeminiProvider] API fetch failed, using predefined models:', apiError);
+          return await this.getPredefinedModels();
+        }
+      } else {
+        // No authentication: return predefined models
+        console.log('[GeminiProvider] No authentication - returning predefined model list');
+        return await this.getPredefinedModels();
+      }
+    } catch (error) {
+      console.warn('[GeminiProvider] Error in getAvailableModels, using predefined models:', error);
+      return await this.getPredefinedModels();
+    }
+  }
+
+  private static async getPredefinedModels(): Promise<string[]> {
+    // Use the same models as CLI
+    const { DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_FLASH_LITE_MODEL } = await import('../config/models.js');
+    return [
+      DEFAULT_GEMINI_MODEL,           // 'gemini-2.5-pro'
+      DEFAULT_GEMINI_FLASH_MODEL,     // 'gemini-2.5-flash' 
+      DEFAULT_GEMINI_FLASH_LITE_MODEL, // 'gemini-2.5-flash-lite'
+      // Add some additional commonly available models
+      'gemini-1.5-pro',
+      'gemini-1.5-flash',
+      'gemini-1.0-pro'
+    ];
+  }
+
+  private static async fetchModelsFromAPI(authHeaders: { [key: string]: string }): Promise<string[]> {
     const response = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models',
       {
         headers: {
-          'x-goog-api-key': geminiApiKey,
+          ...authHeaders,
           'Content-Type': 'application/json',
         },
       }
@@ -273,14 +472,16 @@ export class GeminiProvider extends BaseModelProvider {
   override updateConfig(config: ModelProviderConfig): void {
     super.updateConfig(config);
     
-    // Reinitialize GoogleGenAI client if API key changed
-    if (config.apiKey !== this.config.apiKey) {
-      this.googleAI = new GoogleGenAI({ apiKey: config.apiKey });
-    }
+    // Note: We don't reinitialize clients here because we get credentials dynamically
+    // from AuthManager in initializeGoogleAI(). The clients will be created as needed
+    // with the correct authentication method (OAuth or API key) based on user preference.
     
-    // Update generative model if model changed
-    if (config.model !== this.config.model || config.apiKey !== this.config.apiKey) {
-      this.generativeModel = this.googleAI.models;
+    // Reset all clients if the model name changed
+    // This forces reinitialization with the new model when needed
+    if (config.model !== this.config.model) {
+      this.googleAI = undefined;
+      this.generativeModel = undefined;
+      this.codeAssistServer = undefined;
     }
   }
 
@@ -485,6 +686,9 @@ export class GeminiProvider extends BaseModelProvider {
     request: GenerateContentParameters, 
     signal: AbortSignal
   ): Promise<GenerateContentResponse> {
+    // Initialize authentication client (GoogleGenAI or CodeAssistServer)
+    await this.initializeGoogleAI();
+    
     // Create a promise that rejects when the signal is aborted
     const abortPromise = new Promise<never>((_, reject) => {
       if (signal.aborted) {
@@ -503,17 +707,33 @@ export class GeminiProvider extends BaseModelProvider {
       }
     };
     
-    // Race the generation against the abort signal
-    return Promise.race([
-      this.generativeModel.generateContent(requestWithSignal),
-      abortPromise
-    ]);
+    // Use OAuth Code Assist Server or API key GoogleGenAI based on authentication type
+    if (this.codeAssistServer) {
+      // OAuth authentication - use CodeAssistServer
+      console.log('[GeminiProvider] Using CodeAssistServer for OAuth request');
+      return Promise.race([
+        this.codeAssistServer.generateContent(requestWithSignal, `gui_${Date.now()}`),
+        abortPromise
+      ]);
+    } else if (this.generativeModel) {
+      // API key authentication - use GoogleGenAI
+      console.log('[GeminiProvider] Using GoogleGenAI for API key request');
+      return Promise.race([
+        this.generativeModel.generateContent(requestWithSignal),
+        abortPromise
+      ]);
+    } else {
+      throw new Error('No authentication client available (neither OAuth nor API key)');
+    }
   }
   
   private async generateContentStreamWithSignal(
     request: GenerateContentParameters, 
     signal: AbortSignal
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    // Initialize authentication client (GoogleGenAI or CodeAssistServer)
+    await this.initializeGoogleAI();
+    
     // Create a promise that rejects when the signal is aborted
     const abortPromise = new Promise<never>((_, reject) => {
       if (signal.aborted) {
@@ -532,11 +752,24 @@ export class GeminiProvider extends BaseModelProvider {
       }
     };
     
-    // Race the generation against the abort signal
-    return Promise.race([
-      this.generativeModel.generateContentStream(requestWithSignal),
-      abortPromise
-    ]);
+    // Use OAuth Code Assist Server or API key GoogleGenAI based on authentication type
+    if (this.codeAssistServer) {
+      // OAuth authentication - use CodeAssistServer
+      console.log('[GeminiProvider] Using CodeAssistServer for OAuth stream request');
+      return Promise.race([
+        this.codeAssistServer.generateContentStream(requestWithSignal, `gui_stream_${Date.now()}`),
+        abortPromise
+      ]);
+    } else if (this.generativeModel) {
+      // API key authentication - use GoogleGenAI
+      console.log('[GeminiProvider] Using GoogleGenAI for API key stream request');
+      return Promise.race([
+        this.generativeModel.generateContentStream(requestWithSignal),
+        abortPromise
+      ]);
+    } else {
+      throw new Error('No authentication client available (neither OAuth nor API key)');
+    }
   }
   
   private mapFinishReason(reason?: string): UniversalResponse['finishReason'] {
@@ -604,6 +837,87 @@ export class GeminiProvider extends BaseModelProvider {
     }
 
     return sanitized as Record<string, unknown>;
+  }
+
+  /**
+   * Check if error is a 429 quota exceeded error
+   */
+  private is429QuotaError(error: unknown): boolean {
+    // Check HTTP status 429
+    if (error && typeof error === 'object') {
+      // Handle Gaxios errors
+      if ('status' in error && error.status === 429) {
+        return true;
+      }
+      
+      // Handle general errors with 429 status
+      if ('code' in error && error.code === 429) {
+        return true;
+      }
+      
+      // Handle error messages containing quota information
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('429') || 
+          message.toLowerCase().includes('quota exceeded') ||
+          message.toLowerCase().includes('rate limit') ||
+          message.toLowerCase().includes('too many requests')) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Create a user-friendly quota exceeded error with Flash model suggestion
+   */
+  private createQuotaExceededError(originalError: unknown): Error {
+    const currentModel = this.config.model;
+    const isUsingFlash = currentModel.toLowerCase().includes('flash');
+    const isOAuth = this.codeAssistServer !== undefined;
+    
+    let message = '⚡ Quota exceeded for Gemini model';
+    
+    // Add model-specific information
+    if (currentModel.toLowerCase().includes('pro')) {
+      message += ' Pro';
+    }
+    
+    message += '.\n\n';
+    
+    if (isUsingFlash) {
+      // Already using Flash model
+      message += 'You are already using the Flash model. ';
+      if (isOAuth) {
+        message += 'Consider upgrading your account for higher limits, or try again later.';
+      } else {
+        message += 'Please check your API key quota limits or try again later.';
+      }
+    } else {
+      // Suggest switching to Flash model
+      message += 'Recommendations:\n';
+      message += '• Switch to a Flash model (e.g., gemini-2.5-flash) for higher quotas\n';
+      message += '• Flash models are faster and have more generous rate limits\n';
+      
+      if (isOAuth) {
+        message += '• Consider upgrading your Google Cloud account for Pro model access\n';
+      } else {
+        message += '• Check your API key quota settings in Google AI Studio\n';
+      }
+      
+      message += '• Wait a few minutes and try again';
+    }
+    
+    // Log the original error for debugging
+    console.error('[GeminiProvider] Original quota error:', originalError);
+    
+    const quotaError = new Error(message);
+    (quotaError as any).isQuotaError = true;
+    (quotaError as any).originalError = originalError;
+    (quotaError as any).currentModel = currentModel;
+    (quotaError as any).isUsingFlash = isUsingFlash;
+    
+    return quotaError;
   }
   
 }
