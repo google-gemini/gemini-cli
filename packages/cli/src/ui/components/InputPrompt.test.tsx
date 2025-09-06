@@ -103,6 +103,7 @@ describe('InputPrompt', () => {
 
     mockBuffer = {
       text: '',
+      pastes: new Map(),
       cursor: [0, 0],
       lines: [''],
       setText: vi.fn((newText: string) => {

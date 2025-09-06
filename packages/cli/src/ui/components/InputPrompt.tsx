@@ -32,6 +32,22 @@ import {
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 
+
+const PASTED_CONTENT_REGEX = /\[Pasted Content ID: (paste-\d+)\]/g;
+
+const reconstructInput = (
+  text: string,
+  storedPastes: Map<string, string>,
+): string => {
+  if (storedPastes.size === 0) {
+    return text;
+  }
+
+  return text.replace(PASTED_CONTENT_REGEX, (match, pasteId) => {
+    return storedPastes.get(pasteId) || match;
+  });
+};
+
 export interface InputPromptProps {
   buffer: TextBuffer;
   onSubmit: (value: string) => void;
@@ -141,13 +157,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
+      const fullText = reconstructInput(submittedValue, buffer.pastes);
       if (shellModeActive) {
-        shellHistory.addCommandToHistory(submittedValue);
+        shellHistory.addCommandToHistory(fullText);
       }
       // Clear the buffer *before* calling onSubmit to prevent potential re-submission
       // if onSubmit triggers a re-render while the buffer still holds the old value.
       buffer.setText('');
-      onSubmit(submittedValue);
+      onSubmit(fullText);
       resetCompletionState();
       resetReverseSearchCompletionState();
     },
