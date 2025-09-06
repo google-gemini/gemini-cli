@@ -171,7 +171,7 @@ export function colorizeCode(
           return (
             <Box key={index}>
               {showLineNumbers && (
-                <Text color={activeTheme.colors.Gray}>
+                <Text color={activeTheme.semanticColors.text.secondary}>
                   {`${String(index + 1 + hiddenLinesCount).padStart(
                     padWidth,
                     ' ',
@@ -208,7 +208,9 @@ export function colorizeCode(
                 {`${String(index + 1).padStart(padWidth, ' ')} `}
               </Text>
             )}
-            <Text color={activeTheme.colors.Gray}>{line}</Text>
+            <Text color={activeTheme.semanticColors.text.secondary}>
+              {line}
+            </Text>
           </Box>
         ))}
       </MaxSizedBox>

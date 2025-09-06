@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme as semanticTheme } from '../semantic-colors.js';
 
 interface PrepareLabelProps {
   label: string;
@@ -21,7 +21,7 @@ export const PrepareLabel: React.FC<PrepareLabelProps> = ({
   matchedIndex,
   userInput,
   textColor,
-  highlightColor = Colors.AccentYellow,
+  highlightColor = semanticTheme.status.warning,
 }) => {
   if (
     matchedIndex === undefined ||
@@ -37,9 +37,13 @@ export const PrepareLabel: React.FC<PrepareLabelProps> = ({
   const end = label.slice(matchedIndex + userInput.length);
 
   return (
-    <Text>
+    <Text color={semanticTheme.text.primary}>
       <Text color={textColor}>{start}</Text>
-      <Text color="black" bold backgroundColor={highlightColor}>
+      <Text
+        color={semanticTheme.background.primary}
+        bold
+        backgroundColor={highlightColor}
+      >
         {match}
       </Text>
       <Text color={textColor}>{end}</Text>

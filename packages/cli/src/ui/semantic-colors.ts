@@ -6,8 +6,12 @@
 
 import { themeManager } from './themes/theme-manager.js';
 import type { SemanticColors } from './themes/semantic-tokens.js';
+import type { Theme } from './themes/theme.js';
 
-export const theme: SemanticColors = {
+export const theme: SemanticColors & { type: Theme['colors']['type'] } = {
+  get type() {
+    return themeManager.getActiveTheme().colors.type;
+  },
   get text() {
     return themeManager.getSemanticColors().text;
   },

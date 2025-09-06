@@ -26,7 +26,6 @@ export interface SemanticColors {
   };
   ui: {
     comment: string;
-    symbol: string;
     gradient: string[] | undefined;
   };
   status: {
@@ -56,7 +55,6 @@ export const lightSemanticColors: SemanticColors = {
   },
   ui: {
     comment: lightTheme.Comment,
-    symbol: lightTheme.Gray,
     gradient: lightTheme.GradientColors,
   },
   status: {
@@ -86,7 +84,6 @@ export const darkSemanticColors: SemanticColors = {
   },
   ui: {
     comment: darkTheme.Comment,
-    symbol: darkTheme.Gray,
     gradient: darkTheme.GradientColors,
   },
   status: {
@@ -116,7 +113,6 @@ export const ansiSemanticColors: SemanticColors = {
   },
   ui: {
     comment: ansiTheme.Comment,
-    symbol: ansiTheme.Gray,
     gradient: ansiTheme.GradientColors,
   },
   status: {

@@ -5,7 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme as semanticTheme } from '../semantic-colors.js';
 
 interface UpdateNotificationProps {
   message: string;
@@ -14,10 +14,10 @@ interface UpdateNotificationProps {
 export const UpdateNotification = ({ message }: UpdateNotificationProps) => (
   <Box
     borderStyle="round"
-    borderColor={Colors.AccentYellow}
+    borderColor={semanticTheme.status.warning}
     paddingX={1}
     marginY={1}
   >
-    <Text color={Colors.AccentYellow}>{message}</Text>
+    <Text color={semanticTheme.status.warning}>{message}</Text>
   </Box>
 );

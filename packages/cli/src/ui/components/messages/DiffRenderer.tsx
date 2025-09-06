@@ -6,11 +6,10 @@
 
 import type React from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
-import { Colors } from '../../colors.js';
 import crypto from 'node:crypto';
 import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
-import { theme } from '../../semantic-colors.js';
+import { themeManager } from '../../themes/theme-manager.js';
 
 interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -105,18 +104,25 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight,
   terminalWidth,
-  theme,
+  theme: themeOverride,
 }) => {
+  const theme = themeOverride || themeManager.getActiveTheme();
   const screenReaderEnabled = useIsScreenReaderEnabled();
   if (!diffContent || typeof diffContent !== 'string') {
-    return <Text color={Colors.AccentYellow}>No diff content.</Text>;
+    return (
+      <Text color={theme.semanticColors.status.warning}>No diff content.</Text>
+    );
   }
 
   const parsedLines = parseDiffWithLineNumbers(diffContent);
 
   if (parsedLines.length === 0) {
     return (
-      <Box borderStyle="round" borderColor={Colors.Gray} padding={1}>
+      <Box
+        borderStyle="round"
+        borderColor={theme.semanticColors.border.default}
+        padding={1}
+      >
         <Text dimColor>No changes detected.</Text>
       </Box>
     );
@@ -125,7 +131,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     return (
       <Box flexDirection="column">
         {parsedLines.map((line, index) => (
-          <Text key={index}>
+          <Text key={index} color={theme.semanticColors.text.primary}>
             {line.type}: {line.content}
           </Text>
         ))}
@@ -183,6 +189,7 @@ const renderDiffContent = (
   availableTerminalHeight: number | undefined,
   terminalWidth: number,
 ) => {
+  const theme = themeManager.getActiveTheme();
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
     ...line,
@@ -196,7 +203,11 @@ const renderDiffContent = (
 
   if (displayableLines.length === 0) {
     return (
-      <Box borderStyle="round" borderColor={Colors.Gray} padding={1}>
+      <Box
+        borderStyle="round"
+        borderColor={theme.semanticColors.border.default}
+        padding={1}
+      >
         <Text dimColor>No changes detected.</Text>
       </Box>
     );
@@ -260,7 +271,7 @@ const renderDiffContent = (
         ) {
           acc.push(
             <Box key={`gap-${index}`}>
-              <Text wrap="truncate" color={Colors.Gray}>
+              <Text wrap="truncate" color={theme.semanticColors.text.secondary}>
                 {'═'.repeat(terminalWidth)}
               </Text>
             </Box>,
@@ -301,12 +312,12 @@ const renderDiffContent = (
         acc.push(
           <Box key={lineKey} flexDirection="row">
             <Text
-              color={theme.text.secondary}
+              color={theme.semanticColors.text.secondary}
               backgroundColor={
                 line.type === 'add'
-                  ? theme.background.diff.added
+                  ? theme.semanticColors.background.diff.added
                   : line.type === 'del'
-                    ? theme.background.diff.removed
+                    ? theme.semanticColors.background.diff.removed
                     : undefined
               }
             >
@@ -314,8 +325,10 @@ const renderDiffContent = (
             </Text>
             {line.type === 'context' ? (
               <>
-                <Text>{prefixSymbol} </Text>
-                <Text wrap="wrap">
+                <Text color={theme.semanticColors.text.primary}>
+                  {prefixSymbol}{' '}
+                </Text>
+                <Text wrap="wrap" color={theme.semanticColors.text.primary}>
                   {colorizeLine(displayContent, language)}
                 </Text>
               </>
@@ -323,16 +336,16 @@ const renderDiffContent = (
               <Text
                 backgroundColor={
                   line.type === 'add'
-                    ? theme.background.diff.added
-                    : theme.background.diff.removed
+                    ? theme.semanticColors.background.diff.added
+                    : theme.semanticColors.background.diff.removed
                 }
                 wrap="wrap"
               >
                 <Text
                   color={
                     line.type === 'add'
-                      ? theme.status.success
-                      : theme.status.error
+                      ? theme.semanticColors.status.success
+                      : theme.semanticColors.status.error
                   }
                 >
                   {prefixSymbol}

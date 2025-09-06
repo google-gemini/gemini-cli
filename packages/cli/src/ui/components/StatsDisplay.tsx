@@ -47,7 +47,7 @@ const SubStatRow: React.FC<SubStatRowProps> = ({ title, children }) => (
   <Box paddingLeft={2}>
     {/* Adjust width for the "» " prefix */}
     <Box width={26}>
-      <Text>» {title}</Text>
+      <Text color={theme.text.primary}>» {title}</Text>
     </Box>
     {/* FIX: Apply the same flexGrow fix here */}
     <Box flexGrow={1}>{children}</Box>
@@ -62,7 +62,9 @@ interface SectionProps {
 
 const Section: React.FC<SectionProps> = ({ title, children }) => (
   <Box flexDirection="column" width="100%" marginBottom={1}>
-    <Text bold>{title}</Text>
+    <Text bold color={theme.text.primary}>
+      {title}
+    </Text>
     {children}
   </Box>
 );
@@ -82,16 +84,24 @@ const ModelUsageTable: React.FC<{
       {/* Header */}
       <Box>
         <Box width={nameWidth}>
-          <Text bold>Model Usage</Text>
+          <Text bold color={theme.text.primary}>
+            Model Usage
+          </Text>
         </Box>
         <Box width={requestsWidth} justifyContent="flex-end">
-          <Text bold>Reqs</Text>
+          <Text bold color={theme.text.primary}>
+            Reqs
+          </Text>
         </Box>
         <Box width={inputTokensWidth} justifyContent="flex-end">
-          <Text bold>Input Tokens</Text>
+          <Text bold color={theme.text.primary}>
+            Input Tokens
+          </Text>
         </Box>
         <Box width={outputTokensWidth} justifyContent="flex-end">
-          <Text bold>Output Tokens</Text>
+          <Text bold color={theme.text.primary}>
+            Output Tokens
+          </Text>
         </Box>
       </Box>
       {/* Divider */}
@@ -108,10 +118,12 @@ const ModelUsageTable: React.FC<{
       {Object.entries(models).map(([name, modelMetrics]) => (
         <Box key={name}>
           <Box width={nameWidth}>
-            <Text>{name.replace('-001', '')}</Text>
+            <Text color={theme.text.primary}>{name.replace('-001', '')}</Text>
           </Box>
           <Box width={requestsWidth} justifyContent="flex-end">
-            <Text>{modelMetrics.api.totalRequests}</Text>
+            <Text color={theme.text.primary}>
+              {modelMetrics.api.totalRequests}
+            </Text>
           </Box>
           <Box width={inputTokensWidth} justifyContent="flex-end">
             <Text color={theme.status.warning}>
@@ -202,7 +214,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
 
       <Section title="Interaction Summary">
         <StatRow title="Session ID:">
-          <Text>{stats.sessionId}</Text>
+          <Text color={theme.text.primary}>{stats.sessionId}</Text>
         </StatRow>
         <StatRow title="Tool Calls:">
           <Text>

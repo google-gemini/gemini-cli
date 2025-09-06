@@ -7,7 +7,7 @@
 import type React from 'react';
 import { useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme as semanticTheme } from '../semantic-colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
@@ -209,7 +209,7 @@ export function ThemeDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={Colors.Gray}
+      borderColor={semanticTheme.border.default}
       flexDirection="column"
       paddingTop={includePadding ? 1 : 0}
       paddingBottom={includePadding ? 1 : 0}
@@ -222,7 +222,9 @@ export function ThemeDialog({
         <Box flexDirection="column" width="45%" paddingRight={2}>
           <Text bold={currentFocusedSection === 'theme'} wrap="truncate">
             {currentFocusedSection === 'theme' ? '> ' : '  '}Select Theme{' '}
-            <Text color={Colors.Gray}>{otherScopeModifiedMessage}</Text>
+            <Text color={semanticTheme.text.secondary}>
+              {otherScopeModifiedMessage}
+            </Text>
           </Text>
           <RadioButtonSelect
             key={selectInputKey}
@@ -266,7 +268,7 @@ export function ThemeDialog({
             return (
               <Box
                 borderStyle="single"
-                borderColor={Colors.Gray}
+                borderColor={semanticTheme.border.default}
                 paddingTop={includePadding ? 1 : 0}
                 paddingBottom={includePadding ? 1 : 0}
                 paddingLeft={1}
@@ -302,7 +304,7 @@ def fibonacci(n):
         </Box>
       </Box>
       <Box marginTop={1}>
-        <Text color={Colors.Gray} wrap="truncate">
+        <Text color={semanticTheme.text.secondary} wrap="truncate">
           (Use Enter to select
           {showScopeSelection ? ', Tab to change focus' : ''})
         </Text>

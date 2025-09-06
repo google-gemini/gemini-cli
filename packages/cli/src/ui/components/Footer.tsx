@@ -116,7 +116,7 @@ export const Footer: React.FC<FooterProps> = ({
             <Text color={theme.status.warning}>untrusted</Text>
           ) : process.env['SANDBOX'] &&
             process.env['SANDBOX'] !== 'sandbox-exec' ? (
-            <Text color="green">
+            <Text color={theme.status.success}>
               {process.env['SANDBOX'].replace(/^gemini-(?:cli-)?/, '')}
             </Text>
           ) : process.env['SANDBOX'] === 'sandbox-exec' ? (
@@ -152,7 +152,7 @@ export const Footer: React.FC<FooterProps> = ({
         <Box alignItems="center" paddingLeft={2}>
           {corgiMode && (
             <Text>
-              {!hideModelInfo && <Text color={theme.ui.symbol}>| </Text>}
+              {!hideModelInfo && <Text color={theme.text.secondary}>| </Text>}
               <Text color={theme.status.error}>▼</Text>
               <Text color={theme.text.primary}>(´</Text>
               <Text color={theme.status.error}>ᴥ</Text>
@@ -162,7 +162,7 @@ export const Footer: React.FC<FooterProps> = ({
           )}
           {!showErrorDetails && errorCount > 0 && (
             <Box>
-              {!hideModelInfo && <Text color={theme.ui.symbol}>| </Text>}
+              {!hideModelInfo && <Text color={theme.text.secondary}>| </Text>}
               <ConsoleSummaryDisplay errorCount={errorCount} />
             </Box>
           )}

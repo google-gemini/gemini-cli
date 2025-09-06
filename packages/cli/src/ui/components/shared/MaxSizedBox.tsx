@@ -7,7 +7,7 @@
 import React, { Fragment, useEffect, useId } from 'react';
 import { Box, Text } from 'ink';
 import stringWidth from 'string-width';
-import { Colors } from '../../colors.js';
+import { theme } from '../../semantic-colors.js';
 import { toCodePoints } from '../../utils/textUtils.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
 
@@ -81,17 +81,18 @@ interface MaxSizedBoxProps {
  *   are used as children.
  *
  * @example
+ * // const { theme } = useTheme();
  * <MaxSizedBox maxWidth={80} maxHeight={10}>
  *   <Box>
  *     <Text>This is the first line.</Text>
  *   </Box>
  *   <Box>
- *     <Text color="cyan" wrap="truncate">Non-wrapping Header: </Text>
+ *     <Text color={theme.colors.text.accent} wrap="truncate">Non-wrapping Header: </Text>
  *     <Text>This is the rest of the line which will wrap if it's too long.</Text>
  *   </Box>
  *   <Box>
  *     <Text>
- *       Line 3 with <Text color="yellow">nested styled text</Text> inside of it.
+ *       Line 3 with <Text color={theme.colors.status.warning}>nested styled text</Text> inside of it.
  *     </Text>
  *   </Box>
  * </MaxSizedBox>
@@ -178,7 +179,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
           </Text>
         ))
       ) : (
-        <Text> </Text>
+        <Text color={theme.text.primary}> </Text>
       )}
     </Box>
   ));
@@ -186,14 +187,14 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   return (
     <Box flexDirection="column" width={maxWidth} flexShrink={0}>
       {totalHiddenLines > 0 && overflowDirection === 'top' && (
-        <Text color={Colors.Gray} wrap="truncate">
+        <Text color={theme.text.secondary} wrap="truncate">
           ... first {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
           hidden ...
         </Text>
       )}
       {visibleLines}
       {totalHiddenLines > 0 && overflowDirection === 'bottom' && (
-        <Text color={Colors.Gray} wrap="truncate">
+        <Text color={theme.text.secondary} wrap="truncate">
           ... last {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
           hidden ...
         </Text>
@@ -456,7 +457,10 @@ function layoutInkElementAsStyledText(
           // For lines after the first line break, show only ellipsis if the text would be truncated
           if (index > 0 && textWidth > 0) {
             // This is content after a line break - just show ellipsis to indicate truncation
-            currentLine.push({ text: '…', props: {} });
+            currentLine.push({
+              text: '…',
+              props: { color: theme.text.secondary },
+            });
             currentLineWidth = stringWidth('…');
           } else {
             // This is the first line or a continuation, try to fit what we can
@@ -485,7 +489,10 @@ function layoutInkElementAsStyledText(
               if (slice) {
                 currentLine.push({ text: slice, props: segment.props });
               }
-              currentLine.push({ text: '…', props: {} });
+              currentLine.push({
+                text: '…',
+                props: { color: theme.text.secondary },
+              });
               currentLineWidth = truncatedWidth + stringWidth('…');
             }
           }

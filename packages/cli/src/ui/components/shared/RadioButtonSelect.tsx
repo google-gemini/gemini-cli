@@ -7,7 +7,7 @@
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import { Text, Box } from 'ink';
-import { Colors } from '../../colors.js';
+import { theme as semanticTheme } from '../../semantic-colors.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 
 /**
@@ -164,7 +164,13 @@ export function RadioButtonSelect<T>({
   return (
     <Box flexDirection="column">
       {showScrollArrows && (
-        <Text color={scrollOffset > 0 ? Colors.Foreground : Colors.Gray}>
+        <Text
+          color={
+            scrollOffset > 0
+              ? semanticTheme.text.primary
+              : semanticTheme.text.secondary
+          }
+        >
           ▲
         </Text>
       )}
@@ -172,18 +178,18 @@ export function RadioButtonSelect<T>({
         const itemIndex = scrollOffset + index;
         const isSelected = activeIndex === itemIndex;
 
-        let textColor = Colors.Foreground;
-        let numberColor = Colors.Foreground;
+        let textColor = semanticTheme.text.primary;
+        let numberColor = semanticTheme.text.primary;
         if (isSelected) {
-          textColor = Colors.AccentGreen;
-          numberColor = Colors.AccentGreen;
+          textColor = semanticTheme.status.success;
+          numberColor = semanticTheme.status.success;
         } else if (item.disabled) {
-          textColor = Colors.Gray;
-          numberColor = Colors.Gray;
+          textColor = semanticTheme.text.secondary;
+          numberColor = semanticTheme.text.secondary;
         }
 
         if (!showNumbers) {
-          numberColor = Colors.Gray;
+          numberColor = semanticTheme.text.secondary;
         }
 
         const numberColumnWidth = String(items.length).length;
@@ -195,7 +201,11 @@ export function RadioButtonSelect<T>({
           <Box key={item.label} alignItems="center">
             <Box minWidth={2} flexShrink={0}>
               <Text
-                color={isSelected ? Colors.AccentGreen : Colors.Foreground}
+                color={
+                  isSelected
+                    ? semanticTheme.status.success
+                    : semanticTheme.text.primary
+                }
                 aria-hidden
               >
                 {isSelected ? '●' : ' '}
@@ -212,7 +222,9 @@ export function RadioButtonSelect<T>({
             {item.themeNameDisplay && item.themeTypeDisplay ? (
               <Text color={textColor} wrap="truncate">
                 {item.themeNameDisplay}{' '}
-                <Text color={Colors.Gray}>{item.themeTypeDisplay}</Text>
+                <Text color={semanticTheme.text.secondary}>
+                  {item.themeTypeDisplay}
+                </Text>
               </Text>
             ) : (
               <Text color={textColor} wrap="truncate">
@@ -226,8 +238,8 @@ export function RadioButtonSelect<T>({
         <Text
           color={
             scrollOffset + maxItemsToShow < items.length
-              ? Colors.Foreground
-              : Colors.Gray
+              ? semanticTheme.text.primary
+              : semanticTheme.text.secondary
           }
         >
           ▼

@@ -4,53 +4,52 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { themeManager } from './themes/theme-manager.js';
-import type { ColorsTheme } from './themes/theme.js';
+import { theme } from './semantic-colors.js';
 
-export const Colors: ColorsTheme = {
+export const Colors = {
   get type() {
-    return themeManager.getActiveTheme().colors.type;
+    return theme.type;
   },
   get Foreground() {
-    return themeManager.getActiveTheme().colors.Foreground;
+    return theme.text.primary;
   },
   get Background() {
-    return themeManager.getActiveTheme().colors.Background;
+    return theme.background.primary;
   },
   get LightBlue() {
-    return themeManager.getActiveTheme().colors.LightBlue;
+    return theme.text.link;
   },
   get AccentBlue() {
-    return themeManager.getActiveTheme().colors.AccentBlue;
+    return theme.text.link;
   },
   get AccentPurple() {
-    return themeManager.getActiveTheme().colors.AccentPurple;
+    return theme.text.accent;
   },
   get AccentCyan() {
-    return themeManager.getActiveTheme().colors.AccentCyan;
+    return theme.text.accent;
   },
   get AccentGreen() {
-    return themeManager.getActiveTheme().colors.AccentGreen;
+    return theme.status.success;
   },
   get AccentYellow() {
-    return themeManager.getActiveTheme().colors.AccentYellow;
+    return theme.status.warning;
   },
   get AccentRed() {
-    return themeManager.getActiveTheme().colors.AccentRed;
+    return theme.status.error;
   },
   get DiffAdded() {
-    return themeManager.getActiveTheme().colors.DiffAdded;
+    return theme.background.diff.added;
   },
   get DiffRemoved() {
-    return themeManager.getActiveTheme().colors.DiffRemoved;
+    return theme.background.diff.removed;
   },
   get Comment() {
-    return themeManager.getActiveTheme().colors.Comment;
+    return theme.ui.comment;
   },
   get Gray() {
-    return themeManager.getActiveTheme().colors.Gray;
+    return theme.text.secondary;
   },
   get GradientColors() {
-    return themeManager.getActiveTheme().colors.GradientColors;
+    return theme.ui.gradient;
   },
 };

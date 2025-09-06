@@ -5,7 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme as semanticTheme } from '../semantic-colors.js';
 import { PrepareLabel } from './PrepareLabel.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 export interface Suggestion {
@@ -36,7 +36,7 @@ export function SuggestionsDisplay({
   if (isLoading) {
     return (
       <Box paddingX={1} width={width}>
-        <Text color="gray">Loading suggestions...</Text>
+        <Text color={semanticTheme.text.secondary}>Loading suggestions...</Text>
       </Box>
     );
   }
@@ -70,12 +70,14 @@ export function SuggestionsDisplay({
 
   return (
     <Box flexDirection="column" paddingX={1} width={width}>
-      {scrollOffset > 0 && <Text color={Colors.Foreground}>▲</Text>}
+      {scrollOffset > 0 && <Text color={semanticTheme.text.primary}>▲</Text>}
 
       {visibleSuggestions.map((suggestion, index) => {
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
-        const textColor = isActive ? Colors.AccentPurple : Colors.Gray;
+        const textColor = isActive
+          ? semanticTheme.text.accent
+          : semanticTheme.text.secondary;
         const labelElement = (
           <PrepareLabel
             label={suggestion.label}
@@ -117,9 +119,11 @@ export function SuggestionsDisplay({
           </Box>
         );
       })}
-      {endIndex < suggestions.length && <Text color="gray">▼</Text>}
+      {endIndex < suggestions.length && (
+        <Text color={semanticTheme.text.secondary}>▼</Text>
+      )}
       {suggestions.length > MAX_SUGGESTIONS_TO_SHOW && (
-        <Text color="gray">
+        <Text color={semanticTheme.text.secondary}>
           ({activeIndex + 1}/{suggestions.length})
         </Text>
       )}

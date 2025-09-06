@@ -6,9 +6,12 @@
 
 import { OverflowProvider } from '../../contexts/OverflowContext.js';
 import { render } from 'ink-testing-library';
+import { themeManager } from '../../themes/theme-manager.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import * as CodeColorizer from '../../utils/CodeColorizer.js';
 import { vi } from 'vitest';
+
+const theme = themeManager.getActiveTheme();
 
 describe('<OverflowProvider><DiffRenderer /></OverflowProvider>', () => {
   const mockColorizeCode = vi.spyOn(CodeColorizer, 'colorizeCode');
@@ -44,7 +47,7 @@ index 0000000..e69de29
       'python',
       undefined,
       80,
-      undefined,
+      theme,
     );
   });
 
@@ -72,7 +75,7 @@ index 0000000..e69de29
       null,
       undefined,
       80,
-      undefined,
+      theme,
     );
   });
 
@@ -96,7 +99,7 @@ index 0000000..e69de29
       null,
       undefined,
       80,
-      undefined,
+      theme,
     );
   });
 

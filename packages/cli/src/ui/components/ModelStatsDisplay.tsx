@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme as semanticTheme } from '../semantic-colors.js';
 import { formatDuration } from '../utils/formatters.js';
 import {
   calculateAverageLatency,
@@ -34,7 +34,10 @@ const StatRow: React.FC<StatRowProps> = ({
 }) => (
   <Box>
     <Box width={METRIC_COL_WIDTH}>
-      <Text bold={isSection} color={isSection ? undefined : Colors.LightBlue}>
+      <Text
+        bold={isSection}
+        color={isSection ? undefined : semanticTheme.text.link}
+      >
         {isSubtle ? `  ↳ ${title}` : title}
       </Text>
     </Box>
@@ -57,7 +60,7 @@ export const ModelStatsDisplay: React.FC = () => {
     return (
       <Box
         borderStyle="round"
-        borderColor={Colors.Gray}
+        borderColor={semanticTheme.border.default}
         paddingY={1}
         paddingX={2}
       >
@@ -83,12 +86,12 @@ export const ModelStatsDisplay: React.FC = () => {
   return (
     <Box
       borderStyle="round"
-      borderColor={Colors.Gray}
+      borderColor={semanticTheme.border.default}
       flexDirection="column"
       paddingY={1}
       paddingX={2}
     >
-      <Text bold color={Colors.AccentPurple}>
+      <Text bold color={semanticTheme.text.accent}>
         Model Stats For Nerds
       </Text>
       <Box height={1} />
@@ -127,7 +130,9 @@ export const ModelStatsDisplay: React.FC = () => {
           return (
             <Text
               color={
-                m.api.totalErrors > 0 ? Colors.AccentRed : Colors.Foreground
+                m.api.totalErrors > 0
+                  ? semanticTheme.status.error
+                  : semanticTheme.text.primary
               }
             >
               {m.api.totalErrors.toLocaleString()} ({errorRate.toFixed(1)}%)
@@ -150,7 +155,7 @@ export const ModelStatsDisplay: React.FC = () => {
       <StatRow
         title="Total"
         values={getModelValues((m) => (
-          <Text color={Colors.AccentYellow}>
+          <Text color={semanticTheme.status.warning}>
             {m.tokens.total.toLocaleString()}
           </Text>
         ))}
@@ -167,7 +172,7 @@ export const ModelStatsDisplay: React.FC = () => {
           values={getModelValues((m) => {
             const cacheHitRate = calculateCacheHitRate(m);
             return (
-              <Text color={Colors.AccentGreen}>
+              <Text color={semanticTheme.status.success}>
                 {m.tokens.cached.toLocaleString()} ({cacheHitRate.toFixed(1)}%)
               </Text>
             );

@@ -130,11 +130,12 @@ const InitializingComponent = ({ initialTotal }: { initialTotal: number }) => {
     };
   }, []);
 
+  const theme = themeManager.getActiveTheme();
   const message = `Connecting to MCP servers... (${connected}/${total})`;
 
   return (
     <Box>
-      <Text>
+      <Text color={theme.semanticColors.text.primary}>
         <Spinner /> {message}
       </Text>
     </Box>

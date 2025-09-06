@@ -7,6 +7,8 @@
 import type { DetectedIde } from '@google/gemini-cli-core';
 import { getIdeInfo } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
+
+import { themeManager } from './themes/theme-manager.js';
 import type { RadioSelectItem } from './components/shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
 import { useKeypress } from './hooks/useKeypress.js';
@@ -67,6 +69,7 @@ export function IdeIntegrationNudge({
     },
   ];
 
+  const theme = themeManager.getActiveTheme();
   const installText = isExtensionPreInstalled
     ? `If you select Yes, the CLI will have access to your open files and display diffs directly in ${
         ideName ?? 'your editor'
@@ -79,14 +82,14 @@ export function IdeIntegrationNudge({
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor="yellow"
+      borderColor={theme.semanticColors.status.warning}
       padding={1}
       width="100%"
       marginLeft={1}
     >
       <Box marginBottom={1} flexDirection="column">
-        <Text>
-          <Text color="yellow">{'> '}</Text>
+        <Text color={theme.semanticColors.text.primary}>
+          <Text color={theme.semanticColors.status.warning}>{'> '}</Text>
           {`Do you want to connect ${ideName ?? 'your editor'} to Gemini CLI?`}
         </Text>
         <Text dimColor>{installText}</Text>

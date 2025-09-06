@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import { Colors } from '../colors.js';
+import { theme as semanticTheme } from '../semantic-colors.js';
 import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
 
 interface TableRendererProps {
@@ -87,9 +87,9 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const paddingNeeded = Math.max(0, contentWidth - actualDisplayWidth);
 
     return (
-      <Text>
+      <Text color={semanticTheme.text.primary}>
         {isHeader ? (
-          <Text bold color={Colors.AccentCyan}>
+          <Text bold color={semanticTheme.text.accent}>
             <RenderInline text={cellContent} />
           </Text>
         ) : (
@@ -112,7 +112,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const borderParts = adjustedWidths.map((w) => char.horizontal.repeat(w));
     const border = char.left + borderParts.join(char.middle) + char.right;
 
-    return <Text>{border}</Text>;
+    return <Text color={semanticTheme.border.default}>{border}</Text>;
   };
 
   // Helper function to render a table row
@@ -123,7 +123,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     });
 
     return (
-      <Text>
+      <Text color={semanticTheme.text.primary}>
         │{' '}
         {renderedCells.map((cell, index) => (
           <React.Fragment key={index}>
