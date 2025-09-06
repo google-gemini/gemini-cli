@@ -25,16 +25,19 @@ export const ChatArea: React.FC = () => {
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Error notification */}
       {error && (
-        <div className="mx-4 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-3">
-          <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />
+        <div className="mx-4 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start gap-3">
+          <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
           <div className="flex-1 text-sm text-destructive">
-            <strong>Error:</strong> {error}
+            <strong>Error:</strong>
+            <div className="mt-1 whitespace-pre-line leading-relaxed">
+              {error}
+            </div>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setError(null)}
-            className="h-6 w-6 p-0 text-destructive hover:bg-destructive/20"
+            className="h-6 w-6 p-0 text-destructive hover:bg-destructive/20 flex-shrink-0"
           >
             <X className="h-3 w-3" />
           </Button>
