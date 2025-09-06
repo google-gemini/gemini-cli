@@ -195,6 +195,20 @@ Logs are timestamped records of specific events. The following events are logged
     - `error_type` (if applicable)
     - `metadata` (if applicable, dictionary of string -> any)
 
+- `gemini_cli.file_operation`: This event occurs for each file operation.
+  - **Attributes**:
+    - `tool_name` (string)
+    - `operation` (string: "create", "read", "update")
+    - `lines` (int, if applicable)
+    - `mimetype` (string, if applicable)
+    - `extension` (string, if applicable)
+    - `programming_language` (string, if applicable)
+    - `diff_stat` (json string, if applicable): A JSON string with the following members:
+      - `ai_added_lines` (int)
+      - `ai_removed_lines` (int)
+      - `user_added_lines` (int)
+      - `user_removed_lines` (int)
+
 - `gemini_cli.api_request`: This event occurs when making a request to Gemini API.
   - **Attributes**:
     - `model`

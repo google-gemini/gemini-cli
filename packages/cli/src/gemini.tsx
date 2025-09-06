@@ -36,9 +36,6 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
-  logIdeConnection,
-  IdeConnectionEvent,
-  IdeConnectionType,
   uiTelemetryService,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from './config/auth.js';
@@ -175,8 +172,6 @@ export async function startInteractiveUI(
   workspaceRoot: string = process.cwd(),
 ) {
   const version = await getCliVersion();
-  // Detect and enable Kitty keyboard protocol once at startup
-  await detectAndEnableKittyProtocol();
   setWindowTitle(basename(workspaceRoot), settings);
   const instance = render(
     <React.StrictMode>
@@ -221,6 +216,24 @@ export async function main() {
     argv,
   );
 
+  const wasRaw = process.stdin.isRaw;
+  let kittyProtocolDetectionComplete: Promise<boolean> | undefined;
+  if (config.isInteractive() && !wasRaw) {
+    // Set this as early as possible to avoid spurious characters from
+    // input showing up in the output.
+    process.stdin.setRawMode(true);
+
+    // This cleanup isn't strictly needed but may help in certain situations.
+    process.on('SIGTERM', () => {
+      process.stdin.setRawMode(wasRaw);
+    });
+    process.on('SIGINT', () => {
+      process.stdin.setRawMode(wasRaw);
+    });
+
+    // Detect and enable Kitty keyboard protocol once at startup.
+    kittyProtocolDetectionComplete = detectAndEnableKittyProtocol();
+  }
   if (argv.sessionSummary) {
     registerCleanup(() => {
       const metrics = uiTelemetryService.getMetrics();
@@ -287,11 +300,6 @@ export async function main() {
     await new Promise((f) => setTimeout(f, 100));
     spinnerInstance.clear();
     spinnerInstance.unmount();
-  }
-
-  if (config.getIdeMode()) {
-    await config.getIdeClient().connect();
-    logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
   }
 
   // Load custom themes from settings
@@ -393,6 +401,8 @@ export async function main() {
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {
+    // Need kitty detection to be complete before we can start the interactive UI.
+    await kittyProtocolDetectionComplete;
     await startInteractiveUI(config, settings, startupWarnings);
     return;
   }

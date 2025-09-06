@@ -17,14 +17,16 @@ import {
   SlashCommandStatus,
   ToolConfirmationOutcome,
   Storage,
+  IdeClient,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
-import type {
-  Message,
-  HistoryItemWithoutId,
-  HistoryItem,
-  SlashCommandProcessorResult,
+import {
+  type Message,
+  type HistoryItemWithoutId,
+  type HistoryItem,
+  type SlashCommandProcessorResult,
+  AuthState,
 } from '../types.js';
 import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
@@ -46,7 +48,7 @@ export const useSlashCommandProcessor = (
   refreshStatic: () => void,
   onDebugMessage: (message: string) => void,
   openThemeDialog: () => void,
-  openAuthDialog: () => void,
+  setAuthState: (state: AuthState) => void,
   openEditorDialog: () => void,
   toggleCorgiMode: () => void,
   setQuittingMessages: (message: HistoryItem[]) => void,
@@ -215,15 +217,20 @@ export const useSlashCommandProcessor = (
       return;
     }
 
-    const ideClient = config.getIdeClient();
     const listener = () => {
       reloadCommands();
     };
 
-    ideClient.addStatusChangeListener(listener);
+    (async () => {
+      const ideClient = await IdeClient.getInstance();
+      ideClient.addStatusChangeListener(listener);
+    })();
 
     return () => {
-      ideClient.removeStatusChangeListener(listener);
+      (async () => {
+        const ideClient = await IdeClient.getInstance();
+        ideClient.removeStatusChangeListener(listener);
+      })();
     };
   }, [config, reloadCommands]);
 
@@ -369,7 +376,7 @@ export const useSlashCommandProcessor = (
                 case 'dialog':
                   switch (result.dialog) {
                     case 'auth':
-                      openAuthDialog();
+                      setAuthState(AuthState.Updating);
                       return { type: 'handled' };
                     case 'theme':
                       openThemeDialog();
@@ -548,7 +555,7 @@ export const useSlashCommandProcessor = (
     [
       config,
       addItem,
-      openAuthDialog,
+      setAuthState,
       commands,
       commandContext,
       addMessage,

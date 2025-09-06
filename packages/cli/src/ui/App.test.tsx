@@ -15,7 +15,6 @@ import type {
   ToolRegistry,
   SandboxConfig,
   GeminiClient,
-  AuthType,
 } from '@google/gemini-cli-core';
 import {
   ApprovalMode,
@@ -34,7 +33,6 @@ import type { UpdateObject } from './utils/updateCheck.js';
 import { checkForUpdates } from './utils/updateCheck.js';
 import { EventEmitter } from 'node:events';
 import { updateEventEmitter } from '../utils/updateEventEmitter.js';
-import * as auth from '../config/auth.js';
 import * as useTerminalSize from './hooks/useTerminalSize.js';
 
 // Define a more complete mock server config based on actual Config
@@ -93,7 +91,6 @@ interface MockServerConfig {
   getAllGeminiMdFilenames: Mock<() => string[]>;
   getGeminiClient: Mock<() => GeminiClient | undefined>;
   getUserTier: Mock<() => Promise<string | undefined>>;
-  getIdeClient: Mock<() => { getCurrentIde: Mock<() => string | undefined> }>;
   getScreenReader: Mock<() => boolean>;
 }
 
@@ -183,13 +180,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getWorkspaceContext: vi.fn(() => ({
           getDirectories: vi.fn(() => []),
         })),
-        getIdeClient: vi.fn(() => ({
-          getCurrentIde: vi.fn(() => 'vscode'),
-          getDetectedIdeDisplayName: vi.fn(() => 'VSCode'),
-          addStatusChangeListener: vi.fn(),
-          removeStatusChangeListener: vi.fn(),
-          getConnectionStatus: vi.fn(() => 'connected'),
-        })),
         isTrustedFolder: vi.fn(() => true),
         getScreenReader: vi.fn(() => false),
         getFolderTrustFeature: vi.fn(() => false),
@@ -208,6 +198,15 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     MCPServerConfig: actualCore.MCPServerConfig,
     getAllGeminiMdFilenames: vi.fn(() => ['GEMINI.md']),
     ideContext: ideContextMock,
+    IdeClient: {
+      getInstance: vi.fn().mockResolvedValue({
+        getCurrentIde: vi.fn(() => 'vscode'),
+        getDetectedIdeDisplayName: vi.fn(() => 'VSCode'),
+        addStatusChangeListener: vi.fn(),
+        removeStatusChangeListener: vi.fn(),
+        getConnectionStatus: vi.fn(() => 'connected'),
+      }),
+    },
     isGitRepository: vi.fn(),
   };
 });
@@ -223,14 +222,12 @@ vi.mock('./hooks/useGeminiStream', () => ({
   })),
 }));
 
-vi.mock('./hooks/useAuthCommand', () => ({
+vi.mock('./auth/useAuth.js', () => ({
   useAuthCommand: vi.fn(() => ({
-    isAuthDialogOpen: false,
-    openAuthDialog: vi.fn(),
-    handleAuthSelect: vi.fn(),
-    handleAuthHighlight: vi.fn(),
-    isAuthenticating: false,
-    cancelAuthentication: vi.fn(),
+    authState: 'authenticated',
+    setAuthState: vi.fn(),
+    authError: null,
+    onAuthError: vi.fn(),
   })),
 }));
 
@@ -1185,60 +1182,6 @@ describe('App UI', () => {
 
       // Total error count should be 1 + 3 + 1 = 5
       expect(lastFrame()).toContain('5 errors');
-    });
-  });
-
-  describe('auth validation', () => {
-    it('should call validateAuthMethod when useExternalAuth is false', async () => {
-      const validateAuthMethodSpy = vi.spyOn(auth, 'validateAuthMethod');
-      mockSettings = createMockSettings({
-        workspace: {
-          security: {
-            auth: {
-              selectedType: 'USE_GEMINI' as AuthType,
-              useExternal: false,
-            },
-          },
-          ui: { theme: 'Default' },
-        },
-      });
-
-      const { unmount } = renderWithProviders(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-          version={mockVersion}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(validateAuthMethodSpy).toHaveBeenCalledWith('USE_GEMINI');
-    });
-
-    it('should NOT call validateAuthMethod when useExternalAuth is true', async () => {
-      const validateAuthMethodSpy = vi.spyOn(auth, 'validateAuthMethod');
-      mockSettings = createMockSettings({
-        workspace: {
-          security: {
-            auth: {
-              selectedType: 'USE_GEMINI' as AuthType,
-              useExternal: true,
-            },
-          },
-          ui: { theme: 'Default' },
-        },
-      });
-
-      const { unmount } = renderWithProviders(
-        <App
-          config={mockConfig as unknown as ServerConfig}
-          settings={mockSettings}
-          version={mockVersion}
-        />,
-      );
-      currentUnmount = unmount;
-
-      expect(validateAuthMethodSpy).not.toHaveBeenCalled();
     });
   });
 

@@ -86,8 +86,6 @@ import {
   SlashCommandStatus,
   ToolConfirmationOutcome,
   makeFakeConfig,
-  ToolConfirmationOutcome,
-  type IdeClient,
 } from '@google/gemini-cli-core';
 
 function createTestCommand(
@@ -111,11 +109,6 @@ describe('useSlashCommandProcessor', () => {
   const mockSetQuittingMessages = vi.fn();
 
   const mockConfig = makeFakeConfig({});
-  vi.spyOn(mockConfig, 'getIdeClient').mockReturnValue({
-    addStatusChangeListener: vi.fn(),
-    removeStatusChangeListener: vi.fn(),
-  } as unknown as IdeClient);
-
   const mockSettings = {} as LoadedSettings;
 
   beforeEach(() => {
@@ -226,6 +219,18 @@ describe('useSlashCommandProcessor', () => {
       // Only the file-based command's action should be called.
       expect(fileAction).toHaveBeenCalledTimes(1);
       expect(builtinAction).not.toHaveBeenCalled();
+    });
+
+    it('should not include hidden commands in the command list', async () => {
+      const visibleCommand = createTestCommand({ name: 'visible' });
+      const hiddenCommand = createTestCommand({ name: 'hidden', hidden: true });
+      const result = setupProcessorHook([visibleCommand, hiddenCommand]);
+
+      await waitFor(() => {
+        expect(result.current.slashCommands).toHaveLength(1);
+      });
+
+      expect(result.current.slashCommands[0].name).toBe('visible');
     });
   });
 
