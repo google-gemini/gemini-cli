@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ThemeDebugInfo } from './types.js';
+import type { ThemeDebugInfo } from './theme-types.js';
 
 /**
  * Renders a color value for terminal display
@@ -64,7 +64,7 @@ ${renderColorValue(colors['Gray'], 'Gray')}`;
  * Creates a simple color palette preview from a custom theme
  */
 export function createSimpleColorPreview(
-  theme: import('./types.js').CustomTheme,
+  theme: import('./theme-types.js').CustomTheme,
 ): string {
   return `
 🎨 Color Palette Preview:

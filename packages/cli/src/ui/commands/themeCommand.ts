@@ -12,7 +12,7 @@ import {
   type SlashCommandActionReturn,
   type CommandContext,
 } from './types.js';
-import { listThemeFiles } from '../../theme/storage.js';
+import { listThemeFiles } from '@google/gemini-cli-core';
 import { themeInstaller } from './installers/themeInstaller.js';
 
 // /theme list  -> lists installed custom themes (from files)

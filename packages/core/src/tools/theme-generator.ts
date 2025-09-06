@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '@google/gemini-cli-core';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '@google/gemini-cli-core';
-import type { VSCodeTheme, ColorPalette } from './types.js';
+import type { Config } from '../config/config.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import type { VSCodeTheme, ColorPalette } from './theme-types.js';
 
 /**
  * Generates a theme using AI based on the theme name

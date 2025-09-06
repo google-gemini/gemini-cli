@@ -4,33 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Config } from '../config/config.js';
 import type {
-  Config,
   ToolResult,
   ToolCallConfirmationDetails,
   ToolLocation,
   ToolInvocation,
-} from '@google/gemini-cli-core';
-import { 
-  BaseDeclarativeTool, 
-  BaseToolInvocation, 
-  Kind,
-  getErrorMessage 
-} from '@google/gemini-cli-core';
+} from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import { getErrorMessage } from '../utils/errors.js';
 
 import type {
   InstallVSCodeThemeToolParams,
   VSCodeTheme,
-} from './types.js';
-import { convertVSCodeThemeToCustomTheme } from './converter.js';
-import { createDefaultTheme, generateThemeWithAI } from './generator.js';
+} from './theme-types.js';
+import { convertVSCodeThemeToCustomTheme } from './theme-converter.js';
+import { createDefaultTheme, generateThemeWithAI } from './theme-generator.js';
 import {
   extractExtensionId,
   downloadVsix,
   extractThemeFromVsix,
-} from './extractor.js';
-import { saveThemeToFile } from './storage.js';
-import { createSimpleColorPreview } from './display.js';
+} from './theme-extractor.js';
+import { saveThemeToFile } from './theme-storage.js';
+import { createSimpleColorPreview } from './theme-display.js';
 
 /**
  * Tool for installing VS Code themes from marketplace URLs

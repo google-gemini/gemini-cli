@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as zlib from 'node:zlib';
+import * as zlib from 'zlib';
 
 /**
  * Represents the extracted content of a VSIX file
