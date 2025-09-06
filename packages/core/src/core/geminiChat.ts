@@ -73,7 +73,14 @@ function isValidResponse(response: GenerateContentResponse): boolean {
   if (response.candidates === undefined || response.candidates.length === 0) {
     return false;
   }
-  const content = response.candidates[0]?.content;
+  const candidate = response.candidates[0];
+  if (candidate === undefined) {
+    return false;
+  }
+  if (candidate.finishReason) {
+    return true;
+  }
+  const content = candidate.content;
   if (content === undefined) {
     return false;
   }

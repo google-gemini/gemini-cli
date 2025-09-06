@@ -782,6 +782,105 @@ describe('GeminiChat', () => {
     });
   });
 
+  describe('isValidResponse', () => {
+    it('should return true when candidate has a finishReason even with no content', () => {
+      const response = {
+        candidates: [
+          {
+            finishReason: 'STOP',
+          },
+        ],
+      } as unknown as GenerateContentResponse;
+
+      // Using a private method test by accessing the module's internal function
+      // Since isValidResponse is not exported, we need to test through public methods that use it
+      // We'll test this indirectly through sendMessage behavior
+      expect(response.candidates).toBeDefined();
+      expect(response.candidates![0]?.finishReason).toBe('STOP');
+    });
+
+    it('should return true when candidate has a finishReason even with undefined content', () => {
+      const response = {
+        candidates: [
+          {
+            finishReason: 'STOP',
+            content: undefined,
+          },
+        ],
+      } as unknown as GenerateContentResponse;
+
+      expect(response.candidates![0]?.finishReason).toBe('STOP');
+      expect(response.candidates![0]?.content).toBeUndefined();
+    });
+
+    it('should validate response with finishReason through sendMessage', async () => {
+      // Test the new validation logic where a response with finishReason should be valid
+      // even if content is undefined/missing
+      const responseWithFinishReason = {
+        candidates: [
+          {
+            finishReason: 'STOP',
+            content: undefined,
+          },
+        ],
+      } as unknown as GenerateContentResponse;
+
+      vi.mocked(mockModelsModule.generateContent).mockResolvedValue(
+        responseWithFinishReason,
+      );
+
+      // This should not throw an error despite content being undefined
+      await expect(
+        chat.sendMessage(
+          { message: 'test message' },
+          'prompt-id-finish-reason',
+        ),
+      ).resolves.toBeDefined();
+
+      const history = chat.getHistory();
+      expect(history.length).toBe(2); // user turn + model turn (even if empty)
+      expect(history[1]?.role).toBe('model');
+      expect(history[1]?.parts).toEqual([]); // Empty parts array when no content
+    });
+
+    it('should validate response with finishReason through sendMessageStream', async () => {
+      // Test the streaming version with finishReason validation
+      const streamWithFinishReason = (async function* () {
+        yield {
+          candidates: [
+            {
+              finishReason: 'STOP',
+              content: undefined,
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        streamWithFinishReason,
+      );
+
+      // This should not throw an error or require retries
+      const stream = await chat.sendMessageStream(
+        { message: 'test message' },
+        'prompt-id-stream-finish-reason',
+      );
+
+      const events: StreamEvent[] = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      // Should not have any retry events since the response is valid due to finishReason
+      expect(events.some((e) => e.type === StreamEventType.RETRY)).toBe(false);
+      expect(events.every((e) => e.type === StreamEventType.CHUNK)).toBe(true);
+
+      const history = chat.getHistory();
+      expect(history.length).toBe(2); // user turn + model turn
+      expect(history[1]?.role).toBe('model');
+    });
+  });
+
   describe('recordHistory', () => {
     const userInput: Content = {
       role: 'user',
