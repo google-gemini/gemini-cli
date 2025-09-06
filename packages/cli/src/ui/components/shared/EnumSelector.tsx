@@ -56,7 +56,7 @@ export function EnumSelector({
       <Text
         color={isActive && canScrollLeft ? Colors.AccentGreen : Colors.Gray}
       >
-        {canScrollLeft ? '◀' : ' '}
+        {canScrollLeft ? '←' : ' '}
       </Text>
       <Text> </Text>
       <Text
@@ -69,7 +69,7 @@ export function EnumSelector({
       <Text
         color={isActive && canScrollRight ? Colors.AccentGreen : Colors.Gray}
       >
-        {canScrollRight ? '▶' : ' '}
+        {canScrollRight ? '→' : ' '}
       </Text>
     </Box>
   );
