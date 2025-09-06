@@ -137,16 +137,19 @@ describe('useSlashCommandProcessor', () => {
         mockClearItems,
         mockLoadHistory,
         vi.fn(), // refreshStatic
-        vi.fn(), // onDebugMessage
-        mockOpenThemeDialog, // openThemeDialog
-        mockOpenAuthDialog,
-        vi.fn(), // openEditorDialog
-        vi.fn(), // toggleCorgiMode
-        mockSetQuittingMessages,
-        vi.fn(), // openPrivacyNotice
-        vi.fn(), // openSettingsDialog
         vi.fn(), // toggleVimEnabled
         setIsProcessing,
+        vi.fn(), // setGeminiMdFileCount
+        {
+          openAuthDialog: mockOpenAuthDialog,
+          openThemeDialog: mockOpenThemeDialog,
+          openEditorDialog: vi.fn(),
+          openPrivacyNotice: vi.fn(),
+          openSettingsDialog: vi.fn(),
+          quit: mockSetQuittingMessages,
+          setDebugMessage: vi.fn(),
+          toggleCorgiMode: vi.fn(),
+        },
       ),
     );
 
@@ -460,73 +463,24 @@ describe('useSlashCommandProcessor', () => {
       });
     });
 
-    describe('with fake timers', () => {
-      // This test needs to let the async `waitFor` complete with REAL timers
-      // before switching to FAKE timers to test setTimeout.
-      it('should handle a "quit" action', async () => {
-        const quitAction = vi
-          .fn()
-          .mockResolvedValue({ type: 'quit', messages: [] });
-        const command = createTestCommand({
-          name: 'exit',
-          action: quitAction,
-        });
-        const result = setupProcessorHook([command]);
+    it('should handle a "quit" action', async () => {
+      const quitAction = vi
+        .fn()
+        .mockResolvedValue({ type: 'quit', messages: ['bye'] });
+      const command = createTestCommand({
+        name: 'exit',
+        action: quitAction,
+      });
+      const result = setupProcessorHook([command]);
 
-        await waitFor(() =>
-          expect(result.current.slashCommands).toHaveLength(1),
-        );
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
-        vi.useFakeTimers();
-
-        try {
-          await act(async () => {
-            await result.current.handleSlashCommand('/exit');
-          });
-
-          await act(async () => {
-            await vi.advanceTimersByTimeAsync(200);
-          });
-
-          expect(mockSetQuittingMessages).toHaveBeenCalledWith([]);
-          expect(mockProcessExit).toHaveBeenCalledWith(0);
-        } finally {
-          vi.useRealTimers();
-        }
+      await act(async () => {
+        await result.current.handleSlashCommand('/exit');
       });
 
-      it('should call runExitCleanup when handling a "quit" action', async () => {
-        const quitAction = vi
-          .fn()
-          .mockResolvedValue({ type: 'quit', messages: [] });
-        const command = createTestCommand({
-          name: 'exit',
-          action: quitAction,
-        });
-        const result = setupProcessorHook([command]);
-
-        await waitFor(() =>
-          expect(result.current.slashCommands).toHaveLength(1),
-        );
-
-        vi.useFakeTimers();
-
-        try {
-          await act(async () => {
-            await result.current.handleSlashCommand('/exit');
-          });
-
-          await act(async () => {
-            await vi.advanceTimersByTimeAsync(200);
-          });
-
-          expect(mockRunExitCleanup).toHaveBeenCalledTimes(1);
-        } finally {
-          vi.useRealTimers();
-        }
-      });
+      expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
     });
-
     it('should handle "submit_prompt" action returned from a file-based command', async () => {
       const fileCommand = createTestCommand(
         {

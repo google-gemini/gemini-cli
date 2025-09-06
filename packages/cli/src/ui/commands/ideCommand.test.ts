@@ -20,9 +20,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     IdeClient: {
       getInstance: vi.fn(),
     },
-    ideContext: {
-      getIdeContext: vi.fn(),
-    },
   };
 });
 

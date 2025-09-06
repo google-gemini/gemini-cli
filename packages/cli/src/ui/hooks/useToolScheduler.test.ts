@@ -26,6 +26,8 @@ import type {
   AnyToolInvocation,
 } from '@google/gemini-cli-core';
 import {
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   ToolConfirmationOutcome,
   ApprovalMode,
   MockTool,
@@ -54,6 +56,11 @@ const mockConfig = {
   getSessionId: () => 'test-session-id',
   getUsageStatisticsEnabled: () => true,
   getDebugMode: () => false,
+  storage: {
+    getProjectTempDir: () => '/tmp',
+  },
+  getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+  getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   getAllowedTools: vi.fn(() => []),
   getContentGeneratorConfig: () => ({
     model: 'test-model',
