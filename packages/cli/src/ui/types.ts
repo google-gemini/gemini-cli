@@ -6,10 +6,15 @@
 
 import type {
   CompressionStatus,
+  ThoughtSummary,
   ToolCallConfirmationDetails,
+  ToolConfirmationOutcome,
   ToolResultDisplay,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
+import { type ReactNode } from 'react';
+
+export type { ThoughtSummary };
 
 export enum AuthState {
   // Attemtping to authenticate or re-authenticate
@@ -266,3 +271,16 @@ export type SlashCommandProcessorResult =
       type: 'handled'; // Indicates the command was processed and no further action is needed.
     }
   | SubmitPromptResult;
+
+export interface ShellConfirmationRequest {
+  commands: string[];
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    approvedCommands?: string[],
+  ) => void;
+}
+
+export interface ConfirmationRequest {
+  prompt: ReactNode;
+  onConfirm: (confirm: boolean) => void;
+}
