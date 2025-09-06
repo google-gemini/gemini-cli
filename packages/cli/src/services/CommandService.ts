@@ -85,9 +85,7 @@ export class CommandService {
       });
     }
 
-    const finalCommands = Object.freeze(
-      Array.from(commandMap.values()).filter((cmd) => !cmd.hidden),
-    );
+    const finalCommands = Object.freeze(Array.from(commandMap.values()));
     return new CommandService(finalCommands);
   }
 
