@@ -15,6 +15,7 @@ import {
   useStdout,
 } from 'ink';
 import {
+  AuthState,
   StreamingState,
   type HistoryItem,
   MessageType,
@@ -25,7 +26,7 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
-import { useAuthCommand } from './hooks/useAuthCommand.js';
+import { useAuthCommand } from './auth/useAuth.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
@@ -40,8 +41,6 @@ import { ShellModeIndicator } from './components/ShellModeIndicator.js';
 import { InputPrompt } from './components/InputPrompt.js';
 import { Footer } from './components/Footer.js';
 import { ThemeDialog } from './components/ThemeDialog.js';
-import { AuthDialog } from './components/AuthDialog.js';
-import { AuthInProgress } from './components/AuthInProgress.js';
 import { EditorSettingsDialog } from './components/EditorSettingsDialog.js';
 import { FolderTrustDialog } from './components/FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './components/ShellConfirmationDialog.js';
@@ -82,7 +81,6 @@ import {
 } from '@google/gemini-cli-core';
 import type { IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { IdeIntegrationNudge } from './IdeIntegrationNudge.js';
-import { validateAuthMethod } from '../config/auth.js';
 import { useLogger } from './hooks/useLogger.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
 import {
@@ -116,6 +114,8 @@ import { isNarrowWidth } from './utils/isNarrowWidth.js';
 import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
 import { WorkspaceMigrationDialog } from './components/WorkspaceMigrationDialog.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
+import { AuthInProgress } from './auth/AuthInProgress.js';
+import { AuthDialog } from './auth/AuthDialog.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 // Maximum number of queued messages to display in UI to prevent performance issues
@@ -217,7 +217,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [themeError, setThemeError] = useState<string | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
+
   const [editorError, setEditorError] = useState<string | null>(null);
   const [footerHeight, setFooterHeight] = useState<number>(0);
   const [corgiMode, setCorgiMode] = useState(false);
@@ -338,52 +338,18 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     { isActive: showIdeRestartPrompt },
   );
 
-  const {
-    isAuthDialogOpen,
-    openAuthDialog,
-    handleAuthSelect,
-    isAuthenticating,
-    cancelAuthentication,
-  } = useAuthCommand(settings, setAuthError, config);
-
-  useEffect(() => {
-    if (
-      settings.merged.security?.auth?.enforcedType &&
-      settings.merged.security?.auth.selectedType &&
-      settings.merged.security?.auth.enforcedType !==
-        settings.merged.security?.auth.selectedType
-    ) {
-      setAuthError(
-        `Authentication is enforced to be ${settings.merged.security?.auth.enforcedType}, but you are currently using ${settings.merged.security?.auth.selectedType}.`,
-      );
-      openAuthDialog();
-    } else if (
-      settings.merged.security?.auth?.selectedType &&
-      !settings.merged.security?.auth?.useExternal
-    ) {
-      const error = validateAuthMethod(
-        settings.merged.security.auth.selectedType,
-      );
-      if (error) {
-        setAuthError(error);
-        openAuthDialog();
-      }
-    }
-  }, [
-    settings.merged.security?.auth?.selectedType,
-    settings.merged.security?.auth?.enforcedType,
-    settings.merged.security?.auth?.useExternal,
-    openAuthDialog,
-    setAuthError,
-  ]);
+  const { authState, setAuthState, authError, onAuthError } = useAuthCommand(
+    settings,
+    config,
+  );
 
   // Sync user tier from config when authentication changes
   useEffect(() => {
     // Only sync when not currently authenticating
-    if (!isAuthenticating) {
+    if (authState === AuthState.Authenticated) {
       setUserTier(config.getGeminiClient()?.getUserTier());
     }
-  }, [config, isAuthenticating]);
+  }, [config, authState]);
 
   const {
     isEditorDialogOpen,
@@ -622,11 +588,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     return editorType as EditorType;
   }, [settings, openEditorDialog]);
 
-  const onAuthError = useCallback(() => {
-    setAuthError('reauth required');
-    openAuthDialog();
-  }, [openAuthDialog, setAuthError]);
-
   // Core hooks and processors
   const {
     vimEnabled: vimModeEnabled,
@@ -650,7 +611,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     refreshStatic,
     setDebugMessage,
     openThemeDialog,
-    openAuthDialog,
+    setAuthState,
     openEditorDialog,
     toggleCorgiMode,
     setQuittingMessages,
@@ -843,7 +804,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         handleSlashCommand('/ide status');
       } else if (keyMatchers[Command.QUIT](key)) {
         // When authenticating, let AuthInProgress component handle Ctrl+C.
-        if (isAuthenticating) {
+        if (authState === AuthState.Unauthenticated) {
           return;
         }
         if (!ctrlCPressedOnce) {
@@ -879,7 +840,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       setCtrlDPressedOnce,
       ctrlDTimerRef,
       handleSlashCommand,
-      isAuthenticating,
+      authState,
       cancelOngoingRequest,
       settings.merged.general?.debugKeystrokeLogging,
     ],
@@ -981,8 +942,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     if (
       initialPrompt &&
       !initialPromptSubmitted.current &&
-      !isAuthenticating &&
-      !isAuthDialogOpen &&
+      authState === AuthState.Authenticated &&
       !isThemeDialogOpen &&
       !isEditorDialogOpen &&
       !showPrivacyNotice &&
@@ -994,8 +954,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   }, [
     initialPrompt,
     submitQuery,
-    isAuthenticating,
-    isAuthDialogOpen,
+    authState,
     isThemeDialogOpen,
     isEditorDialogOpen,
     showPrivacyNotice,
@@ -1135,7 +1094,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 setProQuotaDialogResolver(null);
 
                 if (choice === 'auth') {
-                  openAuthDialog();
+                  cancelOngoingRequest?.();
+                  setAuthState(AuthState.Updating);
                 } else {
                   addItem(
                     {
@@ -1208,13 +1168,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 onRestartRequest={() => process.exit(0)}
               />
             </Box>
-          ) : isAuthenticating ? (
+          ) : authState === AuthState.Unauthenticated ? (
             <>
               <AuthInProgress
                 onTimeout={() => {
-                  setAuthError('Authentication timed out. Please try again.');
-                  cancelAuthentication();
-                  openAuthDialog();
+                  onAuthError('Authentication timed out. Please try again.');
                 }}
               />
               {showErrorDetails && (
@@ -1232,12 +1190,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 </OverflowProvider>
               )}
             </>
-          ) : isAuthDialogOpen ? (
+          ) : authState === AuthState.Updating ? (
             <Box flexDirection="column">
               <AuthDialog
-                onSelect={handleAuthSelect}
+                config={config}
                 settings={settings}
-                initialErrorMessage={authError}
+                authError={authError}
+                onAuthError={onAuthError}
+                setAuthState={setAuthState}
               />
             </Box>
           ) : isEditorDialogOpen ? (
