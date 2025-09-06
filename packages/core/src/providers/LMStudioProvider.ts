@@ -67,6 +67,11 @@ interface LMStudioStreamChunk {
     };
     finish_reason?: string;
   }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 interface LMStudioTool {
@@ -97,6 +102,7 @@ interface LMStudioModel {
 
 export class LMStudioProvider extends BaseModelProvider {
   private baseUrl: string;
+  private lastUsage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 
   constructor(config: ModelProviderConfig, configInstance?: Config) {
     super(config, configInstance);
@@ -181,6 +187,13 @@ export class LMStudioProvider extends BaseModelProvider {
     }
 
     const data = await response.json() as LMStudioResponse;
+    
+    // Cache usage information for token counting
+    if (data.usage) {
+      this.lastUsage = data.usage;
+      console.log(`[LMStudioProvider] Cached usage: ${data.usage.total_tokens} tokens (prompt: ${data.usage.prompt_tokens}, completion: ${data.usage.completion_tokens})`);
+    }
+    
     return this.convertFromLMStudioResponse(data);
   }
 
@@ -299,6 +312,12 @@ export class LMStudioProvider extends BaseModelProvider {
               const chunk = JSON.parse(line.slice(6)) as LMStudioStreamChunk;
               const delta = chunk.choices[0]?.delta;
 
+              // Cache usage information if present
+              if (chunk.usage) {
+                this.lastUsage = chunk.usage;
+                console.log(`[LMStudioProvider] Cached usage from stream: ${chunk.usage.total_tokens} tokens (prompt: ${chunk.usage.prompt_tokens}, completion: ${chunk.usage.completion_tokens})`);
+              }
+
               if (delta?.content) {
                 fullContent += delta.content;
                 yield {
@@ -403,6 +422,24 @@ export class LMStudioProvider extends BaseModelProvider {
 
     console.log(`LMStudioProvider: Retrieved ${models.length} models from LM Studio:`, models);
     return models;
+  }
+
+  async countTokens(messages: UniversalMessage[]): Promise<{ totalTokens: number }> {
+    try {
+      // Use cached usage information from recent responses
+      if (this.lastUsage) {
+        const cachedTokens = this.lastUsage.prompt_tokens;
+        console.log(`[LMStudioProvider] Using cached prompt tokens from recent response: ${cachedTokens}`);
+        return { totalTokens: cachedTokens };
+      }
+      
+      // No fallback estimation - require actual API response for accurate token counts
+      console.log(`[LMStudioProvider] No cached usage available - token count unavailable`);
+      return { totalTokens: 0 };
+    } catch (error) {
+      console.error('[LMStudioProvider] Token counting failed:', error);
+      return { totalTokens: 0 };
+    }
   }
 
   setTools(): void {

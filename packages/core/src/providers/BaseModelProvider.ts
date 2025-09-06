@@ -45,6 +45,7 @@ export abstract class BaseModelProvider {
     signal: AbortSignal
   ): AsyncGenerator<UniversalStreamEvent>;
 
+  abstract countTokens(messages: UniversalMessage[]): Promise<{ totalTokens: number }>;
 
   abstract setTools(): void;
 
@@ -74,9 +75,7 @@ export abstract class BaseModelProvider {
     if (!this.config.model) {
       throw new Error('Model is required in configuration');
     }
-    if (this.config.type === ModelProviderType.OPENAI && !this.config.apiKey) {
-      throw new Error('API key is required for OpenAI provider');
-    }
+    // Note: API key validation is now handled by AuthManager, not here
   }
 
   protected createError(message: string, originalError?: unknown): Error {

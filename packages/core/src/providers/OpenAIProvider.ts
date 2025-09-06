@@ -67,6 +67,11 @@ interface OpenAIStreamChunk {
     };
     finish_reason?: string;
   }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 interface OpenAITool {
@@ -89,14 +94,35 @@ interface OpenAIRequestBody {
 }
 
 export class OpenAIProvider extends BaseModelProvider {
-  private apiKey: string;
   private baseUrl: string;
+  private lastUsage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 
   constructor(config: ModelProviderConfig, configInstance?: Config) {
     super(config, configInstance);
-    this.apiKey = config.apiKey || '';
     this.baseUrl = config.baseUrl || 'https://api.openai.com/v1';
-    this.validateConfig();
+    // Don't validate config here - API key will come from AuthManager
+  }
+
+  /**
+   * Get API key from AuthManager based on user's authentication preference
+   */
+  private async getApiKey(): Promise<string> {
+    try {
+      const { AuthManager } = await import('../auth/AuthManager.js');
+      const authManager = AuthManager.getInstance();
+      if (this.configInstance) {
+        authManager.setConfig(this.configInstance);
+      }
+      
+      const credentials = await authManager.getAccessCredentials('openai');
+      if (!credentials?.apiKey) {
+        throw new Error('No OpenAI API key available. Please set OPENAI_API_KEY environment variable.');
+      }
+      
+      return credentials.apiKey;
+    } catch (error) {
+      throw new Error(`OpenAI authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async initialize(): Promise<void> {
@@ -105,8 +131,9 @@ export class OpenAIProvider extends BaseModelProvider {
 
   async testConnection(): Promise<boolean> {
     try {
+      const headers = await this.getHeaders();
       const response = await fetch(`${this.baseUrl}/models`, {
-        headers: this.getHeaders()
+        headers
       });
       return response.ok;
     } catch {
@@ -163,9 +190,10 @@ export class OpenAIProvider extends BaseModelProvider {
       requestBody.tool_choice = 'auto';
     }
 
+    const headers = await this.getHeaders();
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: this.getHeaders(),
+      headers,
       body: JSON.stringify(requestBody),
       signal
     });
@@ -184,6 +212,13 @@ export class OpenAIProvider extends BaseModelProvider {
     }
 
     const data = await response.json() as OpenAIResponse;
+    
+    // Cache usage information for token counting
+    if (data.usage) {
+      this.lastUsage = data.usage;
+      console.log(`[OpenAIProvider] Cached usage: ${data.usage.total_tokens} tokens (prompt: ${data.usage.prompt_tokens}, completion: ${data.usage.completion_tokens})`);
+    }
+    
     return this.convertFromOpenAIResponse(data);
   }
 
@@ -216,9 +251,10 @@ export class OpenAIProvider extends BaseModelProvider {
       requestBody.tool_choice = 'auto';
     }
 
+    const headers = await this.getHeaders();
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: this.getHeaders(),
+      headers,
       body: JSON.stringify(requestBody),
       signal
     });
@@ -316,6 +352,12 @@ export class OpenAIProvider extends BaseModelProvider {
               const chunk = JSON.parse(line.slice(6)) as OpenAIStreamChunk;
               const delta = chunk.choices[0]?.delta;
 
+              // Cache usage information if present
+              if (chunk.usage) {
+                this.lastUsage = chunk.usage;
+                console.log(`[OpenAIProvider] Cached usage from stream: ${chunk.usage.total_tokens} tokens (prompt: ${chunk.usage.prompt_tokens}, completion: ${chunk.usage.completion_tokens})`);
+              }
+
               if (delta?.content) {
                 fullContent += delta.content;
                 yield {
@@ -358,37 +400,61 @@ export class OpenAIProvider extends BaseModelProvider {
   }
 
 
-  static async getAvailableModels(apiKey?: string, baseUrl = 'https://api.openai.com/v1'): Promise<string[]> {
-    // Get API key from environment if not provided
-    const openaiApiKey = apiKey || process.env['OPENAI_API_KEY'];
-    
-    if (!openaiApiKey) {
-      throw new Error('OpenAIProvider: API key is required to fetch available models');
-    }
-
-    const response = await fetch(`${baseUrl}/models`, {
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json'
+  static async getAvailableModels(baseUrl = 'https://api.openai.com/v1'): Promise<string[]> {
+    try {
+      // Get API key from AuthManager
+      const { AuthManager } = await import('../auth/AuthManager.js');
+      const authManager = AuthManager.getInstance();
+      
+      const credentials = await authManager.getAccessCredentials('openai');
+      if (!credentials?.apiKey) {
+        throw new Error('OpenAIProvider: No OpenAI API key available. Please set OPENAI_API_KEY environment variable.');
       }
-    });
 
-    if (!response.ok) {
-      throw new Error(`OpenAIProvider: HTTP error ${response.status}: ${response.statusText}`);
+      const response = await fetch(`${baseUrl}/models`, {
+        headers: {
+          'Authorization': `Bearer ${credentials.apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAIProvider: HTTP error ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json() as { data: Array<{ id: string }> };
+      const models = data.data
+        .map(model => model.id)
+        .filter(id => id.startsWith('gpt-') || id.startsWith('o1-'))
+        .sort();
+
+      if (models.length === 0) {
+        throw new Error('OpenAIProvider: No compatible models found in API response');
+      }
+
+      console.log(`OpenAIProvider: Retrieved ${models.length} models from API:`, models);
+      return models;
+    } catch (error) {
+      throw new Error(`OpenAIProvider: Failed to get models - ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
 
-    const data = await response.json() as { data: Array<{ id: string }> };
-    const models = data.data
-      .map(model => model.id)
-      .filter(id => id.startsWith('gpt-') || id.startsWith('o1-'))
-      .sort();
-
-    if (models.length === 0) {
-      throw new Error('OpenAIProvider: No compatible models found in API response');
+  async countTokens(messages: UniversalMessage[]): Promise<{ totalTokens: number }> {
+    try {
+      // Use cached usage information from recent responses
+      if (this.lastUsage) {
+        const cachedTokens = this.lastUsage.prompt_tokens;
+        console.log(`[OpenAIProvider] Using cached prompt tokens from recent response: ${cachedTokens}`);
+        return { totalTokens: cachedTokens };
+      }
+      
+      // No fallback estimation - require actual API response for accurate token counts
+      console.log(`[OpenAIProvider] No cached usage available - token count unavailable`);
+      return { totalTokens: 0 };
+    } catch (error) {
+      console.error('[OpenAIProvider] Token counting failed:', error);
+      return { totalTokens: 0 };
     }
-
-    console.log(`OpenAIProvider: Retrieved ${models.length} models from API:`, models);
-    return models;
   }
 
   setTools(): void {
@@ -412,9 +478,10 @@ export class OpenAIProvider extends BaseModelProvider {
     };
   }
 
-  private getHeaders(): Record<string, string> {
+  private async getHeaders(): Promise<Record<string, string>> {
+    const apiKey = await this.getApiKey();
     return {
-      'Authorization': `Bearer ${this.apiKey}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json'
     };
   }
