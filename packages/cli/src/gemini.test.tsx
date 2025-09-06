@@ -195,7 +195,6 @@ describe('gemini.tsx main function kitty protocol', () => {
       getIdeMode: () => false,
       getExperimentalZedIntegration: () => false,
       getScreenReader: () => false,
-      getGeminiMdFileCount: () => 0,
     } as unknown as Config);
     vi.mocked(loadSettings).mockReturnValue({
       errors: [],
@@ -324,19 +323,11 @@ describe('startInteractiveUI', () => {
     const { render } = await import('ink');
     const renderSpy = vi.mocked(render);
 
-    const mockInitializationResult = {
-      authError: null,
-      themeError: null,
-      shouldOpenAuthDialog: false,
-      geminiMdFileCount: 0,
-    };
-
     await startInteractiveUI(
       mockConfig,
       mockSettings,
       mockStartupWarnings,
       mockWorkspaceRoot,
-      mockInitializationResult,
     );
 
     // Verify render was called with correct options
@@ -358,19 +349,11 @@ describe('startInteractiveUI', () => {
     const { checkForUpdates } = await import('./ui/utils/updateCheck.js');
     const { registerCleanup } = await import('./utils/cleanup.js');
 
-    const mockInitializationResult = {
-      authError: null,
-      themeError: null,
-      shouldOpenAuthDialog: false,
-      geminiMdFileCount: 0,
-    };
-
     await startInteractiveUI(
       mockConfig,
       mockSettings,
       mockStartupWarnings,
       mockWorkspaceRoot,
-      mockInitializationResult,
     );
 
     // Verify all startup tasks were called

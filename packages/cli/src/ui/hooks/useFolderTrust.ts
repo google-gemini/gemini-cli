@@ -5,8 +5,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { type Config } from '@google/gemini-cli-core';
-import type { LoadedSettings } from '../../config/settings.js';
+import type { Settings, LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import {
   loadTrustedFolders,
@@ -17,27 +16,34 @@ import * as process from 'node:process';
 
 export const useFolderTrust = (
   settings: LoadedSettings,
-  config: Config,
   onTrustChange: (isTrusted: boolean | undefined) => void,
 ) => {
   const [isTrusted, setIsTrusted] = useState<boolean | undefined>(undefined);
   const [isFolderTrustDialogOpen, setIsFolderTrustDialogOpen] = useState(false);
-  const [isRestarting] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
 
   const folderTrust = settings.merged.security?.folderTrust?.enabled;
 
   useEffect(() => {
-    const trusted = isWorkspaceTrusted(settings.merged);
+    const trusted = isWorkspaceTrusted({
+      security: {
+        folderTrust: {
+          enabled: folderTrust,
+        },
+      },
+    } as Settings);
     setIsTrusted(trusted);
     setIsFolderTrustDialogOpen(trusted === undefined);
     onTrustChange(trusted);
-  }, [folderTrust, onTrustChange, settings.merged]);
+  }, [onTrustChange, folderTrust]);
 
   const handleFolderTrustSelect = useCallback(
     (choice: FolderTrustChoice) => {
       const trustedFolders = loadTrustedFolders();
       const cwd = process.cwd();
       let trustLevel: TrustLevel;
+
+      const wasTrusted = isTrusted ?? true;
 
       switch (choice) {
         case FolderTrustChoice.TRUST_FOLDER:
@@ -54,12 +60,21 @@ export const useFolderTrust = (
       }
 
       trustedFolders.setValue(cwd, trustLevel);
-      const trusted = isWorkspaceTrusted(settings.merged);
-      setIsTrusted(trusted);
-      setIsFolderTrustDialogOpen(false);
-      onTrustChange(trusted);
+      const newIsTrusted =
+        trustLevel === TrustLevel.TRUST_FOLDER ||
+        trustLevel === TrustLevel.TRUST_PARENT;
+      setIsTrusted(newIsTrusted);
+      onTrustChange(newIsTrusted);
+
+      const needsRestart = wasTrusted !== newIsTrusted;
+      if (needsRestart) {
+        setIsRestarting(true);
+        setIsFolderTrustDialogOpen(true);
+      } else {
+        setIsFolderTrustDialogOpen(false);
+      }
     },
-    [settings.merged, onTrustChange],
+    [onTrustChange, isTrusted],
   );
 
   return {

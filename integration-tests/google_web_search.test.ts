@@ -10,11 +10,17 @@ import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 describe('google_web_search', () => {
   it('should be able to search the web', async () => {
     const rig = new TestRig();
-    await rig.setup('should be able to search the web');
+    await rig.setup('should be able to search the web', {
+      settings: {
+        tools: {
+          truncateToolOutputThreshold: 4_000_000,
+        },
+      },
+    });
 
     let result;
     try {
-      result = await rig.run(`what is the weather in London`);
+      result = await rig.run(`what is the current weather in London right now`);
     } catch (error) {
       // Network errors can occur in CI environments
       if (

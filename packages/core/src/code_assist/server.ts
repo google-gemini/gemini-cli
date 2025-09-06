@@ -7,7 +7,6 @@
 import type { OAuth2Client } from 'google-auth-library';
 import type {
   CodeAssistGlobalUserSettingResponse,
-  GoogleRpcResponse,
   LoadCodeAssistRequest,
   LoadCodeAssistResponse,
   LongRunningOperationResponse,
@@ -24,7 +23,7 @@ import type {
 } from '@google/genai';
 import * as readline from 'node:readline';
 import type { ContentGenerator } from '../core/contentGenerator.js';
-import { UserTierId } from './types.js';
+import type { UserTierId } from './types.js';
 import type {
   CaCountTokenResponse,
   CaGenerateContentResponse,
@@ -104,20 +103,10 @@ export class CodeAssistServer implements ContentGenerator {
   async loadCodeAssist(
     req: LoadCodeAssistRequest,
   ): Promise<LoadCodeAssistResponse> {
-    try {
-      return await this.requestPost<LoadCodeAssistResponse>(
-        'loadCodeAssist',
-        req,
-      );
-    } catch (e) {
-      if (isVpcScAffectedUser(e)) {
-        return {
-          currentTier: { id: UserTierId.STANDARD },
-        };
-      } else {
-        throw e;
-      }
-    }
+    return await this.requestPost<LoadCodeAssistResponse>(
+      'loadCodeAssist',
+      req,
+    );
   }
 
   async getCodeAssistGlobalUserSetting(): Promise<CodeAssistGlobalUserSettingResponse> {
@@ -231,23 +220,4 @@ export class CodeAssistServer implements ContentGenerator {
       process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
     return `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
   }
-}
-
-function isVpcScAffectedUser(error: unknown): boolean {
-  if (error && typeof error === 'object' && 'response' in error) {
-    const gaxiosError = error as {
-      response?: {
-        data?: unknown;
-      };
-    };
-    const response = gaxiosError.response?.data as
-      | GoogleRpcResponse
-      | undefined;
-    if (Array.isArray(response?.error?.details)) {
-      return response.error.details.some(
-        (detail) => detail.reason === 'SECURITY_POLICY_VIOLATED',
-      );
-    }
-  }
-  return false;
 }

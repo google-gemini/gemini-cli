@@ -31,6 +31,7 @@ vi.mock('@google/gemini-cli-core', async () => {
     ...actual,
     checkHasEditorType: vi.fn(() => true),
     allowEditorTypeInSandbox: vi.fn(() => true),
+    DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD: 4_000_000,
   };
 });
 

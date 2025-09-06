@@ -17,7 +17,7 @@ describe('replace', () => {
     const expectedContent = 'replaced content';
 
     rig.createFile(fileName, originalContent);
-    const prompt = `Can you replace 'original' with 'replaced' in the file 'file_to_replace.txt'`;
+    const prompt = `Use the replace tool to replace 'original' with 'replaced' in the file 'file_to_replace.txt'`;
 
     const result = await rig.run(prompt);
 

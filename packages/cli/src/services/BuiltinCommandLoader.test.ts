@@ -15,16 +15,7 @@ vi.mock('../ui/commands/aboutCommand.js', async () => {
   };
 });
 
-vi.mock('../ui/commands/ideCommand.js', async () => {
-  const { CommandKind } = await import('../ui/commands/types.js');
-  return {
-    ideCommand: vi.fn().mockResolvedValue({
-      name: 'ide',
-      description: 'IDE command',
-      kind: CommandKind.BUILT_IN,
-    }),
-  };
-});
+vi.mock('../ui/commands/ideCommand.js', () => ({ ideCommand: vi.fn() }));
 vi.mock('../ui/commands/restoreCommand.js', () => ({
   restoreCommand: vi.fn(),
 }));
@@ -34,6 +25,7 @@ import { BuiltinCommandLoader } from './BuiltinCommandLoader.js';
 import type { Config } from '@google/gemini-cli-core';
 import { CommandKind } from '../ui/commands/types.js';
 
+import { ideCommand } from '../ui/commands/ideCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
 
 vi.mock('../ui/commands/authCommand.js', () => ({ authCommand: {} }));
@@ -65,12 +57,18 @@ vi.mock('../ui/commands/mcpCommand.js', () => ({
 describe('BuiltinCommandLoader', () => {
   let mockConfig: Config;
 
+  const ideCommandMock = ideCommand as Mock;
   const restoreCommandMock = restoreCommand as Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = { some: 'config' } as unknown as Config;
 
+    ideCommandMock.mockResolvedValue({
+      name: 'ide',
+      description: 'IDE command',
+      kind: CommandKind.BUILT_IN,
+    });
     restoreCommandMock.mockReturnValue({
       name: 'restore',
       description: 'Restore command',
@@ -78,23 +76,25 @@ describe('BuiltinCommandLoader', () => {
     });
   });
 
-  it('should correctly pass the config object to restore command factory', async () => {
+  it('should correctly pass the config object to command factory functions', async () => {
     const loader = new BuiltinCommandLoader(mockConfig);
     await loader.loadCommands(new AbortController().signal);
 
-    // ideCommand is now a constant, no longer needs config
+    expect(ideCommandMock).toHaveBeenCalledTimes(1);
+    expect(ideCommandMock).toHaveBeenCalledWith();
     expect(restoreCommandMock).toHaveBeenCalledTimes(1);
     expect(restoreCommandMock).toHaveBeenCalledWith(mockConfig);
   });
 
   it('should filter out null command definitions returned by factories', async () => {
-    // ideCommand is now a constant SlashCommand
+    // Override the mock's behavior for this specific test.
+    ideCommandMock.mockReturnValue(null);
     const loader = new BuiltinCommandLoader(mockConfig);
     const commands = await loader.loadCommands(new AbortController().signal);
 
-    // The 'ide' command should be present.
+    // The 'ide' command should be filtered out.
     const ideCmd = commands.find((c) => c.name === 'ide');
-    expect(ideCmd).toBeDefined();
+    expect(ideCmd).toBeUndefined();
 
     // Other commands should still be present.
     const aboutCmd = commands.find((c) => c.name === 'about');
@@ -104,7 +104,8 @@ describe('BuiltinCommandLoader', () => {
   it('should handle a null config gracefully when calling factories', async () => {
     const loader = new BuiltinCommandLoader(null);
     await loader.loadCommands(new AbortController().signal);
-    // ideCommand is now a constant, no longer needs config
+    expect(ideCommandMock).toHaveBeenCalledTimes(1);
+    expect(ideCommandMock).toHaveBeenCalledWith();
     expect(restoreCommandMock).toHaveBeenCalledTimes(1);
     expect(restoreCommandMock).toHaveBeenCalledWith(null);
   });
