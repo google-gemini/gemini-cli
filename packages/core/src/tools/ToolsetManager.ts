@@ -22,6 +22,7 @@ import { PDFTool } from './pdf-tool.js';
 import { ZipTool } from './zip-tool.js';
 import { FileTool } from './file-tool.js';
 import { WebTool } from './web-tool.js';
+import { TodoTool } from './todo-tool.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolClass = any;
@@ -46,10 +47,11 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     FileTool,
     ShellTool,
     WebTool,
-    // WebSearchTool,
     ExcelTool,
     PDFTool,
-    ZipTool
+    ZipTool,
+    TodoTool,
+    MemoryTool
   ],
   translator: [
     ReadFileTool,
