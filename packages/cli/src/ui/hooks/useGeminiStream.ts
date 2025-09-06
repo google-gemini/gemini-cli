@@ -651,7 +651,10 @@ export const useGeminiStream = (
             loopDetectedRef.current = true;
             break;
           case ServerGeminiEventType.Retry:
-            // Will add the missing logic later
+            geminiMessageBuffer = '';
+            if (pendingHistoryItemRef.current) {
+              setPendingHistoryItem(null); // Clear pending UI from the failed attempt
+            }
             break;
           default: {
             // enforces exhaustive switch-case
