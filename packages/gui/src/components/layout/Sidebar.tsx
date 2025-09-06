@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { 
   MessageSquare, 
   Plus, 
-  Settings, 
   ChevronLeft, 
   ChevronRight,
   Search,
@@ -16,7 +15,7 @@ import { Card } from '@/components/ui/Card';
 import { useAppStore } from '@/stores/appStore';
 import { multiModelService } from '@/services/multiModelService';
 import { cn } from '@/utils/cn';
-import type { ChatSession, ModelProviderType } from '@/types';
+import type { ChatSession } from '@/types';
 import { WorkspacePanel } from '@/components/workspace/WorkspacePanel';
 
 export const Sidebar: React.FC = () => {
@@ -24,6 +23,9 @@ export const Sidebar: React.FC = () => {
     sessions,
     activeSessionId,
     sidebarCollapsed,
+    currentProvider,
+    currentModel,
+    currentRole,
     setActiveSession,
     addSession,
     removeSession,
@@ -46,9 +48,9 @@ export const Sidebar: React.FC = () => {
       messages: [],
       createdAt: new Date(),
       updatedAt: new Date(),
-      provider: 'gemini' as ModelProviderType,
-      model: 'gemini-1.5-pro-latest',
-      roleId: 'software_engineer'
+      provider: currentProvider,
+      model: currentModel,
+      roleId: currentRole
     };
     
     // Add session to frontend store (automatically sets as active)
@@ -101,16 +103,18 @@ export const Sidebar: React.FC = () => {
   };
 
   const handleDeleteAllSessions = async () => {
-    // Clear frontend store
-    clearAllSessions();
-    
-    // Notify backend to delete all sessions
     try {
+      // First notify backend to delete all sessions
       await multiModelService.deleteAllSessions();
       console.log('All backend sessions deleted');
+      
+      // Then clear frontend store
+      clearAllSessions();
+      
       setShowDeleteAllConfirm(false);
     } catch (error) {
       console.error('Failed to delete all backend sessions:', error);
+      setShowDeleteAllConfirm(false);
     }
   };
 
@@ -172,13 +176,6 @@ export const Sidebar: React.FC = () => {
           <Plus size={16} />
         </Button>
         <div className="flex-1" />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-        >
-          <Settings size={16} />
-        </Button>
       </div>
     );
   }
@@ -289,15 +286,9 @@ export const Sidebar: React.FC = () => {
       {/* Workspace Panel */}
       <WorkspacePanel />
       
-      {/* Footer */}
+      {/* Footer - removed Authentication Settings button */}
       <div className="p-4 border-t border-border">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-2"
-        >
-          <Settings size={16} />
-          Settings
-        </Button>
+        {/* Authentication settings moved to Model Selector */}
       </div>
 
       {/* Delete All Confirmation Modal */}
@@ -329,6 +320,7 @@ export const Sidebar: React.FC = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };
