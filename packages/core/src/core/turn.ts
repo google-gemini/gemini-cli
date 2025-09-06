@@ -91,6 +91,7 @@ export interface ToolCallResponseInfo {
   resultDisplay: ToolResultDisplay | undefined;
   error: Error | undefined;
   errorType: ToolErrorType | undefined;
+  outputFile?: string | undefined;
 }
 
 export interface ServerToolCallConfirmationDetails {

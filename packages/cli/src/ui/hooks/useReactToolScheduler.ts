@@ -140,7 +140,8 @@ export function useReactToolScheduler(
         getPreferredEditor,
         config,
         onEditorClose,
-      }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any),
     [
       config,
       outputUpdateHandler,
@@ -247,6 +248,7 @@ export function mapToDisplay(
             status: mapCoreStatusToDisplayStatus(trackedCall.status),
             resultDisplay: trackedCall.response.resultDisplay,
             confirmationDetails: undefined,
+            outputFile: trackedCall.response.outputFile,
           };
         case 'error':
           return {
