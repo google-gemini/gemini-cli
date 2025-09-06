@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
-const { MultiModelSystem, Config, RoleManager, WorkspaceManager, SessionManager, ModelProviderFactory, GeminiClient, AuthType } = require('@google/gemini-cli-core')
+const { MultiModelSystem, Config, RoleManager, WorkspaceManager, SessionManager, ModelProviderFactory, GeminiClient, AuthType, clearCachedCredentialFile, getOauthClient } = require('@google/gemini-cli-core')
 
 // MultiModelSystem instance - we'll initialize this when needed
 let multiModelSystem = null
@@ -199,7 +199,7 @@ ipcMain.handle('multimodel-get-available-models', async (_, providerType) => {
     // 返回带有默认 LM Studio 模型的备用列表
     return {
       lm_studio: ['openai/gpt-oss-20b'],
-      gemini: ['gemini-1.5-pro-latest', 'gemini-1.5-flash-latest'],
+      gemini: ['gemini-2.5-pro-latest', 'gemini-2.5-flash-latest'],
       openai: ['gpt-4', 'gpt-3.5-turbo'],
     }
   }
@@ -590,5 +590,121 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamI
   } catch (error) {
     console.error('Failed to send streaming message:', error)
     throw error
+  }
+})
+
+// OAuth Authentication IPC handlers using AuthManager
+ipcMain.handle('oauth-start-flow', async (_, providerType) => {
+  try {
+    console.log('OAuth start flow called for:', providerType)
+    
+    // Ensure system is initialized to get config
+    const system = await ensureInitialized()
+    
+    // Use AuthManager instead of hardcoded OAuth logic
+    const { AuthManager } = require('@google/gemini-cli-core')
+    const authManager = AuthManager.getInstance()
+    authManager.setConfig(system.getConfig())
+    
+    const result = await authManager.startOAuthFlow(providerType)
+    console.log('OAuth flow result:', result)
+    
+    return result
+  } catch (error) {
+    console.error('OAuth flow failed:', error)
+    return { 
+      success: false, 
+      error: error.message || 'OAuth authentication failed' 
+    }
+  }
+})
+
+ipcMain.handle('oauth-get-status', async (_, providerType) => {
+  try {
+    console.log('OAuth get status called for:', providerType)
+    
+    // Use AuthManager for unified OAuth status checking
+    const { AuthManager } = require('@google/gemini-cli-core')
+    const authManager = AuthManager.getInstance()
+    
+    // Ensure system is initialized and pass config to AuthManager
+    const system = await ensureInitialized()
+    authManager.setConfig(system.getConfig())
+    
+    const status = await authManager.getAuthStatus(providerType)
+    console.log('OAuth status result:', status)
+    
+    return {
+      authenticated: status.authenticated,
+      userEmail: status.userEmail,
+      type: status.authType
+    }
+  } catch (error) {
+    console.error('Failed to check OAuth status:', error)
+    return { authenticated: false }
+  }
+})
+
+ipcMain.handle('oauth-clear-credentials', async (_, providerType) => {
+  try {
+    console.log('OAuth clear credentials called for:', providerType)
+    
+    // Use AuthManager for unified credential clearing
+    const { AuthManager } = require('@google/gemini-cli-core')
+    const authManager = AuthManager.getInstance()
+    
+    const result = await authManager.clearCredentials(providerType)
+    console.log('OAuth credentials cleared:', result)
+    
+    return result
+  } catch (error) {
+    console.error('Failed to clear OAuth credentials:', error)
+    return { 
+      success: false, 
+      error: error.message 
+    }
+  }
+})
+
+ipcMain.handle('check-env-api-key', async (_, providerType) => {
+  try {
+    console.log('Check environment API key called for:', providerType)
+    
+    // Use AuthManager for unified API key checking
+    const { AuthManager } = require('@google/gemini-cli-core')
+    const authManager = AuthManager.getInstance()
+    
+    const result = await authManager.checkEnvApiKey(providerType)
+    console.log('Environment API key check result:', result)
+    
+    return result
+  } catch (error) {
+    console.error('Failed to check environment API key:', error)
+    return { detected: false, source: 'Error' }
+  }
+})
+
+// Add IPC handler for setting API key preference
+ipcMain.handle('set-api-key-preference', async (_, providerType) => {
+  try {
+    console.log('Set API key preference called for:', providerType)
+    
+    // Ensure system is initialized
+    const system = await ensureInitialized()
+    
+    // Use AuthManager to set API key preference
+    const { AuthManager } = require('@google/gemini-cli-core')
+    const authManager = AuthManager.getInstance()
+    authManager.setConfig(system.getConfig())
+    authManager.useApiKeyAuth(providerType)
+    
+    console.log('API key preference set successfully')
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to set API key preference:', error)
+    return { 
+      success: false, 
+      error: error.message 
+    }
   }
 })

@@ -102,6 +102,12 @@ const electronAPI = {
     getDisplayMessages: (sessionId) => ipcRenderer.invoke('multimodel-get-display-messages', sessionId),
     getSessionsInfo: () => ipcRenderer.invoke('multimodel-get-sessions-info'),
     updateSessionTitle: (sessionId, newTitle) => ipcRenderer.invoke('multimodel-update-session-title', sessionId, newTitle),
+    // OAuth authentication
+    startOAuthFlow: (providerType) => ipcRenderer.invoke('oauth-start-flow', providerType),
+    getOAuthStatus: (providerType) => ipcRenderer.invoke('oauth-get-status', providerType),
+    clearOAuthCredentials: (providerType) => ipcRenderer.invoke('oauth-clear-credentials', providerType),
+    checkEnvApiKey: (providerType) => ipcRenderer.invoke('check-env-api-key', providerType),
+    setApiKeyPreference: (providerType) => ipcRenderer.invoke('set-api-key-preference', providerType),
   }
 }
 
