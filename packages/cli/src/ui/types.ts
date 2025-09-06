@@ -11,6 +11,15 @@ import type {
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 
+export enum AuthState {
+  // Attemtping to authenticate or re-authenticate
+  Unauthenticated = 'unauthenticated',
+  // Auth dialog is open for user to select auth method
+  Updating = 'updating',
+  // Successfully authenticated
+  Authenticated = 'authenticated',
+}
+
 // Only defining the state enum needed by the UI
 export enum StreamingState {
   Idle = 'idle',
@@ -52,6 +61,7 @@ export interface IndividualToolCallDisplay {
   status: ToolCallStatus;
   confirmationDetails: ToolCallConfirmationDetails | undefined;
   renderOutputAsMarkdown?: boolean;
+  outputFile?: string;
 }
 
 export interface CompressionProps {
