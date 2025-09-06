@@ -316,7 +316,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   useEffect(() => {
     // Only sync when not currently authenticating
     if (authState === AuthState.Authenticated) {
-      setUserTier(config.getGeminiClient()?.getUserTier());
+      setUserTier(config.getUserTier());
     }
   }, [config, authState]);
 
