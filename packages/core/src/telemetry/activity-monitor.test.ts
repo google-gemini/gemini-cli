@@ -7,7 +7,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   ActivityMonitor,
-  ActivityType,
   DEFAULT_ACTIVITY_CONFIG,
   initializeActivityMonitor,
   getActivityMonitor,
@@ -15,6 +14,7 @@ import {
   startGlobalActivityMonitoring,
   stopGlobalActivityMonitoring,
 } from './activity-monitor.js';
+import { ActivityType } from './activity-types.js';
 import type { ActivityEvent } from './activity-monitor.js';
 import type { Config } from '../config/config.js';
 
