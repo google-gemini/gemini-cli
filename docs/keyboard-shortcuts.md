@@ -4,16 +4,17 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 
 ## General
 
-| Shortcut | Description                                                                                                           |
-| -------- | --------------------------------------------------------------------------------------------------------------------- |
-| `Esc`    | Close dialogs and suggestions.                                                                                        |
-| `Ctrl+C` | Cancel the ongoing request and clear the input. Press twice to exit the application.                                  |
-| `Ctrl+D` | Exit the application if the input is empty. Press twice to confirm.                                                   |
-| `Ctrl+L` | Clear the screen.                                                                                                     |
-| `Ctrl+O` | Toggle the display of the debug console.                                                                              |
-| `Ctrl+S` | Allows long responses to print fully, disabling truncation. Use your terminal's scrollback to view the entire output. |
-| `Ctrl+T` | Toggle the display of tool descriptions.                                                                              |
-| `Ctrl+Y` | Toggle auto-approval (YOLO mode) for all tool calls.                                                                  |
+| Shortcut  | Description                                                                                                           |
+| --------- | --------------------------------------------------------------------------------------------------------------------- |
+| `Esc`     | Close dialogs and suggestions.                                                                                        |
+| `Ctrl+C`  | Cancel the ongoing request and clear the input. Press twice to exit the application.                                  |
+| `Ctrl+D`  | Exit the application if the input is empty. Press twice to confirm.                                                   |
+| `Ctrl+L`  | Clear the screen.                                                                                                     |
+| `Ctrl+O`  | Toggle the display of the debug console.                                                                              |
+| `Ctrl+S`  | Allows long responses to print fully, disabling truncation. Use your terminal's scrollback to view the entire output. |
+| `Ctrl+T`  | Toggle the display of tool descriptions.                                                                              |
+| `Ctrl+Y`  | Toggle auto-approval (YOLO mode) for all tool calls.                                                                  |
+| `Ctrl+\`` | Toggle message queue mode between wait_for_idle and wait_for_response.                                                |
 
 ## Input Prompt
 

@@ -6,10 +6,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { StreamingState } from '../types.js';
+import type { MessageQueueMode } from '@google/gemini-cli-core';
+import { MESSAGE_QUEUE_MODES } from '@google/gemini-cli-core';
 
 export interface UseMessageQueueOptions {
   streamingState: StreamingState;
   submitQuery: (query: string) => void;
+  messageQueueMode: MessageQueueMode;
 }
 
 export interface UseMessageQueueReturn {
@@ -27,6 +30,7 @@ export interface UseMessageQueueReturn {
 export function useMessageQueue({
   streamingState,
   submitQuery,
+  messageQueueMode,
 }: UseMessageQueueOptions): UseMessageQueueReturn {
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
 
@@ -49,16 +53,26 @@ export function useMessageQueue({
     return messageQueue.join('\n\n');
   }, [messageQueue]);
 
-  // Process queued messages when streaming becomes idle
+  // Process queued messages based on mode
   useEffect(() => {
-    if (streamingState === StreamingState.Idle && messageQueue.length > 0) {
+    const isIdle = streamingState === StreamingState.Idle;
+    const isResponseComplete =
+      streamingState === StreamingState.ResponseComplete;
+    const isWaiting = streamingState === StreamingState.WaitingForConfirmation;
+
+    const shouldSubmit =
+      (messageQueueMode === MESSAGE_QUEUE_MODES[0] && isIdle) ||
+      (messageQueueMode === MESSAGE_QUEUE_MODES[1] &&
+        (isResponseComplete || isWaiting || isIdle));
+
+    if (shouldSubmit && messageQueue.length > 0) {
       // Combine all messages with double newlines for clarity
       const combinedMessage = messageQueue.join('\n\n');
       // Clear the queue and submit
       setMessageQueue([]);
       submitQuery(combinedMessage);
     }
-  }, [streamingState, messageQueue, submitQuery]);
+  }, [streamingState, messageQueue, submitQuery, messageQueueMode]);
 
   return {
     messageQueue,

@@ -64,6 +64,13 @@ export enum ApprovalMode {
   YOLO = 'yolo',
 }
 
+// Message queue mode settings
+export const MESSAGE_QUEUE_MODES = [
+  'wait_for_idle',
+  'wait_for_response',
+] as const;
+export type MessageQueueMode = (typeof MESSAGE_QUEUE_MODES)[number];
+
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
   screenReader?: boolean;
@@ -218,6 +225,7 @@ export interface ConfigParameters {
   truncateToolOutputLines?: number;
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
+  messageQueueMode?: MessageQueueMode;
 }
 
 export class Config {
@@ -297,6 +305,7 @@ export class Config {
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useSmartEdit: boolean;
+  private readonly messageQueueMode: MessageQueueMode;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -378,6 +387,7 @@ export class Config {
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
+    this.messageQueueMode = params.messageQueueMode ?? 'wait_for_idle';
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -832,6 +842,10 @@ export class Config {
 
   getUseSmartEdit(): boolean {
     return this.useSmartEdit;
+  }
+
+  getMessageQueueMode(): MessageQueueMode {
+    return this.messageQueueMode;
   }
 
   async getGitService(): Promise<GitService> {

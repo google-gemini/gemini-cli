@@ -102,6 +102,7 @@ const MIGRATION_MAP: Record<string, string> = {
   memoryImportFormat: 'context.importFormat',
   memoryDiscoveryMaxDirs: 'context.discoveryMaxDirs',
   model: 'model.name',
+  messageQueueMode: 'general.messageQueueMode',
   preferredEditor: 'general.preferredEditor',
   sandbox: 'tools.sandbox',
   selectedAuthType: 'security.auth.selectedType',

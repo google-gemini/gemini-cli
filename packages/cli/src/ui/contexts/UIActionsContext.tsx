@@ -43,6 +43,10 @@ export interface UIActions {
   onWorkspaceMigrationDialogOpen: () => void;
   onWorkspaceMigrationDialogClose: () => void;
   handleProQuotaChoice: (choice: 'auth' | 'continue') => void;
+  // Model dialog actions
+  openModelDialog: () => void;
+  closeModelDialog: () => void;
+  handleModelSelect: (modelName: string) => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);
