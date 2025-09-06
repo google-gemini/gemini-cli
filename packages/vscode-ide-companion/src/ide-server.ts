@@ -245,6 +245,7 @@ export class IDEServer {
             `gemini-ide-server-${process.ppid}.json`,
           );
           this.log(`IDE server listening on port ${this.port}`);
+
           await writePortAndWorkspace(
             context,
             this.port,
