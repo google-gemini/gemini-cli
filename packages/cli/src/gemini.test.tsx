@@ -4,8 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from 'vitest';
+import {
+  main,
   setupUnhandledRejectionHandler,
   validateDnsResolutionOrder,
   startInteractiveUI,
@@ -33,14 +42,10 @@ vi.mock('./config/settings.js', async (importOriginal) => {
 
 vi.mock('./config/config.js', () => ({
   loadCliConfig: vi.fn().mockResolvedValue({
-    config: {
-      getSandbox: vi.fn(() => false),
-      getQuestion: vi.fn(() => ''),
-    },
-    modelWasSwitched: false,
-    originalModelBeforeSwitch: null,
-    finalModel: 'test-model',
-  }),
+    getSandbox: vi.fn(() => false),
+    getQuestion: vi.fn(() => ''),
+  } as unknown as Config),
+  parseArguments: vi.fn().mockResolvedValue({ sessionSummary: null }),
 }));
 
 vi.mock('read-package-up', () => ({
@@ -157,6 +162,87 @@ describe('gemini.tsx main function', () => {
   });
 });
 
+describe('gemini.tsx main function kitty protocol', () => {
+  let setRawModeSpy: MockInstance<
+    (mode: boolean) => NodeJS.ReadStream & { fd: 0 }
+  >;
+
+  beforeEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!(process.stdin as any).setRawMode) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (process.stdin as any).setRawMode = vi.fn();
+    }
+    setRawModeSpy = vi.spyOn(process.stdin, 'setRawMode');
+  });
+
+  it('should call setRawMode and detectAndEnableKittyProtocol when isInteractive is true', async () => {
+    const { detectAndEnableKittyProtocol } = await import(
+      './ui/utils/kittyProtocolDetector.js'
+    );
+    const { loadCliConfig, parseArguments } = await import(
+      './config/config.js'
+    );
+    const { loadSettings } = await import('./config/settings.js');
+    vi.mocked(loadCliConfig).mockResolvedValue({
+      isInteractive: () => true,
+      getQuestion: () => '',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getListExtensions: () => false,
+      getMcpServers: () => ({}),
+      initialize: vi.fn(),
+      getIdeMode: () => false,
+      getExperimentalZedIntegration: () => false,
+      getScreenReader: () => false,
+    } as unknown as Config);
+    vi.mocked(loadSettings).mockReturnValue({
+      errors: [],
+      merged: {
+        advanced: {},
+        security: { auth: {} },
+        ui: {},
+      },
+      setValue: vi.fn(),
+    } as never);
+    vi.mocked(parseArguments).mockResolvedValue({
+      model: undefined,
+      sandbox: undefined,
+      sandboxImage: undefined,
+      debug: undefined,
+      prompt: undefined,
+      promptInteractive: undefined,
+      allFiles: undefined,
+      showMemoryUsage: undefined,
+      yolo: undefined,
+      approvalMode: undefined,
+      telemetry: undefined,
+      checkpointing: undefined,
+      telemetryTarget: undefined,
+      telemetryOtlpEndpoint: undefined,
+      telemetryOtlpProtocol: undefined,
+      telemetryLogPrompts: undefined,
+      telemetryOutfile: undefined,
+      allowedMcpServerNames: undefined,
+      allowedTools: undefined,
+      experimentalAcp: undefined,
+      extensions: undefined,
+      listExtensions: undefined,
+      proxy: undefined,
+      includeDirectories: undefined,
+      screenReader: undefined,
+      useSmartEdit: undefined,
+      sessionSummary: undefined,
+      promptWords: undefined,
+    });
+
+    await main();
+
+    expect(setRawModeSpy).toHaveBeenCalledWith(true);
+    expect(detectAndEnableKittyProtocol).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('validateDnsResolutionOrder', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
@@ -213,7 +299,7 @@ describe('startInteractiveUI', () => {
   }));
 
   vi.mock('./ui/utils/kittyProtocolDetector.js', () => ({
-    detectAndEnableKittyProtocol: vi.fn(() => Promise.resolve()),
+    detectAndEnableKittyProtocol: vi.fn(() => Promise.resolve(true)),
   }));
 
   vi.mock('./ui/utils/updateCheck.js', () => ({
@@ -260,9 +346,6 @@ describe('startInteractiveUI', () => {
 
   it('should perform all startup tasks in correct order', async () => {
     const { getCliVersion } = await import('./utils/version.js');
-    const { detectAndEnableKittyProtocol } = await import(
-      './ui/utils/kittyProtocolDetector.js'
-    );
     const { checkForUpdates } = await import('./ui/utils/updateCheck.js');
     const { registerCleanup } = await import('./utils/cleanup.js');
 
@@ -275,7 +358,6 @@ describe('startInteractiveUI', () => {
 
     // Verify all startup tasks were called
     expect(getCliVersion).toHaveBeenCalledTimes(1);
-    expect(detectAndEnableKittyProtocol).toHaveBeenCalledTimes(1);
     expect(registerCleanup).toHaveBeenCalledTimes(1);
 
     // Verify cleanup handler is registered with unmount function
