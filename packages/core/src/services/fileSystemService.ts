@@ -25,6 +25,21 @@ export interface FileSystemService {
    * @param content - The content to write
    */
   writeTextFile(filePath: string, content: string): Promise<void>;
+
+  /**
+   * Deletes a file.
+   *
+   * @param filePath - The path to the file to delete.
+   */
+  unlink(filePath: string): Promise<void>;
+
+  /**
+   * Creates a directory.
+   *
+   * @param dirPath - The path to the directory to create.
+   * @param options - Options, e.g., { recursive: true }.
+   */
+  mkdir(dirPath: string, options?: { recursive: boolean }): Promise<void>;
 }
 
 /**
@@ -37,5 +52,16 @@ export class StandardFileSystemService implements FileSystemService {
 
   async writeTextFile(filePath: string, content: string): Promise<void> {
     await fs.writeFile(filePath, content, 'utf-8');
+  }
+
+  async unlink(filePath: string): Promise<void> {
+    await fs.unlink(filePath);
+  }
+
+  async mkdir(
+    dirPath: string,
+    options?: { recursive: boolean },
+  ): Promise<void> {
+    await fs.mkdir(dirPath, options);
   }
 }
