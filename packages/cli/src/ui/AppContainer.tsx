@@ -903,7 +903,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
         isEditorDialogOpen ||
         isSettingsDialogOpen ||
         isFolderTrustDialogOpen ||
-        isAuthenticating ||
         showPrivacyNotice;
       if (anyDialogOpen) {
         return;
@@ -932,9 +931,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       ) {
         handleSlashCommand('/ide status');
       } else if (keyMatchers[Command.QUIT](key)) {
-        if (isAuthenticating) {
-          return;
-        }
         if (!ctrlCPressedOnce) {
           cancelOngoingRequest?.();
         }
@@ -968,7 +964,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setCtrlDPressedOnce,
       ctrlDTimerRef,
       handleSlashCommand,
-      isAuthenticating,
       cancelOngoingRequest,
       isThemeDialogOpen,
       isAuthDialogOpen,
