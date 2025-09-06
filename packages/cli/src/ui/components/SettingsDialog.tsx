@@ -38,6 +38,8 @@ interface SettingsDialogProps {
   settings: LoadedSettings;
   onSelect: (settingName: string | undefined, scope: SettingScope) => void;
   onRestartRequest?: () => void;
+  availableTerminalHeight?: number;
+  availableTerminalWidth?: number;
 }
 
 const maxItemsToShow = 8;
@@ -46,6 +48,8 @@ export function SettingsDialog({
   settings,
   onSelect,
   onRestartRequest,
+  availableTerminalHeight,
+  availableTerminalWidth,
 }: SettingsDialogProps): React.JSX.Element {
   // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
@@ -111,7 +115,7 @@ export function SettingsDialog({
     setShowRestartPrompt(newRestartRequired.size > 0);
   }, [selectedScope, settings, globalPendingChanges]);
 
-  const generateSettingsItems = () => {
+  const generateSettingsItems = React.useCallback(() => {
     const settingKeys = getDialogSettingKeys();
 
     return settingKeys.map((key: string) => {
@@ -141,10 +145,6 @@ export function SettingsDialog({
               {} as Settings,
             );
 
-            console.log(
-              `[DEBUG SettingsDialog] Saving ${key} immediately with value:`,
-              newValue,
-            );
             saveModifiedSettings(
               immediateSettings,
               immediateSettingsObject,
@@ -191,12 +191,6 @@ export function SettingsDialog({
             setModifiedSettings((prev) => {
               const updated = new Set(prev).add(key);
               const needsRestart = hasRestartRequiredSettings(updated);
-              console.log(
-                `[DEBUG SettingsDialog] Modified settings:`,
-                Array.from(updated),
-                'Needs restart:',
-                needsRestart,
-              );
               if (needsRestart) {
                 setShowRestartPrompt(true);
                 setRestartRequiredSettings((prevRestart) =>
@@ -216,9 +210,13 @@ export function SettingsDialog({
         },
       };
     });
-  };
-
-  const items = generateSettingsItems();
+  }, [
+    pendingSettings,
+    selectedScope,
+    settings,
+    vimEnabled,
+    toggleVimEnabled,
+  ]);
 
   // Generic edit state
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -345,19 +343,105 @@ export function SettingsDialog({
     setFocusSection('settings');
   };
 
-  // Scroll logic for settings
-  const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
-  // Always show arrows for consistent UI and to indicate circular navigation
-  const showScrollUp = true;
-  const showScrollDown = true;
+  // Memoize the settings items for performance - use just the function since it's stable now
+  const items = React.useMemo(() => generateSettingsItems(), [generateSettingsItems]);
+
+  const DIALOG_PADDING = 2;
+  const SETTINGS_TITLE_HEIGHT = 2;
+  const MINIMUM_SETTINGS_HEIGHT = 2;
+  const SCROLL_ARROWS_HEIGHT = 2;
+  const SPACING_HEIGHT = 1;
+  const SCOPE_SELECTION_HEIGHT = 4;
+  const BOTTOM_HELP_TEXT_HEIGHT = 1;
+  const RESTART_PROMPT_HEIGHT = showRestartPrompt ? 1 : 0;
+
+  let currentAvailableTerminalHeight = availableTerminalHeight ?? Number.MAX_SAFE_INTEGER;
+  currentAvailableTerminalHeight -= 2; // Top and bottom borders
+  currentAvailableTerminalHeight -= BOTTOM_HELP_TEXT_HEIGHT; // Reserve space for help text
+
+  // More aggressive threshold - hide scope selection in compact terminals
+  const COMPACT_HEIGHT_THRESHOLD = 24;
+
+  let totalFixedHeight =
+    DIALOG_PADDING +
+    SETTINGS_TITLE_HEIGHT +
+    MINIMUM_SETTINGS_HEIGHT +
+    SCROLL_ARROWS_HEIGHT +
+    SPACING_HEIGHT +
+    SCOPE_SELECTION_HEIGHT +
+    RESTART_PROMPT_HEIGHT;
+
+  let showScopeSelection = true;
+  let showHelpText = true;
+  let includePadding = true;
+
+  // Hide scope selection immediately if terminal is too small
+  if (currentAvailableTerminalHeight < COMPACT_HEIGHT_THRESHOLD) {
+    showScopeSelection = false;
+    totalFixedHeight -= (SCOPE_SELECTION_HEIGHT + SPACING_HEIGHT);
+  }
+
+  if (totalFixedHeight > currentAvailableTerminalHeight) {
+    includePadding = false;
+    totalFixedHeight -= DIALOG_PADDING;
+  }
+
+  if (totalFixedHeight > currentAvailableTerminalHeight && showScopeSelection) {
+    totalFixedHeight -= (SCOPE_SELECTION_HEIGHT + SPACING_HEIGHT);
+    showScopeSelection = false;
+  }
+
+  if (totalFixedHeight > currentAvailableTerminalHeight) {
+    showHelpText = false;
+  }
+
+  const availableHeightForSettings = Math.max(
+    MINIMUM_SETTINGS_HEIGHT,
+    currentAvailableTerminalHeight - (totalFixedHeight - MINIMUM_SETTINGS_HEIGHT),
+  );
+
+  let compactSpacing = false;
+  let perItemHeight = 2;
+  let maxVisibleItems = Math.max(
+    1,
+    Math.floor(availableHeightForSettings / perItemHeight),
+  );
+
+  if (maxVisibleItems < 2 && availableHeightForSettings >= 1) {
+    compactSpacing = true;
+    perItemHeight = 1;
+    maxVisibleItems = Math.max(
+      1,
+      Math.floor(availableHeightForSettings / perItemHeight),
+    );
+  }
+
+  const effectiveMaxItemsToShow = availableTerminalHeight
+    ? Math.min(maxVisibleItems, items.length)
+    : maxItemsToShow;
+
+  const visibleItems = items.slice(scrollOffset, scrollOffset + effectiveMaxItemsToShow);
+
+  const showScrollUp = items.length > effectiveMaxItemsToShow && scrollOffset > 0;
+  const showScrollDown =
+    items.length > effectiveMaxItemsToShow &&
+    scrollOffset + effectiveMaxItemsToShow < items.length;
+
+  React.useEffect(() => {
+    if (!showScopeSelection && focusSection === 'scope') {
+      setFocusSection('settings');
+    }
+  }, [showScopeSelection, focusSection]);
+
+  const currentFocusedSection = !showScopeSelection ? 'settings' : focusSection;
 
   useKeypress(
     (key) => {
       const { name, ctrl } = key;
-      if (name === 'tab') {
+      if (key.name === 'tab' && showScopeSelection) {
         setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
       }
-      if (focusSection === 'settings') {
+      if (currentFocusedSection === 'settings') {
         // If editing, capture input and control keys
         if (editingKey) {
           const definition = getSettingDefinition(editingKey);
@@ -458,7 +542,7 @@ export function SettingsDialog({
           setActiveSettingIndex(newIndex);
           // Adjust scroll offset for wrap-around
           if (newIndex === items.length - 1) {
-            setScrollOffset(Math.max(0, items.length - maxItemsToShow));
+            setScrollOffset(Math.max(0, items.length - effectiveMaxItemsToShow));
           } else if (newIndex < scrollOffset) {
             setScrollOffset(newIndex);
           }
@@ -473,8 +557,8 @@ export function SettingsDialog({
           // Adjust scroll offset for wrap-around
           if (newIndex === 0) {
             setScrollOffset(0);
-          } else if (newIndex >= scrollOffset + maxItemsToShow) {
-            setScrollOffset(newIndex - maxItemsToShow + 1);
+          } else if (newIndex >= scrollOffset + effectiveMaxItemsToShow) {
+            setScrollOffset(newIndex - effectiveMaxItemsToShow + 1);
           }
         } else if (name === 'return' || name === 'space') {
           const currentItem = items[activeSettingIndex];
@@ -545,16 +629,16 @@ export function SettingsDialog({
                     ? defaultValue
                     : false
                   : typeof defaultValue === 'number' ||
-                      typeof defaultValue === 'string'
+                    typeof defaultValue === 'string'
                     ? defaultValue
                     : undefined;
               const immediateSettingsObject =
                 toSaveValue !== undefined
                   ? setPendingSettingValueAny(
-                      currentSetting.value,
-                      toSaveValue,
-                      {} as Settings,
-                    )
+                    currentSetting.value,
+                    toSaveValue,
+                    {} as Settings,
+                  )
                   : ({} as Settings);
 
               saveModifiedSettings(
@@ -631,24 +715,42 @@ export function SettingsDialog({
     { isActive: true },
   );
 
+  // Responsive width logic
+  const DEFAULT_LABEL_WIDTH = 50;
+  const labelColumnWidth = availableTerminalWidth
+    ? Math.max(
+      12,
+      Math.min(
+        DEFAULT_LABEL_WIDTH,
+        // Allocate roughly 55% of provided width to labels if width supplied
+        Math.floor(availableTerminalWidth * 0.55),
+      ),
+    )
+    : DEFAULT_LABEL_WIDTH;
+
   return (
     <Box
       borderStyle="round"
       borderColor={Colors.Gray}
-      flexDirection="row"
-      padding={1}
+      flexDirection="column"
+      paddingTop={includePadding ? 1 : 0}
+      paddingBottom={includePadding ? 1 : 0}
+      paddingLeft={1}
+      paddingRight={1}
       width="100%"
-      height="100%"
     >
       <Box flexDirection="column" flexGrow={1}>
-        <Text bold color={Colors.AccentBlue}>
-          Settings
+        <Text
+          bold={currentFocusedSection === 'settings'}
+          wrap="truncate"
+        >
+          {currentFocusedSection === 'settings' ? '> ' : '  '}Settings
         </Text>
         <Box height={1} />
         {showScrollUp && <Text color={Colors.Gray}>▲</Text>}
         {visibleItems.map((item, idx) => {
           const isActive =
-            focusSection === 'settings' &&
+            currentFocusedSection === 'settings' &&
             activeSettingIndex === idx + scrollOffset;
 
           const scopeSettings = settings.forScope(selectedScope).settings;
@@ -656,9 +758,7 @@ export function SettingsDialog({
 
           let displayValue: string;
           if (editingKey === item.value) {
-            // Show edit buffer with advanced cursor highlighting
             if (cursorVisible && editCursorPos < cpLen(editBuffer)) {
-              // Cursor is in the middle or at start of text
               const beforeCursor = cpSlice(editBuffer, 0, editCursorPos);
               const atCursor = cpSlice(
                 editBuffer,
@@ -669,17 +769,13 @@ export function SettingsDialog({
               displayValue =
                 beforeCursor + chalk.inverse(atCursor) + afterCursor;
             } else if (cursorVisible && editCursorPos >= cpLen(editBuffer)) {
-              // Cursor is at the end - show inverted space
               displayValue = editBuffer + chalk.inverse(' ');
             } else {
-              // Cursor not visible
               displayValue = editBuffer;
             }
           } else if (item.type === 'number' || item.type === 'string') {
-            // For numbers/strings, get the actual current value from pending settings
             const path = item.value.split('.');
             const currentValue = getNestedValue(pendingSettings, path);
-
             const defaultValue = getDefaultValue(item.value);
 
             if (currentValue !== undefined && currentValue !== null) {
@@ -691,7 +787,6 @@ export function SettingsDialog({
                   : '';
             }
 
-            // Add * if value differs from default OR if currently being modified
             const isModified = modifiedSettings.has(item.value);
             const effectiveCurrentValue =
               currentValue !== undefined && currentValue !== null
@@ -704,7 +799,6 @@ export function SettingsDialog({
               displayValue += '*';
             }
           } else {
-            // For booleans and other types, use existing logic
             displayValue = getDisplayValue(
               item.value,
               scopeSettings,
@@ -714,8 +808,6 @@ export function SettingsDialog({
             );
           }
           const shouldBeGreyedOut = isDefaultValue(item.value, scopeSettings);
-
-          // Generate scope message for this setting
           const scopeMessage = getScopeMessageForSetting(
             item.value,
             selectedScope,
@@ -725,14 +817,15 @@ export function SettingsDialog({
           return (
             <React.Fragment key={item.value}>
               <Box flexDirection="row" alignItems="center">
-                <Box minWidth={2} flexShrink={0}>
+                <Box width={2} flexShrink={0}>
                   <Text color={isActive ? Colors.AccentGreen : Colors.Gray}>
                     {isActive ? '●' : ''}
                   </Text>
                 </Box>
-                <Box minWidth={50}>
+                <Box width={labelColumnWidth} flexShrink={1}>
                   <Text
                     color={isActive ? Colors.AccentGreen : Colors.Foreground}
+                    wrap="truncate"
                   >
                     {item.label}
                     {scopeMessage && (
@@ -740,7 +833,7 @@ export function SettingsDialog({
                     )}
                   </Text>
                 </Box>
-                <Box minWidth={3} />
+                <Box width={2} flexShrink={0} />
                 <Text
                   color={
                     isActive
@@ -749,36 +842,44 @@ export function SettingsDialog({
                         ? Colors.Gray
                         : Colors.Foreground
                   }
+                  wrap="truncate"
                 >
                   {displayValue}
                 </Text>
               </Box>
-              <Box height={1} />
+              {!compactSpacing && <Box height={1} />}
             </React.Fragment>
           );
         })}
         {showScrollDown && <Text color={Colors.Gray}>▼</Text>}
 
-        <Box height={1} />
+        {!compactSpacing && <Box height={1} />}
 
-        <Box marginTop={1} flexDirection="column">
-          <Text bold={focusSection === 'scope'} wrap="truncate">
-            {focusSection === 'scope' ? '> ' : '  '}Apply To
-          </Text>
-          <RadioButtonSelect
-            items={scopeItems}
-            initialIndex={0}
-            onSelect={handleScopeSelect}
-            onHighlight={handleScopeHighlight}
-            isFocused={focusSection === 'scope'}
-            showNumbers={focusSection === 'scope'}
-          />
-        </Box>
+        {showScopeSelection && (
+          <Box marginTop={1} flexDirection="column">
+            <Text bold={currentFocusedSection === 'scope'} wrap="truncate">
+              {currentFocusedSection === 'scope' ? '> ' : '  '}Apply To
+            </Text>
+            <RadioButtonSelect
+              items={scopeItems}
+              initialIndex={0}
+              onSelect={handleScopeSelect}
+              onHighlight={handleScopeHighlight}
+              isFocused={currentFocusedSection === 'scope'}
+              showNumbers={currentFocusedSection === 'scope'}
+            />
+          </Box>
+        )}
 
-        <Box height={1} />
-        <Text color={Colors.Gray}>
-          (Use Enter to select, Tab to change focus)
-        </Text>
+        {showHelpText && (
+          <>
+            <Box height={1} />
+            <Text color={Colors.Gray} wrap="truncate">
+              (Use Enter to select
+              {showScopeSelection ? ', Tab to change focus' : ''})
+            </Text>
+          </>
+        )}
         {showRestartPrompt && (
           <Text color={Colors.AccentYellow}>
             To see changes, Gemini CLI must be restarted. Press r to exit and
