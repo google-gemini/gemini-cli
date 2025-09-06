@@ -689,16 +689,18 @@ function trimPairIfPossible(
 export function unescapeStringForGeminiBug(inputString: string): string {
   // Regex explanation:
   // \\ : Matches exactly one literal backslash character.
-  // (n|t|r|'|"|`|\\|\n) : This is a capturing group. It matches one of the following:
+  // (n|t|r|'|"|`|\\|\n|\$(?!\{)) : This is a capturing group. It matches one of the following:
   //   n, t, r, ', ", ` : These match the literal characters 'n', 't', 'r', single quote, double quote, or backtick.
   //                       This handles cases like "\\n", "\\`", etc.
   //   \\ : This matches a literal backslash. This handles cases like "\\\\" (escaped backslash).
   //   \n : This matches an actual newline character. This handles cases where the input
   //        string might have something like "\\\n" (a literal backslash followed by a newline).
+  //   \$(?!\{) : This matches a literal dollar sign NOT followed by '{'. This handles cases like "\\$"
+  //              but avoids interfering with template literals like "${variable}".
   // g : Global flag, to replace all occurrences.
 
   return inputString.replace(
-    /\\+(n|t|r|'|"|`|\\|\n)/g,
+    /\\+(n|t|r|'|"|`|\\|\n|\$(?!\{))/g,
     (match, capturedChar) => {
       // 'match' is the entire erroneous sequence, e.g., if the input (in memory) was "\\\\`", match is "\\\\`".
       // 'capturedChar' is the character that determines the true meaning, e.g., '`'.
@@ -720,6 +722,8 @@ export function unescapeStringForGeminiBug(inputString: string): string {
           return '\\'; // Replace escaped backslash (e.g., "\\\\") with single backslash
         case '\n': // This handles when 'capturedChar' is an actual newline
           return '\n'; // Replace the whole erroneous sequence (e.g., "\\\n" in memory) with a clean newline
+        case '$': // This handles when 'capturedChar' is a literal dollar sign
+          return '$'; // Replace escaped dollar sign (e.g., "\\$") with single dollar sign
         default:
           // This fallback should ideally not be reached if the regex captures correctly.
           // It would return the original matched sequence if an unexpected character was captured.
