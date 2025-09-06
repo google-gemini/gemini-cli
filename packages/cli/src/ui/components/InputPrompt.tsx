@@ -33,10 +33,11 @@ import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 
 const LARGE_PASTE_CHAR_THRESHOLD = 1000; // When the pasted content is larger than this threshold, it will be inserted as a placeholder
-// const PASTE_FLUSH_DELAY_MS = 60; // The delay for the non-bracket burst
-// const BURST_CHAR_INTERVAL_MS = 10; // Only when the interval between two characters is less than 10ms, it is considered a burst
 
-interface PendingPasteItem { placeholder: string; content: string }
+interface PendingPasteItem {
+  placeholder: string;
+  content: string;
+}
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -78,10 +79,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [pendingPastes, setPendingPastes] = useState<PendingPasteItem[]>([]);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
-  // const burstBufferRef = useRef<string>('');
-  // const burstTimerRef = useRef<NodeJS.Timeout | null>(null);
-  // const burstActiveRef = useRef<boolean>(false);
-  // const lastCharTsRef = useRef<number>(0);
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -200,22 +197,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     resetReverseSearchCompletionState,
   ]);
 
-  // const clearBurstTimer = useCallback(() => {
-  //   if (burstTimerRef.current) {
-  //     clearTimeout(burstTimerRef.current);
-  //     burstTimerRef.current = null;
-  //   }
-  // }, []);
-
-  const insertAtOffsetWithAutoSpaces = useCallback((offset: number, insertText: string): void => {
-    const cpsAround = toCodePoints(buffer.text);
-    let textToInsert = insertText;
-    const charBefore = offset > 0 ? cpsAround[offset - 1] : '';
-    const charAfter = offset < cpsAround.length ? cpsAround[offset] : '';
-    if (charBefore && charBefore !== ' ' && charBefore !== '\n') textToInsert = ' ' + textToInsert;
-    if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) textToInsert = textToInsert + ' ';
-    buffer.replaceRangeByOffset(offset, offset, textToInsert);
-  }, [buffer]);
+  const insertAtOffsetWithAutoSpaces = useCallback(
+    (offset: number, insertText: string): void => {
+      const cpsAround = toCodePoints(buffer.text);
+      let textToInsert = insertText;
+      const charBefore = offset > 0 ? cpsAround[offset - 1] : '';
+      const charAfter = offset < cpsAround.length ? cpsAround[offset] : '';
+      if (charBefore && charBefore !== ' ' && charBefore !== '\n')
+        textToInsert = ' ' + textToInsert;
+      if (!charAfter || (charAfter !== ' ' && charAfter !== '\n'))
+        textToInsert = textToInsert + ' ';
+      buffer.replaceRangeByOffset(offset, offset, textToInsert);
+    },
+    [buffer],
+  );
 
   // // 按Rust语义：任意文本变更后，移除已不在文本中的占位符映射
   // const prunePendingPastes = useCallback(() => {
@@ -223,28 +218,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   //   const t = buffer.text;
   //   setPendingPastes((prev) => (prev.length === 0 ? prev : prev.filter((p) => t.includes(p.placeholder))));
   // }, [buffer.text, pendingPastes.length]);
-
-  // const flushBurstIfDue = useCallback(() => {
-  //   if (!burstActiveRef.current) return false;
-  //   clearBurstTimer();
-  //   const data = burstBufferRef.current;
-  //   const cpsData = toCodePoints(data);
-  //   if (cpsData.length === 0) {
-  //     burstActiveRef.current = false;
-  //     return false;
-  //   }
-  //   // Insert as placeholder if the data is larger than the threshold
-  //   const insertAsPlaceholder = cpsData.length > LARGE_PASTE_CHAR_THRESHOLD;
-  //   if (insertAsPlaceholder) {
-  //     const placeholder = `[Pasted Content ${cpsData.length} chars]`;
-  //     const offset = logicalPosToOffset(buffer.lines, buffer.cursor[0], buffer.cursor[1]);
-  //     insertAtOffsetWithAutoSpaces(offset, placeholder);
-  //     setPendingPastes((prev) => prev.concat({ placeholder, content: data }));
-  //   }
-  //   burstBufferRef.current = '';
-  //   burstActiveRef.current = false;
-  //   return true;
-  // }, [buffer, clearBurstTimer]);
 
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
@@ -275,31 +248,40 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     } catch (error) {
       console.error('Error handling clipboard image:', error);
     }
-  }, [buffer, config]);
+  }, [buffer, config, insertAtOffsetWithAutoSpaces]);
 
-  // 在提交时展开所有占位符（逐个首次匹配替换，保证重复占位符顺序对应）
-  const expandPlaceholders = useCallback((input: string): string => {
-    let out = input;
-    for (const item of pendingPastes) {
-      const idx = out.indexOf(item.placeholder);
-      if (idx !== -1) {
-        out = out.slice(0, idx) + item.content + out.slice(idx + item.placeholder.length);
+  const expandPlaceholders = useCallback(
+    (input: string): string => {
+      let out = input;
+      for (const item of pendingPastes) {
+        const idx = out.indexOf(item.placeholder);
+        if (idx !== -1) {
+          out =
+            out.slice(0, idx) +
+            item.content +
+            out.slice(idx + item.placeholder.length);
+        }
       }
-    }
-    return out;
-  }, [pendingPastes]);
+      return out;
+    },
+    [pendingPastes],
+  );
 
-  // 在退格时如果光标前是任一占位符，整体删除并清理映射
   const tryDeletePlaceholderAtCursor = useCallback((): boolean => {
     if (pendingPastes.length === 0) return false;
-    // 计算当前偏移(与handleClipboardImage一致)
-    const offset = logicalPosToOffset(buffer.lines, buffer.cursor[0], buffer.cursor[1]);
+    const offset = logicalPosToOffset(
+      buffer.lines,
+      buffer.cursor[0],
+      buffer.cursor[1],
+    );
     const text = buffer.text;
     for (let i = 0; i < pendingPastes.length; i++) {
       const ph = pendingPastes[i].placeholder;
-      if (offset >= ph.length && text.slice(offset - ph.length, offset) === ph) {
+      if (
+        offset >= ph.length &&
+        text.slice(offset - ph.length, offset) === ph
+      ) {
         buffer.replaceRangeByOffset(offset - ph.length, offset, '');
-        // 删除一个对应项
         setPendingPastes((prev) => {
           const idx = prev.findIndex((p) => p.placeholder === ph);
           if (idx === -1) return prev;
@@ -320,26 +302,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // // 入口统一冲刷：除显式粘贴/单字符/换行/提交外，先尝试冲刷突发
-      // const isSingleChar = !!key.sequence && !key.ctrl && !key.meta && key.sequence.length === 1;
-      // const isNewline = keyMatchers[Command.NEWLINE](key);
-      // const isSubmit = keyMatchers[Command.SUBMIT](key);
-      // if (!isSingleChar && !key.paste && !isNewline && !isSubmit) {
-      //   flushBurstIfDue();
-      // }
-
-      // 显式粘贴：先清空任何非括号突发，再根据阈值插入
       if (key.paste) {
-        // flushBurstIfDue();
         const content = key.sequence || '';
         const contentLen = toCodePoints(content).length;
         if (contentLen > LARGE_PASTE_CHAR_THRESHOLD) {
           const placeholder = `[Pasted Content ${contentLen} chars]`;
-          const offset = logicalPosToOffset(buffer.lines, buffer.cursor[0], buffer.cursor[1]);
+          const offset = logicalPosToOffset(
+            buffer.lines,
+            buffer.cursor[0],
+            buffer.cursor[1],
+          );
           insertAtOffsetWithAutoSpaces(offset, placeholder);
           setPendingPastes((prev) => prev.concat({ placeholder, content }));
         } else {
-          // 小粘贴走原有路径（保留路径智能检测）
           buffer.handleInput(key);
         }
         return;
@@ -562,7 +537,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.backspace();
             buffer.newline();
           } else {
-            // 展开占位符后提交
             const expanded = expandPlaceholders(buffer.text);
             setPendingPastes([]);
             handleSubmitAndClear(expanded);
@@ -667,9 +641,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,
-      // flushBurstIfDue,
       tryDeletePlaceholderAtCursor,
       expandPlaceholders,
+      insertAtOffsetWithAutoSpaces,
     ],
   );
 
