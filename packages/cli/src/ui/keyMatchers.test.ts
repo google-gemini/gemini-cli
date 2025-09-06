@@ -56,7 +56,7 @@ describe('keyMatchers', () => {
     [Command.TOGGLE_IDE_CONTEXT_DETAIL]: (key: Key) =>
       key.ctrl && key.name === 'g',
     [Command.TOGGLE_MESSAGE_QUEUE_MODE]: (key: Key) =>
-      key.ctrl && key.name === 'm',
+      key.ctrl && key.name === '`',
     [Command.QUIT]: (key: Key) => key.ctrl && key.name === 'c',
     [Command.EXIT]: (key: Key) => key.ctrl && key.name === 'd',
     [Command.SHOW_MORE_LINES]: (key: Key) => key.ctrl && key.name === 's',
@@ -225,8 +225,8 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.TOGGLE_MESSAGE_QUEUE_MODE,
-      positive: [createKey('m', { ctrl: true })],
-      negative: [createKey('m'), createKey('g', { ctrl: true })],
+      positive: [createKey('`', { ctrl: true })],
+      negative: [createKey('`'), createKey('g', { ctrl: true })],
     },
     {
       command: Command.QUIT,

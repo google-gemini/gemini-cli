@@ -51,14 +51,17 @@ export function useMessageQueue({
     return messageQueue.join('\n\n');
   }, [messageQueue]);
 
-  // Process queued messages when streaming becomes idle
+  // Process queued messages based on mode
   useEffect(() => {
     const isIdle = streamingState === StreamingState.Idle;
+    const isResponseComplete =
+      streamingState === StreamingState.ResponseComplete;
     const isWaiting = streamingState === StreamingState.WaitingForConfirmation;
 
     const shouldSubmit =
       (messageQueueMode === 'wait_for_idle' && isIdle) ||
-      (messageQueueMode === 'wait_for_response' && (isIdle || isWaiting));
+      (messageQueueMode === 'wait_for_response' &&
+        (isResponseComplete || isWaiting || isIdle));
 
     if (shouldSubmit && messageQueue.length > 0) {
       // Combine all messages with double newlines for clarity

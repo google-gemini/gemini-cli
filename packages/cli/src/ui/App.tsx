@@ -171,9 +171,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
   const [currentIDE, setCurrentIDE] = useState<DetectedIde | undefined>();
   // Local state for message queue mode to ensure re-renders when it changes
-  const [messageQueueMode, setMessageQueueMode] = useState<'wait_for_idle' | 'wait_for_response'>(
-    settings.merged.general?.messageQueueMode ?? 'wait_for_idle'
-  );
+  const [messageQueueMode, setMessageQueueMode] = useState<
+    'wait_for_idle' | 'wait_for_response'
+  >(settings.merged.general?.messageQueueMode ?? 'wait_for_idle');
 
   useEffect(() => {
     (async () => {
@@ -188,7 +188,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   // Listen for changes to message queue mode setting
   useEffect(() => {
-    const newMode = settings.merged.general?.messageQueueMode ?? 'wait_for_idle';
+    const newMode =
+      settings.merged.general?.messageQueueMode ?? 'wait_for_idle';
     setMessageQueueMode(newMode);
   }, [settings.merged.general?.messageQueueMode]);
 
@@ -332,17 +333,20 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
 
-  const handleModelSelect = useCallback((modelName: string) => {
-    config.setModel(modelName);
-    setIsModelDialogOpen(false);
-    addItem(
-      {
-        type: MessageType.INFO,
-        text: `Switched to model: ${modelName}`,
-      },
-      Date.now(),
-    );
-  }, [config, addItem]);
+  const handleModelSelect = useCallback(
+    (modelName: string) => {
+      config.setModel(modelName);
+      setIsModelDialogOpen(false);
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: `Switched to model: ${modelName}`,
+        },
+        Date.now(),
+      );
+    },
+    [config, addItem],
+  );
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder);
@@ -842,10 +846,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         handleSlashCommand('/ide status');
       } else if (keyMatchers[Command.TOGGLE_MESSAGE_QUEUE_MODE](key)) {
         const current = messageQueueMode;
-        const next = current === 'wait_for_idle' ? 'wait_for_response' : 'wait_for_idle';
+        const next =
+          current === 'wait_for_idle' ? 'wait_for_response' : 'wait_for_idle';
         setMessageQueueMode(next); // Update local state immediately for UI responsiveness
         settings.setValue(SettingScope.User, 'general.messageQueueMode', next);
-        addItem({ type: MessageType.INFO, text: `Message Queue Mode: ${next}` }, Date.now());
+        addItem(
+          { type: MessageType.INFO, text: `Message Queue Mode: ${next}` },
+          Date.now(),
+        );
         return;
       } else if (keyMatchers[Command.QUIT](key)) {
         // When authenticating, let AuthInProgress component handle Ctrl+C.
@@ -887,7 +895,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       handleSlashCommand,
       authState,
       cancelOngoingRequest,
-      settings.merged.general?.debugKeystrokeLogging,
+      addItem,
+      messageQueueMode,
+      settings,
     ],
   );
 

@@ -764,17 +764,21 @@ export function SettingsDialog({
               const effectiveValue =
                 currentValue !== undefined && currentValue !== null
                   ? String(currentValue)
-                  : (defaultValue !== undefined && defaultValue !== null
-                      ? String(defaultValue)
-                      : 'wait_for_idle');
+                  : defaultValue !== undefined && defaultValue !== null
+                    ? String(defaultValue)
+                    : 'wait_for_idle';
 
               // Convert to user-friendly display
-              const displayMode = effectiveValue === 'wait_for_idle' ? 'Wait for Idle' : 'Wait for Response';
+              const displayMode =
+                effectiveValue === 'wait_for_idle'
+                  ? 'Wait for Idle'
+                  : 'Wait for Response';
               displayValue = displayMode;
 
               // Add * if value differs from default OR if currently being modified
               const isModified = modifiedSettings.has(item.value);
-              const isDifferentFromDefault = effectiveValue !== String(defaultValue);
+              const isDifferentFromDefault =
+                effectiveValue !== String(defaultValue);
               if (isDifferentFromDefault || isModified) {
                 displayValue += '*';
               }

@@ -18,7 +18,9 @@ describe('modelCommand', () => {
 
   it('should have correct command metadata', () => {
     expect(modelCommand.name).toBe('model');
-    expect(modelCommand.description).toBe('Select and switch Gemini models interactively');
+    expect(modelCommand.description).toBe(
+      'Select and switch Gemini models interactively',
+    );
     expect(modelCommand.subCommands).toBeUndefined();
   });
 

@@ -1683,5 +1683,21 @@ describe('App UI', () => {
         expect(lastFrame()).not.toContain('some text');
       });
     });
+
+    it('should render MessageQueueIndicator with correct mode', async () => {
+      const { lastFrame, unmount } = renderWithProviders(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('queue: wait_for_idle');
+        expect(lastFrame()).toContain('Ctrl+` to toggle');
+      });
+    });
   });
 });

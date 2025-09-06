@@ -18,9 +18,7 @@ export const MessageQueueIndicator: React.FC<MessageQueueIndicatorProps> = ({
   <Box>
     <Text color={Colors.AccentBlue}>
       queue: {mode}
-      <Text color={Colors.Gray}> (Ctrl+M to toggle)</Text>
+      <Text color={Colors.Gray}> (Ctrl+` to toggle)</Text>
     </Text>
   </Box>
 );
-
-

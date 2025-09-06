@@ -572,6 +572,7 @@ export const useSlashCommandProcessor = (
       setSessionShellAllowlist,
       setIsProcessing,
       setConfirmationRequest,
+      openModelDialog,
     ],
   );
 
