@@ -25,9 +25,14 @@ import { FileOperationEvent } from '../telemetry/types.js';
  */
 export interface ReadFileToolParams {
   /**
-   * The absolute path to the file to read
+   * The absolute path to the file to read (preferred parameter name)
    */
-  absolute_path: string;
+  file_path?: string;
+
+  /**
+   * The absolute path to the file to read (legacy parameter name for backward compatibility)
+   */
+  absolute_path?: string;
 
   /**
    * The line number to start reading from (optional)
@@ -40,15 +45,34 @@ export interface ReadFileToolParams {
   limit?: number;
 }
 
+/**
+ * Internal parameters with resolved file path
+ */
+interface ReadFileToolInternalParams {
+  absolute_path: string;
+  offset?: number;
+  limit?: number;
+}
+
 class ReadFileToolInvocation extends BaseToolInvocation<
-  ReadFileToolParams,
+  ReadFileToolInternalParams,
   ToolResult
 > {
   constructor(
     private config: Config,
     params: ReadFileToolParams,
   ) {
-    super(params);
+    // Add parameter mapping: file_path -> absolute_path
+    const filePath = params.file_path ?? params.absolute_path;
+    if (!filePath) {
+      throw new Error("Either 'file_path' or 'absolute_path' must be provided");
+    }
+    const mappedParams: ReadFileToolInternalParams = {
+      absolute_path: filePath,
+      offset: params.offset,
+      limit: params.limit,
+    };
+    super(mappedParams);
   }
 
   getDescription(): string {
@@ -145,9 +169,14 @@ export class ReadFileTool extends BaseDeclarativeTool<
       Kind.Read,
       {
         properties: {
-          absolute_path: {
+          file_path: {
             description:
               "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
+            type: 'string',
+          },
+          absolute_path: {
+            description:
+              "The absolute path to the file to read (legacy parameter name for backward compatibility). Use 'file_path' instead for consistency with other file system tools.",
             type: 'string',
           },
           offset: {
@@ -161,7 +190,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
             type: 'number',
           },
         },
-        required: ['absolute_path'],
         type: 'object',
       },
     );
@@ -170,9 +198,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: ReadFileToolParams,
   ): string | null {
-    const filePath = params.absolute_path;
-    if (params.absolute_path.trim() === '') {
-      return "The 'absolute_path' parameter must be non-empty.";
+    const filePath = params.file_path ?? params.absolute_path;
+    if (!filePath || filePath.trim() === '') {
+      return "A non-empty file path must be provided via 'file_path' or 'absolute_path'.";
     }
 
     if (!path.isAbsolute(filePath)) {
@@ -199,7 +227,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
     }
 
     const fileService = this.config.getFileService();
-    if (fileService.shouldGeminiIgnoreFile(params.absolute_path)) {
+    if (fileService.shouldGeminiIgnoreFile(filePath)) {
       return `File path '${filePath}' is ignored by .geminiignore pattern(s).`;
     }
 
