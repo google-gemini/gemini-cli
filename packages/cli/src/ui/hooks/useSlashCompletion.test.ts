@@ -9,11 +9,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useSlashCompletion } from './useSlashCompletion.js';
-import {
-  CommandContext,
-  SlashCommand,
-  CommandKind,
-} from '../commands/types.js';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import { CommandKind } from '../commands/types.js';
 import { useState } from 'react';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 
@@ -229,7 +226,12 @@ describe('useSlashCompletion', () => {
 
       await waitFor(() => {
         expect(result.current.suggestions).toEqual([
-          { label: 'memory', value: 'memory', description: 'Manage memory' },
+          {
+            label: 'memory',
+            value: 'memory',
+            description: 'Manage memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
         ]);
       });
     });
@@ -257,6 +259,7 @@ describe('useSlashCompletion', () => {
             label: 'stats',
             value: 'stats',
             description: 'check session stats. Usage: /stats [model|tools]',
+            commandKind: CommandKind.BUILT_IN,
           },
         ]);
       });
@@ -371,8 +374,18 @@ describe('useSlashCompletion', () => {
       expect(result.current.suggestions).toHaveLength(2);
       expect(result.current.suggestions).toEqual(
         expect.arrayContaining([
-          { label: 'show', value: 'show', description: 'Show memory' },
-          { label: 'add', value: 'add', description: 'Add to memory' },
+          {
+            label: 'show',
+            value: 'show',
+            description: 'Show memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
+          {
+            label: 'add',
+            value: 'add',
+            description: 'Add to memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
         ]),
       );
     });
@@ -400,8 +413,18 @@ describe('useSlashCompletion', () => {
       expect(result.current.suggestions).toHaveLength(2);
       expect(result.current.suggestions).toEqual(
         expect.arrayContaining([
-          { label: 'show', value: 'show', description: 'Show memory' },
-          { label: 'add', value: 'add', description: 'Add to memory' },
+          {
+            label: 'show',
+            value: 'show',
+            description: 'Show memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
+          {
+            label: 'add',
+            value: 'add',
+            description: 'Add to memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
         ]),
       );
     });
@@ -428,7 +451,12 @@ describe('useSlashCompletion', () => {
 
       await waitFor(() => {
         expect(result.current.suggestions).toEqual([
-          { label: 'add', value: 'add', description: 'Add to memory' },
+          {
+            label: 'add',
+            value: 'add',
+            description: 'Add to memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
         ]);
       });
     });
@@ -646,14 +674,16 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toEqual([
-        {
-          label: 'summarize',
-          value: 'summarize',
-          description: 'Summarize content',
-          commandKind: CommandKind.MCP_PROMPT,
-        },
-      ]);
+      await waitFor(() => {
+        expect(result.current.suggestions).toEqual([
+          {
+            label: 'summarize',
+            value: 'summarize',
+            description: 'Summarize content',
+            commandKind: CommandKind.MCP_PROMPT,
+          },
+        ]);
+      });
     });
 
     it('should include commandKind for sub-commands', async () => {
@@ -725,14 +755,16 @@ describe('useSlashCompletion', () => {
         ),
       );
 
-      expect(result.current.suggestions).toEqual([
-        {
-          label: 'custom-script',
-          value: 'custom-script',
-          description: 'Run custom script',
-          commandKind: CommandKind.FILE,
-        },
-      ]);
+      await waitFor(() => {
+        expect(result.current.suggestions).toEqual([
+          {
+            label: 'custom-script',
+            value: 'custom-script',
+            description: 'Run custom script',
+            commandKind: CommandKind.FILE,
+          },
+        ]);
+      });
     });
   });
 });

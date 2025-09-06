@@ -7,7 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { SlashCommand, CommandKind } from '../commands/types.js';
+import { type SlashCommand, CommandKind } from '../commands/types.js';
 
 interface Help {
   commands: readonly SlashCommand[];
