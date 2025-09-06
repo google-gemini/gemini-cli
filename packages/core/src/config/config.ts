@@ -64,6 +64,13 @@ export enum ApprovalMode {
   YOLO = 'yolo',
 }
 
+// Message queue mode settings
+export const MESSAGE_QUEUE_MODES = [
+  'wait_for_idle',
+  'wait_for_response',
+] as const;
+export type MessageQueueMode = (typeof MESSAGE_QUEUE_MODES)[number];
+
 export interface AccessibilitySettings {
   disableLoadingPhrases?: boolean;
   screenReader?: boolean;
@@ -218,7 +225,7 @@ export interface ConfigParameters {
   truncateToolOutputLines?: number;
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
-  messageQueueMode?: 'wait_for_idle' | 'wait_for_response';
+  messageQueueMode?: MessageQueueMode;
 }
 
 export class Config {
@@ -298,7 +305,7 @@ export class Config {
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useSmartEdit: boolean;
-  private readonly messageQueueMode: 'wait_for_idle' | 'wait_for_response';
+  private readonly messageQueueMode: MessageQueueMode;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -837,7 +844,7 @@ export class Config {
     return this.useSmartEdit;
   }
 
-  getMessageQueueMode(): 'wait_for_idle' | 'wait_for_response' {
+  getMessageQueueMode(): MessageQueueMode {
     return this.messageQueueMode;
   }
 

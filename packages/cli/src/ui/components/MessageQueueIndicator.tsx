@@ -7,9 +7,10 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
+import type { MessageQueueMode } from '@google/gemini-cli-core';
 
 interface MessageQueueIndicatorProps {
-  mode: 'wait_for_idle' | 'wait_for_response';
+  mode: MessageQueueMode;
 }
 
 export const MessageQueueIndicator: React.FC<MessageQueueIndicatorProps> = ({

@@ -6,11 +6,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { StreamingState } from '../types.js';
+import type { MessageQueueMode } from '@google/gemini-cli-core';
 
 export interface UseMessageQueueOptions {
   streamingState: StreamingState;
   submitQuery: (query: string) => void;
-  messageQueueMode: 'wait_for_idle' | 'wait_for_response';
+  messageQueueMode: MessageQueueMode;
 }
 
 export interface UseMessageQueueReturn {
