@@ -45,6 +45,12 @@ interface ElectronAPI {
     // Tool confirmation
     onToolConfirmationRequest: (callback: (event: any, details: ToolCallConfirmationDetails) => void) => () => void;
     sendToolConfirmationResponse: (outcome: string) => Promise<{ success: boolean }>;
+    // OAuth authentication
+    startOAuthFlow: (providerType: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+    getOAuthStatus: (providerType: string) => Promise<{ authenticated: boolean; userEmail?: string }>;
+    clearOAuthCredentials: (providerType: string) => Promise<{ success: boolean; error?: string }>;
+    checkEnvApiKey: (providerType: string) => Promise<{ detected: boolean; source: string }>;
+    setApiKeyPreference: (providerType: string) => Promise<{ success: boolean; error?: string }>;
   };
 }
 
@@ -465,6 +471,47 @@ class MultiModelService {
     }
 
     await this.api.updateSessionTitle(sessionId, newTitle);
+  }
+
+  // OAuth authentication methods
+  async startOAuthFlow(providerType: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    return await this.api.startOAuthFlow(providerType);
+  }
+
+  async getOAuthStatus(providerType: string): Promise<{ authenticated: boolean; userEmail?: string }> {
+    if (!this.initialized) {
+      return { authenticated: false };
+    }
+
+    return await this.api.getOAuthStatus(providerType);
+  }
+
+  async clearOAuthCredentials(providerType: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    return await this.api.clearOAuthCredentials(providerType);
+  }
+
+  async checkEnvApiKey(providerType: string): Promise<{ detected: boolean; source: string }> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    return await this.api.checkEnvApiKey(providerType);
+  }
+
+  async setApiKeyPreference(providerType: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    return await this.api.setApiKeyPreference(providerType);
   }
 }
 

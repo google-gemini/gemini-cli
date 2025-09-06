@@ -5,7 +5,9 @@ import {
   Bot, 
   Zap,
   Settings,
-  User
+  User,
+  Key,
+  CheckCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ModelSelector } from '@/components/chat/ModelSelector';
@@ -20,6 +22,7 @@ export const Header: React.FC = () => {
     currentRole,
     language,
     theme,
+    authConfig,
     setTheme
   } = useAppStore();
 
@@ -46,6 +49,23 @@ export const Header: React.FC = () => {
     const nextIndex = (currentIndex + 1) % themes.length;
     setTheme(themes[nextIndex]);
   };
+
+  const getAuthStatus = () => {
+    if (currentProvider === 'gemini') {
+      const geminiConfig = authConfig.gemini;
+      if (geminiConfig?.type === 'oauth' && geminiConfig.oauthToken) {
+        return { type: 'oauth' as const, authenticated: true };
+      } else if (geminiConfig?.type === 'api_key') {
+        // For API key, we assume it's available since user switched to it
+        // The actual check is done in the settings modal
+        return { type: 'api_key' as const, authenticated: true };
+      }
+      return { type: 'none' as const, authenticated: false };
+    }
+    return { type: 'other' as const, authenticated: true }; // Other providers assume authenticated
+  };
+
+  const authStatus = getAuthStatus();
 
   return (
     <header className="sticky top-0 z-40 h-16 border-b border-border bg-card px-6 flex items-center justify-between">
@@ -102,6 +122,25 @@ export const Header: React.FC = () => {
 
       {/* Right Section - Controls */}
       <div className="flex items-center gap-2">
+        {/* Authentication Status Indicator */}
+        {currentProvider === 'gemini' && (
+          <div className="flex items-center gap-1 px-2 py-1 rounded-md text-xs">
+            {authStatus.authenticated ? (
+              <>
+                <CheckCircle size={12} className="text-green-500" />
+                <span className="text-green-600">
+                  {authStatus.type === 'oauth' ? 'OAuth' : 'API Key'}
+                </span>
+              </>
+            ) : (
+              <>
+                <Key size={12} className="text-amber-500" />
+                <span className="text-amber-600">Not Configured</span>
+              </>
+            )}
+          </div>
+        )}
+
         <Button
           variant="ghost"
           size="icon"

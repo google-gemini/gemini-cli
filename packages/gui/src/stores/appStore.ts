@@ -23,6 +23,7 @@ interface AppStore extends AppState {
   setCurrentProvider: (provider: ModelProviderType) => void;
   setCurrentModel: (model: string) => void;
   updateAuthConfig: (config: Partial<AuthConfig>) => void;
+  syncOAuthStatus: () => Promise<void>;
   
   setCurrentWorkspace: (workspace: WorkspaceConfig | null) => void;
   addWorkspace: (workspace: WorkspaceConfig) => void;
@@ -100,6 +101,41 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           authConfig: { ...state.authConfig, ...config },
         })),
+
+      syncOAuthStatus: async () => {
+        try {
+          const { multiModelService } = await import('@/services/multiModelService');
+          const oauthStatus = await multiModelService.getOAuthStatus('gemini');
+          
+          // Update auth config based on OAuth status
+          const currentState = useAppStore.getState();
+          const currentGeminiConfig = currentState.authConfig.gemini;
+          
+          if (oauthStatus.authenticated) {
+            // If OAuth is authenticated but config doesn't reflect it, update
+            if (!currentGeminiConfig || currentGeminiConfig.type !== 'oauth') {
+              useAppStore.getState().updateAuthConfig({
+                gemini: {
+                  type: 'oauth',
+                  oauthToken: 'authenticated'
+                }
+              });
+            }
+          } else {
+            // If OAuth is not authenticated but config shows it is, reset to api_key
+            if (currentGeminiConfig && currentGeminiConfig.type === 'oauth') {
+              useAppStore.getState().updateAuthConfig({
+                gemini: {
+                  type: 'api_key',
+                  oauthToken: undefined
+                }
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Failed to sync OAuth status:', error);
+        }
+      },
 
       setCurrentWorkspace: (workspace: WorkspaceConfig | null) =>
         set({ currentWorkspace: workspace }),

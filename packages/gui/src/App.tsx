@@ -7,7 +7,7 @@ import type { ChatSession, ModelProviderType } from '@/types';
 
 export const App: React.FC = () => {
   const { currentProvider, currentModel, currentRole, theme } = useAppStore();
-  const { setBuiltinRoles } = useAppStore();
+  const { setBuiltinRoles, syncOAuthStatus } = useAppStore();
 
   useEffect(() => {
     // Apply theme to document
@@ -79,6 +79,14 @@ export const App: React.FC = () => {
           console.error('Failed to load builtin roles:', error);
         }
 
+        // Sync OAuth authentication status
+        try {
+          await syncOAuthStatus();
+          console.log('OAuth status synchronized');
+        } catch (error) {
+          console.error('Failed to sync OAuth status:', error);
+        }
+
         // Load sessions from backend (backend is the source of truth)
         try {
           const sessionsInfo = await multiModelService.getSessionsInfo();
@@ -97,7 +105,7 @@ export const App: React.FC = () => {
               messages: [], // Will be loaded when session is selected
               createdAt: sessionInfo.lastUpdated, // Using lastUpdated as approximation
               updatedAt: sessionInfo.lastUpdated,
-              provider: 'lm_studio' as ModelProviderType,
+              provider: currentProvider as ModelProviderType,
               model: currentModel,
               roleId: currentRole
             };

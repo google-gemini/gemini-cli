@@ -146,8 +146,8 @@ export interface WorkspaceConfig {
 export interface AuthConfig {
   gemini?: {
     type: 'oauth' | 'api_key';
-    apiKey?: string;
     oauthToken?: string;
+    // Note: API key is read from GEMINI_API_KEY environment variable, not stored in config
   };
   openai?: {
     apiKey: string;
