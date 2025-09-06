@@ -139,6 +139,7 @@ export const DialogManager = () => {
       <Box flexDirection="column">
         <ModelDialog
           onSelect={uiActions.handleModelSelect}
+          onClose={uiActions.closeModelDialog}
           currentModel={uiState.currentModel}
         />
       </Box>

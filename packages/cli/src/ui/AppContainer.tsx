@@ -37,6 +37,7 @@ import {
   logFlashFallback,
   FlashFallbackEvent,
   clearCachedCredentialFile,
+  MESSAGE_QUEUE_MODES,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -937,10 +938,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       ) {
         handleSlashCommand('/ide status');
       } else if (keyMatchers[Command.TOGGLE_MESSAGE_QUEUE_MODE](key)) {
-        const current =
-          settings.merged.general?.messageQueueMode ?? 'wait_for_idle';
-        const next =
-          current === 'wait_for_idle' ? 'wait_for_response' : 'wait_for_idle';
+        const [mode1, mode2] = MESSAGE_QUEUE_MODES;
+        const current = settings.merged.general?.messageQueueMode ?? mode1;
+        const next = current === mode1 ? mode2 : mode1;
         settings.setValue(SettingScope.User, 'general.messageQueueMode', next);
         historyManager.addItem(
           { type: MessageType.INFO, text: `Message Queue Mode: ${next}` },
@@ -1034,6 +1034,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       !!confirmationRequest ||
       isThemeDialogOpen ||
       isSettingsDialogOpen ||
+      isModelDialogOpen ||
       isAuthenticating ||
       isAuthDialogOpen ||
       isEditorDialogOpen ||
@@ -1047,6 +1048,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       confirmationRequest,
       isThemeDialogOpen,
       isSettingsDialogOpen,
+      isModelDialogOpen,
       isAuthenticating,
       isAuthDialogOpen,
       isEditorDialogOpen,

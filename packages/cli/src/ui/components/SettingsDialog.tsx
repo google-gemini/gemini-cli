@@ -33,6 +33,7 @@ import { useVimMode } from '../contexts/VimModeContext.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import chalk from 'chalk';
 import { cpSlice, cpLen, stripUnsafeCharacters } from '../utils/textUtils.js';
+import { MESSAGE_QUEUE_MODES } from '@google/gemini-cli-core';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -128,13 +129,11 @@ export function SettingsDialog({
             const path = key.split('.');
             const current = getNestedValue(pendingSettings, path);
             const def = getDefaultValue(key);
+            const [mode1, mode2] = MESSAGE_QUEUE_MODES;
             const effective =
               (typeof current === 'string' && current) ||
-              (typeof def === 'string' ? def : 'wait_for_idle');
-            const newValue =
-              effective === 'wait_for_idle'
-                ? 'wait_for_response'
-                : 'wait_for_idle';
+              (typeof def === 'string' ? def : mode1);
+            const newValue = effective === mode1 ? mode2 : mode1;
 
             setPendingSettings((prev) =>
               setPendingSettingValueAny(key, newValue, prev),
@@ -761,18 +760,20 @@ export function SettingsDialog({
               const path = item.value.split('.');
               const currentValue = getNestedValue(pendingSettings, path);
               const defaultValue = getDefaultValue(item.value);
+              const [mode1, mode2] = MESSAGE_QUEUE_MODES;
+              const displayMap: Record<string, string> = {
+                [mode1]: 'Wait for Idle',
+                [mode2]: 'Wait for Response',
+              };
               const effectiveValue =
                 currentValue !== undefined && currentValue !== null
                   ? String(currentValue)
                   : defaultValue !== undefined && defaultValue !== null
                     ? String(defaultValue)
-                    : 'wait_for_idle';
+                    : mode1;
 
               // Convert to user-friendly display
-              const displayMode =
-                effectiveValue === 'wait_for_idle'
-                  ? 'Wait for Idle'
-                  : 'Wait for Response';
+              const displayMode = displayMap[effectiveValue] || effectiveValue;
               displayValue = displayMode;
 
               // Add * if value differs from default OR if currently being modified

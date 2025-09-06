@@ -8,29 +8,36 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface ModelDialogProps {
   /** Callback function when a model is selected */
   onSelect: (modelName: string) => void;
+  /** Callback function when dialog should be closed */
+  onClose?: () => void;
   /** Current model name */
   currentModel?: string;
 }
 
+const GEMINI_2_5_PRO = 'gemini-2.5-pro';
+const GEMINI_2_5_FLASH = 'gemini-2.5-flash';
+const GEMINI_2_5_FLASH_LITE = 'gemini-2.5-flash-lite';
+
 const AVAILABLE_MODELS = [
   {
-    name: 'gemini-2.5-pro',
+    name: GEMINI_2_5_PRO,
     alias: 'pro',
     description: 'Most capable model',
     displayName: 'Gemini 2.5 Pro (pro)',
   },
   {
-    name: 'gemini-2.5-flash',
+    name: GEMINI_2_5_FLASH,
     alias: 'flash',
     description: 'Fast and efficient',
     displayName: 'Gemini 2.5 Flash (flash)',
   },
   {
-    name: 'gemini-2.5-flash-lite',
+    name: GEMINI_2_5_FLASH_LITE,
     alias: 'lite',
     description: 'Lightest and fastest',
     displayName: 'Gemini 2.5 Flash Lite (lite)',
@@ -39,6 +46,7 @@ const AVAILABLE_MODELS = [
 
 export function ModelDialog({
   onSelect,
+  onClose,
   currentModel,
 }: ModelDialogProps): React.JSX.Element {
   const modelItems = AVAILABLE_MODELS.map((model) => ({
@@ -56,6 +64,16 @@ export function ModelDialog({
   const handleModelSelect = (modelName: string) => {
     onSelect(modelName);
   };
+
+  // Handle escape key to close dialog
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape' && onClose) {
+        onClose();
+      }
+    },
+    { isActive: true },
+  );
 
   return (
     <Box
@@ -82,7 +100,7 @@ export function ModelDialog({
 
       <Box marginTop={1}>
         <Text color={Colors.Gray}>
-          Use ↑↓ to navigate, Enter to select, Esc to cancel
+          Use ↑↓ to navigate, Enter to select, Esc to close
         </Text>
       </Box>
 

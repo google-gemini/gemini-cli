@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StreamingState } from '../types.js';
 import type { MessageQueueMode } from '@google/gemini-cli-core';
+import { MESSAGE_QUEUE_MODES } from '@google/gemini-cli-core';
 
 export interface UseMessageQueueOptions {
   streamingState: StreamingState;
@@ -60,8 +61,8 @@ export function useMessageQueue({
     const isWaiting = streamingState === StreamingState.WaitingForConfirmation;
 
     const shouldSubmit =
-      (messageQueueMode === 'wait_for_idle' && isIdle) ||
-      (messageQueueMode === 'wait_for_response' &&
+      (messageQueueMode === MESSAGE_QUEUE_MODES[0] && isIdle) ||
+      (messageQueueMode === MESSAGE_QUEUE_MODES[1] &&
         (isResponseComplete || isWaiting || isIdle));
 
     if (shouldSubmit && messageQueue.length > 0) {

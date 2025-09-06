@@ -11,11 +11,6 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
-import type {
-  TelemetryTarget,
-  FileFilteringOptions,
-  MCPServerConfig,
-} from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
 import {
   Config,
@@ -30,6 +25,11 @@ import {
   ShellTool,
   EditTool,
   WriteFileTool,
+  MESSAGE_QUEUE_MODES,
+  type MessageQueueMode,
+  type TelemetryTarget,
+  type FileFilteringOptions,
+  type MCPServerConfig,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -628,10 +628,12 @@ export async function loadCliConfig(
     useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
     // Validate messageQueueMode against allowed values
     messageQueueMode:
-      settings.general?.messageQueueMode === 'wait_for_idle' ||
-      settings.general?.messageQueueMode === 'wait_for_response'
-        ? settings.general?.messageQueueMode
-        : 'wait_for_idle',
+      settings.general?.messageQueueMode &&
+      MESSAGE_QUEUE_MODES.includes(
+        settings.general.messageQueueMode as MessageQueueMode,
+      )
+        ? settings.general.messageQueueMode
+        : MESSAGE_QUEUE_MODES[0],
   });
 }
 
