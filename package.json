@@ -45,7 +45,6 @@
     "format": "prettier --experimental-cli --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "preflight": "npm run clean && npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci",
-    "prepare": "npm run bundle",
     "prepare:package": "node scripts/prepare-package.js",
     "release:version": "node scripts/version.js",
     "telemetry": "node scripts/telemetry.js",
@@ -53,14 +52,18 @@
     "clean": "node scripts/clean.js"
   },
   "bin": {
-    "gemini": "bundle/gemini.js"
+    "gemini": "bin/gemini.js"
   },
   "files": [
+    "bin/",
     "bundle/",
+    "scripts/",
+    "packages/",
+    "esbuild.config.js",
     "README.md",
     "LICENSE"
   ],
-  "devDependencies": {
+  "dependencies": {
     "@types/marked": "^5.0.2",
     "@types/mime-types": "^3.0.1",
     "@types/minimatch": "^5.1.2",
@@ -69,14 +72,12 @@
     "@vitest/coverage-v8": "^3.1.1",
     "@vitest/eslint-plugin": "^1.3.4",
     "cross-env": "^7.0.3",
-    "esbuild": "^0.25.0",
     "eslint": "^9.24.0",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-license-header": "^0.8.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
-    "glob": "^10.4.5",
     "globals": "^16.0.0",
     "json": "^11.0.0",
     "memfs": "^4.17.2",
@@ -88,10 +89,11 @@
     "tsx": "^4.20.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
-    "yargs": "^17.7.2"
-  },
-  "dependencies": {
+    "yargs": "^17.7.2",
     "@lvce-editor/ripgrep": "^1.6.0",
+    "esbuild": "^0.25.9",
+    "glob": "^10.4.5",
+    "read-package-up": "^11.0.0",
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {
