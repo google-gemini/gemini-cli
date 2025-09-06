@@ -459,6 +459,58 @@ describe('GeminiChat', () => {
         })(),
       ).rejects.toThrow(EmptyStreamError);
     });
+
+    it('should succeed if the stream ends with an invalid part but has a finishReason and contained a valid part', async () => {
+      // 1. Mock a stream that sends a valid chunk, then an invalid one, but has a finish reason.
+      const streamWithInvalidEnd = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'Initial valid content...' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+        // This second chunk is invalid, but the response has a finishReason.
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: '' }], // Invalid part
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+        streamWithInvalidEnd,
+      );
+
+      // 2. Action & Assert: The stream should complete without throwing an error.
+      const stream = await chat.sendMessageStream(
+        { message: 'test message' },
+        'prompt-id-valid-then-invalid-end',
+      );
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            /* consume stream */
+          }
+        })(),
+      ).resolves.not.toThrow();
+
+      // 3. Verify history was recorded correctly with only the valid part.
+      const history = chat.getHistory();
+      expect(history.length).toBe(2); // user turn + model turn
+      const modelTurn = history[1]!;
+      expect(modelTurn?.parts?.length).toBe(1);
+      expect(modelTurn?.parts![0]!.text).toBe('Initial valid content...');
+    });
     it('should not consolidate text into a part that also contains a functionCall', async () => {
       // 1. Mock the API to stream a malformed part followed by a valid text part.
       const multiChunkStream = (async function* () {
