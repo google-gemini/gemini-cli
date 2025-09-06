@@ -18,9 +18,14 @@ describe('read_many_files', () => {
 
     const result = await rig.run(prompt);
 
+    // Wait for telemetry to be available before checking tool calls
+    await rig.waitForTelemetryReady();
+
     // Check for either read_many_files or multiple read_file calls
     const allTools = rig.readToolLogs();
-    const readManyFilesCall = await rig.waitForToolCall('read_many_files');
+    const readManyFilesCall = allTools.find(
+      (t) => t.toolRequest.name === 'read_many_files',
+    );
     const readFileCalls = allTools.filter(
       (t) => t.toolRequest.name === 'read_file',
     );
@@ -28,11 +33,13 @@ describe('read_many_files', () => {
     // Accept either read_many_files OR at least 2 read_file calls
     const foundValidPattern = readManyFilesCall || readFileCalls.length >= 2;
 
-    // Add debugging information
-    if (!foundValidPattern) {
+    // Add debugging information if test fails
+    if (!foundValidPattern || !result || result.trim().length === 0) {
       printDebugInfo(rig, result, {
-        'read_many_files called': readManyFilesCall,
+        'read_many_files called': !!readManyFilesCall,
         'read_file calls': readFileCalls.length,
+        'result empty': !result || result.trim().length === 0,
+        'all tool calls': allTools.map((t) => t.toolRequest.name),
       });
     }
 
@@ -41,7 +48,7 @@ describe('read_many_files', () => {
       'Expected to find either read_many_files or multiple read_file tool calls',
     ).toBeTruthy();
 
-    // Validate model output - will throw if no output
+    // Validate model output - just check for non-empty output
     validateModelOutput(result, null, 'Read many files test');
   });
 });
