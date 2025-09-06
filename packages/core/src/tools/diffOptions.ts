@@ -61,8 +61,8 @@ export function getDiffStat(
   const userStats = getStats(userPatch);
 
   return {
-    ai_added_lines: modelStats.addedLines,
-    ai_removed_lines: modelStats.removedLines,
+    model_added_lines: modelStats.addedLines,
+    model_removed_lines: modelStats.removedLines,
     model_added_chars: modelStats.addedChars,
     model_removed_chars: modelStats.removedChars,
     user_added_lines: userStats.addedLines,
