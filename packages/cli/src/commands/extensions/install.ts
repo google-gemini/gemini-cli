@@ -28,7 +28,7 @@ export const installCommand = {
       })
       .check((argv) => {
         if (!argv.source && !argv.path) {
-          throw new Error('Either --source or --path must be provided.');
+          throw new Error('Either source or --path must be provided.');
         }
         if (argv.source && argv.path) {
           throw new Error(

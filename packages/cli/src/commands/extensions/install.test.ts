@@ -17,7 +17,7 @@ describe('extensions install command', () => {
   it('should fail if no source is provided', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);
     expect(() => validationParser.parse('install')).toThrow(
-      'Either --source or --path must be provided.',
+      'Either source or --path must be provided.',
     );
   });
 

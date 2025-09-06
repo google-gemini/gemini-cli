@@ -7,7 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import type { SlashCommand } from '../commands/types.js';
+import { type SlashCommand, CommandKind } from '../commands/types.js';
 
 interface Help {
   commands: readonly SlashCommand[];
@@ -73,6 +73,9 @@ export const Help: React.FC<Help> = ({ commands }) => (
               {' '}
               /{command.name}
             </Text>
+            {command.kind === CommandKind.MCP_PROMPT && (
+              <Text color={Colors.Gray}> [MCP]</Text>
+            )}
             {command.description && ' - ' + command.description}
           </Text>
           {command.subCommands &&
@@ -93,6 +96,10 @@ export const Help: React.FC<Help> = ({ commands }) => (
         !{' '}
       </Text>
       - shell command
+    </Text>
+    <Text color={Colors.Foreground}>
+      <Text color={Colors.Gray}>[MCP]</Text> - Model Context Protocol command
+      (from external servers)
     </Text>
 
     <Box height={1} />
