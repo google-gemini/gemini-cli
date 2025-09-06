@@ -6,8 +6,8 @@ exports[`IDEContextDetailDisplay > handles duplicate basenames by showing path h
 │ VS Code Context (ctrl+g to toggle)                                                               │
 │                                                                                                  │
 │ Open files:                                                                                      │
-│ - bar.txt (/foo) (active)                                                                        │
-│ - bar.txt (/qux)                                                                                 │
+│ - /foo/bar.txt (active)                                                                        │
+│ - /qux/bar.txt                                                                                 │
 │ - unique.txt                                                                                     │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
