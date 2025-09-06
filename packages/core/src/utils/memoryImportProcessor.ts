@@ -118,13 +118,18 @@ function findImports(
     // Extract the path (everything after @)
     const importPath = content.slice(i + 1, j);
 
-    // Basic validation (starts with ./ or / or letter)
-    if (
-      importPath.length > 0 &&
-      (importPath[0] === '.' ||
-        importPath[0] === '/' ||
-        isLetter(importPath[0]))
-    ) {
+    // A valid import path is one of the following:
+    // 1. An explicit relative or absolute path (eg: ./.gemini/FILE.md).
+    // 2. A path with or wihout slashes that has a file extension in the final segment
+    //    (e.g., @folder/file.md), to distinguish from npm packages.
+    const hasExtension = path.basename(importPath).includes('.');
+    const isValid =
+      importPath.startsWith('./') ||
+      importPath.startsWith('../') ||
+      importPath.startsWith('/') ||
+      hasExtension;
+
+    if (importPath.length > 0 && isValid) {
       imports.push({
         start: i,
         _end: j,
@@ -140,14 +145,6 @@ function findImports(
 
 function isWhitespace(char: string): boolean {
   return char === ' ' || char === '\t' || char === '\n' || char === '\r';
-}
-
-function isLetter(char: string): boolean {
-  const code = char.charCodeAt(0);
-  return (
-    (code >= 65 && code <= 90) || // A-Z
-    (code >= 97 && code <= 122)
-  ); // a-z
 }
 
 function findCodeRegions(content: string): Array<[number, number]> {
