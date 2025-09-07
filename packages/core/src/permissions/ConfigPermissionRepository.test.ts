@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { ConfigPermissionRepository } from './ConfigPermissionRepository.js';
 import { Storage } from '../config/storage.js';
 
@@ -26,7 +27,9 @@ describe('ConfigPermissionRepository', () => {
 
   beforeEach(async () => {
     // Create a temporary directory for testing
-    tempDir = await fs.mkdtemp('/tmp/gemini-permissions-test-');
+    tempDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'gemini-permissions-test-'),
+    );
     permissionsPath = path.join(tempDir, 'tool-permissions.json');
 
     // Mock the global gemini dir to use our temp directory
