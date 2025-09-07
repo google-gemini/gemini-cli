@@ -130,12 +130,6 @@ export const AppContainer = (props: AppContainerProps) => {
     ((value: boolean) => void) | null
   >(null);
 
-  // Auto-accept indicator
-  const showAutoAcceptIndicator = useAutoAcceptIndicator({
-    config,
-    addItem: historyManager.addItem,
-  });
-
   const logger = useLogger(config.storage);
   const [userMessages, setUserMessages] = useState<string[]>([]);
 
@@ -612,6 +606,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
     cancelOngoingRequest,
+    handleApprovalModeChange,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -629,6 +624,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
     refreshStatic,
     () => cancelHandlerRef.current(),
   );
+
+  // Auto-accept indicator
+  const showAutoAcceptIndicator = useAutoAcceptIndicator({
+    config,
+    addItem: historyManager.addItem,
+    onApprovalModeChange: handleApprovalModeChange,
+  });
 
   const { messageQueue, addMessage, clearQueue, getQueuedMessagesText } =
     useMessageQueue({
