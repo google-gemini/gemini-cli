@@ -9,24 +9,33 @@ import type {
   UniversalMessage,
   UniversalStreamEvent,
   ConnectionStatus,
-  ToolCall
+  ToolCall,
+  CompressionInfo,
+  ModelProviderType
 } from '../providers/types.js';
-import type { ModelProviderType } from '../providers/types.js';
+import type { Config } from '../config/config.js';
+import type { BaseModelProvider } from '../providers/BaseModelProvider.js';
+import type { ToolCallRequestInfo, ChatCompressionInfo } from '../core/turn.js';
 import { ModelProviderFactory } from '../providers/ModelProviderFactory.js';
 import { ProviderConfigManager } from '../providers/ProviderConfigManager.js';
 import { RoleManager } from '../roles/RoleManager.js';
-import type { Config } from '../config/config.js';
 import { WorkspaceManager } from '../utils/WorkspaceManager.js';
 import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
-import type { ToolCallRequestInfo } from '../core/turn.js';
+import { CompressionStatus } from '../core/turn.js';
 import { SessionManager } from '../sessions/SessionManager.js';
+import { getCompressionPrompt } from '../core/prompts.js';
+// import { findIndexAfterFraction } from '../core/client.js';
+
+// Compression constants (same as Gemini client)
+const COMPRESSION_TOKEN_THRESHOLD = 0.7; // Compress when token usage reaches 70% of limit
+const COMPRESSION_PRESERVE_THRESHOLD = 0.3; // Keep last 30% of conversation
 
 export class MultiModelSystem {
   private configManager: ProviderConfigManager;
   private workspaceManager: WorkspaceManager;
   private currentProvider: ModelProviderConfig | null = null;
   private config: Config;
-  private initializedProviders: Map<string, any> = new Map();
+  private initializedProviders: Map<string, BaseModelProvider> = new Map();
   // Static mapping of model names to their tool call formats
   private static readonly MODEL_FORMATS: Record<string, 'openai' | 'harmony' | 'gemini' | 'qwen'> = {
     // Harmony format models (gpt-oss family)
@@ -41,9 +50,9 @@ export class MultiModelSystem {
     'gpt-3.5-turbo': 'openai',
     
     // Gemini format models (Google)
-    'gemini-pro': 'gemini',
     'gemini-1.5-pro': 'gemini',
     'gemini-1.5-flash': 'gemini',
+    'gemini-2.0-flash': 'gemini',
     'gemini-2.5-pro': 'gemini',
     'gemini-2.5-flash': 'gemini',
     
@@ -212,6 +221,33 @@ export class MultiModelSystem {
       turnCount++;
       if (turnCount > MAX_TURNS) {
         console.error(`[MultiModelSystem] Reached maximum turns (${MAX_TURNS}), stopping to prevent infinite loop.`);
+        
+        // Notify LLM about the tool call limit and how to continue
+        const limitMessage = `\n\n⚠️ **Tool Call Limit Reached**\n\n` +
+          `I've reached the maximum number of consecutive tool calls (${MAX_TURNS}) to prevent infinite loops. ` +
+          `This is a safety measure to ensure system stability.\n\n` +
+          `**What happened:** I made ${MAX_TURNS} consecutive tool calls in this turn.\n\n` +
+          `**How to continue:** Please send me a message (like "continue") to allow more tool calls. ` +
+          `I can then continue with additional tool operations if needed.\n\n` +
+          `**Current status:** I'm pausing here and waiting for your instruction to proceed.`;
+        
+        yield {
+          type: 'content_delta',
+          content: limitMessage
+        };
+        
+        // Add the limit notification to session history so user can see it
+        const limitNotificationMessage: UniversalMessage = {
+          role: 'assistant',
+          content: limitMessage,
+          timestamp: new Date()
+        };
+        sessionManager.addHistory(limitNotificationMessage);
+        
+        yield {
+          type: 'done'
+        };
+        
         return;
       }
 
@@ -223,7 +259,28 @@ export class MultiModelSystem {
       
       // NEW: Get fresh history from SessionManager and apply context limiting each time
       const fullHistory = sessionManager.getHistory();
-      const limitedMessages = this.limitContextSize(fullHistory);
+      
+      // Check if we need to compress before processing (like Gemini client does)
+      const compressionResult = await this.tryCompressChat(provider, sessionManager, fullHistory);
+      if (compressionResult.compressionStatus === CompressionStatus.COMPRESSED) {
+        console.log(`[MultiModelSystem] Chat compressed: ${compressionResult.originalTokenCount} -> ${compressionResult.newTokenCount} tokens`);
+        
+        // Yield compression event to notify frontend
+        const compressionInfo: CompressionInfo = {
+          originalTokenCount: compressionResult.originalTokenCount,
+          newTokenCount: compressionResult.newTokenCount,
+          compressionRatio: compressionResult.newTokenCount / compressionResult.originalTokenCount
+        };
+        
+        yield {
+          type: 'compression',
+          compressionInfo
+        };
+      }
+      
+      // Get the updated history after potential compression
+      const currentHistory = sessionManager.getHistory();
+      const limitedMessages = this.limitContextSize(currentHistory);
       // console.log('[MultiModelSystem] Using limited conversation history:', limitedMessages.length, '/', fullHistory.length, 'messages');
       // print limitedMessages for debugging
       console.log('[MultiModelSystem] Limited Messages:', limitedMessages);
@@ -243,7 +300,7 @@ export class MultiModelSystem {
           return;
         }
         
-        if (event.type === 'content' && event.content) {
+        if (event.type === 'content_delta' && event.content) {
           // Collect assistant content for history
           assistantContent += event.content;
           yield event;
@@ -266,6 +323,16 @@ export class MultiModelSystem {
           
           toolCallRequests.push(toolCallRequest);
           console.log(`[MultiModelSystem] Collected tool call: ${event.toolCall.name}`);
+          
+          // Immediately yield the tool call event to frontend for real-time display
+          yield {
+            type: 'tool_call',
+            toolCall: event.toolCall
+          };
+        } else if (event.type === 'compression') {
+          // Pass through compression events from provider
+          console.log(`[MultiModelSystem] Provider compression event:`, event.compressionInfo);
+          yield event;
         } else if (event.type === 'done') {
           // Save assistant response to history when stream completes
           if (assistantContent.trim() || assistantToolCalls.length > 0) {
@@ -325,11 +392,28 @@ export class MultiModelSystem {
             
             if (toolResponse.error) {
               console.error(`[MultiModelSystem] Tool call failed:`, toolResponse.error);
+              
+              // Create error response message to inform LLM about the failure
+              const errorMessage = `Tool execution failed: ${toolResponse.error.message || toolResponse.error}`;
+              const toolErrorMessage = this.createToolResponseMessage(
+                errorMessage,
+                requestInfo.callId,
+                requestInfo.name
+              );
+              
+              SessionManager.getInstance().addHistory(toolErrorMessage);
+              console.log(`[MultiModelSystem] Added tool error response for ${requestInfo.name} (ID: ${requestInfo.callId}) to session history`);
+              
+              // Yield error response to frontend for immediate display
               yield {
-                type: 'error',
-                error: toolResponse.error
+                type: 'tool_response',
+                content: errorMessage,
+                toolCallId: requestInfo.callId,
+                toolName: requestInfo.name
               };
-              return;
+              
+              // Continue with other tool calls instead of terminating
+              continue;
             }
             
             // Process each response part for this specific tool call
@@ -363,16 +447,41 @@ export class MultiModelSystem {
                 
                 SessionManager.getInstance().addHistory(toolResponseMessage);
                 console.log(`[MultiModelSystem] Added tool response for ${requestInfo.name} (ID: ${requestInfo.callId}) to session history`);
+                
+                // Yield tool response to frontend for immediate display
+                yield {
+                  type: 'tool_response',
+                  content: toolResponseContent,
+                  toolCallId: requestInfo.callId,
+                  toolName: requestInfo.name
+                };
               }
             }
             
           } catch (error) {
             console.error(`[MultiModelSystem] Tool execution error:`, error);
+            
+            // Create error response message to inform LLM about the execution failure
+            const errorMessage = `Tool execution error: ${error instanceof Error ? error.message : 'Unknown tool execution error'}`;
+            const toolErrorMessage = this.createToolResponseMessage(
+              errorMessage,
+              requestInfo.callId,
+              requestInfo.name
+            );
+            
+            SessionManager.getInstance().addHistory(toolErrorMessage);
+            console.log(`[MultiModelSystem] Added tool execution error for ${requestInfo.name} (ID: ${requestInfo.callId}) to session history`);
+            
+            // Yield error response to frontend for immediate display
             yield {
-              type: 'error',
-              error: error instanceof Error ? error : new Error('Unknown tool execution error')
+              type: 'tool_response',
+              content: errorMessage,
+              toolCallId: requestInfo.callId,
+              toolName: requestInfo.name
             };
-            return;
+            
+            // Continue with other tool calls instead of terminating
+            continue;
           }
         }
         
@@ -483,7 +592,7 @@ export class MultiModelSystem {
     return `${config.type}-${config.model}-${config.baseUrl || 'default'}`;
   }
 
-  private async getOrCreateProvider(config: ModelProviderConfig): Promise<any> {
+  private async getOrCreateProvider(config: ModelProviderConfig): Promise<BaseModelProvider> {
     const key = this.getProviderKey(config);
     
     if (this.initializedProviders.has(key)) {
@@ -551,6 +660,8 @@ export class MultiModelSystem {
 
 
   private limitContextSize(messages: readonly UniversalMessage[]): UniversalMessage[] {
+    return [...messages]; // Return mutable copy of all messages
+    
     // Get max turns from config or use default
     const DEFAULT_MAX_TURNS = 10;
     const maxTurns = this.config.getMaxSessionTurns() >= 0 ? this.config.getMaxSessionTurns() : DEFAULT_MAX_TURNS;
@@ -592,6 +703,238 @@ export class MultiModelSystem {
     }
     
     return [...systemMessages, ...keptMessages];
+  }
+
+  /**
+   * Compress conversation history when token usage approaches provider limits
+   */
+  private async tryCompressChat(
+    provider: BaseModelProvider,
+    sessionManager: SessionManager,
+    currentHistory: readonly UniversalMessage[],
+    force: boolean = false
+  ): Promise<ChatCompressionInfo> {
+    const historyArray = [...currentHistory];
+
+    console.log(`[MultiModelSystem] tryCompressChat called: force=${force}, history.length=${historyArray.length}`);
+
+    // Don't do anything if the history is empty
+    if (historyArray.length === 0) {
+      console.log(`[MultiModelSystem] Compression skipped: empty history`);
+      return {
+        originalTokenCount: 0,
+        newTokenCount: 0,
+        compressionStatus: CompressionStatus.NOOP,
+      };
+    }
+
+    // Calculate current token count using provider's countTokens method
+    let originalTokenCount = 0;
+    try {
+      if (provider.countTokens) {
+        const tokenResult = await provider.countTokens(historyArray);
+        originalTokenCount = tokenResult.totalTokens;
+      } else {
+        console.warn(`[MultiModelSystem] Provider does not support token counting, skipping compression`);
+        return {
+          originalTokenCount: 0,
+          newTokenCount: 0,
+          compressionStatus: CompressionStatus.NOOP,
+        };
+      }
+    } catch (error) {
+      console.warn(`[MultiModelSystem] Token counting failed:`, error);
+      return {
+        originalTokenCount: 0,
+        newTokenCount: 0,
+        compressionStatus: CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
+      };
+    }
+
+    if (originalTokenCount === 0) {
+      console.warn(`[MultiModelSystem] Could not determine token count for compression.`);
+      return {
+        originalTokenCount: 0,
+        newTokenCount: 0,
+        compressionStatus: CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
+      };
+    }
+
+    // Get provider capabilities to determine max tokens
+    const capabilities = provider.getCapabilityInfo();
+    const tokenLimit = capabilities?.maxTokens || 10000;
+
+    // Don't compress if not forced and we are under the limit
+    if (!force) {
+      const threshold = COMPRESSION_TOKEN_THRESHOLD;
+      const thresholdTokens = threshold * tokenLimit;
+      console.log(`[MultiModelSystem] Compression check: ${originalTokenCount} tokens vs ${thresholdTokens} threshold (${threshold} * ${tokenLimit})`);
+      
+      if (originalTokenCount < thresholdTokens) {
+        console.log(`[MultiModelSystem] No compression needed: ${originalTokenCount} < ${thresholdTokens}`);
+        return {
+          originalTokenCount,
+          newTokenCount: originalTokenCount,
+          compressionStatus: CompressionStatus.NOOP,
+        };
+      }
+      
+      console.log(`[MultiModelSystem] Compression triggered: ${originalTokenCount} >= ${thresholdTokens}`);
+    }
+
+    console.log(`[MultiModelSystem] Starting compression. Original tokens: ${originalTokenCount}, limit: ${tokenLimit}`);
+
+    // Find split point - compress early messages, keep recent ones
+    let compressBeforeIndex = this.findIndexAfterFraction(
+      historyArray,
+      1 - COMPRESSION_PRESERVE_THRESHOLD,
+    );
+    
+    // Find the first user message after the index to maintain conversation flow
+    while (
+      compressBeforeIndex < historyArray.length &&
+      historyArray[compressBeforeIndex]?.role === 'assistant'
+    ) {
+      compressBeforeIndex++;
+    }
+
+    const historyToCompress = historyArray.slice(0, compressBeforeIndex);
+    const historyToKeep = historyArray.slice(compressBeforeIndex);
+
+    if (historyToCompress.length === 0) {
+      console.log(`[MultiModelSystem] No history to compress`);
+      return {
+        originalTokenCount,
+        newTokenCount: originalTokenCount,
+        compressionStatus: CompressionStatus.NOOP,
+      };
+    }
+
+    console.log(`[MultiModelSystem] Compressing ${historyToCompress.length} messages, keeping ${historyToKeep.length} messages`);
+
+    try {
+      // Create compression request - filter system messages from history to compress
+      const filteredHistoryToCompress = historyToCompress.filter(msg => msg.role !== 'system');
+      
+      const compressionMessages: UniversalMessage[] = [
+        {
+          role: 'system',
+          content: getCompressionPrompt(),
+        },
+        ...filteredHistoryToCompress,
+        {
+          role: 'user',
+          content: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+        }
+      ];
+
+      // Get compression summary using provider directly (avoid recursion and tools)
+      const response = await provider.sendCompressionMessage(compressionMessages, new AbortController().signal);
+      const summary = response.content;
+
+      // Create new compressed history - DO NOT preserve old system messages
+      // Let enhanceMessagesWithRole generate fresh system messages with current role/tools
+      const newHistory: UniversalMessage[] = [
+        {
+          role: 'user',
+          content: summary,
+        },
+        {
+          role: 'assistant',
+          content: 'Got it. Thanks for the additional context!',
+        },
+        ...historyToKeep.filter(msg => msg.role !== 'system'), // Remove system messages from kept history
+      ];
+
+      // Update SessionManager with compressed history
+      sessionManager.setHistory(newHistory);
+      console.log(`[MultiModelSystem] Updated SessionManager with compressed history (${newHistory.length} messages)`);
+
+      // Calculate new token count
+      let newTokenCount = 0;
+      try {
+        const tokenResult = await provider.countTokens(newHistory);
+        newTokenCount = tokenResult.totalTokens;
+      } catch (error) {
+        console.warn('[MultiModelSystem] Could not determine compressed history token count:', error);
+        // Revert to original history
+        sessionManager.setHistory(historyArray);
+        return {
+          originalTokenCount,
+          newTokenCount: originalTokenCount,
+          compressionStatus: CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
+        };
+      }
+
+      if (newTokenCount === 0) {
+        console.warn('[MultiModelSystem] Could not determine compressed history token count.');
+        // Revert to original history
+        sessionManager.setHistory(historyArray);
+        return {
+          originalTokenCount,
+          newTokenCount: originalTokenCount,
+          compressionStatus: CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
+        };
+      }
+
+      // Check if compression actually reduced token count
+      if (newTokenCount > originalTokenCount) {
+        console.warn(`[MultiModelSystem] Compression failed - tokens increased from ${originalTokenCount} to ${newTokenCount}`);
+        // Revert to original history
+        sessionManager.setHistory(historyArray);
+        return {
+          originalTokenCount,
+          newTokenCount,
+          compressionStatus: CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+        };
+      }
+
+      console.log(`[MultiModelSystem] Compression successful. Tokens: ${originalTokenCount} -> ${newTokenCount}`);
+      return {
+        originalTokenCount,
+        newTokenCount,
+        compressionStatus: CompressionStatus.COMPRESSED,
+      };
+
+    } catch (error) {
+      console.error('[MultiModelSystem] Compression failed:', error);
+      return {
+        originalTokenCount,
+        newTokenCount: originalTokenCount,
+        compressionStatus: CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
+      };
+    }
+  }
+
+  /**
+   * Returns the index of the message after the fraction of the total characters in the history.
+   */
+   private findIndexAfterFraction(
+    history: UniversalMessage[],
+    fraction: number,
+  ): number {
+    if (fraction <= 0 || fraction >= 1) {
+      throw new Error('Fraction must be between 0 and 1');
+    }
+
+    const messageLengths = history.map(
+      (message) => JSON.stringify(message).length,
+    );
+
+    const totalCharacters = messageLengths.reduce(
+      (sum, length) => sum + length,
+      0,
+    );
+    const targetCharacters = totalCharacters * fraction;
+
+    let charactersSoFar = 0;
+    for (let i = 0; i < messageLengths.length; i++) {
+      charactersSoFar += messageLengths[i];
+      if (charactersSoFar >= targetCharacters) {
+        return i;
+      }
+    }
+    return messageLengths.length;
   }
 
   private async enhanceMessagesWithRole(
