@@ -13,28 +13,23 @@ import {
   vi,
   type Mocked,
 } from 'vitest';
-import {
-  getCorrectedFileContent,
-  WriteFileTool,
-  WriteFileToolParams,
-} from './write-file.js';
+import type { WriteFileToolParams } from './write-file.js';
+import { getCorrectedFileContent, WriteFileTool } from './write-file.js';
 import { ToolErrorType } from './tool-error.js';
-import {
-  FileDiff,
-  ToolConfirmationOutcome,
-  ToolEditConfirmationDetails,
-} from './tools.js';
+import type { FileDiff, ToolEditConfirmationDetails } from './tools.js';
+import { ToolConfirmationOutcome } from './tools.js';
 import { type EditToolParams } from './edit.js';
-import { ApprovalMode, Config } from '../config/config.js';
-import { ToolRegistry } from './tool-registry.js';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
+import type { ToolRegistry } from './tool-registry.js';
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
 import { GeminiClient } from '../core/client.js';
+import type { CorrectedEditResult } from '../utils/editCorrector.js';
 import {
   ensureCorrectEdit,
   ensureCorrectFileContent,
-  CorrectedEditResult,
 } from '../utils/editCorrector.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
@@ -44,7 +39,11 @@ const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
 // --- MOCKS ---
 vi.mock('../core/client.js');
 vi.mock('../utils/editCorrector.js');
-
+vi.mock('../ide/ide-client.js', () => ({
+  IdeClient: {
+    getInstance: vi.fn(),
+  },
+}));
 let mockGeminiClientInstance: Mocked<GeminiClient>;
 const mockEnsureCorrectEdit = vi.fn<typeof ensureCorrectEdit>();
 const mockEnsureCorrectFileContent = vi.fn<typeof ensureCorrectFileContent>();
@@ -63,7 +62,6 @@ const mockConfigInternal = {
   setApprovalMode: vi.fn(),
   getGeminiClient: vi.fn(), // Initialize as a plain mock function
   getFileSystemService: () => fsService,
-  getIdeClient: vi.fn(),
   getIdeMode: vi.fn(() => false),
   getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
   getApiKey: () => 'test-key',
@@ -88,6 +86,11 @@ const mockConfigInternal = {
     }) as unknown as ToolRegistry,
 };
 const mockConfig = mockConfigInternal as unknown as Config;
+
+vi.mock('../telemetry/loggers.js', () => ({
+  logFileOperation: vi.fn(),
+}));
+
 // --- END MOCKS ---
 
 describe('WriteFileTool', () => {
@@ -120,14 +123,6 @@ describe('WriteFileTool', () => {
     mockConfigInternal.getGeminiClient.mockReturnValue(
       mockGeminiClientInstance,
     );
-    mockConfigInternal.getIdeClient.mockReturnValue({
-      openDiff: vi.fn(),
-      closeDiff: vi.fn(),
-      getIdeContext: vi.fn(),
-      subscribeToIdeContext: vi.fn(),
-      isCodeTrackerEnabled: vi.fn(),
-      getTrackedCode: vi.fn(),
-    });
 
     tool = new WriteFileTool(mockConfig);
 

@@ -4,29 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as Diff from 'diff';
-import {
-  BaseDeclarativeTool,
-  Kind,
+import type {
   ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
   ToolEditConfirmationDetails,
   ToolInvocation,
   ToolLocation,
   ToolResult,
-  ToolResultDisplay,
 } from './tools.js';
+import { BaseDeclarativeTool, Kind, ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
-import { Config, ApprovalMode } from '../config/config.js';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
 import { ensureCorrectEdit } from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
-import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
-import { IDEConnectionStatus } from '../ide/ide-client.js';
+import { logFileOperation } from '../telemetry/loggers.js';
+import { FileOperationEvent } from '../telemetry/types.js';
+import { FileOperation } from '../telemetry/metrics.js';
+import { getSpecificMimeType } from '../utils/fileUtils.js';
+import { getLanguageFromFilePath } from '../utils/language-detection.js';
+import type {
+  ModifiableDeclarativeTool,
+  ModifyContext,
+} from './modifiable-tool.js';
+import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
 
 export function applyReplacement(
   currentContent: string | null,
@@ -79,9 +85,9 @@ export interface EditToolParams {
   modified_by_user?: boolean;
 
   /**
-   * Initially proposed string.
+   * Initially proposed content.
    */
-  ai_proposed_string?: string;
+  ai_proposed_content?: string;
 }
 
 interface CalculatedEdit {
@@ -199,12 +205,23 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       };
     }
 
-    const newContent = applyReplacement(
-      currentContent,
-      finalOldString,
-      finalNewString,
-      isNewFile,
-    );
+    const newContent = !error
+      ? applyReplacement(
+          currentContent,
+          finalOldString,
+          finalNewString,
+          isNewFile,
+        )
+      : (currentContent ?? '');
+
+    if (!error && fileExists && currentContent === newContent) {
+      error = {
+        display:
+          'No changes to apply. The new content is identical to the current content.',
+        raw: `No changes to apply. The new content is identical to the current content in file: ${params.file_path}`,
+        type: ToolErrorType.EDIT_NO_CHANGE,
+      };
+    }
 
     return {
       currentContent,
@@ -249,7 +266,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       'Proposed',
       DEFAULT_DIFF_OPTIONS,
     );
-    const ideClient = this.config.getIdeClient();
+    const ideClient = await IdeClient.getInstance();
     const ideConfirmation =
       this.config.getIdeMode() &&
       ideClient?.getConnectionStatus().status === IDEConnectionStatus.Connected
@@ -344,37 +361,53 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         .getFileSystemService()
         .writeTextFile(this.params.file_path, editData.newContent);
 
-      let displayResult: ToolResultDisplay;
-      if (editData.isNewFile) {
-        displayResult = `Created ${shortenPath(makeRelative(this.params.file_path, this.config.getTargetDir()))}`;
-      } else {
-        // Generate diff for display, even though core logic doesn't technically need it
-        // The CLI wrapper will use this part of the ToolResult
-        const fileName = path.basename(this.params.file_path);
-        const fileDiff = Diff.createPatch(
-          fileName,
-          editData.currentContent ?? '', // Should not be null here if not isNewFile
-          editData.newContent,
-          'Current',
-          'Proposed',
-          DEFAULT_DIFF_OPTIONS,
-        );
-        const originallyProposedContent =
-          this.params.ai_proposed_string || this.params.new_string;
-        const diffStat = getDiffStat(
-          fileName,
-          editData.currentContent ?? '',
-          originallyProposedContent,
-          this.params.new_string,
-        );
-        displayResult = {
-          fileDiff,
-          fileName,
-          originalContent: editData.currentContent,
-          newContent: editData.newContent,
-          diffStat,
-        };
-      }
+      const fileName = path.basename(this.params.file_path);
+      const originallyProposedContent =
+        this.params.ai_proposed_content || editData.newContent;
+      const diffStat = getDiffStat(
+        fileName,
+        editData.currentContent ?? '',
+        originallyProposedContent,
+        editData.newContent,
+      );
+
+      const fileDiff = Diff.createPatch(
+        fileName,
+        editData.currentContent ?? '', // Should not be null here if not isNewFile
+        editData.newContent,
+        'Current',
+        'Proposed',
+        DEFAULT_DIFF_OPTIONS,
+      );
+      const displayResult = {
+        fileDiff,
+        fileName,
+        originalContent: editData.currentContent,
+        newContent: editData.newContent,
+        diffStat,
+      };
+
+      // Log file operation for telemetry (without diff_stat to avoid double-counting)
+      const mimetype = getSpecificMimeType(this.params.file_path);
+      const programmingLanguage = getLanguageFromFilePath(
+        this.params.file_path,
+      );
+      const extension = path.extname(this.params.file_path);
+      const operation = editData.isNewFile
+        ? FileOperation.CREATE
+        : FileOperation.UPDATE;
+
+      logFileOperation(
+        this.config,
+        new FileOperationEvent(
+          EditTool.Name,
+          operation,
+          editData.newContent.split('\n').length,
+          mimetype,
+          extension,
+          programmingLanguage,
+        ),
+      );
 
       const llmSuccessMessageParts = [
         editData.isNewFile
@@ -533,16 +566,13 @@ Expectation for required parameters:
         oldContent: string,
         modifiedProposedContent: string,
         originalParams: EditToolParams,
-      ): EditToolParams => {
-        const content = originalParams.new_string;
-        return {
-          ...originalParams,
-          ai_proposed_string: content,
-          old_string: oldContent,
-          new_string: modifiedProposedContent,
-          modified_by_user: true,
-        };
-      },
+      ): EditToolParams => ({
+        ...originalParams,
+        ai_proposed_content: oldContent,
+        old_string: oldContent,
+        new_string: modifiedProposedContent,
+        modified_by_user: true,
+      }),
     };
   }
 }

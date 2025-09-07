@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { isNodeError } from '../utils/errors.js';
 import { exec } from 'node:child_process';
-import { simpleGit, SimpleGit, CheckRepoActions } from 'simple-git';
-import { Storage } from '../config/storage.js';
+import type { SimpleGit } from 'simple-git';
+import { simpleGit, CheckRepoActions } from 'simple-git';
+import type { Storage } from '../config/storage.js';
 
 export class GitService {
   private projectRoot: string;
@@ -31,7 +32,13 @@ export class GitService {
         'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
       );
     }
-    this.setupShadowGitRepository();
+    try {
+      await this.setupShadowGitRepository();
+    } catch (error) {
+      throw new Error(
+        `Failed to initialize checkpointing: ${error instanceof Error ? error.message : 'Unknown error'}. Please check that Git is working properly or disable checkpointing.`,
+      );
+    }
   }
 
   verifyGitAvailability(): Promise<boolean> {
@@ -105,10 +112,16 @@ export class GitService {
   }
 
   async createFileSnapshot(message: string): Promise<string> {
-    const repo = this.shadowGitRepository;
-    await repo.add('.');
-    const commitResult = await repo.commit(message);
-    return commitResult.commit;
+    try {
+      const repo = this.shadowGitRepository;
+      await repo.add('.');
+      const commitResult = await repo.commit(message);
+      return commitResult.commit;
+    } catch (error) {
+      throw new Error(
+        `Failed to create checkpoint snapshot: ${error instanceof Error ? error.message : 'Unknown error'}. Checkpointing may not be working properly.`,
+      );
+    }
   }
 
   async restoreProjectFromSnapshot(commitHash: string): Promise<void> {

@@ -6,8 +6,9 @@
 
 import { GoogleAuth } from 'google-auth-library';
 import { GoogleCredentialProvider } from './google-auth-provider.js';
-import { vi, describe, beforeEach, it, expect, Mock } from 'vitest';
-import { MCPServerConfig } from '../config/config.js';
+import type { Mock } from 'vitest';
+import { vi, describe, beforeEach, it, expect } from 'vitest';
+import type { MCPServerConfig } from '../config/config.js';
 
 vi.mock('google-auth-library');
 

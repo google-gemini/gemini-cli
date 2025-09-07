@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ICommandLoader } from './types.js';
-import { SlashCommand } from '../ui/commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import type { ICommandLoader } from './types.js';
+import type { SlashCommand } from '../ui/commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
@@ -64,7 +64,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       editorCommand,
       extensionsCommand,
       helpCommand,
-      ideCommand(this.config),
+      await ideCommand(),
       initCommand,
       mcpCommand,
       memoryCommand,

@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs/promises';
-import * as os from 'os';
-import path from 'path';
+import fs from 'node:fs/promises';
+import * as os from 'node:os';
+import path from 'node:path';
 
 type WarningCheck = {
   id: string;
@@ -60,7 +60,7 @@ const WARNING_CHECKS: readonly WarningCheck[] = [
 ];
 
 export async function getUserStartupWarnings(
-  workspaceRoot: string,
+  workspaceRoot: string = process.cwd(),
 ): Promise<string[]> {
   const results = await Promise.all(
     WARNING_CHECKS.map((check) => check.check(workspaceRoot)),
