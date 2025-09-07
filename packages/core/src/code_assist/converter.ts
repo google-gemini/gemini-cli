@@ -174,17 +174,24 @@ function maybeToContent(content?: ContentUnion): Content | undefined {
 }
 
 function toContent(content: ContentUnion): Content {
+  const original_role =
+    typeof content === 'object' &&
+    content !== null &&
+    'role' in content
+      ? content.role
+      : 'user';
+
   if (Array.isArray(content)) {
     // it's a PartsUnion[]
     return {
-      role: 'user',
+      role: original_role,
       parts: toParts(content),
     };
   }
   if (typeof content === 'string') {
     // it's a string
     return {
-      role: 'user',
+      role: original_role,
       parts: [{ text: content }],
     };
   }
@@ -199,7 +206,7 @@ function toContent(content: ContentUnion): Content {
   }
   // it's a Part
   return {
-    role: 'user',
+    role: original_role,
     parts: [toPart(content as Part)],
   };
 }
@@ -281,3 +288,4 @@ function toVertexGenerationConfig(
     thinkingConfig: config.thinkingConfig,
   };
 }
+

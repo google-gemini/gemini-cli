@@ -442,4 +442,29 @@ describe('converter', () => {
       ]);
     });
   });
+  describe('toContent', () => {
+    it('should preserve the role if provided', () => {
+      const content: ContentListUnion = {
+        role: 'model',
+        parts: [{ text: 'hello' }],
+      };
+      expect(toContents(content)).toEqual([
+        { role: 'model', parts: [{ text: 'hello' }] },
+      ]);
+    });
+
+    it('should default to user role for string input', () => {
+      const content: ContentListUnion = 'hello';
+      expect(toContents(content)).toEqual([
+        { role: 'user', parts: [{ text: 'hello' }] },
+      ]);
+    });
+
+    it('should default to user role for Part[] input', () => {
+      const content: ContentListUnion = [{ text: 'hello' }];
+      expect(toContents(content)).toEqual([
+        { role: 'user', parts: [{ text: 'hello' }] },
+      ]);
+    });
+  });
 });
