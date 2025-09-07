@@ -43,11 +43,20 @@ export interface UniversalResponse {
   model?: string;
 }
 
+export interface CompressionInfo {
+  originalTokenCount: number;
+  newTokenCount: number;
+  compressionRatio: number;
+}
+
 export interface UniversalStreamEvent {
-  type: 'content' | 'content_delta' | 'tool_call' | 'done' | 'message_complete' | 'error';
+  type: 'content' | 'content_delta' | 'tool_call' | 'tool_response' | 'done' | 'message_complete' | 'error' | 'compression';
   content?: string;
   toolCall?: ToolCall;
+  toolCallId?: string;
+  toolName?: string;
   response?: UniversalResponse;
+  compressionInfo?: CompressionInfo;
   error?: Error | string;
   role?: 'assistant' | 'user' | 'system';
   timestamp?: number;

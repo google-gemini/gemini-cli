@@ -90,7 +90,7 @@ export const App: React.FC = () => {
         // Load sessions from backend (backend is the source of truth)
         try {
           const sessionsInfo = await multiModelService.getSessionsInfo();
-          console.log('Retrieved sessions from backend:', sessionsInfo);
+          // console.log('Retrieved sessions from backend:', sessionsInfo);
           
           // Convert backend session info to frontend session format
           const { setActiveSession } = useAppStore.getState();

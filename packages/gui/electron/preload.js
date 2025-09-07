@@ -108,6 +108,7 @@ const electronAPI = {
     clearOAuthCredentials: (providerType) => ipcRenderer.invoke('oauth-clear-credentials', providerType),
     checkEnvApiKey: (providerType) => ipcRenderer.invoke('check-env-api-key', providerType),
     setApiKeyPreference: (providerType) => ipcRenderer.invoke('set-api-key-preference', providerType),
+    setOAuthPreference: (providerType) => ipcRenderer.invoke('set-oauth-preference', providerType),
   }
 }
 

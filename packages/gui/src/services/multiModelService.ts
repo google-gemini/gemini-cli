@@ -1,9 +1,17 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import type { 
   UniversalMessage,
   UniversalStreamEvent,
   RoleDefinition,
   PresetTemplate,
-  ModelProviderType 
+  ModelProviderType,
+  CompressionInfo,
+  ToolCall
 } from '@/types';
 import type { ToolCallConfirmationDetails, ToolConfirmationOutcome } from '@google/gemini-cli-core';
 
@@ -17,7 +25,7 @@ interface ElectronAPI {
     sendMessageStream: (messages: UniversalMessage[]) => {
       streamId: string;
       startStream: (
-        onChunk: (chunk: { type: string; content: string; role: string; timestamp: number }) => void,
+        onChunk: (chunk: { type: string; content?: string; role?: string; timestamp: number; compressionInfo?: CompressionInfo; toolCall?: ToolCall; toolCallId?: string; toolName?: string }) => void,
         onComplete: (data: { type: string; content: string; role: string; timestamp: number }) => void,
         onError: (error: { type: string; error: string }) => void
       ) => () => void; // Returns cleanup function
@@ -43,7 +51,7 @@ interface ElectronAPI {
     getSessionsInfo: () => Promise<Array<{id: string, title: string, messageCount: number, lastUpdated: Date}>>;
     updateSessionTitle: (sessionId: string, newTitle: string) => Promise<void>;
     // Tool confirmation
-    onToolConfirmationRequest: (callback: (event: any, details: ToolCallConfirmationDetails) => void) => () => void;
+    onToolConfirmationRequest: (callback: (event: unknown, details: ToolCallConfirmationDetails) => void) => () => void;
     sendToolConfirmationResponse: (outcome: string) => Promise<{ success: boolean }>;
     // OAuth authentication
     startOAuthFlow: (providerType: string) => Promise<{ success: boolean; message?: string; error?: string }>;
@@ -51,6 +59,7 @@ interface ElectronAPI {
     clearOAuthCredentials: (providerType: string) => Promise<{ success: boolean; error?: string }>;
     checkEnvApiKey: (providerType: string) => Promise<{ detected: boolean; source: string }>;
     setApiKeyPreference: (providerType: string) => Promise<{ success: boolean; error?: string }>;
+    setOAuthPreference: (providerType: string) => Promise<{ success: boolean; error?: string }>;
   };
 }
 
@@ -187,7 +196,7 @@ class MultiModelService {
       const cleanup = streamResponse.startStream(
         // onChunk callback
         (chunk) => {
-          if (chunk.type === 'chunk' && chunk.content) {
+          if (chunk.type === 'content_delta' && chunk.content) {
             events.push({
               type: 'content_delta',
               content: chunk.content,
@@ -195,6 +204,44 @@ class MultiModelService {
               timestamp: chunk.timestamp
             });
             // Immediately wake up the generator
+            if (resolveNext) {
+              resolveNext();
+              resolveNext = null;
+            }
+          } else if (chunk.type === 'compression') {
+            // Handle compression events
+            events.push({
+              type: 'compression',
+              compressionInfo: chunk.compressionInfo,
+              timestamp: chunk.timestamp
+            });
+            // Wake up the generator for compression event
+            if (resolveNext) {
+              resolveNext();
+              resolveNext = null;
+            }
+          } else if (chunk.type === 'tool_call') {
+            // Handle tool call events
+            events.push({
+              type: 'tool_call',
+              toolCall: chunk.toolCall,
+              timestamp: chunk.timestamp
+            });
+            // Wake up the generator for tool call event
+            if (resolveNext) {
+              resolveNext();
+              resolveNext = null;
+            }
+          } else if (chunk.type === 'tool_response') {
+            // Handle tool response events
+            events.push({
+              type: 'tool_response',
+              content: chunk.content,
+              toolCallId: chunk.toolCallId,
+              toolName: chunk.toolName,
+              timestamp: chunk.timestamp
+            });
+            // Wake up the generator for tool response event
             if (resolveNext) {
               resolveNext();
               resolveNext = null;
@@ -512,6 +559,14 @@ class MultiModelService {
     }
 
     return await this.api.setApiKeyPreference(providerType);
+  }
+
+  async setOAuthPreference(providerType: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    return await this.api.setOAuthPreference(providerType);
   }
 }
 

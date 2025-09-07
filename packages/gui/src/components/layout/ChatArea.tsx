@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { MessageList } from '@/components/chat/MessageList';
 import { MessageInput } from '@/components/chat/MessageInput';
 import { EmptyState } from '@/components/chat/EmptyState';
+import { CompressionNotification } from '@/components/chat/CompressionNotification';
 import { useAppStore } from '@/stores/appStore';
 import { useChatStore } from '@/stores/chatStore';
 import { AlertCircle, X } from 'lucide-react';
@@ -9,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 
 export const ChatArea: React.FC = () => {
   const { sessions, activeSessionId } = useAppStore();
-  const { isStreaming, isThinking, streamingMessage, error, setError } = useChatStore();
+  const { isStreaming, isThinking, streamingMessage, error, setError, compressionNotification, setCompressionNotification } = useChatStore();
   const messageInputRef = useRef<{ setMessage: (message: string) => void }>(null);
 
   const activeSession = sessions.find(session => session.id === activeSessionId);
@@ -42,6 +43,14 @@ export const ChatArea: React.FC = () => {
             <X className="h-3 w-3" />
           </Button>
         </div>
+      )}
+
+      {/* Compression notification */}
+      {compressionNotification && (
+        <CompressionNotification 
+          compressionInfo={compressionNotification}
+          onDismiss={() => setCompressionNotification(null)}
+        />
       )}
       
       {showEmptyState ? (

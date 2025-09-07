@@ -152,7 +152,7 @@ export const useWorkspaceDirectories = (): WorkspaceDirectoriesState & Workspace
     if ((globalThis as any).electronAPI?.onWorkspaceDirectoriesChanged) {
       cleanup = (globalThis as any).electronAPI.onWorkspaceDirectoriesChanged(
         (_event: any, data: { type: string; directories: readonly string[]; changedDirectory?: string }) => {
-          console.log('Workspace directories changed:', data);
+          // console.log('Workspace directories changed:', data);
           setDirectories(data.directories);
           setError(null);
           

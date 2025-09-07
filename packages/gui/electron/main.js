@@ -544,20 +544,48 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamI
       let fullContent = ''
       
       for await (const chunk of streamGenerator) {
-        // Send each chunk through IPC events
-        const chunkData = {
-          streamId,
-          type: 'chunk',
-          content: chunk.content || '',
-          role: chunk.role || 'assistant',
-          timestamp: Date.now()
-        }
+        // console.log('Stream chunk received:', chunk.type, chunk.content?.substring(0, 50))
         
-        event.sender.send('multimodel-stream-chunk', chunkData)
-        
-        // Accumulate content for final response
-        if (chunk.content) {
-          fullContent += chunk.content
+        // Handle different event types
+        if (chunk.type === 'compression') {
+          // Send compression event
+          const compressionData = {
+            streamId,
+            type: 'compression',
+            compressionInfo: chunk.compressionInfo,
+            timestamp: Date.now()
+          }
+          event.sender.send('multimodel-stream-chunk', compressionData)
+        } else if (chunk.type === 'content') {
+          // Send content chunk - preserve original event type
+          const chunkData = {
+            streamId,
+            type: 'content', // Keep original type for proper frontend handling
+            content: chunk.content || '',
+            role: chunk.role || 'assistant',
+            timestamp: Date.now()
+          }
+          event.sender.send('multimodel-stream-chunk', chunkData)
+          
+          // Accumulate content for final response
+          if (chunk.content) {
+            fullContent += chunk.content
+          }
+        } else {
+          // Handle other event types (tool_call, done, error, etc.)
+          const chunkData = {
+            streamId,
+            type: chunk.type,
+            content: chunk.content || '',
+            role: chunk.role || 'assistant',
+            timestamp: Date.now(),
+            ...chunk // Include any additional properties
+          }
+          event.sender.send('multimodel-stream-chunk', chunkData)
+          
+          if (chunk.content) {
+            fullContent += chunk.content
+          }
         }
       }
       
@@ -702,6 +730,31 @@ ipcMain.handle('set-api-key-preference', async (_, providerType) => {
     return { success: true }
   } catch (error) {
     console.error('Failed to set API key preference:', error)
+    return { 
+      success: false, 
+      error: error.message 
+    }
+  }
+})
+
+// Add IPC handler for setting OAuth preference
+ipcMain.handle('set-oauth-preference', async (_, providerType) => {
+  try {
+    console.log('Set OAuth preference called for:', providerType)
+    
+    // Ensure system is initialized
+    const system = await ensureInitialized()
+    
+    // Use AuthManager to set OAuth preference
+    const { AuthManager } = require('@google/gemini-cli-core')
+    const authManager = AuthManager.getInstance()
+    authManager.setConfig(system.getConfig())
+    authManager.setAuthPreference(providerType, 'oauth')
+    
+    console.log('OAuth preference set successfully')
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to set OAuth preference:', error)
     return { 
       success: false, 
       error: error.message 

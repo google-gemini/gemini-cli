@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ChatMessage } from '@/types';
+import type { ChatMessage, CompressionInfo } from '@/types';
 
 interface ChatState {
   isLoading: boolean;
@@ -7,6 +7,7 @@ interface ChatState {
   isThinking: boolean; // New state for when waiting for LLM response
   error: string | null;
   streamingMessage: string;
+  compressionNotification: CompressionInfo | null; // Show compression notification
   
   // Actions
   setLoading: (loading: boolean) => void;
@@ -14,6 +15,7 @@ interface ChatState {
   setThinking: (thinking: boolean) => void;
   setError: (error: string | null) => void;
   setStreamingMessage: (message: string) => void;
+  setCompressionNotification: (info: CompressionInfo | null) => void;
   addMessage: (sessionId: string, message: ChatMessage) => void;
   updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => void;
 }
@@ -24,6 +26,7 @@ export const useChatStore = create<ChatState>()((set) => ({
   isThinking: false,
   error: null,
   streamingMessage: '',
+  compressionNotification: null,
 
   setLoading: (loading: boolean) => set({ isLoading: loading }),
   
@@ -36,6 +39,8 @@ export const useChatStore = create<ChatState>()((set) => ({
   setStreamingMessage: (message: string) => {
     set({ streamingMessage: message });
   },
+
+  setCompressionNotification: (info: CompressionInfo | null) => set({ compressionNotification: info }),
 
   addMessage: (_sessionId: string, _message: ChatMessage) => {
     // This will be handled by appStore for persistence

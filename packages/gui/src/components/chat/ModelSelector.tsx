@@ -336,20 +336,20 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onClose }) => {
                           <>
                             Authentication required to load models
                             <br />
-                            <span className="text-xs">Click the "Auth" button above to configure authentication</span>
+                            <span className="text-xs">Click the &quot;Auth&quot; button above to configure authentication</span>
                           </>
                         ) : (
                           <>
                             No models loaded
                             <br />
-                            <span className="text-xs">Click "Refresh" to load models or check authentication</span>
+                            <span className="text-xs">Click &quot;Refresh&quot; to load models or check authentication</span>
                           </>
                         )
                       ) : (
                         <>
                           No models available for this provider
                           <br />
-                          <span className="text-xs">Click "Refresh" to retry loading models</span>
+                          <span className="text-xs">Click &quot;Refresh&quot; to retry loading models</span>
                         </>
                       )}
                     </div>

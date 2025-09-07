@@ -74,6 +74,10 @@ export const AuthSettingsModal: React.FC<AuthSettingsModalProps> = ({ open, onCl
       const result = await multiModelService.startOAuthFlow('gemini');
       
       if (result.success) {
+        // Set backend OAuth preference explicitly
+        console.log('Setting OAuth preference in backend...');
+        await multiModelService.setOAuthPreference('gemini');
+        
         // Update configuration to use OAuth
         updateAuthConfig({
           gemini: {
@@ -108,6 +112,37 @@ export const AuthSettingsModal: React.FC<AuthSettingsModalProps> = ({ open, onCl
     }
   };
 
+  const handleUseOAuth = async () => {
+    try {
+      console.log('Setting OAuth preference in backend...');
+      await multiModelService.setOAuthPreference('gemini');
+      
+      // Update configuration to use OAuth
+      updateAuthConfig({
+        gemini: {
+          type: 'oauth',
+          oauthToken: 'authenticated'
+        }
+      });
+      
+      setMessage({
+        type: 'success',
+        text: 'Switched to OAuth authentication'
+      });
+      
+      // Auto-close modal after successful switch
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    } catch (error) {
+      console.error('Failed to set OAuth preference:', error);
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to switch to OAuth authentication'
+      });
+    }
+  };
+
   const handleOAuthLogout = async () => {
     try {
       const result = await multiModelService.clearOAuthCredentials('gemini');
@@ -138,7 +173,7 @@ export const AuthSettingsModal: React.FC<AuthSettingsModalProps> = ({ open, onCl
     }
   };
 
-  const handleSwitchToApiKey = () => {
+  const handleSwitchToApiKey = async () => {
     if (!envApiKeyDetected) {
       setMessage({
         type: 'error',
@@ -147,22 +182,34 @@ export const AuthSettingsModal: React.FC<AuthSettingsModalProps> = ({ open, onCl
       return;
     }
 
-    updateAuthConfig({
-      gemini: {
-        type: 'api_key',
-        oauthToken: undefined
-      }
-    });
-    
-    setMessage({
-      type: 'success',
-      text: 'Switched to API key authentication'
-    });
-    
-    // Auto-close modal after successful switch
-    setTimeout(() => {
-      onClose();
-    }, 1500);
+    try {
+      // Set backend API key preference explicitly
+      console.log('Setting API key preference in backend...');
+      await multiModelService.setApiKeyPreference('gemini');
+
+      updateAuthConfig({
+        gemini: {
+          type: 'api_key',
+          oauthToken: undefined
+        }
+      });
+      
+      setMessage({
+        type: 'success',
+        text: 'Switched to API key authentication'
+      });
+      
+      // Auto-close modal after successful switch
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    } catch (error) {
+      console.error('Failed to set API key preference:', error);
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to switch to API key authentication'
+      });
+    }
   };
 
   if (!open) return null;
@@ -292,13 +339,22 @@ export const AuthSettingsModal: React.FC<AuthSettingsModalProps> = ({ open, onCl
                         Signed in as: <span className="font-medium">{oauthStatus.userEmail}</span>
                       </div>
                     )}
-                    <Button 
-                      onClick={handleOAuthLogout} 
-                      variant="outline" 
-                      className="w-full"
-                    >
-                      Sign Out
-                    </Button>
+                    
+                    <div className="space-y-2">
+                      <Button 
+                        onClick={handleUseOAuth}
+                        className="w-full"
+                      >
+                        Use OAuth Authentication
+                      </Button>
+                      <Button 
+                        onClick={handleOAuthLogout} 
+                        variant="outline" 
+                        className="w-full"
+                      >
+                        Sign Out
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3">
