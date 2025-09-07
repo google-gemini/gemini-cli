@@ -6,7 +6,11 @@
 
 import { useCallback, useMemo, useEffect } from 'react';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
-import { type CommandContext, type SlashCommand, CommandKind } from '../commands/types.js';
+import {
+  type CommandContext,
+  type SlashCommand,
+  CommandKind,
+} from '../commands/types.js';
 import {
   logicalPosToOffset,
   type TextBuffer,
@@ -84,33 +88,36 @@ export function useCommandCompletion(
     const map = new Map<string, SlashCommand>();
     for (const cmd of slashCommands) {
       map.set(cmd.name, cmd);
-      cmd.altNames?.forEach(alt => map.set(alt, cmd));
+      cmd.altNames?.forEach((alt) => map.set(alt, cmd));
     }
     return map;
   }, [slashCommands]);
 
   // Helper function to check if a command is a custom command (from .toml files)
-  const isCustomCommand = useCallback((commandLine: string): boolean => {
-    if (!isSlashCommand(commandLine)) return false;
-    
-    // Extract command name with robust regex parsing
-    const match = commandLine.trim().match(/^\/([^\s]+)/);
-    const commandName = match ? match[1] : '';
-    if (!commandName) return false;
-    
-    // O(1) lookup in memoized map
-    const command = slashCommandMap.get(commandName);
-    return command?.kind === CommandKind.FILE;
-  }, [slashCommandMap]);
+  const isCustomCommand = useCallback(
+    (commandLine: string): boolean => {
+      if (!isSlashCommand(commandLine)) return false;
+
+      // Extract command name with robust regex parsing
+      const match = commandLine.trim().match(/^\/([^\s]+)/);
+      const commandName = match ? match[1] : '';
+      if (!commandName) return false;
+
+      // O(1) lookup in memoized map
+      const command = slashCommandMap.get(commandName);
+      return command?.kind === CommandKind.FILE;
+    },
+    [slashCommandMap],
+  );
 
   const { completionMode, query, completionStart, completionEnd } =
     useMemo(() => {
       const currentLine = buffer.lines[cursorRow] || '';
-      
+
       // Determine command type once at the beginning for efficiency
       const isSlashCmd = cursorRow === 0 && isSlashCommand(currentLine.trim());
       const isCustomCmd = isSlashCmd && isCustomCommand(currentLine.trim());
-      
+
       if (isSlashCmd && !isCustomCmd) {
         // Built-in commands: return SLASH mode immediately (preserve existing behavior)
         return {
@@ -194,7 +201,14 @@ export function useCommandCompletion(
         completionStart: -1,
         completionEnd: -1,
       };
-    }, [cursorRow, cursorCol, buffer.lines, buffer.text, config, isCustomCommand]);
+    }, [
+      cursorRow,
+      cursorCol,
+      buffer.lines,
+      buffer.text,
+      config,
+      isCustomCommand,
+    ]);
 
   useAtCompletion({
     enabled: completionMode === CompletionMode.AT,
