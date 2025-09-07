@@ -59,6 +59,8 @@ import type { AnyToolInvocation } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
+import type { PermissionRepository } from '../permissions/PermissionRepository.js';
+import { ConfigPermissionRepository } from '../permissions/ConfigPermissionRepository.js';
 import type { EventEmitter } from 'node:events';
 import type { UserTierId } from '../code_assist/types.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
@@ -227,6 +229,7 @@ export interface ConfigParameters {
 
 export class Config {
   private toolRegistry!: ToolRegistry;
+  private permissionRepository!: PermissionRepository;
   private promptRegistry!: PromptRegistry;
   private readonly sessionId: string;
   private fileSystemService: FileSystemService;
@@ -419,6 +422,10 @@ export class Config {
       await this.getGitService();
     }
     this.promptRegistry = new PromptRegistry();
+
+    // Initialize permission repository before creating tools
+    this.permissionRepository = new ConfigPermissionRepository();
+
     this.toolRegistry = await this.createToolRegistry();
     logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
 
@@ -854,6 +861,10 @@ export class Config {
 
   getFileExclusions(): FileExclusions {
     return this.fileExclusions;
+  }
+
+  getPermissionRepository(): PermissionRepository {
+    return this.permissionRepository;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {

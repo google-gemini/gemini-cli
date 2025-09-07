@@ -55,6 +55,10 @@ export * from './services/gitService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 
+// Export permissions
+export * from './permissions/PermissionRepository.js';
+export * from './permissions/ConfigPermissionRepository.js';
+
 // Export IDE specific logic
 export * from './ide/ide-client.js';
 export * from './ide/ideContext.js';
