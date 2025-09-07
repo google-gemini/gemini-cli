@@ -39,7 +39,7 @@ describe('ConfigPermissionRepository', () => {
     // Clean up temporary directory
     try {
       await fs.rm(tempDir, { recursive: true, force: true });
-    } catch (error) {
+    } catch (_error) {
       // Ignore cleanup errors
     }
     vi.clearAllMocks();
@@ -297,7 +297,7 @@ describe('ConfigPermissionRepository', () => {
       // Create a permissions file
       const existingData = { shell: ['git status'], memory: ['read_context'] };
       await fs.writeFile(permissionsPath, JSON.stringify(existingData));
-      
+
       // Make multiple concurrent calls that trigger initialization
       const promises = [
         repo.isAllowed('shell', 'git status'),
@@ -305,12 +305,14 @@ describe('ConfigPermissionRepository', () => {
         repo.getAllGranted(),
         repo.isAllowed('shell', 'unknown'),
       ];
-      
+
       const results = await Promise.all(promises);
-      
-      expect(results[0]).toBe(true);  // shell git status
-      expect(results[1]).toBe(true);  // memory read_context
-      expect(results[2].get('shell')).toEqual(new Set(['git status']));
+
+      expect(results[0]).toBe(true); // shell git status
+      expect(results[1]).toBe(true); // memory read_context
+      expect((results[2] as Map<string, Set<string>>).get('shell')).toEqual(
+        new Set(['git status']),
+      );
       expect(results[3]).toBe(false); // shell unknown
     });
 
@@ -323,21 +325,25 @@ describe('ConfigPermissionRepository', () => {
         repo.grant('memory', 'write_context'),
         repo.grant('mcp', 'server.tool'),
       ];
-      
+
       await Promise.all(grantPromises);
-      
+
       // Verify all permissions were granted
       expect(await repo.isAllowed('shell', 'git status')).toBe(true);
       expect(await repo.isAllowed('shell', 'npm install')).toBe(true);
       expect(await repo.isAllowed('memory', 'read_context')).toBe(true);
       expect(await repo.isAllowed('memory', 'write_context')).toBe(true);
       expect(await repo.isAllowed('mcp', 'server.tool')).toBe(true);
-      
+
       // Verify file contains all permissions
       const fileContent = await fs.readFile(permissionsPath, 'utf-8');
       const data = JSON.parse(fileContent);
-      expect(new Set(data.shell)).toEqual(new Set(['git status', 'npm install']));
-      expect(new Set(data.memory)).toEqual(new Set(['read_context', 'write_context']));
+      expect(new Set(data.shell)).toEqual(
+        new Set(['git status', 'npm install']),
+      );
+      expect(new Set(data.memory)).toEqual(
+        new Set(['read_context', 'write_context']),
+      );
       expect(data.mcp).toEqual(['server.tool']);
     });
 
@@ -345,7 +351,7 @@ describe('ConfigPermissionRepository', () => {
       // Start with some permissions
       await repo.grant('shell', 'git status');
       await repo.grant('memory', 'read_context');
-      
+
       // Perform mixed concurrent operations
       const mixedPromises = [
         repo.grant('shell', 'npm install'),
@@ -355,13 +361,13 @@ describe('ConfigPermissionRepository', () => {
         repo.revokeAllForTool('nonexistent'),
         repo.getAllGranted(),
       ];
-      
+
       const results = await Promise.all(mixedPromises);
-      
+
       // Verify the read operations returned correct results at the time they were called
       expect(results[3]).toBe(true); // isAllowed check
       expect(results[5]).toBeDefined(); // getAllGranted
-      
+
       // Verify final state
       expect(await repo.isAllowed('shell', 'git status')).toBe(true);
       expect(await repo.isAllowed('shell', 'npm install')).toBe(true);
@@ -372,30 +378,30 @@ describe('ConfigPermissionRepository', () => {
     it('should serialize write operations to prevent corruption', async () => {
       // This test verifies that write operations are properly serialized
       // by performing many concurrent operations and checking final consistency
-      
-      const operations: Promise<void>[] = [];
-      
+
+      const operations: Array<Promise<void>> = [];
+
       // Add many concurrent grant operations
       for (let i = 0; i < 50; i++) {
         operations.push(repo.grant('tool1', `permission${i}`));
         operations.push(repo.grant('tool2', `permission${i}`));
       }
-      
+
       // Add some revoke operations mixed in
       for (let i = 0; i < 10; i++) {
         operations.push(repo.grant('tool3', `temp${i}`));
         operations.push(repo.revoke('tool3', `temp${i}`));
       }
-      
+
       await Promise.all(operations);
-      
+
       // Verify final state is consistent
       const permissions = await repo.getAllGranted();
-      
+
       expect(permissions.get('tool1')?.size).toBe(50);
       expect(permissions.get('tool2')?.size).toBe(50);
       expect(permissions.has('tool3')).toBe(false); // All temp permissions were revoked
-      
+
       // Verify file integrity
       const fileContent = await fs.readFile(permissionsPath, 'utf-8');
       const data = JSON.parse(fileContent);
@@ -407,9 +413,9 @@ describe('ConfigPermissionRepository', () => {
     it('should handle write queue correctly when operations are queued', async () => {
       // This test verifies the write queue works correctly by ensuring
       // that operations are processed in order even when called concurrently
-      
+
       const results: string[] = [];
-      
+
       // Create promises that track their execution order
       const promises = [
         repo.grant('tool1', 'perm1').then(() => results.push('grant1')),
@@ -417,20 +423,20 @@ describe('ConfigPermissionRepository', () => {
         repo.revoke('tool1', 'perm1').then(() => results.push('revoke1')),
         repo.grant('tool1', 'perm3').then(() => results.push('grant3')),
       ];
-      
+
       await Promise.all(promises);
-      
+
       // All operations should have completed
       expect(results).toHaveLength(4);
       expect(results).toContain('grant1');
       expect(results).toContain('grant2');
       expect(results).toContain('revoke1');
       expect(results).toContain('grant3');
-      
+
       // Verify final state is consistent
       const permissions = await repo.getAllGranted();
       expect(permissions.get('tool1')).toEqual(new Set(['perm2', 'perm3']));
-      
+
       // Verify file state matches in-memory state
       const fileContent = await fs.readFile(permissionsPath, 'utf-8');
       const data = JSON.parse(fileContent);
