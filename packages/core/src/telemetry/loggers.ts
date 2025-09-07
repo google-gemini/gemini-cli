@@ -27,6 +27,7 @@ import {
   EVENT_CONTENT_RETRY,
   EVENT_CONTENT_RETRY_FAILURE,
   EVENT_FILE_OPERATION,
+  EVENT_RIPGREP_FALLBACK,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -279,7 +280,7 @@ export function logRipgrepFallback(
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     ...event,
-    'event.name': EVENT_API_REQUEST,
+    'event.name': EVENT_RIPGREP_FALLBACK,
     'event.timestamp': new Date().toISOString(),
   };
 

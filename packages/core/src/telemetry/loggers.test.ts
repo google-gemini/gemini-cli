@@ -30,6 +30,7 @@ import {
   EVENT_FLASH_FALLBACK,
   EVENT_MALFORMED_JSON_RESPONSE,
   EVENT_FILE_OPERATION,
+  EVENT_RIPGREP_FALLBACK,
 } from './constants.js';
 import {
   logApiRequest,
@@ -480,7 +481,7 @@ describe('loggers', () => {
         expect.objectContaining({
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
-          'event.name': EVENT_API_REQUEST,
+          'event.name': EVENT_RIPGREP_FALLBACK,
           error: undefined,
         }),
       );
@@ -501,7 +502,7 @@ describe('loggers', () => {
         expect.objectContaining({
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
-          'event.name': EVENT_API_REQUEST,
+          'event.name': EVENT_RIPGREP_FALLBACK,
           error: 'rg not found',
         }),
       );
