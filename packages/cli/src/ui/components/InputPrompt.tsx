@@ -268,7 +268,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
 
   const tryDeletePlaceholderAtCursor = useCallback((): boolean => {
-    if (pendingPastes.length === 0) return false;
     const offset = logicalPosToOffset(
       buffer.lines,
       buffer.cursor[0],
@@ -277,11 +276,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     const text = buffer.text;
     for (let i = 0; i < pendingPastes.length; i++) {
       const ph = pendingPastes[i].placeholder;
-      if (
-        offset >= ph.length &&
-        text.slice(offset - ph.length, offset) === ph
-      ) {
-        buffer.replaceRangeByOffset(offset - ph.length, offset, '');
+      const phLen = cpLen(ph);
+      if (offset >= phLen && cpSlice(text, offset - phLen, offset) === ph) {
+        buffer.replaceRangeByOffset(offset - phLen, offset, '');
         setPendingPastes((prev) => {
           const idx = prev.findIndex((p) => p.placeholder === ph);
           if (idx === -1) return prev;
