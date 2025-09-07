@@ -655,16 +655,21 @@ export function KeypressProvider({
     };
 
     let rl: readline.Interface;
+    const IME_ESCAPE_CODE_TIMEOUT_MS = 20;
+
     if (usePassthrough) {
       rl = readline.createInterface({
         input: keypressStream,
-        escapeCodeTimeout: 20,
+        escapeCodeTimeout: IME_ESCAPE_CODE_TIMEOUT_MS,
       });
       readline.emitKeypressEvents(keypressStream, rl);
       keypressStream.on('keypress', handleKeypress);
       stdin.on('data', handleRawKeypress);
     } else {
-      rl = readline.createInterface({ input: stdin, escapeCodeTimeout: 20 });
+      rl = readline.createInterface({
+        input: stdin,
+        escapeCodeTimeout: IME_ESCAPE_CODE_TIMEOUT_MS,
+      });
       readline.emitKeypressEvents(stdin, rl);
       stdin.on('keypress', handleKeypress);
     }
