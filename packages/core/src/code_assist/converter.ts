@@ -174,7 +174,7 @@ function maybeToContent(content?: ContentUnion): Content | undefined {
 }
 
 function toContent(content: ContentUnion): Content {
-  const original_role =
+  const originalRole =
     typeof content === 'object' &&
     content !== null &&
     'role' in content
