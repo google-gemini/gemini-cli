@@ -277,6 +277,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     [pendingPastes],
   );
 
+  const insertLargePastePlaceholder = useCallback(
+    (content: string): void => {
+      const contentLen = toCodePoints(content).length;
+      const placeholder = `[Pasted Content ${contentLen} chars]`;
+      const offset = logicalPosToOffset(
+        buffer.lines,
+        buffer.cursor[0],
+        buffer.cursor[1],
+      );
+      insertAtOffsetWithAutoSpaces(offset, placeholder);
+      setPendingPastes((prev) => prev.concat({ placeholder, content }));
+    },
+    [buffer, insertAtOffsetWithAutoSpaces],
+  );
+
   const tryDeletePlaceholderAtCursor = useCallback((): boolean => {
     const offset = logicalPosToOffset(
       buffer.lines,
@@ -327,14 +342,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         const content = key.sequence || '';
         const contentLen = toCodePoints(content).length;
         if (contentLen > LARGE_PASTE_CHAR_THRESHOLD) {
-          const placeholder = `[Pasted Content ${contentLen} chars]`;
-          const offset = logicalPosToOffset(
-            buffer.lines,
-            buffer.cursor[0],
-            buffer.cursor[1],
-          );
-          insertAtOffsetWithAutoSpaces(offset, placeholder);
-          setPendingPastes((prev) => prev.concat({ placeholder, content }));
+          insertLargePastePlaceholder(content);
         } else {
           buffer.handleInput(key);
         }
@@ -665,7 +673,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       recentPasteTime,
       tryDeletePlaceholderAtCursor,
       expandPlaceholders,
-      insertAtOffsetWithAutoSpaces,
+      insertLargePastePlaceholder,
     ],
   );
 
