@@ -16,7 +16,10 @@ export const toolsCommand: SlashCommand = {
   description: 'list available Gemini CLI tools. Usage: /tools [desc|schema]',
   kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext, args?: string): Promise<void> => {
-    const lowerCaseArgs = (args || '').toLowerCase().split(/\s+/).filter(Boolean);
+    const lowerCaseArgs = (args || '')
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
 
     const hasDesc =
       lowerCaseArgs.includes('desc') || lowerCaseArgs.includes('descriptions');
