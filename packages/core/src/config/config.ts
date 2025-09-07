@@ -31,6 +31,7 @@ import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
+import { LlmUtilityService } from '../core/llmUtilityService.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import type { TelemetryTarget } from '../telemetry/index.js';
@@ -257,6 +258,7 @@ export class Config {
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
   private geminiClient!: GeminiClient;
+  private llmUtilityService!: LlmUtilityService;
   private readonly fileFiltering: {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
@@ -455,12 +457,38 @@ export class Config {
     // Only assign to instance properties after successful initialization
     this.contentGeneratorConfig = newContentGeneratorConfig;
 
+    // Initialize LlmUtilityService now that the ContentGenerator is available
+    this.llmUtilityService = new LlmUtilityService(
+      this.contentGenerator,
+      this,
+    );
+
     // Reset the session flag since we're explicitly changing auth and using default model
     this.inFallbackMode = false;
   }
 
   getUserTier(): UserTierId | undefined {
     return this.contentGenerator?.userTier;
+  }
+
+  /**
+   * Provides access to the LlmUtilityService for stateless LLM operations.
+   */
+  getLlmUtilityService(): LlmUtilityService {
+    if (!this.llmUtilityService) {
+      // Handle cases where initialization might be deferred or authentication failed
+      if (this.contentGenerator) {
+        this.llmUtilityService = new LlmUtilityService(
+          this.getContentGenerator(),
+          this,
+        );
+      } else {
+        throw new Error(
+          'LlmUtilityService not initialized. Ensure authentication has occurred and GeminiClient is ready.',
+        );
+      }
+    }
+    return this.llmUtilityService;
   }
 
   getSessionId(): string {
