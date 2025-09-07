@@ -60,7 +60,6 @@ jobs:
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
           node-version: '${{ matrix.node-version }}'
-          cache: 'npm'
 
       - name: 'Install dependencies'
         run: |-
@@ -81,5 +80,6 @@ jobs:
           KEEP_OUTPUT: 'true'
           SANDBOX: '${{ matrix.sandbox }}'
           VERBOSE: 'true'
+        shell: 'bash'
         run: |-
           npm run "test:integration:${SANDBOX}"

@@ -39,6 +39,18 @@ import {
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 
+export enum StreamEventType {
+  /** A regular content chunk from the API. */
+  CHUNK = 'chunk',
+  /** A signal that a retry is about to happen. The UI should discard any partial
+   * content from the attempt that just failed. */
+  RETRY = 'retry',
+}
+
+export type StreamEvent =
+  | { type: StreamEventType.CHUNK; value: GenerateContentResponse }
+  | { type: StreamEventType.RETRY };
+
 /**
  * Options for retrying due to invalid content from the model.
  */
@@ -360,7 +372,7 @@ export class GeminiChat {
   async sendMessageStream(
     params: SendMessageParameters,
     prompt_id: string,
-  ): Promise<AsyncGenerator<GenerateContentResponse>> {
+  ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
 
     let streamDoneResolver: () => void;
@@ -400,6 +412,10 @@ export class GeminiChat {
           attempt++
         ) {
           try {
+            if (attempt > 0) {
+              yield { type: StreamEventType.RETRY };
+            }
+
             const stream = await self.makeApiCallAndProcessStream(
               requestContents,
               params,
@@ -408,7 +424,7 @@ export class GeminiChat {
             );
 
             for await (const chunk of stream) {
-              yield chunk;
+              yield { type: StreamEventType.CHUNK, value: chunk };
             }
 
             lastError = null;
@@ -596,23 +612,18 @@ export class GeminiChat {
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
     let hasReceivedAnyChunk = false;
+    let hasReceivedValidChunk = false;
     let hasToolCall = false;
     let lastChunk: GenerateContentResponse | null = null;
-
-    let isStreamInvalid = false;
-    let firstInvalidChunkEncountered = false;
-    let validChunkAfterInvalidEncountered = false;
+    let lastChunkIsInvalid = false;
 
     for await (const chunk of streamResponse) {
       hasReceivedAnyChunk = true;
       lastChunk = chunk;
 
       if (isValidResponse(chunk)) {
-        if (firstInvalidChunkEncountered) {
-          // A valid chunk appeared *after* an invalid one.
-          validChunkAfterInvalidEncountered = true;
-        }
-
+        hasReceivedValidChunk = true;
+        lastChunkIsInvalid = false;
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
           if (content.parts.some((part) => part.thought)) {
@@ -630,8 +641,7 @@ export class GeminiChat {
           this.config,
           new InvalidChunkEvent('Invalid chunk received from stream.'),
         );
-        isStreamInvalid = true;
-        firstInvalidChunkEncountered = true;
+        lastChunkIsInvalid = true;
       }
 
       // Record token usage if this chunk has usageMetadata
@@ -646,27 +656,24 @@ export class GeminiChat {
       throw new EmptyStreamError('Model stream completed without any chunks.');
     }
 
-    // --- FIX: The entire validation block was restructured for clarity and correctness ---
-    // Only apply complex validation if an invalid chunk was actually found.
-    if (isStreamInvalid) {
-      // Fail immediately if an invalid chunk was not the absolute last chunk.
-      if (validChunkAfterInvalidEncountered) {
-        throw new EmptyStreamError(
-          'Model stream had invalid intermediate chunks without a tool call.',
-        );
-      }
+    const hasFinishReason = lastChunk?.candidates?.some(
+      (candidate) => candidate.finishReason,
+    );
 
-      if (!hasToolCall) {
-        // If the *only* invalid part was the last chunk, we still check its finish reason.
-        const finishReason = lastChunk?.candidates?.[0]?.finishReason;
-        const isSuccessfulFinish =
-          finishReason === 'STOP' || finishReason === 'MAX_TOKENS';
-        if (!isSuccessfulFinish) {
-          throw new EmptyStreamError(
-            'Model stream ended with an invalid chunk and a failed finish reason.',
-          );
-        }
-      }
+    // Stream validation logic: A stream is considered successful if:
+    // 1. There's a tool call (tool calls can end without explicit finish reasons), OR
+    // 2. There's a finish reason AND the last chunk is valid (or we haven't received any valid chunks)
+    //
+    // We throw an error only when there's no tool call AND:
+    // - No finish reason, OR
+    // - Last chunk is invalid after receiving valid content
+    if (
+      !hasToolCall &&
+      (!hasFinishReason || (lastChunkIsInvalid && !hasReceivedValidChunk))
+    ) {
+      throw new EmptyStreamError(
+        'Model stream ended with an invalid chunk or missing finish reason.',
+      );
     }
 
     // Record model response text from the collected parts
