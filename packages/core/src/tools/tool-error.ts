@@ -18,6 +18,7 @@ export enum ToolErrorType {
   // File System Errors
   FILE_NOT_FOUND = 'file_not_found',
   FILE_WRITE_FAILURE = 'file_write_failure',
+  FILE_OPERATION_FAILED = 'file_operation_failed',
   READ_CONTENT_FAILURE = 'read_content_failure',
   ATTEMPT_TO_CREATE_EXISTING_FILE = 'attempt_to_create_existing_file',
   FILE_TOO_LARGE = 'file_too_large',

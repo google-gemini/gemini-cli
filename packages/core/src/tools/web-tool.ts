@@ -337,12 +337,12 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
         default: throw new Error(`Unknown operation: ${op}`);
       }
     } catch (error: unknown) {
-      const errorMessage = `Web tool operation failed: ${getErrorMessage(error)}`;
+      const errorMessage = getErrorMessage(error);
       return {
         success: false,
         op,
-        llmContent: `Error: ${errorMessage}`,
-        returnDisplay: `Error: ${errorMessage}`,
+        llmContent: `web(${op}): FAILED - ${errorMessage}`,
+        returnDisplay: `web(${op}): ${errorMessage}`,
         error: {
           message: errorMessage,
           type: ToolErrorType.WEB_FETCH_PROCESSING_ERROR,
@@ -417,13 +417,13 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
 
       return result;
     } catch (error) {
-      const errorMessage = `Fetch failed for ${processedUrl}: ${getErrorMessage(error)}`;
+      const errorMessage = getErrorMessage(error);
       return {
         success: false,
         op: 'fetch',
         url: processedUrl,
-        llmContent: `Error: ${errorMessage}`,
-        returnDisplay: `Error: ${errorMessage}`,
+        llmContent: `web(fetch): FAILED - ${errorMessage}`,
+        returnDisplay: `web(fetch): ${errorMessage}`,
         error: {
           message: errorMessage,
           type: ToolErrorType.WEB_FETCH_FALLBACK_FAILED,
@@ -527,13 +527,17 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
         returnDisplay: `web(extract): Extracted ${extract} from ${processedUrl} (${Array.isArray(extracted) ? extracted.length : typeof extracted} items)`,
       };
     } catch (error) {
-      const errorMessage = `Content extraction failed: ${getErrorMessage(error)}`;
+      const errorMessage = getErrorMessage(error);
       return {
         success: false,
         op: 'extract',
         url: processedUrl,
-        llmContent: `Error: ${errorMessage}`,
-        returnDisplay: `Error: ${errorMessage}`,
+        llmContent: `web(extract): FAILED - ${errorMessage}`,
+        returnDisplay: `web(extract): ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_PROCESSING_ERROR,
+        },
       };
     }
   }
@@ -941,14 +945,18 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
         };
       }
     } catch (error) {
-      const errorMessage = `Save failed: ${getErrorMessage(error)}`;
+      const errorMessage = getErrorMessage(error);
       return {
         success: false,
         op: 'save',
         url: processedUrl,
         saved: finalOutputPath,
-        llmContent: `Error: ${errorMessage}`,
-        returnDisplay: `Error: ${errorMessage}`,
+        llmContent: `web(save): FAILED - ${errorMessage}`,
+        returnDisplay: `web(save): ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_PROCESSING_ERROR,
+        },
       };
     }
   }

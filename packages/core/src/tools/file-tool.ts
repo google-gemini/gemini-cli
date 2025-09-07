@@ -13,6 +13,7 @@ import {
   Kind,
 } from './tools.js';
 import type { ToolResult } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 
 interface FileOpsParams {
   /** Operation type */
@@ -513,11 +514,11 @@ class FileOpsInvocation extends BaseToolInvocation<FileOpsParams, FileOpsResult>
       op: this.params.op,
       source: this.params.source || 'unknown',
       target: this.params.target,
-      llmContent: `fileops(${this.params.op}): Failed - ${message}`,
-      returnDisplay: `fileops(${this.params.op}): Failed - ${message}`,
+      llmContent: `fileops(${this.params.op}): FAILED - ${message}`,
+      returnDisplay: `fileops(${this.params.op}): ${message}`,
       error: {
         message,
-        type: 'FILE_OPERATION_FAILED' as any,
+        type: ToolErrorType.FILE_OPERATION_FAILED,
       },
     };
   }
@@ -599,7 +600,7 @@ export class FileTool extends BaseDeclarativeTool<FileOpsParams, FileOpsResult> 
       }
       
       if (['move', 'copy'].includes(operation) && !targetDir) {
-        return `BatchFile ${operation} operation requires \'targetDir\' parameter`;
+        return `BatchFile ${operation} operation requires 'targetDir' parameter`;
       }
       
       if (operation === 'rename' && !target && !targetDir) {
@@ -620,7 +621,7 @@ export class FileTool extends BaseDeclarativeTool<FileOpsParams, FileOpsResult> 
       }
       
       if (['move', 'copy'].includes(operation) && !targetDir) {
-        return `BatchDir ${operation} operation requires \'targetDir\' parameter`;
+        return `BatchDir ${operation} operation requires 'targetDir' parameter`;
       }
       
       if (operation === 'rename' && !target && !targetDir) {
