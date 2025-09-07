@@ -28,7 +28,7 @@ import {
   type ModifiableDeclarativeTool,
   type ModifyContext,
 } from './modifiable-tool.js';
-import { IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
 
 export function applyReplacement(
@@ -526,7 +526,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       'Proposed',
       DEFAULT_DIFF_OPTIONS,
     );
-    const ideClient = this.config.getIdeClient();
+    const ideClient = await IdeClient.getInstance();
     const ideConfirmation =
       this.config.getIdeMode() &&
       ideClient?.getConnectionStatus().status === IDEConnectionStatus.Connected
