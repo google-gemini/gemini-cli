@@ -658,13 +658,13 @@ export function KeypressProvider({
     if (usePassthrough) {
       rl = readline.createInterface({
         input: keypressStream,
-        escapeCodeTimeout: 0,
+        escapeCodeTimeout: 20,
       });
       readline.emitKeypressEvents(keypressStream, rl);
       keypressStream.on('keypress', handleKeypress);
       stdin.on('data', handleRawKeypress);
     } else {
-      rl = readline.createInterface({ input: stdin, escapeCodeTimeout: 0 });
+      rl = readline.createInterface({ input: stdin, escapeCodeTimeout: 20 });
       readline.emitKeypressEvents(stdin, rl);
       stdin.on('keypress', handleKeypress);
     }
