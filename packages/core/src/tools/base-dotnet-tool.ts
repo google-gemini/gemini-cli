@@ -11,11 +11,13 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
 } from './tools.js';
-import type { ToolResult } from './tools.js';
+import type { ToolResult, ToolInvocation } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
+import { BackupableTool } from './backupable-tool.js';
+import type { FileOperationParams } from './backupable-tool.js';
 
 interface DotNetRequest {
   module: string;
@@ -34,9 +36,10 @@ interface DotNetResponse {
 
 /**
  * Base class for tools that delegate processing to .NET modules
+ * Includes automatic file backup functionality for modify operations
  */
-export abstract class BaseDotNetTool<TParams extends object, TResult extends ToolResult>
-  extends BaseDeclarativeTool<TParams, TResult> {
+export abstract class BaseDotNetTool<TParams extends FileOperationParams, TResult extends ToolResult>
+  extends BackupableTool<TParams, TResult> {
 
   constructor(
     name: string,
@@ -50,9 +53,21 @@ export abstract class BaseDotNetTool<TParams extends object, TResult extends Too
     super(name, displayName, description, Kind.Other, parameterSchema, isOutputMarkdown, canUpdateOutput);
   }
 
-  protected createInvocation(params: TParams): DotNetInvocation<TParams, TResult> {
+
+  /**
+   * Default implementation: get the target file path
+   */
+  protected getTargetFilePath(params: TParams): string | null {
+    return params.file;
+  }
+
+  /**
+   * Create .NET invocation as the original invocation
+   */
+  protected createOriginalInvocation(params: TParams): ToolInvocation<TParams, TResult> {
     return new DotNetInvocation(params, this.dotnetModule);
   }
+
 }
 
 /**
@@ -113,8 +128,12 @@ class DotNetInvocation<TParams extends object, TResult extends ToolResult>
       const message = error instanceof Error ? error.message : 'Unknown error';
       return {
         success: false,
-        llmContent: `.NET processing failed: ${message}`,
-        returnDisplay: `.NET processing failed: ${message}`,
+        llmContent: `${this.moduleName}(${(this.params as any).op || 'process'}): FAILED - ${message}`,
+        returnDisplay: `${this.moduleName}(${(this.params as any).op || 'process'}): ${message}`,
+        error: {
+          message,
+          type: ToolErrorType.EXECUTION_FAILED,
+        },
       } as unknown as TResult;
     }
   }
@@ -182,10 +201,15 @@ class DotNetInvocation<TParams extends object, TResult extends ToolResult>
 
   private formatResponse(dotNetResponse: DotNetResponse): TResult {
     if (!dotNetResponse.success) {
+      const errorMessage = dotNetResponse.error || 'Unknown error';
       return {
         success: false,
-        llmContent: `Operation failed: ${dotNetResponse.error || 'Unknown error'}`,
-        returnDisplay: `Operation failed: ${dotNetResponse.error || 'Unknown error'}`,
+        llmContent: `${this.moduleName}(${(this.params as any).op || 'process'}): FAILED - ${errorMessage}`,
+        returnDisplay: `${this.moduleName}(${(this.params as any).op || 'process'}): ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.EXECUTION_FAILED,
+        },
       } as unknown as TResult;
     }
 

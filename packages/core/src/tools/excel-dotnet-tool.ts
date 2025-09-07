@@ -11,7 +11,7 @@ interface ExcelParams {
   /** Excel file path */
   file: string;
   /** Operation type */
-  op: 'read' | 'readContent' | 'write' | 'create' | 'listSheets' | 'copySheet' | 'style' | 'validate' | 'rows' | 'cols' | 'merge' | 'addSheet' | 'editSheet' | 'deleteSheet' | 'comment' | 'csvRead' | 'csvExport' | 'csvImport';
+  op: 'read' | 'readContent' | 'write' | 'create' | 'listSheets' | 'copySheet' | 'style' | 'validate' | 'rows' | 'cols' | 'merge' | 'addSheet' | 'editSheet' | 'deleteSheet' | 'comment' | 'csvRead' | 'csvExport' | 'csvImport' | 'undo';
   /** Sheet name */
   sheet?: string;
   /** Cell range (A1, A1:C5) */
@@ -142,7 +142,7 @@ export class ExcelTool extends BaseDotNetTool<ExcelParams, ExcelResult> {
           file: { type: 'string', description: 'File path: Excel file for most operations (including csvExport), CSV file ONLY for csvRead. Supports .xlsx, .xlsm, .xls formats' },
           op: { 
             type: 'string', 
-            enum: ['read', 'readContent', 'write', 'create', 'listSheets', 'copySheet', 'style', 'validate', 'rows', 'cols', 'merge', 'addSheet', 'editSheet', 'deleteSheet', 'comment', 'csvRead', 'csvExport', 'csvImport'],
+            enum: ['read', 'readContent', 'write', 'create', 'listSheets', 'copySheet', 'style', 'validate', 'rows', 'cols', 'merge', 'addSheet', 'editSheet', 'deleteSheet', 'comment', 'csvRead', 'csvExport', 'csvImport', 'undo'],
             description: 'Operation type'
           },
           sheet: { type: 'string', description: 'Sheet name' },
@@ -182,6 +182,13 @@ export class ExcelTool extends BaseDotNetTool<ExcelParams, ExcelResult> {
       }
     );
   }
+
+  protected isModifyOperation(params: ExcelParams): boolean {
+    const modifyOps = ['write', 'create', 'style', 'merge', 'addSheet', 'deleteSheet', 'editSheet', 'csvImport'];
+    return modifyOps.includes(params.op);
+  }
+
 }
+
 
 export const excelTool = new ExcelTool();
