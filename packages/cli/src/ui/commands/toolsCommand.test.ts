@@ -10,14 +10,23 @@ import { toolsCommand } from './toolsCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 import type { Tool } from '@google/gemini-cli-core';
+import { Type } from '@google/genai';
 
 // Mock tools for testing
-const mockTools = [
+const mockToolsWithSchema = [
   {
     name: 'file-reader',
     displayName: 'File Reader',
     description: 'Reads files from the local system.',
-    schema: {},
+    schema: {
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          path: { type: Type.STRING, description: 'Path to the file' },
+        },
+        required: ['path'],
+      },
+    },
   },
   {
     name: 'code-editor',
@@ -69,11 +78,11 @@ describe('toolsCommand', () => {
     );
   });
 
-  it('should list tools without descriptions by default', async () => {
+  it('should list tools without descriptions or schemas by default', async () => {
     const mockContext = createMockCommandContext({
       services: {
         config: {
-          getToolRegistry: () => ({ getAllTools: () => mockTools }),
+          getToolRegistry: () => ({ getAllTools: () => mockToolsWithSchema }),
         },
       },
     });
@@ -83,6 +92,7 @@ describe('toolsCommand', () => {
 
     const message = (mockContext.ui.addItem as vi.Mock).mock.calls[0][0].text;
     expect(message).not.toContain('Reads files from the local system.');
+    expect(message).not.toContain('Parameters:');
     expect(message).toContain('File Reader');
     expect(message).toContain('Code Editor');
   });
@@ -91,7 +101,7 @@ describe('toolsCommand', () => {
     const mockContext = createMockCommandContext({
       services: {
         config: {
-          getToolRegistry: () => ({ getAllTools: () => mockTools }),
+          getToolRegistry: () => ({ getAllTools: () => mockToolsWithSchema }),
         },
       },
     });
@@ -102,5 +112,50 @@ describe('toolsCommand', () => {
     const message = (mockContext.ui.addItem as vi.Mock).mock.calls[0][0].text;
     expect(message).toContain('Reads files from the local system.');
     expect(message).toContain('Edits code files.');
+    expect(message).not.toContain('Parameters:');
+  });
+
+  it('should list tools with descriptions and schemas when "schema" arg is passed', async () => {
+    const mockContext = createMockCommandContext({
+      services: {
+        config: {
+          getToolRegistry: () => ({ getAllTools: () => mockToolsWithSchema }),
+        },
+      },
+    });
+
+    if (!toolsCommand.action) throw new Error('Action not defined');
+    await toolsCommand.action(mockContext, 'schema');
+
+    const message = (mockContext.ui.addItem as vi.Mock).mock.calls[0][0].text;
+    expect(message).toContain('Parameters:');
+    expect(message).toContain('path');
+    expect(message).toContain('STRING');
+    expect(message).toContain('Reads files from the local system.');
+  });
+
+  it('should handle tools without schemas gracefully when "schema" is passed', async () => {
+    const mockContext = createMockCommandContext({
+      services: {
+        config: {
+          getToolRegistry: () => ({ getAllTools: () => mockToolsWithSchema }),
+        },
+      },
+    });
+
+    if (!toolsCommand.action) throw new Error('Action not defined');
+    await toolsCommand.action(mockContext, 'schema');
+
+    const message = (mockContext.ui.addItem as vi.Mock).mock.calls[0][0].text;
+    // Ensure the tool with schema shows its schema
+    expect(message).toContain('File Reader');
+    expect(message).toContain('Parameters:');
+    expect(message).toContain('path');
+
+    // Ensure the tool without a schema does not cause an error and is still displayed
+    expect(message).toContain('Code Editor');
+    // A simple way to check that no schema is printed for the second tool
+    const parts = message.split('Code Editor');
+    expect(parts[1]).not.toContain('Parameters:');
   });
 });
