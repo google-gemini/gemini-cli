@@ -38,6 +38,11 @@ export interface AuthCredentials {
   expiresAt?: Date;
 }
 
+interface CachedCredentials extends AuthCredentials {
+  cachedAt: Date;
+  validUntil: Date;
+}
+
 /**
  * Singleton class to manage authentication for all model providers
  * Supports both OAuth and API key authentication
@@ -47,7 +52,11 @@ export class AuthManager {
   private oauthClients: Map<string, OAuth2Client> = new Map();
   private authStatuses: Map<string, AuthStatus> = new Map();
   private authPreferences: Map<string, 'oauth' | 'api_key'> = new Map();
+  private credentialsCache: Map<string, CachedCredentials> = new Map();
   private config?: Config;
+
+  // Cache duration: 5 minutes to avoid excessive OAuth token validation
+  private static readonly CACHE_DURATION_MS = 5 * 60 * 1000;
 
   // Storage path for auth preferences
   private static getAuthPreferencesPath(): string {
@@ -201,7 +210,33 @@ export class AuthManager {
    * Get user's preferred authentication type for a provider
    */
   getAuthPreference(providerId: string): 'oauth' | 'api_key' | null {
-    return this.authPreferences.get(providerId) || null;
+    const storedPreference = this.authPreferences.get(providerId);
+    if (storedPreference) {
+      return storedPreference;
+    }
+
+    // Provide default values for known providers
+    const provider = this.getProvider(providerId);
+    if (!provider) {
+      return null;
+    }
+
+    // Default preferences based on provider capabilities
+    switch (providerId) {
+      case 'gemini':
+        return provider.supportsOAuth ? 'oauth' : (provider.supportsApiKey ? 'api_key' : null);
+      case 'openai':
+      case 'anthropic':
+        return provider.supportsApiKey ? 'api_key' : null;
+      default:
+        // For other providers, default to API key if supported, otherwise OAuth
+        if (provider.supportsApiKey) {
+          return 'api_key';
+        } else if (provider.supportsOAuth) {
+          return 'oauth';
+        }
+        return null;
+    }
   }
 
   /**
@@ -307,6 +342,59 @@ export class AuthManager {
   }
 
   /**
+   * Check if cached credentials are still valid
+   */
+  private isCacheValid(cached: CachedCredentials): boolean {
+    const now = new Date();
+    return now < cached.validUntil;
+  }
+
+  /**
+   * Get cached credentials if valid and matches current auth preference
+   */
+  private getCachedCredentials(providerId: string): AuthCredentials | null {
+    const cached = this.credentialsCache.get(providerId);
+    if (!cached || !this.isCacheValid(cached)) {
+      // Remove invalid cache entry
+      if (cached) {
+        this.credentialsCache.delete(providerId);
+      }
+      return null;
+    }
+
+    // Check if cached credentials match current auth preference
+    const currentAuthType = this.getAuthPreference(providerId);
+    const cachedAuthType = cached.accessToken ? 'oauth' : cached.apiKey ? 'api_key' : null;
+    
+    if (currentAuthType !== cachedAuthType) {
+      // Auth preference changed, invalidate cache
+      this.credentialsCache.delete(providerId);
+      return null;
+    }
+
+    return {
+      accessToken: cached.accessToken,
+      apiKey: cached.apiKey,
+      refreshToken: cached.refreshToken,
+      expiresAt: cached.expiresAt
+    };
+  }
+
+  /**
+   * Cache credentials with expiration
+   */
+  private setCachedCredentials(providerId: string, credentials: AuthCredentials): void {
+    const now = new Date();
+    const cachedCredentials: CachedCredentials = {
+      ...credentials,
+      cachedAt: now,
+      validUntil: new Date(now.getTime() + AuthManager.CACHE_DURATION_MS)
+    };
+    
+    this.credentialsCache.set(providerId, cachedCredentials);
+  }
+
+  /**
    * Get access credentials for API calls based on user's preferred authentication type
    * This is the unified interface that providers should use
    */
@@ -316,12 +404,19 @@ export class AuthManager {
       return null;
     }
 
+    // Check cache first to avoid repeated OAuth validation
+    const cachedCredentials = this.getCachedCredentials(providerId);
+    if (cachedCredentials) {
+      return cachedCredentials;
+    }
+
     // Get user's preferred authentication type
     const preferredAuthType = this.getAuthPreference(providerId);
-    console.log(`[AuthManager] Getting credentials for ${providerId}, preferred auth type: ${preferredAuthType}`);
     if (!preferredAuthType) {
       return null; // User hasn't chosen an authentication method
     }
+
+    let credentials: AuthCredentials | null = null;
 
     if (preferredAuthType === 'oauth') {
       // User chose OAuth - only return OAuth credentials
@@ -336,10 +431,9 @@ export class AuthManager {
 
       try {
         const { token } = await oauthClient.getAccessToken();
-        console.log(`[AuthManager] OAuth token retrieval for ${providerId}: ${token ? 'SUCCESS' : 'FAILED'}`);
-        return token ? { accessToken: token } : null;
+        credentials = token ? { accessToken: token } : null;
       } catch (error) {
-        console.log(`[AuthManager] OAuth token retrieval error for ${providerId}:`, error);
+        console.error(`Failed to get OAuth token for ${providerId}:`, error);
         return null; // OAuth token invalid/expired
       }
     } else if (preferredAuthType === 'api_key') {
@@ -349,10 +443,15 @@ export class AuthManager {
       }
 
       const apiKey = process.env[provider.envApiKeyName];
-      return apiKey ? { apiKey } : null;
+      credentials = apiKey ? { apiKey } : null;
     }
 
-    return null;
+    // Cache valid credentials
+    if (credentials) {
+      this.setCachedCredentials(providerId, credentials);
+    }
+
+    return credentials;
   }
 
   /**
@@ -372,8 +471,8 @@ export class AuthManager {
   }
 
   /**
-   * Initialize default API key authentication for providers that only support API keys
-   * and for providers that have API keys available in environment variables
+   * Initialize default API key authentication ONLY for providers that only support API keys
+   * DO NOT automatically set preferences based on environment variables - respect user choice
    */
   initializeDefaultApiKeyAuth(): void {
     // For providers that only support API key (like OpenAI currently), set default preference
@@ -387,17 +486,9 @@ export class AuthManager {
       }
     }
 
-    // Also set default API key preference for providers that have API keys available in environment
-    const providersWithApiKeys = Object.entries(AuthManager.PROVIDERS)
-      .filter(([, provider]) => provider.supportsApiKey && provider.envApiKeyName && process.env[provider.envApiKeyName])
-      .map(([id]) => id);
-
-    for (const providerId of providersWithApiKeys) {
-      if (!this.getAuthPreference(providerId)) {
-        console.log(`[AuthManager] Setting default API key preference for ${providerId} (detected ${AuthManager.PROVIDERS[providerId].envApiKeyName})`);
-        this.useApiKeyAuth(providerId);
-      }
-    }
+    // DO NOT automatically set preferences based on environment variable detection
+    // Let users explicitly choose their preferred authentication method via UI
+    // This respects user choice instead of making automatic decisions
   }
 
   /**
@@ -405,9 +496,10 @@ export class AuthManager {
    */
   async clearCredentials(providerId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      // Clear OAuth client and status
+      // Clear OAuth client, status, and credentials cache
       this.oauthClients.delete(providerId);
       this.authStatuses.delete(providerId);
+      this.credentialsCache.delete(providerId);
 
       if (providerId === 'gemini') {
         // Clear cached OAuth credentials from disk
@@ -435,14 +527,6 @@ export class AuthManager {
 
     const apiKey = process.env[provider.envApiKeyName];
     const detected = !!(apiKey && apiKey.trim());
-    
-    // Debug logging to trace API key detection
-    console.log(`[AuthManager] Checking API key for ${providerId}:`);
-    console.log(`  - Environment variable: ${provider.envApiKeyName}`);
-    console.log(`  - Value exists: ${!!apiKey}`);
-    console.log(`  - Value length: ${apiKey?.length || 0}`);
-    console.log(`  - Value preview: ${apiKey ? `${apiKey.substring(0, 8)}...` : 'null'}`);
-    console.log(`  - Detected: ${detected}`);
     
     return {
       detected,
@@ -503,6 +587,7 @@ export class AuthManager {
       const { token } = await oauthClient.getAccessToken();
       return !!token;
     } catch (error) {
+      console.log('Error verifying Gemini OAuth token:', error);
       return false;
     }
   }

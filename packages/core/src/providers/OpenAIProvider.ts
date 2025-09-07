@@ -95,7 +95,6 @@ interface OpenAIRequestBody {
 
 export class OpenAIProvider extends BaseModelProvider {
   private baseUrl: string;
-  private lastUsage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 
   constructor(config: ModelProviderConfig, configInstance?: Config) {
     super(config, configInstance);
@@ -207,17 +206,12 @@ export class OpenAIProvider extends BaseModelProvider {
         }
       } catch (parseError) {
         // Ignore parsing errors, use basic error message
+        console.error('Error parsing OpenAI error response:', parseError);
       }
       throw this.createError(errorMessage);
     }
 
     const data = await response.json() as OpenAIResponse;
-    
-    // Cache usage information for token counting
-    if (data.usage) {
-      this.lastUsage = data.usage;
-      console.log(`[OpenAIProvider] Cached usage: ${data.usage.total_tokens} tokens (prompt: ${data.usage.prompt_tokens}, completion: ${data.usage.completion_tokens})`);
-    }
     
     return this.convertFromOpenAIResponse(data);
   }
@@ -352,16 +346,12 @@ export class OpenAIProvider extends BaseModelProvider {
               const chunk = JSON.parse(line.slice(6)) as OpenAIStreamChunk;
               const delta = chunk.choices[0]?.delta;
 
-              // Cache usage information if present
-              if (chunk.usage) {
-                this.lastUsage = chunk.usage;
-                console.log(`[OpenAIProvider] Cached usage from stream: ${chunk.usage.total_tokens} tokens (prompt: ${chunk.usage.prompt_tokens}, completion: ${chunk.usage.completion_tokens})`);
-              }
+              // Note: Usage information available in chunk.usage if needed
 
               if (delta?.content) {
                 fullContent += delta.content;
                 yield {
-                  type: 'content',
+                  type: 'content_delta',
                   content: delta.content
                 };
               }
@@ -441,16 +431,76 @@ export class OpenAIProvider extends BaseModelProvider {
 
   async countTokens(messages: UniversalMessage[]): Promise<{ totalTokens: number }> {
     try {
-      // Use cached usage information from recent responses
-      if (this.lastUsage) {
-        const cachedTokens = this.lastUsage.prompt_tokens;
-        console.log(`[OpenAIProvider] Using cached prompt tokens from recent response: ${cachedTokens}`);
-        return { totalTokens: cachedTokens };
+      // Use tiktoken for accurate local token counting
+      console.log(`[OpenAIProvider] Using tiktoken for token counting`);
+      try {
+        // Import tiktoken dynamically
+        const tiktoken = await import('tiktoken');
+        
+        // Get the appropriate encoding for the model
+        let encoding;
+        const model = this.config.model.toLowerCase();
+        
+        if (model.includes('gpt-4') || model.includes('o1')) {
+          encoding = tiktoken.encoding_for_model('gpt-4');
+        } else if (model.includes('gpt-3.5')) {
+          encoding = tiktoken.encoding_for_model('gpt-3.5-turbo');
+        } else {
+          // Default to cl100k_base encoding used by most OpenAI models
+          encoding = tiktoken.get_encoding('cl100k_base');
+        }
+        
+        // Convert messages to text and count tokens
+        let totalTokens = 0;
+        
+        for (const message of messages) {
+          // Count tokens for the message content
+          totalTokens += encoding.encode(message.content).length;
+          
+          // Add overhead for message structure (role, metadata)
+          totalTokens += 4; // Rough estimate for role and structure tokens
+          
+          // Add tokens for tool calls if present
+          if (message.toolCalls && message.toolCalls.length > 0) {
+            for (const toolCall of message.toolCalls) {
+              const toolCallText = JSON.stringify({
+                name: toolCall.name,
+                arguments: toolCall.arguments
+              });
+              totalTokens += encoding.encode(toolCallText).length;
+            }
+          }
+        }
+        
+        // Add system message overhead
+        totalTokens += 3; // rough estimate for system message structure
+        
+        encoding.free(); // Clean up the encoding
+        
+        console.log(`[OpenAIProvider] Tiktoken counted ${totalTokens} tokens for ${messages.length} messages`);
+        return { totalTokens };
+        
+      } catch (tiktokenError) {
+        console.warn(`[OpenAIProvider] Tiktoken failed:`, tiktokenError);
+        
+        // Strategy 2: Character-based estimation as final fallback
+        console.log(`[OpenAIProvider] Using character-based estimation as fallback`);
+        
+        let totalChars = 0;
+        for (const message of messages) {
+          totalChars += message.content.length;
+          if (message.toolCalls) {
+            for (const toolCall of message.toolCalls) {
+              totalChars += JSON.stringify(toolCall).length;
+            }
+          }
+        }
+        
+        // Rough estimation: 1 token ≈ 4 characters for English text
+        const estimatedTokens = Math.ceil(totalChars / 4);
+        console.log(`[OpenAIProvider] Estimated ${estimatedTokens} tokens from ${totalChars} characters`);
+        return { totalTokens: estimatedTokens };
       }
-      
-      // No fallback estimation - require actual API response for accurate token counts
-      console.log(`[OpenAIProvider] No cached usage available - token count unavailable`);
-      return { totalTokens: 0 };
     } catch (error) {
       console.error('[OpenAIProvider] Token counting failed:', error);
       return { totalTokens: 0 };
@@ -548,5 +598,45 @@ export class OpenAIProvider extends BaseModelProvider {
     }
     
     return 4096;
+  }
+
+  async sendCompressionMessage(
+    messages: UniversalMessage[],
+    signal: AbortSignal
+  ): Promise<UniversalResponse> {
+    const openaiMessages = this.convertToOpenAIMessages(messages);
+    
+    const requestBody: OpenAIRequestBody = {
+      model: this.config.model,
+      messages: openaiMessages,
+      max_tokens: 4096,
+      temperature: 0.7
+      // Note: No tools added for compression requests
+    };
+
+    const headers = await this.getHeaders();
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+      signal
+    });
+
+    if (!response.ok) {
+      let errorMessage = `OpenAI API error: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.text();
+        if (errorData) {
+          errorMessage += ` - ${errorData}`;
+        }
+      } catch (parseError) {
+        console.error('Error parsing OpenAI error response:', parseError);
+      }
+      throw this.createError(errorMessage);
+    }
+
+    const data = await response.json() as OpenAIResponse;
+    
+    return this.convertFromOpenAIResponse(data);
   }
 }

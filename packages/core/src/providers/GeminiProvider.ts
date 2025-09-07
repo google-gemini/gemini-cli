@@ -23,12 +23,15 @@ import type {
   Models,
   GenerateContentConfig
 } from '@google/genai';
+import type { OAuth2Client } from 'google-auth-library';
 
 
 export class GeminiProvider extends BaseModelProvider {
   private googleAI?: GoogleGenAI;
   private generativeModel?: Models;
-  private codeAssistServer?: any; // CodeAssistServer for OAuth
+  private codeAssistServer?: import('../code_assist/server.js').CodeAssistServer; // CodeAssistServer for OAuth
+  private isInitialized: boolean = false;
+  private initializationPromise?: Promise<void>;
 
   constructor(config: ModelProviderConfig, configInstance?: Config) {
     super(config, configInstance);
@@ -70,6 +73,31 @@ export class GeminiProvider extends BaseModelProvider {
    * Initialize GoogleGenAI client with proper credentials or OAuth client
    */
   private async initializeGoogleAI(): Promise<void> {
+    // Return if already initialized
+    if (this.isInitialized && (this.googleAI || this.codeAssistServer)) {
+      return;
+    }
+
+    // If initialization is in progress, wait for it
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    // Start initialization
+    this.initializationPromise = this.performInitialization();
+    
+    try {
+      await this.initializationPromise;
+      this.isInitialized = true;
+    } finally {
+      this.initializationPromise = undefined;
+    }
+  }
+
+  /**
+   * Perform the actual initialization
+   */
+  private async performInitialization(): Promise<void> {
     try {
       const { AuthManager } = await import('../auth/AuthManager.js');
       const authManager = AuthManager.getInstance();
@@ -124,12 +152,12 @@ export class GeminiProvider extends BaseModelProvider {
   /**
    * Get OAuth client from AuthManager (similar to CLI pattern)
    */
-  private async getOAuthClient(): Promise<any> {
+  private async getOAuthClient(): Promise<OAuth2Client> {
     const { AuthManager } = await import('../auth/AuthManager.js');
     const authManager = AuthManager.getInstance();
     
     // Get the OAuth client that AuthManager has cached
-    const authStatuses = (authManager as any).oauthClients;
+    const authStatuses = (authManager as unknown as { oauthClients?: Map<string, OAuth2Client> }).oauthClients;
     const oauthClient = authStatuses?.get('gemini');
     
     if (!oauthClient) {
@@ -214,10 +242,19 @@ export class GeminiProvider extends BaseModelProvider {
           if (part.text) {
             fullContent += part.text;
           } else if (part.functionCall) {
-            toolCalls.push({
-              id: `gemini_call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            const toolCallId = `gemini_call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const toolCall = {
+              id: toolCallId,
               name: part.functionCall.name!,
               arguments: part.functionCall.args || {}
+            };
+            toolCalls.push(toolCall);
+            
+            // Log detailed tool call information
+            console.log(`[GeminiProvider] 🔧 Tool Call Generated (sendMessage):`, {
+              id: toolCallId,
+              name: part.functionCall.name,
+              arguments: JSON.stringify(part.functionCall.args, null, 2)
             });
           }
         }
@@ -281,16 +318,24 @@ export class GeminiProvider extends BaseModelProvider {
           if (part.text) {
             fullContent += part.text;
             yield {
-              type: 'content',
+              type: 'content_delta',
               content: part.text
             };
           } else if (part.functionCall) {
+            const toolCallId = `gemini_call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             const toolCall: ToolCall = {
-              id: `gemini_call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              id: toolCallId,
               name: part.functionCall.name!,
               arguments: part.functionCall.args || {}
             };
             toolCalls.push(toolCall);
+            
+            // Log detailed tool call information
+            console.log(`[GeminiProvider] 🔧 Tool Call Generated (stream):`, {
+              id: toolCallId,
+              name: part.functionCall.name,
+              arguments: JSON.stringify(part.functionCall.args, null, 2)
+            });
             
             yield {
               type: 'tool_call',
@@ -344,35 +389,109 @@ export class GeminiProvider extends BaseModelProvider {
 
   async countTokens(messages: UniversalMessage[]): Promise<{ totalTokens: number }> {
     try {
-      // Initialize authentication client (GoogleGenAI or CodeAssistServer)
-      await this.initializeGoogleAI();
-      
-      // Convert messages to Gemini format
-      const geminiData = this.convertToGeminiMessages(messages);
-      
-      // Use different counting approach based on authentication type
-      if (this.codeAssistServer) {
-        // OAuth authentication - use CodeAssistServer
-        console.log('[GeminiProvider] Counting tokens using CodeAssistServer');
-        const result = await this.codeAssistServer.countTokens({
-          model: this.config.model,
-          contents: geminiData.contents
-        });
-        return { totalTokens: result.totalTokens || 0 };
-      } else if (this.generativeModel) {
-        // API key authentication - use GoogleGenAI
-        console.log('[GeminiProvider] Counting tokens using GoogleGenAI');
-        const result = await this.generativeModel.countTokens({
-          model: this.config.model,
-          contents: geminiData.contents
-        });
-        return { totalTokens: result.totalTokens || 0 };
-      } else {
-        throw new Error('No authentication client available for token counting');
+      // Strategy 1: Use official Gemini API (most accurate for Gemini models)
+      try {
+        // Initialize authentication client (GoogleGenAI or CodeAssistServer)
+        await this.initializeGoogleAI();
+        
+        // Convert messages to Gemini format
+        const geminiData = this.convertToGeminiMessages(messages);
+        
+        // Use different counting approach based on authentication type
+        if (this.codeAssistServer) {
+          // OAuth authentication - use CodeAssistServer
+          console.log('[GeminiProvider] Counting tokens using CodeAssistServer');
+          const result = await this.codeAssistServer.countTokens({
+            model: this.config.model,
+            contents: geminiData.contents
+          });
+          const apiTokens = result.totalTokens || 0;
+          console.log(`[GeminiProvider] Official API counted ${apiTokens} tokens for ${messages.length} messages`);
+          return { totalTokens: apiTokens };
+        } else if (this.generativeModel) {
+          // API key authentication - use GoogleGenAI
+          console.log('[GeminiProvider] Counting tokens using GoogleGenAI');
+          const result = await this.generativeModel.countTokens({
+            model: this.config.model,
+            contents: geminiData.contents
+          });
+          const apiTokens = result.totalTokens || 0;
+          console.log(`[GeminiProvider] Official API counted ${apiTokens} tokens for ${messages.length} messages`);
+          return { totalTokens: apiTokens };
+        } else {
+          throw new Error('No authentication client available for token counting');
+        }
+      } catch (apiError) {
+        console.warn(`[GeminiProvider] Official API token counting failed:`, apiError);
+        
+        // Strategy 2: Use tiktoken for local estimation (fallback)
+        console.log(`[GeminiProvider] Falling back to tiktoken for local counting`);
+        try {
+          // Import tiktoken dynamically
+          const tiktoken = await import('tiktoken');
+          
+          // Use cl100k_base encoding (used by GPT-4, reasonable approximation for Gemini)
+          // Note: This is an approximation since Gemini uses different tokenization than OpenAI
+          const encoding = tiktoken.get_encoding('cl100k_base');
+          
+          // Convert messages to text and count tokens
+          let totalTokens = 0;
+          
+          for (const message of messages) {
+            // Count tokens for the message content
+            totalTokens += encoding.encode(message.content).length;
+            
+            // Add overhead for message structure (role, metadata)
+            totalTokens += 4; // Rough estimate for role and structure tokens
+            
+            // Add tokens for tool calls if present
+            if (message.toolCalls && message.toolCalls.length > 0) {
+              for (const toolCall of message.toolCalls) {
+                const toolCallText = JSON.stringify({
+                  name: toolCall.name,
+                  arguments: toolCall.arguments
+                });
+                totalTokens += encoding.encode(toolCallText).length;
+              }
+            }
+          }
+          
+          // Add system message overhead
+          totalTokens += 5; // Gemini may have slightly higher system overhead
+          
+          // Add 10% buffer for Gemini's different tokenization
+          totalTokens = Math.ceil(totalTokens * 1.1);
+          
+          encoding.free(); // Clean up the encoding
+          
+          console.log(`[GeminiProvider] Tiktoken estimated ${totalTokens} tokens for ${messages.length} messages (with 10% Gemini buffer)`);
+          return { totalTokens };
+          
+        } catch (tiktokenError) {
+          console.warn(`[GeminiProvider] Tiktoken failed:`, tiktokenError);
+          
+          // Strategy 3: Character-based estimation as final fallback
+          console.log(`[GeminiProvider] Using character-based estimation as final fallback`);
+          
+          let totalChars = 0;
+          for (const message of messages) {
+            totalChars += message.content.length;
+            if (message.toolCalls) {
+              for (const toolCall of message.toolCalls) {
+                totalChars += JSON.stringify(toolCall).length;
+              }
+            }
+          }
+          
+          // Rough estimation: 1 token ≈ 3.5 characters for Gemini (slightly more efficient than GPT-4)
+          const estimatedTokens = Math.ceil(totalChars / 3.5);
+          console.log(`[GeminiProvider] Estimated ${estimatedTokens} tokens from ${totalChars} characters`);
+          return { totalTokens: estimatedTokens };
+        }
       }
     } catch (error) {
-      console.error('[GeminiProvider] Token counting failed:', error);
-      // Return 0 as fallback to prevent compression failures
+      console.error('[GeminiProvider] All token counting strategies failed:', error);
+      // Return 0 as final fallback to prevent compression failures
       return { totalTokens: 0 };
     }
   }
@@ -417,6 +536,7 @@ export class GeminiProvider extends BaseModelProvider {
       DEFAULT_GEMINI_FLASH_MODEL,     // 'gemini-2.5-flash' 
       DEFAULT_GEMINI_FLASH_LITE_MODEL, // 'gemini-2.5-flash-lite'
       // Add some additional commonly available models
+      'gemini-2.0-flash',
       'gemini-1.5-pro',
       'gemini-1.5-flash',
       'gemini-1.0-pro'
@@ -472,16 +592,14 @@ export class GeminiProvider extends BaseModelProvider {
   override updateConfig(config: ModelProviderConfig): void {
     super.updateConfig(config);
     
-    // Note: We don't reinitialize clients here because we get credentials dynamically
-    // from AuthManager in initializeGoogleAI(). The clients will be created as needed
-    // with the correct authentication method (OAuth or API key) based on user preference.
-    
-    // Reset all clients if the model name changed
+    // Reset all clients and initialization state if the model name changed
     // This forces reinitialization with the new model when needed
     if (config.model !== this.config.model) {
       this.googleAI = undefined;
       this.generativeModel = undefined;
       this.codeAssistServer = undefined;
+      this.isInitialized = false;
+      this.initializationPromise = undefined;
     }
   }
 
@@ -527,7 +645,7 @@ export class GeminiProvider extends BaseModelProvider {
           parts: [{ text: msg.content }]
         });
       } else if (msg.role === 'assistant') {
-        const parts: any[] = [];
+        const parts: Array<{ text?: string; functionCall?: { id: string; name: string; args: Record<string, unknown> } }> = [];
         
         // Add text content if present
         if (msg.content && msg.content.trim()) {
@@ -610,6 +728,9 @@ export class GeminiProvider extends BaseModelProvider {
         console.log(`[GeminiProvider] Content[${index}] (role: ${content.role}) has ${functionCalls.length} functionCall(s):`);
         functionCalls.forEach((part, partIndex) => {
           console.log(`  - functionCall[${partIndex}]: name="${part.functionCall?.name}", id="${part.functionCall?.id}"`);
+          if (part.functionCall?.args && Object.keys(part.functionCall.args).length > 0) {
+            console.log(`    args: ${JSON.stringify(part.functionCall.args, null, 4)}`);
+          }
         });
       }
       
@@ -799,7 +920,7 @@ export class GeminiProvider extends BaseModelProvider {
     const sanitized = JSON.parse(JSON.stringify(schema));
 
     // Recursively fix array schemas that might have missing 'items' fields
-    const fixArraySchema = (obj: any): void => {
+    const fixArraySchema = (obj: unknown): void => {
       if (typeof obj !== 'object' || !obj) return;
 
       if (Array.isArray(obj)) {
@@ -807,18 +928,18 @@ export class GeminiProvider extends BaseModelProvider {
         return;
       }
 
-      for (const [, value] of Object.entries(obj)) {
+      for (const [, value] of Object.entries(obj as Record<string, unknown>)) {
         if (typeof value === 'object' && value) {
-          const schemaValue = value as any;
+          const schemaValue = value as Record<string, unknown> & { type?: string; items?: Record<string, unknown> };
           
           // If it's an array type but missing items, add empty items schema
-          if (schemaValue.type === 'array' && !schemaValue.items) {
-            schemaValue.items = { type: 'string' }; // Default to string type
+          if (schemaValue['type'] === 'array' && !schemaValue['items']) {
+            schemaValue['items'] = { type: 'string' }; // Default to string type
           }
           
           // If items itself is an array type but missing nested items, fix it
-          if (schemaValue.items && schemaValue.items.type === 'array' && !schemaValue.items.items) {
-            schemaValue.items.items = { type: 'string' }; // Default nested items
+          if (schemaValue['items'] && (schemaValue['items'] as Record<string, unknown>)['type'] === 'array' && !(schemaValue['items'] as Record<string, unknown>)['items']) {
+            (schemaValue['items'] as Record<string, unknown>)['items'] = { type: 'string' }; // Default nested items
           }
           
           fixArraySchema(schemaValue);
@@ -912,12 +1033,81 @@ export class GeminiProvider extends BaseModelProvider {
     console.error('[GeminiProvider] Original quota error:', originalError);
     
     const quotaError = new Error(message);
-    (quotaError as any).isQuotaError = true;
-    (quotaError as any).originalError = originalError;
-    (quotaError as any).currentModel = currentModel;
-    (quotaError as any).isUsingFlash = isUsingFlash;
+    (quotaError as Error & { isQuotaError?: boolean; originalError?: unknown; currentModel?: string; isUsingFlash?: boolean }).isQuotaError = true;
+    (quotaError as Error & { isQuotaError?: boolean; originalError?: unknown; currentModel?: string; isUsingFlash?: boolean }).originalError = originalError;
+    (quotaError as Error & { isQuotaError?: boolean; originalError?: unknown; currentModel?: string; isUsingFlash?: boolean }).currentModel = currentModel;
+    (quotaError as Error & { isQuotaError?: boolean; originalError?: unknown; currentModel?: string; isUsingFlash?: boolean }).isUsingFlash = isUsingFlash;
     
     return quotaError;
+  }
+
+  async sendCompressionMessage(
+    messages: UniversalMessage[],
+    signal: AbortSignal
+  ): Promise<UniversalResponse> {
+    try {
+      const geminiData = this.convertToGeminiMessages(messages);
+      const request = this.buildCompressionRequest(geminiData);
+      
+      // Generate content with abort signal support
+      const result = await this.generateContentWithSignal(request, signal);
+      
+      let fullContent = '';
+      const toolCalls: ToolCall[] = [];
+      
+      // Process response parts
+      if (result.candidates?.[0]?.content?.parts) {
+        for (const part of result.candidates[0].content.parts) {
+          if (part.text) {
+            fullContent += part.text;
+          } else if (part.functionCall) {
+            toolCalls.push({
+              id: `gemini_call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              name: part.functionCall.name!,
+              arguments: part.functionCall.args || {}
+            });
+          }
+        }
+      }
+      
+      return {
+        content: fullContent,
+        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        finishReason: this.mapFinishReason(result.candidates?.[0]?.finishReason),
+        model: this.config.model
+      };
+    } catch (error) {
+      console.error(`[GeminiProvider] sendCompressionMessage failed:`, error);
+      throw this.createError('Failed to send compression message to Gemini', error);
+    }
+  }
+
+  /**
+   * Build request for compression without tools
+   */
+  private buildCompressionRequest(geminiData: { contents: Content[], systemInstruction?: string }): GenerateContentParameters {
+    const config: GenerateContentConfig = {
+      temperature: 0.7,
+      topP: 0.8,
+      topK: 40,
+      maxOutputTokens: 4096
+    };
+    
+    // Add system instruction
+    if (geminiData.systemInstruction) {
+      config.systemInstruction = {
+        role: 'user',
+        parts: [{ text: geminiData.systemInstruction }]
+      };
+    }
+    
+    // Note: No tools added for compression requests
+    
+    return {
+      model: this.config.model,
+      contents: geminiData.contents,
+      config
+    };
   }
   
 }

@@ -15,6 +15,11 @@ import type {
 } from './types.js';
 import { BaseModelProvider } from './BaseModelProvider.js';
 import type { Config } from '../config/config.js';
+import { get_encoding } from 'tiktoken';
+import type { Tiktoken } from 'tiktoken';
+
+
+
 
 interface LMStudioMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -102,12 +107,22 @@ interface LMStudioModel {
 
 export class LMStudioProvider extends BaseModelProvider {
   private baseUrl: string;
-  private lastUsage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+  private tokenEncoder?: Tiktoken;
 
   constructor(config: ModelProviderConfig, configInstance?: Config) {
     super(config, configInstance);
     this.baseUrl = config.baseUrl || 'http://127.0.0.1:1234/v1';
+    
+    // Initialize tiktoken encoder for accurate token counting
+    try {
+      this.tokenEncoder = get_encoding('cl100k_base'); // GPT-4/3.5 compatible encoding
+      console.log('[LMStudioProvider] Initialized tiktoken encoder');
+    } catch (error) {
+      console.warn('[LMStudioProvider] Failed to initialize tiktoken encoder:', error);
+    }
   }
+
+
 
   async initialize(): Promise<void> {
     await this.testConnection();
@@ -188,10 +203,12 @@ export class LMStudioProvider extends BaseModelProvider {
 
     const data = await response.json() as LMStudioResponse;
     
-    // Cache usage information for token counting
-    if (data.usage) {
-      this.lastUsage = data.usage;
-      console.log(`[LMStudioProvider] Cached usage: ${data.usage.total_tokens} tokens (prompt: ${data.usage.prompt_tokens}, completion: ${data.usage.completion_tokens})`);
+    // Debug: Print complete response to see what LM Studio actually returns
+    console.log(`[LMStudioProvider] Complete API response:`, JSON.stringify(data, null, 2));
+    
+    // Note: Usage information available in data.usage if needed
+    if (!data.usage) {
+      console.log(`[LMStudioProvider] No usage data in response`);
     }
     
     return this.convertFromLMStudioResponse(data);
@@ -268,9 +285,12 @@ export class LMStudioProvider extends BaseModelProvider {
         for (const line of lines) {
           if (line.trim() === '') continue;
           if (line.trim() === 'data: [DONE]') {
+            // Log final state when stream is done
+            console.log(`[LMStudioProvider] Stream [DONE]`);
+            
             // Process accumulated tool calls when stream is done (same as OpenAIProvider)
             if (accumulatedToolCalls.length > 0) {
-              // console.log('[LMStudioProvider] Processing accumulated tool calls at [DONE]:', accumulatedToolCalls.length);
+              console.log('[LMStudioProvider] Processing accumulated tool calls at [DONE]:', accumulatedToolCalls.length);
               for (const toolCall of accumulatedToolCalls) {
                 if (toolCall.function.name && toolCall.function.arguments) {
                   let args: Record<string, unknown> = {};
@@ -312,16 +332,17 @@ export class LMStudioProvider extends BaseModelProvider {
               const chunk = JSON.parse(line.slice(6)) as LMStudioStreamChunk;
               const delta = chunk.choices[0]?.delta;
 
-              // Cache usage information if present
-              if (chunk.usage) {
-                this.lastUsage = chunk.usage;
-                console.log(`[LMStudioProvider] Cached usage from stream: ${chunk.usage.total_tokens} tokens (prompt: ${chunk.usage.prompt_tokens}, completion: ${chunk.usage.completion_tokens})`);
+              // Note: Usage information available in chunk.usage if needed 
+              
+              if (chunk.choices[0]?.finish_reason) {
+                // Log when we reach the end but don't have usage data
+                console.log(`[LMStudioProvider] Stream chunk at finish_reason but no usage data:`, JSON.stringify(chunk, null, 2));
               }
 
               if (delta?.content) {
                 fullContent += delta.content;
                 yield {
-                  type: 'content',
+                  type: 'content_delta',
                   content: delta.content
                 };
               }
@@ -349,6 +370,20 @@ export class LMStudioProvider extends BaseModelProvider {
               }
 
               if (chunk.choices[0]?.finish_reason) {
+                const finishReason = chunk.choices[0].finish_reason;
+                console.log(`[LMStudioProvider] Stream finished with reason: ${finishReason}, accumulated tool calls: ${accumulatedToolCalls.length}`);
+                
+                // BUG FIX: LM Studio sometimes returns finish_reason: "tool_calls" but provides no tool call data
+                // This causes the system to hang waiting for tool calls that never come
+                if (finishReason === 'tool_calls' && accumulatedToolCalls.length === 0) {
+                  console.error('[LMStudioProvider] LM Studio bug detected: finish_reason is "tool_calls" but no tool call data provided');
+                  yield {
+                    type: 'error',
+                    error: new Error('LM Studio returned finish_reason "tool_calls" but provided no tool call data. This is a known LM Studio bug. Please try again or use a different model.')
+                  };
+                  return;
+                }
+                
                 // Process accumulated tool calls when finish_reason is available
                 if (accumulatedToolCalls.length > 0) {
                   console.log('[LMStudioProvider] Processing accumulated tool calls:', accumulatedToolCalls.length);
@@ -426,16 +461,32 @@ export class LMStudioProvider extends BaseModelProvider {
 
   async countTokens(messages: UniversalMessage[]): Promise<{ totalTokens: number }> {
     try {
-      // Use cached usage information from recent responses
-      if (this.lastUsage) {
-        const cachedTokens = this.lastUsage.prompt_tokens;
-        console.log(`[LMStudioProvider] Using cached prompt tokens from recent response: ${cachedTokens}`);
-        return { totalTokens: cachedTokens };
+      // Use tiktoken for accurate token counting without API calls
+      if (this.tokenEncoder) {
+        try {
+          // Convert messages to text format similar to OpenAI chat format
+          const messageText = messages.map(msg => {
+            let content = `${msg.role}: ${msg.content}`;
+            if (msg.toolCalls && msg.toolCalls.length > 0) {
+              content += ` [tool_calls: ${JSON.stringify(msg.toolCalls)}]`;
+            }
+            return content;
+          }).join('\n');
+          
+          const tokenCount = this.tokenEncoder.encode(messageText).length;
+          console.log(`[LMStudioProvider] tiktoken count: ${tokenCount} tokens for ${messages.length} messages`);
+          return { totalTokens: tokenCount };
+        } catch (tiktokenError) {
+          console.warn('[LMStudioProvider] tiktoken encoding failed:', tiktokenError);
+        }
       }
       
-      // No fallback estimation - require actual API response for accurate token counts
-      console.log(`[LMStudioProvider] No cached usage available - token count unavailable`);
-      return { totalTokens: 0 };
+      // Fallback to character-based estimation
+      const totalChars = messages.reduce((sum, msg) => sum + JSON.stringify(msg).length, 0);
+      const estimatedTokens = Math.ceil(totalChars / 4);
+      
+      console.log(`[LMStudioProvider] Fallback to character estimation: ${totalChars} chars ≈ ${estimatedTokens} tokens`);
+      return { totalTokens: estimatedTokens };
     } catch (error) {
       console.error('[LMStudioProvider] Token counting failed:', error);
       return { totalTokens: 0 };
@@ -459,7 +510,7 @@ export class LMStudioProvider extends BaseModelProvider {
       supportsToolCalls: true,
       supportsSystemMessages: true,
       supportsImages: false,
-      maxTokens: 4096,
+      maxTokens: 10000,
       maxMessages: 100
     };
   }
@@ -500,5 +551,62 @@ export class LMStudioProvider extends BaseModelProvider {
       case 'tool_calls': return 'tool_calls';
       default: return 'stop';
     }
+  }
+
+  /**
+   * Clean up tiktoken encoder resources
+   */
+  destroy(): void {
+    if (this.tokenEncoder) {
+      try {
+        this.tokenEncoder.free();
+        console.log('[LMStudioProvider] Cleaned up tiktoken encoder');
+      } catch (error) {
+        console.warn('[LMStudioProvider] Error cleaning up tiktoken encoder:', error);
+      }
+    }
+  }
+
+  async sendCompressionMessage(
+    messages: UniversalMessage[],
+    signal: AbortSignal
+  ): Promise<UniversalResponse> {
+    const lmStudioMessages = this.convertToLMStudioMessages(messages);
+    
+    const requestBody: LMStudioRequestBody = {
+      model: this.config.model,
+      messages: lmStudioMessages,
+      max_tokens: 4096,
+      temperature: 0.7,
+      stream: false
+      // Note: No tools added for compression requests
+    };
+
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+      signal
+    });
+
+    if (!response.ok) {
+      let errorMessage = `LM Studio API error: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.text();
+        if (errorData) {
+          errorMessage += ` - ${errorData}`;
+        }
+      } catch (parseError) {
+        console.error('Error parsing LM Studio error response:', parseError);
+      }
+      throw this.createError(errorMessage);
+    }
+
+    const data = await response.json();
+    
+    return this.convertFromLMStudioResponse(data);
   }
 }

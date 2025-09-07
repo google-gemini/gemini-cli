@@ -62,11 +62,20 @@ export interface UniversalResponse {
 }
 
 export interface UniversalStreamEvent {
-  type: 'content' | 'tool_call' | 'done' | 'error';
+  type: 'content_delta' | 'tool_call' | 'tool_response' | 'done' | 'error' | 'compression';
   content?: string;
   toolCall?: ToolCall;
+  toolCallId?: string;
+  toolName?: string;
   response?: UniversalResponse;
   error?: Error;
+  compressionInfo?: CompressionInfo;
+}
+
+export interface CompressionInfo {
+  originalTokenCount: number;
+  newTokenCount: number;
+  compressionRatio: number;
 }
 
 export interface ProviderCapabilities {

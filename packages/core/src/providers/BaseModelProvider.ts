@@ -13,7 +13,7 @@ import type {
   ConnectionStatus,
   ToolCall
 } from './types.js';
-import { ModelProviderType } from './types.js';
+import type { ModelProviderType } from './types.js';
 import type { Config } from '../config/config.js';
 import type { FunctionDeclaration } from '@google/genai';
 
@@ -99,4 +99,14 @@ export abstract class BaseModelProvider {
       return total + Math.ceil(contentLength / 4);
     }, 0);
   }
+
+  /**
+   * Send message for compression purposes without tools to avoid unnecessary overhead
+   * This is a specialized function for compression that bypasses tool system
+   * Must be implemented by each provider to avoid tools being automatically added
+   */
+  abstract sendCompressionMessage(
+    messages: UniversalMessage[],
+    signal: AbortSignal
+  ): Promise<UniversalResponse>;
 }
