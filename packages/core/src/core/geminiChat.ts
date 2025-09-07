@@ -18,7 +18,6 @@ import type {
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
-import { AuthType } from './contentGenerator.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
@@ -176,6 +175,8 @@ export class GeminiChat {
     private history: Content[] = [],
   ) {
     validateHistory(history);
+    this.chatRecordingService = new ChatRecordingService(config);
+    this.chatRecordingService.initialize();
   }
 
   setSystemInstruction(sysInstr: string) {

@@ -16,7 +16,7 @@ interface ProQuotaDialogProps {
 }
 
 export function ProQuotaDialog({
-  failedModel: currentModel,
+  failedModel,
   fallbackModel,
   onChoice,
 }: ProQuotaDialogProps): React.JSX.Element {
@@ -38,7 +38,7 @@ export function ProQuotaDialog({
   return (
     <Box borderStyle="round" flexDirection="column" paddingX={1}>
       <Text bold color={Colors.AccentYellow}>
-        Pro quota limit reached for {currentModel}.
+        Pro quota limit reached for {failedModel}.
       </Text>
       <Box marginTop={1}>
         <RadioButtonSelect
