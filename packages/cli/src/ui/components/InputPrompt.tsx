@@ -219,16 +219,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   // Remove pending pastes that are not in the buffer text
   const prunePendingPastes = useCallback(() => {
-    if (pendingPastes.length === 0) return;
     const t = buffer.text;
-    setPendingPastes((prev) =>
-      prev.length === 0 ? prev : prev.filter((p) => t.includes(p.placeholder)),
-    );
-  }, [buffer.text, pendingPastes.length]);
+    setPendingPastes((prev) => {
+      if (prev.length === 0) {
+        return prev;
+      }
+      const next = prev.filter((p) => t.includes(p.placeholder));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [buffer.text]);
 
   useEffect(() => {
     prunePendingPastes();
-  }, [buffer.text, pendingPastes.length, prunePendingPastes]);
+  }, [prunePendingPastes]);
 
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
