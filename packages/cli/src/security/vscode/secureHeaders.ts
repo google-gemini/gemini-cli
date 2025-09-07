@@ -218,10 +218,15 @@ export class SecureHeadersManager {
     return `${token}.${signature}`;
   }
 
-  private generateSignature(data: string): string {
-    // Simple HMAC for demonstration - use proper crypto in production
-    const crypto = require('crypto');
-    const secret = process.env.SECURITY_TOKEN_SECRET || 'default-secret-key';
+  private async generateSignature(data: string): Promise<string> {
+    const crypto = await import('crypto');
+    const secret = process.env['SECURITY_TOKEN_SECRET'];
+
+    // Critical security: Never use default secrets in production
+    if (!secret) {
+      throw new Error('SECURITY_TOKEN_SECRET environment variable is not set. Cannot generate secure tokens without a proper secret key.');
+    }
+
     return crypto.createHmac('sha256', secret).update(data).digest('hex').substring(0, 16);
   }
 
@@ -229,7 +234,7 @@ export class SecureHeadersManager {
     return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  validateSecurityToken(token: string): { valid: boolean; context?: SecurityContext; error?: string } {
+  async validateSecurityToken(token: string): Promise<{ valid: boolean; context?: SecurityContext; error?: string }> {
     try {
       const parts = token.split('.');
       if (parts.length !== 2) {
@@ -237,7 +242,7 @@ export class SecureHeadersManager {
       }
 
       const [payload, signature] = parts;
-      const expectedSignature = this.generateSignature(payload);
+      const expectedSignature = await this.generateSignature(payload);
 
       if (signature !== expectedSignature) {
         return { valid: false, error: 'Invalid token signature' };
@@ -260,16 +265,16 @@ export class SecureHeadersManager {
         } as SecurityContext
       };
 
-    } catch (error) {
+    } catch (_error) {
       return { valid: false, error: 'Token parsing failed' };
     }
   }
 
-  validateSecurityHeaders(headers: Record<string, string>, expectedToken?: string): {
+  async validateSecurityHeaders(headers: Record<string, string>, expectedToken?: string): Promise<{
     valid: boolean;
     violations: string[];
     riskLevel: 'low' | 'medium' | 'high' | 'critical';
-  } {
+  }> {
     const violations: string[] = [];
     let riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'low';
 
@@ -291,7 +296,7 @@ export class SecureHeadersManager {
 
     // Validate security token
     if (expectedToken && headers['X-VSCode-Security-Token']) {
-      const tokenValidation = this.validateSecurityToken(headers['X-VSCode-Security-Token']);
+      const tokenValidation = await this.validateSecurityToken(headers['X-VSCode-Security-Token']);
       if (!tokenValidation.valid) {
         violations.push(`Invalid security token: ${tokenValidation.error}`);
         riskLevel = 'critical';
@@ -303,7 +308,7 @@ export class SecureHeadersManager {
       const cspViolations = this.validateCSPHeader(headers['Content-Security-Policy']);
       violations.push(...cspViolations);
       if (cspViolations.length > 0) {
-        riskLevel = riskLevel === 'critical' ? 'critical' : 'high';
+        riskLevel = 'high';
       }
     }
 
@@ -326,21 +331,37 @@ export class SecureHeadersManager {
   private validateCSPHeader(csp: string): string[] {
     const violations: string[] = [];
 
-    // Check for dangerous CSP directives
+    // Context-aware CSP validation for VS Code compatibility
+
+    // Allow 'unsafe-inline' for VS Code extensions (necessary for extension functionality)
+    // but warn about it for awareness
     if (csp.includes("'unsafe-inline'")) {
-      violations.push('CSP allows unsafe inline scripts');
+      // Only warn if it's not in a controlled VS Code extension context
+      if (!csp.includes('vscode-extension://')) {
+        violations.push('CSP allows unsafe inline scripts - ensure this is necessary for VS Code compatibility');
+      }
     }
 
+    // 'unsafe-eval' should always be flagged as dangerous
     if (csp.includes("'unsafe-eval'")) {
-      violations.push('CSP allows unsafe eval');
+      violations.push('CSP allows unsafe eval - this is a security risk and should be avoided');
     }
 
+    // Check for overly permissive wildcard usage
     if (csp.includes('*')) {
-      violations.push('CSP uses wildcard sources');
+      violations.push('CSP uses wildcard sources - consider restricting to specific domains');
     }
 
+    // Ensure basic CSP structure
     if (!csp.includes('default-src')) {
       violations.push('CSP missing default-src directive');
+    }
+
+    // Additional security checks
+    if (!csp.includes('object-src') || csp.includes("object-src 'none'")) {
+      // This is actually good - object-src 'none' is secure
+    } else {
+      violations.push('CSP allows object-src - consider restricting to none');
     }
 
     return violations;

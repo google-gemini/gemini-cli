@@ -161,6 +161,7 @@ class AuditTrailManager {
   private isInitialized = false;
   private metrics: AuditMetrics;
   private flushTimer?: NodeJS.Timeout;
+  private startTime: number = Date.now();
 
   static getInstance(): AuditTrailManager {
     if (!AuditTrailManager.instance) {
@@ -180,43 +181,43 @@ class AuditTrailManager {
 
   private loadAuditConfig(): AuditTrailConfig {
     return {
-      enabled: process.env.AUDIT_TRAIL_ENABLED !== 'false',
+      enabled: process.env['AUDIT_TRAIL_ENABLED'] !== 'false',
       storage: {
-        type: (process.env.AUDIT_STORAGE_TYPE as AuditTrailConfig['storage']['type']) || 'file',
-        path: process.env.AUDIT_STORAGE_PATH || path.join(process.cwd(), 'audit-logs'),
-        retentionDays: parseInt(process.env.AUDIT_RETENTION_DAYS || '365'),
-        compression: process.env.AUDIT_COMPRESSION !== 'false',
-        encryption: process.env.AUDIT_ENCRYPTION === 'true'
+        type: (process.env['AUDIT_STORAGE_TYPE'] as AuditTrailConfig['storage']['type']) || 'file',
+        path: process.env['AUDIT_STORAGE_PATH'] || path.join(process.cwd(), 'audit-logs'),
+        retentionDays: parseInt(process.env['AUDIT_RETENTION_DAYS'] || '365'),
+        compression: process.env['AUDIT_COMPRESSION'] !== 'false',
+        encryption: process.env['AUDIT_ENCRYPTION'] === 'true'
       },
       filtering: {
-        enabled: process.env.AUDIT_FILTERING_ENABLED !== 'false',
-        minSeverity: (process.env.AUDIT_MIN_SEVERITY as AuditEvent['severity']) || 'info',
-        excludeCategories: process.env.AUDIT_EXCLUDE_CATEGORIES?.split(',') || [],
-        includePatterns: process.env.AUDIT_INCLUDE_PATTERNS?.split(',') || [],
-        samplingRate: parseFloat(process.env.AUDIT_SAMPLING_RATE || '1.0')
+        enabled: process.env['AUDIT_FILTERING_ENABLED'] !== 'false',
+        minSeverity: (process.env['AUDIT_MIN_SEVERITY'] as AuditEvent['severity']) || 'info',
+        excludeCategories: process.env['AUDIT_EXCLUDE_CATEGORIES']?.split(',') || [],
+        includePatterns: process.env['AUDIT_INCLUDE_PATTERNS']?.split(',') || [],
+        samplingRate: parseFloat(process.env['AUDIT_SAMPLING_RATE'] || '1.0')
       },
       realTime: {
-        enabled: process.env.AUDIT_REALTIME_ENABLED !== 'false',
-        bufferSize: parseInt(process.env.AUDIT_BUFFER_SIZE || '1000'),
-        flushInterval: parseInt(process.env.AUDIT_FLUSH_INTERVAL || '30000'),
+        enabled: process.env['AUDIT_REALTIME_ENABLED'] !== 'false',
+        bufferSize: parseInt(process.env['AUDIT_BUFFER_SIZE'] || '1000'),
+        flushInterval: parseInt(process.env['AUDIT_FLUSH_INTERVAL'] || '30000'),
         alertThresholds: {
-          errorRate: parseFloat(process.env.AUDIT_ERROR_RATE_THRESHOLD || '0.1'),
-          anomalyScore: parseFloat(process.env.AUDIT_ANOMALY_THRESHOLD || '0.8'),
-          suspiciousActivity: parseFloat(process.env.AUDIT_SUSPICIOUS_THRESHOLD || '5')
+          errorRate: parseFloat(process.env['AUDIT_ERROR_RATE_THRESHOLD'] || '0.1'),
+          anomalyScore: parseFloat(process.env['AUDIT_ANOMALY_THRESHOLD'] || '0.8'),
+          suspiciousActivity: parseFloat(process.env['AUDIT_SUSPICIOUS_THRESHOLD'] || '5')
         }
       },
       compliance: {
-        gdpr: process.env.AUDIT_GDPR_COMPLIANCE === 'true',
-        sox: process.env.AUDIT_SOX_COMPLIANCE === 'true',
-        pci: process.env.AUDIT_PCI_COMPLIANCE === 'true',
-        hipaa: process.env.AUDIT_HIPAA_COMPLIANCE === 'true',
-        customFrameworks: process.env.AUDIT_CUSTOM_FRAMEWORKS?.split(',') || []
+        gdpr: process.env['AUDIT_GDPR_COMPLIANCE'] === 'true',
+        sox: process.env['AUDIT_SOX_COMPLIANCE'] === 'true',
+        pci: process.env['AUDIT_PCI_COMPLIANCE'] === 'true',
+        hipaa: process.env['AUDIT_HIPAA_COMPLIANCE'] === 'true',
+        customFrameworks: process.env['AUDIT_CUSTOM_FRAMEWORKS']?.split(',') || []
       },
       forensics: {
-        enabled: process.env.AUDIT_FORENSICS_ENABLED === 'true',
-        chainOfCustody: process.env.AUDIT_CHAIN_OF_CUSTODY === 'true',
-        tamperDetection: process.env.AUDIT_TAMPER_DETECTION === 'true',
-        integrityChecks: process.env.AUDIT_INTEGRITY_CHECKS === 'true'
+        enabled: process.env['AUDIT_FORENSICS_ENABLED'] === 'true',
+        chainOfCustody: process.env['AUDIT_CHAIN_OF_CUSTODY'] === 'true',
+        tamperDetection: process.env['AUDIT_TAMPER_DETECTION'] === 'true',
+        integrityChecks: process.env['AUDIT_INTEGRITY_CHECKS'] === 'true'
       }
     };
   }
@@ -239,7 +240,8 @@ class AuditTrailManager {
       try {
         fs.mkdirSync(this.config.storage.path, { recursive: true });
       } catch (error) {
-        logger.error('❌ Failed to create audit log directory', { error: error.message });
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error('❌ Failed to create audit log directory', { error: errorMessage });
       }
     }
 
@@ -287,7 +289,7 @@ class AuditTrailManager {
         ...event.action
       },
       context: {
-        environment: event.context?.environment || process.env.NODE_ENV || 'development',
+        environment: event.context?.environment || process.env['NODE_ENV'] || 'development',
         service: event.context?.service || 'gemini-mcp',
         version: event.context?.version || '1.0.0',
         correlationId: event.context?.correlationId || crypto.randomBytes(8).toString('hex'),
@@ -415,7 +417,7 @@ class AuditTrailManager {
 
   private addForensicData(event: AuditEvent): void {
     if (this.config.forensics.chainOfCustody) {
-      event.metadata.chainOfCustody = {
+      event.metadata['chainOfCustody'] = {
         recordedBy: 'gemini-mcp-audit-trail',
         recordedAt: event.timestamp,
         integrityVerified: true
@@ -423,7 +425,7 @@ class AuditTrailManager {
     }
 
     if (this.config.forensics.tamperDetection) {
-      event.metadata.tamperProtection = {
+      event.metadata['tamperProtection'] = {
         hash: this.generateIntegrityHash(event),
         algorithm: 'sha256',
         salt: crypto.randomBytes(16).toString('hex')
@@ -494,19 +496,37 @@ class AuditTrailManager {
     }
 
     if (this.config.storage.encryption) {
-      // Simple encryption simulation
-      const key = crypto.scryptSync('audit-key', 'salt', 32);
+      // Secure encryption for audit logs
+      const encryptionKey = process.env['AUDIT_ENCRYPTION_KEY'];
+      if (!encryptionKey) {
+        throw new Error('AUDIT_ENCRYPTION_KEY environment variable is not set. Cannot encrypt audit logs without a proper encryption key.');
+      }
+
+      // Use PBKDF2 for key derivation (more secure than scryptSync for this use case)
+      const salt = crypto.randomBytes(32);
+      const key = crypto.pbkdf2Sync(encryptionKey, salt, 100000, 32, 'sha256');
       const iv = crypto.randomBytes(16);
-      const cipher = crypto.createCipher('aes-256-cbc', key);
-      data = cipher.update(data, 'utf8', 'hex') + cipher.final('hex');
+
+      const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+      const encrypted = cipher.update(data, 'utf8', 'hex') + cipher.final('hex');
+      const authTag = cipher.getAuthTag();
+
+      // Store salt, IV, auth tag, and encrypted data
+      data = JSON.stringify({
+        encrypted,
+        salt: salt.toString('hex'),
+        iv: iv.toString('hex'),
+        authTag: authTag.toString('hex')
+      });
     }
 
     try {
       fs.appendFileSync(filePath, data);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error('❌ Failed to write audit event to file', {
         filePath,
-        error: error.message
+        error: errorMessage
       });
     }
   }
@@ -529,7 +549,8 @@ class AuditTrailManager {
   private updateMetrics(): void {
     const now = Date.now();
     // Update events per second (simple moving average)
-    this.metrics.eventsPerSecond = this.metrics.totalEvents / Math.max(1, (now - Date.now() + 1000) / 1000);
+    const elapsedSeconds = Math.max(1, (now - this.startTime) / 1000);
+    this.metrics.eventsPerSecond = this.metrics.totalEvents / elapsedSeconds;
 
     // Update storage size (simplified)
     if (this.config.storage.type === 'file' && this.config.storage.path) {
@@ -659,7 +680,7 @@ class AuditTrailManager {
         e.compliance.frameworks.includes('GDPR') &&
         e.compliance.requirements.includes('Data Protection')
       );
-      compliance.GDPR = hasDataProtection;
+      compliance['GDPR'] = hasDataProtection;
     }
 
     return compliance;
@@ -711,7 +732,7 @@ class AuditTrailManager {
     return true;
   }
 
-  async getChainOfCustody(eventId: string): Promise<any[]> {
+  async getChainOfCustody(eventId: string): Promise<Record<string, unknown>[]> {
     // Implementation for chain of custody tracking
     logger.info('🔗 Retrieving chain of custody', { eventId });
     return [];
@@ -752,7 +773,7 @@ class AuditTrailManager {
     const csvRows = [
       headers.join(','),
       ...events.map(event =>
-        headers.map(header => JSON.stringify((event as any)[header])).join(',')
+        headers.map(header => JSON.stringify((event as unknown as Record<string, unknown>)[header])).join(',')
       )
     ];
 

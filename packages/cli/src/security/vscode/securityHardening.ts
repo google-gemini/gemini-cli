@@ -69,12 +69,42 @@ export interface HardenedResponse {
 }
 
 class SecurityHardeningManager {
-  [x: string]: any;
   private static instance: SecurityHardeningManager;
   private config: SecurityHardeningConfig;
   private violations: SecurityViolation[] = [];
   private dangerousAPIs = new Set<string>();
   private securityPatterns: RegExp[] = [];
+
+  // Robust deep cloning function to replace unreliable JSON.parse(JSON.stringify())
+  private deepClone<T>(obj: T): T {
+    if (obj === null || typeof obj !== 'object') {
+      return obj;
+    }
+
+    if (obj instanceof Date) {
+      return new Date(obj.getTime()) as unknown as T;
+    }
+
+    if (obj instanceof RegExp) {
+      return new RegExp(obj.source, obj.flags) as unknown as T;
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.deepClone(item)) as unknown as T;
+    }
+
+    if (typeof obj === 'object') {
+      const cloned: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) { // Skip undefined values
+          cloned[key] = this.deepClone(value);
+        }
+      }
+      return cloned as T;
+    }
+
+    return obj;
+  }
 
   static getInstance(): SecurityHardeningManager {
     if (!SecurityHardeningManager.instance) {
@@ -160,8 +190,10 @@ class SecurityHardeningManager {
       /\.\.[\/\\]/,
       /%2e%2e[\/\\]/i,
 
-      // Command injection
-      /[;&|`$()]/,
+      // Command injection - more specific patterns to reduce false positives
+      /\b(?:sh|bash|zsh|cmd|powershell|exec|system|shell_exec|popen|proc_open)\s*\(/i,
+      /(?:\|\||&&|;)\s*(?:curl|wget|nc|netcat|nmap|sqlmap|dirb|gobuster|hydra|john|hashcat)/i,
+      /\$\([^)]*\)/, // Command substitution in bash-like shells
 
       // Dangerous function calls
       /\beval\s*\(/,
@@ -585,7 +617,11 @@ class SecurityHardeningManager {
 
     // Add security headers
     if (context?.isExtension) {
-      const securityHeaders = this.secureHeadersManager.generateSecureHeaders(context);
+      const securityHeaders = secureHeadersManager.generateSecureHeaders({
+        isExtension: context.isExtension,
+        vscodeVersion: context.vscodeVersion || 'unknown',
+        workspaceTrust: context.workspaceTrust || false
+      } as any);
       hardened._securityHeaders = securityHeaders;
     }
 
@@ -610,7 +646,7 @@ class SecurityHardeningManager {
       }
     };
 
-    const cleaned = JSON.parse(JSON.stringify(obj)); // Deep clone
+    const cleaned = this.deepClone(obj); // Robust deep clone
     removeSensitive(cleaned);
     return cleaned;
   }
@@ -635,7 +671,7 @@ class SecurityHardeningManager {
       }
     };
 
-    const cleaned = JSON.parse(JSON.stringify(obj));
+    const cleaned = this.deepClone(obj);
     sanitizeErrors(cleaned);
     return cleaned;
   }
@@ -658,7 +694,7 @@ class SecurityHardeningManager {
       }
     };
 
-    const cleaned = JSON.parse(JSON.stringify(obj));
+    const cleaned = this.deepClone(obj);
     removeStacks(cleaned);
     return cleaned;
   }
