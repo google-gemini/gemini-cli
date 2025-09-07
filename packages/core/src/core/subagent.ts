@@ -10,7 +10,6 @@ import type { AnyDeclarativeTool } from '../tools/tools.js';
 import type { Config } from '../config/config.js';
 import type { ToolCallRequestInfo } from './turn.js';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
-import { createContentGenerator } from './contentGenerator.js';
 import { getEnvironmentContext } from '../utils/environmentContext.js';
 import type {
   Content,
@@ -635,9 +634,7 @@ export class SubAgentScope {
       : undefined;
 
     try {
-      const generationConfig: GenerateContentConfig & {
-        systemInstruction?: string | Content;
-      } = {
+      const generationConfig: GenerateContentConfig = {
         temperature: this.modelConfig.temp,
         topP: this.modelConfig.top_p,
       };
@@ -646,17 +643,10 @@ export class SubAgentScope {
         generationConfig.systemInstruction = systemInstruction;
       }
 
-      const contentGenerator = await createContentGenerator(
-        this.runtimeContext.getContentGeneratorConfig(),
-        this.runtimeContext,
-        this.runtimeContext.getSessionId(),
-      );
-
       this.runtimeContext.setModel(this.modelConfig.model);
 
       return new GeminiChat(
         this.runtimeContext,
-        contentGenerator,
         generationConfig,
         start_history,
       );
