@@ -59,7 +59,7 @@ describe('PermissionRepository Interface', () => {
   describe('grant and isAllowed', () => {
     it('should grant and check permissions correctly', async () => {
       expect(await repo.isAllowed('shell', 'git status')).toBe(false);
-      
+
       await repo.grant('shell', 'git status');
       expect(await repo.isAllowed('shell', 'git status')).toBe(true);
     });
@@ -67,7 +67,7 @@ describe('PermissionRepository Interface', () => {
     it('should handle multiple permissions for same tool', async () => {
       await repo.grant('shell', 'git status');
       await repo.grant('shell', 'npm install');
-      
+
       expect(await repo.isAllowed('shell', 'git status')).toBe(true);
       expect(await repo.isAllowed('shell', 'npm install')).toBe(true);
       expect(await repo.isAllowed('shell', 'rm -rf')).toBe(false);
@@ -76,7 +76,7 @@ describe('PermissionRepository Interface', () => {
     it('should handle multiple tools', async () => {
       await repo.grant('shell', 'git status');
       await repo.grant('memory', 'read_context');
-      
+
       expect(await repo.isAllowed('shell', 'git status')).toBe(true);
       expect(await repo.isAllowed('memory', 'read_context')).toBe(true);
       expect(await repo.isAllowed('shell', 'read_context')).toBe(false);
@@ -93,7 +93,7 @@ describe('PermissionRepository Interface', () => {
 
     it('should revoke specific permissions', async () => {
       await repo.revoke('shell', 'git status');
-      
+
       expect(await repo.isAllowed('shell', 'git status')).toBe(false);
       expect(await repo.isAllowed('shell', 'npm install')).toBe(true);
       expect(await repo.isAllowed('memory', 'read_context')).toBe(true);
@@ -102,7 +102,7 @@ describe('PermissionRepository Interface', () => {
     it('should handle revoking non-existent permissions', async () => {
       await repo.revoke('shell', 'non-existent');
       await repo.revoke('non-existent-tool', 'any-permission');
-      
+
       expect(await repo.isAllowed('shell', 'git status')).toBe(true);
       expect(await repo.isAllowed('shell', 'npm install')).toBe(true);
     });
@@ -117,7 +117,7 @@ describe('PermissionRepository Interface', () => {
 
     it('should revoke all permissions for a tool', async () => {
       await repo.revokeAllForTool('shell');
-      
+
       expect(await repo.isAllowed('shell', 'git status')).toBe(false);
       expect(await repo.isAllowed('shell', 'npm install')).toBe(false);
       expect(await repo.isAllowed('memory', 'read_context')).toBe(true);
@@ -125,7 +125,7 @@ describe('PermissionRepository Interface', () => {
 
     it('should handle revoking from non-existent tool', async () => {
       await repo.revokeAllForTool('non-existent');
-      
+
       expect(await repo.isAllowed('shell', 'git status')).toBe(true);
       expect(await repo.isAllowed('memory', 'read_context')).toBe(true);
     });
@@ -140,7 +140,7 @@ describe('PermissionRepository Interface', () => {
 
     it('should revoke all permissions for all tools', async () => {
       await repo.revokeAll();
-      
+
       expect(await repo.isAllowed('shell', 'git status')).toBe(false);
       expect(await repo.isAllowed('shell', 'npm install')).toBe(false);
       expect(await repo.isAllowed('memory', 'read_context')).toBe(false);
@@ -157,20 +157,22 @@ describe('PermissionRepository Interface', () => {
       await repo.grant('shell', 'git status');
       await repo.grant('shell', 'npm install');
       await repo.grant('memory', 'read_context');
-      
+
       const permissions = await repo.getAllGranted();
-      
+
       expect(permissions.size).toBe(2);
-      expect(permissions.get('shell')).toEqual(new Set(['git status', 'npm install']));
+      expect(permissions.get('shell')).toEqual(
+        new Set(['git status', 'npm install']),
+      );
       expect(permissions.get('memory')).toEqual(new Set(['read_context']));
     });
 
     it('should return a copy to prevent external mutation', async () => {
       await repo.grant('shell', 'git status');
-      
+
       const permissions = await repo.getAllGranted();
       permissions.get('shell')?.add('malicious_permission');
-      
+
       expect(await repo.isAllowed('shell', 'malicious_permission')).toBe(false);
     });
   });
