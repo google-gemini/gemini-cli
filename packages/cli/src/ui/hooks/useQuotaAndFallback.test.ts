@@ -252,6 +252,49 @@ describe('useQuotaAndFallback', () => {
         // The pending request should be cleared from the state
         expect(result.current.proQuotaRequest).toBeNull();
       });
+
+      it('should handle race conditions by stopping subsequent requests', async () => {
+        const { result } = renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: UserTierId.FREE,
+            setAuthState: mockSetAuthState,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          }),
+        );
+
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackHandler;
+
+        const promise1 = handler(
+          'gemini-pro',
+          'gemini-flash',
+          new Error('pro quota 1'),
+        );
+        await act(async () => {});
+
+        const firstRequest = result.current.proQuotaRequest;
+        expect(firstRequest).not.toBeNull();
+
+        const result2 = await handler(
+          'gemini-pro',
+          'gemini-flash',
+          new Error('pro quota 2'),
+        );
+
+        // The lock should have stopped the second request
+        expect(result2).toBe('stop');
+        expect(result.current.proQuotaRequest).toBe(firstRequest);
+
+        act(() => {
+          result.current.handleProQuotaChoice('continue');
+        });
+
+        const intent1 = await promise1;
+        expect(intent1).toBe('retry');
+        expect(result.current.proQuotaRequest).toBeNull();
+      });
     });
   });
 

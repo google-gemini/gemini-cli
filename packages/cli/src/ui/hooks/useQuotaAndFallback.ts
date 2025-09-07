@@ -13,7 +13,7 @@ import {
   isProQuotaExceededError,
   UserTierId,
 } from '@google/gemini-cli-core';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
 import { AuthState, MessageType } from '../types.js';
 import { type ProQuotaDialogRequest } from '../contexts/UIStateContext.js';
@@ -35,6 +35,7 @@ export function useQuotaAndFallback({
 }: UseQuotaAndFallbackArgs) {
   const [proQuotaRequest, setProQuotaRequest] =
     useState<ProQuotaDialogRequest | null>(null);
+  const isDialogPending = useRef(false);
 
   // Set up Flash fallback handler
   useEffect(() => {
@@ -119,6 +120,11 @@ export function useQuotaAndFallback({
 
       // Interactive Fallback for Pro quota
       if (error && isProQuotaExceededError(error)) {
+        if (isDialogPending.current) {
+          return 'stop'; // A dialog is already active, so just stop this request.
+        }
+        isDialogPending.current = true;
+
         const intent: FallbackIntent = await new Promise<FallbackIntent>(
           (resolve) => {
             setProQuotaRequest({
@@ -145,6 +151,7 @@ export function useQuotaAndFallback({
       const intent: FallbackIntent = choice === 'auth' ? 'auth' : 'retry';
       proQuotaRequest.resolve(intent);
       setProQuotaRequest(null);
+      isDialogPending.current = false; // Reset the flag here
 
       if (choice === 'auth') {
         setAuthState(AuthState.Updating);
