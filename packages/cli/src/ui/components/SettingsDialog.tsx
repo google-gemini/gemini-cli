@@ -33,6 +33,7 @@ import { useVimMode } from '../contexts/VimModeContext.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import chalk from 'chalk';
 import { cpSlice, cpLen, stripUnsafeCharacters } from '../utils/textUtils.js';
+import { MESSAGE_QUEUE_MODES } from '@google/gemini-cli-core';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -122,6 +123,81 @@ export function SettingsDialog({
         value: key,
         type: definition?.type,
         toggle: () => {
+          // Special-case toggle for enum-like string: general.messageQueueMode
+          if (key === 'general.messageQueueMode') {
+            // Cycle between 'wait_for_idle' and 'wait_for_response'
+            const path = key.split('.');
+            const current = getNestedValue(pendingSettings, path);
+            const def = getDefaultValue(key);
+            const [mode1, mode2] = MESSAGE_QUEUE_MODES;
+            const effective =
+              (typeof current === 'string' && current) ||
+              (typeof def === 'string' ? def : mode1);
+            const newValue = effective === mode1 ? mode2 : mode1;
+
+            setPendingSettings((prev) =>
+              setPendingSettingValueAny(key, newValue, prev),
+            );
+
+            if (!requiresRestart(key)) {
+              const immediateSettings = new Set([key]);
+              const immediateSettingsObject = setPendingSettingValueAny(
+                key,
+                newValue,
+                {} as Settings,
+              );
+
+              saveModifiedSettings(
+                immediateSettings,
+                immediateSettingsObject,
+                settings,
+                selectedScope,
+              );
+
+              // Remove from modified/restart-required/global pending
+              setModifiedSettings((prev) => {
+                const updated = new Set(prev);
+                updated.delete(key);
+                return updated;
+              });
+              setRestartRequiredSettings((prev) => {
+                const updated = new Set(prev);
+                updated.delete(key);
+                return updated;
+              });
+              setGlobalPendingChanges((prev) => {
+                if (!prev.has(key)) return prev;
+                const next = new Map(prev);
+                next.delete(key);
+                return next;
+              });
+
+              // Refresh pending settings from saved state
+              setPendingSettings(
+                structuredClone(settings.forScope(selectedScope).settings),
+              );
+            } else {
+              // Track as modified for restart-required settings
+              setModifiedSettings((prev) => {
+                const updated = new Set(prev).add(key);
+                const needsRestart = hasRestartRequiredSettings(updated);
+                if (needsRestart) {
+                  setShowRestartPrompt(true);
+                  setRestartRequiredSettings((prevRestart) =>
+                    new Set(prevRestart).add(key),
+                  );
+                }
+                return updated;
+              });
+              setGlobalPendingChanges((prev) => {
+                const next = new Map(prev);
+                next.set(key, newValue as PendingValue);
+                return next;
+              });
+            }
+            return;
+          }
+
           if (definition?.type !== 'boolean') {
             // For non-boolean items, toggle will be handled via edit mode.
             return;
@@ -478,7 +554,10 @@ export function SettingsDialog({
           }
         } else if (name === 'return' || name === 'space') {
           const currentItem = items[activeSettingIndex];
-          if (
+          // Special case: messageQueueMode should toggle, not edit
+          if (currentItem?.value === 'general.messageQueueMode') {
+            currentItem?.toggle();
+          } else if (
             currentItem?.type === 'number' ||
             currentItem?.type === 'string'
           ) {
@@ -676,32 +755,62 @@ export function SettingsDialog({
               displayValue = editBuffer;
             }
           } else if (item.type === 'number' || item.type === 'string') {
-            // For numbers/strings, get the actual current value from pending settings
-            const path = item.value.split('.');
-            const currentValue = getNestedValue(pendingSettings, path);
+            // Special case for messageQueueMode: show user-friendly display
+            if (item.value === 'general.messageQueueMode') {
+              const path = item.value.split('.');
+              const currentValue = getNestedValue(pendingSettings, path);
+              const defaultValue = getDefaultValue(item.value);
+              const [mode1, mode2] = MESSAGE_QUEUE_MODES;
+              const displayMap: Record<string, string> = {
+                [mode1]: 'Wait for Idle',
+                [mode2]: 'Wait for Response',
+              };
+              const effectiveValue =
+                currentValue !== undefined && currentValue !== null
+                  ? String(currentValue)
+                  : defaultValue !== undefined && defaultValue !== null
+                    ? String(defaultValue)
+                    : mode1;
 
-            const defaultValue = getDefaultValue(item.value);
+              // Convert to user-friendly display
+              const displayMode = displayMap[effectiveValue] || effectiveValue;
+              displayValue = displayMode;
 
-            if (currentValue !== undefined && currentValue !== null) {
-              displayValue = String(currentValue);
+              // Add * if value differs from default OR if currently being modified
+              const isModified = modifiedSettings.has(item.value);
+              const isDifferentFromDefault =
+                effectiveValue !== String(defaultValue);
+              if (isDifferentFromDefault || isModified) {
+                displayValue += '*';
+              }
             } else {
-              displayValue =
-                defaultValue !== undefined && defaultValue !== null
-                  ? String(defaultValue)
-                  : '';
-            }
+              // For other numbers/strings, get the actual current value from pending settings
+              const path = item.value.split('.');
+              const currentValue = getNestedValue(pendingSettings, path);
 
-            // Add * if value differs from default OR if currently being modified
-            const isModified = modifiedSettings.has(item.value);
-            const effectiveCurrentValue =
-              currentValue !== undefined && currentValue !== null
-                ? currentValue
-                : defaultValue;
-            const isDifferentFromDefault =
-              effectiveCurrentValue !== defaultValue;
+              const defaultValue = getDefaultValue(item.value);
 
-            if (isDifferentFromDefault || isModified) {
-              displayValue += '*';
+              if (currentValue !== undefined && currentValue !== null) {
+                displayValue = String(currentValue);
+              } else {
+                displayValue =
+                  defaultValue !== undefined && defaultValue !== null
+                    ? String(defaultValue)
+                    : '';
+              }
+
+              // Add * if value differs from default OR if currently being modified
+              const isModified = modifiedSettings.has(item.value);
+              const effectiveCurrentValue =
+                currentValue !== undefined && currentValue !== null
+                  ? currentValue
+                  : defaultValue;
+              const isDifferentFromDefault =
+                effectiveCurrentValue !== defaultValue;
+
+              if (isDifferentFromDefault || isModified) {
+                displayValue += '*';
+              }
             }
           } else {
             // For booleans and other types, use existing logic

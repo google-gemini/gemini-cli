@@ -106,6 +106,8 @@ export const useGeminiStream = (
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
   const [isResponding, setIsResponding] = useState<boolean>(false);
+  const [justFinishedResponding, setJustFinishedResponding] =
+    useState<boolean>(false);
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
   const [pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
@@ -171,8 +173,12 @@ export const useGeminiStream = (
     if (toolCalls.some((tc) => tc.status === 'awaiting_approval')) {
       return StreamingState.WaitingForConfirmation;
     }
+    if (isResponding) {
+      return StreamingState.Responding;
+    }
+    // If AI just finished responding OR there are tools running, we're in ResponseComplete
     if (
-      isResponding ||
+      justFinishedResponding ||
       toolCalls.some(
         (tc) =>
           tc.status === 'executing' ||
@@ -185,10 +191,37 @@ export const useGeminiStream = (
               .responseSubmittedToGemini),
       )
     ) {
-      return StreamingState.Responding;
+      return StreamingState.ResponseComplete;
     }
     return StreamingState.Idle;
-  }, [isResponding, toolCalls]);
+  }, [isResponding, justFinishedResponding, toolCalls]);
+
+  // Track when AI just finished responding (transition from true to false)
+  const prevIsResponding = useRef(isResponding);
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+
+    if (
+      prevIsResponding.current &&
+      !isResponding &&
+      !turnCancelledRef.current
+    ) {
+      // AI just finished responding naturally (true -> false transition, not cancelled)
+      setJustFinishedResponding(true);
+      // Use setTimeout instead of queueMicrotask to ensure message queue has time to process
+      // This gives the message queue's useEffect a full render cycle to detect ResponseComplete state
+      const timeoutId = setTimeout(() => {
+        setJustFinishedResponding(false);
+      }, 0);
+      cleanup = () => clearTimeout(timeoutId);
+    } else if (isResponding) {
+      // AI started responding, clear the flag
+      setJustFinishedResponding(false);
+    }
+    prevIsResponding.current = isResponding;
+
+    return cleanup;
+  }, [isResponding]);
 
   useEffect(() => {
     if (
@@ -685,6 +718,7 @@ export const useGeminiStream = (
     ) => {
       if (
         (streamingState === StreamingState.Responding ||
+          streamingState === StreamingState.ResponseComplete ||
           streamingState === StreamingState.WaitingForConfirmation) &&
         !options?.isContinuation
       )

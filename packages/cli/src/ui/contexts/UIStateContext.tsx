@@ -80,6 +80,8 @@ export interface UIState {
   userTier: UserTierId | undefined;
   isProQuotaDialogOpen: boolean;
   currentModel: string;
+  // Model dialog visibility
+  isModelDialogOpen: boolean;
   // New fields for complete state management
   contextFileNames: string[];
   errorCount: number;

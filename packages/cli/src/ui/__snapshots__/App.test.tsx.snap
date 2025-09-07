@@ -2,7 +2,7 @@
 
 exports[`App UI > should render correctly with the prompt input box 1`] = `
 "
-
+                                                   queue: wait_for_idle (Ctrl+\` to toggle)
 ╭────────────────────────────────────────────────────────────────────────────────────────╮
 │ >   Type your message or @path/to/file                                                 │
 ╰────────────────────────────────────────────────────────────────────────────────────────╯
@@ -12,7 +12,7 @@ exports[`App UI > should render correctly with the prompt input box 1`] = `
 exports[`App UI > should render the initial UI correctly 1`] = `
 " I'm Feeling Lucky (esc to cancel, 0s)
 
-
+                                                   queue: wait_for_idle (Ctrl+\` to toggle)
 /test/dir               no sandbox (see /docs)                 model (100% context left)"
 `;
 
@@ -20,6 +20,7 @@ exports[`App UI > when in a narrow terminal > should render with a column layout
 "
 
 
+  queue: wait_for_idle (Ctrl+\` to toggle)
 ╭────────────────────────────────────────────────────────────────────────────────────────╮
 │ >   Type your message or @path/to/file                                                 │
 ╰────────────────────────────────────────────────────────────────────────────────────────╯

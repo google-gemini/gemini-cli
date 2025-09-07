@@ -16,6 +16,10 @@ export {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
 } from './src/config/config.js';
+export {
+  MESSAGE_QUEUE_MODES,
+  type MessageQueueMode,
+} from './src/config/config.js';
 export { getIdeInfo } from './src/ide/detect-ide.js';
 export { logIdeConnection } from './src/telemetry/loggers.js';
 export {

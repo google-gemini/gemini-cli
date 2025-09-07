@@ -40,42 +40,49 @@ describe('detectIde', () => {
 
   it('should detect Codespaces', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('CURSOR_TRACE_ID', undefined);
     vi.stubEnv('CODESPACES', 'true');
     expect(detectIde(ideProcessInfo)).toBe(DetectedIde.Codespaces);
   });
 
   it('should detect Cloud Shell via EDITOR_IN_CLOUD_SHELL', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('CURSOR_TRACE_ID', undefined);
     vi.stubEnv('EDITOR_IN_CLOUD_SHELL', 'true');
     expect(detectIde(ideProcessInfo)).toBe(DetectedIde.CloudShell);
   });
 
   it('should detect Cloud Shell via CLOUD_SHELL', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('CURSOR_TRACE_ID', undefined);
     vi.stubEnv('CLOUD_SHELL', 'true');
     expect(detectIde(ideProcessInfo)).toBe(DetectedIde.CloudShell);
   });
 
   it('should detect Trae', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('CURSOR_TRACE_ID', undefined);
     vi.stubEnv('TERM_PRODUCT', 'Trae');
     expect(detectIde(ideProcessInfo)).toBe(DetectedIde.Trae);
   });
 
   it('should detect Firebase Studio via MONOSPACE_ENV', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('CURSOR_TRACE_ID', undefined);
     vi.stubEnv('MONOSPACE_ENV', 'true');
     expect(detectIde(ideProcessInfo)).toBe(DetectedIde.FirebaseStudio);
   });
 
   it('should detect VSCode when no other IDE is detected and command includes "code"', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('CURSOR_TRACE_ID', undefined);
     vi.stubEnv('MONOSPACE_ENV', '');
     expect(detectIde(ideProcessInfo)).toBe(DetectedIde.VSCode);
   });
 
   it('should detect VSCodeFork when no other IDE is detected and command does not include "code"', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('CURSOR_TRACE_ID', undefined);
     vi.stubEnv('MONOSPACE_ENV', '');
     expect(detectIde(ideProcessInfoNoCode)).toBe(DetectedIde.VSCodeFork);
   });

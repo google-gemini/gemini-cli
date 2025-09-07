@@ -11,6 +11,7 @@ import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
+import { ModelDialog } from './ModelDialog.js';
 import { AuthInProgress } from '../auth/AuthInProgress.js';
 import { AuthDialog } from '../auth/AuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
@@ -129,6 +130,17 @@ export const DialogManager = () => {
           settings={settings}
           onSelect={() => uiActions.closeSettingsDialog()}
           onRestartRequest={() => process.exit(0)}
+        />
+      </Box>
+    );
+  }
+  if (uiState.isModelDialogOpen) {
+    return (
+      <Box flexDirection="column">
+        <ModelDialog
+          onSelect={uiActions.handleModelSelect}
+          onClose={uiActions.closeModelDialog}
+          currentModel={uiState.currentModel}
         />
       </Box>
     );

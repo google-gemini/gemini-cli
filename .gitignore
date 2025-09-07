@@ -43,3 +43,7 @@ packages/vscode-ide-companion/*.vsix
 
 # GHA credentials
 gha-creds-*.json
+
+# Claude AI assistant files
+.claude
+CLAUDE.md

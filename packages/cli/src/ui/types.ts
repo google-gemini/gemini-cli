@@ -29,6 +29,7 @@ export enum AuthState {
 export enum StreamingState {
   Idle = 'idle',
   Responding = 'responding',
+  ResponseComplete = 'response_complete',
   WaitingForConfirmation = 'waiting_for_confirmation',
 }
 

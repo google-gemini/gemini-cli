@@ -8,6 +8,7 @@ import { Box, Text } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
+import { MessageQueueIndicator } from './MessageQueueIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { InputPrompt } from './InputPrompt.js';
@@ -37,6 +38,8 @@ export const Composer = () => {
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
 
   const { contextFileNames, showAutoAcceptIndicator } = uiState;
+  const messageQueueMode =
+    settings.merged.general?.messageQueueMode ?? 'wait_for_idle';
 
   // Build footer props from context values
   const footerProps: Omit<FooterProps, 'vimMode'> = {
@@ -136,6 +139,9 @@ export const Composer = () => {
               <AutoAcceptIndicator approvalMode={showAutoAcceptIndicator} />
             )}
           {uiState.shellModeActive && <ShellModeIndicator />}
+          {!uiState.shellModeActive && (
+            <MessageQueueIndicator mode={messageQueueMode} />
+          )}
         </Box>
       </Box>
 
