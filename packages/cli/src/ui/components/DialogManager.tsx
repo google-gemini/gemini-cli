@@ -17,6 +17,7 @@ import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { WorkspaceMigrationDialog } from './WorkspaceMigrationDialog.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
+import { PermissionsDialog } from './PermissionsDialog.js';
 import { Colors } from '../colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
@@ -129,6 +130,16 @@ export const DialogManager = () => {
           settings={settings}
           onSelect={() => uiActions.closeSettingsDialog()}
           onRestartRequest={() => process.exit(0)}
+        />
+      </Box>
+    );
+  }
+  if (uiState.isPermissionsDialogOpen) {
+    return (
+      <Box flexDirection="column">
+        <PermissionsDialog
+          config={config}
+          onClose={uiActions.closePermissionsDialog}
         />
       </Box>
     );

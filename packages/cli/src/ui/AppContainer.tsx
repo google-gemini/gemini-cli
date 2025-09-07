@@ -46,6 +46,7 @@ import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
+import { usePermissionsCommand } from './hooks/usePermissionsCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
@@ -361,6 +362,12 @@ Logging in with Google... Please restart Gemini CLI to continue.
     useSettingsCommand();
 
   const {
+    isPermissionsDialogOpen,
+    openPermissionsDialog,
+    closePermissionsDialog,
+  } = usePermissionsCommand();
+
+  const {
     showWorkspaceMigrationDialog,
     workspaceExtensions,
     onWorkspaceMigrationDialogOpen,
@@ -376,6 +383,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       openEditorDialog,
       openPrivacyNotice: () => setShowPrivacyNotice(true),
       openSettingsDialog,
+      openPermissionsDialog,
       quit: (messages: HistoryItem[]) => {
         setQuittingMessages(messages);
         setTimeout(async () => {
@@ -391,6 +399,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       openThemeDialog,
       openEditorDialog,
       openSettingsDialog,
+      openPermissionsDialog,
       setQuittingMessages,
       setDebugMessage,
       setShowPrivacyNotice,
@@ -710,7 +719,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     return terminalHeight - staticExtraHeight;
   }, [terminalHeight]);
 
-  const isFocused = useFocus();
+  const terminalFocused = useFocus();
   useBracketedPaste();
 
   // Context file names computation
@@ -735,6 +744,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       !isAuthDialogOpen &&
       !isThemeDialogOpen &&
       !isEditorDialogOpen &&
+      !isSettingsDialogOpen &&
+      !isPermissionsDialogOpen &&
       !showPrivacyNotice &&
       geminiClient?.isInitialized?.()
     ) {
@@ -748,6 +759,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isAuthDialogOpen,
     isThemeDialogOpen,
     isEditorDialogOpen,
+    isSettingsDialogOpen,
+    isPermissionsDialogOpen,
     showPrivacyNotice,
     geminiClient,
   ]);
@@ -902,6 +915,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
         isAuthDialogOpen ||
         isEditorDialogOpen ||
         isSettingsDialogOpen ||
+        isPermissionsDialogOpen ||
         isFolderTrustDialogOpen ||
         showPrivacyNotice;
       if (anyDialogOpen) {
@@ -969,6 +983,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isAuthDialogOpen,
       isEditorDialogOpen,
       isSettingsDialogOpen,
+      isPermissionsDialogOpen,
       isFolderTrustDialogOpen,
       showPrivacyNotice,
       settings.merged.general?.debugKeystrokeLogging,
@@ -1012,6 +1027,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       !!confirmationRequest ||
       isThemeDialogOpen ||
       isSettingsDialogOpen ||
+      isPermissionsDialogOpen ||
       isAuthenticating ||
       isAuthDialogOpen ||
       isEditorDialogOpen ||
@@ -1025,6 +1041,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       confirmationRequest,
       isThemeDialogOpen,
       isSettingsDialogOpen,
+      isPermissionsDialogOpen,
       isAuthenticating,
       isAuthDialogOpen,
       isEditorDialogOpen,
@@ -1032,6 +1049,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isProQuotaDialogOpen,
     ],
   );
+
+  // Disable input focus when dialogs are visible
+  const isFocused = terminalFocused && !dialogsVisible;
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
@@ -1053,6 +1073,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       debugMessage,
       quittingMessages,
       isSettingsDialogOpen,
+      isPermissionsDialogOpen,
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
@@ -1126,6 +1147,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       debugMessage,
       quittingMessages,
       isSettingsDialogOpen,
+      isPermissionsDialogOpen,
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
@@ -1199,6 +1221,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       exitEditorDialog,
       exitPrivacyNotice: () => setShowPrivacyNotice(false),
       closeSettingsDialog,
+      closePermissionsDialog,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,
@@ -1221,6 +1244,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleEditorSelect,
       exitEditorDialog,
       closeSettingsDialog,
+      closePermissionsDialog,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,
