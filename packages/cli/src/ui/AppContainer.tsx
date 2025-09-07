@@ -20,7 +20,7 @@ import {
   type HistoryItemWithoutId,
   AuthState,
 } from './types.js';
-import { MessageType } from './types.js';
+import { MessageType, StreamingState } from './types.js';
 import {
   type EditorType,
   type Config,
@@ -699,7 +699,20 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
-  const isInputActive = !initError && !isProcessing;
+  /**
+   * Determines if the input prompt should be active and accept user input.
+   * Input is disabled during:
+   * - Initialization errors
+   * - Slash command processing
+   * - Tool confirmations (WaitingForConfirmation state)
+   * - Any future streaming states not explicitly allowed
+   */
+  const isInputActive =
+    !initError &&
+    !isProcessing &&
+    (streamingState === StreamingState.Idle ||
+      streamingState === StreamingState.Responding) &&
+    !isProQuotaDialogOpen;
 
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = useMemo(() => {
