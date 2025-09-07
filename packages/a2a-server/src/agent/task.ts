@@ -89,11 +89,10 @@ export class Task {
     this.completedToolCalls = [];
     this._resetToolCompletionPromise();
     this.config.setFallbackHandler(
-      async (currentModel: string, fallbackModel: string): Promise<'stop'> => {
-        config.setModel(fallbackModel); // gemini-cli-core sets to DEFAULT_GEMINI_FLASH_MODEL
-        // Switch model for future use but return false to stop current retry
-        return 'stop';
-      },
+      // For a2a-server, we want to automatically switch to the fallback model
+      // for future requests without retrying the current one. The 'stop'
+      // intent achieves this.
+      async () => 'stop',
     );
   }
 

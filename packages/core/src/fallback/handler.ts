@@ -51,9 +51,11 @@ export async function handleFallback(
   }
 }
 
-function activateFallbackMode(config: Config, authType: string) {
+function activateFallbackMode(config: Config, authType: string | undefined) {
   if (!config.isInFallbackMode()) {
     config.setFallbackMode(true);
-    logFlashFallback(config, new FlashFallbackEvent(authType));
+    if (authType) {
+      logFlashFallback(config, new FlashFallbackEvent(authType));
+    }
   }
 }
