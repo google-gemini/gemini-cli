@@ -19,7 +19,7 @@ import { DebugProfiler } from './DebugProfiler.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 
-interface FooterProps {
+export interface FooterProps {
   model: string;
   targetDir: string;
   branchName?: string;
@@ -124,31 +124,35 @@ export const Footer: React.FC<FooterProps> = ({
 
       {/* Right Section: Gemini Label and Console Summary */}
       <Box alignItems="center" paddingTop={isNarrow ? 1 : 0}>
-        <Text color={theme.text.accent}>
-          {isNarrow ? '' : ' '}
-          {model}{' '}
-          <ContextUsageDisplay
-            promptTokenCount={promptTokenCount}
-            model={model}
-          />
-        </Text>
-        {corgiMode && (
-          <Text>
-            <Text color={theme.ui.symbol}>| </Text>
-            <Text color={theme.status.error}>▼</Text>
-            <Text color={theme.text.primary}>(´</Text>
-            <Text color={theme.status.error}>ᴥ</Text>
-            <Text color={theme.text.primary}>`)</Text>
-            <Text color={theme.status.error}>▼ </Text>
+        <Box alignItems="center">
+          <Text color={theme.text.accent}>
+            {isNarrow ? '' : ' '}
+            {model}{' '}
+            <ContextUsageDisplay
+              promptTokenCount={promptTokenCount}
+              model={model}
+            />
           </Text>
-        )}
-        {!showErrorDetails && errorCount > 0 && (
-          <Box>
-            <Text color={theme.ui.symbol}>| </Text>
-            <ConsoleSummaryDisplay errorCount={errorCount} />
-          </Box>
-        )}
-        {showMemoryUsage && <MemoryUsageDisplay />}
+          {showMemoryUsage && <MemoryUsageDisplay />}
+        </Box>
+        <Box alignItems="center" paddingLeft={2}>
+          {corgiMode && (
+            <Text>
+              <Text color={theme.ui.symbol}>| </Text>
+              <Text color={theme.status.error}>▼</Text>
+              <Text color={theme.text.primary}>(´</Text>
+              <Text color={theme.status.error}>ᴥ</Text>
+              <Text color={theme.text.primary}>`)</Text>
+              <Text color={theme.status.error}>▼ </Text>
+            </Text>
+          )}
+          {!showErrorDetails && errorCount > 0 && (
+            <Box>
+              <Text color={theme.ui.symbol}>| </Text>
+              <ConsoleSummaryDisplay errorCount={errorCount} />
+            </Box>
+          )}
+        </Box>
       </Box>
     </Box>
   );

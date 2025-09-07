@@ -1,0 +1,103 @@
+graph LR
+    %% --- Style Definitions ---
+    classDef new fill:#98fb98,color:#000
+    classDef changed fill:#add8e6,color:#000
+    classDef unchanged fill:#f0f0f0,color:#000
+
+    %% --- Subgraphs ---
+    subgraph "Context Providers"
+        direction TB
+        A["gemini.tsx"]
+        B["AppContainer.tsx"]
+    end
+
+    subgraph "Contexts"
+        direction TB
+        CtxSession["SessionContext"]
+        CtxVim["VimModeContext"]
+        CtxSettings["SettingsContext"]
+        CtxApp["AppContext"]
+        CtxConfig["ConfigContext"]
+        CtxUIState["UIStateContext"]
+        CtxUIActions["UIActionsContext"]
+    end
+
+    subgraph "Component Consumers"
+        direction TB
+        ConsumerApp["App"]
+        ConsumerAppContainer["AppContainer"]
+        ConsumerAppHeader["AppHeader"]
+        ConsumerDialogManager["DialogManager"]
+        ConsumerHistoryItem["HistoryItemDisplay"]
+        ConsumerComposer["Composer"]
+        ConsumerMainContent["MainContent"]
+        ConsumerNotifications["Notifications"]
+    end
+
+    %% --- Provider -> Context Connections ---
+    A -.-> CtxSession
+    A -.-> CtxVim
+    A -.-> CtxSettings
+
+    B -.-> CtxApp
+    B -.-> CtxConfig
+    B -.-> CtxUIState
+    B -.-> CtxUIActions
+    B -.-> CtxSettings
+
+    %% --- Context -> Consumer Connections ---
+    CtxSession -.-> ConsumerAppContainer
+    CtxSession -.-> ConsumerApp
+
+    CtxVim -.-> ConsumerAppContainer
+    CtxVim -.-> ConsumerComposer
+    CtxVim -.-> ConsumerApp
+
+    CtxSettings -.-> ConsumerAppContainer
+    CtxSettings -.-> ConsumerAppHeader
+    CtxSettings -.-> ConsumerDialogManager
+    CtxSettings -.-> ConsumerApp
+
+    CtxApp -.-> ConsumerAppHeader
+    CtxApp -.-> ConsumerNotifications
+
+    CtxConfig -.-> ConsumerAppHeader
+    CtxConfig -.-> ConsumerHistoryItem
+    CtxConfig -.-> ConsumerComposer
+    CtxConfig -.-> ConsumerDialogManager
+
+
+
+    CtxUIState -.-> ConsumerApp
+    CtxUIState -.-> ConsumerMainContent
+    CtxUIState -.-> ConsumerComposer
+    CtxUIState -.-> ConsumerDialogManager
+
+    CtxUIActions -.-> ConsumerComposer
+    CtxUIActions -.-> ConsumerDialogManager
+
+    %% --- Apply Styles ---
+    %% New Elements (Green)
+    class B,CtxApp,CtxConfig,CtxUIState,CtxUIActions,ConsumerAppHeader,ConsumerDialogManager,ConsumerComposer,ConsumerMainContent,ConsumerNotifications new
+
+    %% Heavily Changed Elements (Blue)
+    class A,ConsumerApp,ConsumerAppContainer,ConsumerHistoryItem changed
+
+    %% Mostly Unchanged Elements (Gray)
+    class CtxSession,CtxVim,CtxSettings unchanged
+
+    %% --- Link Styles ---
+    %% CtxSession (Red)
+    linkStyle 0,8,9 stroke:#e57373,stroke-width:2px
+    %% CtxVim (Orange)
+    linkStyle 1,10,11,12 stroke:#ffb74d,stroke-width:2px
+    %% CtxSettings (Yellow)
+    linkStyle 2,7,13,14,15,16 stroke:#fff176,stroke-width:2px
+    %% CtxApp (Green)
+    linkStyle 3,17,18 stroke:#81c784,stroke-width:2px
+    %% CtxConfig (Blue)
+    linkStyle 4,19,20,21,22 stroke:#64b5f6,stroke-width:2px
+    %% CtxUIState (Indigo)
+    linkStyle 5,23,24,25,26 stroke:#7986cb,stroke-width:2px
+    %% CtxUIActions (Violet)
+    linkStyle 6,27,28 stroke:#ba68c8,stroke-width:2px

@@ -23,6 +23,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
+import { parseInputForHighlighting } from '../utils/highlight.js';
 import {
   clipboardHasImage,
   saveClipboardImage,
@@ -70,6 +71,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [escPressCount, setEscPressCount] = useState(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [recentPasteTime, setRecentPasteTime] = useState<number | null>(null);
+  const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Refs for robust IME submission handling
   const bufferRef = useRef(buffer);
@@ -140,6 +143,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       if (imeTimeoutRef.current) {
         clearTimeout(imeTimeoutRef.current);
+      }
+      if (pasteTimeoutRef.current) {
+        clearTimeout(pasteTimeoutRef.current);
       }
     },
     [],
@@ -284,6 +290,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.paste) {
+        // Record paste time to prevent accidental auto-submission
+        setRecentPasteTime(Date.now());
+
+        // Clear any existing paste timeout
+        if (pasteTimeoutRef.current) {
+          clearTimeout(pasteTimeoutRef.current);
+        }
+
+        // Clear the paste protection after a safe delay
+        pasteTimeoutRef.current = setTimeout(() => {
+          setRecentPasteTime(null);
+          pasteTimeoutRef.current = null;
+        }, 500);
+
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
         return;
@@ -506,6 +526,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (keyMatchers[Command.SUBMIT](key)) {
         if (buffer.text.trim()) {
+          // Check if a paste operation occurred recently to prevent accidental auto-submission
+          if (recentPasteTime !== null) {
+            // Paste occurred recently, ignore this submit to prevent auto-execution
+            return;
+          }
+
           const [row, col] = buffer.cursor;
           const line = buffer.lines[row];
           const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
@@ -550,6 +576,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       if (keyMatchers[Command.KILL_LINE_LEFT](key)) {
         buffer.killLineLeft();
+        return;
+      }
+
+      if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) {
+        buffer.deleteWordLeft();
         return;
       }
 
@@ -599,6 +630,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       textBeforeReverseSearch,
       cursorPosition,
       deferAndSubmit,
+      recentPasteTime,
     ],
   );
 
@@ -764,70 +796,95 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           ) : (
             linesToRender
               .map((lineText, visualIdxInRenderedSet) => {
+                const tokens = parseInputForHighlighting(
+                  lineText,
+                  visualIdxInRenderedSet,
+                );
                 const cursorVisualRow =
                   cursorVisualRowAbsolute - scrollVisualRow;
-                let display = cpSlice(lineText, 0, inputWidth);
-
                 const isOnCursorLine =
                   focus && visualIdxInRenderedSet === cursorVisualRow;
-                const currentLineGhost = isOnCursorLine ? inlineGhost : '';
 
-                const ghostWidth = stringWidth(currentLineGhost);
+                const renderedLine: React.ReactNode[] = [];
+                let charCount = 0;
 
-                if (focus && visualIdxInRenderedSet === cursorVisualRow) {
-                  const relativeVisualColForHighlight = cursorVisualColAbsolute;
+                tokens.forEach((token, tokenIdx) => {
+                  let display = token.text;
+                  if (isOnCursorLine) {
+                    const relativeVisualColForHighlight =
+                      cursorVisualColAbsolute;
+                    const tokenStart = charCount;
+                    const tokenEnd = tokenStart + cpLen(token.text);
 
-                  if (relativeVisualColForHighlight >= 0) {
-                    if (relativeVisualColForHighlight < cpLen(display)) {
-                      const charToHighlight =
-                        cpSlice(
-                          display,
-                          relativeVisualColForHighlight,
-                          relativeVisualColForHighlight + 1,
-                        ) || ' ';
+                    if (
+                      relativeVisualColForHighlight >= tokenStart &&
+                      relativeVisualColForHighlight < tokenEnd
+                    ) {
+                      const charToHighlight = cpSlice(
+                        token.text,
+                        relativeVisualColForHighlight - tokenStart,
+                        relativeVisualColForHighlight - tokenStart + 1,
+                      );
                       const highlighted = chalk.inverse(charToHighlight);
                       display =
-                        cpSlice(display, 0, relativeVisualColForHighlight) +
+                        cpSlice(
+                          token.text,
+                          0,
+                          relativeVisualColForHighlight - tokenStart,
+                        ) +
                         highlighted +
-                        cpSlice(display, relativeVisualColForHighlight + 1);
-                    } else if (
-                      relativeVisualColForHighlight === cpLen(display)
-                    ) {
-                      if (!currentLineGhost) {
-                        display = display + chalk.inverse(' ');
-                      }
+                        cpSlice(
+                          token.text,
+                          relativeVisualColForHighlight - tokenStart + 1,
+                        );
                     }
+                    charCount = tokenEnd;
+                  }
+
+                  const color =
+                    token.type === 'command' || token.type === 'file'
+                      ? theme.text.accent
+                      : undefined;
+
+                  renderedLine.push(
+                    <Text key={`token-${tokenIdx}`} color={color}>
+                      {display}
+                    </Text>,
+                  );
+                });
+                const currentLineGhost = isOnCursorLine ? inlineGhost : '';
+
+                if (
+                  isOnCursorLine &&
+                  cursorVisualColAbsolute === cpLen(lineText)
+                ) {
+                  if (!currentLineGhost) {
+                    renderedLine.push(
+                      <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
+                        {chalk.inverse(' ')}
+                      </Text>,
+                    );
                   }
                 }
 
                 const showCursorBeforeGhost =
                   focus &&
-                  visualIdxInRenderedSet === cursorVisualRow &&
-                  cursorVisualColAbsolute ===
-                    // eslint-disable-next-line no-control-regex
-                    cpLen(display.replace(/\x1b\[[0-9;]*m/g, '')) &&
+                  isOnCursorLine &&
+                  cursorVisualColAbsolute === cpLen(lineText) &&
                   currentLineGhost;
 
-                const actualDisplayWidth = stringWidth(display);
-                const cursorWidth = showCursorBeforeGhost ? 1 : 0;
-                const totalContentWidth =
-                  actualDisplayWidth + cursorWidth + ghostWidth;
-                const trailingPadding = Math.max(
-                  0,
-                  inputWidth - totalContentWidth,
-                );
-
                 return (
-                  <Text key={`line-${visualIdxInRenderedSet}`}>
-                    {display}
-                    {showCursorBeforeGhost && chalk.inverse(' ')}
-                    {currentLineGhost && (
-                      <Text color={theme.text.secondary}>
-                        {currentLineGhost}
-                      </Text>
-                    )}
-                    {trailingPadding > 0 && ' '.repeat(trailingPadding)}
-                  </Text>
+                  <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
+                    <Text>
+                      {renderedLine}
+                      {showCursorBeforeGhost && chalk.inverse(' ')}
+                      {currentLineGhost && (
+                        <Text color={theme.text.secondary}>
+                          {currentLineGhost}
+                        </Text>
+                      )}
+                    </Text>
+                  </Box>
                 );
               })
               .concat(
