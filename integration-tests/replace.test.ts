@@ -61,34 +61,4 @@ describe('replace', () => {
       console.log('File replaced successfully. New content:', newFileContent);
     }
   });
-
-  it('should handle $ literally when replacing text ending with $', async () => {
-    const rig = new TestRig();
-    await rig.setup(
-      'should handle $ literally when replacing text ending with $',
-    );
-
-    const fileName = 'regex.yml';
-    const originalContent = "| select('match', '^[sv]d[a-z]$')\n";
-    const expectedContent = "| select('match', '^[sv]d[a-z]$') # updated\n";
-
-    rig.createFile(fileName, originalContent);
-
-    const prompt =
-      "Open regex.yml and append ' # updated' after the line containing ^[sv]d[a-z]$ without breaking the $ character.";
-
-    const result = await rig.run(prompt);
-    const foundToolCall = await rig.waitForToolCall('replace');
-
-    if (!foundToolCall) {
-      printDebugInfo(rig, result);
-    }
-
-    expect(foundToolCall, 'Expected to find a replace tool call').toBeTruthy();
-
-    validateModelOutput(result, ['regex.yml'], 'Replace $ literal test');
-
-    const newFileContent = rig.readFile(fileName);
-    expect(newFileContent).toBe(expectedContent);
-  });
 });

@@ -226,7 +226,12 @@ describe('useSlashCompletion', () => {
 
       await waitFor(() => {
         expect(result.current.suggestions).toEqual([
-          { label: 'memory', value: 'memory', description: 'Manage memory' },
+          {
+            label: 'memory',
+            value: 'memory',
+            description: 'Manage memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
         ]);
       });
     });
@@ -254,6 +259,7 @@ describe('useSlashCompletion', () => {
             label: 'stats',
             value: 'stats',
             description: 'check session stats. Usage: /stats [model|tools]',
+            commandKind: CommandKind.BUILT_IN,
           },
         ]);
       });
@@ -341,6 +347,31 @@ describe('useSlashCompletion', () => {
 
       expect(result.current.suggestions).toHaveLength(0);
     });
+
+    it('should not suggest hidden commands', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'visible',
+          description: 'A visible command',
+        }),
+        createTestCommand({
+          name: 'hidden',
+          description: 'A hidden command',
+          hidden: true,
+        }),
+      ];
+      const { result } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions.length).toBe(1);
+      expect(result.current.suggestions[0].label).toBe('visible');
+    });
   });
 
   describe('Sub-Commands', () => {
@@ -368,8 +399,18 @@ describe('useSlashCompletion', () => {
       expect(result.current.suggestions).toHaveLength(2);
       expect(result.current.suggestions).toEqual(
         expect.arrayContaining([
-          { label: 'show', value: 'show', description: 'Show memory' },
-          { label: 'add', value: 'add', description: 'Add to memory' },
+          {
+            label: 'show',
+            value: 'show',
+            description: 'Show memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
+          {
+            label: 'add',
+            value: 'add',
+            description: 'Add to memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
         ]),
       );
     });
@@ -397,8 +438,18 @@ describe('useSlashCompletion', () => {
       expect(result.current.suggestions).toHaveLength(2);
       expect(result.current.suggestions).toEqual(
         expect.arrayContaining([
-          { label: 'show', value: 'show', description: 'Show memory' },
-          { label: 'add', value: 'add', description: 'Add to memory' },
+          {
+            label: 'show',
+            value: 'show',
+            description: 'Show memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
+          {
+            label: 'add',
+            value: 'add',
+            description: 'Add to memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
         ]),
       );
     });
@@ -425,7 +476,12 @@ describe('useSlashCompletion', () => {
 
       await waitFor(() => {
         expect(result.current.suggestions).toEqual([
-          { label: 'add', value: 'add', description: 'Add to memory' },
+          {
+            label: 'add',
+            value: 'add',
+            description: 'Add to memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
         ]);
       });
     });
@@ -574,473 +630,166 @@ describe('useSlashCompletion', () => {
     });
   });
 
-  describe('Fuzzy Matching', () => {
-    const fuzzyTestCommands = [
-      createTestCommand({
-        name: 'help',
-        altNames: ['?'],
-        description: 'Show help',
-      }),
-      createTestCommand({
-        name: 'history',
-        description: 'Show command history',
-      }),
-      createTestCommand({ name: 'hello', description: 'Hello world command' }),
-      createTestCommand({
-        name: 'config',
-        altNames: ['configure'],
-        description: 'Configure settings',
-      }),
-      createTestCommand({ name: 'clear', description: 'Clear the screen' }),
-    ];
+  describe('Command Kind Information', () => {
+    it('should include commandKind for MCP commands in suggestions', async () => {
+      const slashCommands = [
+        {
+          name: 'summarize',
+          description: 'Summarize content',
+          kind: CommandKind.MCP_PROMPT,
+          action: vi.fn(),
+        },
+        {
+          name: 'help',
+          description: 'Show help',
+          kind: CommandKind.BUILT_IN,
+          action: vi.fn(),
+        },
+      ] as SlashCommand[];
 
-    it('should match commands with fuzzy search for partial queries', async () => {
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/he',
-          fuzzyTestCommands,
-          mockCommandContext,
-        ),
-      );
-
-      await waitFor(() => {
-        expect(result.current.suggestions.length).toBeGreaterThan(0);
-      });
-
-      const labels = result.current.suggestions.map((s) => s.label);
-      expect(labels).toEqual(expect.arrayContaining(['help', 'hello']));
-    });
-
-    it('should handle case-insensitive fuzzy matching', async () => {
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/HeLp',
-          fuzzyTestCommands,
-          mockCommandContext,
-        ),
-      );
-
-      await waitFor(() => {
-        expect(result.current.suggestions.length).toBeGreaterThan(0);
-      });
-
-      const labels = result.current.suggestions.map((s) => s.label);
-      expect(labels).toContain('help');
-    });
-
-    it('should provide typo-tolerant matching', async () => {
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/hlp',
-          fuzzyTestCommands,
-          mockCommandContext,
-        ),
-      );
-
-      await waitFor(() => {
-        expect(result.current.suggestions.length).toBeGreaterThan(0);
-      });
-
-      const labels = result.current.suggestions.map((s) => s.label);
-      expect(labels).toContain('help');
-    });
-
-    it('should match against alternative names with fuzzy search', async () => {
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/conf',
-          fuzzyTestCommands,
-          mockCommandContext,
-        ),
-      );
-
-      await waitFor(() => {
-        expect(result.current.suggestions.length).toBeGreaterThan(0);
-      });
-
-      const labels = result.current.suggestions.map((s) => s.label);
-      expect(labels).toContain('config');
-    });
-
-    it('should fallback to prefix matching when AsyncFzf find fails', async () => {
-      // Mock console.error to avoid noise in test output
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
-      // Import the mocked AsyncFzf
-      const { AsyncFzf } = await import('fzf');
-
-      // Create a failing find method for this specific test
-      const mockFind = vi
-        .fn()
-        .mockRejectedValue(new Error('AsyncFzf find failed'));
-
-      // Mock AsyncFzf to return an instance with failing find
-      vi.mocked(AsyncFzf).mockImplementation(
-        (_items, _options) =>
-          ({
-            finder: vi.fn(),
-            find: mockFind,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          }) as any,
-      );
-
-      const testCommands = [
-        createTestCommand({ name: 'clear', description: 'Clear the screen' }),
-        createTestCommand({
-          name: 'config',
-          description: 'Configure settings',
-        }),
-        createTestCommand({ name: 'chat', description: 'Start chat' }),
-      ];
-
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/cle',
-          testCommands,
-          mockCommandContext,
-        ),
-      );
-
-      await waitFor(() => {
-        expect(result.current.suggestions.length).toBeGreaterThan(0);
-      });
-
-      // Should still get suggestions via prefix matching fallback
-      const labels = result.current.suggestions.map((s) => s.label);
-      expect(labels).toContain('clear');
-      expect(labels).not.toContain('config'); // Doesn't start with 'cle'
-      expect(labels).not.toContain('chat'); // Doesn't start with 'cle'
-
-      // Verify the error was logged
-      await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          '[Fuzzy search - falling back to prefix matching]',
-          expect.any(Error),
-        );
-      });
-
-      consoleErrorSpy.mockRestore();
-
-      // Reset AsyncFzf mock to default behavior for other tests
-      vi.mocked(AsyncFzf).mockImplementation(createDefaultAsyncFzfMock());
-    });
-
-    it('should show all commands for empty partial query', async () => {
       const { result } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
           '/',
-          fuzzyTestCommands,
-          mockCommandContext,
-        ),
-      );
-
-      expect(result.current.suggestions.length).toBe(fuzzyTestCommands.length);
-    });
-
-    it('should handle AsyncFzf errors gracefully and fallback to prefix matching', async () => {
-      // Mock console.error to avoid noise in test output
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
-      // Import the mocked AsyncFzf
-      const { AsyncFzf } = await import('fzf');
-
-      // Create a failing find method for this specific test
-      const mockFind = vi
-        .fn()
-        .mockRejectedValue(new Error('AsyncFzf error in find'));
-
-      // Mock AsyncFzf to return an instance with failing find
-      vi.mocked(AsyncFzf).mockImplementation(
-        (_items, _options) =>
-          ({
-            finder: vi.fn(),
-            find: mockFind,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          }) as any,
-      );
-
-      const testCommands = [
-        { name: 'test', description: 'Test command' },
-        { name: 'temp', description: 'Temporary command' },
-      ] as unknown as SlashCommand[];
-
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/te',
-          testCommands,
-          mockCommandContext,
-        ),
-      );
-
-      await waitFor(() => {
-        expect(result.current.suggestions.length).toBeGreaterThan(0);
-      });
-
-      // Should get suggestions via prefix matching fallback
-      const labels = result.current.suggestions.map((s) => s.label);
-      expect(labels).toEqual(expect.arrayContaining(['test', 'temp']));
-
-      // Verify the error was logged
-      await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          '[Fuzzy search - falling back to prefix matching]',
-          expect.any(Error),
-        );
-      });
-
-      consoleErrorSpy.mockRestore();
-
-      // Reset AsyncFzf mock to default behavior for other tests
-      vi.mocked(AsyncFzf).mockImplementation(createDefaultAsyncFzfMock());
-    });
-
-    it('should cache AsyncFzf instances for performance', async () => {
-      // Reset constructor call count and ensure mock is set up correctly
-      resetConstructorCallCount();
-
-      // Import the mocked AsyncFzf
-      const { AsyncFzf } = await import('fzf');
-      vi.mocked(AsyncFzf).mockImplementation(createDefaultAsyncFzfMock());
-
-      const { result, rerender } = renderHook(
-        ({ query }) =>
-          useTestHarnessForSlashCompletion(
-            true,
-            query,
-            fuzzyTestCommands,
-            mockCommandContext,
-          ),
-        { initialProps: { query: '/he' } },
-      );
-
-      await waitFor(() => {
-        expect(result.current.suggestions.length).toBeGreaterThan(0);
-      });
-
-      const firstResults = result.current.suggestions.map((s) => s.label);
-      const callCountAfterFirst = getConstructorCallCount();
-      expect(callCountAfterFirst).toBeGreaterThan(0);
-
-      // Rerender with same query - should use cached instance
-      rerender({ query: '/he' });
-
-      await waitFor(() => {
-        expect(result.current.suggestions.length).toBeGreaterThan(0);
-      });
-
-      const secondResults = result.current.suggestions.map((s) => s.label);
-      const callCountAfterSecond = getConstructorCallCount();
-
-      // Should have same number of constructor calls (reused cached instance)
-      expect(callCountAfterSecond).toBe(callCountAfterFirst);
-      expect(secondResults).toEqual(firstResults);
-
-      // Different query should still use same cached instance for same command set
-      rerender({ query: '/hel' });
-
-      await waitFor(() => {
-        expect(result.current.suggestions.length).toBeGreaterThan(0);
-      });
-
-      const thirdCallCount = getConstructorCallCount();
-      expect(thirdCallCount).toBe(callCountAfterFirst); // Same constructor call count
-    });
-
-    it('should not return duplicate suggestions when query matches both name and altNames', async () => {
-      const commandsWithAltNames = [
-        createTestCommand({
-          name: 'config',
-          altNames: ['configure', 'conf'],
-          description: 'Configure settings',
-        }),
-        createTestCommand({
-          name: 'help',
-          altNames: ['?'],
-          description: 'Show help',
-        }),
-      ];
-
-      const { result } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/con',
-          commandsWithAltNames,
-          mockCommandContext,
-        ),
-      );
-
-      await waitFor(() => {
-        expect(result.current.suggestions.length).toBeGreaterThan(0);
-      });
-
-      const labels = result.current.suggestions.map((s) => s.label);
-      const uniqueLabels = new Set(labels);
-
-      // Should not have duplicates
-      expect(labels.length).toBe(uniqueLabels.size);
-      expect(labels).toContain('config');
-    });
-  });
-  describe('Race Condition Handling', () => {
-    it('should handle rapid input changes without race conditions', async () => {
-      const mockDelayedCompletion = vi
-        .fn()
-        .mockImplementation(
-          async (_context: CommandContext, partialArg: string) => {
-            // Simulate network delay with different delays for different inputs
-            const delay = partialArg.includes('slow') ? 200 : 50;
-            await new Promise((resolve) => setTimeout(resolve, delay));
-            return [`suggestion-for-${partialArg}`];
-          },
-        );
-
-      const slashCommands = [
-        createTestCommand({
-          name: 'test',
-          description: 'Test command',
-          completion: mockDelayedCompletion,
-        }),
-      ];
-
-      const { result, rerender } = renderHook(
-        ({ query }) =>
-          useTestHarnessForSlashCompletion(
-            true,
-            query,
-            slashCommands,
-            mockCommandContext,
-          ),
-        { initialProps: { query: '/test slowquery' } },
-      );
-
-      // Quickly change to a faster query
-      rerender({ query: '/test fastquery' });
-
-      await waitFor(() => {
-        expect(result.current.suggestions.length).toBeGreaterThan(0);
-      });
-
-      // Should show suggestions for the latest query only
-      const labels = result.current.suggestions.map((s) => s.label);
-      expect(labels).toContain('suggestion-for-fastquery');
-      expect(labels).not.toContain('suggestion-for-slowquery');
-    });
-
-    it('should not update suggestions if component unmounts during async operation', async () => {
-      let resolveCompletion: (value: string[]) => void;
-      const mockCompletion = vi.fn().mockImplementation(
-        async () =>
-          new Promise<string[]>((resolve) => {
-            resolveCompletion = resolve;
-          }),
-      );
-
-      const slashCommands = [
-        createTestCommand({
-          name: 'test',
-          description: 'Test command',
-          completion: mockCompletion,
-        }),
-      ];
-
-      const { unmount } = renderHook(() =>
-        useTestHarnessForSlashCompletion(
-          true,
-          '/test query',
           slashCommands,
           mockCommandContext,
         ),
       );
 
-      // Start the async operation
-      await waitFor(() => {
-        expect(mockCompletion).toHaveBeenCalled();
-      });
-
-      // Unmount before completion resolves
-      unmount();
-
-      // Now resolve the completion
-      resolveCompletion!(['late-suggestion']);
-
-      // Wait a bit to ensure any pending updates would have been processed
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Since the component is unmounted, suggestions should remain empty
-      // and no state update errors should occur
-      expect(true).toBe(true); // Test passes if no errors are thrown
+      expect(result.current.suggestions).toEqual(
+        expect.arrayContaining([
+          {
+            label: 'summarize',
+            value: 'summarize',
+            description: 'Summarize content',
+            commandKind: CommandKind.MCP_PROMPT,
+          },
+          {
+            label: 'help',
+            value: 'help',
+            description: 'Show help',
+            commandKind: CommandKind.BUILT_IN,
+          },
+        ]),
+      );
     });
-  });
 
-  describe('Error Logging', () => {
-    it('should log errors to the console', async () => {
-      // Mock console.error to capture log calls
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
-      // Import the mocked AsyncFzf
-      const { AsyncFzf } = await import('fzf');
-
-      // Create a failing find method with error containing sensitive-looking data
-      const sensitiveError = new Error(
-        'Database connection failed: user=admin, pass=secret123',
-      );
-      const mockFind = vi.fn().mockRejectedValue(sensitiveError);
-
-      // Mock AsyncFzf to return an instance with failing find
-      vi.mocked(AsyncFzf).mockImplementation(
-        (_items, _options) =>
-          ({
-            find: mockFind,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          }) as any,
-      );
-
-      const testCommands = [
-        createTestCommand({ name: 'test', description: 'Test command' }),
-      ];
+    it('should include commandKind when filtering MCP commands by prefix', async () => {
+      const slashCommands = [
+        {
+          name: 'summarize',
+          description: 'Summarize content',
+          kind: CommandKind.MCP_PROMPT,
+          action: vi.fn(),
+        },
+        {
+          name: 'settings',
+          description: 'Open settings',
+          kind: CommandKind.BUILT_IN,
+          action: vi.fn(),
+        },
+      ] as SlashCommand[];
 
       const { result } = renderHook(() =>
         useTestHarnessForSlashCompletion(
           true,
-          '/test',
-          testCommands,
+          '/summ',
+          slashCommands,
           mockCommandContext,
         ),
       );
 
       await waitFor(() => {
-        expect(result.current.suggestions.length).toBeGreaterThan(0);
+        expect(result.current.suggestions).toEqual([
+          {
+            label: 'summarize',
+            value: 'summarize',
+            description: 'Summarize content',
+            commandKind: CommandKind.MCP_PROMPT,
+          },
+        ]);
       });
+    });
 
-      // Should get fallback suggestions
-      const labels = result.current.suggestions.map((s) => s.label);
-      expect(labels).toContain('test');
+    it('should include commandKind for sub-commands', async () => {
+      const slashCommands = [
+        {
+          name: 'memory',
+          description: 'Manage memory',
+          kind: CommandKind.BUILT_IN,
+          subCommands: [
+            {
+              name: 'show',
+              description: 'Show memory',
+              kind: CommandKind.BUILT_IN,
+              action: vi.fn(),
+            },
+            {
+              name: 'add',
+              description: 'Add to memory',
+              kind: CommandKind.MCP_PROMPT,
+              action: vi.fn(),
+            },
+          ],
+        },
+      ] as SlashCommand[];
 
-      // Verify error logging occurred
+      const { result } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/memory',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      expect(result.current.suggestions).toEqual(
+        expect.arrayContaining([
+          {
+            label: 'show',
+            value: 'show',
+            description: 'Show memory',
+            commandKind: CommandKind.BUILT_IN,
+          },
+          {
+            label: 'add',
+            value: 'add',
+            description: 'Add to memory',
+            commandKind: CommandKind.MCP_PROMPT,
+          },
+        ]),
+      );
+    });
+
+    it('should include commandKind for file commands', async () => {
+      const slashCommands = [
+        {
+          name: 'custom-script',
+          description: 'Run custom script',
+          kind: CommandKind.FILE,
+          action: vi.fn(),
+        },
+      ] as SlashCommand[];
+
+      const { result } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/custom',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
       await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          '[Fuzzy search - falling back to prefix matching]',
-          sensitiveError,
-        );
+        expect(result.current.suggestions).toEqual([
+          {
+            label: 'custom-script',
+            value: 'custom-script',
+            description: 'Run custom script',
+            commandKind: CommandKind.FILE,
+          },
+        ]);
       });
-
-      consoleErrorSpy.mockRestore();
-
-      // Reset AsyncFzf mock to default behavior
-      vi.mocked(AsyncFzf).mockImplementation(createDefaultAsyncFzfMock());
     });
   });
 });

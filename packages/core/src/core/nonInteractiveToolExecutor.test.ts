@@ -12,7 +12,12 @@ import type {
   ToolResult,
   Config,
 } from '../index.js';
-import { ToolErrorType, ApprovalMode } from '../index.js';
+import {
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+  ToolErrorType,
+  ApprovalMode,
+} from '../index.js';
 import type { Part } from '@google/genai';
 import { MockTool } from '../test-utils/tools.js';
 
@@ -41,6 +46,12 @@ describe('executeToolCall', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
@@ -75,6 +86,7 @@ describe('executeToolCall', () => {
       callId: 'call1',
       error: undefined,
       errorType: undefined,
+      outputFile: undefined,
       resultDisplay: 'Success!',
       responseParts: [
         {
@@ -274,6 +286,7 @@ describe('executeToolCall', () => {
       callId: 'call6',
       error: undefined,
       errorType: undefined,
+      outputFile: undefined,
       resultDisplay: 'Image processed',
       responseParts: [
         {

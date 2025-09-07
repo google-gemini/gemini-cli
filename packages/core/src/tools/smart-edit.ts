@@ -30,7 +30,26 @@ import {
 } from './modifiable-tool.js';
 import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
-import { applyReplacement } from './edit.js';
+
+export function applyReplacement(
+  currentContent: string | null,
+  oldString: string,
+  newString: string,
+  isNewFile: boolean,
+): string {
+  if (isNewFile) {
+    return newString;
+  }
+  if (currentContent === null) {
+    // Should not happen if not a new file, but defensively return empty or newString if oldString is also empty
+    return oldString === '' ? newString : '';
+  }
+  // If oldString is empty and it's not a new file, do not modify the content.
+  if (oldString === '' && !isNewFile) {
+    return currentContent;
+  }
+  return currentContent.replaceAll(oldString, newString);
+}
 
 interface ReplacementContext {
   params: EditToolParams;
