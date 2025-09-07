@@ -212,12 +212,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     [buffer],
   );
 
-  // // 按Rust语义：任意文本变更后，移除已不在文本中的占位符映射
-  // const prunePendingPastes = useCallback(() => {
-  //   if (pendingPastes.length === 0) return;
-  //   const t = buffer.text;
-  //   setPendingPastes((prev) => (prev.length === 0 ? prev : prev.filter((p) => t.includes(p.placeholder))));
-  // }, [buffer.text, pendingPastes.length]);
+  // Remove pending pastes that are not in the buffer text
+  const prunePendingPastes = useCallback(() => {
+    if (pendingPastes.length === 0) return;
+    const t = buffer.text;
+    setPendingPastes((prev) =>
+      prev.length === 0 ? prev : prev.filter((p) => t.includes(p.placeholder)),
+    );
+  }, [buffer.text, pendingPastes.length]);
+
+  useEffect(() => {
+    prunePendingPastes();
+  }, [buffer.text, pendingPastes.length, prunePendingPastes]);
 
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
@@ -242,7 +248,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
           // Insert at cursor position with auto spaces
           insertAtOffsetWithAutoSpaces(offset, insertText);
-          // prunePendingPastes();
         }
       }
     } catch (error) {
@@ -570,18 +575,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Kill line commands
       if (keyMatchers[Command.KILL_LINE_RIGHT](key)) {
         buffer.killLineRight();
-        // prunePendingPastes();
         return;
       }
       if (keyMatchers[Command.KILL_LINE_LEFT](key)) {
         buffer.killLineLeft();
-        // prunePendingPastes();
         return;
       }
 
       if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) {
         buffer.deleteWordLeft();
-        // prunePendingPastes();
         return;
       }
 
@@ -594,18 +596,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Ctrl+V for clipboard image paste
       if (keyMatchers[Command.PASTE_CLIPBOARD_IMAGE](key)) {
         handleClipboardImage();
-        // prunePendingPastes();
         return;
       }
 
-      // 其他按键处理前，先尝试占位符删除（退格）
       if (key.name === 'backspace') {
         if (tryDeletePlaceholderAtCursor()) {
           return;
         }
       }
       buffer.handleInput(key);
-      // prunePendingPastes();
 
       // Clear ghost text when user types regular characters (not navigation/control keys)
       if (
