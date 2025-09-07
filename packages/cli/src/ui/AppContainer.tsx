@@ -719,7 +719,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     return terminalHeight - staticExtraHeight;
   }, [terminalHeight]);
 
-  const terminalFocused = useFocus();
+  const isFocused = useFocus();
   useBracketedPaste();
 
   // Context file names computation
@@ -1049,9 +1049,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isProQuotaDialogOpen,
     ],
   );
-
-  // Disable input focus when dialogs are visible
-  const isFocused = terminalFocused && !dialogsVisible;
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
