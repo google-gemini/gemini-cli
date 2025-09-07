@@ -9,7 +9,11 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useCommandCompletion } from './useCommandCompletion.js';
-import { type CommandContext, CommandKind, type SlashCommand } from '../commands/types.js';
+import {
+  type CommandContext,
+  CommandKind,
+  type SlashCommand,
+} from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import { useEffect } from 'react';
@@ -819,7 +823,11 @@ describe('useCommandCompletion', () => {
         action: async () => ({ type: 'submit_prompt', content: 'test' }),
       };
 
-      const commandsWithSubstring = [customCommand, builtInCommand, logsCommand];
+      const commandsWithSubstring = [
+        customCommand,
+        builtInCommand,
+        logsCommand,
+      ];
 
       setupMocks({
         slashSuggestions: [{ label: 'log', value: 'log' }],
@@ -904,6 +912,55 @@ describe('useCommandCompletion', () => {
           }),
         );
         expect(useAtCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: false,
+          }),
+        );
+      });
+    });
+
+    it('should handle substring commands with extra whitespace and an empty @ query', async () => {
+      const logCommand: SlashCommand = {
+        name: 'log',
+        description: 'Log command',
+        kind: CommandKind.FILE,
+        action: async () => ({ type: 'submit_prompt', content: 'test' }),
+      };
+
+      const logsCommand: SlashCommand = {
+        name: 'logs',
+        description: 'Built-in logs command (longer name)',
+        kind: CommandKind.BUILT_IN,
+        action: async () => ({ type: 'submit_prompt', content: 'test' }),
+      };
+
+      const commandsWithSubstring = [logCommand, logsCommand];
+
+      setupMocks({
+        atSuggestions: [],
+      });
+
+      renderHook(() =>
+        useCommandCompletion(
+          useTextBufferForTest('  /log @', 9), // Position cursor right after @ symbol
+          testDirs,
+          testRootDir,
+          commandsWithSubstring,
+          mockCommandContext,
+          false,
+          mockConfig,
+        ),
+      );
+
+      await waitFor(() => {
+        // It should correctly identify '/log' as a FILE command and switch to AT mode
+        expect(useAtCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            enabled: true,
+            pattern: '', // Empty pattern because cursor is right after @
+          }),
+        );
+        expect(useSlashCompletion).toHaveBeenLastCalledWith(
           expect.objectContaining({
             enabled: false,
           }),

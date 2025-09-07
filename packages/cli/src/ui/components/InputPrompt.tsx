@@ -17,7 +17,10 @@ import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
-import { useCommandCompletion, CompletionMode } from '../hooks/useCommandCompletion.js';
+import {
+  useCommandCompletion,
+  CompletionMode,
+} from '../hooks/useCommandCompletion.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
