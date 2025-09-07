@@ -6,14 +6,16 @@
 
 import { existsSync, promises as fs, createWriteStream } from 'node:fs';
 import path from 'node:path';
+import { Worker } from 'node:worker_threads';
+import { fileURLToPath } from 'node:url';
 // import { createRequire } from 'node:module';
 // import { pathToFileURL } from 'node:url';
 import {
-  BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
 } from './tools.js';
-import type { ToolResult } from './tools.js';
+import type { ToolResult, ToolInvocation } from './tools.js';
+import { BackupableTool, type FileOperationParams } from './backupable-tool.js';
 
 // PDF manipulation libraries
 import PDFDocument from 'pdfkit';
@@ -64,11 +66,9 @@ interface PDFMetadata {
   keywords?: string[];
 }
 
-interface PDFParams {
-  /** PDF file path */
-  file: string;
+interface PDFParams extends FileOperationParams {
   /** Operation type - carefully designed for token efficiency */
-  op: 'create' | 'merge' | 'split' | 'extracttext' | 'search' | 'info'; // | 'hanko' | 'toimage';
+  op: 'create' | 'merge' | 'split' | 'extracttext' | 'search' | 'info' | 'undo'; // | 'hanko' | 'toimage';
   // Commented out to save tokens: 'metadata' | 'forms' | 'protect' | 'optimize' | 'convert' | 'annotate' | 'watermark' | 'compress'
   
   // Core parameters (most common)
@@ -157,7 +157,7 @@ interface PDFResult extends ToolResult {
 }
 
 class PDFInvocation extends BaseToolInvocation<PDFParams, PDFResult> {
-  async execute(): Promise<PDFResult> {
+  async execute(signal?: AbortSignal, liveOutputCallback?: (chunk: string) => void): Promise<PDFResult> {
     const { file, op, pages, query, output, text } = this.params;
     
     try {
@@ -183,7 +183,10 @@ class PDFInvocation extends BaseToolInvocation<PDFParams, PDFResult> {
           return await this.extractText(file, pages);
           
         case 'search':
-          return await this.searchText(file, query || '', pages);
+          if (!query || query.trim().length === 0) {
+            return this.createErrorResult('Search operation requires a query parameter');
+          }
+          return await this.searchText(file, query, pages, liveOutputCallback, signal);
           
         case 'info':
           return await this.getPDFInfo(file, pages);
@@ -409,7 +412,13 @@ ${text}`).join('\n\n')}`,
     }
   }
 
-  private async searchText(file: string, query: string, pages?: string): Promise<PDFResult> {
+  private async searchText(
+    file: string, 
+    query: string, 
+    pages?: string, 
+    liveOutputCallback?: (chunk: string) => void,
+    signal?: AbortSignal
+  ): Promise<PDFResult> {
     try {
       const buffer = await fs.readFile(file);
       const pdfDoc = await PDFLibDocument.load(buffer);
@@ -419,52 +428,104 @@ ${text}`).join('\n\n')}`,
       const pageSearchResults: Record<number, MatchResult[]> = {};
       let totalMatches = 0;
       
-      // Search in each specified page
-      for (const pageNum of pageNumbers) {
-        try {
-          // Create a single-page PDF for individual text extraction
-          const singlePageDoc = await PDFLibDocument.create();
-          const [copiedPage] = await singlePageDoc.copyPages(pdfDoc, [pageNum - 1]);
-          singlePageDoc.addPage(copiedPage);
-          
-          // Convert single page to buffer and extract text
-          const singlePageBuffer = await singlePageDoc.save();
-          const singlePageData = await pdfParse(Buffer.from(singlePageBuffer));
-          const pageText = singlePageData.text;
-          
-          // Search for all occurrences of query in this page
-          const matches: MatchResult[] = [];
-          const queryLower = query.toLowerCase();
-          const textLower = pageText.toLowerCase();
-          
-          let searchIndex = 0;
-          while (searchIndex < textLower.length) {
-            const matchIndex = textLower.indexOf(queryLower, searchIndex);
-            if (matchIndex === -1) break;
-            
-            // Extract context around the match (50 characters before and after)
-            const contextStart = Math.max(0, matchIndex - 50);
-            const contextEnd = Math.min(pageText.length, matchIndex + query.length + 50);
-            const context = pageText.substring(contextStart, contextEnd).trim();
-            
-            matches.push({
-              text: pageText.substring(matchIndex, matchIndex + query.length),
-              context: context.length > 150 ? context.substring(0, 147) + '...' : context,
-              index: matchIndex
-            });
-            
-            searchIndex = matchIndex + 1; // Continue searching from next position
-          }
-          
-          pageSearchResults[pageNum] = matches;
-          totalMatches += matches.length;
-        } catch (pageError) {
-          pageSearchResults[pageNum] = [{
-            text: query,
-            context: `[Error searching page: ${pageError instanceof Error ? pageError.message : 'Unknown error'}]`,
-            index: -1
-          }];
+      // Report initial progress
+      if (liveOutputCallback) {
+        liveOutputCallback(`Starting search for "${query}" in ${pageNumbers.length} pages...`);
+      }
+
+      // Use worker threads for better performance when processing many pages
+      if (pageNumbers.length > 20) {
+        console.log(`[PDF Search] Using ${Math.min(4, pageNumbers.length)} worker threads for parallel processing...`);
+        return await this.searchWithWorkers(file, query, pageNumbers, liveOutputCallback, signal);
+      }
+
+      // Process pages with controlled concurrency for smaller searches
+      console.log(`[PDF Search] Processing ${pageNumbers.length} pages with controlled parallelism...`);
+      
+      // Limit concurrent page processing to reduce memory usage
+      const BATCH_SIZE = 8;
+      const results: { pageNum: number; matches: MatchResult[] }[] = [];
+      
+      for (let i = 0; i < pageNumbers.length; i += BATCH_SIZE) {
+        const batch = pageNumbers.slice(i, i + BATCH_SIZE);
+        
+        // Check for cancellation
+        if (signal?.aborted) {
+          throw new Error('Search cancelled by user');
         }
+        
+        if (liveOutputCallback) {
+          liveOutputCallback(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(pageNumbers.length / BATCH_SIZE)} (pages ${batch[0]}-${batch[batch.length - 1]})`);
+        }
+        
+        const batchPromises = batch.map(async (pageNum) => {
+          try {
+            // Create a single-page PDF for individual text extraction
+            const singlePageDoc = await PDFLibDocument.create();
+            const [copiedPage] = await singlePageDoc.copyPages(pdfDoc, [pageNum - 1]);
+            singlePageDoc.addPage(copiedPage);
+            
+            // Convert single page to buffer and extract text
+            const singlePageBuffer = await singlePageDoc.save();
+            const singlePageData = await pdfParse(Buffer.from(singlePageBuffer));
+            const pageText = singlePageData.text;
+            
+            // Search for all occurrences of query in this page
+            const matches: MatchResult[] = [];
+            const queryLower = query.toLowerCase();
+            const textLower = pageText.toLowerCase();
+            
+            let searchIndex = 0;
+            while (searchIndex < textLower.length) {
+              const matchIndex = textLower.indexOf(queryLower, searchIndex);
+              if (matchIndex === -1) break;
+              
+              // Extract context around the match (50 characters before and after)
+              const contextStart = Math.max(0, matchIndex - 50);
+              const contextEnd = Math.min(pageText.length, matchIndex + query.length + 50);
+              const context = pageText.substring(contextStart, contextEnd).trim();
+              
+              matches.push({
+                text: pageText.substring(matchIndex, matchIndex + query.length),
+                context: context.length > 150 ? context.substring(0, 147) + '...' : context,
+                index: matchIndex
+              });
+              
+              searchIndex = matchIndex + 1;
+            }
+            
+            return { pageNum, matches };
+          } catch (pageError) {
+            return {
+              pageNum,
+              matches: [{
+                text: query,
+                context: `[Error searching page: ${pageError instanceof Error ? pageError.message : 'Unknown error'}]`,
+                index: -1
+              }]
+            };
+          }
+        });
+        
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults);
+        
+        // Report progress after each batch
+        if (liveOutputCallback) {
+          const progress = Math.round(((i + batch.length) / pageNumbers.length) * 100);
+          liveOutputCallback(`Completed ${i + batch.length}/${pageNumbers.length} pages (${progress}%)`);
+        }
+      }
+      
+      // Collect results from all batches
+      for (const { pageNum, matches } of results) {
+        pageSearchResults[pageNum] = matches;
+        totalMatches += matches.length;
+      }
+      
+      // Report completion
+      if (liveOutputCallback) {
+        liveOutputCallback(`Search completed! Found ${totalMatches} matches total.`);
       }
       
       return {
@@ -473,19 +534,185 @@ ${text}`).join('\n\n')}`,
         op: 'search',
         pageSearchResults,
         pageCount,
-        llmContent: `pdf(search): Found ${totalMatches} matches for "${query}" in ${pageNumbers.length} pages:
-
-${Object.entries(pageSearchResults)
-  .filter(([, matches]) => matches.length > 0)
-  .map(([pageNum, matches]) => 
-    `**Page ${pageNum} (${matches.length} matches):**
-${matches.map(match => `- "${match.text}" (context: ${match.context})`).join('\n')}`
-  ).join('\n\n') || 'No matches found'}`,
-        returnDisplay: `pdf(search): Found ${totalMatches} matches for "${query}" in ${pageNumbers.length} pages`
+        llmContent: this.formatSearchResults(query, totalMatches, pageSearchResults, pageCount, false),
+        returnDisplay: `pdf(search): Found ${totalMatches} matches for "${query}" ${pages ? `in pages ${pages}` : `across entire PDF`}`
       };
     } catch (error) {
       return this.createErrorResult(`Failed to search PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  private async searchWithWorkers(
+    file: string,
+    query: string,
+    pageNumbers: number[],
+    liveOutputCallback?: (chunk: string) => void,
+    signal?: AbortSignal
+  ): Promise<PDFResult> {
+    const pageSearchResults: Record<number, MatchResult[]> = {};
+    let totalMatches = 0;
+    const pageCount = pageNumbers.length;
+    
+    try {
+      // Get current directory for worker script (compiled .js file)  
+      const __dirname = path.dirname(fileURLToPath(import.meta.url));
+      const workerScript = path.join(__dirname, 'pdf-search-worker.js');
+      
+      // Check if worker file exists - if not, fall back gracefully
+      if (!existsSync(workerScript)) {
+        console.warn(`[PDF Search] Worker script not found: ${workerScript}, falling back to async processing`);
+        if (liveOutputCallback) {
+          liveOutputCallback(`Worker not available, using regular async processing for ${pageNumbers.length} pages...`);
+        }
+        // Fall back to regular batch processing
+        throw new Error('Worker not available');
+      }
+      
+      // Limit concurrent workers to avoid overwhelming system
+      const maxWorkers = Math.min(4, pageNumbers.length);
+      const batches: number[][] = [];
+      
+      // Split pages into batches for worker processing
+      for (let i = 0; i < pageNumbers.length; i += Math.ceil(pageNumbers.length / maxWorkers)) {
+        batches.push(pageNumbers.slice(i, i + Math.ceil(pageNumbers.length / maxWorkers)));
+      }
+      
+      if (liveOutputCallback) {
+        liveOutputCallback(`Starting ${batches.length} worker threads for ${pageNumbers.length} pages...`);
+      }
+      
+      const workerPromises = batches.map((batch, batchIndex) => {
+        return new Promise<{ pageNum: number; matches: MatchResult[] }[]>((resolve, reject) => {
+          if (signal?.aborted) {
+            reject(new Error('Search cancelled by user'));
+            return;
+          }
+          
+          // Create one worker per batch, pass all pages in the batch
+          const worker = new Worker(workerScript, {
+            workerData: {
+              filePath: file,
+              query,
+              pageNums: batch,  // 传递整个batch的页面数组
+              requestId: `batch-${batchIndex}`
+            }
+          });
+          
+          worker.on('message', (result) => {
+            // Worker now returns pageResults array with all pages processed
+            const results = result.pageResults;
+            
+            if (liveOutputCallback) {
+              const totalProcessed = (batchIndex + 1) * batch.length;
+              const overallProgress = Math.round(Math.min(totalProcessed, pageNumbers.length) / pageNumbers.length * 100);
+              liveOutputCallback(`Worker ${batchIndex + 1}: Completed ${batch.length} pages (${overallProgress}%)`);
+            }
+            
+            resolve(results);
+            worker.terminate();
+          });
+          
+          worker.on('error', (error) => {
+            // Create error results for all pages in this batch
+            const errorResults = batch.map(pageNum => ({
+              pageNum,
+              matches: [{
+                text: query,
+                context: `[Worker Error: ${error.message}]`,
+                index: -1
+              }]
+            }));
+            
+            resolve(errorResults);
+            worker.terminate();
+          });
+        });
+      });
+      
+      // Wait for all worker batches to complete
+      const batchResults = await Promise.all(workerPromises);
+      
+      // Flatten and collect results
+      for (const batchResult of batchResults) {
+        for (const { pageNum, matches } of batchResult) {
+          pageSearchResults[pageNum] = matches;
+          totalMatches += matches.length;
+        }
+      }
+      
+      if (liveOutputCallback) {
+        liveOutputCallback(`Multi-threaded search completed! Found ${totalMatches} matches total.`);
+      }
+      
+      return {
+        success: true,
+        file,
+        op: 'search',
+        pageSearchResults,
+        pageCount,
+        llmContent: this.formatSearchResults(query, totalMatches, pageSearchResults, pageCount, true, batches.length),
+        returnDisplay: `pdf(search): Found ${totalMatches} matches for "${query}" across entire PDF using multi-threading`
+      };
+      
+    } catch (error) {
+      return this.createErrorResult(`Multi-threaded search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private formatSearchResults(
+    query: string, 
+    totalMatches: number, 
+    pageSearchResults: Record<number, MatchResult[]>,
+    pageCount: number,
+    isMultiThreaded: boolean = false,
+    workerCount?: number
+  ): string {
+    // Check for errors in results
+    const errorPages = Object.entries(pageSearchResults).filter(([, matches]) => 
+      matches.some(match => match.context.startsWith('[Worker Error:') || match.context.startsWith('[Error'))
+    );
+    
+    // If there are many errors, summarize instead of listing all
+    if (errorPages.length > 3) {
+      const successfulPages = Object.keys(pageSearchResults).length - errorPages.length;
+      const actualMatches = totalMatches - errorPages.length; // Subtract error entries
+      
+      return `pdf(search): ${isMultiThreaded ? `Multi-threaded search using ${workerCount} workers` : 'Search'} completed with issues.
+
+**Summary:**
+- Successfully searched: ${successfulPages} pages
+- Actual matches found: ${actualMatches}
+- Pages with errors: ${errorPages.length}
+
+${actualMatches > 0 ? `**Valid Results:**
+${Object.entries(pageSearchResults)
+  .filter(([, matches]) => matches.length > 0 && !matches.some(m => m.context.startsWith('[')))
+  .map(([pageNum, matches]) => `- Page ${pageNum}: ${matches.length} matches`)
+  .join('\n')}` : ''}
+
+${errorPages.length > 0 ? `\n**Note:** ${errorPages.length} pages encountered processing errors and were skipped.` : ''}`;
+    }
+    
+    // Normal output for successful searches or few errors
+    const methodInfo = isMultiThreaded ? ` using ${workerCount} worker threads` : '';
+    const scopeInfo = `across entire PDF (${pageCount} pages)`;
+    
+    return `pdf(search): Found ${totalMatches} matches for "${query}" ${scopeInfo}${methodInfo}:
+
+${Object.entries(pageSearchResults)
+  .filter(([, matches]) => matches.length > 0)
+  .map(([pageNum, matches]) => {
+    // Filter out error entries for cleaner display  
+    const validMatches = matches.filter(match => !match.context.startsWith('['));
+    if (validMatches.length === 0) return null;
+    
+    return `**Page ${pageNum} (${validMatches.length} matches):**
+${validMatches.map(match => `- "${match.text}" (context: ${match.context})`).join('\n')}`;
+  })
+  .filter(Boolean)
+  .join('\n\n') || 'No matches found'}
+
+${totalMatches === 0 ? `The text "${query}" was not found in the searched pages.` : ''}`;
   }
 
   private async getPDFInfo(file: string, pages?: string): Promise<PDFResult> {
@@ -495,36 +722,128 @@ ${matches.map(match => `- "${match.text}" (context: ${match.context})`).join('\n
       const stats = await fs.stat(file);
       const pageNumbers = this.parsePageNumbers(pages, pageCount);
       
-      // Get basic metadata
-      const title = pdfDoc.getTitle();
-      const author = pdfDoc.getAuthor();
-      const subject = pdfDoc.getSubject();
-      const creator = pdfDoc.getCreator();
-      const producer = pdfDoc.getProducer();
+      // Get basic metadata and decode hex strings
+      const decodeMetadataValue = (value: string | undefined): string | undefined => {
+        if (!value) return undefined;
+        
+        // Check if value is a hex string wrapped in angle brackets
+        if (value.startsWith('<') && value.endsWith('>')) {
+          const hexString = value.slice(1, -1);
+          // Validate hex string format
+          if (/^[0-9A-Fa-f]+$/.test(hexString) && hexString.length % 2 === 0) {
+            try {
+              // Convert hex to bytes and decode as UTF-8
+              const bytes: number[] = [];
+              for (let i = 0; i < hexString.length; i += 2) {
+                bytes.push(parseInt(hexString.substr(i, 2), 16));
+              }
+              const buffer = Buffer.from(bytes);
+              
+              // Try different encodings
+              let decoded = '';
+              
+              // Try UTF-8 first
+              try {
+                decoded = buffer.toString('utf8');
+                // Check if decoded contains replacement characters indicating encoding issues
+                if (!decoded.includes('\uFFFD')) {
+                  return decoded;
+                }
+              } catch {
+                // Continue to next encoding
+              }
+              
+              // Try UTF-16LE
+              try {
+                decoded = buffer.toString('utf16le');
+                if (!decoded.includes('\uFFFD') && decoded.length > 0) {
+                  return decoded;
+                }
+              } catch {
+                // Continue to next encoding
+              }
+              
+              // Try Latin1 for legacy encodings
+              try {
+                decoded = buffer.toString('latin1');
+                if (decoded.length > 0) {
+                  return decoded;
+                }
+              } catch {
+                // Continue to fallback
+              }
+              
+              // Final fallback to ASCII
+              try {
+                return buffer.toString('ascii');
+              } catch {
+                return value; // Return original if all fail
+              }
+            } catch {
+              // If decoding fails, return original value
+              return value;
+            }
+          }
+        }
+        
+        return value;
+      };
+      
+      const rawTitle = pdfDoc.getTitle();
+      const rawAuthor = pdfDoc.getAuthor();
+      const rawSubject = pdfDoc.getSubject();
+      const rawCreator = pdfDoc.getCreator();
+      const rawProducer = pdfDoc.getProducer();
       
       const metadata: PDFMetadata = {
-        title: title || undefined,
-        author: author || undefined,
-        subject: subject || undefined,
-        creator: creator || undefined,
-        producer: producer || undefined,
+        title: decodeMetadataValue(rawTitle),
+        author: decodeMetadataValue(rawAuthor),
+        subject: decodeMetadataValue(rawSubject),
+        creator: decodeMetadataValue(rawCreator),
+        producer: decodeMetadataValue(rawProducer),
       };
       
       // Get page structure information
       const pagesInfo: PageInfo[] = [];
+      const pageSizeGroups = new Map<string, { size: string; rotation: number; pages: number[] }>();
+      
       for (const pageNum of pageNumbers) {
         const page = pdfDoc.getPage(pageNum - 1);
         const { width, height } = page.getSize();
+        const rotation = page.getRotation().angle;
+        
+        // Group pages with same dimensions and rotation
+        const sizeKey = `${width}x${height}${rotation ? `_rot${rotation}` : ''}`;
+        if (!pageSizeGroups.has(sizeKey)) {
+          pageSizeGroups.set(sizeKey, {
+            size: `${width} x ${height} points${rotation ? ` (rotated ${rotation}°)` : ''}`,
+            rotation,
+            pages: []
+          });
+        }
+        pageSizeGroups.get(sizeKey)!.pages.push(pageNum);
         
         pagesInfo.push({
           page: pageNum,
           width,
           height,
-          rotation: page.getRotation().angle,
+          rotation,
           textBlocks: [], // Would require OCR library for full implementation
           images: 0 // Would require image extraction
         });
       }
+      
+      // Create optimized page structure display
+      const pageStructureDisplay = Array.from(pageSizeGroups.entries())
+        .map(([, group]) => {
+          const pageList = group.pages.length === 1 
+            ? `Page ${group.pages[0]}`
+            : group.pages.length <= 5
+              ? `Pages ${group.pages.join(', ')}`
+              : `Pages ${group.pages[0]}-${group.pages[group.pages.length - 1]} (${group.pages.length} pages)`;
+          return `${pageList}: ${group.size}`;
+        })
+        .join('\n');
       
       return {
         success: true,
@@ -544,9 +863,7 @@ ${Object.entries(metadata)
   .join('\n') || 'No metadata available'}
 
 **Page Structure:**
-${pagesInfo.map(page => 
-  `Page ${page.page}: ${page.width} x ${page.height} points${page.rotation ? ` (rotated ${page.rotation}°)` : ''}`
-).join('\n')}`,
+${pageStructureDisplay}`,
         returnDisplay: `pdf(info): PDF has ${pageCount} pages, size: ${Math.round(stats.size/1024)}KB`
       };
     } catch (error) {
@@ -1320,7 +1637,7 @@ ${pagesInfo.map(page =>
       case 'extracttext':
         return `Extracting text from PDF "${file}"${pages ? ` pages ${pages}` : ''}`;
       case 'search':
-        return `Searching for "${query}" in PDF "${file}"`;
+        return `Searching for "${query}" in PDF "${file}"${pages ? ` pages ${pages}` : ' (all pages)'}`;
       case 'info':
         return `Getting info and structure for PDF "${file}"${pages ? ` pages ${pages}` : ''}`;
       // case 'hanko':
@@ -1341,12 +1658,12 @@ ${pagesInfo.map(page =>
   }
 }
 
-export class PDFTool extends BaseDeclarativeTool<PDFParams, PDFResult> {
+export class PDFTool extends BackupableTool<PDFParams, PDFResult> {
   constructor() {
     super(
       'pdf',
       'PDF Operations',
-      'PDF operations: create/merge PDFs, SPLIT pages into separate PDF files, extracttext to get page-specific text content, search, info for PDF metadata and page structure.',
+      'PDF operations: create/merge PDFs, SPLIT pages into separate PDF files, extracttext to get text from pages, SEARCH text across entire PDF (pages optional), info for PDF metadata.',
       Kind.Other,
       {
         type: 'object',
@@ -1355,11 +1672,11 @@ export class PDFTool extends BaseDeclarativeTool<PDFParams, PDFResult> {
           file: { type: 'string', description: 'PDF file path' },
           op: {
             type: 'string',
-            enum: ['create', 'merge', 'split', 'extracttext', 'search', 'info'], // 'hanko', 'toimage'],
-            description: 'Operation: split=save pages as PDF files, extracttext=get text content from pages, info=get PDF info and page structure' // , toimage=convert PDF pages to PNG images for visual analysis
+            enum: ['create', 'merge', 'split', 'extracttext', 'search', 'info', 'undo'], // 'hanko', 'toimage'],
+            description: 'Operation: split=save pages as PDF files, extracttext=get text content, search=find text in entire PDF, info=get PDF info' // , toimage=convert PDF pages to PNG images for visual analysis
           },
-          pages: { type: 'string', description: 'Page numbers/ranges (1-based): "1-3,5,7-10"' },
-          query: { type: 'string', description: 'Search text query' },
+          pages: { type: 'string', description: 'OPTIONAL page numbers/ranges (1-based): "1-3,5,7-10". If not specified, processes ALL pages' },
+          query: { type: 'string', description: 'Search text query (REQUIRED for search operation)' },
           output: { type: 'string', description: 'Output file path' },
           text: { type: 'string', description: 'Text content to add' },
           position: {
@@ -1408,7 +1725,30 @@ export class PDFTool extends BaseDeclarativeTool<PDFParams, PDFResult> {
     );
   }
 
-  protected createInvocation(params: PDFParams): PDFInvocation {
+  /**
+   * Identify which operations modify PDF files
+   */
+  protected isModifyOperation(params: PDFParams): boolean {
+    const modifyOps = ['create', 'merge', 'split'];
+    return modifyOps.includes(params.op);
+  }
+
+  /**
+   * Get the target file path for the operation
+   */
+  protected getTargetFilePath(params: PDFParams): string | null {
+    // For split and merge, the main file is the target
+    // For create, output is the target but we backup if file exists
+    if (params.op === 'create' && params.output) {
+      return params.output;
+    }
+    return params.file;
+  }
+
+  /**
+   * Create the original tool invocation
+   */
+  protected createOriginalInvocation(params: PDFParams): ToolInvocation<PDFParams, PDFResult> {
     return new PDFInvocation(params);
   }
 }
