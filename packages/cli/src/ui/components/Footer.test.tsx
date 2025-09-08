@@ -9,7 +9,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { Footer } from './Footer.js';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
 import { tildeifyPath } from '@google/gemini-cli-core';
-import path from 'node:path';
 
 vi.mock('../hooks/useTerminalSize.js');
 const useTerminalSizeMock = vi.mocked(useTerminalSize.useTerminalSize);
@@ -58,30 +57,26 @@ describe('<Footer />', () => {
     it('should display shortened path on a wide terminal', () => {
       const { lastFrame } = renderWithWidth(120);
       const tildePath = tildeifyPath(defaultProps.targetDir);
-      const expectedPath = '...' + tildePath.slice(tildePath.length - 48 + 3);
+      const expectedPath =
+        '...' + tildePath.slice(tildePath.length - 120 * 0.25 + 3);
       expect(lastFrame()).toContain(expectedPath);
     });
 
-    it('should display only the base directory name on a narrow terminal', () => {
+    it('should display a shortened path on a narrow terminal', () => {
       const { lastFrame } = renderWithWidth(79);
-      const expectedPath = path.basename(defaultProps.targetDir);
+      const tildePath = tildeifyPath(defaultProps.targetDir);
+      const pathLength = Math.max(20, Math.floor(79 * 0.25));
+      const expectedPath =
+        '...' + tildePath.slice(tildePath.length - pathLength + 3);
       expect(lastFrame()).toContain(expectedPath);
     });
 
     it('should use wide layout at 80 columns', () => {
       const { lastFrame } = renderWithWidth(80);
       const tildePath = tildeifyPath(defaultProps.targetDir);
-      const expectedPath = '...' + tildePath.slice(tildePath.length - 32 + 3);
+      const expectedPath =
+        '...' + tildePath.slice(tildePath.length - 80 * 0.25 + 3);
       expect(lastFrame()).toContain(expectedPath);
-    });
-
-    it('should use narrow layout at 79 columns', () => {
-      const { lastFrame } = renderWithWidth(79);
-      const expectedPath = path.basename(defaultProps.targetDir);
-      expect(lastFrame()).toContain(expectedPath);
-      const tildePath = tildeifyPath(defaultProps.targetDir);
-      const unexpectedPath = '...' + tildePath.slice(tildePath.length - 31 + 3);
-      expect(lastFrame()).not.toContain(unexpectedPath);
     });
   });
 
@@ -101,7 +96,13 @@ describe('<Footer />', () => {
   it('displays the model name and context percentage', () => {
     const { lastFrame } = renderWithWidth(120);
     expect(lastFrame()).toContain(defaultProps.model);
-    expect(lastFrame()).toMatch(/\(\d+% context[\s\S]*left\)/);
+    expect(lastFrame()).toMatch(/\(\d+% context left\)/);
+  });
+
+  it('displays the model name and abbreviated context percentage', () => {
+    const { lastFrame } = renderWithWidth(99);
+    expect(lastFrame()).toContain(defaultProps.model);
+    expect(lastFrame()).toMatch(/\(\d+%\)/);
   });
 
   describe('sandbox and trust info', () => {
