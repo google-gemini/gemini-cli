@@ -1,0 +1,1268 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { type DOMElement, measureElement } from 'ink';
+import { App } from './App.js';
+import { AppContext } from './contexts/AppContext.js';
+import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
+import {
+  UIActionsContext,
+  type UIActions,
+} from './contexts/UIActionsContext.js';
+import { ConfigContext } from './contexts/ConfigContext.js';
+import {
+  type HistoryItem,
+  ToolCallStatus,
+  type HistoryItemWithoutId,
+  AuthState,
+} from './types.js';
+import { MessageType, StreamingState } from './types.js';
+import {
+  type EditorType,
+  type Config,
+  IdeClient,
+  type DetectedIde,
+  ideContext,
+  type IdeContext,
+  getErrorMessage,
+  getAllGeminiMdFilenames,
+  UserTierId,
+  AuthType,
+  isProQuotaExceededError,
+  isGenericQuotaExceededError,
+  logFlashFallback,
+  FlashFallbackEvent,
+  clearCachedCredentialFile,
+} from '@google/gemini-cli-core';
+import { validateAuthMethod } from '../config/auth.js';
+import { loadHierarchicalGeminiMemory } from '../config/config.js';
+import process from 'node:process';
+import { useHistory } from './hooks/useHistoryManager.js';
+import { useThemeCommand } from './hooks/useThemeCommand.js';
+import { useAuthCommand } from './auth/useAuth.js';
+import { useEditorSettings } from './hooks/useEditorSettings.js';
+import { useSettingsCommand } from './hooks/useSettingsCommand.js';
+import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
+import { useVimMode } from './contexts/VimModeContext.js';
+import { useConsoleMessages } from './hooks/useConsoleMessages.js';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
+import { useStdin, useStdout } from 'ink';
+import ansiEscapes from 'ansi-escapes';
+import * as fs from 'node:fs';
+import { useTextBuffer } from './components/shared/text-buffer.js';
+import { useLogger } from './hooks/useLogger.js';
+import { useGeminiStream } from './hooks/useGeminiStream.js';
+import { useVim } from './hooks/vim.js';
+import { type LoadedSettings, SettingScope } from '../config/settings.js';
+import { type InitializationResult } from '../core/initializer.js';
+import { useFocus } from './hooks/useFocus.js';
+import { useBracketedPaste } from './hooks/useBracketedPaste.js';
+import { useKeypress, type Key } from './hooks/useKeypress.js';
+import { keyMatchers, Command } from './keyMatchers.js';
+import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
+import { useFolderTrust } from './hooks/useFolderTrust.js';
+import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
+import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
+import { appEvents, AppEvent } from '../utils/events.js';
+import { type UpdateObject } from './utils/updateCheck.js';
+import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
+import { ConsolePatcher } from './utils/ConsolePatcher.js';
+import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
+import { useMessageQueue } from './hooks/useMessageQueue.js';
+import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
+import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
+import { useSessionStats } from './contexts/SessionContext.js';
+import { useGitBranchName } from './hooks/useGitBranchName.js';
+
+const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
+
+function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
+  return pendingHistoryItems.some((item) => {
+    if (item && item.type === 'tool_group') {
+      return item.tools.some(
+        (tool) => ToolCallStatus.Executing === tool.status,
+      );
+    }
+    return false;
+  });
+}
+
+interface AppContainerProps {
+  config: Config;
+  settings: LoadedSettings;
+  startupWarnings?: string[];
+  version: string;
+  initializationResult: InitializationResult;
+}
+
+export const AppContainer = (props: AppContainerProps) => {
+  const { settings, config, initializationResult } = props;
+  const historyManager = useHistory();
+  const [corgiMode, setCorgiMode] = useState(false);
+  const [debugMessage, setDebugMessage] = useState<string>('');
+  const [quittingMessages, setQuittingMessages] = useState<
+    HistoryItem[] | null
+  >(null);
+  const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
+  const [themeError, setThemeError] = useState<string | null>(
+    initializationResult.themeError,
+  );
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
+    initializationResult.geminiMdFileCount,
+  );
+  const [shellModeActive, setShellModeActive] = useState(false);
+  const [modelSwitchedFromQuotaError, setModelSwitchedFromQuotaError] =
+    useState<boolean>(false);
+  const [historyRemountKey, setHistoryRemountKey] = useState(0);
+  const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
+  const [isTrustedFolder, setIsTrustedFolder] = useState<boolean | undefined>(
+    config.isTrustedFolder(),
+  );
+  const [currentModel, setCurrentModel] = useState(config.getModel());
+  const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
+  const [isProQuotaDialogOpen, setIsProQuotaDialogOpen] = useState(false);
+  const [proQuotaDialogResolver, setProQuotaDialogResolver] = useState<
+    ((value: boolean) => void) | null
+  >(null);
+
+  // Auto-accept indicator
+  const showAutoAcceptIndicator = useAutoAcceptIndicator({
+    config,
+    addItem: historyManager.addItem,
+  });
+
+  const logger = useLogger(config.storage);
+  const [userMessages, setUserMessages] = useState<string[]>([]);
+
+  // Terminal and layout hooks
+  const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
+  const { stdin, setRawMode } = useStdin();
+  const { stdout } = useStdout();
+
+  // Additional hooks moved from App.tsx
+  const { stats: sessionStats } = useSessionStats();
+  const branchName = useGitBranchName(config.getTargetDir());
+
+  // Layout measurements
+  const mainControlsRef = useRef<DOMElement>(null);
+  const staticExtraHeight = 3;
+
+  useEffect(() => {
+    registerCleanup(async () => {
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.disconnect();
+    });
+  }, [config]);
+
+  useEffect(() => {
+    const cleanup = setUpdateHandler(historyManager.addItem, setUpdateInfo);
+    return cleanup;
+  }, [historyManager.addItem]);
+
+  // Watch for model changes (e.g., from Flash fallback)
+  useEffect(() => {
+    const checkModelChange = () => {
+      const configModel = config.getModel();
+      if (configModel !== currentModel) {
+        setCurrentModel(configModel);
+      }
+    };
+
+    // Check immediately and then periodically
+    checkModelChange();
+    const interval = setInterval(checkModelChange, 1000); // Check every second
+
+    return () => clearInterval(interval);
+  }, [config, currentModel]);
+
+  const {
+    consoleMessages,
+    handleNewMessage,
+    clearConsoleMessages: clearConsoleMessagesState,
+  } = useConsoleMessages();
+
+  useEffect(() => {
+    const consolePatcher = new ConsolePatcher({
+      onNewMessage: handleNewMessage,
+      debugMode: config.getDebugMode(),
+    });
+    consolePatcher.patch();
+    registerCleanup(consolePatcher.cleanup);
+  }, [handleNewMessage, config]);
+
+  const widthFraction = 0.9;
+  const inputWidth = Math.max(
+    20,
+    Math.floor(terminalWidth * widthFraction) - 3,
+  );
+  const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 0.8));
+  const mainAreaWidth = Math.floor(terminalWidth * 0.9);
+  const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
+
+  const isValidPath = useCallback((filePath: string): boolean => {
+    try {
+      return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+    } catch (_e) {
+      return false;
+    }
+  }, []);
+
+  const buffer = useTextBuffer({
+    initialText: '',
+    viewport: { height: 10, width: inputWidth },
+    stdin,
+    setRawMode,
+    isValidPath,
+    shellModeActive,
+  });
+
+  useEffect(() => {
+    const fetchUserMessages = async () => {
+      const pastMessagesRaw = (await logger?.getPreviousUserMessages()) || [];
+      const currentSessionUserMessages = historyManager.history
+        .filter(
+          (item): item is HistoryItem & { type: 'user'; text: string } =>
+            item.type === 'user' &&
+            typeof item.text === 'string' &&
+            item.text.trim() !== '',
+        )
+        .map((item) => item.text)
+        .reverse();
+      const combinedMessages = [
+        ...currentSessionUserMessages,
+        ...pastMessagesRaw,
+      ];
+      const deduplicatedMessages: string[] = [];
+      if (combinedMessages.length > 0) {
+        deduplicatedMessages.push(combinedMessages[0]);
+        for (let i = 1; i < combinedMessages.length; i++) {
+          if (combinedMessages[i] !== combinedMessages[i - 1]) {
+            deduplicatedMessages.push(combinedMessages[i]);
+          }
+        }
+      }
+      setUserMessages(deduplicatedMessages.reverse());
+    };
+    fetchUserMessages();
+  }, [historyManager.history, logger]);
+
+  const refreshStatic = useCallback(() => {
+    stdout.write(ansiEscapes.clearTerminal);
+    setHistoryRemountKey((prev) => prev + 1);
+  }, [setHistoryRemountKey, stdout]);
+
+  const {
+    isThemeDialogOpen,
+    openThemeDialog,
+    handleThemeSelect,
+    handleThemeHighlight,
+  } = useThemeCommand(
+    settings,
+    setThemeError,
+    historyManager.addItem,
+    initializationResult.themeError,
+  );
+
+  const { authState, setAuthState, authError, onAuthError } = useAuthCommand(
+    settings,
+    config,
+  );
+
+  // Derive auth state variables for backward compatibility with UIStateContext
+  const isAuthDialogOpen = authState === AuthState.Updating;
+  const isAuthenticating = authState === AuthState.Unauthenticated;
+
+  // Create handleAuthSelect wrapper for backward compatibility
+  const handleAuthSelect = useCallback(
+    async (authType: AuthType | undefined, scope: SettingScope) => {
+      if (authType) {
+        await clearCachedCredentialFile();
+        settings.setValue(scope, 'security.auth.selectedType', authType);
+
+        try {
+          await config.refreshAuth(authType);
+          setAuthState(AuthState.Authenticated);
+        } catch (e) {
+          onAuthError(
+            `Failed to authenticate: ${e instanceof Error ? e.message : String(e)}`,
+          );
+          return;
+        }
+
+        if (
+          authType === AuthType.LOGIN_WITH_GOOGLE &&
+          config.isBrowserLaunchSuppressed()
+        ) {
+          await runExitCleanup();
+          console.log(`
+----------------------------------------------------------------
+Logging in with Google... Please restart Gemini CLI to continue.
+----------------------------------------------------------------
+          `);
+          process.exit(0);
+        }
+      }
+      setAuthState(AuthState.Authenticated);
+    },
+    [settings, config, setAuthState, onAuthError],
+  );
+
+  // Sync user tier from config when authentication changes
+  useEffect(() => {
+    // Only sync when not currently authenticating
+    if (authState === AuthState.Authenticated) {
+      setUserTier(config.getUserTier());
+    }
+  }, [config, authState]);
+
+  // Check for enforced auth type mismatch
+  useEffect(() => {
+    if (
+      settings.merged.security?.auth?.enforcedType &&
+      settings.merged.security?.auth.selectedType &&
+      settings.merged.security?.auth.enforcedType !==
+        settings.merged.security?.auth.selectedType
+    ) {
+      onAuthError(
+        `Authentication is enforced to be ${settings.merged.security?.auth.enforcedType}, but you are currently using ${settings.merged.security?.auth.selectedType}.`,
+      );
+    } else if (
+      settings.merged.security?.auth?.selectedType &&
+      !settings.merged.security?.auth?.useExternal
+    ) {
+      const error = validateAuthMethod(
+        settings.merged.security.auth.selectedType,
+      );
+      if (error) {
+        onAuthError(error);
+      }
+    }
+  }, [
+    settings.merged.security?.auth?.selectedType,
+    settings.merged.security?.auth?.enforcedType,
+    settings.merged.security?.auth?.useExternal,
+    onAuthError,
+  ]);
+
+  const [editorError, setEditorError] = useState<string | null>(null);
+  const {
+    isEditorDialogOpen,
+    openEditorDialog,
+    handleEditorSelect,
+    exitEditorDialog,
+  } = useEditorSettings(settings, setEditorError, historyManager.addItem);
+
+  const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
+    useSettingsCommand();
+
+  const {
+    showWorkspaceMigrationDialog,
+    workspaceExtensions,
+    onWorkspaceMigrationDialogOpen,
+    onWorkspaceMigrationDialogClose,
+  } = useWorkspaceMigration(settings);
+
+  const { toggleVimEnabled } = useVimMode();
+
+  const slashCommandActions = useMemo(
+    () => ({
+      openAuthDialog: () => setAuthState(AuthState.Updating),
+      openThemeDialog,
+      openEditorDialog,
+      openPrivacyNotice: () => setShowPrivacyNotice(true),
+      openSettingsDialog,
+      quit: (messages: HistoryItem[]) => {
+        setQuittingMessages(messages);
+        setTimeout(async () => {
+          await runExitCleanup();
+          process.exit(0);
+        }, 100);
+      },
+      setDebugMessage,
+      toggleCorgiMode: () => setCorgiMode((prev) => !prev),
+    }),
+    [
+      setAuthState,
+      openThemeDialog,
+      openEditorDialog,
+      openSettingsDialog,
+      setQuittingMessages,
+      setDebugMessage,
+      setShowPrivacyNotice,
+      setCorgiMode,
+    ],
+  );
+
+  const {
+    handleSlashCommand,
+    slashCommands,
+    pendingHistoryItems: pendingSlashCommandHistoryItems,
+    commandContext,
+    shellConfirmationRequest,
+    confirmationRequest,
+  } = useSlashCommandProcessor(
+    config,
+    settings,
+    historyManager.addItem,
+    historyManager.clearItems,
+    historyManager.loadHistory,
+    refreshStatic,
+    toggleVimEnabled,
+    setIsProcessing,
+    setGeminiMdFileCount,
+    slashCommandActions,
+  );
+
+  const performMemoryRefresh = useCallback(async () => {
+    historyManager.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'Refreshing hierarchical memory (GEMINI.md or other context files)...',
+      },
+      Date.now(),
+    );
+    try {
+      const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
+        process.cwd(),
+        settings.merged.context?.loadMemoryFromIncludeDirectories
+          ? config.getWorkspaceContext().getDirectories()
+          : [],
+        config.getDebugMode(),
+        config.getFileService(),
+        settings.merged,
+        config.getExtensionContextFilePaths(),
+        config.isTrustedFolder(),
+        settings.merged.context?.importFormat || 'tree', // Use setting or default to 'tree'
+        config.getFileFilteringOptions(),
+      );
+
+      config.setUserMemory(memoryContent);
+      config.setGeminiMdFileCount(fileCount);
+      setGeminiMdFileCount(fileCount);
+
+      historyManager.addItem(
+        {
+          type: MessageType.INFO,
+          text: `Memory refreshed successfully. ${
+            memoryContent.length > 0
+              ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).`
+              : 'No memory content found.'
+          }`,
+        },
+        Date.now(),
+      );
+      if (config.getDebugMode()) {
+        console.log(
+          `[DEBUG] Refreshed memory content in config: ${memoryContent.substring(
+            0,
+            200,
+          )}...`,
+        );
+      }
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      historyManager.addItem(
+        {
+          type: MessageType.ERROR,
+          text: `Error refreshing memory: ${errorMessage}`,
+        },
+        Date.now(),
+      );
+      console.error('Error refreshing memory:', error);
+    }
+  }, [config, historyManager, settings.merged]);
+
+  // Set up Flash fallback handler
+  useEffect(() => {
+    const flashFallbackHandler = async (
+      currentModel: string,
+      fallbackModel: string,
+      error?: unknown,
+    ): Promise<boolean> => {
+      // Check if we've already switched to the fallback model
+      if (config.isInFallbackMode()) {
+        // If we're already in fallback mode, don't show the dialog again
+        return false;
+      }
+
+      let message: string;
+
+      if (
+        config.getContentGeneratorConfig().authType ===
+        AuthType.LOGIN_WITH_GOOGLE
+      ) {
+        // Use actual user tier if available; otherwise, default to FREE tier behavior (safe default)
+        const isPaidTier =
+          userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
+
+        // Check if this is a Pro quota exceeded error
+        if (error && isProQuotaExceededError(error)) {
+          if (isPaidTier) {
+            message = `⚡ You have reached your daily ${currentModel} quota limit.
+⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
+⚡ To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
+          } else {
+            message = `⚡ You have reached your daily ${currentModel} quota limit.
+⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
+⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
+⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
+⚡ You can switch authentication methods by typing /auth`;
+          }
+        } else if (error && isGenericQuotaExceededError(error)) {
+          if (isPaidTier) {
+            message = `⚡ You have reached your daily quota limit.
+⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
+⚡ To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
+          } else {
+            message = `⚡ You have reached your daily quota limit.
+⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
+⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
+⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
+⚡ You can switch authentication methods by typing /auth`;
+          }
+        } else {
+          if (isPaidTier) {
+            // Default fallback message for other cases (like consecutive 429s)
+            message = `⚡ Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.
+⚡ Possible reasons for this are that you have received multiple consecutive capacity errors or you have reached your daily ${currentModel} quota limit
+⚡ To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
+          } else {
+            // Default fallback message for other cases (like consecutive 429s)
+            message = `⚡ Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.
+⚡ Possible reasons for this are that you have received multiple consecutive capacity errors or you have reached your daily ${currentModel} quota limit
+⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
+⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
+⚡ You can switch authentication methods by typing /auth`;
+          }
+        }
+
+        // Add message to UI history
+        historyManager.addItem(
+          {
+            type: MessageType.INFO,
+            text: message,
+          },
+          Date.now(),
+        );
+
+        // For Pro quota errors, show the dialog and wait for user's choice
+        if (error && isProQuotaExceededError(error)) {
+          // Set the flag to prevent tool continuation
+          setModelSwitchedFromQuotaError(true);
+          // Set global quota error flag to prevent Flash model calls
+          config.setQuotaErrorOccurred(true);
+
+          // Show the ProQuotaDialog and wait for user's choice
+          const shouldContinueWithFallback = await new Promise<boolean>(
+            (resolve) => {
+              setIsProQuotaDialogOpen(true);
+              setProQuotaDialogResolver(() => resolve);
+            },
+          );
+
+          // If user chose to continue with fallback, we don't need to stop the current prompt
+          if (shouldContinueWithFallback) {
+            // Switch to fallback model for future use
+            config.setModel(fallbackModel);
+            config.setFallbackMode(true);
+            logFlashFallback(
+              config,
+              new FlashFallbackEvent(
+                config.getContentGeneratorConfig().authType!,
+              ),
+            );
+            return true; // Continue with current prompt using fallback model
+          }
+
+          // If user chose to authenticate, stop current prompt
+          return false;
+        }
+
+        // For other quota errors, automatically switch to fallback model
+        // Set the flag to prevent tool continuation
+        setModelSwitchedFromQuotaError(true);
+        // Set global quota error flag to prevent Flash model calls
+        config.setQuotaErrorOccurred(true);
+      }
+
+      // Switch model for future use but return false to stop current retry
+      config.setModel(fallbackModel);
+      config.setFallbackMode(true);
+      logFlashFallback(
+        config,
+        new FlashFallbackEvent(config.getContentGeneratorConfig().authType!),
+      );
+      return false; // Don't continue with current prompt
+    };
+
+    config.setFlashFallbackHandler(flashFallbackHandler);
+  }, [config, historyManager, userTier]);
+
+  const cancelHandlerRef = useRef<() => void>(() => {});
+
+  const {
+    streamingState,
+    submitQuery,
+    initError,
+    pendingHistoryItems: pendingGeminiHistoryItems,
+    thought,
+    cancelOngoingRequest,
+  } = useGeminiStream(
+    config.getGeminiClient(),
+    historyManager.history,
+    historyManager.addItem,
+    config,
+    settings,
+    setDebugMessage,
+    handleSlashCommand,
+    shellModeActive,
+    () => settings.merged.general?.preferredEditor as EditorType,
+    onAuthError,
+    performMemoryRefresh,
+    modelSwitchedFromQuotaError,
+    setModelSwitchedFromQuotaError,
+    refreshStatic,
+    () => cancelHandlerRef.current(),
+  );
+
+  const { messageQueue, addMessage, clearQueue, getQueuedMessagesText } =
+    useMessageQueue({
+      streamingState,
+      submitQuery,
+    });
+
+  cancelHandlerRef.current = useCallback(() => {
+    const pendingHistoryItems = [
+      ...pendingSlashCommandHistoryItems,
+      ...pendingGeminiHistoryItems,
+    ];
+    if (isToolExecuting(pendingHistoryItems)) {
+      buffer.setText(''); // Just clear the prompt
+      return;
+    }
+
+    const lastUserMessage = userMessages.at(-1);
+    let textToSet = lastUserMessage || '';
+
+    const queuedText = getQueuedMessagesText();
+    if (queuedText) {
+      textToSet = textToSet ? `${textToSet}\n\n${queuedText}` : queuedText;
+      clearQueue();
+    }
+
+    if (textToSet) {
+      buffer.setText(textToSet);
+    }
+  }, [
+    buffer,
+    userMessages,
+    getQueuedMessagesText,
+    clearQueue,
+    pendingSlashCommandHistoryItems,
+    pendingGeminiHistoryItems,
+  ]);
+
+  const handleFinalSubmit = useCallback(
+    (submittedValue: string) => {
+      addMessage(submittedValue);
+    },
+    [addMessage],
+  );
+
+  const handleClearScreen = useCallback(() => {
+    historyManager.clearItems();
+    clearConsoleMessagesState();
+    console.clear();
+    refreshStatic();
+  }, [historyManager, clearConsoleMessagesState, refreshStatic]);
+
+  const handleProQuotaChoice = useCallback(
+    (choice: 'auth' | 'continue') => {
+      setIsProQuotaDialogOpen(false);
+      if (proQuotaDialogResolver) {
+        if (choice === 'auth') {
+          proQuotaDialogResolver(false); // Don't continue with fallback, show auth dialog
+          setAuthState(AuthState.Updating);
+        } else {
+          proQuotaDialogResolver(true); // Continue with fallback model
+        }
+        setProQuotaDialogResolver(null);
+      }
+    },
+    [proQuotaDialogResolver, setAuthState],
+  );
+
+  const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
+
+  /**
+   * Determines if the input prompt should be active and accept user input.
+   * Input is disabled during:
+   * - Initialization errors
+   * - Slash command processing
+   * - Tool confirmations (WaitingForConfirmation state)
+   * - Any future streaming states not explicitly allowed
+   */
+  const isInputActive =
+    !initError &&
+    !isProcessing &&
+    (streamingState === StreamingState.Idle ||
+      streamingState === StreamingState.Responding) &&
+    !isProQuotaDialogOpen;
+
+  // Compute available terminal height based on controls measurement
+  const availableTerminalHeight = useMemo(() => {
+    if (mainControlsRef.current) {
+      const fullFooterMeasurement = measureElement(mainControlsRef.current);
+      return terminalHeight - fullFooterMeasurement.height - staticExtraHeight;
+    }
+    return terminalHeight - staticExtraHeight;
+  }, [terminalHeight]);
+
+  const isFocused = useFocus();
+  useBracketedPaste();
+
+  // Context file names computation
+  const contextFileNames = useMemo(() => {
+    const fromSettings = settings.merged.context?.fileName;
+    return fromSettings
+      ? Array.isArray(fromSettings)
+        ? fromSettings
+        : [fromSettings]
+      : getAllGeminiMdFilenames();
+  }, [settings.merged.context?.fileName]);
+  // Initial prompt handling
+  const initialPrompt = useMemo(() => config.getQuestion(), [config]);
+  const initialPromptSubmitted = useRef(false);
+  const geminiClient = config.getGeminiClient();
+
+  useEffect(() => {
+    if (
+      initialPrompt &&
+      !initialPromptSubmitted.current &&
+      !isAuthenticating &&
+      !isAuthDialogOpen &&
+      !isThemeDialogOpen &&
+      !isEditorDialogOpen &&
+      !showPrivacyNotice &&
+      geminiClient?.isInitialized?.()
+    ) {
+      handleFinalSubmit(initialPrompt);
+      initialPromptSubmitted.current = true;
+    }
+  }, [
+    initialPrompt,
+    handleFinalSubmit,
+    isAuthenticating,
+    isAuthDialogOpen,
+    isThemeDialogOpen,
+    isEditorDialogOpen,
+    showPrivacyNotice,
+    geminiClient,
+  ]);
+
+  const [idePromptAnswered, setIdePromptAnswered] = useState(false);
+  const [currentIDE, setCurrentIDE] = useState<DetectedIde | null>(null);
+
+  useEffect(() => {
+    const getIde = async () => {
+      const ideClient = await IdeClient.getInstance();
+      const currentIde = ideClient.getCurrentIde();
+      setCurrentIDE(currentIde || null);
+    };
+    getIde();
+  }, []);
+  const shouldShowIdePrompt = Boolean(
+    currentIDE &&
+      !config.getIdeMode() &&
+      !settings.merged.ide?.hasSeenNudge &&
+      !idePromptAnswered,
+  );
+
+  const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
+  const [showToolDescriptions, setShowToolDescriptions] =
+    useState<boolean>(false);
+
+  const [ctrlCPressedOnce, setCtrlCPressedOnce] = useState(false);
+  const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [ctrlDPressedOnce, setCtrlDPressedOnce] = useState(false);
+  const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
+  const [ideContextState, setIdeContextState] = useState<
+    IdeContext | undefined
+  >();
+  const [showEscapePrompt, setShowEscapePrompt] = useState(false);
+  const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
+
+  const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
+    useFolderTrust(settings, config, setIsTrustedFolder, refreshStatic);
+  const { needsRestart: ideNeedsRestart } = useIdeTrustListener();
+  const isInitialMount = useRef(true);
+
+  useEffect(() => {
+    if (ideNeedsRestart) {
+      // IDE trust changed, force a restart.
+      setShowIdeRestartPrompt(true);
+    }
+  }, [ideNeedsRestart]);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    const handler = setTimeout(() => {
+      refreshStatic();
+    }, 300);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [terminalWidth, refreshStatic]);
+
+  useEffect(() => {
+    const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
+    setIdeContextState(ideContext.getIdeContext());
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const openDebugConsole = () => {
+      setShowErrorDetails(true);
+      setConstrainHeight(false);
+    };
+    appEvents.on(AppEvent.OpenDebugConsole, openDebugConsole);
+
+    const logErrorHandler = (errorMessage: unknown) => {
+      handleNewMessage({
+        type: 'error',
+        content: String(errorMessage),
+        count: 1,
+      });
+    };
+    appEvents.on(AppEvent.LogError, logErrorHandler);
+
+    return () => {
+      appEvents.off(AppEvent.OpenDebugConsole, openDebugConsole);
+      appEvents.off(AppEvent.LogError, logErrorHandler);
+    };
+  }, [handleNewMessage]);
+
+  const handleEscapePromptChange = useCallback((showPrompt: boolean) => {
+    setShowEscapePrompt(showPrompt);
+  }, []);
+
+  const handleIdePromptComplete = useCallback(
+    (result: IdeIntegrationNudgeResult) => {
+      if (result.userSelection === 'yes') {
+        handleSlashCommand('/ide install');
+        settings.setValue(
+          SettingScope.User,
+          'hasSeenIdeIntegrationNudge',
+          true,
+        );
+      } else if (result.userSelection === 'dismiss') {
+        settings.setValue(
+          SettingScope.User,
+          'hasSeenIdeIntegrationNudge',
+          true,
+        );
+      }
+      setIdePromptAnswered(true);
+    },
+    [handleSlashCommand, settings],
+  );
+
+  const { elapsedTime, currentLoadingPhrase } =
+    useLoadingIndicator(streamingState);
+
+  const handleExit = useCallback(
+    (
+      pressedOnce: boolean,
+      setPressedOnce: (value: boolean) => void,
+      timerRef: React.MutableRefObject<NodeJS.Timeout | null>,
+    ) => {
+      if (pressedOnce) {
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+        }
+        handleSlashCommand('/quit');
+      } else {
+        setPressedOnce(true);
+        timerRef.current = setTimeout(() => {
+          setPressedOnce(false);
+          timerRef.current = null;
+        }, CTRL_EXIT_PROMPT_DURATION_MS);
+      }
+    },
+    [handleSlashCommand],
+  );
+
+  const handleGlobalKeypress = useCallback(
+    (key: Key) => {
+      // Debug log keystrokes if enabled
+      if (settings.merged.general?.debugKeystrokeLogging) {
+        console.log('[DEBUG] Keystroke:', JSON.stringify(key));
+      }
+
+      const anyDialogOpen =
+        isThemeDialogOpen ||
+        isAuthDialogOpen ||
+        isEditorDialogOpen ||
+        isSettingsDialogOpen ||
+        isFolderTrustDialogOpen ||
+        showPrivacyNotice;
+      if (anyDialogOpen) {
+        return;
+      }
+
+      let enteringConstrainHeightMode = false;
+      if (!constrainHeight) {
+        enteringConstrainHeightMode = true;
+        setConstrainHeight(true);
+      }
+
+      if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
+        setShowErrorDetails((prev) => !prev);
+      } else if (keyMatchers[Command.TOGGLE_TOOL_DESCRIPTIONS](key)) {
+        const newValue = !showToolDescriptions;
+        setShowToolDescriptions(newValue);
+
+        const mcpServers = config.getMcpServers();
+        if (Object.keys(mcpServers || {}).length > 0) {
+          handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
+        }
+      } else if (
+        keyMatchers[Command.TOGGLE_IDE_CONTEXT_DETAIL](key) &&
+        config.getIdeMode() &&
+        ideContextState
+      ) {
+        handleSlashCommand('/ide status');
+      } else if (keyMatchers[Command.QUIT](key)) {
+        if (!ctrlCPressedOnce) {
+          cancelOngoingRequest?.();
+        }
+        handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+      } else if (keyMatchers[Command.EXIT](key)) {
+        if (buffer.text.length > 0) {
+          return;
+        }
+        handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
+      } else if (
+        keyMatchers[Command.SHOW_MORE_LINES](key) &&
+        !enteringConstrainHeightMode
+      ) {
+        setConstrainHeight(false);
+      }
+    },
+    [
+      constrainHeight,
+      setConstrainHeight,
+      setShowErrorDetails,
+      showToolDescriptions,
+      setShowToolDescriptions,
+      config,
+      ideContextState,
+      handleExit,
+      ctrlCPressedOnce,
+      setCtrlCPressedOnce,
+      ctrlCTimerRef,
+      buffer.text.length,
+      ctrlDPressedOnce,
+      setCtrlDPressedOnce,
+      ctrlDTimerRef,
+      handleSlashCommand,
+      cancelOngoingRequest,
+      isThemeDialogOpen,
+      isAuthDialogOpen,
+      isEditorDialogOpen,
+      isSettingsDialogOpen,
+      isFolderTrustDialogOpen,
+      showPrivacyNotice,
+      settings.merged.general?.debugKeystrokeLogging,
+    ],
+  );
+
+  useKeypress(handleGlobalKeypress, { isActive: true });
+  useKeypress(
+    (key) => {
+      if (key.name === 'r' || key.name === 'R') {
+        process.exit(0);
+      }
+    },
+    { isActive: showIdeRestartPrompt },
+  );
+
+  const filteredConsoleMessages = useMemo(() => {
+    if (config.getDebugMode()) {
+      return consoleMessages;
+    }
+    return consoleMessages.filter((msg) => msg.type !== 'debug');
+  }, [consoleMessages, config]);
+
+  // Computed values
+  const errorCount = useMemo(
+    () =>
+      filteredConsoleMessages
+        .filter((msg) => msg.type === 'error')
+        .reduce((total, msg) => total + msg.count, 0),
+    [filteredConsoleMessages],
+  );
+
+  const nightly = props.version.includes('nightly');
+
+  const dialogsVisible = useMemo(
+    () =>
+      showWorkspaceMigrationDialog ||
+      shouldShowIdePrompt ||
+      isFolderTrustDialogOpen ||
+      !!shellConfirmationRequest ||
+      !!confirmationRequest ||
+      isThemeDialogOpen ||
+      isSettingsDialogOpen ||
+      isAuthenticating ||
+      isAuthDialogOpen ||
+      isEditorDialogOpen ||
+      showPrivacyNotice ||
+      isProQuotaDialogOpen,
+    [
+      showWorkspaceMigrationDialog,
+      shouldShowIdePrompt,
+      isFolderTrustDialogOpen,
+      shellConfirmationRequest,
+      confirmationRequest,
+      isThemeDialogOpen,
+      isSettingsDialogOpen,
+      isAuthenticating,
+      isAuthDialogOpen,
+      isEditorDialogOpen,
+      showPrivacyNotice,
+      isProQuotaDialogOpen,
+    ],
+  );
+
+  const pendingHistoryItems = useMemo(
+    () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
+    [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
+  );
+
+  const uiState: UIState = useMemo(
+    () => ({
+      history: historyManager.history,
+      isThemeDialogOpen,
+      themeError,
+      isAuthenticating,
+      authError,
+      isAuthDialogOpen,
+      editorError,
+      isEditorDialogOpen,
+      showPrivacyNotice,
+      corgiMode,
+      debugMessage,
+      quittingMessages,
+      isSettingsDialogOpen,
+      slashCommands,
+      pendingSlashCommandHistoryItems,
+      commandContext,
+      shellConfirmationRequest,
+      confirmationRequest,
+      geminiMdFileCount,
+      streamingState,
+      initError,
+      pendingGeminiHistoryItems,
+      thought,
+      shellModeActive,
+      userMessages,
+      buffer,
+      inputWidth,
+      suggestionsWidth,
+      isInputActive,
+      shouldShowIdePrompt,
+      isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
+      isTrustedFolder,
+      constrainHeight,
+      showErrorDetails,
+      filteredConsoleMessages,
+      ideContextState,
+      showToolDescriptions,
+      ctrlCPressedOnce,
+      ctrlDPressedOnce,
+      showEscapePrompt,
+      isFocused,
+      elapsedTime,
+      currentLoadingPhrase,
+      historyRemountKey,
+      messageQueue,
+      showAutoAcceptIndicator,
+      showWorkspaceMigrationDialog,
+      workspaceExtensions,
+      // Use current state values instead of config.getModel()
+      currentModel,
+      userTier,
+      isProQuotaDialogOpen,
+      // New fields
+      contextFileNames,
+      errorCount,
+      availableTerminalHeight,
+      mainAreaWidth,
+      staticAreaMaxItemHeight,
+      staticExtraHeight,
+      dialogsVisible,
+      pendingHistoryItems,
+      nightly,
+      branchName,
+      sessionStats,
+      terminalWidth,
+      terminalHeight,
+      mainControlsRef,
+      currentIDE,
+      updateInfo,
+      showIdeRestartPrompt,
+      isRestarting,
+    }),
+    [
+      historyManager.history,
+      isThemeDialogOpen,
+      themeError,
+      isAuthenticating,
+      authError,
+      isAuthDialogOpen,
+      editorError,
+      isEditorDialogOpen,
+      showPrivacyNotice,
+      corgiMode,
+      debugMessage,
+      quittingMessages,
+      isSettingsDialogOpen,
+      slashCommands,
+      pendingSlashCommandHistoryItems,
+      commandContext,
+      shellConfirmationRequest,
+      confirmationRequest,
+      geminiMdFileCount,
+      streamingState,
+      initError,
+      pendingGeminiHistoryItems,
+      thought,
+      shellModeActive,
+      userMessages,
+      buffer,
+      inputWidth,
+      suggestionsWidth,
+      isInputActive,
+      shouldShowIdePrompt,
+      isFolderTrustDialogOpen,
+      isTrustedFolder,
+      constrainHeight,
+      showErrorDetails,
+      filteredConsoleMessages,
+      ideContextState,
+      showToolDescriptions,
+      ctrlCPressedOnce,
+      ctrlDPressedOnce,
+      showEscapePrompt,
+      isFocused,
+      elapsedTime,
+      currentLoadingPhrase,
+      historyRemountKey,
+      messageQueue,
+      showAutoAcceptIndicator,
+      showWorkspaceMigrationDialog,
+      workspaceExtensions,
+      // Quota-related state dependencies
+      userTier,
+      isProQuotaDialogOpen,
+      // New fields dependencies
+      contextFileNames,
+      errorCount,
+      availableTerminalHeight,
+      mainAreaWidth,
+      staticAreaMaxItemHeight,
+      staticExtraHeight,
+      dialogsVisible,
+      pendingHistoryItems,
+      nightly,
+      branchName,
+      sessionStats,
+      terminalWidth,
+      terminalHeight,
+      mainControlsRef,
+      currentIDE,
+      updateInfo,
+      showIdeRestartPrompt,
+      isRestarting,
+      // Quota-related dependencies
+      currentModel,
+    ],
+  );
+
+  const uiActions: UIActions = useMemo(
+    () => ({
+      handleThemeSelect,
+      handleThemeHighlight,
+      handleAuthSelect,
+      setAuthState,
+      onAuthError,
+      handleEditorSelect,
+      exitEditorDialog,
+      exitPrivacyNotice: () => setShowPrivacyNotice(false),
+      closeSettingsDialog,
+      setShellModeActive,
+      vimHandleInput,
+      handleIdePromptComplete,
+      handleFolderTrustSelect,
+      setConstrainHeight,
+      onEscapePromptChange: handleEscapePromptChange,
+      refreshStatic,
+      handleFinalSubmit,
+      handleClearScreen,
+      onWorkspaceMigrationDialogOpen,
+      onWorkspaceMigrationDialogClose,
+      handleProQuotaChoice,
+    }),
+    [
+      handleThemeSelect,
+      handleThemeHighlight,
+      handleAuthSelect,
+      setAuthState,
+      onAuthError,
+      handleEditorSelect,
+      exitEditorDialog,
+      closeSettingsDialog,
+      setShellModeActive,
+      vimHandleInput,
+      handleIdePromptComplete,
+      handleFolderTrustSelect,
+      setConstrainHeight,
+      handleEscapePromptChange,
+      refreshStatic,
+      handleFinalSubmit,
+      handleClearScreen,
+      onWorkspaceMigrationDialogOpen,
+      onWorkspaceMigrationDialogClose,
+      handleProQuotaChoice,
+    ],
+  );
+
+  return (
+    <UIStateContext.Provider value={uiState}>
+      <UIActionsContext.Provider value={uiActions}>
+        <ConfigContext.Provider value={config}>
+          <AppContext.Provider
+            value={{
+              version: props.version,
+              startupWarnings: props.startupWarnings || [],
+            }}
+          >
+            <App />
+          </AppContext.Provider>
+        </ConfigContext.Provider>
+      </UIActionsContext.Provider>
+    </UIStateContext.Provider>
+  );
+};

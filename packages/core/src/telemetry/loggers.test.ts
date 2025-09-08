@@ -524,7 +524,22 @@ describe('loggers', () => {
         response: {
           callId: 'test-call-id',
           responseParts: [{ text: 'test-response' }],
-          resultDisplay: undefined,
+          resultDisplay: {
+            fileDiff: 'diff',
+            fileName: 'file.txt',
+            originalContent: 'old content',
+            newContent: 'new content',
+            diffStat: {
+              model_added_lines: 1,
+              model_removed_lines: 2,
+              model_added_chars: 3,
+              model_removed_chars: 4,
+              user_added_lines: 5,
+              user_removed_lines: 6,
+              user_added_chars: 7,
+              user_removed_chars: 8,
+            },
+          },
           error: undefined,
           errorType: undefined,
         },
@@ -560,7 +575,16 @@ describe('loggers', () => {
           tool_type: 'native',
           error: undefined,
           error_type: undefined,
-          metadata: undefined,
+          metadata: {
+            model_added_lines: 1,
+            model_removed_lines: 2,
+            model_added_chars: 3,
+            model_removed_chars: 4,
+            user_added_lines: 5,
+            user_removed_lines: 6,
+            user_added_chars: 7,
+            user_removed_chars: 8,
+          },
         },
       });
 

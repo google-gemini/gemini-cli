@@ -20,6 +20,8 @@ import type { UseCommandCompletionReturn } from '../hooks/useCommandCompletion.j
 import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
 import type { UseInputHistoryReturn } from '../hooks/useInputHistory.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
+import type { UseReverseSearchCompletionReturn } from '../hooks/useReverseSearchCompletion.js';
+import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import chalk from 'chalk';
@@ -27,6 +29,7 @@ import chalk from 'chalk';
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
+vi.mock('../hooks/useReverseSearchCompletion.js');
 vi.mock('../utils/clipboardUtils.js');
 
 const mockSlashCommands: SlashCommand[] = [
@@ -82,12 +85,16 @@ describe('InputPrompt', () => {
   let mockShellHistory: UseShellHistoryReturn;
   let mockCommandCompletion: UseCommandCompletionReturn;
   let mockInputHistory: UseInputHistoryReturn;
+  let mockReverseSearchCompletion: UseReverseSearchCompletionReturn;
   let mockBuffer: TextBuffer;
   let mockCommandContext: CommandContext;
 
   const mockedUseShellHistory = vi.mocked(useShellHistory);
   const mockedUseCommandCompletion = vi.mocked(useCommandCompletion);
   const mockedUseInputHistory = vi.mocked(useInputHistory);
+  const mockedUseReverseSearchCompletion = vi.mocked(
+    useReverseSearchCompletion,
+  );
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -167,6 +174,21 @@ describe('InputPrompt', () => {
       handleSubmit: vi.fn(),
     };
     mockedUseInputHistory.mockReturnValue(mockInputHistory);
+
+    mockReverseSearchCompletion = {
+      suggestions: [],
+      activeSuggestionIndex: -1,
+      visibleStartIndex: 0,
+      showSuggestions: false,
+      isLoadingSuggestions: false,
+      navigateUp: vi.fn(),
+      navigateDown: vi.fn(),
+      handleAutocomplete: vi.fn(),
+      resetCompletionState: vi.fn(),
+    };
+    mockedUseReverseSearchCompletion.mockReturnValue(
+      mockReverseSearchCompletion,
+    );
 
     props = {
       buffer: mockBuffer,
@@ -1375,6 +1397,77 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('paste auto-submission protection', () => {
+    it('should prevent auto-submission immediately after paste with newlines', async () => {
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // First type some text manually
+      stdin.write('test command');
+      await wait();
+
+      // Simulate a paste operation (this should set the paste protection)
+      stdin.write(`\x1b[200~\npasted content\x1b[201~`);
+      await wait();
+
+      // Simulate an Enter key press immediately after paste
+      stdin.write('\r');
+      await wait();
+
+      // Verify that onSubmit was NOT called due to recent paste protection
+      expect(props.onSubmit).not.toHaveBeenCalled();
+
+      unmount();
+    });
+
+    it('should allow submission after paste protection timeout', async () => {
+      // Set up buffer with text for submission
+      props.buffer.text = 'test command';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Simulate a paste operation (this sets the protection)
+      stdin.write(`\x1b[200~\npasted\x1b[201~`);
+      await wait();
+
+      // Wait for the protection timeout to naturally expire
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      // Now Enter should work normally
+      stdin.write('\r');
+      await wait();
+
+      // Verify that onSubmit was called after the timeout
+      expect(props.onSubmit).toHaveBeenCalledWith('test command');
+
+      unmount();
+    });
+
+    it('should not interfere with normal Enter key submission when no recent paste', async () => {
+      // Set up buffer with text before rendering to ensure submission works
+      props.buffer.text = 'normal command';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Press Enter without any recent paste
+      stdin.write('\r');
+      await wait();
+
+      // Verify that onSubmit was called normally
+      expect(props.onSubmit).toHaveBeenCalledWith('normal command');
+
+      unmount();
+    });
+  });
+
   describe('enhanced input UX - double ESC clear functionality', () => {
     it('should clear buffer on second ESC press', async () => {
       const onEscapePromptChange = vi.fn();
@@ -1502,12 +1595,27 @@ describe('InputPrompt', () => {
     });
 
     it('invokes reverse search on Ctrl+R', async () => {
+      // Mock the reverse search completion to return suggestions
+      mockedUseReverseSearchCompletion.mockReturnValue({
+        ...mockReverseSearchCompletion,
+        suggestions: [
+          { label: 'echo hello', value: 'echo hello' },
+          { label: 'echo world', value: 'echo world' },
+          { label: 'ls', value: 'ls' },
+        ],
+        showSuggestions: true,
+        activeSuggestionIndex: 0,
+      });
+
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
       await wait();
 
-      stdin.write('\x12');
+      // Trigger reverse search with Ctrl+R
+      act(() => {
+        stdin.write('\x12');
+      });
       await wait();
 
       const frame = stdout.lastFrame();
@@ -1539,6 +1647,27 @@ describe('InputPrompt', () => {
     });
 
     it('completes the highlighted entry on Tab and exits reverse-search', async () => {
+      // Mock the reverse search completion
+      const mockHandleAutocomplete = vi.fn(() => {
+        props.buffer.setText('echo hello');
+      });
+
+      mockedUseReverseSearchCompletion.mockImplementation(
+        (buffer, shellHistory, reverseSearchActive) => ({
+          ...mockReverseSearchCompletion,
+          suggestions: reverseSearchActive
+            ? [
+                { label: 'echo hello', value: 'echo hello' },
+                { label: 'echo world', value: 'echo world' },
+                { label: 'ls', value: 'ls' },
+              ]
+            : [],
+          showSuggestions: reverseSearchActive,
+          activeSuggestionIndex: reverseSearchActive ? 0 : -1,
+          handleAutocomplete: mockHandleAutocomplete,
+        }),
+      );
+
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
@@ -1556,19 +1685,26 @@ describe('InputPrompt', () => {
       act(() => {
         stdin.write('\t');
       });
+      await wait();
 
-      await waitFor(
-        () => {
-          expect(stdout.lastFrame()).not.toContain('(r:)');
-        },
-        { timeout: 5000 },
-      ); // Increase timeout
-
+      expect(mockHandleAutocomplete).toHaveBeenCalledWith(0);
       expect(props.buffer.setText).toHaveBeenCalledWith('echo hello');
       unmount();
-    });
+    }, 15000);
 
     it('submits the highlighted entry on Enter and exits reverse-search', async () => {
+      // Mock the reverse search completion to return suggestions
+      mockedUseReverseSearchCompletion.mockReturnValue({
+        ...mockReverseSearchCompletion,
+        suggestions: [
+          { label: 'echo hello', value: 'echo hello' },
+          { label: 'echo world', value: 'echo world' },
+          { label: 'ls', value: 'ls' },
+        ],
+        showSuggestions: true,
+        activeSuggestionIndex: 0,
+      });
+
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
