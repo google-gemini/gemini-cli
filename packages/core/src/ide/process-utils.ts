@@ -42,7 +42,7 @@ async function getProcessInfo(pid: number): Promise<{
       const {
         Name = '',
         ParentProcessId = 0,
-        CommandLine,
+        CommandLine = '',
       } = JSON.parse(output);
       return {
         parentPid: ParentProcessId,
