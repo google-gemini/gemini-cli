@@ -339,8 +339,8 @@ async function cloneFromGit(
   destination: string,
 ): Promise<void> {
   try {
-    const git = simpleGit();
-    await git.clone(installMetadata.source, destination, ['--depth', '1']);
+    const git = simpleGit(destination);
+    await git.clone(installMetadata.source, './', ['--depth', '1']);
 
     const remotes = await git.getRemotes(true);
     if (remotes.length === 0) {
