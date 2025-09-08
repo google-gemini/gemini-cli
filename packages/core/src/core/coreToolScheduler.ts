@@ -21,6 +21,7 @@ import {
   ToolConfirmationOutcome,
   ApprovalMode,
   logToolCall,
+  ReadFileTool,
   ToolErrorType,
   ToolCallEvent,
 } from '../index.js';
@@ -32,6 +33,8 @@ import {
   modifyWithEditor,
 } from '../tools/modifiable-tool.js';
 import * as Diff from 'diff';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 import levenshtein from 'fast-levenshtein';
 
@@ -242,6 +245,70 @@ const createErrorResponse = (
   resultDisplay: error.message,
   errorType,
 });
+
+export async function truncateAndSaveToFile(
+  content: string,
+  callId: string,
+  projectTempDir: string,
+  threshold: number,
+  truncateLines: number,
+): Promise<{ content: string; outputFile?: string }> {
+  if (content.length <= threshold) {
+    return { content };
+  }
+
+  let lines = content.split('\n');
+  let fileContent = content;
+
+  // If the content is long but has few lines, wrap it to enable line-based truncation.
+  if (lines.length <= truncateLines) {
+    const wrapWidth = 120; // A reasonable width for wrapping.
+    const wrappedLines: string[] = [];
+    for (const line of lines) {
+      if (line.length > wrapWidth) {
+        for (let i = 0; i < line.length; i += wrapWidth) {
+          wrappedLines.push(line.substring(i, i + wrapWidth));
+        }
+      } else {
+        wrappedLines.push(line);
+      }
+    }
+    lines = wrappedLines;
+    fileContent = lines.join('\n');
+  }
+
+  const head = Math.floor(truncateLines / 5);
+  const beginning = lines.slice(0, head);
+  const end = lines.slice(-(truncateLines - head));
+  const truncatedContent =
+    beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
+
+  // Sanitize callId to prevent path traversal.
+  const safeFileName = `${path.basename(callId)}.output`;
+  const outputFile = path.join(projectTempDir, safeFileName);
+  try {
+    await fs.writeFile(outputFile, fileContent);
+
+    return {
+      content: `Tool output was too large and has been truncated.
+The full output has been saved to: ${outputFile}
+To read the complete output, use the ${ReadFileTool.Name} tool with the absolute file path above. For large files, you can use the offset and limit parameters to read specific sections:
+- ${ReadFileTool.Name} tool with offset=0, limit=100 to see the first 100 lines
+- ${ReadFileTool.Name} tool with offset=N to skip N lines from the beginning
+- ${ReadFileTool.Name} tool with limit=M to read only M lines at a time
+The truncated output below shows the beginning and end of the content. The marker '... [CONTENT TRUNCATED] ...' indicates where content was removed.
+This allows you to efficiently examine different parts of the output without loading the entire file.
+Truncated part of the output:
+${truncatedContent}`,
+      outputFile,
+    };
+  } catch (_error) {
+    return {
+      content:
+        truncatedContent + `\n[Note: Could not save full output to file]`,
+    };
+  }
+}
 
 interface CoreToolSchedulerOptions {
   config: Config;
@@ -905,10 +972,25 @@ export class CoreToolScheduler {
             }
 
             if (toolResult.error === undefined) {
+              let content = toolResult.llmContent;
+              let outputFile: string | undefined = undefined;
+              if (
+                typeof content === 'string' &&
+                this.config.getTruncateToolOutputThreshold() > 0
+              ) {
+                ({ content, outputFile } = await truncateAndSaveToFile(
+                  content,
+                  callId,
+                  this.config.storage.getProjectTempDir(),
+                  this.config.getTruncateToolOutputThreshold(),
+                  this.config.getTruncateToolOutputLines(),
+                ));
+              }
+
               const response = convertToFunctionResponse(
                 toolName,
                 callId,
-                toolResult.llmContent,
+                content,
               );
               const successResponse: ToolCallResponseInfo = {
                 callId,
@@ -916,6 +998,7 @@ export class CoreToolScheduler {
                 resultDisplay: toolResult.returnDisplay,
                 error: undefined,
                 errorType: undefined,
+                outputFile,
               };
               this.setStatusInternal(callId, 'success', successResponse);
             } else {

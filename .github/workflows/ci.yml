@@ -371,3 +371,25 @@ jobs:
 
       - name: 'Perform CodeQL Analysis'
         uses: 'github/codeql-action/analyze@df559355d593797519d70b90fc8edd5db049e7a2' # ratchet:github/codeql-action/analyze@v3
+
+  # Check for changes in bundle size.
+  bundle_size:
+    name: 'Check Bundle Size'
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read' # For checkout
+      pull-requests: 'write' # For commenting
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - uses: 'preactjs/compressed-size-action@946a292cd35bd1088e0d7eb92b69d1a8d5b5d76a'
+        with:
+          repo-token: '${{ secrets.GITHUB_TOKEN }}'
+          pattern: './bundle/**/*.{js,sb}'
+          minimum-change-threshold: '1000'
+          compression: 'none'
+          clean-script: 'clean'

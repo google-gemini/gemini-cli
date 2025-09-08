@@ -6,10 +6,10 @@
 
 import type { Mock } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Content, GoogleGenAI, Models } from '@google/genai';
+import type { Content } from '@google/genai';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { GeminiClient } from '../core/client.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import type { NextSpeakerResponse } from './nextSpeakerChecker.js';
 import { checkNextSpeaker } from './nextSpeakerChecker.js';
 import { GeminiChat } from '../core/geminiChat.js';
@@ -44,73 +44,28 @@ vi.mock('node:fs', () => {
 vi.mock('../core/client.js');
 vi.mock('../config/config.js');
 
-// Define mocks for GoogleGenAI and Models instances that will be used across tests
-const mockModelsInstance = {
-  generateContent: vi.fn(),
-  generateContentStream: vi.fn(),
-  countTokens: vi.fn(),
-  embedContent: vi.fn(),
-  batchEmbedContents: vi.fn(),
-} as unknown as Models;
-
-const mockGoogleGenAIInstance = {
-  getGenerativeModel: vi.fn().mockReturnValue(mockModelsInstance),
-  // Add other methods of GoogleGenAI if they are directly used by GeminiChat constructor or its methods
-} as unknown as GoogleGenAI;
-
-vi.mock('@google/genai', async () => {
-  const actualGenAI =
-    await vi.importActual<typeof import('@google/genai')>('@google/genai');
-  return {
-    ...actualGenAI,
-    GoogleGenAI: vi.fn(() => mockGoogleGenAIInstance), // Mock constructor to return the predefined instance
-    // If Models is instantiated directly in GeminiChat, mock its constructor too
-    // For now, assuming Models instance is obtained via getGenerativeModel
-  };
-});
-
 describe('checkNextSpeaker', () => {
   let chatInstance: GeminiChat;
+  let mockConfig: Config;
   let mockGeminiClient: GeminiClient;
-  let MockConfig: Mock;
   const abortSignal = new AbortController().signal;
 
   beforeEach(() => {
-    MockConfig = vi.mocked(Config);
-    const mockConfigInstance = new MockConfig(
-      'test-api-key',
-      'gemini-pro',
-      false,
-      '.',
-      false,
-      undefined,
-      false,
-      undefined,
-      undefined,
-      undefined,
-    );
+    vi.resetAllMocks();
+    mockConfig = {
+      getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getSessionId: vi.fn().mockReturnValue('test-session-id'),
+      getModel: () => 'test-model',
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+      },
+    } as unknown as Config;
 
-    // Mock the methods that ChatRecordingService needs
-    mockConfigInstance.getSessionId = vi
-      .fn()
-      .mockReturnValue('test-session-id');
-    mockConfigInstance.getProjectRoot = vi
-      .fn()
-      .mockReturnValue('/test/project/root');
-    mockConfigInstance.storage = {
-      getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
-    };
-
-    mockGeminiClient = new GeminiClient(mockConfigInstance);
-
-    // Reset mocks before each test to ensure test isolation
-    vi.mocked(mockModelsInstance.generateContent).mockReset();
-    vi.mocked(mockModelsInstance.generateContentStream).mockReset();
+    mockGeminiClient = new GeminiClient(mockConfig);
 
     // GeminiChat will receive the mocked instances via the mocked GoogleGenAI constructor
     chatInstance = new GeminiChat(
-      mockConfigInstance,
-      mockModelsInstance, // This is the instance returned by mockGoogleGenAIInstance.getGenerativeModel
+      mockConfig,
       {},
       [], // initial history
     );
@@ -120,7 +75,7 @@ describe('checkNextSpeaker', () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('should return null if history is empty', async () => {
@@ -135,9 +90,9 @@ describe('checkNextSpeaker', () => {
   });
 
   it('should return null if the last speaker was the user', async () => {
-    (chatInstance.getHistory as Mock).mockReturnValue([
+    vi.mocked(chatInstance.getHistory).mockReturnValue([
       { role: 'user', parts: [{ text: 'Hello' }] },
-    ] as Content[]);
+    ]);
     const result = await checkNextSpeaker(
       chatInstance,
       mockGeminiClient,
