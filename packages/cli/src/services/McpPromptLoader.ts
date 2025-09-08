@@ -141,23 +141,55 @@ export class McpPromptLoader implements ICommandLoader {
               };
             }
           },
-          completion: async (_: CommandContext, partialArg: string) => {
-            if (!prompt || !prompt.arguments) {
+          completion: async (
+            commandContext: CommandContext,
+            partialArg: string,
+          ) => {
+            const rawInvocation = commandContext.invocation?.raw;
+            if (!prompt || !prompt.arguments || !rawInvocation) {
               return [];
             }
-
-            const suggestions: string[] = [];
-            const usedArgNames = new Set(
-              (partialArg.match(/--([^=]+)/g) || []).map((s) => s.substring(2)),
+            const emptyFlagArguments = prompt.arguments.map(
+              (argument) => `--${argument.name}="`,
             );
 
-            for (const arg of prompt.arguments) {
-              if (!usedArgNames.has(arg.name)) {
-                suggestions.push(`--${arg.name}=""`);
+            const unusedArguments = emptyFlagArguments.filter(
+              (flagArgument) => {
+                const regex = new RegExp(`${flagArgument}([^"]*)"`);
+                return !regex.test(rawInvocation);
+              },
+            );
+
+            const exactlyMatchingArgumentAtTheEnd = unusedArguments.filter(
+              (flagArgument) => {
+                const regex = new RegExp(`${flagArgument}[^"]*$`);
+                return regex.test(rawInvocation);
+              },
+            );
+
+            if (exactlyMatchingArgumentAtTheEnd.length === 1) {
+              if (exactlyMatchingArgumentAtTheEnd[0] === partialArg) {
+                return [`${partialArg}"`];
               }
+              if (partialArg.endsWith('"')) {
+                return [partialArg];
+              }
+              return [`${partialArg}"`];
             }
 
-            return suggestions;
+            if (
+              partialArg === '' ||
+              partialArg === '-' ||
+              partialArg === '--'
+            ) {
+              return unusedArguments;
+            }
+
+            const matchingArguments = unusedArguments.filter((flagArgument) =>
+              flagArgument.startsWith(partialArg),
+            );
+
+            return matchingArguments;
           },
         };
         promptCommands.push(newPromptCommand);
