@@ -55,8 +55,6 @@ async function createMockConfig(
   };
   const config = new Config(configParams);
   await config.initialize();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await config.refreshAuth('test-auth' as any);
 
   // Mock ToolRegistry
   const mockToolRegistry = {
@@ -164,15 +162,13 @@ describe('subagent.ts', () => {
     // Helper to safely access generationConfig from mock calls
     const getGenerationConfigFromMock = (
       callIndex = 0,
-    ): GenerateContentConfig & { systemInstruction?: string | Content } => {
+    ): GenerateContentConfig => {
       const callArgs = vi.mocked(GeminiChat).mock.calls[callIndex];
-      const generationConfig = callArgs?.[2];
+      const generationConfig = callArgs?.[1];
       // Ensure it's defined before proceeding
       expect(generationConfig).toBeDefined();
       if (!generationConfig) throw new Error('generationConfig is undefined');
-      return generationConfig as GenerateContentConfig & {
-        systemInstruction?: string | Content;
-      };
+      return generationConfig as GenerateContentConfig;
     };
 
     describe('create (Tool Validation)', () => {
@@ -347,7 +343,7 @@ describe('subagent.ts', () => {
         );
 
         // Check History (should include environment context)
-        const history = callArgs[3];
+        const history = callArgs[2];
         expect(history).toEqual([
           { role: 'user', parts: [{ text: 'Env Context' }] },
           {
@@ -420,7 +416,7 @@ describe('subagent.ts', () => {
 
         const callArgs = vi.mocked(GeminiChat).mock.calls[0];
         const generationConfig = getGenerationConfigFromMock();
-        const history = callArgs[3];
+        const history = callArgs[2];
 
         expect(generationConfig.systemInstruction).toBeUndefined();
         expect(history).toEqual([

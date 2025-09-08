@@ -7,11 +7,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type {
   Content,
-  Models,
   GenerateContentConfig,
   Part,
   GenerateContentResponse,
 } from '@google/genai';
+import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
   GeminiChat,
   EmptyStreamError,
@@ -47,15 +47,6 @@ vi.mock('node:fs', () => {
   };
 });
 
-// Mocks
-const mockModelsModule = {
-  generateContent: vi.fn(),
-  generateContentStream: vi.fn(),
-  countTokens: vi.fn(),
-  embedContent: vi.fn(),
-  batchEmbedContents: vi.fn(),
-} as unknown as Models;
-
 const { mockLogInvalidChunk, mockLogContentRetry, mockLogContentRetryFailure } =
   vi.hoisted(() => ({
     mockLogInvalidChunk: vi.fn(),
@@ -70,12 +61,21 @@ vi.mock('../telemetry/loggers.js', () => ({
 }));
 
 describe('GeminiChat', () => {
+  let mockContentGenerator: ContentGenerator;
   let chat: GeminiChat;
   let mockConfig: Config;
   const config: GenerateContentConfig = {};
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockContentGenerator = {
+      generateContent: vi.fn(),
+      generateContentStream: vi.fn(),
+      countTokens: vi.fn(),
+      embedContent: vi.fn(),
+      batchEmbedContents: vi.fn(),
+    } as unknown as ContentGenerator;
+
     mockConfig = {
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
@@ -97,12 +97,13 @@ describe('GeminiChat', () => {
       getToolRegistry: vi.fn().mockReturnValue({
         getTool: vi.fn(),
       }),
+      getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
     } as unknown as Config;
 
     // Disable 429 simulation for tests
     setSimulate429(false);
     // Reset history for each test by creating a new instance
-    chat = new GeminiChat(mockConfig, mockModelsModule, config, []);
+    chat = new GeminiChat(mockConfig, config, []);
   });
 
   afterEach(() => {
@@ -160,7 +161,7 @@ describe('GeminiChat', () => {
         ],
       } as unknown as GenerateContentResponse;
 
-      vi.mocked(mockModelsModule.generateContent).mockResolvedValue(
+      vi.mocked(mockContentGenerator.generateContent).mockResolvedValue(
         mockAfcResponse,
       );
 
@@ -218,7 +219,7 @@ describe('GeminiChat', () => {
           { content: { role: 'model', parts: [{ text: 'some response' }] } },
         ],
       } as unknown as GenerateContentResponse;
-      vi.mocked(mockModelsModule.generateContent).mockResolvedValue(
+      vi.mocked(mockContentGenerator.generateContent).mockResolvedValue(
         mockResponse,
       );
 
@@ -247,7 +248,7 @@ describe('GeminiChat', () => {
         ],
       } as unknown as GenerateContentResponse;
 
-      vi.mocked(mockModelsModule.generateContent).mockResolvedValue(
+      vi.mocked(mockContentGenerator.generateContent).mockResolvedValue(
         mixedContentResponse,
       );
 
@@ -302,7 +303,7 @@ describe('GeminiChat', () => {
           { content: { role: 'model', parts: [{ thought: true }] } },
         ],
       } as unknown as GenerateContentResponse;
-      vi.mocked(mockModelsModule.generateContent).mockResolvedValue(
+      vi.mocked(mockContentGenerator.generateContent).mockResolvedValue(
         emptyModelResponse,
       );
 
@@ -348,11 +349,13 @@ describe('GeminiChat', () => {
         ],
         text: () => 'response',
       } as unknown as GenerateContentResponse;
-      vi.mocked(mockModelsModule.generateContent).mockResolvedValue(response);
+      vi.mocked(mockContentGenerator.generateContent).mockResolvedValue(
+        response,
+      );
 
       await chat.sendMessage({ message: 'hello' }, 'prompt-id-1');
 
-      expect(mockModelsModule.generateContent).toHaveBeenCalledWith(
+      expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
         {
           model: 'gemini-pro',
           contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
@@ -390,7 +393,7 @@ describe('GeminiChat', () => {
         } as unknown as GenerateContentResponse;
       })();
 
-      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
         streamWithToolCall,
       );
 
@@ -442,7 +445,7 @@ describe('GeminiChat', () => {
         } as unknown as GenerateContentResponse;
       })();
 
-      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
         streamWithNoFinish,
       );
 
@@ -487,7 +490,7 @@ describe('GeminiChat', () => {
         } as unknown as GenerateContentResponse;
       })();
 
-      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
         streamWithInvalidEnd,
       );
 
@@ -543,7 +546,7 @@ describe('GeminiChat', () => {
         } as unknown as GenerateContentResponse;
       })();
 
-      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
         multiChunkStream,
       );
 
@@ -593,7 +596,7 @@ describe('GeminiChat', () => {
         } as unknown as GenerateContentResponse;
       })();
 
-      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
         multiChunkStream,
       );
 
@@ -650,7 +653,7 @@ describe('GeminiChat', () => {
         } as unknown as GenerateContentResponse;
       })();
 
-      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
         multiChunkStream,
       );
 
@@ -697,7 +700,7 @@ describe('GeminiChat', () => {
         } as unknown as GenerateContentResponse;
       })();
 
-      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
         mixedContentStream,
       );
 
@@ -759,7 +762,7 @@ describe('GeminiChat', () => {
           ],
         } as unknown as GenerateContentResponse;
       })();
-      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
         emptyStreamResponse,
       );
 
@@ -811,7 +814,7 @@ describe('GeminiChat', () => {
           text: () => 'response',
         } as unknown as GenerateContentResponse;
       })();
-      vi.mocked(mockModelsModule.generateContentStream).mockResolvedValue(
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
         response,
       );
 
@@ -823,7 +826,7 @@ describe('GeminiChat', () => {
         // consume stream to trigger internal logic
       }
 
-      expect(mockModelsModule.generateContentStream).toHaveBeenCalledWith(
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
         {
           model: 'gemini-pro',
           contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
@@ -1012,7 +1015,7 @@ describe('GeminiChat', () => {
   describe('sendMessageStream with retries', () => {
     it('should yield a RETRY event when an invalid stream is encountered', async () => {
       // ARRANGE: Mock the stream to fail once, then succeed.
-      vi.mocked(mockModelsModule.generateContentStream)
+      vi.mocked(mockContentGenerator.generateContentStream)
         .mockImplementationOnce(async () =>
           // First attempt: An invalid stream with an empty text part.
           (async function* () {
@@ -1053,7 +1056,7 @@ describe('GeminiChat', () => {
     });
     it('should retry on invalid content, succeed, and report metrics', async () => {
       // Use mockImplementationOnce to provide a fresh, promise-wrapped generator for each attempt.
-      vi.mocked(mockModelsModule.generateContentStream)
+      vi.mocked(mockContentGenerator.generateContentStream)
         .mockImplementationOnce(async () =>
           // First call returns an invalid stream
           (async function* () {
@@ -1089,7 +1092,9 @@ describe('GeminiChat', () => {
       expect(mockLogInvalidChunk).toHaveBeenCalledTimes(1);
       expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
       expect(mockLogContentRetryFailure).not.toHaveBeenCalled();
-      expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(2);
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        2,
+      );
 
       // Check for a retry event
       expect(chunks.some((c) => c.type === StreamEventType.RETRY)).toBe(true);
@@ -1118,7 +1123,7 @@ describe('GeminiChat', () => {
     });
 
     it('should fail after all retries on persistent invalid content and report metrics', async () => {
-      vi.mocked(mockModelsModule.generateContentStream).mockImplementation(
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
         async () =>
           (async function* () {
             yield {
@@ -1150,7 +1155,9 @@ describe('GeminiChat', () => {
       );
 
       // Should be called 3 times (initial + 2 retries)
-      expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(3);
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        3,
+      );
       expect(mockLogInvalidChunk).toHaveBeenCalledTimes(3);
       expect(mockLogContentRetry).toHaveBeenCalledTimes(2);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
@@ -1169,7 +1176,7 @@ describe('GeminiChat', () => {
     chat.setHistory(initialHistory);
 
     // 2. Mock the API to fail once with an empty stream, then succeed.
-    vi.mocked(mockModelsModule.generateContentStream)
+    vi.mocked(mockContentGenerator.generateContentStream)
       .mockImplementationOnce(async () =>
         (async function* () {
           yield {
@@ -1264,7 +1271,7 @@ describe('GeminiChat', () => {
       } as unknown as GenerateContentResponse;
 
       // 2. Mock the API to return our controllable promises in order
-      vi.mocked(mockModelsModule.generateContent)
+      vi.mocked(mockContentGenerator.generateContent)
         .mockReturnValueOnce(firstCallPromise)
         .mockReturnValueOnce(secondCallPromise);
 
@@ -1285,8 +1292,8 @@ describe('GeminiChat', () => {
 
       // 5. CRUCIAL CHECK: At this point, only the first API call should have been made.
       // The second call should be waiting on `sendPromise`.
-      expect(mockModelsModule.generateContent).toHaveBeenCalledTimes(1);
-      expect(mockModelsModule.generateContent).toHaveBeenCalledWith(
+      expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(1);
+      expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
         expect.objectContaining({
           contents: expect.arrayContaining([
             expect.objectContaining({ parts: [{ text: 'first' }] }),
@@ -1303,8 +1310,8 @@ describe('GeminiChat', () => {
       await new Promise(process.nextTick);
 
       // 7. CRUCIAL CHECK: Now, the second API call should have been made.
-      expect(mockModelsModule.generateContent).toHaveBeenCalledTimes(2);
-      expect(mockModelsModule.generateContent).toHaveBeenCalledWith(
+      expect(mockContentGenerator.generateContent).toHaveBeenCalledTimes(2);
+      expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
         expect.objectContaining({
           contents: expect.arrayContaining([
             expect.objectContaining({ parts: [{ text: 'second' }] }),
@@ -1320,7 +1327,7 @@ describe('GeminiChat', () => {
   });
   it('should retry if the model returns a completely empty stream (no chunks)', async () => {
     // 1. Mock the API to return an empty stream first, then a valid one.
-    vi.mocked(mockModelsModule.generateContentStream)
+    vi.mocked(mockContentGenerator.generateContentStream)
       .mockImplementationOnce(
         // First call resolves to an async generator that yields nothing.
         async () => (async function* () {})(),
@@ -1353,7 +1360,7 @@ describe('GeminiChat', () => {
     }
 
     // 3. Assert the results.
-    expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(2);
+    expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(2);
     expect(
       chunks.some(
         (c) =>
@@ -1417,7 +1424,7 @@ describe('GeminiChat', () => {
       } as unknown as GenerateContentResponse;
     })();
 
-    vi.mocked(mockModelsModule.generateContentStream)
+    vi.mocked(mockContentGenerator.generateContentStream)
       .mockResolvedValueOnce(firstStreamGenerator)
       .mockResolvedValueOnce(secondStreamGenerator);
 
@@ -1436,7 +1443,7 @@ describe('GeminiChat', () => {
     );
 
     // 5. Assert that only one API call has been made so far.
-    expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(1);
+    expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(1);
 
     // 6. Unblock and fully consume the first stream to completion.
     continueFirstStream!();
@@ -1451,7 +1458,7 @@ describe('GeminiChat', () => {
     await secondStreamIterator.next();
 
     // 9. The second API call should now have been made.
-    expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(2);
+    expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(2);
 
     // 10. FIX: Fully consume the second stream to ensure recordHistory is called.
     await secondStreamIterator.next(); // This finishes the iterator.
@@ -1471,7 +1478,7 @@ describe('GeminiChat', () => {
 
   it('should discard valid partial content from a failed attempt upon retry', async () => {
     // ARRANGE: Mock the stream to fail on the first attempt after yielding some valid content.
-    vi.mocked(mockModelsModule.generateContentStream)
+    vi.mocked(mockContentGenerator.generateContentStream)
       .mockImplementationOnce(async () =>
         // First attempt: yields one valid chunk, then one invalid chunk
         (async function* () {
@@ -1517,7 +1524,7 @@ describe('GeminiChat', () => {
 
     // ASSERT
     // Check that a retry happened
-    expect(mockModelsModule.generateContentStream).toHaveBeenCalledTimes(2);
+    expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(2);
     expect(events.some((e) => e.type === StreamEventType.RETRY)).toBe(true);
 
     // Check the final recorded history
@@ -1531,5 +1538,42 @@ describe('GeminiChat', () => {
     expect(modelTurn!.parts![0]!.text).not.toContain(
       'This valid part should be discarded',
     );
+  });
+
+  describe('stripThoughtsFromHistory', () => {
+    it('should strip thought signatures', () => {
+      chat.setHistory([
+        {
+          role: 'user',
+          parts: [{ text: 'hello' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            { text: 'thinking...', thoughtSignature: 'thought-123' },
+            {
+              functionCall: { name: 'test', args: {} },
+              thoughtSignature: 'thought-456',
+            },
+          ],
+        },
+      ]);
+
+      chat.stripThoughtsFromHistory();
+
+      expect(chat.getHistory()).toEqual([
+        {
+          role: 'user',
+          parts: [{ text: 'hello' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            { text: 'thinking...' },
+            { functionCall: { name: 'test', args: {} } },
+          ],
+        },
+      ]);
+    });
   });
 });
