@@ -845,7 +845,6 @@ export class GeminiClient {
         },
         config: {
           systemInstruction: { text: getCompressionPrompt() },
-          maxOutputTokens: originalTokenCount,
         },
       },
       prompt_id,
