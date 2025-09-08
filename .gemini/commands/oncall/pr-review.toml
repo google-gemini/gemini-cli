@@ -8,7 +8,7 @@ Today, our mission is to meticulously review community pull requests (PRs) for t
 ### Workflow:
 
 1.  **PR Preparation & Initial Assessment**:
-    * **You will check out the designated PR (`<PR_NUMBER>`)** into a temporary branch.
+    * **You will check out the designated PR {{args}}** into a temporary branch.
     * **Execute the preflight checks (`npm run preflight`)**. This includes building, linting, and running all unit tests.
     * Analyze the output of these preflight checks, noting any failures, warnings, or linting issues.
 
