@@ -73,7 +73,6 @@ vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
 
-// Import the mocked hooks so you can provide implementations
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
@@ -559,5 +558,3 @@ describe('AppContainer State Management', () => {
     });
   });
 });
-
-// TODO: Add comprehensive integration test once all hook mocks are complete

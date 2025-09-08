@@ -2260,7 +2260,6 @@ ${JSON.stringify(
         requestedModel,
       );
 
-      // Assert that the Flash model was used, not the requested model
       expect(mockGenerateContentFn).toHaveBeenCalledWith(
         expect.objectContaining({
           model: DEFAULT_GEMINI_FLASH_MODEL,

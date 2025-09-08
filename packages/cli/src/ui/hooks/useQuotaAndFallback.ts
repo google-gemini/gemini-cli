@@ -7,7 +7,7 @@
 import {
   AuthType,
   type Config,
-  type FallbackHandler,
+  type FallbackModelHandler,
   type FallbackIntent,
   isGenericQuotaExceededError,
   isProQuotaExceededError,
@@ -39,7 +39,7 @@ export function useQuotaAndFallback({
 
   // Set up Flash fallback handler
   useEffect(() => {
-    const fallbackHandler: FallbackHandler = async (
+    const fallbackHandler: FallbackModelHandler = async (
       failedModel,
       fallbackModel,
       error,
@@ -141,7 +141,7 @@ export function useQuotaAndFallback({
       return 'stop';
     };
 
-    config.setFallbackHandler(fallbackHandler);
+    config.setFallbackModelHandler(fallbackHandler);
   }, [config, historyManager, userTier, setModelSwitchedFromQuotaError]);
 
   const handleProQuotaChoice = useCallback(

@@ -16,7 +16,7 @@ import {
 import { act, renderHook } from '@testing-library/react';
 import {
   type Config,
-  type FallbackHandler,
+  type FallbackModelHandler,
   UserTierId,
   AuthType,
   isGenericQuotaExceededError,
@@ -71,7 +71,7 @@ describe('useQuotaAndFallback', () => {
     mockSetAuthState = vi.fn();
     mockSetModelSwitchedFromQuotaError = vi.fn();
 
-    setFallbackHandlerSpy = vi.spyOn(mockConfig, 'setFallbackHandler');
+    setFallbackHandlerSpy = vi.spyOn(mockConfig, 'setFallbackModelHandler');
     vi.spyOn(mockConfig, 'setQuotaErrorOccurred');
 
     mockedIsGenericQuotaExceededError.mockReturnValue(false);
@@ -101,7 +101,7 @@ describe('useQuotaAndFallback', () => {
     // Helper function to render the hook and extract the registered handler
     const getRegisteredHandler = (
       userTier: UserTierId = UserTierId.FREE,
-    ): FallbackHandler => {
+    ): FallbackModelHandler => {
       renderHook(
         (props) =>
           useQuotaAndFallback({
@@ -113,7 +113,7 @@ describe('useQuotaAndFallback', () => {
           }),
         { initialProps: { userTier } },
       );
-      return setFallbackHandlerSpy.mock.calls[0][0] as FallbackHandler;
+      return setFallbackHandlerSpy.mock.calls[0][0] as FallbackModelHandler;
     };
 
     it('should return null and take no action if already in fallback mode', async () => {
@@ -225,7 +225,7 @@ describe('useQuotaAndFallback', () => {
         );
 
         const handler = setFallbackHandlerSpy.mock
-          .calls[0][0] as FallbackHandler;
+          .calls[0][0] as FallbackModelHandler;
 
         // Call the handler but do not await it, to check the intermediate state
         const promise = handler(
@@ -265,7 +265,7 @@ describe('useQuotaAndFallback', () => {
         );
 
         const handler = setFallbackHandlerSpy.mock
-          .calls[0][0] as FallbackHandler;
+          .calls[0][0] as FallbackModelHandler;
 
         const promise1 = handler(
           'gemini-pro',
@@ -333,7 +333,8 @@ describe('useQuotaAndFallback', () => {
         }),
       );
 
-      const handler = setFallbackHandlerSpy.mock.calls[0][0] as FallbackHandler;
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
       const promise = handler(
         'gemini-pro',
         'gemini-flash',
@@ -362,7 +363,8 @@ describe('useQuotaAndFallback', () => {
         }),
       );
 
-      const handler = setFallbackHandlerSpy.mock.calls[0][0] as FallbackHandler;
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
       // The first `addItem` call is for the initial quota error message
       const promise = handler(
         'gemini-pro',

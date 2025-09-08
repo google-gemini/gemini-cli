@@ -18,7 +18,7 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { retryWithBackoff } from './retry.js';
 import { AuthType } from '../core/contentGenerator.js';
 // Import the new types (Assuming this test file is in packages/core/src/utils/)
-import type { FallbackHandler } from '../fallback/types.js';
+import type { FallbackModelHandler } from '../fallback/types.js';
 
 vi.mock('node:fs');
 
@@ -47,13 +47,13 @@ describe('Retry Utility Fallback Integration', () => {
   // This test validates the Config's ability to store and execute the handler contract.
   it('should execute the injected FallbackHandler contract correctly', async () => {
     // Set up a minimal handler for testing, ensuring it matches the new type.
-    const fallbackHandler: FallbackHandler = async () => 'retry';
+    const fallbackHandler: FallbackModelHandler = async () => 'retry';
 
     // Use the generalized setter
-    config.setFallbackHandler(fallbackHandler);
+    config.setFallbackModelHandler(fallbackHandler);
 
     // Call the handler directly via the config property
-    const result = await config.fallbackHandler!(
+    const result = await config.fallbackModelHandler!(
       'gemini-2.5-pro',
       DEFAULT_GEMINI_FLASH_MODEL,
     );

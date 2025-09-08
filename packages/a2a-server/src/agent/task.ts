@@ -88,7 +88,7 @@ export class Task {
     this.eventBus = eventBus;
     this.completedToolCalls = [];
     this._resetToolCompletionPromise();
-    this.config.setFallbackHandler(
+    this.config.setFallbackModelHandler(
       // For a2a-server, we want to automatically switch to the fallback model
       // for future requests without retrying the current one. The 'stop'
       // intent achieves this.

@@ -23,12 +23,16 @@ export async function handleFallback(
   if (failedModel === fallbackModel) return null;
 
   // Consult UI Handler for Intent
-  const fallbackHandler = config.fallbackHandler;
-  if (typeof fallbackHandler !== 'function') return null;
+  const fallbackModelHandler = config.fallbackModelHandler;
+  if (typeof fallbackModelHandler !== 'function') return null;
 
   try {
     // Pass the specific failed model to the UI handler.
-    const intent = await fallbackHandler(failedModel, fallbackModel, error);
+    const intent = await fallbackModelHandler(
+      failedModel,
+      fallbackModel,
+      error,
+    );
 
     // Process Intent and Update State
     switch (intent) {
@@ -42,11 +46,15 @@ export async function handleFallback(
         return false;
 
       case 'auth':
-      default:
         return false;
+
+      default:
+        throw new Error(
+          `Unexpected fallback intent received from fallbackModelHandler: "${intent}"`,
+        );
     }
   } catch (handlerError) {
-    console.warn('Fallback UI handler failed:', handlerError);
+    console.error('Fallback UI handler failed:', handlerError);
     return null;
   }
 }

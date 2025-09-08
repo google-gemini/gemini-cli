@@ -52,7 +52,7 @@ import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { logCliConfiguration, logIdeConnection } from '../telemetry/loggers.js';
 import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
-import type { FallbackHandler } from '../fallback/types.js';
+import type { FallbackModelHandler } from '../fallback/types.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -276,7 +276,7 @@ export class Config {
     name: string;
     extensionName: string;
   }>;
-  fallbackHandler?: FallbackHandler;
+  fallbackModelHandler?: FallbackModelHandler;
   private quotaErrorOccurred: boolean = false;
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
@@ -485,8 +485,8 @@ export class Config {
     this.inFallbackMode = active;
   }
 
-  setFallbackHandler(handler: FallbackHandler): void {
-    this.fallbackHandler = handler;
+  setFallbackModelHandler(handler: FallbackModelHandler): void {
+    this.fallbackModelHandler = handler;
   }
 
   getMaxSessionTurns(): number {

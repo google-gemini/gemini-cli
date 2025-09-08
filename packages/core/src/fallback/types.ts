@@ -16,7 +16,7 @@ export type FallbackIntent =
  * The interface for the handler provided by the UI layer (e.g., the CLI)
  * to interact with the user during a fallback scenario.
  */
-export type FallbackHandler = (
+export type FallbackModelHandler = (
   failedModel: string,
   fallbackModel: string,
   error?: unknown,

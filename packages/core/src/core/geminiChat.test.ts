@@ -1669,8 +1669,10 @@ describe('GeminiChat', () => {
   });
 
   it('should discard valid partial content from a failed attempt upon retry', async () => {
+    // Mock the stream to fail on the first attempt after yielding some valid content.
     vi.mocked(mockContentGenerator.generateContentStream)
       .mockImplementationOnce(async () =>
+        // First attempt: yields one valid chunk, then one invalid chunk
         (async function* () {
           yield {
             candidates: [
@@ -1687,6 +1689,7 @@ describe('GeminiChat', () => {
         })(),
       )
       .mockImplementationOnce(async () =>
+        // Second attempt (the retry): succeeds
         (async function* () {
           yield {
             candidates: [
@@ -1701,6 +1704,7 @@ describe('GeminiChat', () => {
         })(),
       );
 
+    // Send a message and consume the stream
     const stream = await chat.sendMessageStream(
       { message: 'test' },
       'prompt-id-discard-test',

@@ -22,7 +22,7 @@ import {
   DEFAULT_GEMINI_MODEL,
 } from '../config/models.js';
 import { logFlashFallback } from '../telemetry/index.js';
-import type { FallbackHandler } from './types.js';
+import type { FallbackModelHandler } from './types.js';
 
 // Mock the telemetry logger and event class
 vi.mock('../telemetry/index.js', () => ({
@@ -45,21 +45,21 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
 
 describe('handleFallback', () => {
   let mockConfig: Config;
-  let mockHandler: Mock<FallbackHandler>;
-  let consoleWarnSpy: MockInstance;
+  let mockHandler: Mock<FallbackModelHandler>;
+  let consoleErrorSpy: MockInstance;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockHandler = vi.fn();
     // Default setup: OAuth user, Pro model failed, handler injected
     mockConfig = createMockConfig({
-      fallbackHandler: mockHandler,
+      fallbackModelHandler: mockHandler,
     });
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    consoleWarnSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
   });
 
   it('should return null immediately if authType is not OAuth', async () => {
@@ -85,7 +85,7 @@ describe('handleFallback', () => {
 
   it('should return null if no fallbackHandler is injected in config', async () => {
     const configWithoutHandler = createMockConfig({
-      fallbackHandler: undefined,
+      fallbackModelHandler: undefined,
     });
     const result = await handleFallback(
       configWithoutHandler,
@@ -143,8 +143,8 @@ describe('handleFallback', () => {
     });
   });
 
-  describe('when handler returns null (default)', () => {
-    it('should NOT activate fallback mode and return false', async () => {
+  describe('when handler returns an unexpected value', () => {
+    it('should log an error and return null', async () => {
       mockHandler.mockResolvedValue(null);
 
       const result = await handleFallback(
@@ -153,8 +153,13 @@ describe('handleFallback', () => {
         AUTH_OAUTH,
       );
 
-      // The default case in the switch results in false
-      expect(result).toBe(false);
+      expect(result).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Fallback UI handler failed:',
+        new Error(
+          'Unexpected fallback intent received from fallbackModelHandler: "null"',
+        ),
+      );
       expect(mockConfig.setFallbackMode).not.toHaveBeenCalled();
     });
   });
@@ -175,7 +180,7 @@ describe('handleFallback', () => {
   it('should not call setFallbackMode or log telemetry if already in fallback mode', async () => {
     // Setup config where fallback mode is already active
     const activeFallbackConfig = createMockConfig({
-      fallbackHandler: mockHandler,
+      fallbackModelHandler: mockHandler,
       isInFallbackMode: vi.fn(() => true), // Already active
       setFallbackMode: vi.fn(),
     });
@@ -197,14 +202,14 @@ describe('handleFallback', () => {
     expect(logFlashFallback).not.toHaveBeenCalled();
   });
 
-  it('should catch errors from the handler, log a warning, and return null', async () => {
+  it('should catch errors from the handler, log an error, and return null', async () => {
     const handlerError = new Error('UI interaction failed');
     mockHandler.mockRejectedValue(handlerError);
 
     const result = await handleFallback(mockConfig, MOCK_PRO_MODEL, AUTH_OAUTH);
 
     expect(result).toBeNull();
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Fallback UI handler failed:',
       handlerError,
     );
