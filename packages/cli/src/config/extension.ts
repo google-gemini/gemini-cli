@@ -345,7 +345,7 @@ async function cloneFromGit(
     const remotes = await git.getRemotes(true);
     if (remotes.length === 0) {
       throw new Error(
-        `Unable to find any remotes for repo ${installMetadata.source}`
+        `Unable to find any remotes for repo ${installMetadata.source}`,
       );
     }
 
