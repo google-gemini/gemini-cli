@@ -347,4 +347,20 @@ export enum EventMetadataKey {
 
   // Logs the status of the extension install.
   GEMINI_CLI_EXTENSION_INSTALL_STATUS = 88,
+
+  // ==========================================================================
+  // Tool Output Truncated Event Keys
+  // ===========================================================================
+
+  // Logs the original length of the tool output.
+  GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_ORIGINAL_LENGTH = 89,
+
+  // Logs the truncated length of the tool output.
+  GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_TRUNCATED_LENGTH = 90,
+
+  // Logs the threshold at which the tool output was truncated.
+  GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_THRESHOLD = 91,
+
+  // Logs the number of lines the tool output was truncated to.
+  GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_LINES = 92,
 }
