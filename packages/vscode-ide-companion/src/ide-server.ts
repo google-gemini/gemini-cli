@@ -107,7 +107,7 @@ export class IDEServer {
       const sessionsWithInitialNotification = new Set<string>();
 
       const app = express();
-      app.use(express.json());
+      app.use(express.json({ limit: '10mb' }));
       const mcpServer = createMcpServer(this.diffManager);
 
       this.openFilesManager = new OpenFilesManager(context);
