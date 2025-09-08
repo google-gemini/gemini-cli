@@ -61,13 +61,13 @@ export const useFolderTrust = (
       }
 
       trustedFolders.setValue(cwd, trustLevel);
-      const newIsTrusted =
+      const currentIsTrusted =
         trustLevel === TrustLevel.TRUST_FOLDER ||
         trustLevel === TrustLevel.TRUST_PARENT;
-      setIsTrusted(newIsTrusted);
-      onTrustChange(newIsTrusted);
+      setIsTrusted(currentIsTrusted);
+      onTrustChange(currentIsTrusted);
 
-      const needsRestart = wasTrusted !== newIsTrusted;
+      const needsRestart = wasTrusted !== currentIsTrusted;
       if (needsRestart) {
         setIsRestarting(true);
         setIsFolderTrustDialogOpen(true);
