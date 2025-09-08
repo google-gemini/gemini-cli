@@ -11,20 +11,69 @@ import type {
   AuthType,
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
+import {
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+} from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 
+export type SettingsType =
+  | 'boolean'
+  | 'string'
+  | 'number'
+  | 'array'
+  | 'object'
+  | 'enum';
+
+export type SettingsValue =
+  | boolean
+  | string
+  | number
+  | string[]
+  | object
+  | undefined;
+
+/**
+ * Setting datatypes that "toggle" through a fixed list of options
+ * (e.g. an enum or true/false) rather than allowing for free form input
+ * (like a number or string).
+ */
+export const TOGGLE_TYPES: ReadonlySet<SettingsType | undefined> = new Set([
+  'boolean',
+  'enum',
+]);
+
+interface SettingEnumOption {
+  value: string | number;
+  label: string;
+}
+
+export enum MergeStrategy {
+  // Replace the old value with the new value. This is the default.
+  REPLACE = 'replace',
+  // Concatenate arrays.
+  CONCAT = 'concat',
+  // Merge arrays, ensuring unique values.
+  UNION = 'union',
+  // Shallow merge objects.
+  SHALLOW_MERGE = 'shallow_merge',
+}
+
 export interface SettingDefinition {
-  type: 'boolean' | 'string' | 'number' | 'array' | 'object';
+  type: SettingsType;
   label: string;
   category: string;
   requiresRestart: boolean;
-  default: boolean | string | number | string[] | object | undefined;
+  default: SettingsValue;
   description?: string;
   parentKey?: string;
   childKey?: string;
   key?: string;
   properties?: SettingsSchema;
   showInDialog?: boolean;
+  mergeStrategy?: MergeStrategy;
+  /** Enum type options  */
+  options?: readonly SettingEnumOption[];
 }
 
 export interface SettingsSchema {
@@ -39,7 +88,7 @@ export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
  * The structure of this object defines the structure of the `Settings` type.
  * `as const` is crucial for TypeScript to infer the most specific types possible.
  */
-export const SETTINGS_SCHEMA = {
+const SETTINGS_SCHEMA = {
   // Maintained for compatibility/criticality
   mcpServers: {
     type: 'object',
@@ -49,6 +98,7 @@ export const SETTINGS_SCHEMA = {
     default: {} as Record<string, MCPServerConfig>,
     description: 'Configuration for MCP servers.',
     showInDialog: false,
+    mergeStrategy: MergeStrategy.SHALLOW_MERGE,
   },
 
   general: {
@@ -485,6 +535,7 @@ export const SETTINGS_SCHEMA = {
         description:
           'Additional directories to include in the workspace context. Missing directories will be skipped with a warning.',
         showInDialog: false,
+        mergeStrategy: MergeStrategy.CONCAT,
       },
       loadMemoryFromIncludeDirectories: {
         type: 'boolean',
@@ -574,6 +625,16 @@ export const SETTINGS_SCHEMA = {
           'Use node-pty for shell command execution. Fallback to child_process still applies.',
         showInDialog: true,
       },
+      autoAccept: {
+        type: 'boolean',
+        label: 'Auto Accept',
+        category: 'Tools',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).',
+        showInDialog: true,
+      },
       core: {
         type: 'array',
         label: 'Core Tools',
@@ -628,6 +689,25 @@ export const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
+        showInDialog: true,
+      },
+      truncateToolOutputThreshold: {
+        type: 'number',
+        label: 'Tool Output Truncation Threshold',
+        category: 'General',
+        requiresRestart: false,
+        default: DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+        description:
+          'Truncate tool output if it is larger than this many characters. Set to -1 to disable.',
+        showInDialog: true,
+      },
+      truncateToolOutputLines: {
+        type: 'number',
+        label: 'Tool Output Truncation Lines',
+        category: 'General',
+        requiresRestart: false,
+        default: DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+        description: 'The number of lines to keep when truncating tool output.',
         showInDialog: true,
       },
     },
@@ -727,6 +807,16 @@ export const SETTINGS_SCHEMA = {
             description: 'The currently selected authentication type.',
             showInDialog: false,
           },
+          enforcedType: {
+            type: 'string',
+            label: 'Enforced Auth Type',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as AuthType | undefined,
+            description:
+              'The required auth type. If this does not match the selected auth type, the user will be prompted to re-authenticate.',
+            showInDialog: false,
+          },
           useExternal: {
             type: 'boolean',
             label: 'Use External Auth',
@@ -776,6 +866,7 @@ export const SETTINGS_SCHEMA = {
         default: ['DEBUG', 'DEBUG_MODE'] as string[],
         description: 'Environment variables to exclude from project context.',
         showInDialog: false,
+        mergeStrategy: MergeStrategy.UNION,
       },
       bugCommand: {
         type: 'object',
@@ -803,7 +894,7 @@ export const SETTINGS_SCHEMA = {
         label: 'Extension Management',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enable extension management features.',
         showInDialog: false,
       },
@@ -827,6 +918,7 @@ export const SETTINGS_SCHEMA = {
         default: [] as string[],
         description: 'List of disabled extensions.',
         showInDialog: false,
+        mergeStrategy: MergeStrategy.UNION,
       },
       workspacesWithMigrationNudge: {
         type: 'array',
@@ -837,10 +929,17 @@ export const SETTINGS_SCHEMA = {
         description:
           'List of workspaces for which the migration nudge has been shown.',
         showInDialog: false,
+        mergeStrategy: MergeStrategy.UNION,
       },
     },
   },
-} as const;
+} as const satisfies SettingsSchema;
+
+export type SettingsSchemaType = typeof SETTINGS_SCHEMA;
+
+export function getSettingsSchema(): SettingsSchemaType {
+  return SETTINGS_SCHEMA;
+}
 
 type InferSettings<T extends SettingsSchema> = {
   -readonly [K in keyof T]?: T[K] extends { properties: SettingsSchema }
@@ -850,7 +949,7 @@ type InferSettings<T extends SettingsSchema> = {
       : T[K]['default'];
 };
 
-export type Settings = InferSettings<typeof SETTINGS_SCHEMA>;
+export type Settings = InferSettings<SettingsSchemaType>;
 
 export interface FooterSettings {
   hideCWD?: boolean;

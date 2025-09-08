@@ -163,10 +163,14 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       const diffStat = (call.response.resultDisplay as FileDiff).diffStat;
       if (diffStat) {
         this.metadata = {
-          ai_added_lines: diffStat.ai_added_lines,
-          ai_removed_lines: diffStat.ai_removed_lines,
+          model_added_lines: diffStat.model_added_lines,
+          model_removed_lines: diffStat.model_removed_lines,
+          model_added_chars: diffStat.model_added_chars,
+          model_removed_chars: diffStat.model_removed_chars,
           user_added_lines: diffStat.user_added_lines,
           user_removed_lines: diffStat.user_removed_lines,
+          user_added_chars: diffStat.user_added_chars,
+          user_removed_chars: diffStat.user_removed_chars,
         };
       }
     }

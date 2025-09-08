@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.2.2",
+  "version": "0.3.4",
   "description": "Gemini CLI Core",
   "repository": {
     "type": "git",
@@ -50,6 +50,7 @@
     "https-proxy-agent": "^7.0.6",
     "ignore": "^7.0.0",
     "marked": "^15.0.12",
+    "mime": "4.0.7",
     "mnemonist": "^0.40.3",
     "open": "^10.1.2",
     "picomatch": "^4.0.1",
@@ -76,6 +77,7 @@
     "@types/minimatch": "^5.1.2",
     "@types/picomatch": "^4.0.1",
     "@types/ws": "^8.5.10",
+    "msw": "^2.3.4",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"
   },
