@@ -191,8 +191,17 @@ gemini -m gemini-2.5-flash
 
 #### Non-interactive mode for scripts
 
+Get a simple text response:
+
 ```bash
 gemini -p "Explain the architecture of this codebase"
+```
+
+For more advanced scripting, including how to parse JSON and handle errors, use
+the `--output-format json` flag to get structured output:
+
+```bash
+gemini -p "Explain the architecture of this codebase" --output-format json
 ```
 
 ### Quick Examples
