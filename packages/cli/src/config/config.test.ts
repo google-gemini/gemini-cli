@@ -1893,3 +1893,133 @@ describe('loadCliConfig approval mode', () => {
     });
   });
 });
+
+describe('loadCliConfig fileFiltering', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    process.argv = ['node', 'script.js']; // Reset argv for each test
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  const testCases: Array<{
+    property: keyof NonNullable<Settings['fileFiltering']>;
+    getter: (config: ServerConfig.Config) => boolean;
+    value: boolean;
+  }> = [
+    {
+      property: 'disableFuzzySearch',
+      getter: (c) => c.getFileFilteringDisableFuzzySearch(),
+      value: true,
+    },
+    {
+      property: 'disableFuzzySearch',
+      getter: (c) => c.getFileFilteringDisableFuzzySearch(),
+      value: false,
+    },
+    {
+      property: 'respectGitIgnore',
+      getter: (c) => c.getFileFilteringRespectGitIgnore(),
+      value: true,
+    },
+    {
+      property: 'respectGitIgnore',
+      getter: (c) => c.getFileFilteringRespectGitIgnore(),
+      value: false,
+    },
+    {
+      property: 'respectGeminiIgnore',
+      getter: (c) => c.getFileFilteringRespectGeminiIgnore(),
+      value: true,
+    },
+    {
+      property: 'respectGeminiIgnore',
+      getter: (c) => c.getFileFilteringRespectGeminiIgnore(),
+      value: false,
+    },
+    {
+      property: 'enableRecursiveFileSearch',
+      getter: (c) => c.getEnableRecursiveFileSearch(),
+      value: true,
+    },
+    {
+      property: 'enableRecursiveFileSearch',
+      getter: (c) => c.getEnableRecursiveFileSearch(),
+      value: false,
+    },
+  ];
+
+  it.each(testCases)(
+    'should pass $property from settings to config when $value',
+    async ({ property, getter, value }) => {
+      const settings: Settings = {
+        context: {
+          fileFiltering: { [property]: value },
+        },
+      };
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(getter(config)).toBe(value);
+    },
+  );
+});
+
+describe('parseArguments with positional prompt', () => {
+  const originalArgv = process.argv;
+
+  afterEach(() => {
+    process.argv = originalArgv;
+  });
+
+  it('should throw an error when both a positional prompt and the --prompt flag are used', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      'positional',
+      'prompt',
+      '--prompt',
+      'test prompt',
+    ];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments({} as Settings)).rejects.toThrow(
+      'process.exit called',
+    );
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Cannot use both a positional prompt and the --prompt (-p) flag together',
+      ),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should correctly parse a positional prompt', async () => {
+    process.argv = ['node', 'script.js', 'positional', 'prompt'];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.promptWords).toEqual(['positional', 'prompt']);
+  });
+
+  it('should correctly parse a prompt from the --prompt flag', async () => {
+    process.argv = ['node', 'script.js', '--prompt', 'test prompt'];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.prompt).toBe('test prompt');
+  });
+});

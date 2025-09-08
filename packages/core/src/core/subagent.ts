@@ -10,7 +10,6 @@ import type { AnyDeclarativeTool } from '../tools/tools.js';
 import type { Config } from '../config/config.js';
 import type { ToolCallRequestInfo } from './turn.js';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
-import { createContentGenerator } from './contentGenerator.js';
 import { getEnvironmentContext } from '../utils/environmentContext.js';
 import type {
   Content,
@@ -20,7 +19,7 @@ import type {
   FunctionDeclaration,
 } from '@google/genai';
 import { Type } from '@google/genai';
-import { GeminiChat } from './geminiChat.js';
+import { GeminiChat, StreamEventType } from './geminiChat.js';
 
 /**
  * @fileoverview Defines the configuration interfaces for a subagent.
@@ -439,12 +438,11 @@ export class SubAgentScope {
         let textResponse = '';
         for await (const resp of responseStream) {
           if (abortController.signal.aborted) return;
-          if (resp.functionCalls) {
-            functionCalls.push(...resp.functionCalls);
+          if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
+            functionCalls.push(...resp.value.functionCalls);
           }
-          const text = resp.text;
-          if (text) {
-            textResponse += text;
+          if (resp.type === StreamEventType.CHUNK && resp.value.text) {
+            textResponse += resp.value.text;
           }
         }
 
@@ -636,9 +634,7 @@ export class SubAgentScope {
       : undefined;
 
     try {
-      const generationConfig: GenerateContentConfig & {
-        systemInstruction?: string | Content;
-      } = {
+      const generationConfig: GenerateContentConfig = {
         temperature: this.modelConfig.temp,
         topP: this.modelConfig.top_p,
       };
@@ -647,17 +643,10 @@ export class SubAgentScope {
         generationConfig.systemInstruction = systemInstruction;
       }
 
-      const contentGenerator = await createContentGenerator(
-        this.runtimeContext.getContentGeneratorConfig(),
-        this.runtimeContext,
-        this.runtimeContext.getSessionId(),
-      );
-
       this.runtimeContext.setModel(this.modelConfig.model);
 
       return new GeminiChat(
         this.runtimeContext,
-        contentGenerator,
         generationConfig,
         start_history,
       );

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ConfigParameters, SandboxConfig } from './config.js';
 import { Config, ApprovalMode } from './config.js';
@@ -71,18 +71,12 @@ vi.mock('../tools/memoryTool', () => ({
   GEMINI_CONFIG_DIR: '.gemini',
 }));
 
-vi.mock('../core/contentGenerator.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../core/contentGenerator.js')>();
-  return {
-    ...actual,
-    createContentGeneratorConfig: vi.fn(),
-  };
-});
+vi.mock('../core/contentGenerator.js');
 
 vi.mock('../core/client.js', () => ({
   GeminiClient: vi.fn().mockImplementation(() => ({
     initialize: vi.fn().mockResolvedValue(undefined),
+    stripThoughtsFromHistory: vi.fn(),
   })),
 }));
 
@@ -196,7 +190,9 @@ describe('Server Config (config.ts)', () => {
         apiKey: 'test-key',
       };
 
-      (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
+      vi.mocked(createContentGeneratorConfig).mockReturnValue(
+        mockContentConfig,
+      );
 
       // Set fallback mode to true to ensure it gets reset
       config.setFallbackMode(true);
@@ -217,172 +213,38 @@ describe('Server Config (config.ts)', () => {
       expect(config.isInFallbackMode()).toBe(false);
     });
 
-    it('should preserve conversation history when refreshing auth', async () => {
-      const config = new Config(baseParams);
-      const authType = AuthType.USE_GEMINI;
-      const mockContentConfig = {
-        model: 'gemini-pro',
-        apiKey: 'test-key',
-      };
-
-      (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
-
-      // Mock the existing client with some history
-      const mockExistingHistory = [
-        { role: 'user', parts: [{ text: 'Hello' }] },
-        { role: 'model', parts: [{ text: 'Hi there!' }] },
-        { role: 'user', parts: [{ text: 'How are you?' }] },
-      ];
-
-      const mockExistingClient = {
-        isInitialized: vi.fn().mockReturnValue(true),
-        getHistory: vi.fn().mockReturnValue(mockExistingHistory),
-      };
-
-      const mockNewClient = {
-        isInitialized: vi.fn().mockReturnValue(true),
-        getHistory: vi.fn().mockReturnValue([]),
-        setHistory: vi.fn(),
-        initialize: vi.fn().mockResolvedValue(undefined),
-      };
-
-      // Set the existing client
-      (
-        config as unknown as { geminiClient: typeof mockExistingClient }
-      ).geminiClient = mockExistingClient;
-      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
-
-      await config.refreshAuth(authType);
-
-      // Verify that existing history was retrieved
-      expect(mockExistingClient.getHistory).toHaveBeenCalled();
-
-      // Verify that new client was created and initialized
-      expect(GeminiClient).toHaveBeenCalledWith(config);
-      expect(mockNewClient.initialize).toHaveBeenCalledWith(mockContentConfig);
-
-      // Verify that history was restored to the new client
-      expect(mockNewClient.setHistory).toHaveBeenCalledWith(
-        mockExistingHistory,
-        { stripThoughts: false },
-      );
-    });
-
-    it('should handle case when no existing client is initialized', async () => {
-      const config = new Config(baseParams);
-      const authType = AuthType.USE_GEMINI;
-      const mockContentConfig = {
-        model: 'gemini-pro',
-        apiKey: 'test-key',
-      };
-
-      (createContentGeneratorConfig as Mock).mockReturnValue(mockContentConfig);
-
-      const mockNewClient = {
-        isInitialized: vi.fn().mockReturnValue(true),
-        getHistory: vi.fn().mockReturnValue([]),
-        setHistory: vi.fn(),
-        initialize: vi.fn().mockResolvedValue(undefined),
-      };
-
-      // No existing client
-      (config as unknown as { geminiClient: null }).geminiClient = null;
-      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
-
-      await config.refreshAuth(authType);
-
-      // Verify that new client was created and initialized
-      expect(GeminiClient).toHaveBeenCalledWith(config);
-      expect(mockNewClient.initialize).toHaveBeenCalledWith(mockContentConfig);
-
-      // Verify that setHistory was not called since there was no existing history
-      expect(mockNewClient.setHistory).not.toHaveBeenCalled();
-    });
-
     it('should strip thoughts when switching from GenAI to Vertex', async () => {
       const config = new Config(baseParams);
-      const mockContentConfig = {
-        model: 'gemini-pro',
-        apiKey: 'test-key',
-        authType: AuthType.USE_GEMINI,
-      };
-      (
-        config as unknown as { contentGeneratorConfig: ContentGeneratorConfig }
-      ).contentGeneratorConfig = mockContentConfig;
 
-      (createContentGeneratorConfig as Mock).mockReturnValue({
-        ...mockContentConfig,
-        authType: AuthType.LOGIN_WITH_GOOGLE,
-      });
+      vi.mocked(createContentGeneratorConfig).mockImplementation(
+        (_: Config, authType: AuthType | undefined) =>
+          ({ authType }) as unknown as ContentGeneratorConfig,
+      );
 
-      const mockExistingHistory = [
-        { role: 'user', parts: [{ text: 'Hello' }] },
-      ];
-      const mockExistingClient = {
-        isInitialized: vi.fn().mockReturnValue(true),
-        getHistory: vi.fn().mockReturnValue(mockExistingHistory),
-      };
-      const mockNewClient = {
-        isInitialized: vi.fn().mockReturnValue(true),
-        getHistory: vi.fn().mockReturnValue([]),
-        setHistory: vi.fn(),
-        initialize: vi.fn().mockResolvedValue(undefined),
-      };
-
-      (
-        config as unknown as { geminiClient: typeof mockExistingClient }
-      ).geminiClient = mockExistingClient;
-      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
+      await config.refreshAuth(AuthType.USE_GEMINI);
 
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
 
-      expect(mockNewClient.setHistory).toHaveBeenCalledWith(
-        mockExistingHistory,
-        { stripThoughts: true },
-      );
+      expect(
+        config.getGeminiClient().stripThoughtsFromHistory,
+      ).toHaveBeenCalledWith();
     });
 
     it('should not strip thoughts when switching from Vertex to GenAI', async () => {
       const config = new Config(baseParams);
-      const mockContentConfig = {
-        model: 'gemini-pro',
-        apiKey: 'test-key',
-        authType: AuthType.LOGIN_WITH_GOOGLE,
-      };
-      (
-        config as unknown as { contentGeneratorConfig: ContentGeneratorConfig }
-      ).contentGeneratorConfig = mockContentConfig;
 
-      (createContentGeneratorConfig as Mock).mockReturnValue({
-        ...mockContentConfig,
-        authType: AuthType.USE_GEMINI,
-      });
+      vi.mocked(createContentGeneratorConfig).mockImplementation(
+        (_: Config, authType: AuthType | undefined) =>
+          ({ authType }) as unknown as ContentGeneratorConfig,
+      );
 
-      const mockExistingHistory = [
-        { role: 'user', parts: [{ text: 'Hello' }] },
-      ];
-      const mockExistingClient = {
-        isInitialized: vi.fn().mockReturnValue(true),
-        getHistory: vi.fn().mockReturnValue(mockExistingHistory),
-      };
-      const mockNewClient = {
-        isInitialized: vi.fn().mockReturnValue(true),
-        getHistory: vi.fn().mockReturnValue([]),
-        setHistory: vi.fn(),
-        initialize: vi.fn().mockResolvedValue(undefined),
-      };
-
-      (
-        config as unknown as { geminiClient: typeof mockExistingClient }
-      ).geminiClient = mockExistingClient;
-      (GeminiClient as Mock).mockImplementation(() => mockNewClient);
+      await config.refreshAuth(AuthType.USE_VERTEX_AI);
 
       await config.refreshAuth(AuthType.USE_GEMINI);
 
-      expect(mockNewClient.setHistory).toHaveBeenCalledWith(
-        mockExistingHistory,
-        { stripThoughts: false },
-      );
+      expect(
+        config.getGeminiClient().stripThoughtsFromHistory,
+      ).not.toHaveBeenCalledWith();
     });
   });
 
@@ -670,6 +532,90 @@ describe('Server Config (config.ts)', () => {
         registerToolMock as Mock
       ).mock.calls.some((call) => call[0] instanceof vi.mocked(ReadFileTool));
       expect(wasReadFileToolRegistered).toBe(false);
+    });
+
+    describe('with minified tool class names', () => {
+      beforeEach(() => {
+        Object.defineProperty(
+          vi.mocked(ShellTool).prototype.constructor,
+          'name',
+          {
+            value: '_ShellTool',
+            configurable: true,
+          },
+        );
+      });
+
+      afterEach(() => {
+        Object.defineProperty(
+          vi.mocked(ShellTool).prototype.constructor,
+          'name',
+          {
+            value: 'ShellTool',
+          },
+        );
+      });
+
+      it('should register a tool if coreTools contains the non-minified class name', async () => {
+        const params: ConfigParameters = {
+          ...baseParams,
+          coreTools: ['ShellTool'],
+        };
+        const config = new Config(params);
+        await config.initialize();
+
+        const registerToolMock = (
+          (await vi.importMock('../tools/tool-registry')) as {
+            ToolRegistry: { prototype: { registerTool: Mock } };
+          }
+        ).ToolRegistry.prototype.registerTool;
+
+        const wasShellToolRegistered = (
+          registerToolMock as Mock
+        ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
+        expect(wasShellToolRegistered).toBe(true);
+      });
+
+      it('should not register a tool if excludeTools contains the non-minified class name', async () => {
+        const params: ConfigParameters = {
+          ...baseParams,
+          coreTools: undefined, // all tools enabled by default
+          excludeTools: ['ShellTool'],
+        };
+        const config = new Config(params);
+        await config.initialize();
+
+        const registerToolMock = (
+          (await vi.importMock('../tools/tool-registry')) as {
+            ToolRegistry: { prototype: { registerTool: Mock } };
+          }
+        ).ToolRegistry.prototype.registerTool;
+
+        const wasShellToolRegistered = (
+          registerToolMock as Mock
+        ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
+        expect(wasShellToolRegistered).toBe(false);
+      });
+
+      it('should register a tool if coreTools contains an argument-specific pattern with the non-minified class name', async () => {
+        const params: ConfigParameters = {
+          ...baseParams,
+          coreTools: ['ShellTool(git status)'],
+        };
+        const config = new Config(params);
+        await config.initialize();
+
+        const registerToolMock = (
+          (await vi.importMock('../tools/tool-registry')) as {
+            ToolRegistry: { prototype: { registerTool: Mock } };
+          }
+        ).ToolRegistry.prototype.registerTool;
+
+        const wasShellToolRegistered = (
+          registerToolMock as Mock
+        ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
+        expect(wasShellToolRegistered).toBe(true);
+      });
     });
   });
 });
