@@ -73,6 +73,7 @@ const MIGRATION_MAP: Record<string, string> = {
   dnsResolutionOrder: 'advanced.dnsResolutionOrder',
   enablePromptCompletion: 'general.enablePromptCompletion',
   enforcedAuthType: 'security.auth.enforcedType',
+  enforcedOAuthDomain: 'security.auth.enforcedOAuthDomain',
   excludeTools: 'tools.exclude',
   excludeMCPServers: 'mcp.excluded',
   excludedProjectEnvVars: 'advanced.excludedEnvVars',

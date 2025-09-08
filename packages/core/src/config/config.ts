@@ -223,6 +223,7 @@ export interface ConfigParameters {
   truncateToolOutputLines?: number;
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
+  enforcedOAuthDomain?: string;
 }
 
 export class Config {
@@ -303,6 +304,7 @@ export class Config {
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useSmartEdit: boolean;
+  private readonly enforcedOAuthDomain: string | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -384,6 +386,7 @@ export class Config {
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
+    this.enforcedOAuthDomain = params.enforcedOAuthDomain;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -854,6 +857,10 @@ export class Config {
 
   getFileExclusions(): FileExclusions {
     return this.fileExclusions;
+  }
+
+  getEnforcedOAuthDomain(): string | undefined {
+    return this.enforcedOAuthDomain;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {

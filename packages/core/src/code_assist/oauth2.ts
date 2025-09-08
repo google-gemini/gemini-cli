@@ -130,11 +130,13 @@ async function initOauthClient(
     }
   }
 
+  const enforcedOAuthDomain = config.getEnforcedOAuthDomain();
+
   if (config.isBrowserLaunchSuppressed()) {
     let success = false;
     const maxRetries = 2;
     for (let i = 0; !success && i < maxRetries; i++) {
-      success = await authWithUserCode(client);
+      success = await authWithUserCode(client, enforcedOAuthDomain);
       if (!success) {
         console.error(
           '\nFailed to authenticate with user code.',
@@ -148,7 +150,7 @@ async function initOauthClient(
       );
     }
   } else {
-    const webLogin = await authWithWeb(client);
+    const webLogin = await authWithWeb(client, enforcedOAuthDomain);
 
     console.log(
       `\n\nCode Assist login required.\n` +
@@ -213,7 +215,10 @@ export async function getOauthClient(
   return oauthClientPromises.get(authType)!;
 }
 
-async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
+async function authWithUserCode(
+  client: OAuth2Client,
+  enforcedOAuthDomain?: string,
+): Promise<boolean> {
   const redirectUri = 'https://codeassist.google.com/authcode';
   const codeVerifier = await client.generateCodeVerifierAsync();
   const state = crypto.randomBytes(32).toString('hex');
@@ -224,6 +229,7 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
     code_challenge_method: CodeChallengeMethod.S256,
     code_challenge: codeVerifier.codeChallenge,
     state,
+    hd: enforcedOAuthDomain,
   });
   console.log('Please visit the following URL to authorize the application:');
   console.log('');
@@ -263,7 +269,10 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
   return true;
 }
 
-async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
+async function authWithWeb(
+  client: OAuth2Client,
+  enforcedOAuthDomain?: string,
+): Promise<OauthWebLogin> {
   const port = await getAvailablePort();
   // The hostname used for the HTTP server binding (e.g., '0.0.0.0' in Docker).
   const host = process.env['OAUTH_CALLBACK_HOST'] || 'localhost';
@@ -278,6 +287,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
     access_type: 'offline',
     scope: OAUTH_SCOPE,
     state,
+    hd: enforcedOAuthDomain,
   });
 
   const loginCompletePromise = new Promise<void>((resolve, reject) => {
@@ -396,7 +406,7 @@ export function getAvailablePort(): Promise<number> {
         port = parseInt(portStr, 10);
         if (isNaN(port) || port <= 0 || port > 65535) {
           return reject(
-            new Error(`Invalid value for OAUTH_CALLBACK_PORT: "${portStr}"`),
+            new Error(`Invalid value for OAUTH_CALLBACK_PORT: "${portStr}" `),
           );
         }
         return resolve(port);

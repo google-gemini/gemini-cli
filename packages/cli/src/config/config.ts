@@ -626,6 +626,7 @@ export async function loadCliConfig(
     truncateToolOutputLines: settings.tools?.truncateToolOutputLines,
     eventEmitter: appEvents,
     useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
+    enforcedOAuthDomain: settings.security?.auth?.enforcedOAuthDomain,
   });
 }
 
