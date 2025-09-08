@@ -6,7 +6,7 @@
 
 import {
   CoreToolScheduler,
-  GeminiClient,
+  type GeminiClient,
   GeminiEventType,
   ToolConfirmationOutcome,
   ApprovalMode,
@@ -82,7 +82,7 @@ export class Task {
     this.contextId = contextId;
     this.config = config;
     this.scheduler = this.createScheduler();
-    this.geminiClient = new GeminiClient(this.config);
+    this.geminiClient = this.config.getGeminiClient();
     this.pendingToolConfirmationDetails = new Map();
     this.taskState = 'submitted';
     this.eventBus = eventBus;
@@ -227,7 +227,7 @@ export class Task {
     } = {
       coderAgent: coderAgentMessage,
       model: this.config.getModel(),
-      userTier: this.geminiClient.getUserTier(),
+      userTier: this.config.getUserTier(),
     };
 
     if (metadataError) {
@@ -509,8 +509,7 @@ export class Task {
     if (oldString === '' && !isNewFile) {
       return currentContent;
     }
-    // Use split/join to ensure replacement
-    return currentContent.split(oldString).join(newString);
+    return currentContent.replaceAll(oldString, newString);
   }
 
   async scheduleToolCalls(
