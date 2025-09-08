@@ -7,9 +7,9 @@
 import { useEffect, useState } from 'react';
 import { appEvents } from './../../utils/events.js';
 import { Box, Text } from 'ink';
-import Spinner from 'ink-spinner';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { type McpClient, MCPServerStatus } from '@google/gemini-cli-core';
+import { GeminiSpinner } from './GeminiRespondingSpinner.js';
 
 export const ConfigInitDisplay = () => {
   const config = useConfig();
@@ -39,7 +39,7 @@ export const ConfigInitDisplay = () => {
   return (
     <Box marginTop={1}>
       <Text>
-        <Spinner /> {message}
+        <GeminiSpinner /> {message}
       </Text>
     </Box>
   );
