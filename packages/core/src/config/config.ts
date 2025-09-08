@@ -923,7 +923,7 @@ export class Config {
     registerCoreTool(WebFetchTool, this);
     registerCoreTool(ReadManyFilesTool, this);
     registerCoreTool(ShellTool, this);
-    registerCoreTool(MemoryTool);
+    registerCoreTool(MemoryTool, this);
     registerCoreTool(WebSearchTool, this);
 
     await registry.discoverAllTools();

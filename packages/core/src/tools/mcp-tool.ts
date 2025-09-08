@@ -61,8 +61,6 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ToolParams,
   ToolResult
 > {
-  private static readonly allowlist: Set<string> = new Set();
-
   constructor(
     private readonly mcpTool: CallableTool,
     readonly serverName: string,
@@ -85,10 +83,32 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       return false; // server is trusted, no confirmation needed
     }
 
-    if (
-      DiscoveredMCPToolInvocation.allowlist.has(serverAllowListKey) ||
-      DiscoveredMCPToolInvocation.allowlist.has(toolAllowListKey)
-    ) {
+    if (!this.cliConfig) {
+      // If no config is available, proceed with confirmation
+      const confirmationDetails: ToolMcpConfirmationDetails = {
+        type: 'mcp',
+        title: 'Confirm MCP Tool Execution',
+        serverName: this.serverName,
+        toolName: this.serverToolName,
+        toolDisplayName: this.displayName,
+        onConfirm: async () => {}, // No permission storage available
+      };
+      return confirmationDetails;
+    }
+
+    const permissionRepository = this.cliConfig.getPermissionRepository();
+
+    // Check if server or specific tool is already allowed
+    const serverAllowed = await permissionRepository.isAllowed(
+      'mcp',
+      serverAllowListKey,
+    );
+    const toolAllowed = await permissionRepository.isAllowed(
+      'mcp',
+      toolAllowListKey,
+    );
+
+    if (serverAllowed || toolAllowed) {
       return false; // server and/or tool already allowlisted
     }
 
@@ -100,9 +120,9 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       toolDisplayName: this.displayName, // Display global registry name exposed to model and user
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
-          DiscoveredMCPToolInvocation.allowlist.add(serverAllowListKey);
+          await permissionRepository.grant('mcp', serverAllowListKey);
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysTool) {
-          DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
+          await permissionRepository.grant('mcp', toolAllowListKey);
         }
       },
     };

@@ -81,9 +81,7 @@ describe('DiscoveredMCPTool', () => {
       baseDescription,
       inputSchema,
     );
-    // Clear allowlist before each relevant test, especially for shouldConfirmExecute
-    const invocation = tool.build({ param: 'mock' }) as any;
-    invocation.constructor.allowlist.clear();
+    // Note: Permission repository is now managed at the Config level
   });
 
   afterEach(() => {

@@ -50,6 +50,29 @@ describe('ShellTool', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Create a mock permission repository that tracks granted permissions
+    const grantedPermissions = new Map<string, Set<string>>();
+    const mockPermissionRepository = {
+      isAllowed: vi
+        .fn()
+        .mockImplementation(async (toolId: string, permissionKey: string) => {
+          const toolPermissions = grantedPermissions.get(toolId);
+          return toolPermissions ? toolPermissions.has(permissionKey) : false;
+        }),
+      grant: vi
+        .fn()
+        .mockImplementation(async (toolId: string, permissionKey: string) => {
+          if (!grantedPermissions.has(toolId)) {
+            grantedPermissions.set(toolId, new Set());
+          }
+          grantedPermissions.get(toolId)!.add(permissionKey);
+        }),
+      revoke: vi.fn().mockResolvedValue(undefined),
+      revokeAllForTool: vi.fn().mockResolvedValue(undefined),
+      revokeAll: vi.fn().mockResolvedValue(undefined),
+      getAllGranted: vi.fn().mockResolvedValue(grantedPermissions),
+    };
+
     mockConfig = {
       getCoreTools: vi.fn().mockReturnValue([]),
       getExcludeTools: vi.fn().mockReturnValue([]),
@@ -59,6 +82,9 @@ describe('ShellTool', () => {
       getWorkspaceContext: () => createMockWorkspaceContext('.'),
       getGeminiClient: vi.fn(),
       getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
+      getPermissionRepository: vi
+        .fn()
+        .mockReturnValue(mockPermissionRepository),
     } as unknown as Config;
 
     shellTool = new ShellTool(mockConfig);

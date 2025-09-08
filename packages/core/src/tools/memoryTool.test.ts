@@ -18,6 +18,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
+import type { Config } from '../config/config.js';
 
 // Mock dependencies
 vi.mock(import('node:fs/promises'), async (importOriginal) => {
@@ -199,7 +200,13 @@ describe('MemoryTool', () => {
     let performAddMemoryEntrySpy: Mock<typeof MemoryTool.performAddMemoryEntry>;
 
     beforeEach(() => {
-      memoryTool = new MemoryTool();
+      const mockConfig = {
+        getPermissionRepository: vi.fn().mockReturnValue({
+          isAllowed: vi.fn().mockResolvedValue(false),
+          grant: vi.fn().mockResolvedValue(undefined),
+        }),
+      } as unknown as Config;
+      memoryTool = new MemoryTool(mockConfig);
       // Spy on the static method for these tests
       performAddMemoryEntrySpy = vi
         .spyOn(MemoryTool, 'performAddMemoryEntry')
@@ -297,13 +304,40 @@ describe('MemoryTool', () => {
 
   describe('shouldConfirmExecute', () => {
     let memoryTool: MemoryTool;
+    let mockConfig: Config;
+    let grantedPermissions: Map<string, Set<string>>;
 
     beforeEach(() => {
-      memoryTool = new MemoryTool();
-      // Clear the allowlist before each test
-      const invocation = memoryTool.build({ fact: 'mock-fact' });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (invocation.constructor as any).allowlist.clear();
+      // Create a mock permission repository that tracks granted permissions
+      grantedPermissions = new Map<string, Set<string>>();
+      const mockPermissionRepository = {
+        isAllowed: vi
+          .fn()
+          .mockImplementation(async (toolId: string, permissionKey: string) => {
+            const toolPermissions = grantedPermissions.get(toolId);
+            return toolPermissions ? toolPermissions.has(permissionKey) : false;
+          }),
+        grant: vi
+          .fn()
+          .mockImplementation(async (toolId: string, permissionKey: string) => {
+            if (!grantedPermissions.has(toolId)) {
+              grantedPermissions.set(toolId, new Set());
+            }
+            grantedPermissions.get(toolId)!.add(permissionKey);
+          }),
+        revoke: vi.fn().mockResolvedValue(undefined),
+        revokeAllForTool: vi.fn().mockResolvedValue(undefined),
+        revokeAll: vi.fn().mockResolvedValue(undefined),
+        getAllGranted: vi.fn().mockResolvedValue(grantedPermissions),
+      };
+
+      mockConfig = {
+        getPermissionRepository: vi
+          .fn()
+          .mockReturnValue(mockPermissionRepository),
+      } as unknown as Config;
+
+      memoryTool = new MemoryTool(mockConfig);
       // Mock fs.readFile to return empty string (file doesn't exist)
       vi.mocked(fs.readFile).mockResolvedValue('');
     });
@@ -338,11 +372,13 @@ describe('MemoryTool', () => {
         getCurrentGeminiMdFilename(),
       );
 
-      const invocation = memoryTool.build(params);
-      // Add the memory file to the allowlist
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (invocation.constructor as any).allowlist.add(memoryFilePath);
+      // Pre-grant permission for the memory file
+      if (!grantedPermissions.has('memory')) {
+        grantedPermissions.set('memory', new Set());
+      }
+      grantedPermissions.get('memory')!.add(memoryFilePath);
 
+      const invocation = memoryTool.build(params);
       const result = await invocation.shouldConfirmExecute(mockAbortSignal);
 
       expect(result).toBe(false);
@@ -366,11 +402,10 @@ describe('MemoryTool', () => {
         // Simulate the onConfirm callback
         await result.onConfirm(ToolConfirmationOutcome.ProceedAlways);
 
-        // Check that the memory file was added to the allowlist
-        expect(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (invocation.constructor as any).allowlist.has(memoryFilePath),
-        ).toBe(true);
+        // Check that the memory file was added to the granted permissions
+        expect(grantedPermissions.get('memory')?.has(memoryFilePath)).toBe(
+          true,
+        );
       }
     });
 
@@ -391,12 +426,14 @@ describe('MemoryTool', () => {
       if (result && result.type === 'edit') {
         // Simulate the onConfirm callback with different outcomes
         await result.onConfirm(ToolConfirmationOutcome.ProceedOnce);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const allowlist = (invocation.constructor as any).allowlist;
-        expect(allowlist.has(memoryFilePath)).toBe(false);
+        expect(
+          grantedPermissions.get('memory')?.has(memoryFilePath) ?? false,
+        ).toBe(false);
 
         await result.onConfirm(ToolConfirmationOutcome.Cancel);
-        expect(allowlist.has(memoryFilePath)).toBe(false);
+        expect(
+          grantedPermissions.get('memory')?.has(memoryFilePath) ?? false,
+        ).toBe(false);
       }
     });
 

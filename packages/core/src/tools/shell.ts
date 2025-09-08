@@ -48,7 +48,6 @@ class ShellToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: ShellToolParams,
-    private readonly allowlist: Set<string>,
   ) {
     super(params);
   }
@@ -72,9 +71,19 @@ class ShellToolInvocation extends BaseToolInvocation<
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
     const rootCommands = [...new Set(getCommandRoots(command))];
-    const commandsToConfirm = rootCommands.filter(
-      (command) => !this.allowlist.has(command),
-    );
+    const permissionRepository = this.config.getPermissionRepository();
+
+    // Check which commands need confirmation
+    const commandsToConfirm: string[] = [];
+    for (const rootCommand of rootCommands) {
+      const isAllowed = await permissionRepository.isAllowed(
+        'shell',
+        rootCommand,
+      );
+      if (!isAllowed) {
+        commandsToConfirm.push(rootCommand);
+      }
+    }
 
     if (commandsToConfirm.length === 0) {
       return false; // already approved and allowlisted
@@ -87,7 +96,9 @@ class ShellToolInvocation extends BaseToolInvocation<
       rootCommand: commandsToConfirm.join(', '),
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          commandsToConfirm.forEach((command) => this.allowlist.add(command));
+          for (const command of commandsToConfirm) {
+            await permissionRepository.grant('shell', command);
+          }
         }
       },
     };
@@ -337,7 +348,6 @@ export class ShellTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static Name: string = 'run_shell_command';
-  private allowlist: Set<string> = new Set();
 
   constructor(private readonly config: Config) {
     super(
@@ -412,6 +422,6 @@ export class ShellTool extends BaseDeclarativeTool<
   protected createInvocation(
     params: ShellToolParams,
   ): ToolInvocation<ShellToolParams, ToolResult> {
-    return new ShellToolInvocation(this.config, params, this.allowlist);
+    return new ShellToolInvocation(this.config, params);
   }
 }

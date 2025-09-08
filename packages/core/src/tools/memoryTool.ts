@@ -23,6 +23,7 @@ import type {
   ModifyContext,
 } from './modifiable-tool.js';
 import { ToolErrorType } from './tool-error.js';
+import type { Config } from '../config/config.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
   name: 'save_memory',
@@ -175,7 +176,12 @@ class MemoryToolInvocation extends BaseToolInvocation<
   SaveMemoryParams,
   ToolResult
 > {
-  private static readonly allowlist: Set<string> = new Set();
+  constructor(
+    private readonly config: Config,
+    params: SaveMemoryParams,
+  ) {
+    super(params);
+  }
 
   getDescription(): string {
     const memoryFilePath = getGlobalMemoryFilePath();
@@ -186,9 +192,14 @@ class MemoryToolInvocation extends BaseToolInvocation<
     _abortSignal: AbortSignal,
   ): Promise<ToolEditConfirmationDetails | false> {
     const memoryFilePath = getGlobalMemoryFilePath();
-    const allowlistKey = memoryFilePath;
+    const permissionRepository = this.config.getPermissionRepository();
 
-    if (MemoryToolInvocation.allowlist.has(allowlistKey)) {
+    // Check if the memory file is already allowed
+    const isAllowed = await permissionRepository.isAllowed(
+      'memory',
+      memoryFilePath,
+    );
+    if (isAllowed) {
       return false;
     }
 
@@ -215,7 +226,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
       newContent,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          MemoryToolInvocation.allowlist.add(allowlistKey);
+          await permissionRepository.grant('memory', memoryFilePath);
         }
       },
     };
@@ -290,7 +301,7 @@ export class MemoryTool
   implements ModifiableDeclarativeTool<SaveMemoryParams>
 {
   static readonly Name: string = memoryToolSchemaData.name!;
-  constructor() {
+  constructor(private readonly config: Config) {
     super(
       MemoryTool.Name,
       'Save Memory',
@@ -311,7 +322,7 @@ export class MemoryTool
   }
 
   protected createInvocation(params: SaveMemoryParams) {
-    return new MemoryToolInvocation(params);
+    return new MemoryToolInvocation(this.config, params);
   }
 
   static async performAddMemoryEntry(
