@@ -47,7 +47,7 @@ import {
   MalformedJsonResponseEvent,
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
-import type { IdeContext, File } from '../ide/ideContext.js';
+import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 
 export function isThinkingSupported(model: string) {
