@@ -15,7 +15,7 @@ export const FileSchema = z.object({
    */
   path: z.string(),
   /**
-   * The timestamp of when the file was last focused.
+   * The unix timestamp of when the file was last focused.
    */
   timestamp: z.number(),
   /**
