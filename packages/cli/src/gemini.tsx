@@ -246,6 +246,7 @@ export async function main() {
     extensions,
     sessionId,
     argv,
+    await getCliVersion(),
   );
 
   const wasRaw = process.stdin.isRaw;
