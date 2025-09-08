@@ -780,58 +780,56 @@ describe('setApprovalMode with folder trust', () => {
 });
 
 describe('LlmUtilityService Lifecycle', () => {
-    const MODEL = 'gemini-pro';
-    const SANDBOX: SandboxConfig = {
-      command: 'docker',
-      image: 'gemini-cli-sandbox',
-    };
-    const TARGET_DIR = '/path/to/target';
-    const DEBUG_MODE = false;
-    const QUESTION = 'test question';
-    const FULL_CONTEXT = false;
-    const USER_MEMORY = 'Test User Memory';
-    const TELEMETRY_SETTINGS = { enabled: false };
-    const EMBEDDING_MODEL = 'gemini-embedding';
-    const SESSION_ID = 'test-session-id';
-    const baseParams: ConfigParameters = {
-      cwd: '/tmp',
-      embeddingModel: EMBEDDING_MODEL,
-      sandbox: SANDBOX,
-      targetDir: TARGET_DIR,
-      debugMode: DEBUG_MODE,
-      question: QUESTION,
-      fullContext: FULL_CONTEXT,
-      userMemory: USER_MEMORY,
-      telemetry: TELEMETRY_SETTINGS,
-      sessionId: SESSION_ID,
-      model: MODEL,
-      usageStatisticsEnabled: false,
-    };
-  
-    it('should throw an error if getLlmUtilityService is called before refreshAuth', () => {
-      const config = new Config(baseParams);
-      expect(() => config.getLlmUtilityService()).toThrow(
-        'LlmUtilityService not initialized. Ensure authentication has occurred and GeminiClient is ready.',
-      );
-    });
+  const MODEL = 'gemini-pro';
+  const SANDBOX: SandboxConfig = {
+    command: 'docker',
+    image: 'gemini-cli-sandbox',
+  };
+  const TARGET_DIR = '/path/to/target';
+  const DEBUG_MODE = false;
+  const QUESTION = 'test question';
+  const FULL_CONTEXT = false;
+  const USER_MEMORY = 'Test User Memory';
+  const TELEMETRY_SETTINGS = { enabled: false };
+  const EMBEDDING_MODEL = 'gemini-embedding';
+  const SESSION_ID = 'test-session-id';
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    embeddingModel: EMBEDDING_MODEL,
+    sandbox: SANDBOX,
+    targetDir: TARGET_DIR,
+    debugMode: DEBUG_MODE,
+    question: QUESTION,
+    fullContext: FULL_CONTEXT,
+    userMemory: USER_MEMORY,
+    telemetry: TELEMETRY_SETTINGS,
+    sessionId: SESSION_ID,
+    model: MODEL,
+    usageStatisticsEnabled: false,
+  };
 
-    it('should successfully initialize LlmUtilityService after refreshAuth is called', async () => {
-      const config = new Config(baseParams);
-      const authType = AuthType.USE_GEMINI;
-      const mockContentConfig = { model: 'gemini-flash', apiKey: 'test-key' };
-
-      vi.mocked(createContentGeneratorConfig).mockReturnValue(
-        mockContentConfig,
-      );
-
-      await config.refreshAuth(authType);
-
-      // Should not throw
-      const llmService = config.getLlmUtilityService();
-      expect(llmService).toBeDefined();
-      expect(LlmUtilityService).toHaveBeenCalledWith(
-        config.getContentGenerator(),
-        config,
-      );
-    });
+  it('should throw an error if getLlmUtilityService is called before refreshAuth', () => {
+    const config = new Config(baseParams);
+    expect(() => config.getLlmUtilityService()).toThrow(
+      'LlmUtilityService not initialized. Ensure authentication has occurred and GeminiClient is ready.',
+    );
   });
+
+  it('should successfully initialize LlmUtilityService after refreshAuth is called', async () => {
+    const config = new Config(baseParams);
+    const authType = AuthType.USE_GEMINI;
+    const mockContentConfig = { model: 'gemini-flash', apiKey: 'test-key' };
+
+    vi.mocked(createContentGeneratorConfig).mockReturnValue(mockContentConfig);
+
+    await config.refreshAuth(authType);
+
+    // Should not throw
+    const llmService = config.getLlmUtilityService();
+    expect(llmService).toBeDefined();
+    expect(LlmUtilityService).toHaveBeenCalledWith(
+      config.getContentGenerator(),
+      config,
+    );
+  });
+});

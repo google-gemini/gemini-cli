@@ -458,10 +458,7 @@ export class Config {
     this.contentGeneratorConfig = newContentGeneratorConfig;
 
     // Initialize LlmUtilityService now that the ContentGenerator is available
-    this.llmUtilityService = new LlmUtilityService(
-      this.contentGenerator,
-      this,
-    );
+    this.llmUtilityService = new LlmUtilityService(this.contentGenerator, this);
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.inFallbackMode = false;

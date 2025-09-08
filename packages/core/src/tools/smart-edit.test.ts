@@ -60,6 +60,7 @@ import { ApprovalMode, type Config } from '../config/config.js';
 import { type Content, type Part, type SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
+import type { LlmUtilityService } from '../core/llmUtilityService.js';
 
 describe('SmartEditTool', () => {
   let tool: SmartEditTool;
@@ -67,6 +68,7 @@ describe('SmartEditTool', () => {
   let rootDir: string;
   let mockConfig: Config;
   let geminiClient: any;
+  let llmUtilityService: LlmUtilityService;
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -78,8 +80,13 @@ describe('SmartEditTool', () => {
       generateJson: mockGenerateJson,
     };
 
+    llmUtilityService = {
+      generateJson: mockGenerateJson,
+    } as unknown as LlmUtilityService;
+
     mockConfig = {
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
+      getLlmUtilityService: vi.fn().mockReturnValue(llmUtilityService),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),

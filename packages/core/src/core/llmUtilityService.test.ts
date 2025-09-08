@@ -15,7 +15,10 @@ import {
 } from 'vitest';
 
 import type { GenerateContentResponse } from '@google/genai';
-import { LlmUtilityService, type GenerateJsonOptions } from './llmUtilityService.js';
+import {
+  LlmUtilityService,
+  type GenerateJsonOptions,
+} from './llmUtilityService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { Config } from '../config/config.js';
 import { AuthType } from './contentGenerator.js';
@@ -25,15 +28,14 @@ import { retryWithBackoff } from '../utils/retry.js';
 import { MalformedJsonResponseEvent } from '../telemetry/types.js';
 import { getErrorMessage } from '../utils/errors.js';
 
-
 vi.mock('../utils/errorReporting.js');
 vi.mock('../telemetry/loggers.js');
 vi.mock('../utils/errors.js', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('../utils/errors.js')>();
-    return {
-        ...actual,
-        getErrorMessage: vi.fn((e) => (e instanceof Error ? e.message : String(e))),
-    };
+  const actual = await importOriginal<typeof import('../utils/errors.js')>();
+  return {
+    ...actual,
+    getErrorMessage: vi.fn((e) => (e instanceof Error ? e.message : String(e))),
+  };
 });
 
 vi.mock('../utils/retry.js', () => ({
@@ -48,13 +50,16 @@ const mockContentGenerator = {
 
 const mockConfig = {
   getSessionId: vi.fn().mockReturnValue('test-session-id'),
-  getContentGeneratorConfig: vi.fn().mockReturnValue({ authType: AuthType.USE_GEMINI }),
+  getContentGeneratorConfig: vi
+    .fn()
+    .mockReturnValue({ authType: AuthType.USE_GEMINI }),
 } as unknown as Mocked<Config>;
 
 // Helper to create a mock GenerateContentResponse
-const createMockResponse = (text: string): GenerateContentResponse => ({
-  candidates: [{ content: { role: 'model', parts: [{ text }] }, index: 0 }],
-} as GenerateContentResponse);
+const createMockResponse = (text: string): GenerateContentResponse =>
+  ({
+    candidates: [{ content: { role: 'model', parts: [{ text }] }, index: 0 }],
+  }) as GenerateContentResponse;
 
 describe('LlmUtilityService', () => {
   let service: LlmUtilityService;
@@ -64,7 +69,9 @@ describe('LlmUtilityService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset the mocked implementation for getErrorMessage for accurate error message assertions
-    vi.mocked(getErrorMessage).mockImplementation((e) => (e instanceof Error ? e.message : String(e)));
+    vi.mocked(getErrorMessage).mockImplementation((e) =>
+      e instanceof Error ? e.message : String(e),
+    );
     service = new LlmUtilityService(mockContentGenerator, mockConfig);
     abortController = new AbortController();
     defaultOptions = {
@@ -91,7 +98,7 @@ describe('LlmUtilityService', () => {
 
       // Ensure the retry mechanism was engaged
       expect(retryWithBackoff).toHaveBeenCalledTimes(1);
-      
+
       // Validate the parameters passed to the underlying generator
       expect(mockGenerateContent).toHaveBeenCalledTimes(1);
       expect(mockGenerateContent).toHaveBeenCalledWith(
@@ -100,8 +107,8 @@ describe('LlmUtilityService', () => {
           contents: defaultOptions.contents,
           config: {
             abortSignal: defaultOptions.abortSignal,
-            temperature: 0, 
-            topP: 1,        
+            temperature: 0,
+            topP: 1,
             responseJsonSchema: defaultOptions.schema,
             responseMimeType: 'application/json',
             // Crucial: systemInstruction should NOT be in the config object if not provided
@@ -157,51 +164,56 @@ describe('LlmUtilityService', () => {
     });
 
     it('should use the provided promptId', async () => {
-        const mockResponse = createMockResponse('{"color": "yellow"}');
-        mockGenerateContent.mockResolvedValue(mockResponse);
-        const customPromptId = 'custom-id-123';
-  
-        const options: GenerateJsonOptions = {
-          ...defaultOptions,
-          promptId: customPromptId,
-        };
-  
-        await service.generateJson(options);
-  
-        expect(mockGenerateContent).toHaveBeenCalledWith(
-          expect.any(Object),
-          customPromptId,
-        );
-      });
+      const mockResponse = createMockResponse('{"color": "yellow"}');
+      mockGenerateContent.mockResolvedValue(mockResponse);
+      const customPromptId = 'custom-id-123';
+
+      const options: GenerateJsonOptions = {
+        ...defaultOptions,
+        promptId: customPromptId,
+      };
+
+      await service.generateJson(options);
+
+      expect(mockGenerateContent).toHaveBeenCalledWith(
+        expect.any(Object),
+        customPromptId,
+      );
+    });
   });
 
   describe('generateJson - Response Cleaning', () => {
     it('should clean JSON wrapped in markdown backticks and log telemetry', async () => {
       const malformedResponse = '```json\n{"color": "purple"}\n```';
-      mockGenerateContent.mockResolvedValue(createMockResponse(malformedResponse));
+      mockGenerateContent.mockResolvedValue(
+        createMockResponse(malformedResponse),
+      );
 
       const result = await service.generateJson(defaultOptions);
 
       expect(result).toEqual({ color: 'purple' });
       expect(logMalformedJsonResponse).toHaveBeenCalledTimes(1);
       expect(logMalformedJsonResponse).toHaveBeenCalledWith(
-          mockConfig, 
-          expect.any(MalformedJsonResponseEvent)
+        mockConfig,
+        expect.any(MalformedJsonResponseEvent),
       );
       // Validate the telemetry event content
-      const event = vi.mocked(logMalformedJsonResponse).mock.calls[0][1] as MalformedJsonResponseEvent;
+      const event = vi.mocked(logMalformedJsonResponse).mock
+        .calls[0][1] as MalformedJsonResponseEvent;
       expect(event.model).toBe('test-model');
     });
 
     it('should handle extra whitespace correctly without logging malformed telemetry', async () => {
-        const responseWithWhitespace = '  \n  {"color": "orange"}  \n';
-        mockGenerateContent.mockResolvedValue(createMockResponse(responseWithWhitespace));
-  
-        const result = await service.generateJson(defaultOptions);
-  
-        expect(result).toEqual({ color: 'orange' });
-        expect(logMalformedJsonResponse).not.toHaveBeenCalled();
-      });
+      const responseWithWhitespace = '  \n  {"color": "orange"}  \n';
+      mockGenerateContent.mockResolvedValue(
+        createMockResponse(responseWithWhitespace),
+      );
+
+      const result = await service.generateJson(defaultOptions);
+
+      expect(result).toEqual({ color: 'orange' });
+      expect(logMalformedJsonResponse).not.toHaveBeenCalled();
+    });
   });
 
   describe('generateJson - Error Handling', () => {
@@ -210,7 +222,7 @@ describe('LlmUtilityService', () => {
 
       // The final error message includes the prefix added by the service's outer catch block.
       await expect(service.generateJson(defaultOptions)).rejects.toThrow(
-        'Failed to generate JSON content: API returned an empty response for generateJson.'
+        'Failed to generate JSON content: API returned an empty response for generateJson.',
       );
 
       // Verify error reporting details
@@ -219,7 +231,7 @@ describe('LlmUtilityService', () => {
         expect.any(Error),
         'Error in generateJson: API returned an empty response.',
         defaultOptions.contents,
-        'generateJson-empty-response'
+        'generateJson-empty-response',
       );
     });
 
@@ -228,15 +240,15 @@ describe('LlmUtilityService', () => {
       mockGenerateContent.mockResolvedValue(createMockResponse(invalidJson));
 
       await expect(service.generateJson(defaultOptions)).rejects.toThrow(
-        /^Failed to generate JSON content: Failed to parse API response as JSON:/
+        /^Failed to generate JSON content: Failed to parse API response as JSON:/,
       );
 
       expect(reportError).toHaveBeenCalledTimes(1);
       expect(reportError).toHaveBeenCalledWith(
-        expect.any(Error), 
+        expect.any(Error),
         'Failed to parse JSON response from generateJson.',
         expect.objectContaining({ responseTextFailedToParse: invalidJson }),
-        'generateJson-parse'
+        'generateJson-parse',
       );
     });
 
@@ -246,7 +258,7 @@ describe('LlmUtilityService', () => {
       mockGenerateContent.mockRejectedValue(apiError);
 
       await expect(service.generateJson(defaultOptions)).rejects.toThrow(
-        'Failed to generate JSON content: Service Unavailable (503)'
+        'Failed to generate JSON content: Service Unavailable (503)',
       );
 
       // Verify generic error reporting
@@ -255,25 +267,28 @@ describe('LlmUtilityService', () => {
         apiError,
         'Error generating JSON content via API.',
         defaultOptions.contents,
-        'generateJson-api'
+        'generateJson-api',
       );
     });
 
     it('should throw immediately without reporting if aborted', async () => {
-        const abortError = new DOMException('Aborted', 'AbortError');
-        
-        // Simulate abortion happening during the API call
-        mockGenerateContent.mockImplementation(() => {
-            abortController.abort(); // Ensure the signal is aborted when the service checks
-            throw abortError;
-        });
+      const abortError = new DOMException('Aborted', 'AbortError');
 
-        const options = { ...defaultOptions, abortSignal: abortController.signal };
+      // Simulate abortion happening during the API call
+      mockGenerateContent.mockImplementation(() => {
+        abortController.abort(); // Ensure the signal is aborted when the service checks
+        throw abortError;
+      });
 
-        await expect(service.generateJson(options)).rejects.toThrow(abortError);
-  
-        // Crucially, it should not report a cancellation as an application error
-        expect(reportError).not.toHaveBeenCalled();
+      const options = {
+        ...defaultOptions,
+        abortSignal: abortController.signal,
+      };
+
+      await expect(service.generateJson(options)).rejects.toThrow(abortError);
+
+      // Crucially, it should not report a cancellation as an application error
+      expect(reportError).not.toHaveBeenCalled();
     });
   });
 });

@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Content,
-  GenerateContentConfig,
-  Part,
-} from '@google/genai';
+import type { Content, GenerateContentConfig, Part } from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { getResponseText } from '../utils/partUtils.js';
@@ -36,10 +32,17 @@ export interface GenerateJsonOptions {
   /**
    * Overrides for generation configuration (e.g., temperature).
    */
-  config?: Omit<GenerateContentConfig, 'systemInstruction' | 'responseJsonSchema' | 'responseMimeType' | 'tools' | 'abortSignal'>;
+  config?: Omit<
+    GenerateContentConfig,
+    | 'systemInstruction'
+    | 'responseJsonSchema'
+    | 'responseMimeType'
+    | 'tools'
+    | 'abortSignal'
+  >;
   /** Signal for cancellation. */
   abortSignal: AbortSignal;
-   /**
+  /**
    * A unique ID for the prompt, used for logging/telemetry correlation.
    */
   promptId: string;
@@ -60,8 +63,17 @@ export class LlmUtilityService {
     private readonly config: Config,
   ) {}
 
-  async generateJson(options: GenerateJsonOptions): Promise<Record<string, unknown>> {
-    const { contents, schema, model, abortSignal, systemInstruction, promptId } = options;
+  async generateJson(
+    options: GenerateJsonOptions,
+  ): Promise<Record<string, unknown>> {
+    const {
+      contents,
+      schema,
+      model,
+      abortSignal,
+      systemInstruction,
+      promptId,
+    } = options;
 
     const requestConfig: GenerateContentConfig = {
       abortSignal,
@@ -73,20 +85,23 @@ export class LlmUtilityService {
     };
 
     try {
-      const apiCall = () => this.contentGenerator.generateContent(
-        {
-          model,
-          config: requestConfig,
-          contents,
-        },
-        promptId,
-      );
+      const apiCall = () =>
+        this.contentGenerator.generateContent(
+          {
+            model,
+            config: requestConfig,
+            contents,
+          },
+          promptId,
+        );
 
       const result = await retryWithBackoff(apiCall);
 
       let text = getResponseText(result)?.trim();
       if (!text) {
-        const error = new Error('API returned an empty response for generateJson.');
+        const error = new Error(
+          'API returned an empty response for generateJson.',
+        );
         await reportError(
           error,
           'Error in generateJson: API returned an empty response.',
@@ -101,7 +116,9 @@ export class LlmUtilityService {
       try {
         return JSON.parse(text);
       } catch (parseError) {
-        const error = new Error(`Failed to parse API response as JSON: ${getErrorMessage(parseError)}`);
+        const error = new Error(
+          `Failed to parse API response as JSON: ${getErrorMessage(parseError)}`,
+        );
         await reportError(
           parseError,
           'Failed to parse JSON response from generateJson.',
@@ -113,40 +130,42 @@ export class LlmUtilityService {
         );
         throw error;
       }
-
     } catch (error) {
-       if (abortSignal.aborted) {
+      if (abortSignal.aborted) {
         throw error;
       }
 
-      if (error instanceof Error && (
-          error.message === 'API returned an empty response for generateJson.' ||
-          error.message.startsWith('Failed to parse API response as JSON:')
-      )) {
-          // We perform this check so that we don't report these again.
+      if (
+        error instanceof Error &&
+        (error.message === 'API returned an empty response for generateJson.' ||
+          error.message.startsWith('Failed to parse API response as JSON:'))
+      ) {
+        // We perform this check so that we don't report these again.
       } else {
         await reportError(
-            error,
-            'Error generating JSON content via API.',
-            contents,
-            'generateJson-api',
+          error,
+          'Error generating JSON content via API.',
+          contents,
+          'generateJson-api',
         );
       }
 
-      throw new Error(`Failed to generate JSON content: ${getErrorMessage(error)}`);
+      throw new Error(
+        `Failed to generate JSON content: ${getErrorMessage(error)}`,
+      );
     }
   }
 
   private cleanJsonResponse(text: string, model: string): string {
-      const prefix = '```json';
-      const suffix = '```';
-      if (text.startsWith(prefix) && text.endsWith(suffix)) {
-        logMalformedJsonResponse(
-          this.config,
-          new MalformedJsonResponseEvent(model),
-        );
-        return text.substring(prefix.length, text.length - suffix.length).trim();
-      }
-      return text;
+    const prefix = '```json';
+    const suffix = '```';
+    if (text.startsWith(prefix) && text.endsWith(suffix)) {
+      logMalformedJsonResponse(
+        this.config,
+        new MalformedJsonResponseEvent(model),
+      );
+      return text.substring(prefix.length, text.length - suffix.length).trim();
+    }
+    return text;
   }
 }

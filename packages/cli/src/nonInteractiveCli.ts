@@ -13,6 +13,7 @@ import {
   parseAndFormatApiError,
   FatalInputError,
   FatalTurnLimitedError,
+  promptIdContext,
 } from '@google/gemini-cli-core';
 import type { Content, Part } from '@google/genai';
 
@@ -24,115 +25,117 @@ export async function runNonInteractive(
   input: string,
   prompt_id: string,
 ): Promise<void> {
-  const consolePatcher = new ConsolePatcher({
-    stderr: true,
-    debugMode: config.getDebugMode(),
-  });
-
-  try {
-    consolePatcher.patch();
-    // Handle EPIPE errors when the output is piped to a command that closes early.
-    process.stdout.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'EPIPE') {
-        // Exit gracefully if the pipe is closed.
-        process.exit(0);
-      }
+  return promptIdContext.run({ promptId: prompt_id }, async () => {
+    const consolePatcher = new ConsolePatcher({
+      stderr: true,
+      debugMode: config.getDebugMode(),
     });
 
-    const geminiClient = config.getGeminiClient();
+    try {
+      consolePatcher.patch();
+      // Handle EPIPE errors when the output is piped to a command that closes early.
+      process.stdout.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EPIPE') {
+          // Exit gracefully if the pipe is closed.
+          process.exit(0);
+        }
+      });
 
-    const abortController = new AbortController();
+      const geminiClient = config.getGeminiClient();
 
-    const { processedQuery, shouldProceed } = await handleAtCommand({
-      query: input,
-      config,
-      addItem: (_item, _timestamp) => 0,
-      onDebugMessage: () => {},
-      messageId: Date.now(),
-      signal: abortController.signal,
-    });
+      const abortController = new AbortController();
 
-    if (!shouldProceed || !processedQuery) {
-      // An error occurred during @include processing (e.g., file not found).
-      // The error message is already logged by handleAtCommand.
-      throw new FatalInputError(
-        'Exiting due to an error processing the @ command.',
-      );
-    }
+      const { processedQuery, shouldProceed } = await handleAtCommand({
+        query: input,
+        config,
+        addItem: (_item, _timestamp) => 0,
+        onDebugMessage: () => {},
+        messageId: Date.now(),
+        signal: abortController.signal,
+      });
 
-    let currentMessages: Content[] = [
-      { role: 'user', parts: processedQuery as Part[] },
-    ];
-
-    let turnCount = 0;
-    while (true) {
-      turnCount++;
-      if (
-        config.getMaxSessionTurns() >= 0 &&
-        turnCount > config.getMaxSessionTurns()
-      ) {
-        throw new FatalTurnLimitedError(
-          'Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
+      if (!shouldProceed || !processedQuery) {
+        // An error occurred during @include processing (e.g., file not found).
+        // The error message is already logged by handleAtCommand.
+        throw new FatalInputError(
+          'Exiting due to an error processing the @ command.',
         );
       }
-      const toolCallRequests: ToolCallRequestInfo[] = [];
 
-      const responseStream = geminiClient.sendMessageStream(
-        currentMessages[0]?.parts || [],
-        abortController.signal,
-        prompt_id,
-      );
+      let currentMessages: Content[] = [
+        { role: 'user', parts: processedQuery as Part[] },
+      ];
 
-      for await (const event of responseStream) {
-        if (abortController.signal.aborted) {
-          console.error('Operation cancelled.');
+      let turnCount = 0;
+      while (true) {
+        turnCount++;
+        if (
+          config.getMaxSessionTurns() >= 0 &&
+          turnCount > config.getMaxSessionTurns()
+        ) {
+          throw new FatalTurnLimitedError(
+            'Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
+          );
+        }
+        const toolCallRequests: ToolCallRequestInfo[] = [];
+
+        const responseStream = geminiClient.sendMessageStream(
+          currentMessages[0]?.parts || [],
+          abortController.signal,
+          prompt_id,
+        );
+
+        for await (const event of responseStream) {
+          if (abortController.signal.aborted) {
+            console.error('Operation cancelled.');
+            return;
+          }
+
+          if (event.type === GeminiEventType.Content) {
+            process.stdout.write(event.value);
+          } else if (event.type === GeminiEventType.ToolCallRequest) {
+            toolCallRequests.push(event.value);
+          }
+        }
+
+        if (toolCallRequests.length > 0) {
+          const toolResponseParts: Part[] = [];
+          for (const requestInfo of toolCallRequests) {
+            const toolResponse = await executeToolCall(
+              config,
+              requestInfo,
+              abortController.signal,
+            );
+
+            if (toolResponse.error) {
+              console.error(
+                `Error executing tool ${requestInfo.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
+              );
+            }
+
+            if (toolResponse.responseParts) {
+              toolResponseParts.push(...toolResponse.responseParts);
+            }
+          }
+          currentMessages = [{ role: 'user', parts: toolResponseParts }];
+        } else {
+          process.stdout.write('\n'); // Ensure a final newline
           return;
         }
-
-        if (event.type === GeminiEventType.Content) {
-          process.stdout.write(event.value);
-        } else if (event.type === GeminiEventType.ToolCallRequest) {
-          toolCallRequests.push(event.value);
-        }
       }
-
-      if (toolCallRequests.length > 0) {
-        const toolResponseParts: Part[] = [];
-        for (const requestInfo of toolCallRequests) {
-          const toolResponse = await executeToolCall(
-            config,
-            requestInfo,
-            abortController.signal,
-          );
-
-          if (toolResponse.error) {
-            console.error(
-              `Error executing tool ${requestInfo.name}: ${toolResponse.resultDisplay || toolResponse.error.message}`,
-            );
-          }
-
-          if (toolResponse.responseParts) {
-            toolResponseParts.push(...toolResponse.responseParts);
-          }
-        }
-        currentMessages = [{ role: 'user', parts: toolResponseParts }];
-      } else {
-        process.stdout.write('\n'); // Ensure a final newline
-        return;
+    } catch (error) {
+      console.error(
+        parseAndFormatApiError(
+          error,
+          config.getContentGeneratorConfig()?.authType,
+        ),
+      );
+      throw error;
+    } finally {
+      consolePatcher.cleanup();
+      if (isTelemetrySdkInitialized()) {
+        await shutdownTelemetry(config);
       }
     }
-  } catch (error) {
-    console.error(
-      parseAndFormatApiError(
-        error,
-        config.getContentGeneratorConfig()?.authType,
-      ),
-    );
-    throw error;
-  } finally {
-    consolePatcher.cleanup();
-    if (isTelemetrySdkInitialized()) {
-      await shutdownTelemetry(config);
-    }
-  }
+  });
 }
