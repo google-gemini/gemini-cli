@@ -56,12 +56,13 @@ export async function handleInstall(args: InstallArgs) {
 }
 
 export const installCommand: CommandModule = {
-  command: 'install [--source | --path ]',
-  describe: 'Installs an extension from a git repository or a local path.',
+  command: 'install [source]',
+  describe:
+    'Installs an extension from a git repository URL or a local path.',
   builder: (yargs) =>
     yargs
-      .option('source', {
-        describe: 'The git URL of the extension to install.',
+      .positional('source', {
+        describe: 'The github URL of the extension to install.',
         type: 'string',
       })
       .option('path', {
@@ -71,7 +72,7 @@ export const installCommand: CommandModule = {
       .conflicts('source', 'path')
       .check((argv) => {
         if (!argv.source && !argv.path) {
-          throw new Error('Either --source or --path must be provided.');
+          throw new Error('Either source or --path must be provided.');
         }
         return true;
       }),

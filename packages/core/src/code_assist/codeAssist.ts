@@ -40,7 +40,7 @@ export async function createCodeAssistContentGenerator(
 export function getCodeAssistServer(
   config: Config,
 ): CodeAssistServer | undefined {
-  let server = config.getGeminiClient().getContentGenerator();
+  let server = config.getContentGenerator();
 
   // Unwrap LoggingContentGenerator if present
   if (server instanceof LoggingContentGenerator) {

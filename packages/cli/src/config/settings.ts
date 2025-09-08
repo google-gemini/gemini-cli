@@ -22,17 +22,17 @@ import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
   type Settings,
   type MemoryImportFormat,
-  SETTINGS_SCHEMA,
   type MergeStrategy,
   type SettingsSchema,
   type SettingDefinition,
+  getSettingsSchema,
 } from './settingsSchema.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge } from '../utils/deepMerge.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
-  let currentSchema: SettingsSchema | undefined = SETTINGS_SCHEMA;
+  let currentSchema: SettingsSchema | undefined = getSettingsSchema();
 
   for (const key of path) {
     if (!currentSchema || !currentSchema[key]) {
@@ -76,7 +76,7 @@ const MIGRATION_MAP: Record<string, string> = {
   excludeTools: 'tools.exclude',
   excludeMCPServers: 'mcp.excluded',
   excludedProjectEnvVars: 'advanced.excludedEnvVars',
-  extensionManagement: 'advanced.extensionManagement',
+  extensionManagement: 'experimental.extensionManagement',
   extensions: 'extensions',
   fileFiltering: 'context.fileFiltering',
   folderTrustFeature: 'security.folderTrust.featureEnabled',
