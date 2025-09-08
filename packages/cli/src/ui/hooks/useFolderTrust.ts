@@ -34,7 +34,7 @@ export const useFolderTrust = (
     onTrustChange(trusted);
   }, [folderTrust, onTrustChange, settings.merged]);
 
-   useEffect(() => {
+  useEffect(() => {
     // When the folder trust dialog is about to open/close, we need to force a refresh
     // of the static content to ensure the Tips are hidden/shown correctly.
     refreshStatic();
