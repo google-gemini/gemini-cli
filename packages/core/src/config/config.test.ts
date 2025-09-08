@@ -25,6 +25,11 @@ import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js'
 
 import { ShellTool } from '../tools/shell.js';
 import { ReadFileTool } from '../tools/read-file.js';
+import { GrepTool } from '../tools/grep.js';
+import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
+import { logRipgrepFallback } from '../telemetry/loggers.js';
+import { RipgrepFallbackEvent } from '../telemetry/types.js';
+import { ToolRegistry } from '../tools/tool-registry.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -56,7 +61,11 @@ vi.mock('../utils/memoryDiscovery.js', () => ({
 // Mock individual tools if their constructors are complex or have side effects
 vi.mock('../tools/ls');
 vi.mock('../tools/read-file');
-vi.mock('../tools/grep');
+vi.mock('../tools/grep.js');
+vi.mock('../tools/ripGrep.js', () => ({
+  canUseRipgrep: vi.fn(),
+  RipGrepTool: class MockRipGrepTool {},
+}));
 vi.mock('../tools/glob');
 vi.mock('../tools/edit');
 vi.mock('../tools/shell');
@@ -85,6 +94,15 @@ vi.mock('../telemetry/index.js', async (importOriginal) => {
   return {
     ...actual,
     initializeTelemetry: vi.fn(),
+  };
+});
+
+vi.mock('../telemetry/loggers.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../telemetry/loggers.js')>();
+  return {
+    ...actual,
+    logRipgrepFallback: vi.fn(),
   };
 });
 
@@ -665,5 +683,94 @@ describe('setApprovalMode with folder trust', () => {
     expect(() => config.setApprovalMode(ApprovalMode.YOLO)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.AUTO_EDIT)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
+  });
+
+  describe('registerCoreTools', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should register RipGrepTool when useRipgrep is true and it is available', async () => {
+      (canUseRipgrep as Mock).mockResolvedValue(true);
+      const config = new Config({ ...baseParams, useRipgrep: true });
+      await config.initialize();
+
+      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const wasRipGrepRegistered = calls.some(
+        (call) => call[0] instanceof vi.mocked(RipGrepTool),
+      );
+      const wasGrepRegistered = calls.some(
+        (call) => call[0] instanceof vi.mocked(GrepTool),
+      );
+
+      expect(wasRipGrepRegistered).toBe(true);
+      expect(wasGrepRegistered).toBe(false);
+      expect(logRipgrepFallback).not.toHaveBeenCalled();
+    });
+
+    it('should register GrepTool as a fallback when useRipgrep is true but it is not available', async () => {
+      (canUseRipgrep as Mock).mockResolvedValue(false);
+      const config = new Config({ ...baseParams, useRipgrep: true });
+      await config.initialize();
+
+      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const wasRipGrepRegistered = calls.some(
+        (call) => call[0] instanceof vi.mocked(RipGrepTool),
+      );
+      const wasGrepRegistered = calls.some(
+        (call) => call[0] instanceof vi.mocked(GrepTool),
+      );
+
+      expect(wasRipGrepRegistered).toBe(false);
+      expect(wasGrepRegistered).toBe(true);
+      expect(logRipgrepFallback).toHaveBeenCalledWith(
+        config,
+        expect.any(RipgrepFallbackEvent),
+      );
+      const event = (logRipgrepFallback as Mock).mock.calls[0][1];
+      expect(event.error).toBeUndefined();
+    });
+
+    it('should register GrepTool as a fallback when canUseRipgrep throws an error', async () => {
+      const error = new Error('ripGrep check failed');
+      (canUseRipgrep as Mock).mockRejectedValue(error);
+      const config = new Config({ ...baseParams, useRipgrep: true });
+      await config.initialize();
+
+      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const wasRipGrepRegistered = calls.some(
+        (call) => call[0] instanceof vi.mocked(RipGrepTool),
+      );
+      const wasGrepRegistered = calls.some(
+        (call) => call[0] instanceof vi.mocked(GrepTool),
+      );
+
+      expect(wasRipGrepRegistered).toBe(false);
+      expect(wasGrepRegistered).toBe(true);
+      expect(logRipgrepFallback).toHaveBeenCalledWith(
+        config,
+        expect.any(RipgrepFallbackEvent),
+      );
+      const event = (logRipgrepFallback as Mock).mock.calls[0][1];
+      expect(event.error).toBe(String(error));
+    });
+
+    it('should register GrepTool when useRipgrep is false', async () => {
+      const config = new Config({ ...baseParams, useRipgrep: false });
+      await config.initialize();
+
+      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const wasRipGrepRegistered = calls.some(
+        (call) => call[0] instanceof vi.mocked(RipGrepTool),
+      );
+      const wasGrepRegistered = calls.some(
+        (call) => call[0] instanceof vi.mocked(GrepTool),
+      );
+
+      expect(wasRipGrepRegistered).toBe(false);
+      expect(wasGrepRegistered).toBe(true);
+      expect(canUseRipgrep).not.toHaveBeenCalled();
+      expect(logRipgrepFallback).not.toHaveBeenCalled();
+    });
   });
 });

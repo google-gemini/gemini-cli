@@ -392,6 +392,24 @@ describe('ClearcutLogger', () => {
     });
   });
 
+  describe('logRipgrepFallbackEvent', () => {
+    it('logs an event with the proper name', () => {
+      const { logger } = setup();
+      // Spy on flushToClearcut to prevent it from clearing the queue
+      const flushSpy = vi
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .spyOn(logger!, 'flushToClearcut' as any)
+        .mockResolvedValue({ nextRequestWaitMs: 0 });
+
+      logger?.logRipgrepFallbackEvent();
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.RIPGREP_FALLBACK);
+      expect(flushSpy).toHaveBeenCalledOnce();
+    });
+  });
+
   describe('enqueueLogEvent', () => {
     it('should add events to the queue', () => {
       const { logger } = setup();

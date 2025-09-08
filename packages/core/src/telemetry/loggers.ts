@@ -27,6 +27,7 @@ import {
   EVENT_CONTENT_RETRY,
   EVENT_CONTENT_RETRY_FAILURE,
   EVENT_FILE_OPERATION,
+  EVENT_RIPGREP_FALLBACK,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -48,6 +49,7 @@ import type {
   InvalidChunkEvent,
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  RipgrepFallbackEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -263,6 +265,28 @@ export function logFlashFallback(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Switching to flash as Fallback.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logRipgrepFallback(
+  config: Config,
+  event: RipgrepFallbackEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logRipgrepFallbackEvent();
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_RIPGREP_FALLBACK,
+    'event.timestamp': new Date().toISOString(),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Switching to grep as fallback.`,
     attributes,
   };
   logger.emit(logRecord);
