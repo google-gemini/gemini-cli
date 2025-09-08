@@ -38,11 +38,13 @@ interface SettingsDialogProps {
   settings: LoadedSettings;
   onSelect: (settingName: string | undefined, scope: SettingScope) => void;
   onRestartRequest?: () => void;
-  availableTerminalHeight?: number;
-  availableTerminalWidth?: number;
+  // These are required so layout is stable and deterministic.
+  // The dialog relies on them to compute a fixed list height up front
+  // to avoid flicker when arrows and sections appear/disappear.
+  availableTerminalHeight: number;
+  availableTerminalWidth: number;
 }
 
-const maxItemsToShow = 8;
 
 export function SettingsDialog({
   settings,
@@ -349,18 +351,28 @@ export function SettingsDialog({
   const DIALOG_PADDING = 2;
   const SETTINGS_TITLE_HEIGHT = 2;
   const MINIMUM_SETTINGS_HEIGHT = 2;
+  // Reserve exactly two lines for scroll arrows (top and bottom) even when
+  // one of them is hidden, to prevent the list from reflowing during scroll.
   const SCROLL_ARROWS_HEIGHT = 2;
+  // One blank line between the settings list and the scope selector.
+  // Keep this in sync with the single spacer rendered before the scope block.
   const SPACING_HEIGHT = 1;
+  // Scope section minimum height is 4: one title line ("Apply To") plus the
+  // three scope radio options (User, Workspace, System). Spacing above the
+  // scope block is accounted for separately via SPACING_HEIGHT.
   const SCOPE_SELECTION_HEIGHT = 4;
   const BOTTOM_HELP_TEXT_HEIGHT = 1;
   const RESTART_PROMPT_HEIGHT = showRestartPrompt ? 1 : 0;
 
-  let currentAvailableTerminalHeight = availableTerminalHeight ?? Number.MAX_SAFE_INTEGER;
+  let currentAvailableTerminalHeight = availableTerminalHeight;
   currentAvailableTerminalHeight -= 2; // Top and bottom borders
   currentAvailableTerminalHeight -= BOTTOM_HELP_TEXT_HEIGHT; // Reserve space for help text
 
-  // More aggressive threshold - hide scope selection in compact terminals
-  const COMPACT_HEIGHT_THRESHOLD = 24;
+  // Compact mode thresholds with hysteresis to prevent flapping while resizing.
+  // Hide scope selection below this height; only show it again once we have
+  // more space than SHOW to avoid rapid toggling at the boundary.
+  const COMPACT_HIDE_THRESHOLD = 24;
+  const COMPACT_SHOW_THRESHOLD = 28;
 
   let totalFixedHeight =
     DIALOG_PADDING +
@@ -375,8 +387,12 @@ export function SettingsDialog({
   let showHelpText = true;
   let includePadding = true;
 
-  // Hide scope selection immediately if terminal is too small
-  if (currentAvailableTerminalHeight < COMPACT_HEIGHT_THRESHOLD) {
+  // Apply compact visibility with hysteresis
+  if (currentAvailableTerminalHeight < COMPACT_HIDE_THRESHOLD) {
+    showScopeSelection = false;
+    totalFixedHeight -= (SCOPE_SELECTION_HEIGHT + SPACING_HEIGHT);
+  } else if (currentAvailableTerminalHeight < COMPACT_SHOW_THRESHOLD) {
+    // Between thresholds, keep scope hidden to avoid flicker.
     showScopeSelection = false;
     totalFixedHeight -= (SCOPE_SELECTION_HEIGHT + SPACING_HEIGHT);
   }
@@ -416,9 +432,7 @@ export function SettingsDialog({
     );
   }
 
-  const effectiveMaxItemsToShow = availableTerminalHeight
-    ? Math.min(maxVisibleItems, items.length)
-    : maxItemsToShow;
+  const effectiveMaxItemsToShow = Math.min(maxVisibleItems, items.length);
 
   const visibleItems = items.slice(scrollOffset, scrollOffset + effectiveMaxItemsToShow);
 
@@ -432,6 +446,21 @@ export function SettingsDialog({
       setFocusSection('settings');
     }
   }, [showScopeSelection, focusSection]);
+
+  // Clamp scroll position and keep active item visible on resize.
+  React.useEffect(() => {
+    const maxScroll = Math.max(0, items.length - effectiveMaxItemsToShow);
+    setScrollOffset((prev) => Math.min(prev, maxScroll));
+    // Ensure active index remains within visible window after resize.
+    setActiveSettingIndex((current) => {
+      if (current < scrollOffset) return scrollOffset;
+      if (current >= scrollOffset + effectiveMaxItemsToShow) {
+        return Math.max(0, scrollOffset + effectiveMaxItemsToShow - 1);
+      }
+      return current;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableTerminalHeight, effectiveMaxItemsToShow, items.length]);
 
   const currentFocusedSection = !showScopeSelection ? 'settings' : focusSection;
 
@@ -853,10 +882,11 @@ export function SettingsDialog({
         })}
         {showScrollDown && <Text color={Colors.Gray}>▼</Text>}
 
-        {!compactSpacing && <Box height={1} />}
-
         {showScopeSelection && (
-          <Box marginTop={1} flexDirection="column">
+          <>
+            {/* Single spacer between list and scope selection. Keep in sync with SPACING_HEIGHT. */}
+            <Box height={1} />
+            <Box flexDirection="column">
             <Text bold={currentFocusedSection === 'scope'} wrap="truncate">
               {currentFocusedSection === 'scope' ? '> ' : '  '}Apply To
             </Text>
@@ -868,7 +898,8 @@ export function SettingsDialog({
               isFocused={currentFocusedSection === 'scope'}
               showNumbers={currentFocusedSection === 'scope'}
             />
-          </Box>
+            </Box>
+          </>
         )}
 
         {showHelpText && (

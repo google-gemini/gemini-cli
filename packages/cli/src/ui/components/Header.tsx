@@ -28,11 +28,14 @@ export const Header: React.FC<HeaderProps> = ({
   const widthOfLongLogo = getAsciiArtWidth(longAsciiLogo);
   const widthOfShortLogo = getAsciiArtWidth(shortAsciiLogo);
 
+  // Small hysteresis to reduce toggling between logo sizes around width thresholds.
+  const HYSTERESIS = 2;
+
   if (customAsciiArt) {
     displayTitle = customAsciiArt;
-  } else if (terminalWidth >= widthOfLongLogo) {
+  } else if (terminalWidth >= widthOfLongLogo + HYSTERESIS) {
     displayTitle = longAsciiLogo;
-  } else if (terminalWidth >= widthOfShortLogo) {
+  } else if (terminalWidth >= widthOfShortLogo + HYSTERESIS) {
     displayTitle = shortAsciiLogo;
   } else {
     displayTitle = tinyAsciiLogo;

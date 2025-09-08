@@ -141,6 +141,12 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Terminal and layout hooks
   const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
+  // Smooth height changes slightly to avoid layout thrash while resizing.
+  const [smoothedTerminalHeight, setSmoothedTerminalHeight] = useState(terminalHeight);
+  useEffect(() => {
+    const id = setTimeout(() => setSmoothedTerminalHeight(terminalHeight), 100);
+    return () => clearTimeout(id);
+  }, [terminalHeight]);
   const { stdin, setRawMode } = useStdin();
   const { stdout } = useStdout();
 
@@ -202,7 +208,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
   const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 0.8));
   const mainAreaWidth = Math.floor(terminalWidth * 0.9);
-  const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
+  const staticAreaMaxItemHeight = Math.max(smoothedTerminalHeight * 4, 100);
 
   const isValidPath = useCallback((filePath: string): boolean => {
     try {
@@ -718,10 +724,12 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const availableTerminalHeight = useMemo(() => {
     if (mainControlsRef.current) {
       const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      return terminalHeight - fullFooterMeasurement.height - staticExtraHeight;
+      return (
+        smoothedTerminalHeight - fullFooterMeasurement.height - staticExtraHeight
+      );
     }
-    return terminalHeight - staticExtraHeight;
-  }, [terminalHeight]);
+    return smoothedTerminalHeight - staticExtraHeight;
+  }, [smoothedTerminalHeight]);
 
   const isFocused = useFocus();
   useBracketedPaste();
