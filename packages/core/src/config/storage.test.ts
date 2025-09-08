@@ -53,8 +53,8 @@ describe('Storage – additional helpers', () => {
     expect(Storage.getMcpOAuthTokensPath()).toBe(expected);
   });
 
-  it('getGlobalBinDir returns ~/.gemini/bin', () => {
-    const expected = path.join(os.homedir(), '.gemini', 'bin');
+  it('getGlobalBinDir returns ~/.gemini/tmp/bin', () => {
+    const expected = path.join(os.homedir(), '.gemini', 'tmp', 'bin');
     expect(Storage.getGlobalBinDir()).toBe(expected);
   });
 });

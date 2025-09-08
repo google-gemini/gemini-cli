@@ -59,7 +59,7 @@ export class Storage {
   }
 
   static getGlobalBinDir(): string {
-    return path.join(Storage.getGlobalGeminiDir(), BIN_DIR_NAME);
+    return path.join(Storage.getGlobalTempDir(), BIN_DIR_NAME);
   }
 
   getGeminiDir(): string {

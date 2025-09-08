@@ -29,6 +29,7 @@ import { GrepTool } from '../tools/grep.js';
 import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
 import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
+import { ToolRegistry } from '../tools/tool-registry.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -685,22 +686,22 @@ describe('setApprovalMode with folder trust', () => {
   });
 
   describe('registerCoreTools', () => {
+    beforeEach(() => {
+      (canUseRipgrep as Mock).mockClear();
+      (ToolRegistry.prototype.registerTool as Mock).mockClear();
+      (logRipgrepFallback as Mock).mockClear();
+    });
+
     it('should register RipGrepTool when useRipgrep is true and it is available', async () => {
-      vi.resetAllMocks();
       (canUseRipgrep as Mock).mockResolvedValue(true);
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
-      const registerToolMock = (
-        (await vi.importMock('../tools/tool-registry')) as {
-          ToolRegistry: { prototype: { registerTool: Mock } };
-        }
-      ).ToolRegistry.prototype.registerTool;
-
-      const wasRipGrepRegistered = registerToolMock.mock.calls.some(
+      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const wasRipGrepRegistered = calls.some(
         (call) => call[0] instanceof vi.mocked(RipGrepTool),
       );
-      const wasGrepRegistered = registerToolMock.mock.calls.some(
+      const wasGrepRegistered = calls.some(
         (call) => call[0] instanceof vi.mocked(GrepTool),
       );
 
@@ -710,21 +711,15 @@ describe('setApprovalMode with folder trust', () => {
     });
 
     it('should register GrepTool as a fallback when useRipgrep is true but it is not available', async () => {
-      vi.resetAllMocks();
       (canUseRipgrep as Mock).mockResolvedValue(false);
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
-      const registerToolMock = (
-        (await vi.importMock('../tools/tool-registry')) as {
-          ToolRegistry: { prototype: { registerTool: Mock } };
-        }
-      ).ToolRegistry.prototype.registerTool;
-
-      const wasRipGrepRegistered = registerToolMock.mock.calls.some(
+      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const wasRipGrepRegistered = calls.some(
         (call) => call[0] instanceof vi.mocked(RipGrepTool),
       );
-      const wasGrepRegistered = registerToolMock.mock.calls.some(
+      const wasGrepRegistered = calls.some(
         (call) => call[0] instanceof vi.mocked(GrepTool),
       );
 
@@ -739,22 +734,16 @@ describe('setApprovalMode with folder trust', () => {
     });
 
     it('should register GrepTool as a fallback when canUseRipgrep throws an error', async () => {
-      vi.resetAllMocks();
       const error = new Error('ripGrep check failed');
       (canUseRipgrep as Mock).mockRejectedValue(error);
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
-      const registerToolMock = (
-        (await vi.importMock('../tools/tool-registry')) as {
-          ToolRegistry: { prototype: { registerTool: Mock } };
-        }
-      ).ToolRegistry.prototype.registerTool;
-
-      const wasRipGrepRegistered = registerToolMock.mock.calls.some(
+      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const wasRipGrepRegistered = calls.some(
         (call) => call[0] instanceof vi.mocked(RipGrepTool),
       );
-      const wasGrepRegistered = registerToolMock.mock.calls.some(
+      const wasGrepRegistered = calls.some(
         (call) => call[0] instanceof vi.mocked(GrepTool),
       );
 
@@ -769,20 +758,14 @@ describe('setApprovalMode with folder trust', () => {
     });
 
     it('should register GrepTool when useRipgrep is false', async () => {
-      vi.resetAllMocks();
       const config = new Config({ ...baseParams, useRipgrep: false });
       await config.initialize();
 
-      const registerToolMock = (
-        (await vi.importMock('../tools/tool-registry')) as {
-          ToolRegistry: { prototype: { registerTool: Mock } };
-        }
-      ).ToolRegistry.prototype.registerTool;
-
-      const wasRipGrepRegistered = registerToolMock.mock.calls.some(
+      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const wasRipGrepRegistered = calls.some(
         (call) => call[0] instanceof vi.mocked(RipGrepTool),
       );
-      const wasGrepRegistered = registerToolMock.mock.calls.some(
+      const wasGrepRegistered = calls.some(
         (call) => call[0] instanceof vi.mocked(GrepTool),
       );
 
