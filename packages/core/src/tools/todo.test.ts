@@ -1,3 +1,4 @@
+
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -19,8 +20,13 @@ import {
   ListTodosTool,
   RemoveTodoTool,
 } from './todo.js';
+import type {
+  ListTodosToolParams,
+  AddTodoToolParams,
+  EditTodoToolParams,
+  RemoveTodoToolParams,
+} from './todo.js';
 import type { Config } from '../config/config.js';
-import { StandardFileSystemService } from '../services/fileSystemService.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 
 // Mock Config
@@ -56,7 +62,7 @@ describe('Todo Tools', () => {
       ];
       fileSystemService.readTextFile.mockResolvedValue(JSON.stringify(todos));
 
-      const invocation = tool.build({});
+      const invocation = tool.build({} as ListTodosToolParams);
       const result = await invocation.execute();
 
       expect(result.llmContent).toContain('Here are your todos:');
@@ -68,7 +74,7 @@ describe('Todo Tools', () => {
       const tool = new ListTodosTool(mockConfig);
       fileSystemService.readTextFile.mockRejectedValue({ code: 'ENOENT' });
 
-      const invocation = tool.build({});
+      const invocation = tool.build({} as ListTodosToolParams);
       const result = await invocation.execute();
 
       expect(result.llmContent).toBe('No todos found.');
@@ -82,7 +88,7 @@ describe('Todo Tools', () => {
       ];
       fileSystemService.readTextFile.mockResolvedValue(JSON.stringify(todos));
 
-      const invocation = tool.build({ filter: { status: 'done' } });
+      const invocation = tool.build({ filter: { status: 'done' } } as ListTodosToolParams);
       const result = await invocation.execute();
 
       expect(result.llmContent).not.toContain('- [ ] #1: Task 1');
@@ -97,7 +103,7 @@ describe('Todo Tools', () => {
       ];
       fileSystemService.readTextFile.mockResolvedValue(JSON.stringify(todos));
 
-      const invocation = tool.build({ filter: { status: 'open' } });
+      const invocation = tool.build({ filter: { status: 'open' } } as ListTodosToolParams);
       const result = await invocation.execute();
 
       expect(result.llmContent).toContain('- [ ] #1: Task 1');
@@ -112,7 +118,7 @@ describe('Todo Tools', () => {
       ];
       fileSystemService.readTextFile.mockResolvedValue(JSON.stringify(todos));
 
-      const invocation = tool.build({ sort: 'priority' });
+      const invocation = tool.build({ sort: 'priority' } as ListTodosToolParams);
       const result = await invocation.execute();
 
       expect(result.llmContent).toContain('- [ ] #2: Task 2');
@@ -125,7 +131,7 @@ describe('Todo Tools', () => {
       const tool = new AddTodoTool(mockConfig);
       fileSystemService.readTextFile.mockRejectedValue({ code: 'ENOENT' });
 
-      const invocation = tool.build({ task: 'New Task' });
+      const invocation = tool.build({ task: 'New Task' } as AddTodoToolParams);
       await invocation.execute();
 
       expect(fileSystemService.writeTextFile).toHaveBeenCalledWith(
@@ -138,7 +144,7 @@ describe('Todo Tools', () => {
       const tool = new AddTodoTool(mockConfig);
       fileSystemService.readTextFile.mockRejectedValue({ code: 'ENOENT' });
 
-      const invocation = tool.build({ task: 'Sub Task', parent: 1 });
+      const invocation = tool.build({ task: 'Sub Task', parent: 1 } as AddTodoToolParams);
       const result = await invocation.execute();
 
       expect(result.error).toBeDefined();
@@ -152,7 +158,7 @@ describe('Todo Tools', () => {
       const todos = [{ id: 1, task: 'Task 1', done: false }];
       fileSystemService.readTextFile.mockResolvedValue(JSON.stringify(todos));
 
-      const invocation = tool.build({ id: 1, task: 'Updated Task' });
+      const invocation = tool.build({ id: 1, task: 'Updated Task' } as EditTodoToolParams);
       await invocation.execute();
 
       expect(fileSystemService.writeTextFile).toHaveBeenCalledWith(
@@ -165,7 +171,7 @@ describe('Todo Tools', () => {
       const tool = new EditTodoTool(mockConfig);
       fileSystemService.readTextFile.mockRejectedValue({ code: 'ENOENT' });
 
-      const invocation = tool.build({ id: 1, task: 'Updated Task' });
+      const invocation = tool.build({ id: 1, task: 'Updated Task' } as EditTodoToolParams);
       const result = await invocation.execute();
 
       expect(result.error).toBeDefined();
@@ -179,7 +185,7 @@ describe('Todo Tools', () => {
       const todos = [{ id: 1, task: 'Task 1', done: false }];
       fileSystemService.readTextFile.mockResolvedValue(JSON.stringify(todos));
 
-      const invocation = tool.build({ id: 1 });
+      const invocation = tool.build({ id: 1 } as RemoveTodoToolParams);
       await invocation.execute();
 
       expect(fileSystemService.writeTextFile).toHaveBeenCalledWith(
@@ -192,7 +198,7 @@ describe('Todo Tools', () => {
       const tool = new RemoveTodoTool(mockConfig);
       fileSystemService.readTextFile.mockRejectedValue({ code: 'ENOENT' });
 
-      const invocation = tool.build({ id: 1 });
+      const invocation = tool.build({ id: 1 } as RemoveTodoToolParams);
       const result = await invocation.execute();
 
       expect(result.error).toBeDefined();
