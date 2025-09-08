@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.2.2",
+  "version": "0.3.4",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.2.2"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.3.4"
   },
   "scripts": {
     "start": "node scripts/start.js",
@@ -36,9 +36,9 @@
     "test:scripts": "vitest run --config ./scripts/tests/vitest.config.ts",
     "test:e2e": "cross-env VERBOSE=true KEEP_OUTPUT=true npm run test:integration:sandbox:none",
     "test:integration:all": "npm run test:integration:sandbox:none && npm run test:integration:sandbox:docker && npm run test:integration:sandbox:podman",
-    "test:integration:sandbox:none": "GEMINI_SANDBOX=false vitest run --root ./integration-tests",
-    "test:integration:sandbox:docker": "GEMINI_SANDBOX=docker npm run build:sandbox && GEMINI_SANDBOX=docker vitest run --root ./integration-tests",
-    "test:integration:sandbox:podman": "GEMINI_SANDBOX=podman vitest run --root ./integration-tests",
+    "test:integration:sandbox:none": "cross-env GEMINI_SANDBOX=false vitest run --root ./integration-tests",
+    "test:integration:sandbox:docker": "cross-env GEMINI_SANDBOX=docker npm run build:sandbox && cross-env GEMINI_SANDBOX=docker vitest run --root ./integration-tests",
+    "test:integration:sandbox:podman": "cross-env GEMINI_SANDBOX=podman vitest run --root ./integration-tests",
     "lint": "eslint . --ext .ts,.tsx && eslint integration-tests",
     "lint:fix": "eslint . --fix && eslint integration-tests --fix",
     "lint:ci": "eslint . --ext .ts,.tsx --max-warnings 0 && eslint integration-tests --max-warnings 0",
@@ -68,7 +68,6 @@
     "@types/shell-quote": "^1.7.5",
     "@vitest/coverage-v8": "^3.1.1",
     "@vitest/eslint-plugin": "^1.3.4",
-    "concurrently": "^9.2.0",
     "cross-env": "^7.0.3",
     "esbuild": "^0.25.0",
     "eslint": "^9.24.0",
@@ -80,7 +79,6 @@
     "glob": "^10.4.5",
     "globals": "^16.0.0",
     "json": "^11.0.0",
-    "lodash": "^4.17.21",
     "memfs": "^4.17.2",
     "mnemonist": "^0.40.3",
     "mock-fs": "^5.5.0",
@@ -94,8 +92,7 @@
   },
   "dependencies": {
     "@lvce-editor/ripgrep": "^1.6.0",
-    "simple-git": "^3.28.0",
-    "strip-ansi": "^7.1.0"
+    "simple-git": "^3.28.0"
   },
   "optionalDependencies": {
     "@lydell/node-pty": "1.1.0",

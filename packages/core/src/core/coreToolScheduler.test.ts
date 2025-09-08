@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ToolCall, WaitingToolCall } from './coreToolScheduler.js';
 import {
   CoreToolScheduler,
   convertToFunctionResponse,
+  truncateAndSaveToFile,
 } from './coreToolScheduler.js';
 import type {
   ToolCallConfirmationDetails,
@@ -20,6 +21,8 @@ import type {
   ToolRegistry,
 } from '../index.js';
 import {
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   BaseDeclarativeTool,
   BaseToolInvocation,
   ToolConfirmationOutcome,
@@ -28,6 +31,12 @@ import {
 } from '../index.js';
 import type { Part, PartListUnion } from '@google/genai';
 import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+
+vi.mock('fs/promises', () => ({
+  writeFile: vi.fn(),
+}));
 
 class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
   static readonly Name = 'testApprovalTool';
@@ -167,6 +176,12 @@ describe('CoreToolScheduler', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
@@ -268,6 +283,12 @@ describe('CoreToolScheduler with payload', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
@@ -306,7 +327,11 @@ describe('CoreToolScheduler with payload', () => {
       );
     }
 
-    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    // Wait for the tool execution to complete
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
     expect(completedCalls[0].status).toBe('success');
@@ -576,6 +601,9 @@ describe('CoreToolScheduler edit cancellation', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
@@ -669,7 +697,13 @@ describe('CoreToolScheduler YOLO mode', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
       getToolRegistry: () => mockToolRegistry,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
@@ -694,6 +728,11 @@ describe('CoreToolScheduler YOLO mode', () => {
     // Act
     await scheduler.schedule([request], abortController.signal);
 
+    // Wait for the tool execution to complete
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
     // Assert
     // 1. The tool's execute method was called directly.
     expect(mockTool.executeFn).toHaveBeenCalledWith({ param: 'value' });
@@ -711,7 +750,6 @@ describe('CoreToolScheduler YOLO mode', () => {
     ]);
 
     // 3. The final callback indicates the tool call was successful.
-    expect(onAllToolCallsComplete).toHaveBeenCalled();
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
     expect(completedCalls).toHaveLength(1);
@@ -761,6 +799,12 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
@@ -880,6 +924,12 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
@@ -903,6 +953,11 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Act
     await scheduler.schedule([request], abortController.signal);
+
+    // Wait for the tool execution to complete
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
 
     // Assert
     // 1. The tool's execute method was called directly.
@@ -961,6 +1016,12 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
@@ -1023,6 +1084,12 @@ describe('CoreToolScheduler request queueing', () => {
       setApprovalMode: (mode: ApprovalMode) => {
         approvalMode = mode;
       },
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
@@ -1141,5 +1208,226 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Verify approval mode was changed
     expect(approvalMode).toBe(ApprovalMode.AUTO_EDIT);
+  });
+});
+
+describe('truncateAndSaveToFile', () => {
+  const mockWriteFile = vi.mocked(fs.writeFile);
+  const THRESHOLD = 40_000;
+  const TRUNCATE_LINES = 1000;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return content unchanged if below threshold', async () => {
+    const content = 'Short content';
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    expect(result).toEqual({ content });
+    expect(mockWriteFile).not.toHaveBeenCalled();
+  });
+
+  it('should truncate content by lines when content has many lines', async () => {
+    // Create content that exceeds 100,000 character threshold with many lines
+    const lines = Array(2000).fill('x'.repeat(100)); // 100 chars per line * 2000 lines = 200,000 chars
+    const content = lines.join('\n');
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    expect(result.outputFile).toBe(
+      path.join(projectTempDir, `${callId}.output`),
+    );
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      path.join(projectTempDir, `${callId}.output`),
+      content,
+    );
+
+    // Should contain the first and last lines with 1/5 head and 4/5 tail
+    const head = Math.floor(TRUNCATE_LINES / 5);
+    const beginning = lines.slice(0, head);
+    const end = lines.slice(-(TRUNCATE_LINES - head));
+    const expectedTruncated =
+      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
+
+    expect(result.content).toContain(
+      'Tool output was too large and has been truncated',
+    );
+    expect(result.content).toContain('Truncated part of the output:');
+    expect(result.content).toContain(expectedTruncated);
+  });
+
+  it('should wrap and truncate content when content has few but long lines', async () => {
+    const content = 'a'.repeat(200_000); // A single very long line
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+    const wrapWidth = 120;
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    // Manually wrap the content to generate the expected file content
+    const wrappedLines: string[] = [];
+    for (let i = 0; i < content.length; i += wrapWidth) {
+      wrappedLines.push(content.substring(i, i + wrapWidth));
+    }
+    const expectedFileContent = wrappedLines.join('\n');
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    expect(result.outputFile).toBe(
+      path.join(projectTempDir, `${callId}.output`),
+    );
+    // Check that the file was written with the wrapped content
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      path.join(projectTempDir, `${callId}.output`),
+      expectedFileContent,
+    );
+
+    // Should contain the first and last lines with 1/5 head and 4/5 tail of the wrapped content
+    const head = Math.floor(TRUNCATE_LINES / 5);
+    const beginning = wrappedLines.slice(0, head);
+    const end = wrappedLines.slice(-(TRUNCATE_LINES - head));
+    const expectedTruncated =
+      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
+    expect(result.content).toContain(
+      'Tool output was too large and has been truncated',
+    );
+    expect(result.content).toContain('Truncated part of the output:');
+    expect(result.content).toContain(expectedTruncated);
+  });
+
+  it('should handle file write errors gracefully', async () => {
+    const content = 'a'.repeat(2_000_000);
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+
+    mockWriteFile.mockRejectedValue(new Error('File write failed'));
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    expect(result.outputFile).toBeUndefined();
+    expect(result.content).toContain(
+      '[Note: Could not save full output to file]',
+    );
+    expect(mockWriteFile).toHaveBeenCalled();
+  });
+
+  it('should save to correct file path with call ID', async () => {
+    const content = 'a'.repeat(200_000);
+    const callId = 'unique-call-123';
+    const projectTempDir = '/custom/temp/dir';
+    const wrapWidth = 120;
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    // Manually wrap the content to generate the expected file content
+    const wrappedLines: string[] = [];
+    for (let i = 0; i < content.length; i += wrapWidth) {
+      wrappedLines.push(content.substring(i, i + wrapWidth));
+    }
+    const expectedFileContent = wrappedLines.join('\n');
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    const expectedPath = path.join(projectTempDir, `${callId}.output`);
+    expect(result.outputFile).toBe(expectedPath);
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expectedPath,
+      expectedFileContent,
+    );
+  });
+
+  it('should include helpful instructions in truncated message', async () => {
+    const content = 'a'.repeat(2_000_000);
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    expect(result.content).toContain(
+      'read_file tool with the absolute file path above',
+    );
+    expect(result.content).toContain('read_file tool with offset=0, limit=100');
+    expect(result.content).toContain(
+      'read_file tool with offset=N to skip N lines',
+    );
+    expect(result.content).toContain(
+      'read_file tool with limit=M to read only M lines',
+    );
+  });
+
+  it('should sanitize callId to prevent path traversal', async () => {
+    const content = 'a'.repeat(200_000);
+    const callId = '../../../../../etc/passwd';
+    const projectTempDir = '/tmp/safe_dir';
+    const wrapWidth = 120;
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    // Manually wrap the content to generate the expected file content
+    const wrappedLines: string[] = [];
+    for (let i = 0; i < content.length; i += wrapWidth) {
+      wrappedLines.push(content.substring(i, i + wrapWidth));
+    }
+    const expectedFileContent = wrappedLines.join('\n');
+
+    await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    const expectedPath = path.join(projectTempDir, 'passwd.output');
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expectedPath,
+      expectedFileContent,
+    );
   });
 });

@@ -55,7 +55,6 @@ export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
 const MIGRATE_V2_OVERWRITE = false;
 
-// As defined in spec.md
 const MIGRATION_MAP: Record<string, string> = {
   accessibility: 'ui.accessibility',
   allowedTools: 'tools.allowed',
@@ -77,7 +76,7 @@ const MIGRATION_MAP: Record<string, string> = {
   excludeTools: 'tools.exclude',
   excludeMCPServers: 'mcp.excluded',
   excludedProjectEnvVars: 'advanced.excludedEnvVars',
-  extensionManagement: 'advanced.extensionManagement',
+  extensionManagement: 'experimental.extensionManagement',
   extensions: 'extensions',
   fileFiltering: 'context.fileFiltering',
   folderTrustFeature: 'security.folderTrust.featureEnabled',
@@ -330,18 +329,6 @@ function mergeSettings(
 ): Settings {
   const safeWorkspace = isTrusted ? workspace : ({} as Settings);
 
-  // folderTrust is not supported at workspace level.
-  const { security, ...restOfWorkspace } = safeWorkspace;
-  const safeWorkspaceWithoutFolderTrust = security
-    ? {
-        ...restOfWorkspace,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        security: (({ folderTrust, ...rest }) => rest)(security),
-      }
-    : {
-        ...restOfWorkspace,
-      };
-
   // Settings are merged with the following precedence (last one wins for
   // single values):
   // 1. System Defaults
@@ -353,7 +340,7 @@ function mergeSettings(
     {}, // Start with an empty object
     systemDefaults,
     user,
-    safeWorkspaceWithoutFolderTrust,
+    safeWorkspace,
     system,
   ) as Settings;
 }
