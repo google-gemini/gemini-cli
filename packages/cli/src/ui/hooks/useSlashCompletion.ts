@@ -225,7 +225,7 @@ function useCommandSuggestions(
         if (partial === '') {
           // If no partial query, show all available commands
           potentialSuggestions = commandsToSearch.filter(
-            (cmd) => cmd.description,
+            (cmd) => cmd.description && !cmd.hidden,
           );
         } else {
           // Use fuzzy search for non-empty partial queries with fallback
@@ -267,6 +267,7 @@ function useCommandSuggestions(
             label: cmd.name,
             value: cmd.name,
             description: cmd.description,
+            commandKind: cmd.kind,
           }));
 
           setSuggestions(finalSuggestions);
@@ -399,7 +400,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       const commandMap = new Map<string, SlashCommand>();
 
       commands.forEach((cmd) => {
-        if (cmd.description) {
+        if (cmd.description && !cmd.hidden) {
           commandItems.push(cmd.name);
           commandMap.set(cmd.name, cmd);
 

@@ -18,7 +18,6 @@ import type {
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
-import type { ContentGenerator } from './contentGenerator.js';
 import { AuthType } from './contentGenerator.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
@@ -172,7 +171,6 @@ export class GeminiChat {
 
   constructor(
     private readonly config: Config,
-    private readonly contentGenerator: ContentGenerator,
     private readonly generationConfig: GenerateContentConfig = {},
     private history: Content[] = [],
   ) {
@@ -287,7 +285,7 @@ export class GeminiChat {
           );
         }
 
-        return this.contentGenerator.generateContent(
+        return this.config.getContentGenerator().generateContent(
           {
             model: modelToUse,
             contents: requestContents,
@@ -498,7 +496,7 @@ export class GeminiChat {
         );
       }
 
-      return this.contentGenerator.generateContentStream(
+      return this.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
           contents: requestContents,
@@ -570,8 +568,26 @@ export class GeminiChat {
   addHistory(content: Content): void {
     this.history.push(content);
   }
+
   setHistory(history: Content[]): void {
     this.history = history;
+  }
+
+  stripThoughtsFromHistory(): void {
+    this.history = this.history.map((content) => {
+      const newContent = { ...content };
+      if (newContent.parts) {
+        newContent.parts = newContent.parts.map((part) => {
+          if (part && typeof part === 'object' && 'thoughtSignature' in part) {
+            const newPart = { ...part };
+            delete (newPart as { thoughtSignature?: string }).thoughtSignature;
+            return newPart;
+          }
+          return part;
+        });
+      }
+      return newContent;
+    });
   }
 
   setTools(tools: Tool[]): void {
@@ -612,6 +628,7 @@ export class GeminiChat {
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
     let hasReceivedAnyChunk = false;
+    let hasReceivedValidChunk = false;
     let hasToolCall = false;
     let lastChunk: GenerateContentResponse | null = null;
     let lastChunkIsInvalid = false;
@@ -621,6 +638,7 @@ export class GeminiChat {
       lastChunk = chunk;
 
       if (isValidResponse(chunk)) {
+        hasReceivedValidChunk = true;
         lastChunkIsInvalid = false;
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
@@ -658,15 +676,17 @@ export class GeminiChat {
       (candidate) => candidate.finishReason,
     );
 
-    // --- FIX: The entire validation block was restructured for clarity and correctness ---
     // Stream validation logic: A stream is considered successful if:
     // 1. There's a tool call (tool calls can end without explicit finish reasons), OR
-    // 2. Both conditions are met: last chunk is valid AND any candidate has a finish reason
+    // 2. There's a finish reason AND the last chunk is valid (or we haven't received any valid chunks)
     //
-    // We throw an error only when there's no tool call AND either:
-    // - The last chunk is invalid, OR
-    // - No candidate in the last chunk has a finish reason
-    if (!hasToolCall && (lastChunkIsInvalid || !hasFinishReason)) {
+    // We throw an error only when there's no tool call AND:
+    // - No finish reason, OR
+    // - Last chunk is invalid after receiving valid content
+    if (
+      !hasToolCall &&
+      (!hasFinishReason || (lastChunkIsInvalid && !hasReceivedValidChunk))
+    ) {
       throw new EmptyStreamError(
         'Model stream ended with an invalid chunk or missing finish reason.',
       );
