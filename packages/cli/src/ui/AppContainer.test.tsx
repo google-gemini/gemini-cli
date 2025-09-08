@@ -416,10 +416,9 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Version Handling', () => {
-    it('handles different version formats', () => {
-      const versions = ['1.0.0', '2.1.3-beta', '3.0.0-nightly'];
-
-      versions.forEach((version) => {
+    it.each(['1.0.0', '2.1.3-beta', '3.0.0-nightly'])(
+      'handles version format: %s',
+      (version) => {
         expect(() => {
           render(
             <AppContainer
@@ -430,8 +429,8 @@ describe('AppContainer State Management', () => {
             />,
           );
         }).not.toThrow();
-      });
-    });
+      },
+    );
   });
 
   describe('Error Handling', () => {

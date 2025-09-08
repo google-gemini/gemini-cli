@@ -38,6 +38,7 @@ export interface UIState {
   isThemeDialogOpen: boolean;
   themeError: string | null;
   isAuthenticating: boolean;
+  isConfigInitialized: boolean;
   authError: string | null;
   isAuthDialogOpen: boolean;
   editorError: string | null;

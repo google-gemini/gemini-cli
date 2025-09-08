@@ -23,6 +23,7 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
+import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 
 const MAX_DISPLAYED_QUEUED_MESSAGES = 3;
 
@@ -71,6 +72,8 @@ export const Composer = () => {
         }
         elapsedTime={uiState.elapsedTime}
       />
+
+      {!uiState.isConfigInitialized && <ConfigInitDisplay />}
 
       {uiState.messageQueue.length > 0 && (
         <Box flexDirection="column" marginTop={1}>

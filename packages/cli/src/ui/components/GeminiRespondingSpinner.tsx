@@ -30,10 +30,11 @@ export const GeminiRespondingSpinner: React.FC<
   const streamingState = useStreamingContext();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
   if (streamingState === StreamingState.Responding) {
-    return isScreenReaderEnabled ? (
-      <Text>{SCREEN_READER_RESPONDING}</Text>
-    ) : (
-      <Spinner type={spinnerType} />
+    return (
+      <GeminiSpinner
+        spinnerType={spinnerType}
+        altText={SCREEN_READER_RESPONDING}
+      />
     );
   } else if (nonRespondingDisplay) {
     return isScreenReaderEnabled ? (
@@ -43,4 +44,21 @@ export const GeminiRespondingSpinner: React.FC<
     );
   }
   return null;
+};
+
+interface GeminiSpinnerProps {
+  spinnerType?: SpinnerName;
+  altText?: string;
+}
+
+export const GeminiSpinner: React.FC<GeminiSpinnerProps> = ({
+  spinnerType = 'dots',
+  altText,
+}) => {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  return isScreenReaderEnabled ? (
+    <Text>{altText}</Text>
+  ) : (
+    <Spinner type={spinnerType} />
+  );
 };
