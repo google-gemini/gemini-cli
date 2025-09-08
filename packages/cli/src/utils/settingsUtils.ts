@@ -9,7 +9,6 @@ import type {
   SettingScope,
   LoadedSettings,
 } from '../config/settings.js';
-import _ from 'lodash';
 import type {
   SettingDefinition,
   SettingsSchema,
