@@ -236,43 +236,43 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         })
         .deprecateOption(
           'telemetry',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "telemetry.enabled" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'telemetry-target',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "telemetry.target" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'telemetry-otlp-endpoint',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "telemetry.otlpEndpoint" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'telemetry-otlp-protocol',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "telemetry.otlpProtocol" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'telemetry-log-prompts',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "telemetry.logPrompts" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'telemetry-outfile',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "telemetry.outfile" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'show-memory-usage',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "ui.showMemoryUsage" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'sandbox-image',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "tools.sandbox" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'proxy',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "proxy" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'checkpointing',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "general.checkpointing.enabled" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'all-files',
@@ -305,7 +305,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     // Register MCP subcommands
     .command(mcpCommand);
 
-  if (settings?.experimental?.extensionManagement ?? false) {
+  if (settings?.experimental?.extensionManagement ?? true) {
     yargsInstance.command(extensionsCommand);
   }
 
@@ -622,6 +622,8 @@ export async function loadCliConfig(
     shouldUseNodePtyShell: settings.tools?.usePty,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
+    truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
+    truncateToolOutputLines: settings.tools?.truncateToolOutputLines,
     eventEmitter: appEvents,
     useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
   });
