@@ -25,6 +25,20 @@ export interface FileSystemService {
    * @param content - The content to write
    */
   writeTextFile(filePath: string, content: string): Promise<void>;
+
+  /**
+   * Delete a file
+   *
+   * @param filePath - The path to the file to delete
+   */
+  deleteFile(filePath: string): Promise<void>;
+
+  /**
+   * Atomically create a file if it does not exist.
+   *
+   * @param filePath - The path to the file to create
+   */
+  createLockFile(filePath: string): Promise<void>;
 }
 
 /**
@@ -37,5 +51,14 @@ export class StandardFileSystemService implements FileSystemService {
 
   async writeTextFile(filePath: string, content: string): Promise<void> {
     await fs.writeFile(filePath, content, 'utf-8');
+  }
+
+  async deleteFile(filePath: string): Promise<void> {
+    await fs.unlink(filePath);
+  }
+
+  async createLockFile(filePath: string): Promise<void> {
+    const file = await fs.open(filePath, 'wx');
+    await file.close();
   }
 }

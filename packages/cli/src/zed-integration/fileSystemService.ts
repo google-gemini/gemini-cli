@@ -44,4 +44,12 @@ export class AcpFileSystemService implements FileSystemService {
       sessionId: this.sessionId,
     });
   }
+
+  async deleteFile(filePath: string): Promise<void> {
+    return this.fallback.deleteFile(filePath);
+  }
+
+  async createLockFile(filePath: string): Promise<void> {
+    return this.fallback.createLockFile(filePath);
+  }
 }
