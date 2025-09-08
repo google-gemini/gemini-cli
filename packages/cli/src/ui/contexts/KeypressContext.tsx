@@ -41,6 +41,9 @@ import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 const ESC = '\u001B';
 export const PASTE_MODE_PREFIX = `${ESC}[200~`;
 export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
+export const DRAG_COMPLETION_TIMEOUT_MS = 100; // Broadcast full path after 100ms if no more input
+export const SINGLE_QUOTE = "'";
+export const DOUBLE_QUOTE = '"';
 
 export interface Key {
   name: string;
@@ -86,6 +89,9 @@ export function KeypressProvider({
 }) {
   const { stdin, setRawMode } = useStdin();
   const subscribers = useRef<Set<KeypressHandler>>(new Set()).current;
+  const isDraggingRef = useRef(false);
+  const dragBufferRef = useRef('');
+  const draggingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const subscribe = useCallback(
     (handler: KeypressHandler) => {
@@ -102,7 +108,17 @@ export function KeypressProvider({
   );
 
   useEffect(() => {
-    setRawMode(true);
+    const clearDraggingTimer = () => {
+      if (draggingTimerRef.current) {
+        clearTimeout(draggingTimerRef.current);
+        draggingTimerRef.current = null;
+      }
+    };
+
+    const wasRaw = stdin.isRaw;
+    if (wasRaw === false) {
+      setRawMode(true);
+    }
 
     const keypressStream = new PassThrough();
     let usePassthrough = false;
@@ -395,6 +411,27 @@ export function KeypressProvider({
         return;
       }
 
+      if (
+        key.sequence === SINGLE_QUOTE ||
+        key.sequence === DOUBLE_QUOTE ||
+        isDraggingRef.current
+      ) {
+        isDraggingRef.current = true;
+        dragBufferRef.current += key.sequence;
+
+        clearDraggingTimer();
+        draggingTimerRef.current = setTimeout(() => {
+          isDraggingRef.current = false;
+          const seq = dragBufferRef.current;
+          dragBufferRef.current = '';
+          if (seq) {
+            broadcast({ ...key, name: '', paste: true, sequence: seq });
+          }
+        }, DRAG_COMPLETION_TIMEOUT_MS);
+
+        return;
+      }
+
       if (key.name === 'return' && waitingForEnterAfterBackslash) {
         if (backslashTimeout) {
           clearTimeout(backslashTimeout);
@@ -643,7 +680,9 @@ export function KeypressProvider({
       rl.close();
 
       // Restore the terminal to its original state.
-      setRawMode(false);
+      if (wasRaw === false) {
+        setRawMode(false);
+      }
 
       if (backslashTimeout) {
         clearTimeout(backslashTimeout);
@@ -661,6 +700,23 @@ export function KeypressProvider({
           sequence: pasteBuffer.toString(),
         });
         pasteBuffer = Buffer.alloc(0);
+      }
+
+      if (draggingTimerRef.current) {
+        clearTimeout(draggingTimerRef.current);
+        draggingTimerRef.current = null;
+      }
+      if (isDraggingRef.current && dragBufferRef.current) {
+        broadcast({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: true,
+          sequence: dragBufferRef.current,
+        });
+        isDraggingRef.current = false;
+        dragBufferRef.current = '';
       }
     };
   }, [
