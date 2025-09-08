@@ -687,9 +687,7 @@ describe('setApprovalMode with folder trust', () => {
 
   describe('registerCoreTools', () => {
     beforeEach(() => {
-      (canUseRipgrep as Mock).mockClear();
-      (ToolRegistry.prototype.registerTool as Mock).mockClear();
-      (logRipgrepFallback as Mock).mockClear();
+      vi.clearAllMocks();
     });
 
     it('should register RipGrepTool when useRipgrep is true and it is available', async () => {
