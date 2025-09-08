@@ -23,7 +23,10 @@ import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { loadExtensions } from './config/extension.js';
+import {
+  loadExtensions,
+  checkForExtensionUpdates,
+} from './config/extension.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
@@ -211,6 +214,8 @@ export async function main() {
 
   const argv = await parseArguments(settings.merged);
   const extensions = loadExtensions();
+  // This is async, but we want it to happen in the background.
+  checkForExtensionUpdates(extensions);
   const config = await loadCliConfig(
     settings.merged,
     extensions,

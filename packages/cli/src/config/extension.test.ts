@@ -29,11 +29,19 @@ import {
 } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
 import { SettingScope, loadSettings } from './settings.js';
-import { type SimpleGit, simpleGit } from 'simple-git';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
+const mockGit = {
+  clone: vi.fn(),
+  getRemotes: vi.fn(),
+  fetch: vi.fn(),
+  checkout: vi.fn(),
+  listRemote: vi.fn(),
+  revparse: vi.fn(),
+};
+
 vi.mock('simple-git', () => ({
-  simpleGit: vi.fn(),
+  simpleGit: vi.fn(() => mockGit),
 }));
 
 vi.mock('os', async (importOriginal) => {
@@ -433,6 +441,7 @@ describe('installExtension', () => {
     fs.mkdirSync(userExtensionsDir, { recursive: true });
     vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
     vi.mocked(execSync).mockClear();
+    Object.values(mockGit).forEach((fn) => fn.mockReset());
   });
 
   afterEach(() => {
@@ -495,16 +504,14 @@ describe('installExtension', () => {
     const targetExtDir = path.join(userExtensionsDir, extensionName);
     const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
 
-    const clone = vi.fn().mockImplementation(async (_, destination) => {
+    mockGit.clone.mockImplementation(async (_, destination) => {
       fs.mkdirSync(destination, { recursive: true });
       fs.writeFileSync(
         path.join(destination, EXTENSIONS_CONFIG_FILENAME),
         JSON.stringify({ name: extensionName, version: '1.0.0' }),
       );
     });
-
-    const mockedSimpleGit = simpleGit as vi.MockedFunction<typeof simpleGit>;
-    mockedSimpleGit.mockReturnValue({ clone } as unknown as SimpleGit);
+    mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
     await installExtension({ source: gitUrl, type: 'git' });
 
@@ -779,6 +786,7 @@ describe('updateExtension', () => {
     vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
 
     vi.mocked(execSync).mockClear();
+    Object.values(mockGit).forEach((fn) => fn.mockReset());
   });
 
   afterEach(() => {
@@ -801,20 +809,16 @@ describe('updateExtension', () => {
       JSON.stringify({ source: gitUrl, type: 'git' }),
     );
 
-    const clone = vi.fn().mockImplementation(async (_, destination) => {
+    mockGit.clone.mockImplementation(async (_, destination) => {
       fs.mkdirSync(destination, { recursive: true });
       fs.writeFileSync(
         path.join(destination, EXTENSIONS_CONFIG_FILENAME),
         JSON.stringify({ name: extensionName, version: '1.1.0' }),
       );
     });
+    mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
-    const mockedSimpleGit = simpleGit as vi.MockedFunction<typeof simpleGit>;
-    mockedSimpleGit.mockReturnValue({
-      clone,
-    } as unknown as SimpleGit);
-
-    const updateInfo = await updateExtension(loadExtension(targetExtDir));
+    const updateInfo = await updateExtension(loadExtension(targetExtDir)!);
 
     expect(updateInfo).toEqual({
       name: 'gemini-extensions',

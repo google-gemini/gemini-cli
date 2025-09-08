@@ -111,6 +111,7 @@ import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { SettingsDialog } from './components/SettingsDialog.js';
 import { ProQuotaDialog } from './components/ProQuotaDialog.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
+import { setExtensionUpdateHandler } from '../utils/handleExtensionAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
 import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
@@ -188,6 +189,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   useEffect(() => {
     const cleanup = setUpdateHandler(addItem, setUpdateInfo);
+    return cleanup;
+  }, [addItem]);
+
+  useEffect(() => {
+    const cleanup = setExtensionUpdateHandler(addItem);
     return cleanup;
   }, [addItem]);
 

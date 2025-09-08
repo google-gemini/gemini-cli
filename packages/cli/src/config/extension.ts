@@ -18,6 +18,10 @@ import { getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
+import {
+  extensionUpdateEventEmitter,
+  ExtensionUpdateEvent,
+} from '../utils/extensionUpdateEventEmitter.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
@@ -42,6 +46,8 @@ export interface ExtensionConfig {
 export interface ExtensionInstallMetadata {
   source: string;
   type: 'git' | 'local' | 'link';
+  ref?: string;
+  subpath?: string;
 }
 
 export interface ExtensionUpdateInfo {
@@ -324,20 +330,38 @@ export function annotateActiveExtensions(
 
 /**
  * Clones a Git repository to a specified local path.
- * @param gitUrl The Git URL to clone.
+ * @param installMetadata The metadata for the extension to install.
  * @param destination The destination path to clone the repository to.
  */
 async function cloneFromGit(
-  gitUrl: string,
+  installMetadata: ExtensionInstallMetadata,
   destination: string,
 ): Promise<void> {
   try {
-    // TODO(chrstnb): Download the archive instead to avoid unnecessary .git info.
-    await simpleGit().clone(gitUrl, destination, ['--depth', '1']);
+    const git = simpleGit();
+    await git.clone(installMetadata.source, destination, ['--depth', '1']);
+
+    const remotes = await git.getRemotes(true);
+    if (remotes.length === 0) {
+      throw new Error(
+        'Unable to find any remotes for repo ${installMetadata.source}',
+      );
+    }
+
+    const refToFetch = installMetadata.ref || 'HEAD';
+
+    await git.fetch(remotes[0].name, refToFetch);
+
+    // After fetching, checkout FETCH_HEAD to get the content of the fetched ref.
+    // This results in a detached HEAD state, which is fine for this purpose.
+    await git.checkout('FETCH_HEAD');
   } catch (error) {
-    throw new Error(`Failed to clone Git repository from ${gitUrl}`, {
-      cause: error,
-    });
+    throw new Error(
+      `Failed to clone Git repository from ${installMetadata.source}`,
+      {
+        cause: error,
+      },
+    );
   }
 }
 
@@ -369,8 +393,11 @@ export async function installExtension(
 
   if (installMetadata.type === 'git') {
     tempDir = await ExtensionStorage.createTmpDir();
-    await cloneFromGit(installMetadata.source, tempDir);
+    await cloneFromGit(installMetadata, tempDir);
     localSourcePath = tempDir;
+    if (installMetadata.subpath) {
+      localSourcePath = path.join(localSourcePath, installMetadata.subpath);
+    }
   } else if (
     installMetadata.type === 'local' ||
     installMetadata.type === 'link'
@@ -473,6 +500,12 @@ export function toOutputString(extension: Extension): string {
   output += `\n Path: ${extension.path}`;
   if (extension.installMetadata) {
     output += `\n Source: ${extension.installMetadata.source} (Type: ${extension.installMetadata.type})`;
+    if (extension.installMetadata.ref) {
+      output += `\n Ref: ${extension.installMetadata.ref}`;
+    }
+    if (extension.installMetadata.subpath) {
+      output += `\n Subpath: ${extension.installMetadata.subpath}`;
+    }
   }
   if (extension.contextFiles.length > 0) {
     output += `\n Context files:`;
@@ -611,4 +644,53 @@ export async function updateAllUpdatableExtensions(
   return await Promise.all(
     extensions.map((extension) => updateExtension(extension, cwd)),
   );
+}
+
+export async function checkForExtensionUpdates(extensions: Extension[]) {
+  for (const extension of extensions) {
+    if (extension.installMetadata?.type === 'git') {
+      try {
+        const git = simpleGit(extension.path);
+        const remotes = await git.getRemotes(true);
+        if (remotes.length === 0) {
+          continue;
+        }
+        const remoteUrl = remotes[0].refs.fetch;
+        if (!remoteUrl) {
+          continue;
+        }
+
+        // Determine the ref to check on the remote.
+        const refToCheck = extension.installMetadata.ref || 'HEAD';
+
+        const lsRemoteOutput = await git.listRemote([remoteUrl, refToCheck]);
+
+        if (
+          typeof lsRemoteOutput !== 'string' ||
+          lsRemoteOutput.trim() === ''
+        ) {
+          continue;
+        }
+
+        const remoteHash = lsRemoteOutput.split('\t')[0];
+        const localHash = await git.revparse(['HEAD']);
+
+        if (remoteHash && remoteHash !== localHash) {
+          const message = `An update is available for extension "${extension.config.name}". Run "gemini extensions update ${extension.config.name}" to update.`;
+          extensionUpdateEventEmitter.emit(
+            ExtensionUpdateEvent.UpdateAvailable,
+            message,
+          );
+        }
+      } catch (error) {
+        const errorMessage = `Failed to check for updates for extension "${
+          extension.config.name
+        }": ${getErrorMessage(error)}`;
+        extensionUpdateEventEmitter.emit(
+          ExtensionUpdateEvent.LogError,
+          errorMessage,
+        );
+      }
+    }
+  }
 }
