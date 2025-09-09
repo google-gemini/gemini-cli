@@ -106,7 +106,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
         fullMatch.includes('](') &&
         fullMatch.endsWith(')')
       ) {
-        const linkMatch = fullMatch.match(/.*\[(.*?)\]\((.*?)\)/);
+        const linkMatch = fullMatch.match(/\[(.*?)\]\((.*?)\)/);
         if (linkMatch) {
           const linkText = linkMatch[1];
           const url = linkMatch[2];
