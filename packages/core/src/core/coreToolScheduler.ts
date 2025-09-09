@@ -24,6 +24,7 @@ import {
   ReadFileTool,
   ToolErrorType,
   ToolCallEvent,
+  ShellTool,
 } from '../index.js';
 import type { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
@@ -976,7 +977,10 @@ export class CoreToolScheduler {
               let outputFile: string | undefined = undefined;
               if (
                 typeof content === 'string' &&
-                this.config.getTruncateToolOutputThreshold() > 0
+                toolName === ShellTool.Name &&
+                this.config.getEnableToolOutputTruncation() &&
+                this.config.getTruncateToolOutputThreshold() > 0 &&
+                this.config.getTruncateToolOutputLines() > 0
               ) {
                 ({ content, outputFile } = await truncateAndSaveToFile(
                   content,
