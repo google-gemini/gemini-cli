@@ -45,7 +45,7 @@ export function WorkspaceMigrationDialog(props: {
       >
         {failedExtensions.length > 0 ? (
           <>
-            <Text>
+            <Text color={theme.text.primary}>
               The following extensions failed to migrate. Please try installing
               them manually. To see other changes, Gemini CLI must be restarted.
               Press &apos;q&apos; to quit.
@@ -57,7 +57,7 @@ export function WorkspaceMigrationDialog(props: {
             </Box>
           </>
         ) : (
-          <Text>
+          <Text color={theme.text.primary}>
             Migration complete. To see changes, Gemini CLI must be restarted.
             Press &apos;q&apos; to quit.
           </Text>
@@ -73,12 +73,12 @@ export function WorkspaceMigrationDialog(props: {
       borderColor={theme.border.default}
       padding={1}
     >
-      <Text bold>Workspace-level extensions are deprecated{'\n'}</Text>
-      <Text>Would you like to install them at the user level?</Text>
-      <Text>
+      <Text bold color={theme.text.primary}>Workspace-level extensions are deprecated{'\n'}</Text>
+      <Text color={theme.text.primary}>Would you like to install them at the user level?</Text>
+      <Text color={theme.text.primary}>
         The extension definition will remain in your workspace directory.
       </Text>
-      <Text>
+      <Text color={theme.text.primary}>
         If you opt to skip, you can install them manually using the extensions
         install command.
       </Text>

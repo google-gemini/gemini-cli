@@ -24,7 +24,7 @@ interface RenderInlineProps {
 const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
   // Early return for plain text without markdown or URLs
   if (!/[*_~`<[https?:]/.test(text)) {
-    return <Text>{text}</Text>;
+    return <Text color={theme.text.primary}>{text}</Text>;
   }
 
   const nodes: React.ReactNode[] = [];

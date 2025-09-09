@@ -202,7 +202,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
           break;
         default:
           headerNode = (
-            <Text>
+            <Text color={theme.text.primary}>
               <RenderInline text={headerText} />
             </Text>
           );

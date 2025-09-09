@@ -112,7 +112,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const borderParts = adjustedWidths.map((w) => char.horizontal.repeat(w));
     const border = char.left + borderParts.join(char.middle) + char.right;
 
-    return <Text>{border}</Text>;
+    return <Text color={theme.border.default}>{border}</Text>;
   };
 
   // Helper function to render a table row
@@ -123,7 +123,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     });
 
     return (
-      <Text>
+      <Text color={theme.text.primary}>
         │{' '}
         {renderedCells.map((cell, index) => (
           <React.Fragment key={index}>

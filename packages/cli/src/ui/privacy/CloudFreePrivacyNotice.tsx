@@ -63,13 +63,13 @@ export const CloudFreePrivacyNotice = ({
         Gemini Code Assist for Individuals Privacy Notice
       </Text>
       <Newline />
-      <Text>
+      <Text color={theme.text.primary}>
         This notice and our Privacy Policy
         <Text color={theme.text.link}>[1]</Text> describe how Gemini Code Assist
         handles your data. Please read them carefully.
       </Text>
       <Newline />
-      <Text>
+      <Text color={theme.text.primary}>
         When you use Gemini Code Assist for individuals with Gemini CLI, Google
         collects your prompts, related code, generated output, code edits,
         related feature usage information, and your feedback to provide,
@@ -77,7 +77,7 @@ export const CloudFreePrivacyNotice = ({
         technologies.
       </Text>
       <Newline />
-      <Text>
+      <Text color={theme.text.primary}>
         To help with quality and improve our products (such as generative
         machine-learning models), human reviewers may read, annotate, and
         process the data collected above. We take steps to protect your privacy
@@ -90,7 +90,7 @@ export const CloudFreePrivacyNotice = ({
       </Text>
       <Newline />
       <Box flexDirection="column">
-        <Text>
+        <Text color={theme.text.primary}>
           Allow Google to use this data to develop and improve our products?
         </Text>
         <RadioButtonSelect

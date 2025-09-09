@@ -30,7 +30,7 @@ export const CloudPaidPrivacyNotice = ({
         Vertex AI Notice
       </Text>
       <Newline />
-      <Text>
+      <Text color={theme.text.primary}>
         Service Specific Terms<Text color={theme.text.link}>[1]</Text> are
         incorporated into the agreement under which Google has agreed to provide
         Google Cloud Platform<Text color={theme.status.success}>[2]</Text> to
@@ -44,11 +44,11 @@ export const CloudPaidPrivacyNotice = ({
         them in the Agreement.
       </Text>
       <Newline />
-      <Text>
+      <Text color={theme.text.primary}>
         <Text color={theme.text.link}>[1]</Text>{' '}
         https://cloud.google.com/terms/service-terms
       </Text>
-      <Text>
+      <Text color={theme.text.primary}>
         <Text color={theme.status.success}>[2]</Text>{' '}
         https://cloud.google.com/terms/services
       </Text>

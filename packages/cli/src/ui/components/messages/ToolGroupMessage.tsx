@@ -122,7 +122,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               )}
             {tool.outputFile && (
               <Box marginX={1}>
-                <Text>Output too long and was saved to: {tool.outputFile}</Text>
+                <Text color={theme.text.primary}>Output too long and was saved to: {tool.outputFile}</Text>
               </Box>
             )}
           </Box>

@@ -28,7 +28,7 @@ export const GeminiPrivacyNotice = ({ onExit }: GeminiPrivacyNoticeProps) => {
         Gemini API Key Notice
       </Text>
       <Newline />
-      <Text>
+      <Text color={theme.text.primary}>
         By using the Gemini API<Text color={theme.text.link}>[1]</Text>, Google
         AI Studio
         <Text color={theme.status.error}>[2]</Text>, and the other Google
@@ -40,18 +40,18 @@ export const GeminiPrivacyNotice = ({ onExit }: GeminiPrivacyNoticeProps) => {
         <Text color={theme.text.accent}>[4]</Text>.
       </Text>
       <Newline />
-      <Text>
+      <Text color={theme.text.primary}>
         <Text color={theme.text.link}>[1]</Text>{' '}
         https://ai.google.dev/docs/gemini_api_overview
       </Text>
-      <Text>
+      <Text color={theme.text.primary}>
         <Text color={theme.status.error}>[2]</Text> https://aistudio.google.com/
       </Text>
-      <Text>
+      <Text color={theme.text.primary}>
         <Text color={theme.status.success}>[3]</Text>{' '}
         https://developers.google.com/terms
       </Text>
-      <Text>
+      <Text color={theme.text.primary}>
         <Text color={theme.text.accent}>[4]</Text>{' '}
         https://ai.google.dev/gemini-api/terms
       </Text>
