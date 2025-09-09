@@ -38,7 +38,7 @@ jobs:
         id: 'stable_version'
         run: |
           npm install
-          VERSION_JSON=$(node scripts/get-release-version.js --type stable --version ${{ steps.preview_tag.outputs.TAG }})
+          VERSION_JSON=$(node dist/get-release-version.js --type stable --version ${{ steps.preview_tag.outputs.TAG }})
           echo "RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)" >> "${GITHUB_OUTPUT}"
           echo "RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
@@ -46,7 +46,7 @@ jobs:
       - name: 'Get Preview Version'
         id: 'preview_version'
         run: |
-          VERSION_JSON=$(node scripts/get-release-version.js --type preview --version ${{ steps.stable_version.outputs.RELEASE_TAG }})
+          VERSION_JSON=$(node dist/get-release-version.js --type preview --version ${{ steps.stable_version.outputs.RELEASE_TAG }})
           echo "RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)" >> "${GITHUB_OUTPUT}"
           echo "RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
