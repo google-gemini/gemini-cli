@@ -94,6 +94,8 @@ const electronAPI = {
     getCurrentToolset: () => ipcRenderer.invoke('multimodel-get-current-toolset'),
     addCustomRole: (role) => ipcRenderer.invoke('multimodel-add-custom-role', role),
     addCustomTemplate: (template) => ipcRenderer.invoke('multimodel-add-custom-template', template),
+    updateCustomTemplate: (id, updates) => ipcRenderer.invoke('multimodel-update-custom-template', id, updates),
+    deleteCustomTemplate: (id) => ipcRenderer.invoke('multimodel-delete-custom-template', id),
     // Session management
     createSession: (sessionId, title) => ipcRenderer.invoke('multimodel-create-session', sessionId, title),
     switchSession: (sessionId) => ipcRenderer.invoke('multimodel-switch-session', sessionId),
@@ -110,6 +112,8 @@ const electronAPI = {
     checkEnvApiKey: (providerType) => ipcRenderer.invoke('check-env-api-key', providerType),
     setApiKeyPreference: (providerType) => ipcRenderer.invoke('set-api-key-preference', providerType),
     setOAuthPreference: (providerType) => ipcRenderer.invoke('set-oauth-preference', providerType),
+    getApprovalMode: () => ipcRenderer.invoke('get-approval-mode'),
+    setApprovalMode: (mode) => ipcRenderer.invoke('set-approval-mode', mode),
     // Tool confirmation
     onToolConfirmationRequest: (callback) => {
       ipcRenderer.on('tool-confirmation-request', callback);

@@ -1,9 +1,19 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* eslint-env node */
+/* eslint-disable no-console, @typescript-eslint/no-require-imports, import/enforce-node-protocol-usage, @typescript-eslint/no-unused-vars, no-undef */
+
 const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
-const { MultiModelSystem, Config, RoleManager, WorkspaceManager, SessionManager, ModelProviderFactory, GeminiClient, AuthType, clearCachedCredentialFile, getOauthClient } = require('@google/gemini-cli-core')
+const { MultiModelSystem, Config, RoleManager, WorkspaceManager, SessionManager, ModelProviderFactory, AuthManager, TemplateManager} = require('@google/gemini-cli-core')
 
 // MultiModelSystem instance - we'll initialize this when needed
 let multiModelSystem = null
+let templateManager = null
 let isInitialized = false
 let initializationPromise = null
 
@@ -147,6 +157,10 @@ const ensureInitialized = async (configParams = {}) => {
       const workspaceManager = WorkspaceManager.getInstance(config)
       await workspaceManager.ensureInitialized()
       // console.log('WorkspaceManager initialized with config and persisted directories loaded')
+      
+      // Initialize TemplateManager with config
+      templateManager = new TemplateManager(config)
+      // console.log('TemplateManager initialized with config')
       
       isInitialized = true
       // console.log('MultiModelSystem, SessionManager and WorkspaceManager initialized with LM Studio default model')
@@ -348,8 +362,51 @@ ipcMain.handle('multimodel-set-workspace-directories', async (event, directories
 })
 
 ipcMain.handle('multimodel-get-all-templates', async () => {
-  // console.log('MultiModel getAllTemplates called')
-  return []
+  try {
+    await ensureInitialized()
+    const templates = templateManager.getAllTemplates()
+    // console.log('MultiModel getAllTemplates called, returning', templates.length, 'templates')
+    return templates
+  } catch (error) {
+    console.error('Failed to get all templates:', error)
+    return []
+  }
+})
+
+ipcMain.handle('multimodel-add-custom-template', async (_, template) => {
+  try {
+    await ensureInitialized()
+    templateManager.addCustomTemplate(template)
+    // console.log('MultiModel addCustomTemplate called:', template.name)
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to add custom template:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('multimodel-update-custom-template', async (_, id, updates) => {
+  try {
+    await ensureInitialized()
+    templateManager.updateCustomTemplate(id, updates)
+    // console.log('MultiModel updateCustomTemplate called:', id)
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to update custom template:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('multimodel-delete-custom-template', async (_, id) => {
+  try {
+    await ensureInitialized()
+    templateManager.deleteCustomTemplate(id)
+    // console.log('MultiModel deleteCustomTemplate called:', id)
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to delete custom template:', error)
+    throw error
+  }
 })
 
 // History management handlers
@@ -673,7 +730,7 @@ ipcMain.handle('oauth-start-flow', async (_, providerType) => {
     const system = await ensureInitialized()
     
     // Use AuthManager instead of hardcoded OAuth logic
-    const { AuthManager } = require('@google/gemini-cli-core')
+    // const { AuthManager } = require('@google/gemini-cli-core')
     const authManager = AuthManager.getInstance()
     authManager.setConfig(system.getConfig())
     
@@ -695,7 +752,7 @@ ipcMain.handle('oauth-get-status', async (_, providerType) => {
     // console.log('OAuth get status called for:', providerType)
     
     // Use AuthManager for unified OAuth status checking
-    const { AuthManager } = require('@google/gemini-cli-core')
+    // const { AuthManager } = require('@google/gemini-cli-core')
     const authManager = AuthManager.getInstance()
     
     // Ensure system is initialized and pass config to AuthManager
@@ -721,7 +778,7 @@ ipcMain.handle('oauth-clear-credentials', async (_, providerType) => {
     // console.log('OAuth clear credentials called for:', providerType)
     
     // Use AuthManager for unified credential clearing
-    const { AuthManager } = require('@google/gemini-cli-core')
+    // const { AuthManager } = require('@google/gemini-cli-core')
     const authManager = AuthManager.getInstance()
     
     const result = await authManager.clearCredentials(providerType)
@@ -742,7 +799,7 @@ ipcMain.handle('check-env-api-key', async (_, providerType) => {
     // console.log('Check environment API key called for:', providerType)
     
     // Use AuthManager for unified API key checking
-    const { AuthManager } = require('@google/gemini-cli-core')
+    // const { AuthManager } = require('@google/gemini-cli-core')
     const authManager = AuthManager.getInstance()
     
     const result = await authManager.checkEnvApiKey(providerType)
@@ -764,7 +821,7 @@ ipcMain.handle('set-api-key-preference', async (_, providerType) => {
     const system = await ensureInitialized()
     
     // Use AuthManager to set API key preference
-    const { AuthManager } = require('@google/gemini-cli-core')
+    // const { AuthManager } = require('@google/gemini-cli-core')
     const authManager = AuthManager.getInstance()
     authManager.setConfig(system.getConfig())
     authManager.useApiKeyAuth(providerType)
@@ -789,7 +846,7 @@ ipcMain.handle('set-oauth-preference', async (_, providerType) => {
     const system = await ensureInitialized()
     
     // Use AuthManager to set OAuth preference
-    const { AuthManager } = require('@google/gemini-cli-core')
+    // const { AuthManager } = require('@google/gemini-cli-core')
     const authManager = AuthManager.getInstance()
     authManager.setConfig(system.getConfig())
     authManager.setAuthPreference(providerType, 'oauth')
@@ -802,5 +859,28 @@ ipcMain.handle('set-oauth-preference', async (_, providerType) => {
       success: false, 
       error: error.message 
     }
+  }
+})
+
+// Approval mode management handlers
+ipcMain.handle('get-approval-mode', async () => {
+  try {
+    const system = await ensureInitialized()
+    const approvalMode = system.getApprovalMode()
+    return approvalMode
+  } catch (error) {
+    console.error('Failed to get approval mode:', error)
+    return 'default'
+  }
+})
+
+ipcMain.handle('set-approval-mode', async (_, mode) => {
+  try {
+    const system = await ensureInitialized()
+    system.setApprovalMode(mode)
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to set approval mode:', error)
+    throw error
   }
 })
