@@ -47,68 +47,61 @@ async function listAction(context: CommandContext) {
 }
 
 const updateOutput = (info: ExtensionUpdateInfo) =>
-  `Extension "${info.name}" successfully updated: ${info.originalVersion} → ${info.updatedVersion}. Restart gemini-cli to see the changes.`;
+  `Extension "${info.name}" successfully updated: ${info.originalVersion} → ${info.updatedVersion}.`;
 
 async function updateAction(context: CommandContext, args: string) {
   const updateArgs = args.split(' ').filter((value) => value.length > 0);
   const all = updateArgs.length === 1 && updateArgs[0] === '--all';
   const names = all ? undefined : updateArgs;
-
-  if (all) {
-    try {
-      const updateInfos = await updateAllUpdatableExtensions();
-      if (updateInfos.length === 0) {
-        context.ui.addItem(
-          {
-            type: MessageType.INFO,
-            text: 'No extensions to update.',
-          },
-          Date.now(),
-        );
-        return;
+  let updateInfos: ExtensionUpdateInfo[] = [];
+  try {
+    if (all) {
+      updateInfos = await updateAllUpdatableExtensions();
+    } else if (names?.length) {
+      for (const name of names) {
+        updateInfos.push(await updateExtensionByName(name));
       }
-      context.ui.addItem(
-        {
-          type: MessageType.INFO,
-          text: updateInfos.map((info) => updateOutput(info)).join('\n'),
-        },
-        Date.now(),
-      );
-    } catch (error) {
+    } else {
       context.ui.addItem(
         {
           type: MessageType.ERROR,
-          text: getErrorMessage(error),
+          text: 'Usage: /extensions update <extension-names>|--all',
         },
         Date.now(),
       );
     }
-  } else if (names?.length) {
-    for (const name of names) {
-      try {
-        const updatedExtensionInfo = await updateExtensionByName(name);
-        context.ui.addItem(
-          {
-            type: MessageType.INFO,
-            text: updateOutput(updatedExtensionInfo),
-          },
-          Date.now(),
-        );
-      } catch (error) {
-        context.ui.addItem(
-          {
-            type: MessageType.ERROR,
-            text: getErrorMessage(error),
-          },
-          Date.now(),
-        );
-      }
+
+    // Filter to the actually updated ones.
+    updateInfos = updateInfos.filter(
+      (info) => info.originalVersion !== info.updatedVersion,
+    );
+
+    if (updateInfos.length === 0) {
+      context.ui.addItem(
+        {
+          type: MessageType.INFO,
+          text: 'No extensions to update.',
+        },
+        Date.now(),
+      );
+      return;
     }
-  } else {
+
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: [
+          ...updateInfos.map((info) => updateOutput(info)),
+          'Restart gemini-cli to see the changes.',
+        ].join('\n'),
+      },
+      Date.now(),
+    );
+  } catch (error) {
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Usage: /extensions update <extension-names>|--all',
+        text: getErrorMessage(error),
       },
       Date.now(),
     );
