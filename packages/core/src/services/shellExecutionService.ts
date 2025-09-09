@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getPty, PtyImplementation } from '../utils/getPty.js';
-import { spawn as cpSpawn } from 'child_process';
-import { TextDecoder } from 'util';
-import os from 'os';
+import type { PtyImplementation } from '../utils/getPty.js';
+import { getPty } from '../utils/getPty.js';
+import { spawn as cpSpawn } from 'node:child_process';
+import { TextDecoder } from 'node:util';
+import os from 'node:os';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import { isBinary } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
@@ -140,6 +141,7 @@ export class ShellExecutionService {
       const child = cpSpawn(commandToExecute, [], {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
+        windowsVerbatimArguments: true,
         shell: isWindows ? true : 'bash',
         detached: !isWindows,
         env: {
@@ -321,7 +323,7 @@ export class ShellExecutionService {
       const isWindows = os.platform() === 'win32';
       const shell = isWindows ? 'cmd.exe' : 'bash';
       const args = isWindows
-        ? ['/c', commandToExecute]
+        ? `/c ${commandToExecute}`
         : ['-c', commandToExecute];
 
       const ptyProcess = ptyInfo?.module.spawn(shell, args, {
@@ -346,7 +348,6 @@ export class ShellExecutionService {
         });
         let processingChain = Promise.resolve();
         let decoder: TextDecoder | null = null;
-        let output = '';
         const outputChunks: Buffer[] = [];
         const error: Error | null = null;
         let exited = false;
@@ -383,9 +384,10 @@ export class ShellExecutionService {
                 if (isStreamingRawContent) {
                   const decodedChunk = decoder.decode(data, { stream: true });
                   headlessTerminal.write(decodedChunk, () => {
-                    const newStrippedOutput = getFullText(headlessTerminal);
-                    output = newStrippedOutput;
-                    onOutputEvent({ type: 'data', chunk: newStrippedOutput });
+                    onOutputEvent({
+                      type: 'data',
+                      chunk: stripAnsi(decodedChunk),
+                    });
                     resolve();
                   });
                 } else {
@@ -418,7 +420,7 @@ export class ShellExecutionService {
 
               resolve({
                 rawOutput: finalBuffer,
-                output,
+                output: getFullText(headlessTerminal),
                 exitCode,
                 signal: signal ?? null,
                 error,

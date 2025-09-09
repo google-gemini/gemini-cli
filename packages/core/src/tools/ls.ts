@@ -4,17 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
-  ToolInvocation,
-  ToolResult,
-} from './tools.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import type { ToolInvocation, ToolResult } from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
+import type { Config } from '../config/config.js';
+import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
 import { ToolErrorType } from './tool-error.js';
 
 /**

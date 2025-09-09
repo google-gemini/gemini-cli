@@ -4,27 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
-import os, { EOL } from 'os';
-import crypto from 'crypto';
-import { Config } from '../config/config.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
+import fs from 'node:fs';
+import path from 'node:path';
+import os, { EOL } from 'node:os';
+import crypto from 'node:crypto';
+import type { Config } from '../config/config.js';
+import { ToolErrorType } from './tool-error.js';
+import type {
   ToolInvocation,
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
+} from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
 } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
-import {
-  ShellExecutionService,
-  ShellOutputEvent,
-} from '../services/shellExecutionService.js';
+import type { ShellOutputEvent } from '../services/shellExecutionService.js';
+import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import {
   getCommandRoots,
@@ -76,7 +77,7 @@ class ShellToolInvocation extends BaseToolInvocation<
     );
 
     if (commandsToConfirm.length === 0) {
-      return false; // already approved and whitelisted
+      return false; // already approved and allowlisted
     }
 
     const confirmationDetails: ToolExecuteConfirmationDetails = {
@@ -131,6 +132,7 @@ class ShellToolInvocation extends BaseToolInvocation<
       );
 
       let cumulativeOutput = '';
+      let outputChunks: string[] = [cumulativeOutput];
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
 
@@ -148,9 +150,11 @@ class ShellToolInvocation extends BaseToolInvocation<
           switch (event.type) {
             case 'data':
               if (isBinaryStream) break;
-              cumulativeOutput = event.chunk;
-              currentDisplayOutput = cumulativeOutput;
+              outputChunks.push(event.chunk);
               if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
+                cumulativeOutput = outputChunks.join('');
+                outputChunks = [cumulativeOutput];
+                currentDisplayOutput = cumulativeOutput;
                 shouldUpdate = true;
               }
               break;
@@ -263,6 +267,14 @@ class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const summarizeConfig = this.config.getSummarizeToolOutputConfig();
+      const executionError = result.error
+        ? {
+            error: {
+              message: result.error.message,
+              type: ToolErrorType.SHELL_EXECUTE_ERROR,
+            },
+          }
+        : {};
       if (summarizeConfig && summarizeConfig[ShellTool.Name]) {
         const summary = await summarizeToolOutput(
           llmContent,
@@ -273,12 +285,14 @@ class ShellToolInvocation extends BaseToolInvocation<
         return {
           llmContent: summary,
           returnDisplay: returnDisplayMessage,
+          ...executionError,
         };
       }
 
       return {
         llmContent,
         returnDisplay: returnDisplayMessage,
+        ...executionError,
       };
     } finally {
       if (fs.existsSync(tempFilePath)) {

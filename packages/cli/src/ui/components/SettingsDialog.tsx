@@ -7,11 +7,8 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import {
-  LoadedSettings,
-  SettingScope,
-  Settings,
-} from '../../config/settings.js';
+import type { LoadedSettings, Settings } from '../../config/settings.js';
+import { SettingScope } from '../../config/settings.js';
 import {
   getScopeItems,
   getScopeMessageForSetting,
@@ -19,7 +16,6 @@ import {
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import {
   getDialogSettingKeys,
-  getSettingValue,
   setPendingSettingValue,
   getDisplayValue,
   hasRestartRequiredSettings,
@@ -31,11 +27,16 @@ import {
   getDefaultValue,
   setPendingSettingValueAny,
   getNestedValue,
+  getEffectiveValue,
 } from '../../utils/settingsUtils.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import chalk from 'chalk';
 import { cpSlice, cpLen, stripUnsafeCharacters } from '../utils/textUtils.js';
+import {
+  type SettingsValue,
+  TOGGLE_TYPES,
+} from '../../config/settingsSchema.js';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -125,15 +126,33 @@ export function SettingsDialog({
         value: key,
         type: definition?.type,
         toggle: () => {
-          if (definition?.type !== 'boolean') {
-            // For non-boolean items, toggle will be handled via edit mode.
+          if (!TOGGLE_TYPES.has(definition?.type)) {
             return;
           }
-          const currentValue = getSettingValue(key, pendingSettings, {});
-          const newValue = !currentValue;
+          const currentValue = getEffectiveValue(key, pendingSettings, {});
+          let newValue: SettingsValue;
+          if (definition?.type === 'boolean') {
+            newValue = !(currentValue as boolean);
+            setPendingSettings((prev) =>
+              setPendingSettingValue(key, newValue as boolean, prev),
+            );
+          } else if (definition?.type === 'enum' && definition.options) {
+            const options = definition.options;
+            const currentIndex = options?.findIndex(
+              (opt) => opt.value === currentValue,
+            );
+            if (currentIndex !== -1 && currentIndex < options.length - 1) {
+              newValue = options[currentIndex + 1].value;
+            } else {
+              newValue = options[0].value; // loop back to start.
+            }
+            setPendingSettings((prev) =>
+              setPendingSettingValueAny(key, newValue, prev),
+            );
+          }
 
           setPendingSettings((prev) =>
-            setPendingSettingValue(key, newValue, prev),
+            setPendingSettingValue(key, newValue as boolean, prev),
           );
 
           if (!requiresRestart(key)) {
@@ -156,7 +175,7 @@ export function SettingsDialog({
             );
 
             // Special handling for vim mode to sync with VimModeContext
-            if (key === 'vimMode' && newValue !== vimEnabled) {
+            if (key === 'general.vimMode' && newValue !== vimEnabled) {
               // Call toggleVimEnabled to sync the VimModeContext local state
               toggleVimEnabled().catch((error) => {
                 console.error('Failed to toggle vim mode:', error);

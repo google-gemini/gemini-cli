@@ -4,20 +4,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
 import {
-  Chat,
-  Content,
-  EmbedContentResponse,
-  GenerateContentResponse,
-  GoogleGenAI,
-} from '@google/genai';
-import { findIndexAfterFraction, GeminiClient } from './client.js';
-import { AuthType, ContentGenerator } from './contentGenerator.js';
-import { GeminiChat } from './geminiChat.js';
-import { Config } from '../config/config.js';
-import { GeminiEventType, Turn } from './turn.js';
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+
+import type { Content, GenerateContentResponse, Part } from '@google/genai';
+import {
+  findIndexAfterFraction,
+  isThinkingDefault,
+  isThinkingSupported,
+  GeminiClient,
+} from './client.js';
+import {
+  AuthType,
+  type ContentGenerator,
+  type ContentGeneratorConfig,
+} from './contentGenerator.js';
+import { type GeminiChat } from './geminiChat.js';
+import type { Config } from '../config/config.js';
+import {
+  CompressionStatus,
+  GeminiEventType,
+  Turn,
+  type ChatCompressionInfo,
+} from './turn.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
@@ -26,14 +42,37 @@ import { tokenLimit } from './tokenLimits.js';
 import { ideContext } from '../ide/ideContext.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
+// Mock fs module to prevent actual file system operations during tests
+const mockFileSystem = new Map<string, string>();
+
+vi.mock('node:fs', () => {
+  const fsModule = {
+    mkdirSync: vi.fn(),
+    writeFileSync: vi.fn((path: string, data: string) => {
+      mockFileSystem.set(path, data);
+    }),
+    readFileSync: vi.fn((path: string) => {
+      if (mockFileSystem.has(path)) {
+        return mockFileSystem.get(path);
+      }
+      throw Object.assign(new Error('ENOENT: no such file or directory'), {
+        code: 'ENOENT',
+      });
+    }),
+    existsSync: vi.fn((path: string) => mockFileSystem.has(path)),
+  };
+
+  return {
+    default: fsModule,
+    ...fsModule,
+  };
+});
+
 // --- Mocks ---
-const mockChatCreateFn = vi.fn();
-const mockGenerateContentFn = vi.fn();
-const mockEmbedContentFn = vi.fn();
 const mockTurnRunFn = vi.fn();
 
-vi.mock('@google/genai');
-vi.mock('./turn', () => {
+vi.mock('./turn', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./turn.js')>();
   // Define a mock class that has the same shape as the real Turn
   class MockTurn {
     pendingToolCalls = [];
@@ -46,11 +85,8 @@ vi.mock('./turn', () => {
   }
   // Export the mock class as 'Turn'
   return {
+    ...actual,
     Turn: MockTurn,
-    GeminiEventType: {
-      MaxSessionTurns: 'MaxSessionTurns',
-      ChatCompressed: 'ChatCompressed',
-    },
   };
 });
 
@@ -74,6 +110,19 @@ vi.mock('../telemetry/index.js', () => ({
   logApiError: vi.fn(),
 }));
 vi.mock('../ide/ideContext.js');
+
+/**
+ * Array.fromAsync ponyfill, which will be available in es 2024.
+ *
+ * Buffers an async generator into an array and returns the result.
+ */
+async function fromAsync<T>(promise: AsyncGenerator<T>): Promise<readonly T[]> {
+  const results: T[] = [];
+  for await (const result of promise) {
+    results.push(result);
+  }
+  return results;
+}
 
 describe('findIndexAfterFraction', () => {
   const history: Content[] = [
@@ -133,37 +182,62 @@ describe('findIndexAfterFraction', () => {
   });
 });
 
+describe('isThinkingSupported', () => {
+  it('should return true for gemini-2.5', () => {
+    expect(isThinkingSupported('gemini-2.5')).toBe(true);
+  });
+
+  it('should return true for gemini-2.5-pro', () => {
+    expect(isThinkingSupported('gemini-2.5-pro')).toBe(true);
+  });
+
+  it('should return false for other models', () => {
+    expect(isThinkingSupported('gemini-1.5-flash')).toBe(false);
+    expect(isThinkingSupported('some-other-model')).toBe(false);
+  });
+});
+
+describe('isThinkingDefault', () => {
+  it('should return false for gemini-2.5-flash-lite', () => {
+    expect(isThinkingDefault('gemini-2.5-flash-lite')).toBe(false);
+  });
+
+  it('should return true for gemini-2.5', () => {
+    expect(isThinkingDefault('gemini-2.5')).toBe(true);
+  });
+
+  it('should return true for gemini-2.5-pro', () => {
+    expect(isThinkingDefault('gemini-2.5-pro')).toBe(true);
+  });
+
+  it('should return false for other models', () => {
+    expect(isThinkingDefault('gemini-1.5-flash')).toBe(false);
+    expect(isThinkingDefault('some-other-model')).toBe(false);
+  });
+});
+
 describe('Gemini Client (client.ts)', () => {
+  let mockContentGenerator: ContentGenerator;
+  let mockConfig: Config;
   let client: GeminiClient;
+  let mockGenerateContentFn: Mock;
   beforeEach(async () => {
     vi.resetAllMocks();
+
+    mockGenerateContentFn = vi.fn().mockResolvedValue({
+      candidates: [{ content: { parts: [{ text: '{"key": "value"}' }] } }],
+    });
 
     // Disable 429 simulation for tests
     setSimulate429(false);
 
-    // Set up the mock for GoogleGenAI constructor and its methods
-    const MockedGoogleGenAI = vi.mocked(GoogleGenAI);
-    MockedGoogleGenAI.mockImplementation(() => {
-      const mock = {
-        chats: { create: mockChatCreateFn },
-        models: {
-          generateContent: mockGenerateContentFn,
-          embedContent: mockEmbedContentFn,
-        },
-      };
-      return mock as unknown as GoogleGenAI;
-    });
-
-    mockChatCreateFn.mockResolvedValue({} as Chat);
-    mockGenerateContentFn.mockResolvedValue({
-      candidates: [
-        {
-          content: {
-            parts: [{ text: '{"key": "value"}' }],
-          },
-        },
-      ],
-    } as unknown as GenerateContentResponse);
+    mockContentGenerator = {
+      generateContent: mockGenerateContentFn,
+      generateContentStream: vi.fn(),
+      countTokens: vi.fn(),
+      embedContent: vi.fn(),
+      batchEmbedContents: vi.fn(),
+    } as unknown as ContentGenerator;
 
     // Because the GeminiClient constructor kicks off an async process (startChat)
     // that depends on a fully-formed Config object, we need to mock the
@@ -173,13 +247,13 @@ describe('Gemini Client (client.ts)', () => {
       getTool: vi.fn().mockReturnValue(null),
     };
     const fileService = new FileDiscoveryService('/test/dir');
-    const contentGeneratorConfig = {
+    const contentGeneratorConfig: ContentGeneratorConfig = {
       model: 'test-model',
       apiKey: 'test-key',
       vertexai: false,
       authType: AuthType.USE_GEMINI,
     };
-    const mockConfigObject = {
+    mockConfig = {
       getContentGeneratorConfig: vi
         .fn()
         .mockReturnValue(contentGeneratorConfig),
@@ -207,48 +281,26 @@ describe('Gemini Client (client.ts)', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getGeminiClient: vi.fn(),
+      isInFallbackMode: vi.fn().mockReturnValue(false),
       setFallbackMode: vi.fn(),
       getChatCompression: vi.fn().mockReturnValue(undefined),
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
-    };
-    const MockedConfig = vi.mocked(Config, true);
-    MockedConfig.mockImplementation(
-      () => mockConfigObject as unknown as Config,
-    );
+      getUseSmartEdit: vi.fn().mockReturnValue(false),
+      getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+      },
+      getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+    } as unknown as Config;
 
-    // We can instantiate the client here since Config is mocked
-    // and the constructor will use the mocked GoogleGenAI
-    client = new GeminiClient(
-      new Config({ sessionId: 'test-session-id' } as never),
-    );
-    mockConfigObject.getGeminiClient.mockReturnValue(client);
-
-    await client.initialize(contentGeneratorConfig);
+    client = new GeminiClient(mockConfig);
+    await client.initialize();
+    vi.mocked(mockConfig.getGeminiClient).mockReturnValue(client);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
-
-  // NOTE: The following tests for startChat were removed due to persistent issues with
-  // the @google/genai mock. Specifically, the mockChatCreateFn (representing instance.chats.create)
-  // was not being detected as called by the GeminiClient instance.
-  // This likely points to a subtle issue in how the GoogleGenerativeAI class constructor
-  // and its instance methods are mocked and then used by the class under test.
-  // For future debugging, ensure that the `this.client` in `GeminiClient` (which is an
-  // instance of the mocked GoogleGenerativeAI) correctly has its `chats.create` method
-  // pointing to `mockChatCreateFn`.
-  // it('startChat should call getCoreSystemPrompt with userMemory and pass to chats.create', async () => { ... });
-  // it('startChat should call getCoreSystemPrompt with empty string if userMemory is empty', async () => { ... });
-
-  // NOTE: The following tests for generateJson were removed due to persistent issues with
-  // the @google/genai mock, similar to the startChat tests. The mockGenerateContentFn
-  // (representing instance.models.generateContent) was not being detected as called, or the mock
-  // was not preventing an actual API call (leading to API key errors).
-  // For future debugging, ensure `this.client.models.generateContent` in `GeminiClient` correctly
-  // uses the `mockGenerateContentFn`.
-  // it('generateJson should call getCoreSystemPrompt with userMemory and pass to generateContent', async () => { ... });
-  // it('generateJson should call getCoreSystemPrompt with empty string if userMemory is empty', async () => { ... });
 
   describe('generateEmbedding', () => {
     const texts = ['hello world', 'goodbye world'];
@@ -259,18 +311,17 @@ describe('Gemini Client (client.ts)', () => {
         [0.1, 0.2, 0.3],
         [0.4, 0.5, 0.6],
       ];
-      const mockResponse: EmbedContentResponse = {
+      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
         embeddings: [
           { values: mockEmbeddings[0] },
           { values: mockEmbeddings[1] },
         ],
-      };
-      mockEmbedContentFn.mockResolvedValue(mockResponse);
+      });
 
       const result = await client.generateEmbedding(texts);
 
-      expect(mockEmbedContentFn).toHaveBeenCalledTimes(1);
-      expect(mockEmbedContentFn).toHaveBeenCalledWith({
+      expect(mockContentGenerator.embedContent).toHaveBeenCalledTimes(1);
+      expect(mockContentGenerator.embedContent).toHaveBeenCalledWith({
         model: testEmbeddingModel,
         contents: texts,
       });
@@ -280,11 +331,11 @@ describe('Gemini Client (client.ts)', () => {
     it('should return an empty array if an empty array is passed', async () => {
       const result = await client.generateEmbedding([]);
       expect(result).toEqual([]);
-      expect(mockEmbedContentFn).not.toHaveBeenCalled();
+      expect(mockContentGenerator.embedContent).not.toHaveBeenCalled();
     });
 
     it('should throw an error if API response has no embeddings array', async () => {
-      mockEmbedContentFn.mockResolvedValue({} as EmbedContentResponse); // No `embeddings` key
+      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({});
 
       await expect(client.generateEmbedding(texts)).rejects.toThrow(
         'No embeddings found in API response.',
@@ -292,20 +343,19 @@ describe('Gemini Client (client.ts)', () => {
     });
 
     it('should throw an error if API response has an empty embeddings array', async () => {
-      const mockResponse: EmbedContentResponse = {
+      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
         embeddings: [],
-      };
-      mockEmbedContentFn.mockResolvedValue(mockResponse);
+      });
+
       await expect(client.generateEmbedding(texts)).rejects.toThrow(
         'No embeddings found in API response.',
       );
     });
 
     it('should throw an error if API returns a mismatched number of embeddings', async () => {
-      const mockResponse: EmbedContentResponse = {
+      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
         embeddings: [{ values: [1, 2, 3] }], // Only one for two texts
-      };
-      mockEmbedContentFn.mockResolvedValue(mockResponse);
+      });
 
       await expect(client.generateEmbedding(texts)).rejects.toThrow(
         'API returned a mismatched number of embeddings. Expected 2, got 1.',
@@ -313,10 +363,9 @@ describe('Gemini Client (client.ts)', () => {
     });
 
     it('should throw an error if any embedding has nullish values', async () => {
-      const mockResponse: EmbedContentResponse = {
+      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
         embeddings: [{ values: [1, 2, 3] }, { values: undefined }], // Second one is bad
-      };
-      mockEmbedContentFn.mockResolvedValue(mockResponse);
+      });
 
       await expect(client.generateEmbedding(texts)).rejects.toThrow(
         'API returned an empty embedding for input text at index 1: "goodbye world"',
@@ -324,10 +373,9 @@ describe('Gemini Client (client.ts)', () => {
     });
 
     it('should throw an error if any embedding has an empty values array', async () => {
-      const mockResponse: EmbedContentResponse = {
+      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
         embeddings: [{ values: [] }, { values: [1, 2, 3] }], // First one is bad
-      };
-      mockEmbedContentFn.mockResolvedValue(mockResponse);
+      });
 
       await expect(client.generateEmbedding(texts)).rejects.toThrow(
         'API returned an empty embedding for input text at index 0: "hello world"',
@@ -335,42 +383,12 @@ describe('Gemini Client (client.ts)', () => {
     });
 
     it('should propagate errors from the API call', async () => {
-      const apiError = new Error('API Failure');
-      mockEmbedContentFn.mockRejectedValue(apiError);
+      vi.mocked(mockContentGenerator.embedContent).mockRejectedValue(
+        new Error('API Failure'),
+      );
 
       await expect(client.generateEmbedding(texts)).rejects.toThrow(
         'API Failure',
-      );
-    });
-  });
-
-  describe('generateContent', () => {
-    it('should call generateContent with the correct parameters', async () => {
-      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
-      const generationConfig = { temperature: 0.5 };
-      const abortSignal = new AbortController().signal;
-
-      // Mock countTokens
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
-        generateContent: mockGenerateContentFn,
-      };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
-
-      await client.generateContent(contents, generationConfig, abortSignal);
-
-      expect(mockGenerateContentFn).toHaveBeenCalledWith(
-        {
-          model: 'test-model',
-          config: {
-            abortSignal,
-            systemInstruction: getCoreSystemPrompt(''),
-            temperature: 0.5,
-            topP: 1,
-          },
-          contents,
-        },
-        'test-session-id',
       );
     });
   });
@@ -381,18 +399,20 @@ describe('Gemini Client (client.ts)', () => {
       const schema = { type: 'string' };
       const abortSignal = new AbortController().signal;
 
-      // Mock countTokens
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
-        generateContent: mockGenerateContentFn,
-      };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
+      vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
+        totalTokens: 1,
+      });
 
-      await client.generateJson(contents, schema, abortSignal);
+      await client.generateJson(
+        contents,
+        schema,
+        abortSignal,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
 
-      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+      expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
         {
-          model: 'test-model', // Should use current model from config
+          model: DEFAULT_GEMINI_FLASH_MODEL,
           config: {
             abortSignal,
             systemInstruction: getCoreSystemPrompt(''),
@@ -408,17 +428,17 @@ describe('Gemini Client (client.ts)', () => {
     });
 
     it('should allow overriding model and config', async () => {
-      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const contents: Content[] = [
+        { role: 'user', parts: [{ text: 'hello' }] },
+      ];
       const schema = { type: 'string' };
       const abortSignal = new AbortController().signal;
       const customModel = 'custom-json-model';
       const customConfig = { temperature: 0.9, topK: 20 };
 
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
-        generateContent: mockGenerateContentFn,
-      };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
+      vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
+        totalTokens: 1,
+      });
 
       await client.generateJson(
         contents,
@@ -428,7 +448,7 @@ describe('Gemini Client (client.ts)', () => {
         customConfig,
       );
 
-      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+      expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
         {
           model: customModel,
           config: {
@@ -445,14 +465,35 @@ describe('Gemini Client (client.ts)', () => {
         'test-session-id',
       );
     });
+
+    it('should use the Flash model when fallback mode is active', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const schema = { type: 'string' };
+      const abortSignal = new AbortController().signal;
+      const requestedModel = 'gemini-2.5-pro'; // A non-flash model
+
+      // Mock config to be in fallback mode
+      // We access the mock via the client instance which holds the mocked config
+      vi.spyOn(client['config'], 'isInFallbackMode').mockReturnValue(true);
+
+      await client.generateJson(contents, schema, abortSignal, requestedModel);
+
+      // Assert that the Flash model was used, not the requested model
+      expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+        }),
+        'test-session-id',
+      );
+    });
   });
 
   describe('addHistory', () => {
     it('should call chat.addHistory with the provided content', async () => {
       const mockChat = {
         addHistory: vi.fn(),
-      };
-      client['chat'] = mockChat as unknown as GeminiChat;
+      } as unknown as GeminiChat;
+      client['chat'] = mockChat;
 
       const newContent = {
         role: 'user',
@@ -493,7 +534,6 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   describe('tryCompressChat', () => {
-    const mockCountTokens = vi.fn();
     const mockSendMessage = vi.fn();
     const mockGetHistory = vi.fn();
 
@@ -501,10 +541,6 @@ describe('Gemini Client (client.ts)', () => {
       vi.mock('./tokenLimits', () => ({
         tokenLimit: vi.fn(),
       }));
-
-      client['contentGenerator'] = {
-        countTokens: mockCountTokens,
-      } as unknown as ContentGenerator;
 
       client['chat'] = {
         getHistory: mockGetHistory,
@@ -514,14 +550,115 @@ describe('Gemini Client (client.ts)', () => {
       } as unknown as GeminiChat;
     });
 
+    function setup({
+      chatHistory = [
+        { role: 'user', parts: [{ text: 'Long conversation' }] },
+        { role: 'model', parts: [{ text: 'Long response' }] },
+      ] as Content[],
+    } = {}) {
+      const mockChat: Partial<GeminiChat> = {
+        getHistory: vi.fn().mockReturnValue(chatHistory),
+        setHistory: vi.fn(),
+        sendMessage: vi.fn().mockResolvedValue({ text: 'Summary' }),
+      };
+      vi.mocked(mockContentGenerator.countTokens)
+        .mockResolvedValueOnce({ totalTokens: 1000 })
+        .mockResolvedValueOnce({ totalTokens: 5000 });
+
+      client['chat'] = mockChat as GeminiChat;
+      client['startChat'] = vi.fn().mockResolvedValue({ ...mockChat });
+
+      return { client, mockChat };
+    }
+
+    describe('when compression inflates the token count', () => {
+      it('allows compression to be forced/manual after a failure', async () => {
+        const { client } = setup();
+
+        vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
+          totalTokens: 1000,
+        });
+        await client.tryCompressChat('prompt-id-4'); // Fails
+        const result = await client.tryCompressChat('prompt-id-4', true);
+
+        expect(result).toEqual({
+          compressionStatus: CompressionStatus.COMPRESSED,
+          newTokenCount: 1000,
+          originalTokenCount: 1000,
+        });
+      });
+
+      it('yields the result even if the compression inflated the tokens', async () => {
+        const { client } = setup();
+        vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
+          totalTokens: 1000,
+        });
+        const result = await client.tryCompressChat('prompt-id-4', true);
+
+        expect(result).toEqual({
+          compressionStatus:
+            CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+          newTokenCount: 5000,
+          originalTokenCount: 1000,
+        });
+      });
+
+      it('does not manipulate the source chat', async () => {
+        const { client, mockChat } = setup();
+        await client.tryCompressChat('prompt-id-4', true);
+
+        expect(client['chat']).toBe(mockChat); // a new chat session was not created
+      });
+
+      it('restores the history back to the original', async () => {
+        vi.mocked(tokenLimit).mockReturnValue(1000);
+        vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
+          totalTokens: 999,
+        });
+
+        const originalHistory: Content[] = [
+          { role: 'user', parts: [{ text: 'what is your wisdom?' }] },
+          { role: 'model', parts: [{ text: 'some wisdom' }] },
+          { role: 'user', parts: [{ text: 'ahh that is a good a wisdom' }] },
+        ];
+
+        const { client } = setup({
+          chatHistory: originalHistory,
+        });
+        const { compressionStatus } =
+          await client.tryCompressChat('prompt-id-4');
+
+        expect(compressionStatus).toBe(
+          CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+        );
+        expect(client['chat']?.setHistory).toHaveBeenCalledWith(
+          originalHistory,
+        );
+      });
+
+      it('will not attempt to compress context after a failure', async () => {
+        const { client } = setup();
+        await client.tryCompressChat('prompt-id-4');
+
+        const result = await client.tryCompressChat('prompt-id-5');
+
+        // it counts tokens for {original, compressed} and then never again
+        expect(mockContentGenerator.countTokens).toHaveBeenCalledTimes(2);
+        expect(result).toEqual({
+          compressionStatus: CompressionStatus.NOOP,
+          newTokenCount: 0,
+          originalTokenCount: 0,
+        });
+      });
+    });
+
     it('should not trigger summarization if token count is below threshold', async () => {
       const MOCKED_TOKEN_LIMIT = 1000;
       vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
       mockGetHistory.mockReturnValue([
         { role: 'user', parts: [{ text: '...history...' }] },
       ]);
-
-      mockCountTokens.mockResolvedValue({
+      vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
         totalTokens: MOCKED_TOKEN_LIMIT * 0.699, // TOKEN_THRESHOLD_FOR_SUMMARIZATION = 0.7
       });
 
@@ -530,7 +667,11 @@ describe('Gemini Client (client.ts)', () => {
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
-      expect(result).toBeNull();
+      expect(result).toEqual({
+        compressionStatus: CompressionStatus.NOOP,
+        newTokenCount: 699,
+        originalTokenCount: 699,
+      });
       expect(newChat).toBe(initialChat);
     });
 
@@ -551,7 +692,7 @@ describe('Gemini Client (client.ts)', () => {
         MOCKED_TOKEN_LIMIT * MOCKED_CONTEXT_PERCENTAGE_THRESHOLD;
       const newTokenCount = 100;
 
-      mockCountTokens
+      vi.mocked(mockContentGenerator.countTokens)
         .mockResolvedValueOnce({ totalTokens: originalTokenCount }) // First call for the check
         .mockResolvedValueOnce({ totalTokens: newTokenCount }); // Second call for the new history
 
@@ -588,7 +729,7 @@ describe('Gemini Client (client.ts)', () => {
         MOCKED_TOKEN_LIMIT * MOCKED_CONTEXT_PERCENTAGE_THRESHOLD;
       const newTokenCount = 100;
 
-      mockCountTokens
+      vi.mocked(mockContentGenerator.countTokens)
         .mockResolvedValueOnce({ totalTokens: originalTokenCount }) // First call for the check
         .mockResolvedValueOnce({ totalTokens: newTokenCount }); // Second call for the new history
 
@@ -607,6 +748,7 @@ describe('Gemini Client (client.ts)', () => {
 
       // Assert that summarization happened and returned the correct stats
       expect(result).toEqual({
+        compressionStatus: CompressionStatus.COMPRESSED,
         originalTokenCount,
         newTokenCount,
       });
@@ -640,7 +782,7 @@ describe('Gemini Client (client.ts)', () => {
       const originalTokenCount = 1000 * 0.7;
       const newTokenCount = 100;
 
-      mockCountTokens
+      vi.mocked(mockContentGenerator.countTokens)
         .mockResolvedValueOnce({ totalTokens: originalTokenCount }) // First call for the check
         .mockResolvedValueOnce({ totalTokens: newTokenCount }); // Second call for the new history
 
@@ -659,6 +801,7 @@ describe('Gemini Client (client.ts)', () => {
 
       // Assert that summarization happened and returned the correct stats
       expect(result).toEqual({
+        compressionStatus: CompressionStatus.COMPRESSED,
         originalTokenCount,
         newTokenCount,
       });
@@ -681,7 +824,7 @@ describe('Gemini Client (client.ts)', () => {
       const originalTokenCount = 10; // Well below threshold
       const newTokenCount = 5;
 
-      mockCountTokens
+      vi.mocked(mockContentGenerator.countTokens)
         .mockResolvedValueOnce({ totalTokens: originalTokenCount })
         .mockResolvedValueOnce({ totalTokens: newTokenCount });
 
@@ -698,6 +841,7 @@ describe('Gemini Client (client.ts)', () => {
       expect(mockSendMessage).toHaveBeenCalled();
 
       expect(result).toEqual({
+        compressionStatus: CompressionStatus.COMPRESSED,
         originalTokenCount,
         newTokenCount,
       });
@@ -705,9 +849,138 @@ describe('Gemini Client (client.ts)', () => {
       // Assert that the chat was reset
       expect(newChat).not.toBe(initialChat);
     });
+
+    it('should use current model from config for token counting after sendMessage', async () => {
+      const initialModel = mockConfig.getModel();
+
+      // mock the model has been changed between calls of `countTokens`
+      const firstCurrentModel = initialModel + '-changed-1';
+      const secondCurrentModel = initialModel + '-changed-2';
+      vi.mocked(mockConfig.getModel)
+        .mockReturnValueOnce(firstCurrentModel)
+        .mockReturnValueOnce(secondCurrentModel);
+
+      vi.mocked(mockContentGenerator.countTokens)
+        .mockResolvedValueOnce({ totalTokens: 100000 })
+        .mockResolvedValueOnce({ totalTokens: 5000 });
+
+      const mockSendMessage = vi.fn().mockResolvedValue({ text: 'Summary' });
+
+      const mockChatHistory = [
+        { role: 'user', parts: [{ text: 'Long conversation' }] },
+        { role: 'model', parts: [{ text: 'Long response' }] },
+      ];
+
+      const mockChat = {
+        getHistory: vi.fn().mockReturnValue(mockChatHistory),
+        setHistory: vi.fn(),
+        sendMessage: mockSendMessage,
+      } as unknown as GeminiChat;
+
+      client['chat'] = mockChat;
+      client['startChat'] = vi.fn().mockResolvedValue(mockChat);
+
+      const result = await client.tryCompressChat('prompt-id-4', true);
+
+      expect(mockContentGenerator.countTokens).toHaveBeenCalledTimes(2);
+      expect(mockContentGenerator.countTokens).toHaveBeenNthCalledWith(1, {
+        model: firstCurrentModel,
+        contents: mockChatHistory,
+      });
+      expect(mockContentGenerator.countTokens).toHaveBeenNthCalledWith(2, {
+        model: secondCurrentModel,
+        contents: expect.any(Array),
+      });
+
+      expect(result).toEqual({
+        compressionStatus: CompressionStatus.COMPRESSED,
+        originalTokenCount: 100000,
+        newTokenCount: 5000,
+      });
+    });
   });
 
   describe('sendMessageStream', () => {
+    it('emits a compression event when the context was automatically compressed', async () => {
+      // Arrange
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
+
+      const compressionInfo: ChatCompressionInfo = {
+        compressionStatus: CompressionStatus.COMPRESSED,
+        originalTokenCount: 1000,
+        newTokenCount: 500,
+      };
+
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValueOnce(
+        compressionInfo,
+      );
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-1',
+      );
+
+      const events = await fromAsync(stream);
+
+      // Assert
+      expect(events).toContainEqual({
+        type: GeminiEventType.ChatCompressed,
+        value: compressionInfo,
+      });
+    });
+
+    it.each([
+      {
+        compressionStatus:
+          CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+      },
+      { compressionStatus: CompressionStatus.NOOP },
+      {
+        compressionStatus:
+          CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
+      },
+    ])(
+      'does not emit a compression event when the status is $compressionStatus',
+      async ({ compressionStatus }) => {
+        // Arrange
+        const mockStream = (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })();
+        mockTurnRunFn.mockReturnValue(mockStream);
+
+        const compressionInfo: ChatCompressionInfo = {
+          compressionStatus,
+          originalTokenCount: 1000,
+          newTokenCount: 500,
+        };
+
+        vi.spyOn(client, 'tryCompressChat').mockResolvedValueOnce(
+          compressionInfo,
+        );
+
+        // Act
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-1',
+        );
+
+        const events = await fromAsync(stream);
+
+        // Assert
+        expect(events).not.toContainEqual({
+          type: GeminiEventType.ChatCompressed,
+          value: expect.anything(),
+        });
+      },
+    );
+
     it('should include editor context when ideMode is enabled', async () => {
       // Arrange
       vi.mocked(ideContext.getIdeContext).mockReturnValue({
@@ -732,26 +1005,21 @@ describe('Gemini Client (client.ts)', () => {
         },
       });
 
-      vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
+      vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
 
-      const mockStream = (async function* () {
-        yield { type: 'content', value: 'Hello' };
-      })();
-      mockTurnRunFn.mockReturnValue(mockStream);
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
 
-      const mockChat: Partial<GeminiChat> = {
+      const mockChat = {
         addHistory: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
-      };
-      client['chat'] = mockChat as GeminiChat;
+      } as unknown as GeminiChat;
+      client['chat'] = mockChat;
 
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
-        generateContent: mockGenerateContentFn,
-      };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
-
-      const initialRequest = [{ text: 'Hi' }];
+      const initialRequest: Part[] = [{ text: 'Hi' }];
 
       // Act
       const stream = client.sendMessageStream(
@@ -813,12 +1081,6 @@ ${JSON.stringify(
       };
       client['chat'] = mockChat as GeminiChat;
 
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
-        generateContent: mockGenerateContentFn,
-      };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
-
       const initialRequest = [{ text: 'Hi' }];
 
       // Act
@@ -867,12 +1129,6 @@ ${JSON.stringify(
         getHistory: vi.fn().mockReturnValue([]),
       };
       client['chat'] = mockChat as GeminiChat;
-
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
-        generateContent: mockGenerateContentFn,
-      };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
 
       const initialRequest = [{ text: 'Hi' }];
 
@@ -944,12 +1200,6 @@ ${JSON.stringify(
       };
       client['chat'] = mockChat as GeminiChat;
 
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
-        generateContent: mockGenerateContentFn,
-      };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
-
       const initialRequest = [{ text: 'Hi' }];
 
       // Act
@@ -996,12 +1246,6 @@ ${JSON.stringify(
       };
       client['chat'] = mockChat as GeminiChat;
 
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
-        generateContent: mockGenerateContentFn,
-      };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
-
       // Act
       const stream = client.sendMessageStream(
         [{ text: 'Hi' }],
@@ -1045,12 +1289,6 @@ ${JSON.stringify(
         getHistory: vi.fn().mockReturnValue([]),
       };
       client['chat'] = mockChat as GeminiChat;
-
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
-        generateContent: mockGenerateContentFn,
-      };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
 
       // Use a signal that never gets aborted
       const abortController = new AbortController();
@@ -1139,12 +1377,6 @@ ${JSON.stringify(
       };
       client['chat'] = mockChat as GeminiChat;
 
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
-        generateContent: mockGenerateContentFn,
-      };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
-
       // Act & Assert
       // Run up to the limit
       for (let i = 0; i < MAX_SESSION_TURNS; i++) {
@@ -1200,12 +1432,6 @@ ${JSON.stringify(
         getHistory: vi.fn().mockReturnValue([]),
       };
       client['chat'] = mockChat as GeminiChat;
-
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
-        generateContent: mockGenerateContentFn,
-      };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
 
       // Use a signal that never gets aborted
       const abortController = new AbortController();
@@ -1266,7 +1492,11 @@ ${JSON.stringify(
 
       beforeEach(() => {
         client['forceFullIdeContext'] = false; // Reset before each delta test
-        vi.spyOn(client, 'tryCompressChat').mockResolvedValue(null);
+        vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+          originalTokenCount: 0,
+          newTokenCount: 0,
+          compressionStatus: CompressionStatus.COMPRESSED,
+        });
         vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
         mockTurnRunFn.mockReturnValue(mockStream);
 
@@ -1282,12 +1512,6 @@ ${JSON.stringify(
             ]),
         };
         client['chat'] = mockChat as GeminiChat;
-
-        const mockGenerator: Partial<ContentGenerator> = {
-          countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
-          generateContent: mockGenerateContentFn,
-        };
-        client['contentGenerator'] = mockGenerator as ContentGenerator;
       });
 
       const testCases = [
@@ -1525,7 +1749,11 @@ ${JSON.stringify(
       let mockChat: Partial<GeminiChat>;
 
       beforeEach(() => {
-        vi.spyOn(client, 'tryCompressChat').mockResolvedValue(null);
+        vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+          originalTokenCount: 0,
+          newTokenCount: 0,
+          compressionStatus: CompressionStatus.COMPRESSED,
+        });
 
         const mockStream = (async function* () {
           yield { type: 'content', value: 'response' };
@@ -1539,11 +1767,6 @@ ${JSON.stringify(
           sendMessage: vi.fn().mockResolvedValue({ text: 'summary' }),
         };
         client['chat'] = mockChat as GeminiChat;
-
-        const mockGenerator: Partial<ContentGenerator> = {
-          countTokens: vi.fn().mockResolvedValue({ totalTokens: 0 }),
-        };
-        client['contentGenerator'] = mockGenerator as ContentGenerator;
 
         vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
         vi.mocked(ideContext.getIdeContext).mockReturnValue({
@@ -1863,9 +2086,107 @@ ${JSON.stringify(
         expect(JSON.stringify(finalCall)).toContain('fileC.ts');
       });
     });
+
+    it('should not call checkNextSpeaker when turn.run() yields an error', async () => {
+      // Arrange
+      const { checkNextSpeaker } = await import(
+        '../utils/nextSpeakerChecker.js'
+      );
+      const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
+
+      const mockStream = (async function* () {
+        yield {
+          type: GeminiEventType.Error,
+          value: { error: { message: 'test error' } },
+        };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-error',
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      // Assert
+      expect(mockCheckNextSpeaker).not.toHaveBeenCalled();
+    });
+
+    it('should not call checkNextSpeaker when turn.run() yields a value then an error', async () => {
+      // Arrange
+      const { checkNextSpeaker } = await import(
+        '../utils/nextSpeakerChecker.js'
+      );
+      const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
+
+      const mockStream = (async function* () {
+        yield { type: GeminiEventType.Content, value: 'some content' };
+        yield {
+          type: GeminiEventType.Error,
+          value: { error: { message: 'test error' } },
+        };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-error',
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      // Assert
+      expect(mockCheckNextSpeaker).not.toHaveBeenCalled();
+    });
   });
 
   describe('generateContent', () => {
+    it('should call generateContent with the correct parameters', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const generationConfig = { temperature: 0.5 };
+      const abortSignal = new AbortController().signal;
+
+      await client.generateContent(
+        contents,
+        generationConfig,
+        abortSignal,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
+
+      expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
+        {
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+          config: {
+            abortSignal,
+            systemInstruction: getCoreSystemPrompt(''),
+            temperature: 0.5,
+            topP: 1,
+          },
+          contents,
+        },
+        'test-session-id',
+      );
+    });
+
     it('should use current model from config for content generation', async () => {
       const initialModel = client['config'].getModel();
       const contents = [{ role: 'user', parts: [{ text: 'test' }] }];
@@ -1873,180 +2194,50 @@ ${JSON.stringify(
 
       vi.spyOn(client['config'], 'getModel').mockReturnValueOnce(currentModel);
 
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: vi.fn().mockResolvedValue({ totalTokens: 1 }),
-        generateContent: mockGenerateContentFn,
-      };
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
+      await client.generateContent(
+        contents,
+        {},
+        new AbortController().signal,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
 
-      await client.generateContent(contents, {}, new AbortController().signal);
-
-      expect(mockGenerateContentFn).not.toHaveBeenCalledWith({
+      expect(mockContentGenerator.generateContent).not.toHaveBeenCalledWith({
         model: initialModel,
         config: expect.any(Object),
         contents,
       });
-      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+      expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
         {
-          model: currentModel,
+          model: DEFAULT_GEMINI_FLASH_MODEL,
           config: expect.any(Object),
           contents,
         },
         'test-session-id',
       );
     });
-  });
 
-  describe('tryCompressChat', () => {
-    it('should use current model from config for token counting after sendMessage', async () => {
-      const initialModel = client['config'].getModel();
+    it('should use the Flash model when fallback mode is active', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const generationConfig = { temperature: 0.5 };
+      const abortSignal = new AbortController().signal;
+      const requestedModel = 'gemini-2.5-pro'; // A non-flash model
 
-      const mockCountTokens = vi
-        .fn()
-        .mockResolvedValueOnce({ totalTokens: 100000 })
-        .mockResolvedValueOnce({ totalTokens: 5000 });
+      // Mock config to be in fallback mode
+      vi.spyOn(client['config'], 'isInFallbackMode').mockReturnValue(true);
 
-      const mockSendMessage = vi.fn().mockResolvedValue({ text: 'Summary' });
-
-      const mockChatHistory = [
-        { role: 'user', parts: [{ text: 'Long conversation' }] },
-        { role: 'model', parts: [{ text: 'Long response' }] },
-      ];
-
-      const mockChat: Partial<GeminiChat> = {
-        getHistory: vi.fn().mockReturnValue(mockChatHistory),
-        setHistory: vi.fn(),
-        sendMessage: mockSendMessage,
-      };
-
-      const mockGenerator: Partial<ContentGenerator> = {
-        countTokens: mockCountTokens,
-      };
-
-      // mock the model has been changed between calls of `countTokens`
-      const firstCurrentModel = initialModel + '-changed-1';
-      const secondCurrentModel = initialModel + '-changed-2';
-      vi.spyOn(client['config'], 'getModel')
-        .mockReturnValueOnce(firstCurrentModel)
-        .mockReturnValueOnce(secondCurrentModel);
-
-      client['chat'] = mockChat as GeminiChat;
-      client['contentGenerator'] = mockGenerator as ContentGenerator;
-      client['startChat'] = vi.fn().mockResolvedValue(mockChat);
-
-      const result = await client.tryCompressChat('prompt-id-4', true);
-
-      expect(mockCountTokens).toHaveBeenCalledTimes(2);
-      expect(mockCountTokens).toHaveBeenNthCalledWith(1, {
-        model: firstCurrentModel,
-        contents: mockChatHistory,
-      });
-      expect(mockCountTokens).toHaveBeenNthCalledWith(2, {
-        model: secondCurrentModel,
-        contents: expect.any(Array),
-      });
-
-      expect(result).toEqual({
-        originalTokenCount: 100000,
-        newTokenCount: 5000,
-      });
-    });
-  });
-
-  describe('handleFlashFallback', () => {
-    it('should use current model from config when checking for fallback', async () => {
-      const initialModel = client['config'].getModel();
-      const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
-
-      // mock config been changed
-      const currentModel = initialModel + '-changed';
-      const getModelSpy = vi.spyOn(client['config'], 'getModel');
-      getModelSpy.mockReturnValue(currentModel);
-
-      const mockFallbackHandler = vi.fn().mockResolvedValue(true);
-      client['config'].flashFallbackHandler = mockFallbackHandler;
-      client['config'].setModel = vi.fn();
-
-      const result = await client['handleFlashFallback'](
-        AuthType.LOGIN_WITH_GOOGLE,
+      await client.generateContent(
+        contents,
+        generationConfig,
+        abortSignal,
+        requestedModel,
       );
 
-      expect(result).toBe(fallbackModel);
-
-      expect(mockFallbackHandler).toHaveBeenCalledWith(
-        currentModel,
-        fallbackModel,
-        undefined,
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+        }),
+        'test-session-id',
       );
-    });
-  });
-
-  describe('setHistory', () => {
-    it('should strip thought signatures when stripThoughts is true', () => {
-      const mockChat = {
-        setHistory: vi.fn(),
-      };
-      client['chat'] = mockChat as unknown as GeminiChat;
-
-      const historyWithThoughts: Content[] = [
-        {
-          role: 'user',
-          parts: [{ text: 'hello' }],
-        },
-        {
-          role: 'model',
-          parts: [
-            { text: 'thinking...', thoughtSignature: 'thought-123' },
-            {
-              functionCall: { name: 'test', args: {} },
-              thoughtSignature: 'thought-456',
-            },
-          ],
-        },
-      ];
-
-      client.setHistory(historyWithThoughts, { stripThoughts: true });
-
-      const expectedHistory: Content[] = [
-        {
-          role: 'user',
-          parts: [{ text: 'hello' }],
-        },
-        {
-          role: 'model',
-          parts: [
-            { text: 'thinking...' },
-            { functionCall: { name: 'test', args: {} } },
-          ],
-        },
-      ];
-
-      expect(mockChat.setHistory).toHaveBeenCalledWith(expectedHistory);
-    });
-
-    it('should not strip thought signatures when stripThoughts is false', () => {
-      const mockChat = {
-        setHistory: vi.fn(),
-      };
-      client['chat'] = mockChat as unknown as GeminiChat;
-
-      const historyWithThoughts: Content[] = [
-        {
-          role: 'user',
-          parts: [{ text: 'hello' }],
-        },
-        {
-          role: 'model',
-          parts: [
-            { text: 'thinking...', thoughtSignature: 'thought-123' },
-            { text: 'ok', thoughtSignature: 'thought-456' },
-          ],
-        },
-      ];
-
-      client.setHistory(historyWithThoughts, { stripThoughts: false });
-
-      expect(mockChat.setHistory).toHaveBeenCalledWith(historyWithThoughts);
     });
   });
 });

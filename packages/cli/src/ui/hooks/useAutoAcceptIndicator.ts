@@ -7,13 +7,17 @@
 import { useState, useEffect } from 'react';
 import { ApprovalMode, type Config } from '@google/gemini-cli-core';
 import { useKeypress } from './useKeypress.js';
+import type { HistoryItemWithoutId } from '../types.js';
+import { MessageType } from '../types.js';
 
 export interface UseAutoAcceptIndicatorArgs {
   config: Config;
+  addItem: (item: HistoryItemWithoutId, timestamp: number) => void;
 }
 
 export function useAutoAcceptIndicator({
   config,
+  addItem,
 }: UseAutoAcceptIndicatorArgs): ApprovalMode {
   const currentConfigValue = config.getApprovalMode();
   const [showAutoAcceptIndicator, setShowAutoAcceptIndicator] =
@@ -40,9 +44,19 @@ export function useAutoAcceptIndicator({
       }
 
       if (nextApprovalMode) {
-        config.setApprovalMode(nextApprovalMode);
-        // Update local state immediately for responsiveness
-        setShowAutoAcceptIndicator(nextApprovalMode);
+        try {
+          config.setApprovalMode(nextApprovalMode);
+          // Update local state immediately for responsiveness
+          setShowAutoAcceptIndicator(nextApprovalMode);
+        } catch (e) {
+          addItem(
+            {
+              type: MessageType.INFO,
+              text: (e as Error).message,
+            },
+            Date.now(),
+          );
+        }
       }
     },
     { isActive: true },
