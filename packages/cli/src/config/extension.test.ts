@@ -32,6 +32,7 @@ import {
 import { execSync } from 'node:child_process';
 import { SettingScope, loadSettings } from './settings.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
+import mock from 'mock-fs';
 
 const mockGit = {
   clone: vi.fn(),
@@ -40,10 +41,16 @@ const mockGit = {
   checkout: vi.fn(),
   listRemote: vi.fn(),
   revparse: vi.fn(),
+  // Not a part of the actual API, but we need to use this to do the correct
+  // file system interactions.
+  path: vi.fn(),
 };
 
 vi.mock('simple-git', () => ({
-  simpleGit: vi.fn(() => mockGit),
+  simpleGit: vi.fn((path: string) => {
+    mockGit.path.mockReturnValue(path);
+    return mockGit;
+  }),
 }));
 
 vi.mock('os', async (importOriginal) => {
@@ -500,9 +507,9 @@ describe('installExtension', () => {
     const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
 
     mockGit.clone.mockImplementation(async (_, destination) => {
-      fs.mkdirSync(destination, { recursive: true });
+      fs.mkdirSync(path.join(mockGit.path(), destination), { recursive: true });
       fs.writeFileSync(
-        path.join(destination, EXTENSIONS_CONFIG_FILENAME),
+        path.join(mockGit.path(), destination, EXTENSIONS_CONFIG_FILENAME),
         JSON.stringify({ name: extensionName, version: '1.0.0' }),
       );
     });
@@ -818,9 +825,9 @@ describe('updateExtension', () => {
     );
 
     mockGit.clone.mockImplementation(async (_, destination) => {
-      fs.mkdirSync(destination, { recursive: true });
+      fs.mkdirSync(path.join(mockGit.path(), destination), { recursive: true });
       fs.writeFileSync(
-        path.join(destination, EXTENSIONS_CONFIG_FILENAME),
+        path.join(mockGit.path(), destination, EXTENSIONS_CONFIG_FILENAME),
         JSON.stringify({ name: extensionName, version: '1.1.0' }),
       );
     });
