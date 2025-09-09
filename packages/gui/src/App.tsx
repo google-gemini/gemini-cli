@@ -2,6 +2,7 @@ import type React from 'react';
 import {useEffect} from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAppStore } from '@/stores/appStore';
+import { useChatStore } from '@/stores/chatStore';
 import { multiModelService } from '@/services/multiModelService';
 import type { ChatSession, ModelProviderType } from '@/types';
 
@@ -58,10 +59,33 @@ export const App: React.FC = () => {
           cwd: workingDirectory,
           interactive: true,
           telemetry: { enabled: false },
-          approvalMode: 'yolo'  // Auto-approve all tool calls in GUI mode
+          approvalMode: 'default'  // Require user confirmation for important tool calls
         };
         
         await multiModelService.initialize(configParams);
+        
+        // Set up tool confirmation callback
+        multiModelService.setConfirmationCallback(async (details) => 
+          new Promise((resolve) => {
+            // Set the confirmation request in chat store
+            useChatStore.getState().setToolConfirmation(details);
+            
+            // Override the onConfirm to resolve our promise
+            const originalOnConfirm = details.onConfirm;
+            details.onConfirm = async (outcome, payload) => {
+              // Clear the confirmation from store
+              useChatStore.getState().setToolConfirmation(null);
+              
+              // Call original handler if it exists
+              if (originalOnConfirm) {
+                await originalOnConfirm(outcome, payload);
+              }
+              
+              // Resolve with the outcome
+              resolve(outcome);
+            };
+          })
+        );
         
         // Switch to the current provider and model after initialization
         await multiModelService.switchProvider(currentProvider, currentModel);
@@ -123,7 +147,7 @@ export const App: React.FC = () => {
             // Load messages for the initial session
             try {
               const messages = await multiModelService.getDisplayMessages(mostRecentSessionId);
-              console.log('Loaded', messages.length, 'messages for initial session:', mostRecentSessionId);
+              // console.log('Loaded', messages.length, 'messages for initial session:', mostRecentSessionId);
               
               // Convert and update the session with messages
               const { updateSession } = useAppStore.getState();
