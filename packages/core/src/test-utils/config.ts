@@ -21,7 +21,7 @@ export const DEFAULT_CONFIG_PARAMETERS: ConfigParameters = {
 };
 
 /**
- * Produces a config.  Default paramters are set to
+ * Produces a config.  Default parameters are set to
  * {@link DEFAULT_CONFIG_PARAMETERS}, optionally, fields can be specified to
  * override those defaults.
  */
