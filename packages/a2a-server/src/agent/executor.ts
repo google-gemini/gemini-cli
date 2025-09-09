@@ -36,6 +36,7 @@ import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { Task } from './task.js';
 import { requestStorage } from '../http/requestStorage.js';
+import { pushTaskStateFailed } from '../utils/executor_utils.js';
 
 /**
  * Provides a wrapper for Task. Passes data from Task to SDKTask.
@@ -116,8 +117,8 @@ export class CoderAgentExecutor implements AgentExecutor {
 
     const agentSettings = persistedState._agentSettings;
     const config = await this.getConfig(agentSettings, sdkTask.id);
-    const contextId : string =
-      (metadata['_contextId'] as string) || (sdkTask.contextId);
+    const contextId: string =
+      (metadata['_contextId'] as string) || sdkTask.contextId;
     const runtimeTask = await Task.create(
       sdkTask.id,
       contextId,
@@ -389,42 +390,11 @@ export class CoderAgentExecutor implements AgentExecutor {
           eventBus,
         );
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Agent execution error';
         logger.error(
           `[CoderAgentExecutor] Error creating task ${taskId}:`,
           error,
         );
-        const stateChange: StateChange = {
-          kind: CoderAgentEvent.StateChangeEvent,
-        };
-        eventBus.publish({
-          kind: 'status-update',
-          taskId,
-          contextId,
-          status: {
-            state: 'failed',
-            message: {
-              kind: 'message',
-              role: 'agent',
-              parts: [
-                {
-                  kind: 'text',
-                  text: errorMessage,
-                },
-              ],
-              messageId: uuidv4(),
-              taskId,
-              contextId,
-            } as Message,
-          },
-          final: true,
-          metadata: {
-            coderAgent: stateChange,
-            model: 'unknown',
-            error: errorMessage,
-          },
-        });
+        pushTaskStateFailed(error, eventBus, taskId, contextId);
         return;
       }
       const newTaskSDK = wrapper.toSDKTask();
