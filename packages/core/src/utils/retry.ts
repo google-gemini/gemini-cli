@@ -10,6 +10,10 @@ import {
   isGenericQuotaExceededError,
 } from './quotaErrorDetection.js';
 
+export interface HttpError extends Error {
+  status?: number;
+}
+
 export interface RetryOptions {
   maxAttempts: number;
   initialDelayMs: number;

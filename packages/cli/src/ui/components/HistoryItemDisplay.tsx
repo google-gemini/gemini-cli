@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import type { HistoryItem } from '../types.js';
 import { UserMessage } from './messages/UserMessage.js';
 import { UserShellMessage } from './messages/UserShellMessage.js';
@@ -20,15 +20,16 @@ import { StatsDisplay } from './StatsDisplay.js';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import { ToolStatsDisplay } from './ToolStatsDisplay.js';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
-import { Config } from '@google/gemini-cli-core';
+import { Help } from './Help.js';
+import type { SlashCommand } from '../commands/types.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
   availableTerminalHeight?: number;
   terminalWidth: number;
   isPending: boolean;
-  config?: Config;
   isFocused?: boolean;
+  commands?: readonly SlashCommand[];
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -36,7 +37,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   availableTerminalHeight,
   terminalWidth,
   isPending,
-  config,
+  commands,
   isFocused = true,
 }) => (
   <Box flexDirection="column" key={item.id}>
@@ -69,8 +70,10 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         modelVersion={item.modelVersion}
         selectedAuthType={item.selectedAuthType}
         gcpProject={item.gcpProject}
+        ideClient={item.ideClient}
       />
     )}
+    {item.type === 'help' && commands && <Help commands={commands} />}
     {item.type === 'stats' && <StatsDisplay duration={item.duration} />}
     {item.type === 'model_stats' && <ModelStatsDisplay />}
     {item.type === 'tool_stats' && <ToolStatsDisplay />}
@@ -81,7 +84,6 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         groupId={item.id}
         availableTerminalHeight={availableTerminalHeight}
         terminalWidth={terminalWidth}
-        config={config}
         isFocused={isFocused}
       />
     )}

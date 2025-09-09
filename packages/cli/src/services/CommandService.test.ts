@@ -177,4 +177,176 @@ describe('CommandService', () => {
     expect(loader2.loadCommands).toHaveBeenCalledTimes(1);
     expect(loader2.loadCommands).toHaveBeenCalledWith(signal);
   });
+
+  it('should rename extension commands when they conflict', async () => {
+    const builtinCommand = createMockCommand('deploy', CommandKind.BUILT_IN);
+    const userCommand = createMockCommand('sync', CommandKind.FILE);
+    const extensionCommand1 = {
+      ...createMockCommand('deploy', CommandKind.FILE),
+      extensionName: 'firebase',
+      description: '[firebase] Deploy to Firebase',
+    };
+    const extensionCommand2 = {
+      ...createMockCommand('sync', CommandKind.FILE),
+      extensionName: 'git-helper',
+      description: '[git-helper] Sync with remote',
+    };
+
+    const mockLoader1 = new MockCommandLoader([builtinCommand]);
+    const mockLoader2 = new MockCommandLoader([
+      userCommand,
+      extensionCommand1,
+      extensionCommand2,
+    ]);
+
+    const service = await CommandService.create(
+      [mockLoader1, mockLoader2],
+      new AbortController().signal,
+    );
+
+    const commands = service.getCommands();
+    expect(commands).toHaveLength(4);
+
+    // Built-in command keeps original name
+    const deployBuiltin = commands.find(
+      (cmd) => cmd.name === 'deploy' && !cmd.extensionName,
+    );
+    expect(deployBuiltin).toBeDefined();
+    expect(deployBuiltin?.kind).toBe(CommandKind.BUILT_IN);
+
+    // Extension command conflicting with built-in gets renamed
+    const deployExtension = commands.find(
+      (cmd) => cmd.name === 'firebase.deploy',
+    );
+    expect(deployExtension).toBeDefined();
+    expect(deployExtension?.extensionName).toBe('firebase');
+
+    // User command keeps original name
+    const syncUser = commands.find(
+      (cmd) => cmd.name === 'sync' && !cmd.extensionName,
+    );
+    expect(syncUser).toBeDefined();
+    expect(syncUser?.kind).toBe(CommandKind.FILE);
+
+    // Extension command conflicting with user command gets renamed
+    const syncExtension = commands.find(
+      (cmd) => cmd.name === 'git-helper.sync',
+    );
+    expect(syncExtension).toBeDefined();
+    expect(syncExtension?.extensionName).toBe('git-helper');
+  });
+
+  it('should handle user/project command override correctly', async () => {
+    const builtinCommand = createMockCommand('help', CommandKind.BUILT_IN);
+    const userCommand = createMockCommand('help', CommandKind.FILE);
+    const projectCommand = createMockCommand('deploy', CommandKind.FILE);
+    const userDeployCommand = createMockCommand('deploy', CommandKind.FILE);
+
+    const mockLoader1 = new MockCommandLoader([builtinCommand]);
+    const mockLoader2 = new MockCommandLoader([
+      userCommand,
+      userDeployCommand,
+      projectCommand,
+    ]);
+
+    const service = await CommandService.create(
+      [mockLoader1, mockLoader2],
+      new AbortController().signal,
+    );
+
+    const commands = service.getCommands();
+    expect(commands).toHaveLength(2);
+
+    // User command overrides built-in
+    const helpCommand = commands.find((cmd) => cmd.name === 'help');
+    expect(helpCommand).toBeDefined();
+    expect(helpCommand?.kind).toBe(CommandKind.FILE);
+
+    // Project command overrides user command (last wins)
+    const deployCommand = commands.find((cmd) => cmd.name === 'deploy');
+    expect(deployCommand).toBeDefined();
+    expect(deployCommand?.kind).toBe(CommandKind.FILE);
+  });
+
+  it('should handle secondary conflicts when renaming extension commands', async () => {
+    // User has both /deploy and /gcp.deploy commands
+    const userCommand1 = createMockCommand('deploy', CommandKind.FILE);
+    const userCommand2 = createMockCommand('gcp.deploy', CommandKind.FILE);
+
+    // Extension also has a deploy command that will conflict with user's /deploy
+    const extensionCommand = {
+      ...createMockCommand('deploy', CommandKind.FILE),
+      extensionName: 'gcp',
+      description: '[gcp] Deploy to Google Cloud',
+    };
+
+    const mockLoader = new MockCommandLoader([
+      userCommand1,
+      userCommand2,
+      extensionCommand,
+    ]);
+
+    const service = await CommandService.create(
+      [mockLoader],
+      new AbortController().signal,
+    );
+
+    const commands = service.getCommands();
+    expect(commands).toHaveLength(3);
+
+    // Original user command keeps its name
+    const deployUser = commands.find(
+      (cmd) => cmd.name === 'deploy' && !cmd.extensionName,
+    );
+    expect(deployUser).toBeDefined();
+
+    // User's dot notation command keeps its name
+    const gcpDeployUser = commands.find(
+      (cmd) => cmd.name === 'gcp.deploy' && !cmd.extensionName,
+    );
+    expect(gcpDeployUser).toBeDefined();
+
+    // Extension command gets renamed with suffix due to secondary conflict
+    const deployExtension = commands.find(
+      (cmd) => cmd.name === 'gcp.deploy1' && cmd.extensionName === 'gcp',
+    );
+    expect(deployExtension).toBeDefined();
+    expect(deployExtension?.description).toBe('[gcp] Deploy to Google Cloud');
+  });
+
+  it('should handle multiple secondary conflicts with incrementing suffixes', async () => {
+    // User has /deploy, /gcp.deploy, and /gcp.deploy1
+    const userCommand1 = createMockCommand('deploy', CommandKind.FILE);
+    const userCommand2 = createMockCommand('gcp.deploy', CommandKind.FILE);
+    const userCommand3 = createMockCommand('gcp.deploy1', CommandKind.FILE);
+
+    // Extension has a deploy command
+    const extensionCommand = {
+      ...createMockCommand('deploy', CommandKind.FILE),
+      extensionName: 'gcp',
+      description: '[gcp] Deploy to Google Cloud',
+    };
+
+    const mockLoader = new MockCommandLoader([
+      userCommand1,
+      userCommand2,
+      userCommand3,
+      extensionCommand,
+    ]);
+
+    const service = await CommandService.create(
+      [mockLoader],
+      new AbortController().signal,
+    );
+
+    const commands = service.getCommands();
+    expect(commands).toHaveLength(4);
+
+    // Extension command gets renamed with suffix 2 due to multiple conflicts
+    const deployExtension = commands.find(
+      (cmd) => cmd.name === 'gcp.deploy2' && cmd.extensionName === 'gcp',
+    );
+    expect(deployExtension).toBeDefined();
+    expect(deployExtension?.description).toBe('[gcp] Deploy to Google Cloud');
+  });
 });

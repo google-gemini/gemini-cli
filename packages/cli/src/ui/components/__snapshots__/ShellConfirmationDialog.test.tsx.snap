@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ShellConfirmationDialog > renders correctly 1`] = `
+" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │                                                                                                  │
+ │ Shell Command Execution                                                                          │
+ │ A custom command wants to run the following shell commands:                                      │
+ │                                                                                                  │
+ │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
+ │ │ ls -la                                                                                       │ │
+ │ │ echo "hello"                                                                                 │ │
+ │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
+ │                                                                                                  │
+ │ Do you want to proceed?                                                                          │
+ │                                                                                                  │
+ │ ● 1. Yes, allow once                                                                             │
+ │   2. Yes, allow always for this session                                                          │
+ │   3. No (esc)                                                                                    │
+ │                                                                                                  │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;

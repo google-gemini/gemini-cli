@@ -4,31 +4,40 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { promises as fs } from 'fs';
-import path from 'path';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 import toml from '@iarna/toml';
 import { glob } from 'glob';
 import { z } from 'zod';
-import {
-  Config,
-  getProjectCommandsDir,
-  getUserCommandsDir,
-} from '@google/gemini-cli-core';
-import { ICommandLoader } from './types.js';
-import {
+import type { Config } from '@google/gemini-cli-core';
+import { Storage } from '@google/gemini-cli-core';
+import type { ICommandLoader } from './types.js';
+import type {
   CommandContext,
-  CommandKind,
   SlashCommand,
-  SubmitPromptActionReturn,
+  SlashCommandActionReturn,
 } from '../ui/commands/types.js';
-import {
-  DefaultArgumentProcessor,
-  ShorthandArgumentProcessor,
-} from './prompt-processors/argumentProcessor.js';
-import {
+import { CommandKind } from '../ui/commands/types.js';
+import { DefaultArgumentProcessor } from './prompt-processors/argumentProcessor.js';
+import type {
   IPromptProcessor,
-  SHORTHAND_ARGS_PLACEHOLDER,
+  PromptPipelineContent,
 } from './prompt-processors/types.js';
+import {
+  SHORTHAND_ARGS_PLACEHOLDER,
+  SHELL_INJECTION_TRIGGER,
+  AT_FILE_INJECTION_TRIGGER,
+} from './prompt-processors/types.js';
+import {
+  ConfirmationRequiredError,
+  ShellProcessor,
+} from './prompt-processors/shellProcessor.js';
+import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
+
+interface CommandDirectory {
+  path: string;
+  extensionName?: string;
+}
 
 /**
  * Defines the Zod schema for a command definition file. This serves as the
@@ -54,73 +63,120 @@ const TomlCommandDefSchema = z.object({
  */
 export class FileCommandLoader implements ICommandLoader {
   private readonly projectRoot: string;
+  private readonly folderTrustEnabled: boolean;
+  private readonly folderTrust: boolean;
 
   constructor(private readonly config: Config | null) {
+    this.folderTrustEnabled = !!config?.getFolderTrustFeature();
+    this.folderTrust = !!config?.getFolderTrust();
     this.projectRoot = config?.getProjectRoot() || process.cwd();
   }
 
   /**
-   * Loads all commands, applying the precedence rule where project-level
-   * commands override user-level commands with the same name.
+   * Loads all commands from user, project, and extension directories.
+   * Returns commands in order: user → project → extensions (alphabetically).
+   *
+   * Order is important for conflict resolution in CommandService:
+   * - User/project commands (without extensionName) use "last wins" strategy
+   * - Extension commands (with extensionName) get renamed if conflicts exist
+   *
    * @param signal An AbortSignal to cancel the loading process.
-   * @returns A promise that resolves to an array of loaded SlashCommands.
+   * @returns A promise that resolves to an array of all loaded SlashCommands.
    */
   async loadCommands(signal: AbortSignal): Promise<SlashCommand[]> {
-    const commandMap = new Map<string, SlashCommand>();
+    const allCommands: SlashCommand[] = [];
     const globOptions = {
       nodir: true,
       dot: true,
       signal,
+      follow: true,
     };
 
-    try {
-      // User Commands
-      const userDir = getUserCommandsDir();
-      const userFiles = await glob('**/*.toml', {
-        ...globOptions,
-        cwd: userDir,
-      });
-      const userCommandPromises = userFiles.map((file) =>
-        this.parseAndAdaptFile(path.join(userDir, file), userDir),
-      );
-      const userCommands = (await Promise.all(userCommandPromises)).filter(
-        (cmd): cmd is SlashCommand => cmd !== null,
-      );
-      for (const cmd of userCommands) {
-        commandMap.set(cmd.name, cmd);
-      }
+    // Load commands from each directory
+    const commandDirs = this.getCommandDirectories();
+    for (const dirInfo of commandDirs) {
+      try {
+        const files = await glob('**/*.toml', {
+          ...globOptions,
+          cwd: dirInfo.path,
+        });
 
-      // Project Commands (these intentionally override user commands)
-      const projectDir = getProjectCommandsDir(this.projectRoot);
-      const projectFiles = await glob('**/*.toml', {
-        ...globOptions,
-        cwd: projectDir,
-      });
-      const projectCommandPromises = projectFiles.map((file) =>
-        this.parseAndAdaptFile(path.join(projectDir, file), projectDir),
-      );
-      const projectCommands = (
-        await Promise.all(projectCommandPromises)
-      ).filter((cmd): cmd is SlashCommand => cmd !== null);
-      for (const cmd of projectCommands) {
-        commandMap.set(cmd.name, cmd);
+        if (this.folderTrustEnabled && !this.folderTrust) {
+          return [];
+        }
+
+        const commandPromises = files.map((file) =>
+          this.parseAndAdaptFile(
+            path.join(dirInfo.path, file),
+            dirInfo.path,
+            dirInfo.extensionName,
+          ),
+        );
+
+        const commands = (await Promise.all(commandPromises)).filter(
+          (cmd): cmd is SlashCommand => cmd !== null,
+        );
+
+        // Add all commands without deduplication
+        allCommands.push(...commands);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          console.error(
+            `[FileCommandLoader] Error loading commands from ${dirInfo.path}:`,
+            error,
+          );
+        }
       }
-    } catch (error) {
-      console.error(`[FileCommandLoader] Error during file search:`, error);
     }
 
-    return Array.from(commandMap.values());
+    return allCommands;
+  }
+
+  /**
+   * Get all command directories in order for loading.
+   * User commands → Project commands → Extension commands
+   * This order ensures extension commands can detect all conflicts.
+   */
+  private getCommandDirectories(): CommandDirectory[] {
+    const dirs: CommandDirectory[] = [];
+
+    const storage = this.config?.storage ?? new Storage(this.projectRoot);
+
+    // 1. User commands
+    dirs.push({ path: Storage.getUserCommandsDir() });
+
+    // 2. Project commands (override user commands)
+    dirs.push({ path: storage.getProjectCommandsDir() });
+
+    // 3. Extension commands (processed last to detect all conflicts)
+    if (this.config) {
+      const activeExtensions = this.config
+        .getExtensions()
+        .filter((ext) => ext.isActive)
+        .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically for deterministic loading
+
+      const extensionCommandDirs = activeExtensions.map((ext) => ({
+        path: path.join(ext.path, 'commands'),
+        extensionName: ext.name,
+      }));
+
+      dirs.push(...extensionCommandDirs);
+    }
+
+    return dirs;
   }
 
   /**
    * Parses a single .toml file and transforms it into a SlashCommand object.
    * @param filePath The absolute path to the .toml file.
    * @param baseDir The root command directory for name calculation.
+   * @param extensionName Optional extension name to prefix commands with.
    * @returns A promise resolving to a SlashCommand, or null if the file is invalid.
    */
   private async parseAndAdaptFile(
     filePath: string,
     baseDir: string,
+    extensionName?: string,
   ): Promise<SlashCommand | null> {
     let fileContent: string;
     try {
@@ -161,7 +217,7 @@ export class FileCommandLoader implements ICommandLoader {
       0,
       relativePathWithExt.length - 5, // length of '.toml'
     );
-    const commandName = relativePath
+    const baseCommandName = relativePath
       .split(path.sep)
       // Sanitize each path segment to prevent ambiguity. Since ':' is our
       // namespace separator, we replace any literal colons in filenames
@@ -169,44 +225,90 @@ export class FileCommandLoader implements ICommandLoader {
       .map((segment) => segment.replaceAll(':', '_'))
       .join(':');
 
-    const processors: IPromptProcessor[] = [];
+    // Add extension name tag for extension commands
+    const defaultDescription = `Custom command from ${path.basename(filePath)}`;
+    let description = validDef.description || defaultDescription;
+    if (extensionName) {
+      description = `[${extensionName}] ${description}`;
+    }
 
-    // The presence of '{{args}}' is the switch that determines the behavior.
-    if (validDef.prompt.includes(SHORTHAND_ARGS_PLACEHOLDER)) {
-      processors.push(new ShorthandArgumentProcessor());
-    } else {
+    const processors: IPromptProcessor[] = [];
+    const usesArgs = validDef.prompt.includes(SHORTHAND_ARGS_PLACEHOLDER);
+    const usesShellInjection = validDef.prompt.includes(
+      SHELL_INJECTION_TRIGGER,
+    );
+    const usesAtFileInjection = validDef.prompt.includes(
+      AT_FILE_INJECTION_TRIGGER,
+    );
+
+    // 1. @-File Injection (Security First).
+    // This runs first to ensure we're not executing shell commands that
+    // could dynamically generate malicious @-paths.
+    if (usesAtFileInjection) {
+      processors.push(new AtFileProcessor(baseCommandName));
+    }
+
+    // 2. Argument and Shell Injection.
+    // This runs after file content has been safely injected.
+    if (usesShellInjection || usesArgs) {
+      processors.push(new ShellProcessor(baseCommandName));
+    }
+
+    // 3. Default Argument Handling.
+    // Appends the raw invocation if no explicit {{args}} are used.
+    if (!usesArgs) {
       processors.push(new DefaultArgumentProcessor());
     }
 
     return {
-      name: commandName,
-      description:
-        validDef.description ||
-        `Custom command from ${path.basename(filePath)}`,
+      name: baseCommandName,
+      description,
       kind: CommandKind.FILE,
+      extensionName,
       action: async (
         context: CommandContext,
         _args: string,
-      ): Promise<SubmitPromptActionReturn> => {
+      ): Promise<SlashCommandActionReturn> => {
         if (!context.invocation) {
           console.error(
-            `[FileCommandLoader] Critical error: Command '${commandName}' was executed without invocation context.`,
+            `[FileCommandLoader] Critical error: Command '${baseCommandName}' was executed without invocation context.`,
           );
           return {
             type: 'submit_prompt',
-            content: validDef.prompt, // Fallback to unprocessed prompt
+            content: [{ text: validDef.prompt }], // Fallback to unprocessed prompt
           };
         }
 
-        let processedPrompt = validDef.prompt;
-        for (const processor of processors) {
-          processedPrompt = await processor.process(processedPrompt, context);
-        }
+        try {
+          let processedContent: PromptPipelineContent = [
+            { text: validDef.prompt },
+          ];
+          for (const processor of processors) {
+            processedContent = await processor.process(
+              processedContent,
+              context,
+            );
+          }
 
-        return {
-          type: 'submit_prompt',
-          content: processedPrompt,
-        };
+          return {
+            type: 'submit_prompt',
+            content: processedContent,
+          };
+        } catch (e) {
+          // Check if it's our specific error type
+          if (e instanceof ConfirmationRequiredError) {
+            // Halt and request confirmation from the UI layer.
+            return {
+              type: 'confirm_shell_commands',
+              commandsToConfirm: e.commandsToConfirm,
+              originalInvocation: {
+                raw: context.invocation.raw,
+              },
+            };
+          }
+          // Re-throw other errors to be handled by the global error handler.
+          throw e;
+        }
       },
     };
   }

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { type Config } from '@google/gemini-cli-core';
@@ -16,7 +16,7 @@ interface TipsProps {
 export const Tips: React.FC<TipsProps> = ({ config }) => {
   const geminiMdFileCount = config.getGeminiMdFileCount();
   return (
-    <Box flexDirection="column" marginBottom={1}>
+    <Box flexDirection="column">
       <Text color={Colors.Foreground}>Tips for getting started:</Text>
       <Text color={Colors.Foreground}>
         1. Ask questions, edit files, or run commands.

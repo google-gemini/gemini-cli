@@ -4,10 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
+  CompressionStatus,
+  ThoughtSummary,
   ToolCallConfirmationDetails,
+  ToolConfirmationOutcome,
   ToolResultDisplay,
 } from '@google/gemini-cli-core';
+import type { PartListUnion } from '@google/genai';
+import { type ReactNode } from 'react';
+
+export type { ThoughtSummary };
+
+export enum AuthState {
+  // Attemtping to authenticate or re-authenticate
+  Unauthenticated = 'unauthenticated',
+  // Auth dialog is open for user to select auth method
+  Updating = 'updating',
+  // Successfully authenticated
+  Authenticated = 'authenticated',
+}
 
 // Only defining the state enum needed by the UI
 export enum StreamingState {
@@ -50,12 +66,14 @@ export interface IndividualToolCallDisplay {
   status: ToolCallStatus;
   confirmationDetails: ToolCallConfirmationDetails | undefined;
   renderOutputAsMarkdown?: boolean;
+  outputFile?: string;
 }
 
 export interface CompressionProps {
   isPending: boolean;
   originalTokenCount: number | null;
   newTokenCount: number | null;
+  compressionStatus: CompressionStatus | null;
 }
 
 export interface HistoryItemBase {
@@ -95,6 +113,12 @@ export type HistoryItemAbout = HistoryItemBase & {
   modelVersion: string;
   selectedAuthType: string;
   gcpProject: string;
+  ideClient: string;
+};
+
+export type HistoryItemHelp = HistoryItemBase & {
+  type: 'help';
+  timestamp: Date;
 };
 
 export type HistoryItemStats = HistoryItemBase & {
@@ -142,6 +166,7 @@ export type HistoryItemWithoutId =
   | HistoryItemInfo
   | HistoryItemError
   | HistoryItemAbout
+  | HistoryItemHelp
   | HistoryItemToolGroup
   | HistoryItemStats
   | HistoryItemModelStats
@@ -157,6 +182,7 @@ export enum MessageType {
   ERROR = 'error',
   USER = 'user',
   ABOUT = 'about',
+  HELP = 'help',
   STATS = 'stats',
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
@@ -181,7 +207,13 @@ export type Message =
       modelVersion: string;
       selectedAuthType: string;
       gcpProject: string;
+      ideClient: string;
       content?: string; // Optional content, not really used for ABOUT
+    }
+  | {
+      type: MessageType.HELP;
+      timestamp: Date;
+      content?: string; // Optional content, not really used for HELP
     }
   | {
       type: MessageType.STATS;
@@ -212,7 +244,7 @@ export type Message =
     };
 
 export interface ConsoleMessageItem {
-  type: 'log' | 'warn' | 'error' | 'debug';
+  type: 'log' | 'warn' | 'error' | 'debug' | 'info';
   content: string;
   count: number;
 }
@@ -223,7 +255,7 @@ export interface ConsoleMessageItem {
  */
 export interface SubmitPromptResult {
   type: 'submit_prompt';
-  content: string;
+  content: PartListUnion;
 }
 
 /**
@@ -239,3 +271,16 @@ export type SlashCommandProcessorResult =
       type: 'handled'; // Indicates the command was processed and no further action is needed.
     }
   | SubmitPromptResult;
+
+export interface ShellConfirmationRequest {
+  commands: string[];
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    approvedCommands?: string[],
+  ) => void;
+}
+
+export interface ConfirmationRequest {
+  prompt: ReactNode;
+  onConfirm: (confirm: boolean) => void;
+}

@@ -10,9 +10,10 @@ import reactPlugin from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
+import vitest from '@vitest/eslint-plugin';
 import globals from 'globals';
 import licenseHeader from 'eslint-plugin-license-header';
-import path from 'node:path'; // Use node: prefix for built-ins
+import path from 'node:path';
 import url from 'node:url';
 
 // --- ESM way to get __dirname ---
@@ -28,12 +29,12 @@ export default tseslint.config(
     // Global ignores
     ignores: [
       'node_modules/*',
+      '.integration-tests/**',
       'eslint.config.js',
-      'packages/cli/dist/**',
-      'packages/core/dist/**',
-      'packages/server/dist/**',
-      'packages/vscode-ide-companion/dist/**',
+      'packages/**/dist/**',
       'bundle/**',
+      'package/bundle/**',
+      '.integration-tests/**',
     ],
   },
   eslint.configs.recommended,
@@ -103,6 +104,10 @@ export default tseslint.config(
         'error',
         { ignoreParameters: true, ignoreProperties: true },
       ],
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { disallowTypeAnnotations: false },
+      ],
       '@typescript-eslint/no-namespace': ['error', { allowDeclarations: true }],
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -115,7 +120,12 @@ export default tseslint.config(
       'import/no-internal-modules': [
         'error',
         {
-          allow: ['react-dom/test-utils', 'memfs/lib/volume.js', 'yargs/**'],
+          allow: [
+            'react-dom/test-utils',
+            'memfs/lib/volume.js',
+            'yargs/**',
+            'msw/node',
+          ],
         },
       ],
       'import/no-relative-packages': 'error',
@@ -151,9 +161,21 @@ export default tseslint.config(
     },
   },
   {
+    files: ['packages/*/src/**/*.test.{ts,tsx}'],
+    plugins: {
+      vitest,
+    },
+    rules: {
+      ...vitest.configs.recommended.rules,
+      'vitest/expect-expect': 'off',
+      'vitest/no-commented-out-tests': 'off',
+    },
+  },
+  {
     files: ['./**/*.{tsx,ts,js}'],
     plugins: {
       'license-header': licenseHeader,
+      import: importPlugin,
     },
     rules: {
       'license-header/header': [
@@ -166,6 +188,7 @@ export default tseslint.config(
           ' */',
         ],
       ],
+      'import/enforce-node-protocol-usage': ['error', 'always'],
     },
   },
   // extra settings for scripts that we run directly with node
@@ -191,6 +214,21 @@ export default tseslint.config(
   },
   {
     files: ['packages/vscode-ide-companion/esbuild.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        process: 'readonly',
+        console: 'readonly',
+      },
+    },
+    rules: {
+      'no-restricted-syntax': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  // extra settings for scripts that we run directly with node
+  {
+    files: ['packages/vscode-ide-companion/scripts/**/*.js'],
     languageOptions: {
       globals: {
         ...globals.node,

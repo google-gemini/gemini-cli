@@ -4,14 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  metrics,
-  Attributes,
-  ValueType,
-  Meter,
-  Counter,
-  Histogram,
-} from '@opentelemetry/api';
+import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
+import { metrics, ValueType } from '@opentelemetry/api';
 import {
   SERVICE_NAME,
   METRIC_TOOL_CALL_COUNT,
@@ -21,8 +15,12 @@ import {
   METRIC_TOKEN_USAGE,
   METRIC_SESSION_COUNT,
   METRIC_FILE_OPERATION_COUNT,
+  EVENT_CHAT_COMPRESSION,
+  METRIC_INVALID_CHUNK_COUNT,
+  METRIC_CONTENT_RETRY_COUNT,
+  METRIC_CONTENT_RETRY_FAILURE_COUNT,
 } from './constants.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 
 export enum FileOperation {
   CREATE = 'create',
@@ -37,6 +35,10 @@ let apiRequestCounter: Counter | undefined;
 let apiRequestLatencyHistogram: Histogram | undefined;
 let tokenUsageCounter: Counter | undefined;
 let fileOperationCounter: Counter | undefined;
+let chatCompressionCounter: Counter | undefined;
+let invalidChunkCounter: Counter | undefined;
+let contentRetryCounter: Counter | undefined;
+let contentRetryFailureCounter: Counter | undefined;
 let isMetricsInitialized = false;
 
 function getCommonAttributes(config: Config): Attributes {
@@ -87,6 +89,28 @@ export function initializeMetrics(config: Config): void {
     description: 'Counts file operations (create, read, update).',
     valueType: ValueType.INT,
   });
+  chatCompressionCounter = meter.createCounter(EVENT_CHAT_COMPRESSION, {
+    description: 'Counts chat compression events.',
+    valueType: ValueType.INT,
+  });
+
+  // New counters for content errors
+  invalidChunkCounter = meter.createCounter(METRIC_INVALID_CHUNK_COUNT, {
+    description: 'Counts invalid chunks received from a stream.',
+    valueType: ValueType.INT,
+  });
+  contentRetryCounter = meter.createCounter(METRIC_CONTENT_RETRY_COUNT, {
+    description: 'Counts retries due to content errors (e.g., empty stream).',
+    valueType: ValueType.INT,
+  });
+  contentRetryFailureCounter = meter.createCounter(
+    METRIC_CONTENT_RETRY_FAILURE_COUNT,
+    {
+      description: 'Counts occurrences of all content retries failing.',
+      valueType: ValueType.INT,
+    },
+  );
+
   const sessionCounter = meter.createCounter(METRIC_SESSION_COUNT, {
     description: 'Count of CLI sessions started.',
     valueType: ValueType.INT,
@@ -95,12 +119,24 @@ export function initializeMetrics(config: Config): void {
   isMetricsInitialized = true;
 }
 
+export function recordChatCompressionMetrics(
+  config: Config,
+  args: { tokens_before: number; tokens_after: number },
+) {
+  if (!chatCompressionCounter || !isMetricsInitialized) return;
+  chatCompressionCounter.add(1, {
+    ...getCommonAttributes(config),
+    ...args,
+  });
+}
+
 export function recordToolCallMetrics(
   config: Config,
   functionName: string,
   durationMs: number,
   success: boolean,
-  decision?: 'accept' | 'reject' | 'modify',
+  decision?: 'accept' | 'reject' | 'modify' | 'auto_accept',
+  tool_type?: 'native' | 'mcp',
 ): void {
   if (!toolCallCounter || !toolCallLatencyHistogram || !isMetricsInitialized)
     return;
@@ -110,6 +146,7 @@ export function recordToolCallMetrics(
     function_name: functionName,
     success,
     decision,
+    tool_type,
   };
   toolCallCounter.add(1, metricAttributes);
   toolCallLatencyHistogram.record(durationMs, {
@@ -189,14 +226,44 @@ export function recordFileOperationMetric(
   lines?: number,
   mimetype?: string,
   extension?: string,
+  programming_language?: string,
 ): void {
   if (!fileOperationCounter || !isMetricsInitialized) return;
   const attributes: Attributes = {
     ...getCommonAttributes(config),
     operation,
   };
-  if (lines !== undefined) attributes.lines = lines;
-  if (mimetype !== undefined) attributes.mimetype = mimetype;
-  if (extension !== undefined) attributes.extension = extension;
+  if (lines !== undefined) attributes['lines'] = lines;
+  if (mimetype !== undefined) attributes['mimetype'] = mimetype;
+  if (extension !== undefined) attributes['extension'] = extension;
+  if (programming_language !== undefined) {
+    attributes['programming_language'] = programming_language;
+  }
   fileOperationCounter.add(1, attributes);
+}
+
+// --- New Metric Recording Functions ---
+
+/**
+ * Records a metric for when an invalid chunk is received from a stream.
+ */
+export function recordInvalidChunk(config: Config): void {
+  if (!invalidChunkCounter || !isMetricsInitialized) return;
+  invalidChunkCounter.add(1, getCommonAttributes(config));
+}
+
+/**
+ * Records a metric for when a retry is triggered due to a content error.
+ */
+export function recordContentRetry(config: Config): void {
+  if (!contentRetryCounter || !isMetricsInitialized) return;
+  contentRetryCounter.add(1, getCommonAttributes(config));
+}
+
+/**
+ * Records a metric for when all content error retries have failed for a request.
+ */
+export function recordContentRetryFailure(config: Config): void {
+  if (!contentRetryFailureCounter || !isMetricsInitialized) return;
+  contentRetryFailureCounter.add(1, getCommonAttributes(config));
 }

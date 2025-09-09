@@ -12,8 +12,9 @@ import type {
   Context,
   Histogram,
 } from '@opentelemetry/api';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { FileOperation } from './metrics.js';
+import { makeFakeConfig } from '../test-utils/config.js';
 
 const mockCounterAddFn: Mock<
   (value: number, attributes?: Attributes, context?: Context) => void
@@ -28,18 +29,18 @@ const mockCreateHistogramFn: Mock<
   (name: string, options?: unknown) => Histogram
 > = vi.fn();
 
-const mockCounterInstance = {
+const mockCounterInstance: Counter = {
   add: mockCounterAddFn,
-} as unknown as Counter;
+} as Partial<Counter> as Counter;
 
-const mockHistogramInstance = {
+const mockHistogramInstance: Histogram = {
   record: mockHistogramRecordFn,
-} as unknown as Histogram;
+} as Partial<Histogram> as Histogram;
 
-const mockMeterInstance = {
+const mockMeterInstance: Meter = {
   createCounter: mockCreateCounterFn.mockReturnValue(mockCounterInstance),
   createHistogram: mockCreateHistogramFn.mockReturnValue(mockHistogramInstance),
-} as unknown as Meter;
+} as Partial<Meter> as Meter;
 
 function originalOtelMockFactory() {
   return {
@@ -49,15 +50,19 @@ function originalOtelMockFactory() {
     ValueType: {
       INT: 1,
     },
+    diag: {
+      setLogger: vi.fn(),
+    },
   };
 }
 
-vi.mock('@opentelemetry/api', originalOtelMockFactory);
+vi.mock('@opentelemetry/api');
 
 describe('Telemetry Metrics', () => {
   let initializeMetricsModule: typeof import('./metrics.js').initializeMetrics;
   let recordTokenUsageMetricsModule: typeof import('./metrics.js').recordTokenUsageMetrics;
   let recordFileOperationMetricModule: typeof import('./metrics.js').recordFileOperationMetric;
+  let recordChatCompressionMetricsModule: typeof import('./metrics.js').recordChatCompressionMetrics;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -71,6 +76,8 @@ describe('Telemetry Metrics', () => {
     initializeMetricsModule = metricsJsModule.initializeMetrics;
     recordTokenUsageMetricsModule = metricsJsModule.recordTokenUsageMetrics;
     recordFileOperationMetricModule = metricsJsModule.recordFileOperationMetric;
+    recordChatCompressionMetricsModule =
+      metricsJsModule.recordChatCompressionMetrics;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -83,6 +90,35 @@ describe('Telemetry Metrics', () => {
     (otelApiModule.metrics.getMeter as Mock).mockReturnValue(mockMeterInstance);
     mockCreateCounterFn.mockReturnValue(mockCounterInstance);
     mockCreateHistogramFn.mockReturnValue(mockHistogramInstance);
+  });
+
+  describe('recordChatCompressionMetrics', () => {
+    it('does not record metrics if not initialized', () => {
+      const lol = makeFakeConfig({});
+
+      recordChatCompressionMetricsModule(lol, {
+        tokens_after: 100,
+        tokens_before: 200,
+      });
+
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('records token compression with the correct attributes', () => {
+      const config = makeFakeConfig({});
+      initializeMetricsModule(config);
+
+      recordChatCompressionMetricsModule(config, {
+        tokens_after: 100,
+        tokens_before: 200,
+      });
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        tokens_after: 100,
+        tokens_before: 200,
+      });
+    });
   });
 
   describe('recordTokenUsageMetrics', () => {
@@ -219,6 +255,64 @@ describe('Telemetry Metrics', () => {
         'session.id': 'test-session-id',
         operation: FileOperation.UPDATE,
         mimetype: 'application/javascript',
+      });
+    });
+
+    it('should record file operation without diffStat', () => {
+      initializeMetricsModule(mockConfig);
+      mockCounterAddFn.mockClear();
+
+      recordFileOperationMetricModule(
+        mockConfig,
+        FileOperation.UPDATE,
+        undefined,
+        undefined,
+        undefined,
+      );
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        operation: FileOperation.UPDATE,
+      });
+    });
+
+    it('should record minimal file operation when optional parameters are undefined', () => {
+      initializeMetricsModule(mockConfig);
+      mockCounterAddFn.mockClear();
+
+      recordFileOperationMetricModule(
+        mockConfig,
+        FileOperation.UPDATE,
+        10,
+        'text/plain',
+        'txt',
+        undefined,
+      );
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        operation: FileOperation.UPDATE,
+        lines: 10,
+        mimetype: 'text/plain',
+        extension: 'txt',
+      });
+    });
+
+    it('should not include diffStat attributes when diffStat is not provided', () => {
+      initializeMetricsModule(mockConfig);
+      mockCounterAddFn.mockClear();
+
+      recordFileOperationMetricModule(
+        mockConfig,
+        FileOperation.UPDATE,
+        undefined,
+        undefined,
+        undefined,
+      );
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        operation: FileOperation.UPDATE,
       });
     });
   });

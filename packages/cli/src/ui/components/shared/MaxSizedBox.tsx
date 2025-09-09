@@ -264,13 +264,12 @@ function visitBoxRow(element: React.ReactNode): Row {
 
   if (enableDebugLog) {
     const boxProps = element.props as {
-      children?: React.ReactNode | undefined;
+      children?: React.ReactNode;
       readonly flexDirection?:
         | 'row'
         | 'column'
         | 'row-reverse'
-        | 'column-reverse'
-        | undefined;
+        | 'column-reverse';
     };
     // Ensure the Box has no props other than the default ones and key.
     let maxExpectedProps = 4;
@@ -321,7 +320,7 @@ function visitBoxRow(element: React.ReactNode): Row {
       const segment: StyledText = { text, props: parentProps ?? {} };
 
       // Check the 'wrap' property from the merged props to decide the segment type.
-      if (parentProps === undefined || parentProps.wrap === 'wrap') {
+      if (parentProps === undefined || parentProps['wrap'] === 'wrap') {
         hasSeenWrapped = true;
         row.segments.push(segment);
       } else {

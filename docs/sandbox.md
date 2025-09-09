@@ -55,7 +55,9 @@ gemini -p "run the test suite"
 
 # Configure in settings.json
 {
-  "sandbox": "docker"
+  "tools": {
+    "sandbox": "docker"
+  }
 }
 ```
 
@@ -65,7 +67,7 @@ gemini -p "run the test suite"
 
 1. **Command flag**: `-s` or `--sandbox`
 2. **Environment variable**: `GEMINI_SANDBOX=true|docker|podman|sandbox-exec`
-3. **Settings file**: `"sandbox": true` in `settings.json`
+3. **Settings file**: `"sandbox": true` in the `tools` object of your `settings.json` file (e.g., `{"tools": {"sandbox": true}}`).
 
 ### macOS Seatbelt profiles
 
@@ -76,6 +78,24 @@ Built-in profiles (set via `SEATBELT_PROFILE` env var):
 - `permissive-proxied`: Write restrictions, network via proxy
 - `restrictive-open`: Strict restrictions, network allowed
 - `restrictive-closed`: Maximum restrictions
+
+### Custom Sandbox Flags
+
+For container-based sandboxing, you can inject custom flags into the `docker` or `podman` command using the `SANDBOX_FLAGS` environment variable. This is useful for advanced configurations, such as disabling security features for specific use cases.
+
+**Example (Podman)**:
+
+To disable SELinux labeling for volume mounts, you can set the following:
+
+```bash
+export SANDBOX_FLAGS="--security-opt label=disable"
+```
+
+Multiple flags can be provided as a space-separated string:
+
+```bash
+export SANDBOX_FLAGS="--flag1 --flag2=value"
+```
 
 ## Linux UID/GID handling
 
@@ -110,6 +130,8 @@ export SANDBOX_SET_UID_GID=false  # Disable UID/GID mapping
 ```bash
 DEBUG=1 gemini -s -p "debug command"
 ```
+
+**Note:** If you have `DEBUG=true` in a project's `.env` file, it won't affect gemini-cli due to automatic exclusion. Use `.gemini/.env` files for gemini-cli specific debug settings.
 
 ### Inspect sandbox
 
