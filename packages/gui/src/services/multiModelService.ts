@@ -13,7 +13,7 @@ import type {
   CompressionInfo,
   ToolCall
 } from '@/types';
-import type { ToolCallConfirmationDetails, ToolConfirmationOutcome } from '@google/gemini-cli-core';
+import type { ToolCallConfirmationDetails, ToolConfirmationOutcome } from '@/types';
 
 // Define Electron API interface
 interface ElectronAPI {
@@ -51,7 +51,7 @@ interface ElectronAPI {
     getSessionsInfo: () => Promise<Array<{id: string, title: string, messageCount: number, lastUpdated: Date}>>;
     updateSessionTitle: (sessionId: string, newTitle: string) => Promise<void>;
     // Tool confirmation
-    onToolConfirmationRequest: (callback: (event: unknown, details: ToolCallConfirmationDetails) => void) => () => void;
+    onToolConfirmationRequest: (callback: (event: unknown, data: { streamId: string; confirmationDetails: ToolCallConfirmationDetails }) => void) => () => void;
     sendToolConfirmationResponse: (outcome: string) => Promise<{ success: boolean }>;
     // OAuth authentication
     startOAuthFlow: (providerType: string) => Promise<{ success: boolean; message?: string; error?: string }>;
@@ -108,25 +108,26 @@ class MultiModelService {
   // Set up the confirmation request listener from main process
   private setupConfirmationListener(): void {
     if (this.api.onToolConfirmationRequest) {
-      this.api.onToolConfirmationRequest(async (_, confirmationDetails) => {
-        console.log('Received tool confirmation request from main process:', confirmationDetails);
+      this.api.onToolConfirmationRequest(async (_, data) => {
+        console.log('Received tool confirmation request from main process:', data);
         
         if (this.confirmationCallback) {
           try {
             // Call the registered callback to handle confirmation in GUI
-            const outcome = await this.confirmationCallback(confirmationDetails);
+            // data.confirmationDetails is the actual ToolCallConfirmationDetails
+            const outcome = await this.confirmationCallback(data.confirmationDetails);
             console.log('Sending confirmation response:', outcome);
             
             // Send the response back to main process
-            await this.api.sendToolConfirmationResponse(outcome);
+            this.api.sendToolConfirmationResponse(outcome);
           } catch (error) {
             console.error('Error handling tool confirmation:', error);
             // Send cancel as fallback
-            await this.api.sendToolConfirmationResponse('cancel');
+            this.api.sendToolConfirmationResponse('cancel');
           }
         } else {
           console.warn('No confirmation callback registered, auto-cancelling');
-          await this.api.sendToolConfirmationResponse('cancel');
+          this.api.sendToolConfirmationResponse('cancel');
         }
       });
     }

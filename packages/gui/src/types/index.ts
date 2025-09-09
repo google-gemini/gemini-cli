@@ -171,6 +171,61 @@ export interface AuthConfig {
 export type Language = 'en' | 'zh' | 'ja' | 'ko' | 'es' | 'fr' | 'de';
 export type ThemeMode = 'light' | 'dark' | 'system';
 
+// Tool confirmation types (defined locally to avoid WASM dependencies)
+export enum ToolConfirmationOutcome {
+  ProceedOnce = 'proceed_once',
+  ProceedAlways = 'proceed_always',
+  ProceedAlwaysServer = 'proceed_always_server',
+  ProceedAlwaysTool = 'proceed_always_tool',
+  ModifyWithEditor = 'modify_with_editor',
+  Cancel = 'cancel',
+}
+
+export interface ToolEditConfirmationDetails {
+  type: 'edit';
+  title: string;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: any,
+  ) => Promise<void>;
+  fileName: string;
+  filePath: string;
+  fileDiff: string;
+  originalContent: string | null;
+  newContent: string;
+}
+
+export interface ToolExecuteConfirmationDetails {
+  type: 'exec';
+  title: string;
+  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+  command: string;
+  rootCommand: string;
+}
+
+export interface ToolMcpConfirmationDetails {
+  type: 'mcp';
+  title: string;
+  serverName: string;
+  toolName: string;
+  toolDisplayName: string;
+  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+}
+
+export interface ToolInfoConfirmationDetails {
+  type: 'info';
+  title: string;
+  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+  prompt: string;
+  urls?: string[];
+}
+
+export type ToolCallConfirmationDetails =
+  | ToolEditConfirmationDetails
+  | ToolExecuteConfirmationDetails
+  | ToolMcpConfirmationDetails
+  | ToolInfoConfirmationDetails;
+
 export interface AppState {
   // Session management
   sessions: ChatSession[];

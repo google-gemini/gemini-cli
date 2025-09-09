@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ChatMessage, CompressionInfo } from '@/types';
+import type { ChatMessage, CompressionInfo, ToolCallConfirmationDetails } from '@/types';
 
 interface ChatState {
   isLoading: boolean;
@@ -8,6 +8,7 @@ interface ChatState {
   error: string | null;
   streamingMessage: string;
   compressionNotification: CompressionInfo | null; // Show compression notification
+  toolConfirmation: ToolCallConfirmationDetails | null; // Tool confirmation request
   
   // Actions
   setLoading: (loading: boolean) => void;
@@ -16,6 +17,7 @@ interface ChatState {
   setError: (error: string | null) => void;
   setStreamingMessage: (message: string) => void;
   setCompressionNotification: (info: CompressionInfo | null) => void;
+  setToolConfirmation: (confirmation: ToolCallConfirmationDetails | null) => void;
   addMessage: (sessionId: string, message: ChatMessage) => void;
   updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => void;
 }
@@ -27,6 +29,7 @@ export const useChatStore = create<ChatState>()((set) => ({
   error: null,
   streamingMessage: '',
   compressionNotification: null,
+  toolConfirmation: null,
 
   setLoading: (loading: boolean) => set({ isLoading: loading }),
   
@@ -41,6 +44,8 @@ export const useChatStore = create<ChatState>()((set) => ({
   },
 
   setCompressionNotification: (info: CompressionInfo | null) => set({ compressionNotification: info }),
+  
+  setToolConfirmation: (confirmation: ToolCallConfirmationDetails | null) => set({ toolConfirmation: confirmation }),
 
   addMessage: (_sessionId: string, _message: ChatMessage) => {
     // This will be handled by appStore for persistence
