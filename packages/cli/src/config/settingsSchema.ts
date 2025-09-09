@@ -17,6 +17,37 @@ import {
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 
+export type SettingsType =
+  | 'boolean'
+  | 'string'
+  | 'number'
+  | 'array'
+  | 'object'
+  | 'enum';
+
+export type SettingsValue =
+  | boolean
+  | string
+  | number
+  | string[]
+  | object
+  | undefined;
+
+/**
+ * Setting datatypes that "toggle" through a fixed list of options
+ * (e.g. an enum or true/false) rather than allowing for free form input
+ * (like a number or string).
+ */
+export const TOGGLE_TYPES: ReadonlySet<SettingsType | undefined> = new Set([
+  'boolean',
+  'enum',
+]);
+
+interface SettingEnumOption {
+  value: string | number;
+  label: string;
+}
+
 export enum MergeStrategy {
   // Replace the old value with the new value. This is the default.
   REPLACE = 'replace',
@@ -29,11 +60,11 @@ export enum MergeStrategy {
 }
 
 export interface SettingDefinition {
-  type: 'boolean' | 'string' | 'number' | 'array' | 'object';
+  type: SettingsType;
   label: string;
   category: string;
   requiresRestart: boolean;
-  default: boolean | string | number | string[] | object | undefined;
+  default: SettingsValue;
   description?: string;
   parentKey?: string;
   childKey?: string;
@@ -41,6 +72,8 @@ export interface SettingDefinition {
   properties?: SettingsSchema;
   showInDialog?: boolean;
   mergeStrategy?: MergeStrategy;
+  /** Enum type options  */
+  options?: readonly SettingEnumOption[];
 }
 
 export interface SettingsSchema {
@@ -55,7 +88,7 @@ export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
  * The structure of this object defines the structure of the `Settings` type.
  * `as const` is crucial for TypeScript to infer the most specific types possible.
  */
-export const SETTINGS_SCHEMA = {
+const SETTINGS_SCHEMA = {
   // Maintained for compatibility/criticality
   mcpServers: {
     type: 'object',
@@ -900,7 +933,13 @@ export const SETTINGS_SCHEMA = {
       },
     },
   },
-} as const;
+} as const satisfies SettingsSchema;
+
+export type SettingsSchemaType = typeof SETTINGS_SCHEMA;
+
+export function getSettingsSchema(): SettingsSchemaType {
+  return SETTINGS_SCHEMA;
+}
 
 type InferSettings<T extends SettingsSchema> = {
   -readonly [K in keyof T]?: T[K] extends { properties: SettingsSchema }
@@ -910,7 +949,7 @@ type InferSettings<T extends SettingsSchema> = {
       : T[K]['default'];
 };
 
-export type Settings = InferSettings<typeof SETTINGS_SCHEMA>;
+export type Settings = InferSettings<SettingsSchemaType>;
 
 export interface FooterSettings {
   hideCWD?: boolean;

@@ -281,6 +281,16 @@ export class FlashFallbackEvent implements BaseTelemetryEvent {
   }
 }
 
+export class RipgrepFallbackEvent implements BaseTelemetryEvent {
+  'event.name': 'ripgrep_fallback';
+  'event.timestamp': string;
+
+  constructor(public error?: string) {
+    this['event.name'] = 'ripgrep_fallback';
+    this['event.timestamp'] = new Date().toISOString();
+  }
+}
+
 export enum LoopType {
   CONSECUTIVE_IDENTICAL_TOOL_CALLS = 'consecutive_identical_tool_calls',
   CHANTING_IDENTICAL_SENTENCES = 'chanting_identical_sentences',
