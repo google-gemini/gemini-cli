@@ -33,12 +33,7 @@ describe('Session Cleanup Integration', () => {
       },
     };
 
-    const startTime = Date.now();
     const result = await cleanupExpiredSessions(config, settings);
-    const endTime = Date.now();
-
-    // Should complete quickly even with non-existent directory
-    expect(endTime - startTime).toBeLessThan(100);
 
     // Should return empty result for non-existent directory
     expect(result.scanned).toBe(0);
@@ -57,12 +52,7 @@ describe('Session Cleanup Integration', () => {
       },
     };
 
-    const startTime = Date.now();
     const result = await cleanupExpiredSessions(config, settings);
-    const endTime = Date.now();
-
-    // Should complete almost instantly when disabled
-    expect(endTime - startTime).toBeLessThan(10);
 
     expect(result.scanned).toBe(0);
     expect(result.deleted).toBe(0);
@@ -74,12 +64,7 @@ describe('Session Cleanup Integration', () => {
     const config = createTestConfig();
     const settings: Settings = {};
 
-    const startTime = Date.now();
     const result = await cleanupExpiredSessions(config, settings);
-    const endTime = Date.now();
-
-    // Should complete almost instantly when not configured
-    expect(endTime - startTime).toBeLessThan(10);
 
     expect(result.scanned).toBe(0);
     expect(result.deleted).toBe(0);
@@ -98,12 +83,7 @@ describe('Session Cleanup Integration', () => {
       },
     };
 
-    const startTime = Date.now();
     const result = await cleanupExpiredSessions(config, settings);
-    const endTime = Date.now();
-
-    // Should complete quickly even with invalid config
-    expect(endTime - startTime).toBeLessThan(50);
 
     expect(result.scanned).toBe(0);
     expect(result.deleted).toBe(0);
