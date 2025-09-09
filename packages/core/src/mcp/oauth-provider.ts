@@ -781,7 +781,6 @@ export class MCPOAuthProvider {
 
     const token: OAuthToken = {
       accessToken: bearerToken,
-
       tokenType: tokenResponse.token_type || 'Bearer',
       refreshToken: tokenResponse.refresh_token,
       scope: tokenResponse.scope,
