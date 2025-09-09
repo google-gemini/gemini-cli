@@ -459,8 +459,7 @@ export function SettingsDialog({
       }
       return current;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableTerminalHeight, effectiveMaxItemsToShow, items.length]);
+  }, [availableTerminalHeight, effectiveMaxItemsToShow, items.length, scrollOffset]);
 
   const currentFocusedSection = !showScopeSelection ? 'settings' : focusSection;
 
@@ -887,17 +886,17 @@ export function SettingsDialog({
             {/* Single spacer between list and scope selection. Keep in sync with SPACING_HEIGHT. */}
             <Box height={1} />
             <Box flexDirection="column">
-            <Text bold={currentFocusedSection === 'scope'} wrap="truncate">
-              {currentFocusedSection === 'scope' ? '> ' : '  '}Apply To
-            </Text>
-            <RadioButtonSelect
-              items={scopeItems}
-              initialIndex={0}
-              onSelect={handleScopeSelect}
-              onHighlight={handleScopeHighlight}
-              isFocused={currentFocusedSection === 'scope'}
-              showNumbers={currentFocusedSection === 'scope'}
-            />
+              <Text bold={currentFocusedSection === 'scope'} wrap="truncate">
+                {currentFocusedSection === 'scope' ? '> ' : '  '}Apply To
+              </Text>
+              <RadioButtonSelect
+                items={scopeItems}
+                initialIndex={0}
+                onSelect={handleScopeSelect}
+                onHighlight={handleScopeHighlight}
+                isFocused={currentFocusedSection === 'scope'}
+                showNumbers={currentFocusedSection === 'scope'}
+              />
             </Box>
           </>
         )}

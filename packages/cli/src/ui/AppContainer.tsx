@@ -141,12 +141,6 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Terminal and layout hooks
   const { columns: terminalWidth, rows: terminalHeight } = useTerminalSize();
-  // Smooth height changes slightly to avoid layout thrash while resizing.
-  const [smoothedTerminalHeight, setSmoothedTerminalHeight] = useState(terminalHeight);
-  useEffect(() => {
-    const id = setTimeout(() => setSmoothedTerminalHeight(terminalHeight), 100);
-    return () => clearTimeout(id);
-  }, [terminalHeight]);
   const { stdin, setRawMode } = useStdin();
   const { stdout } = useStdout();
 
@@ -208,7 +202,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
   const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 0.8));
   const mainAreaWidth = Math.floor(terminalWidth * 0.9);
-  const staticAreaMaxItemHeight = Math.max(smoothedTerminalHeight * 4, 100);
+  const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
   const isValidPath = useCallback((filePath: string): boolean => {
     try {
@@ -332,7 +326,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       settings.merged.security?.auth?.enforcedType &&
       settings.merged.security?.auth.selectedType &&
       settings.merged.security?.auth.enforcedType !==
-        settings.merged.security?.auth.selectedType
+      settings.merged.security?.auth.selectedType
     ) {
       onAuthError(
         `Authentication is enforced to be ${settings.merged.security?.auth.enforcedType}, but you are currently using ${settings.merged.security?.auth.selectedType}.`,
@@ -454,11 +448,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
       historyManager.addItem(
         {
           type: MessageType.INFO,
-          text: `Memory refreshed successfully. ${
-            memoryContent.length > 0
+          text: `Memory refreshed successfully. ${memoryContent.length > 0
               ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).`
               : 'No memory content found.'
-          }`,
+            }`,
         },
         Date.now(),
       );
@@ -609,7 +602,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     config.setFlashFallbackHandler(flashFallbackHandler);
   }, [config, historyManager, userTier]);
 
-  const cancelHandlerRef = useRef<() => void>(() => {});
+  const cancelHandlerRef = useRef<() => void>(() => { });
 
   const {
     streamingState,
@@ -722,14 +715,17 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = useMemo(() => {
+    // Provide a small vertical slack to reduce layout jitter while resizing.
+    const RESIZE_ROW_SLACK = 2;
     if (mainControlsRef.current) {
       const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      return (
-        smoothedTerminalHeight - fullFooterMeasurement.height - staticExtraHeight
+      return Math.max(
+        0,
+        terminalHeight - fullFooterMeasurement.height - staticExtraHeight - RESIZE_ROW_SLACK,
       );
     }
-    return smoothedTerminalHeight - staticExtraHeight;
-  }, [smoothedTerminalHeight]);
+    return Math.max(0, terminalHeight - staticExtraHeight - RESIZE_ROW_SLACK);
+  }, [terminalHeight]);
 
   const isFocused = useFocus();
   useBracketedPaste();
@@ -786,9 +782,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
   }, []);
   const shouldShowIdePrompt = Boolean(
     currentIDE &&
-      !config.getIdeMode() &&
-      !settings.merged.ide?.hasSeenNudge &&
-      !idePromptAnswered,
+    !config.getIdeMode() &&
+    !settings.merged.ide?.hasSeenNudge &&
+    !idePromptAnswered,
   );
 
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
