@@ -146,10 +146,10 @@ const ensureInitialized = async (configParams = {}) => {
       // Initialize WorkspaceManager with config to ensure proper setup
       const workspaceManager = WorkspaceManager.getInstance(config)
       await workspaceManager.ensureInitialized()
-      console.log('WorkspaceManager initialized with config and persisted directories loaded')
+      // console.log('WorkspaceManager initialized with config and persisted directories loaded')
       
       isInitialized = true
-      console.log('MultiModelSystem, SessionManager and WorkspaceManager initialized with LM Studio default model')
+      // console.log('MultiModelSystem, SessionManager and WorkspaceManager initialized with LM Studio default model')
     } catch (error) {
       console.error('Failed to initialize MultiModelSystem:', error)
       initializationPromise = null // Reset on error
@@ -164,7 +164,7 @@ const ensureInitialized = async (configParams = {}) => {
 // MultiModel IPC handlers - Now using actual MultiModelSystem  
 ipcMain.handle('multimodel-initialize', async (_, configParams) => {
   try {
-    console.log('MultiModel initialize called with:', configParams)
+    // console.log('MultiModel initialize called with:', configParams)
     await ensureInitialized(configParams)
     return { success: true }
   } catch (error) {
@@ -175,7 +175,7 @@ ipcMain.handle('multimodel-initialize', async (_, configParams) => {
 
 ipcMain.handle('multimodel-get-available-models', async (_, providerType) => {
   try {
-    console.log('MultiModel getAvailableModels called with:', providerType)
+    // console.log('MultiModel getAvailableModels called with:', providerType)
     const system = await ensureInitialized()
     const models = await system.getAvailableModels(providerType)
     
@@ -192,7 +192,7 @@ ipcMain.handle('multimodel-get-available-models', async (_, providerType) => {
       Object.entries(models).filter(([provider, modelList]) => modelList && modelList.length > 0)
     )
     
-    console.log('Retrieved models:', filteredModels)
+    // console.log('Retrieved models:', filteredModels)
     return filteredModels
   } catch (error) {
     console.error('Failed to get available models:', error)
@@ -206,11 +206,11 @@ ipcMain.handle('multimodel-get-available-models', async (_, providerType) => {
 })
 
 ipcMain.handle('multimodel-get-all-roles', async () => {
-  console.log('MultiModel getAllRoles called')
+  // console.log('MultiModel getAllRoles called')
   try {
     const system = await ensureInitialized()
     const roles = RoleManager.getInstance().getAllRoles()
-    console.log('Retrieved roles:', roles.length, 'roles')
+    // console.log('Retrieved roles:', roles.length, 'roles')
     return roles
   } catch (error) {
     console.error('Failed to get all roles:', error)
@@ -229,11 +229,11 @@ ipcMain.handle('multimodel-get-all-roles', async () => {
 })
 
 ipcMain.handle('multimodel-get-current-role', async () => {
-  console.log('MultiModel getCurrentRole called')
+  // console.log('MultiModel getCurrentRole called')
   try {
     const system = await ensureInitialized()
     const currentRole = RoleManager.getInstance().getCurrentRole()
-    console.log('Retrieved current role:', currentRole.id)
+    // console.log('Retrieved current role:', currentRole.id)
     return currentRole
   } catch (error) {
     console.error('Failed to get current role:', error)
@@ -252,7 +252,7 @@ ipcMain.handle('multimodel-get-current-role', async () => {
 // Add more handlers as needed...
 ipcMain.handle('multimodel-switch-provider', async (_, providerType, model) => {
   try {
-    console.log('MultiModel switchProvider called:', providerType, model)
+    // console.log('MultiModel switchProvider called:', providerType, model)
     const system = await ensureInitialized()
     
     // 创建提供商配置
@@ -265,7 +265,7 @@ ipcMain.handle('multimodel-switch-provider', async (_, providerType, model) => {
     // 切换到新的提供商和模型
     await system.switchProvider(providerConfig)
     
-    console.log('Successfully switched to provider:', providerType, 'model:', model)
+    // console.log('Successfully switched to provider:', providerType, 'model:', model)
     return { success: true }
   } catch (error) {
     console.error('Failed to switch provider:', error)
@@ -274,11 +274,11 @@ ipcMain.handle('multimodel-switch-provider', async (_, providerType, model) => {
 })
 
 ipcMain.handle('multimodel-switch-role', async (_, roleId) => {
-  console.log('MultiModel switchRole called:', roleId)
+  // console.log('MultiModel switchRole called:', roleId)
   try {
     const system = await ensureInitialized()
     const success = await system.switchRole(roleId)
-    console.log('Role switched successfully:', success)
+    // console.log('Role switched successfully:', success)
     return success
   } catch (error) {
     console.error('Failed to switch role:', error)
@@ -289,10 +289,10 @@ ipcMain.handle('multimodel-switch-role', async (_, roleId) => {
 // Workspace directory management handlers
 ipcMain.handle('multimodel-get-workspace-directories', async () => {
   try {
-    console.log('MultiModel getWorkspaceDirectories called')
+    // console.log('MultiModel getWorkspaceDirectories called')
     const system = await ensureInitialized()
     const directories = WorkspaceManager.getInstance().getDirectories()
-    console.log('Current workspace directories:', directories)
+    // console.log('Current workspace directories:', directories)
     return directories
   } catch (error) {
     console.error('Failed to get workspace directories:', error)
@@ -302,7 +302,7 @@ ipcMain.handle('multimodel-get-workspace-directories', async () => {
 
 ipcMain.handle('multimodel-add-workspace-directory', async (event, directory, basePath) => {
   try {
-    console.log('MultiModel addWorkspaceDirectory called:', directory, 'basePath:', basePath)
+    // console.log('MultiModel addWorkspaceDirectory called:', directory, 'basePath:', basePath)
     const system = await ensureInitialized()
     await WorkspaceManager.getInstance().addWorkspaceDirectory(directory, basePath)
     
@@ -316,7 +316,7 @@ ipcMain.handle('multimodel-add-workspace-directory', async (event, directory, ba
       })
     })
     
-    console.log('Successfully added workspace directory:', directory)
+    // console.log('Successfully added workspace directory:', directory)
     return { success: true }
   } catch (error) {
     console.error('Failed to add workspace directory:', error)
@@ -326,7 +326,7 @@ ipcMain.handle('multimodel-add-workspace-directory', async (event, directory, ba
 
 ipcMain.handle('multimodel-set-workspace-directories', async (event, directories) => {
   try {
-    console.log('MultiModel setWorkspaceDirectories called:', directories)
+    // console.log('MultiModel setWorkspaceDirectories called:', directories)
     const system = await ensureInitialized()
     await WorkspaceManager.getInstance().setDirectories(directories)
     
@@ -339,7 +339,7 @@ ipcMain.handle('multimodel-set-workspace-directories', async (event, directories
       })
     })
     
-    console.log('Successfully set workspace directories')
+    // console.log('Successfully set workspace directories')
     return { success: true }
   } catch (error) {
     console.error('Failed to set workspace directories:', error)
@@ -348,7 +348,7 @@ ipcMain.handle('multimodel-set-workspace-directories', async (event, directories
 })
 
 ipcMain.handle('multimodel-get-all-templates', async () => {
-  console.log('MultiModel getAllTemplates called')
+  // console.log('MultiModel getAllTemplates called')
   return []
 })
 
@@ -357,7 +357,7 @@ ipcMain.handle('multimodel-get-history', async () => {
   try {
     const system = await ensureInitialized()
     const history = SessionManager.getInstance().getHistory()
-    console.log('MultiModel getHistory called, returning', history.length, 'messages')
+    // console.log('MultiModel getHistory called, returning', history.length, 'messages')
     return history
   } catch (error) {
     console.error('Failed to get conversation history:', error)
@@ -369,7 +369,7 @@ ipcMain.handle('multimodel-set-history', async (_, history) => {
   try {
     const system = await ensureInitialized()
     SessionManager.getInstance().setHistory(history)
-    console.log('MultiModel setHistory called with', history.length, 'messages')
+    // console.log('MultiModel setHistory called with', history.length, 'messages')
     return { success: true }
   } catch (error) {
     console.error('Failed to set conversation history:', error)
@@ -381,7 +381,7 @@ ipcMain.handle('multimodel-clear-history', async () => {
   try {
     const system = await ensureInitialized()
     SessionManager.getInstance().clearHistory()
-    console.log('MultiModel clearHistory called')
+    // console.log('MultiModel clearHistory called')
     return { success: true }
   } catch (error) {
     console.error('Failed to clear conversation history:', error)
@@ -394,7 +394,7 @@ ipcMain.handle('multimodel-create-session', async (_, sessionId, title = 'New Ch
   try {
     const system = await ensureInitialized()
     SessionManager.getInstance().createSession(sessionId, title)
-    console.log('MultiModel createSession called:', sessionId, title)
+    // console.log('MultiModel createSession called:', sessionId, title)
     return { success: true }
   } catch (error) {
     console.error('Failed to create session:', error)
@@ -406,7 +406,7 @@ ipcMain.handle('multimodel-switch-session', async (_, sessionId) => {
   try {
     const system = await ensureInitialized()
     SessionManager.getInstance().switchSession(sessionId)
-    console.log('MultiModel switchSession called:', sessionId)
+    // console.log('MultiModel switchSession called:', sessionId)
     return { success: true }
   } catch (error) {
     console.error('Failed to switch session:', error)
@@ -418,7 +418,7 @@ ipcMain.handle('multimodel-delete-session', async (_, sessionId) => {
   try {
     const system = await ensureInitialized()
     SessionManager.getInstance().deleteSession(sessionId)
-    console.log('MultiModel deleteSession called:', sessionId)
+    // console.log('MultiModel deleteSession called:', sessionId)
     return { success: true }
   } catch (error) {
     console.error('Failed to delete session:', error)
@@ -437,7 +437,7 @@ ipcMain.handle('multimodel-delete-all-sessions', async () => {
       sessionManager.deleteSession(sessionInfo.id)
     }
     
-    console.log('MultiModel deleteAllSessions called, deleted', sessionsInfo.length, 'sessions')
+    // console.log('MultiModel deleteAllSessions called, deleted', sessionsInfo.length, 'sessions')
     return { success: true }
   } catch (error) {
     console.error('Failed to delete all sessions:', error)
@@ -449,7 +449,7 @@ ipcMain.handle('multimodel-get-current-session-id', async () => {
   try {
     const system = await ensureInitialized()
     const sessionId = SessionManager.getInstance().getCurrentSessionId()
-    console.log('MultiModel getCurrentSessionId called, returning:', sessionId)
+    // console.log('MultiModel getCurrentSessionId called, returning:', sessionId)
     return sessionId
   } catch (error) {
     console.error('Failed to get current session ID:', error)
@@ -461,7 +461,7 @@ ipcMain.handle('multimodel-get-display-messages', async (_, sessionId) => {
   try {
     const system = await ensureInitialized()
     const messages = SessionManager.getInstance().getDisplayMessages(sessionId)
-    console.log('MultiModel getDisplayMessages called for session:', sessionId, 'returning', messages.length, 'messages')
+    // console.log('MultiModel getDisplayMessages called for session:', sessionId, 'returning', messages.length, 'messages')
     return messages
   } catch (error) {
     console.error('Failed to get display messages:', error)
@@ -473,7 +473,7 @@ ipcMain.handle('multimodel-get-sessions-info', async () => {
   try {
     const system = await ensureInitialized()
     const sessionsInfo = SessionManager.getInstance().getSessionsInfo()
-    console.log('MultiModel getSessionsInfo called, returning', sessionsInfo.length, 'sessions')
+    // console.log('MultiModel getSessionsInfo called, returning', sessionsInfo.length, 'sessions')
     return sessionsInfo
   } catch (error) {
     console.error('Failed to get sessions info:', error)
@@ -485,7 +485,7 @@ ipcMain.handle('multimodel-update-session-title', async (_, sessionId, newTitle)
   try {
     const system = await ensureInitialized()
     SessionManager.getInstance().updateSessionTitle(sessionId, newTitle)
-    console.log('MultiModel updateSessionTitle called:', sessionId, newTitle)
+    // console.log('MultiModel updateSessionTitle called:', sessionId, newTitle)
     return { success: true }
   } catch (error) {
     console.error('Failed to update session title:', error)
@@ -497,12 +497,12 @@ ipcMain.handle('multimodel-update-session-title', async (_, sessionId, newTitle)
 // Add message sending handler
 ipcMain.handle('multimodel-send-message', async (_, messages, signal) => {
   try {
-    console.log('MultiModel sendMessage called with:', messages?.length, 'messages')
+    // console.log('MultiModel sendMessage called with:', messages?.length, 'messages')
     const system = await ensureInitialized()
     
     // Debug: check current provider
     const currentProvider = system.getCurrentProvider()
-    console.log('Current provider config:', currentProvider)
+    // console.log('Current provider config:', currentProvider)
     
     // Convert messages to the format expected by MultiModelSystem
     const universalMessages = messages.map(msg => ({
@@ -514,7 +514,7 @@ ipcMain.handle('multimodel-send-message', async (_, messages, signal) => {
     const abortController = new AbortController()
     
     const response = await system.sendMessage(universalMessages, abortController.signal)
-    console.log('MultiModel sendMessage response received')
+    // console.log('MultiModel sendMessage response received')
     return response
   } catch (error) {
     console.error('Failed to send message:', error)
@@ -525,8 +525,51 @@ ipcMain.handle('multimodel-send-message', async (_, messages, signal) => {
 // Add streaming message handler using electron-ipc-stream
 ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamId) => {
   try {
-    console.log('MultiModel sendMessageStream called with:', messages?.length, 'messages', 'streamId:', streamId)
+    // console.log('MultiModel sendMessageStream called with:', messages?.length, 'messages', 'streamId:', streamId)
     const system = await ensureInitialized()
+    
+    // Set up tool confirmation handler for this stream session
+    system.setToolConfirmationHandler(async (confirmationDetails) => {
+      // console.log('Tool confirmation requested from main process:', confirmationDetails)
+      
+      // Create a serializable confirmation request with all necessary data
+      const confirmationRequest = {
+        title: confirmationDetails.title,
+        type: confirmationDetails.type,
+        // Include all fields needed for display
+        ...(confirmationDetails.type === 'edit' && {
+          fileName: confirmationDetails.fileName,
+          fileDiff: confirmationDetails.fileDiff,
+          originalContent: confirmationDetails.originalContent,
+          newContent: confirmationDetails.newContent
+        }),
+        ...(confirmationDetails.type === 'exec' && {
+          command: confirmationDetails.command,
+          rootCommand: confirmationDetails.rootCommand
+        }),
+        ...(confirmationDetails.type === 'mcp' && {
+          toolName: confirmationDetails.toolName,
+          parameters: confirmationDetails.parameters
+        }),
+        ...(confirmationDetails.type === 'info' && {
+          message: confirmationDetails.message
+        })
+      }
+      
+      // Send confirmation request to renderer process
+      event.sender.send('tool-confirmation-request', {
+        streamId,
+        confirmationDetails: confirmationRequest
+      })
+      
+      // Wait for response from renderer
+      return new Promise((resolve) => {
+        ipcMain.once('tool-confirmation-response', (responseEvent, outcome) => {
+          // console.log('Tool confirmation response received in main process:', outcome)
+          resolve(outcome)
+        })
+      })
+    })
     
     // Convert messages to the format expected by MultiModelSystem
     const universalMessages = messages.map(msg => ({
@@ -544,7 +587,7 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamI
       let fullContent = ''
       
       for await (const chunk of streamGenerator) {
-        // console.log('Stream chunk received:', chunk.type, chunk.content?.substring(0, 50))
+        // // console.log('Stream chunk received:', chunk.type, chunk.content?.substring(0, 50))
         
         // Handle different event types
         if (chunk.type === 'compression') {
@@ -624,7 +667,7 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamI
 // OAuth Authentication IPC handlers using AuthManager
 ipcMain.handle('oauth-start-flow', async (_, providerType) => {
   try {
-    console.log('OAuth start flow called for:', providerType)
+    // console.log('OAuth start flow called for:', providerType)
     
     // Ensure system is initialized to get config
     const system = await ensureInitialized()
@@ -635,7 +678,7 @@ ipcMain.handle('oauth-start-flow', async (_, providerType) => {
     authManager.setConfig(system.getConfig())
     
     const result = await authManager.startOAuthFlow(providerType)
-    console.log('OAuth flow result:', result)
+    // console.log('OAuth flow result:', result)
     
     return result
   } catch (error) {
@@ -649,7 +692,7 @@ ipcMain.handle('oauth-start-flow', async (_, providerType) => {
 
 ipcMain.handle('oauth-get-status', async (_, providerType) => {
   try {
-    console.log('OAuth get status called for:', providerType)
+    // console.log('OAuth get status called for:', providerType)
     
     // Use AuthManager for unified OAuth status checking
     const { AuthManager } = require('@google/gemini-cli-core')
@@ -660,7 +703,7 @@ ipcMain.handle('oauth-get-status', async (_, providerType) => {
     authManager.setConfig(system.getConfig())
     
     const status = await authManager.getAuthStatus(providerType)
-    console.log('OAuth status result:', status)
+    // console.log('OAuth status result:', status)
     
     return {
       authenticated: status.authenticated,
@@ -675,14 +718,14 @@ ipcMain.handle('oauth-get-status', async (_, providerType) => {
 
 ipcMain.handle('oauth-clear-credentials', async (_, providerType) => {
   try {
-    console.log('OAuth clear credentials called for:', providerType)
+    // console.log('OAuth clear credentials called for:', providerType)
     
     // Use AuthManager for unified credential clearing
     const { AuthManager } = require('@google/gemini-cli-core')
     const authManager = AuthManager.getInstance()
     
     const result = await authManager.clearCredentials(providerType)
-    console.log('OAuth credentials cleared:', result)
+    // console.log('OAuth credentials cleared:', result)
     
     return result
   } catch (error) {
@@ -696,14 +739,14 @@ ipcMain.handle('oauth-clear-credentials', async (_, providerType) => {
 
 ipcMain.handle('check-env-api-key', async (_, providerType) => {
   try {
-    console.log('Check environment API key called for:', providerType)
+    // console.log('Check environment API key called for:', providerType)
     
     // Use AuthManager for unified API key checking
     const { AuthManager } = require('@google/gemini-cli-core')
     const authManager = AuthManager.getInstance()
     
     const result = await authManager.checkEnvApiKey(providerType)
-    console.log('Environment API key check result:', result)
+    // console.log('Environment API key check result:', result)
     
     return result
   } catch (error) {
@@ -715,7 +758,7 @@ ipcMain.handle('check-env-api-key', async (_, providerType) => {
 // Add IPC handler for setting API key preference
 ipcMain.handle('set-api-key-preference', async (_, providerType) => {
   try {
-    console.log('Set API key preference called for:', providerType)
+    // console.log('Set API key preference called for:', providerType)
     
     // Ensure system is initialized
     const system = await ensureInitialized()
@@ -726,7 +769,7 @@ ipcMain.handle('set-api-key-preference', async (_, providerType) => {
     authManager.setConfig(system.getConfig())
     authManager.useApiKeyAuth(providerType)
     
-    console.log('API key preference set successfully')
+    // console.log('API key preference set successfully')
     return { success: true }
   } catch (error) {
     console.error('Failed to set API key preference:', error)
@@ -740,7 +783,7 @@ ipcMain.handle('set-api-key-preference', async (_, providerType) => {
 // Add IPC handler for setting OAuth preference
 ipcMain.handle('set-oauth-preference', async (_, providerType) => {
   try {
-    console.log('Set OAuth preference called for:', providerType)
+    // console.log('Set OAuth preference called for:', providerType)
     
     // Ensure system is initialized
     const system = await ensureInitialized()
@@ -751,7 +794,7 @@ ipcMain.handle('set-oauth-preference', async (_, providerType) => {
     authManager.setConfig(system.getConfig())
     authManager.setAuthPreference(providerType, 'oauth')
     
-    console.log('OAuth preference set successfully')
+    // console.log('OAuth preference set successfully')
     return { success: true }
   } catch (error) {
     console.error('Failed to set OAuth preference:', error)
