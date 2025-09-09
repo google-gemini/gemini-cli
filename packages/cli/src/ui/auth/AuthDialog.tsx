@@ -7,7 +7,7 @@
 import type React from 'react';
 import { useCallback } from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
@@ -149,7 +149,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   return (
     <Box
       borderStyle="round"
-      borderColor={Colors.Gray}
+      borderColor={theme.border.default}
       flexDirection="column"
       padding={1}
       width="100%"
@@ -167,17 +167,17 @@ Logging in with Google... Please restart Gemini CLI to continue.
       </Box>
       {authError && (
         <Box marginTop={1}>
-          <Text color={Colors.AccentRed}>{authError}</Text>
+          <Text color={theme.status.error}>{authError}</Text>
         </Box>
       )}
       <Box marginTop={1}>
-        <Text color={Colors.Gray}>(Use Enter to select)</Text>
+        <Text color={theme.text.secondary}>(Use Enter to select)</Text>
       </Box>
       <Box marginTop={1}>
         <Text>Terms of Services and Privacy Notice for Gemini CLI</Text>
       </Box>
       <Box marginTop={1}>
-        <Text color={Colors.AccentBlue}>
+        <Text color={theme.text.link}>
           {
             'https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md'
           }
