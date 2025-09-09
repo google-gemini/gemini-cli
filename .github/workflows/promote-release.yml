@@ -10,26 +10,30 @@ on:
         default: true
 
 jobs:
-  promote:
-    runs-on: 'ubuntu-latest'
-    environment:
-      name: 'production-release'
-    permissions:
-      contents: 'write'
-      packages: 'write'
-      id-token: 'write'
-      issues: 'write'
-      pull-requests: 'write'
-
+  get_versions:
+    runs-on: ubuntu-latest
+    outputs:
+      MAIN_SHA: ${{ steps.main_sha.outputs.SHA }}
+      PREVIEW_TAG: ${{ steps.preview_tag.outputs.TAG }}
+      STABLE_RELEASE_TAG: ${{ steps.stable_version.outputs.RELEASE_TAG }}
+      STABLE_RELEASE_VERSION: ${{ steps.stable_version.outputs.RELEASE_VERSION }}
+      STABLE_NPM_TAG: ${{ steps.stable_version.outputs.NPM_TAG }}
+      STABLE_PREVIOUS_TAG: ${{ steps.stable_version.outputs.PREVIOUS_TAG }}
+      PREVIEW_RELEASE_TAG: ${{ steps.preview_version.outputs.RELEASE_TAG }}
+      PREVIEW_RELEASE_VERSION: ${{ steps.preview_version.outputs.RELEASE_VERSION }}
+      PREVIEW_NPM_TAG: ${{ steps.preview_version.outputs.NPM_TAG }}
+      PREVIEW_PREVIOUS_TAG: ${{ steps.preview_version.outputs.PREVIOUS_TAG }}
     steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: 'Get main SHA'
         id: 'main_sha'
         run: echo "SHA=$(git rev-parse main)" >> $GITHUB_OUTPUT
-
       - name: 'Get latest preview tag'
         id: 'preview_tag'
         run: echo "TAG=$(git describe --tags --abbrev=0 --match 'v*-preview')" >> $GITHUB_OUTPUT
-
       - name: 'Get Stable Version'
         id: 'stable_version'
         run: |
@@ -38,26 +42,6 @@ jobs:
           echo "RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
-
-      - name: 'Promote Preview to Stable'
-        uses: ./.github/workflows/reusable/build-and-publish.yml
-        with:
-          ref: ${{ steps.preview_tag.outputs.TAG }}
-          release_version: ${{ steps.stable_version.outputs.RELEASE_VERSION }}
-          npm_tag: ${{ steps.stable_version.outputs.NPM_TAG }}
-          dry_run: ${{ github.event.inputs.dry_run }}
-        secrets:
-          WOMBAT_TOKEN_CORE: ${{ secrets.WOMBAT_TOKEN_CORE }}
-          WOMBAT_TOKEN_CLI: ${{ secrets.WOMBAT_TOKEN_CLI }}
-
-      - name: 'Create Stable GitHub Release'
-        uses: ./.github/workflows/reusable/create-github-release.yml
-        with:
-          release_tag: ${{ steps.stable_version.outputs.RELEASE_TAG }}
-          release_branch: ${{ steps.preview_tag.outputs.TAG }}
-          previous_tag: ${{ steps.stable_version.outputs.PREVIOUS_TAG }}
-          dry_run: ${{ github.event.inputs.dry_run }}
-
       - name: 'Get Preview Version'
         id: 'preview_version'
         run: |
@@ -67,30 +51,61 @@ jobs:
           echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
 
-      - name: 'Create Next Preview from main'
-        uses: ./.github/workflows/reusable/build-and-publish.yml
-        with:
-          ref: ${{ steps.main_sha.outputs.SHA }}
-          release_version: ${{ steps.preview_version.outputs.RELEASE_VERSION }}
-          npm_tag: ${{ steps.preview_version.outputs.NPM_TAG }}
-          dry_run: ${{ github.event.inputs.dry_run }}
-        secrets:
-          WOMBAT_TOKEN_CORE: ${{ secrets.WOMBAT_TOKEN_CORE }}
-          WOMBAT_TOKEN_CLI: ${{ secrets.WOMBAT_TOKEN_CLI }}
+  promote_to_stable:
+    needs: get_versions
+    uses: ./.github/workflows/reusable/build-and-publish.yml
+    with:
+      ref: ${{ needs.get_versions.outputs.PREVIEW_TAG }}
+      release_version: ${{ needs.get_versions.outputs.STABLE_RELEASE_VERSION }}
+      npm_tag: ${{ needs.get_versions.outputs.STABLE_NPM_TAG }}
+      dry_run: ${{ github.event.inputs.dry_run }}
+    secrets:
+      WOMBAT_TOKEN_CORE: ${{ secrets.WOMBAT_TOKEN_CORE }}
+      WOMBAT_TOKEN_CLI: ${{ secrets.WOMBAT_TOKEN_CLI }}
 
-      - name: 'Create Preview GitHub Release'
-        uses: ./.github/workflows/reusable/create-github-release.yml
-        with:
-          release_tag: ${{ steps.preview_version.outputs.RELEASE_TAG }}
-          release_branch: ${{ steps.main_sha.outputs.SHA }}
-          previous_tag: ${{ steps.stable_version.outputs.RELEASE_TAG }}
-          dry_run: ${{ github.event.inputs.dry_run }}
+  create_stable_release:
+    needs: [get_versions, promote_to_stable]
+    uses: ./.github/workflows/reusable/create-github-release.yml
+    with:
+      release_tag: ${{ needs.get_versions.outputs.STABLE_RELEASE_TAG }}
+      release_branch: ${{ needs.get_versions.outputs.PREVIEW_TAG }}
+      previous_tag: ${{ needs.get_versions.outputs.STABLE_PREVIOUS_TAG }}
+      dry_run: ${{ github.event.inputs.dry_run }}
 
+  create_preview:
+    needs: get_versions
+    uses: ./.github/workflows/reusable/build-and-publish.yml
+    with:
+      ref: ${{ needs.get_versions.outputs.MAIN_SHA }}
+      release_version: ${{ needs.get_versions.outputs.PREVIEW_RELEASE_VERSION }}
+      npm_tag: ${{ needs.get_versions.outputs.PREVIEW_NPM_TAG }}
+      dry_run: ${{ github.event.inputs.dry_run }}
+    secrets:
+      WOMBAT_TOKEN_CORE: ${{ secrets.WOMBAT_TOKEN_CORE }}
+      WOMBAT_TOKEN_CLI: ${{ secrets.WOMBAT_TOKEN_CLI }}
+
+  create_preview_release:
+    needs: [get_versions, create_preview]
+    uses: ./.github/workflows/reusable/create-github-release.yml
+    with:
+      release_tag: ${{ needs.get_versions.outputs.PREVIEW_RELEASE_TAG }}
+      release_branch: ${{ needs.get_versions.outputs.MAIN_SHA }}
+      previous_tag: ${{ needs.get_versions.outputs.STABLE_RELEASE_TAG }}
+      dry_run: ${{ github.event.inputs.dry_run }}
+
+  prepare_next_nightly:
+    needs: [get_versions, create_preview_release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: 'Prepare main for Next Nightly'
         if: ${{ !github.event.inputs.dry_run }}
         run: |
-          NEXT_NIGHTLY_VERSION=$(node -e "console.log(require('./scripts/get-release-version.js').calculateNextVersion('${{ steps.preview_version.outputs.RELEASE_VERSION }}'))")
-          git checkout ${{ steps.main_sha.outputs.SHA }}
+          NEXT_NIGHTLY_VERSION=$(node -e "console.log(require('./scripts/get-release-version.js').calculateNextVersion('${{ needs.get_versions.outputs.PREVIEW_RELEASE_VERSION }}'))")
+          git checkout ${{ needs.get_versions.outputs.MAIN_SHA }}
           git checkout -b release/prepare-nightly-${NEXT_NIGHTLY_VERSION}
           npm run release:version ${NEXT_NIGHTLY_VERSION}
           git add .
