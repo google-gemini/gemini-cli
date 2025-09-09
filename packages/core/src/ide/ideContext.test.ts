@@ -5,11 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  createIdeContextStore,
-  FileSchema,
-  IdeContextSchema,
-} from './ideContext.js';
+import { createIdeContextStore } from './ideContext.js';
+import { FileSchema, IdeContextSchema } from './types.js';
 
 describe('ideContext', () => {
   describe('createIdeContextStore', () => {
