@@ -951,7 +951,6 @@ describe('checkForExtensionUpdates', () => {
   });
 });
 
-
 describe('disableExtension', () => {
   let tempWorkspaceDir: string;
   let tempHomeDir: string;

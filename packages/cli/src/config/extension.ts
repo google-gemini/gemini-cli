@@ -680,7 +680,6 @@ export async function updateAllUpdatableExtensions(
   );
 }
 
-
 export enum ExtensionUpdateStatus {
   UpdateAvailable,
   UpToDate,
@@ -728,10 +727,7 @@ export async function checkForExtensionUpdates(
 
       const lsRemoteOutput = await git.listRemote([remoteUrl, refToCheck]);
 
-      if (
-        typeof lsRemoteOutput !== 'string' ||
-        lsRemoteOutput.trim() === ''
-      ) {
+      if (typeof lsRemoteOutput !== 'string' || lsRemoteOutput.trim() === '') {
         results.set(extension.config.name, {
           status: ExtensionUpdateStatus.UpToDate,
         });
