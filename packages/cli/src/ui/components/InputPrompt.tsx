@@ -797,7 +797,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   const color =
                     token.type === 'command' || token.type === 'file'
                       ? theme.text.accent
-                      : undefined;
+                      : theme.text.primary;
 
                   renderedLine.push(
                     <Text key={`token-${tokenIdx}`} color={color}>

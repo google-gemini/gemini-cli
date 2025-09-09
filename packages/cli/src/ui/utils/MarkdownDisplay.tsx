@@ -246,7 +246,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       } else {
         addContentBlock(
           <Box key={key}>
-            <Text wrap="wrap">
+            <Text wrap="wrap" color={theme.text.primary}>
               <RenderInline text={line} />
             </Text>
           </Box>,
