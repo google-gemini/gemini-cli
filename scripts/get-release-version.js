@@ -5,47 +5,17 @@
  */
 
 import { execSync } from 'node:child_process';
-
-function getLatestStableTag() {
-  // Fetches all tags, then filters for the latest stable (non-prerelease) tag.
-  const tags = execSync('git tag --list "v*.*.*" --sort=-v:refname')
-    .toString()
-    .split('\n');
-  const latestStableTag = tags.find((tag) =>
-    tag.match(/^v[0-9]+\.[0-9]+\.[0-9]+$/),
-  );
-  if (!latestStableTag) {
-    throw new Error('Could not find a stable tag.');
-  }
-  return latestStableTag;
-}
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 function getShortSha() {
   return execSync('git rev-parse --short HEAD').toString().trim();
 }
 
-function getNextVersionString(stableVersion, minorIncrement) {
-  const [major, minor] = stableVersion.substring(1).split('.');
-  const nextMinorVersion = parseInt(minor, 10) + minorIncrement;
-  return `${major}.${nextMinorVersion}.0`;
-}
-
-export function getNightlyTagName(stableVersion) {
-  const version = getNextVersionString(stableVersion, 2);
-
-  const now = new Date();
-  const year = now.getUTCFullYear().toString();
-  const month = (now.getUTCMonth() + 1).toString().padStart(2, '0');
-  const day = now.getUTCDate().toString().padStart(2, '0');
-  const date = `${year}${month}${day}`;
-
-  const sha = getShortSha();
-  return `v${version}-nightly.${date}.${sha}`;
-}
-
-export function getPreviewTagName(stableVersion) {
-  const version = getNextVersionString(stableVersion, 1);
-  return `v${version}-preview`;
+function getVersionFromPackageJson() {
+  const rootPackageJsonPath = resolve(process.cwd(), 'package.json');
+  const rootPackageJson = JSON.parse(readFileSync(rootPackageJsonPath, 'utf-8'));
+  return rootPackageJson.version;
 }
 
 function getPreviousReleaseTag(isNightly) {
@@ -72,22 +42,26 @@ export function getReleaseVersion() {
   const manualVersion = process.env.MANUAL_VERSION;
 
   let releaseTag;
+  const versionFromPackage = getVersionFromPackageJson();
 
   if (isNightly) {
     console.error('Calculating next nightly version...');
-    const stableVersion = getLatestStableTag();
-    releaseTag = getNightlyTagName(stableVersion);
+    const now = new Date();
+    const year = now.getUTCFullYear().toString();
+    const month = (now.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = now.getUTCDate().toString().padStart(2, '0');
+    const date = `${year}${month}${day}`;
+    const sha = getShortSha();
+    releaseTag = `v${versionFromPackage}.${date}.${sha}`;
   } else if (isPreview) {
     console.error('Calculating next preview version...');
-    const stableVersion = getLatestStableTag();
-    releaseTag = getPreviewTagName(stableVersion);
+    releaseTag = `v${versionFromPackage.replace('-nightly', '-preview')}`;
   } else if (manualVersion) {
     console.error(`Using manual version: ${manualVersion}`);
     releaseTag = manualVersion;
   } else {
-    throw new Error(
-      'Error: No version specified and this is not a nightly or preview release.',
-    );
+    // Stable release
+    releaseTag = `v${versionFromPackage.replace('-nightly', '')}`;
   }
 
   if (!releaseTag) {
