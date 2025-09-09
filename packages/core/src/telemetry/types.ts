@@ -517,4 +517,28 @@ export type TelemetryEvent =
   | FileOperationEvent
   | InvalidChunkEvent
   | ContentRetryEvent
-  | ContentRetryFailureEvent;
+  | ContentRetryFailureEvent
+  | ExtensionInstallEvent;
+
+export class ExtensionInstallEvent implements BaseTelemetryEvent {
+  'event.name': 'extension_install';
+  'event.timestamp': string;
+  extension_name: string;
+  extension_version: string;
+  extension_source: string;
+  status: 'success' | 'error';
+
+  constructor(
+    extension_name: string,
+    extension_version: string,
+    extension_source: string,
+    status: 'success' | 'error',
+  ) {
+    this['event.name'] = 'extension_install';
+    this['event.timestamp'] = new Date().toISOString();
+    this.extension_name = extension_name;
+    this.extension_version = extension_version;
+    this.extension_source = extension_source;
+    this.status = status;
+  }
+}
