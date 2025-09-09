@@ -194,12 +194,6 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiToolCallRequestEvent
   | ServerGeminiToolCallResponseEvent
   | ServerGeminiUserCancelledEvent
-  | ServerGeminiErrorEvent
-  | ServerGeminiChatCompressedEvent
-  | ServerGeminiThoughtEvent
-  | ServerGeminiMaxSessionTurnsEvent
-  | ServerGeminiFinishedEvent
-  | ServerGeminiLoopDetectedEvent
   | ServerGeminiRetryEvent;
 
 // A turn manages the agentic loop turn within the server context.
