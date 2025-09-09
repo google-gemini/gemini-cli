@@ -6,6 +6,7 @@
 
 import { BaseDotNetTool } from './base-dotnet-tool.js';
 import type { ToolResult } from './tools.js';
+import type { Config } from '../config/config.js';
 
 interface ExcelParams {
   /** Excel file path */
@@ -129,7 +130,7 @@ interface ExcelResult extends ToolResult {
 }
 
 export class ExcelTool extends BaseDotNetTool<ExcelParams, ExcelResult> {
-  constructor() {
+  constructor(config?: Config) {
     super(
       'excel',
       'Excel & CSV Operations',
@@ -179,7 +180,10 @@ export class ExcelTool extends BaseDotNetTool<ExcelParams, ExcelResult> {
           worksheet: { type: 'string', description: 'Worksheet name for readContent operation (if not specified, reads all worksheets)' },
           outputFormat: { type: 'string', enum: ['markdown', 'text', 'json'], description: 'Output format for readContent operation (default: markdown)' }
         }
-      }
+      },
+      true,  // isOutputMarkdown
+      false, // canUpdateOutput 
+      config // config parameter
     );
   }
 
@@ -191,4 +195,4 @@ export class ExcelTool extends BaseDotNetTool<ExcelParams, ExcelResult> {
 }
 
 
-export const excelTool = new ExcelTool();
+// export const excelTool = new ExcelTool(); // Removed: Tools now require config parameter

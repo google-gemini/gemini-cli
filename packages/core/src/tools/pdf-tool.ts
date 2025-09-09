@@ -268,7 +268,7 @@ class PDFInvocation extends BaseToolInvocation<PDFParams, PDFResult> {
           return this.createErrorResult(`Source file not found: ${source}`);
         }
         
-        const sourceDoc = await PDFLibDocument.load(await fs.readFile(source));
+        const sourceDoc = await PDFLibDocument.load(await fs.readFile(source), { ignoreEncryption: false });
         const pages = await mergedDoc.copyPages(sourceDoc, sourceDoc.getPageIndices());
         pages.forEach(page => mergedDoc.addPage(page));
       }
@@ -301,7 +301,17 @@ ${sources.map((source, index) => `${index + 1}. ${path.basename(source)}`).join(
 
   private async splitPDF(file: string, pages: string | undefined, outputPath?: string): Promise<PDFResult> {
     try {
-      const pdfDoc = await PDFLibDocument.load(await fs.readFile(file));
+      let pdfDoc: PDFLibDocument;
+      
+      try {
+        pdfDoc = await PDFLibDocument.load(await fs.readFile(file), { ignoreEncryption: false });
+      } catch (loadError) {
+        const errorMessage = loadError instanceof Error ? loadError.message : String(loadError);
+        if (this.isEncryptionError(errorMessage)) {
+          return this.createEncryptionErrorResult(errorMessage);
+        }
+        return this.createErrorResult(`Failed to load PDF: ${errorMessage}`);
+      }
       const totalPages = pdfDoc.getPageCount();
       const pageNumbers = this.parsePageNumbers(pages, totalPages);
       
@@ -372,7 +382,18 @@ ${outputFiles.map((filePath, index) => `${index + 1}. ${path.basename(filePath)}
   private async extractText(file: string, pages?: string): Promise<PDFResult> {
     try {
       const buffer = await fs.readFile(file);
-      const pdfDoc = await PDFLibDocument.load(buffer);
+      let pdfDoc: PDFLibDocument;
+      
+      try {
+        pdfDoc = await PDFLibDocument.load(buffer, { ignoreEncryption: false });
+      } catch (loadError) {
+        const errorMessage = loadError instanceof Error ? loadError.message : String(loadError);
+        if (this.isEncryptionError(errorMessage)) {
+          return this.createEncryptionErrorResult(errorMessage);
+        }
+        return this.createErrorResult(`Failed to load PDF: ${errorMessage}`);
+      }
+      
       const pageCount = pdfDoc.getPageCount();
       const pageNumbers = this.parsePageNumbers(pages, pageCount);
       
@@ -421,7 +442,22 @@ ${text}`).join('\n\n')}`,
   ): Promise<PDFResult> {
     try {
       const buffer = await fs.readFile(file);
-      const pdfDoc = await PDFLibDocument.load(buffer);
+      let pdfDoc: PDFLibDocument;
+      
+      try {
+        pdfDoc = await PDFLibDocument.load(buffer, { ignoreEncryption: false });
+      } catch (loadError) {
+        const errorMessage = loadError instanceof Error ? loadError.message : String(loadError);
+        
+        // Check if it's an encryption-related error
+        if (this.isEncryptionError(errorMessage)) {
+          return this.createEncryptionErrorResult(errorMessage);
+        }
+        
+        // For other types of errors, return the original error
+        return this.createErrorResult(`Failed to load PDF: ${errorMessage}`);
+      }
+      
       const pageCount = pdfDoc.getPageCount();
       const pageNumbers = this.parsePageNumbers(pages, pageCount);
       
@@ -444,7 +480,7 @@ ${text}`).join('\n\n')}`,
       
       // Limit concurrent page processing to reduce memory usage
       const BATCH_SIZE = 8;
-      const results: { pageNum: number; matches: MatchResult[] }[] = [];
+      const results: Array<{ pageNum: number; matches: MatchResult[] }> = [];
       
       for (let i = 0; i < pageNumbers.length; i += BATCH_SIZE) {
         const batch = pageNumbers.slice(i, i + BATCH_SIZE);
@@ -581,8 +617,8 @@ ${text}`).join('\n\n')}`,
         liveOutputCallback(`Starting ${batches.length} worker threads for ${pageNumbers.length} pages...`);
       }
       
-      const workerPromises = batches.map((batch, batchIndex) => {
-        return new Promise<{ pageNum: number; matches: MatchResult[] }[]>((resolve, reject) => {
+      const workerPromises = batches.map((batch, batchIndex) => 
+        new Promise<Array<{ pageNum: number; matches: MatchResult[] }>>((resolve, reject) => {
           if (signal?.aborted) {
             reject(new Error('Search cancelled by user'));
             return;
@@ -626,8 +662,8 @@ ${text}`).join('\n\n')}`,
             resolve(errorResults);
             worker.terminate();
           });
-        });
-      });
+        })
+      );
       
       // Wait for all worker batches to complete
       const batchResults = await Promise.all(workerPromises);
@@ -717,7 +753,17 @@ ${totalMatches === 0 ? `The text "${query}" was not found in the searched pages.
 
   private async getPDFInfo(file: string, pages?: string): Promise<PDFResult> {
     try {
-      const pdfDoc = await PDFLibDocument.load(await fs.readFile(file));
+      let pdfDoc: PDFLibDocument;
+      
+      try {
+        pdfDoc = await PDFLibDocument.load(await fs.readFile(file), { ignoreEncryption: false });
+      } catch (loadError) {
+        const errorMessage = loadError instanceof Error ? loadError.message : String(loadError);
+        if (this.isEncryptionError(errorMessage)) {
+          return this.createEncryptionErrorResult(errorMessage);
+        }
+        return this.createErrorResult(`Failed to load PDF: ${errorMessage}`);
+      }
       const pageCount = pdfDoc.getPageCount();
       const stats = await fs.stat(file);
       const pageNumbers = this.parsePageNumbers(pages, pageCount);
@@ -877,7 +923,7 @@ ${pageStructureDisplay}`,
   //       return this.createErrorResult('Hanko name is required');
   //     }
 
-  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file));
+  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file), { ignoreEncryption: false });
   //     const pages = pdfDoc.getPages();
   //     const firstPage = pages[0];
       
@@ -1108,7 +1154,7 @@ ${pageStructureDisplay}`,
 
 //   private async convertToImage(file: string, pages?: string, output?: string): Promise<PDFResult> {
 //     try {
-//       const pdfDoc = await PDFLibDocument.load(await fs.readFile(file));
+//       const pdfDoc = await PDFLibDocument.load(await fs.readFile(file), { ignoreEncryption: false });
 //       const totalPages = pdfDoc.getPageCount();
 //       const pageNumbers = this.parsePageNumbers(pages, totalPages);
       
@@ -1277,7 +1323,7 @@ ${pageStructureDisplay}`,
 
   // private async handleMetadata(file: string, newMetadata?: PDFMetadata, output?: string): Promise<PDFResult> {
   //   try {
-  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file));
+  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file), { ignoreEncryption: false });
       
   //     if (newMetadata) {
   //       // Set new metadata
@@ -1326,7 +1372,7 @@ ${pageStructureDisplay}`,
 
   // private async handleForms(file: string, fields?: Record<string, string>, flatten?: boolean, output?: string): Promise<PDFResult> {
   //   try {
-  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file));
+  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file), { ignoreEncryption: false });
   //     const form = pdfDoc.getForm();
       
   //     if (fields) {
@@ -1395,7 +1441,7 @@ ${pageStructureDisplay}`,
 
   // private async protectPDF(file: string, protection?: PDFParams['protection'], output?: string): Promise<PDFResult> {
   //   try {
-  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file));
+  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file), { ignoreEncryption: false });
       
   //     if (protection) {
   //       // Note: pdf-lib has limited encryption support
@@ -1421,7 +1467,7 @@ ${pageStructureDisplay}`,
 
   // private async optimizePDF(file: string, output?: string, quality?: number): Promise<PDFResult> {
   //   try {
-  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file));
+  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file), { ignoreEncryption: false });
   //     const originalSize = (await fs.stat(file)).size;
       
   //     // Basic optimization - remove unused objects
@@ -1473,7 +1519,7 @@ ${pageStructureDisplay}`,
 
   // private async addAnnotation(file: string, text: string, position?: { x: number; y: number }, output?: string): Promise<PDFResult> {
   //   try {
-  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file));
+  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file), { ignoreEncryption: false });
   //     const pages = pdfDoc.getPages();
   //     const firstPage = pages[0];
       
@@ -1506,7 +1552,7 @@ ${pageStructureDisplay}`,
 
   // private async addWatermark(file: string, watermarkText: string, output?: string): Promise<PDFResult> {
   //   try {
-  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file));
+  //     const pdfDoc = await PDFLibDocument.load(await fs.readFile(file), { ignoreEncryption: false });
   //     const pages = pdfDoc.getPages();
   //     const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
       
@@ -1622,6 +1668,29 @@ ${pageStructureDisplay}`,
       llmContent: `pdf(${this.params.op}): ${message}`,
       returnDisplay: `pdf(${this.params.op}): ${message}`,
     };
+  }
+
+  private isEncryptionError(errorMessage: string): boolean {
+    return errorMessage.includes('encrypted') || 
+           errorMessage.includes('Invalid object ref') || 
+           errorMessage.includes('Expected instance of PDFDict') ||
+           errorMessage.includes('Trying to parse invalid object') ||
+           errorMessage.includes('password') ||
+           errorMessage.includes('security');
+  }
+
+  private createEncryptionErrorResult(errorMessage: string): PDFResult {
+    return this.createErrorResult(
+      `PDF appears to be encrypted or password-protected. The file cannot be processed because:\n` +
+      `• The PDF may require a password to access its content\n` +
+      `• The encryption method may not be supported by the PDF processor\n` +
+      `• The PDF structure may be corrupted due to encryption issues\n\n` +
+      `Technical details: ${errorMessage}\n\n` +
+      `Suggestions:\n` +
+      `• Try removing password protection from the PDF using another tool\n` +
+      `• Use a different PDF processor that supports this encryption method\n` +
+      `• Contact the PDF creator for an unencrypted version`
+    );
   }
 
   getDescription(): string {

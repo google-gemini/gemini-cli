@@ -12,12 +12,20 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   BaseToolInvocation,
-  Kind,
+  Kind,  
 } from './tools.js';
-import type { ToolResult, ToolInvocation } from './tools.js';
+import type { 
+  ToolResult, 
+  ToolInvocation,
+  ToolCallConfirmationDetails,
+  ToolExecuteConfirmationDetails,
+  ToolConfirmationOutcome,
+} from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { BackupableTool } from './backupable-tool.js';
 import type { FileOperationParams } from './backupable-tool.js';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
 
 interface DotNetRequest {
   module: string;
@@ -49,6 +57,7 @@ export abstract class BaseDotNetTool<TParams extends FileOperationParams, TResul
     parameterSchema: unknown,
     isOutputMarkdown: boolean = true,
     canUpdateOutput: boolean = false,
+    protected config?: Config,
   ) {
     super(name, displayName, description, Kind.Other, parameterSchema, isOutputMarkdown, canUpdateOutput);
   }
@@ -65,7 +74,7 @@ export abstract class BaseDotNetTool<TParams extends FileOperationParams, TResul
    * Create .NET invocation as the original invocation
    */
   protected createOriginalInvocation(params: TParams): ToolInvocation<TParams, TResult> {
-    return new DotNetInvocation(params, this.dotnetModule);
+    return new DotNetInvocation(params, this.dotnetModule, this.config);
   }
 
 }
@@ -82,13 +91,46 @@ class DotNetInvocation<TParams extends object, TResult extends ToolResult>
 
   constructor(
     params: TParams,
-    private moduleName: string
+    private moduleName: string,
+    private config?: Config
   ) {
     super(params);
   }
 
   getDescription(): string {
     return `Processing ${this.moduleName} operation via .NET module`;
+  }
+
+  override async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    if (!this.config || this.config.getApprovalMode() === ApprovalMode.YOLO) {
+      return false;
+    }
+
+    // For Excel operations, check if it's a destructive operation
+    const params = this.params as any;
+    const isDestructiveOperation = this.isDestructiveExcelOperation(params);
+    
+    if (!isDestructiveOperation) {
+      return false;
+    }
+
+    const confirmationDetails: ToolExecuteConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Excel Operation',
+      command: `${this.moduleName}(${params.op}): ${params.file}`,
+      rootCommand: this.moduleName,
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // No persistent approval for .NET tools
+      },
+    };
+    return confirmationDetails;
+  }
+
+  private isDestructiveExcelOperation(params: any): boolean {
+    const destructiveOps = ['write', 'create', 'style', 'merge', 'addSheet', 'deleteSheet', 'editSheet', 'csvImport'];
+    return destructiveOps.includes(params.op);
   }
 
   async execute(): Promise<TResult> {

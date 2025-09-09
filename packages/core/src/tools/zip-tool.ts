@@ -13,8 +13,15 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  ToolConfirmationOutcome,
 } from './tools.js';
-import type { ToolResult } from './tools.js';
+import type { 
+  ToolResult,
+  ToolCallConfirmationDetails,
+  ToolExecuteConfirmationDetails,
+} from './tools.js';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
 
 interface ZipParams {
   /** Operation type */
@@ -46,7 +53,10 @@ interface ZipResult extends ToolResult {
 }
 
 class ZipInvocation extends BaseToolInvocation<ZipParams, ZipResult> {
-  constructor(params: ZipParams) {
+  constructor(
+    private readonly config: Config,
+    params: ZipParams
+  ) {
     super(params);
   }
 
@@ -575,10 +585,127 @@ Note: This is a simulation. For actual file removal, a proper ZIP library would 
     zip.writeZip(outputPath);
   }
 
+  override async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    // Skip confirmation for YOLO mode
+    if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
+      return false;
+    }
+
+    const params = this.params;
+    const isDestructiveOperation = this.isDestructiveZipOperation(params);
+    
+    // Only require confirmation for destructive operations
+    if (!isDestructiveOperation) {
+      return false;
+    }
+
+    const operationDescription = this.getZipOperationDescription(params);
+    const command = this.formatZipCommandDisplay(params);
+
+    const confirmationDetails: ToolExecuteConfirmationDetails = {
+      type: 'exec',
+      title: `Confirm Archive Operation`,
+      command,
+      rootCommand: operationDescription,
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          // For archive operations, we could set a flag to skip confirmation for similar operations
+          // But since archive operations can be varied, we'll keep per-operation confirmation
+        }
+      },
+    };
+
+    return confirmationDetails;
+  }
+
+  private isDestructiveZipOperation(params: ZipParams): boolean {
+    const { op } = params;
+    
+    // Operations that create or modify files
+    const destructiveOps = [
+      'create',     // Creates new archive (may overwrite)
+      'extract',    // Extracts files (may overwrite existing files)
+      'add',        // Modifies archive
+      'delete',     // Modifies archive by removing files
+      'compress',   // Creates compressed file
+      'decompress'  // Creates decompressed file (may overwrite)
+    ];
+    
+    if (destructiveOps.includes(op)) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  private getZipOperationDescription(params: ZipParams): string {
+    const { op, source, target } = params;
+    
+    switch (op) {
+      case 'create': {
+        const sourceCount = Array.isArray(source) ? source.length : 1;
+        return `Create archive with ${sourceCount} item${sourceCount > 1 ? 's' : ''}`;
+      }
+      case 'extract':
+        return `Extract archive${target ? ` to "${target}"` : ''}`;
+      case 'add': {
+        const addCount = Array.isArray(source) ? source.length : 1;
+        return `Add ${addCount} item${addCount > 1 ? 's' : ''} to archive`;
+      }
+      case 'delete':
+        return `Delete items from archive`;
+      case 'compress':
+        return `Compress file`;
+      case 'decompress':
+        return `Decompress file`;
+      case 'list':
+        return `List archive contents`;
+      default:
+        return `Archive operation: ${op}`;
+    }
+  }
+
+  private formatZipCommandDisplay(params: ZipParams): string {
+    const { op, file, source, target } = params;
+    const fileName = file.split(/[\\/]/g).pop() || file;
+    
+    switch (op) {
+      case 'create':
+        {
+          const sources = Array.isArray(source) ? source.slice(0, 3).map(s => `"${s.split(/[\\/]/g).pop()}"`).join(', ') : `"${source?.split(/[\\/]/g).pop() || 'source'}"`;
+          const moreCount = Array.isArray(source) && source.length > 3 ? ` +${source.length - 3} more` : '';
+          return `zip create "${fileName}" <- ${sources}${moreCount}`;
+        }
+      case 'extract':
+        return `zip extract "${fileName}"${target ? ` -> "${target}"` : ' -> .'}`;
+      case 'add':
+        {
+          const addSources = Array.isArray(source) ? source.slice(0, 3).map(s => `"${s.split(/[\\/]/g).pop()}"`).join(', ') : `"${source?.split(/[\\/]/g).pop() || 'source'}"`;
+          const addMoreCount = Array.isArray(source) && source.length > 3 ? ` +${source.length - 3} more` : '';
+          return `zip add "${fileName}" += ${addSources}${addMoreCount}`;
+        }
+      case 'delete':
+        {
+          const delSources = Array.isArray(source) ? source.slice(0, 3).join(', ') : source || 'items';
+          return `zip delete "${fileName}" -= ${delSources}`;
+        }
+      case 'compress':
+        return `gzip "${fileName.split('.')[0]}" -> "${fileName}"`;
+      case 'decompress':
+        return `gunzip "${fileName}" -> "${target || fileName.replace(/\.gz$/, '')}"`;
+      case 'list':
+        return `zip list "${fileName}"`;
+      default:
+        return `zip ${op} "${fileName}"`;
+    }
+  }
+
 }
 
 export class ZipTool extends BaseDeclarativeTool<ZipParams, ZipResult> {
-  constructor() {
+  constructor(private readonly config: Config) {
     super(
       'zip',
       'Archive Operations',
@@ -655,8 +782,8 @@ export class ZipTool extends BaseDeclarativeTool<ZipParams, ZipResult> {
   }
 
   protected createInvocation(params: ZipParams): ZipInvocation {
-    return new ZipInvocation(params);
+    return new ZipInvocation(this.config, params);
   }
 }
 
-export const zipTool = new ZipTool();
+// export const zipTool = new ZipTool(); // Removed: Tools now require config parameter

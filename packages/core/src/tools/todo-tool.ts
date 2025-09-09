@@ -219,6 +219,9 @@ class TodoInvocation extends BaseToolInvocation<TodoParams, TodoResult> {
 
     // Get current todos
     let todos = session.todos || [];
+    
+    // Normalize date fields
+    todos = this.normalizeDates(todos);
 
     switch (this.params.action) {
       case 'add':
@@ -277,7 +280,7 @@ class TodoInvocation extends BaseToolInvocation<TodoParams, TodoResult> {
     }
 
     const newTask: TodoTask = {
-      id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: (todos.length + 1).toString(),
       content,
       activeForm: activeForm || content,
       status: TaskStatus.PENDING,
@@ -504,6 +507,27 @@ class TodoInvocation extends BaseToolInvocation<TodoParams, TodoResult> {
     });
   }
 
+  // Normalize date fields to ensure they are Date objects
+  private normalizeDates(todos: TodoTask[]): TodoTask[] {
+    return todos.map(task => ({
+      ...task,
+      createdAt: task.createdAt instanceof Date ? task.createdAt : new Date(task.createdAt),
+      updatedAt: task.updatedAt instanceof Date ? task.updatedAt : new Date(task.updatedAt),
+      lifecycle: {
+        ...task.lifecycle,
+        pausedAt: task.lifecycle?.pausedAt ? 
+          (task.lifecycle.pausedAt instanceof Date ? task.lifecycle.pausedAt : new Date(task.lifecycle.pausedAt)) : 
+          undefined
+      },
+      context: {
+        ...task.context,
+        lastMentioned: task.context?.lastMentioned ? 
+          (task.context.lastMentioned instanceof Date ? task.context.lastMentioned : new Date(task.context.lastMentioned)) : 
+          undefined
+      }
+    }));
+  }
+
   // Build result
   private buildResult(filteredTasks: TodoTask[], allTasks: TodoTask[]): TodoResult {
     const now = new Date();
@@ -550,7 +574,7 @@ class TodoInvocation extends BaseToolInvocation<TodoParams, TodoResult> {
     const decisionSupport = this.buildDecisionSupport(allTasks);
 
     const result: TodoResult = {
-      llmContent: this.buildLLMContent(this.params.action, summary, decisionSupport),
+      llmContent: this.buildLLMContent(this.params.action, summary, decisionSupport, filteredTasks, allTasks),
       returnDisplay: this.formatDisplayMessage(summary, tasks.slice(0, 5)),
       tasks,
       summary,
@@ -565,29 +589,81 @@ class TodoInvocation extends BaseToolInvocation<TodoParams, TodoResult> {
   private buildLLMContent(
     action: string, 
     summary: TodoResult['summary'], 
-    decisionSupport: TodoResult['decisionSupport']
+    decisionSupport: TodoResult['decisionSupport'],
+    filteredTasks: TodoTask[],
+    allTasks: TodoTask[]
   ): string {
     let content = '';
     
     switch (action) {
-      case 'add':
-        content = `Task added successfully. Total tasks: ${summary.total}`;
+      case 'add':{
+        const newTask = allTasks[allTasks.length - 1]; // Get the most recently added task
+        content = `✅ **Task added successfully:**\n\n• **[${newTask.id}]** "${newTask.content}" - *${newTask.priority} priority*\n\n📊 Total tasks: ${summary.total}`;
         break;
-      case 'update':
-        content = `Task updated successfully.`;
+      }
+      case 'update':{
+        const { taskId } = this.params;
+        const updatedTask = allTasks.find(t => t.id === taskId);
+        if (updatedTask) {
+          const statusText = updatedTask.status.replace('_', ' ');
+          content = `✅ **Task updated successfully:**\n\n• **[${updatedTask.id}]** "${updatedTask.content}" - *${statusText}* (${updatedTask.priority} priority)`;
+        } else {
+          content = `✅ Task updated successfully.`;
+        }
         break;
-      case 'pause':
-        content = `Task paused. You can resume it later when ready.`;
+      }        
+      case 'pause':{
+        const { taskId: pausedTaskId } = this.params;
+        const pausedTask = allTasks.find(t => t.id === pausedTaskId);
+        if (pausedTask) {
+          content = `Task paused: "${pausedTask.content}". You can resume it later when ready.`;
+        } else {
+          content = `Task paused. You can resume it later when ready.`;
+        }
         break;
-      case 'resume':
-        content = `Task resumed and ready to continue.`;
+      }        
+      case 'resume':{
+        const { taskId: resumedTaskId } = this.params;
+        const resumedTask = allTasks.find(t => t.id === resumedTaskId);
+        if (resumedTask) {
+          content = `Task resumed: "${resumedTask.content}" and ready to continue.`;
+        } else {
+          content = `Task resumed and ready to continue.`;
+        }
         break;
-      case 'cancel':
-        content = `Task cancelled successfully.`;
+      }
+      case 'cancel':{
+        const { taskId: cancelledTaskId } = this.params;
+        const cancelledTask = allTasks.find(t => t.id === cancelledTaskId);
+        if (cancelledTask) {
+          content = `Task cancelled: "${cancelledTask.content}".`;
+        } else {
+          content = `Task cancelled successfully.`;
+        }
         break;
+      }        
       case 'list':
       case 'get_context':
         content = `Current status: ${summary.total} tasks (${summary.completed} completed, ${summary.inProgress} in progress, ${summary.pending} pending, ${summary.paused} paused)`;
+        
+        // Add specific task information for better context
+        if (filteredTasks.length > 0) {
+          content += `\n\n**Current tasks:**\n`;
+          filteredTasks.slice(0, 5).forEach(task => {
+            const statusText = task.status.replace('_', ' ');
+            content += `\n• **[${task.id}]** "${task.content}" - *${statusText}* (${task.priority} priority)`;
+            if (task.dependencies.length > 0) {
+              content += ` [depends on ${task.dependencies.length} task${task.dependencies.length > 1 ? 's' : ''}]`;
+            }
+            if (!this.canTaskStart(task, allTasks)) {
+              content += ` [blocked]`;
+            }
+          });
+          
+          if (filteredTasks.length > 5) {
+            content += `\n• ... and ${filteredTasks.length - 5} more tasks`;
+          }
+        }
         
         // Add decision support information for LLM
         if (decisionSupport?.staleTasks && decisionSupport.staleTasks.length > 0) {
@@ -597,16 +673,21 @@ class TodoInvocation extends BaseToolInvocation<TodoParams, TodoResult> {
         if (decisionSupport?.recommendations && decisionSupport.recommendations.length > 0) {
           const highConfidenceRecs = decisionSupport.recommendations.filter(r => r.confidence > 0.7);
           if (highConfidenceRecs.length > 0) {
-            content += `\n\nRecommendations: ${highConfidenceRecs.map(r => `${r.type} task ${r.taskId} (${r.reason})`).join(', ')}`;
+            content += `\n\nRecommendations: ${highConfidenceRecs.map(r => {
+              const task = allTasks.find(t => t.id === r.taskId);
+              return `${r.type} "${task?.content || r.taskId}" (${r.reason})`;
+            }).join(', ')}`;
           }
         }
         break;
       case 'clear':
-        content = `All tasks cleared.`;
+        content = `All ${summary.total} tasks cleared.`;
         break;
-      case 'archive':
-        content = `Old completed/cancelled tasks archived.`;
+      case 'archive':{
+        const archivedCount = allTasks.length - summary.total;
+        content = `${archivedCount} old completed/cancelled tasks archived. ${summary.total} tasks remaining.`;
         break;
+      }
       default:
         content = `Task operation completed. Status: ${summary.total} total tasks`;
     }
