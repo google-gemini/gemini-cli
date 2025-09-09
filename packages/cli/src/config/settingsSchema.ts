@@ -80,7 +80,6 @@ export interface SettingsSchema {
   [key: string]: SettingDefinition;
 }
 
-
 export type MemoryImportFormat = 'tree' | 'flat';
 export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
 
