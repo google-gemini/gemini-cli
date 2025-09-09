@@ -6,7 +6,7 @@
 
 import { Box, Text } from 'ink';
 import type React from 'react';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -68,7 +68,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
       <Box
         flexDirection="column"
         borderStyle="round"
-        borderColor={Colors.AccentYellow}
+        borderColor={theme.status.warning}
         padding={1}
         width="100%"
         marginLeft={1}
@@ -90,7 +90,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
       </Box>
       {isRestarting && (
         <Box marginLeft={1} marginTop={1}>
-          <Text color={Colors.AccentYellow}>
+          <Text color={theme.status.warning}>
             To see changes, Gemini CLI must be restarted. Press r to exit and
             apply changes now.
           </Text>
