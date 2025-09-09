@@ -40,6 +40,8 @@ jobs:
 
       - name: 'Get Stable Version'
         id: 'stable_version'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION_JSON=$(node dist/get-release-version.js --type stable --version ${{ steps.preview_tag.outputs.TAG }})
           echo "RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)" >> "${GITHUB_OUTPUT}"
@@ -74,6 +76,8 @@ jobs:
 
       - name: 'Get Preview Version'
         id: 'preview_version'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION_JSON=$(node dist/get-release-version.js --type preview --version ${{ steps.stable_version.outputs.RELEASE_TAG }})
           echo "RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)" >> "${GITHUB_OUTPUT}"
