@@ -32,7 +32,6 @@ import {
 import { execSync } from 'node:child_process';
 import { SettingScope, loadSettings } from './settings.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import mock from 'mock-fs';
 
 const mockGit = {
   clone: vi.fn(),
