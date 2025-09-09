@@ -331,4 +331,12 @@ export enum EventMetadataKey {
 
   // Logs the current nodejs version
   GEMINI_CLI_NODE_VERSION = 83,
+
+  // ==========================================================================
+  // Extension Install Event Keys
+  // ===========================================================================
+  GEMINI_CLI_EXTENSION_NAME = 85,
+  GEMINI_CLI_EXTENSION_VERSION = 86,
+  GEMINI_CLI_EXTENSION_SOURCE = 87,
+  GEMINI_CLI_EXTENSION_INSTALL_STATUS = 88,
 }
