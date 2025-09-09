@@ -5,6 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
+import Spinner from 'ink-spinner';
 import { Colors } from '../colors.js';
 
 interface UpdateNotificationProps {
@@ -18,6 +19,8 @@ export const UpdateNotification = ({ message }: UpdateNotificationProps) => (
     paddingX={1}
     marginY={1}
   >
-    <Text color={Colors.AccentYellow}>{message}</Text>
+    <Text color={Colors.AccentYellow}>
+      <Spinner type="dots" /> {message}
+    </Text>
   </Box>
 );
