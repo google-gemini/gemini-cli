@@ -7,22 +7,9 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Launch CLI",
+      "name": "Build & Launch CLI",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "start"],
-      "skipFiles": ["<node_internals>/**"],
-      "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "env": {
-        "GEMINI_SANDBOX": "false"
-      }
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Launch E2E",
-      "program": "${workspaceFolder}/integration-tests/run-tests.js",
-      "args": ["--verbose", "--keep-output", "list_directory"],
+      "runtimeArgs": ["run", "build-and-start"],
       "skipFiles": ["<node_internals>/**"],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
@@ -80,6 +67,27 @@
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Debug Integration Test File",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vitest",
+        "run",
+        "--root",
+        "./integration-tests",
+        "--inspect-brk=9229",
+        "${file}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "GEMINI_SANDBOX": "false"
+      }
     }
   ],
   "inputs": [

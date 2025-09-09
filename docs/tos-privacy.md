@@ -9,7 +9,7 @@ This article outlines the specific terms and privacy policies applicable for dif
 Your authentication method refers to the method you use to log into and access the Gemini CLI. There are four ways to authenticate:
 
 - Logging in with your Google account to Gemini Code Assist for Individuals
-- Logging in with your Google account to Gemini Code Assist for Workspace, Standard, or Enterprise Users
+- Logging in with your Google account to Gemini Code Assist for Standard, or Enterprise Users
 - Using an API key with Gemini Developer
 - Using an API key with Vertex AI GenAI API
 
@@ -30,7 +30,7 @@ For users who use their Google account to access [Gemini Code Assist for Individ
 - **Terms of Service:** Your use of the Gemini CLI is governed by the [Google Terms of Service](https://policies.google.com/terms?hl=en-US).
 - **Privacy Notice:** The collection and use of your data is described in the [Gemini Code Assist Privacy Notice for Individuals](https://developers.google.com/gemini-code-assist/resources/privacy-notice-gemini-code-assist-individuals).
 
-## 2. If you have logged in with your Google account to Gemini Code Assist for Workspace, Standard, or Enterprise Users
+## 2. If you have logged in with your Google account to Gemini Code Assist for Standard, or Enterprise Users
 
 For users who use their Google account to access the [Standard or Enterprise edition](https://cloud.google.com/gemini/docs/codeassist/overview#editions-overview) of Gemini Code Assist, these Terms of Service and Privacy Notice documents apply:
 
@@ -67,7 +67,7 @@ By default (if you have not opted out):
 
 - **Google account with Gemini Code Assist for Individuals**: Yes. When you use your personal Google account, the [Gemini Code Assist Privacy Notice for Individuals](https://developers.google.com/gemini-code-assist/resources/privacy-notice-gemini-code-assist-individuals) applies. Under this notice,
   your **prompts, answers, and related code are collected** and may be used to improve Google's products, including for model training.
-- **Google account with Gemini Code Assist for Workspace, Standard, or Enterprise**: No. For these accounts, your data is governed by the [Gemini Code Assist Privacy Notices](https://cloud.google.com/gemini/docs/codeassist/security-privacy-compliance#standard_and_enterprise_data_protection_and_privacy) terms, which treat your inputs as confidential. Your **prompts, answers, and related code are not collected** and are not used to train models.
+- **Google account with Gemini Code Assist for Standard, or Enterprise**: No. For these accounts, your data is governed by the [Gemini Code Assist Privacy Notices](https://cloud.google.com/gemini/docs/codeassist/security-privacy-compliance#standard_and_enterprise_data_protection_and_privacy) terms, which treat your inputs as confidential. Your **prompts, answers, and related code are not collected** and are not used to train models.
 - **Gemini API key via the Gemini Developer API**: Whether your code is collected or used depends on whether you are using an unpaid or paid service.
   - **Unpaid services**: Yes. When you use the Gemini API key via the Gemini Developer API with an unpaid service, the [Gemini API Terms of Service - Unpaid Services](https://ai.google.dev/gemini-api/terms#unpaid-services) terms apply. Under this notice, your **prompts, answers, and related code are collected** and may be used to improve Google's products, including for model training.
   - **Paid services**: No. When you use the Gemini API key via the Gemini Developer API with a paid service, the [Gemini API Terms of Service - Paid Services](https://ai.google.dev/gemini-api/terms#paid-services) terms apply, which treats your inputs as confidential. Your **prompts, answers, and related code are not collected** and are not used to train models.
@@ -82,7 +82,7 @@ The **Usage Statistics** setting is the single control for all optional data col
 The data it collects depends on your account and authentication type:
 
 - **Google account with Gemini Code Assist for Individuals**: When enabled, this setting allows Google to collect both anonymous telemetry (for example, commands run and performance metrics) and **your prompts and answers, including code,** for model improvement.
-- **Google account with Gemini Code Assist for Workspace, Standard, or Enterprise**: This setting only controls the collection of anonymous telemetry. Your prompts and answers, including code, are never collected, regardless of this setting.
+- **Google account with Gemini Code Assist for Standard, or Enterprise**: This setting only controls the collection of anonymous telemetry. Your prompts and answers, including code, are never collected, regardless of this setting.
 - **Gemini API key via the Gemini Developer API**:
   **Unpaid services**: When enabled, this setting allows Google to collect both anonymous telemetry (like commands run and performance metrics) and **your prompts and answers, including code,** for model improvement. When disabled we will use your data as described in [How Google Uses Your Data](https://ai.google.dev/gemini-api/terms#data-use-unpaid).
   **Paid services**: This setting only controls the collection of anonymous telemetry. Google logs prompts and responses for a limited period of time, solely for the purpose of detecting violations of the Prohibited Use Policy and any required legal or regulatory disclosures.

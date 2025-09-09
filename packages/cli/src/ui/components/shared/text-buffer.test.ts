@@ -5,17 +5,24 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import stripAnsi from 'strip-ansi';
 import { renderHook, act } from '@testing-library/react';
-import {
-  useTextBuffer,
+import type {
   Viewport,
   TextBuffer,
-  offsetToLogicalPos,
-  logicalPosToOffset,
-  textBufferReducer,
   TextBufferState,
   TextBufferAction,
 } from './text-buffer.js';
+import {
+  useTextBuffer,
+  offsetToLogicalPos,
+  logicalPosToOffset,
+  textBufferReducer,
+  findWordEndInLine,
+  findNextWordStartInLine,
+  isWordCharStrict,
+} from './text-buffer.js';
+import { cpLen } from '../../utils/textUtils.js';
 
 const initialState: TextBufferState = {
   lines: [''],
@@ -163,6 +170,117 @@ describe('textBufferReducer', () => {
       expect(state.undoStack[0].lines).toEqual(['hello']);
       expect(state.undoStack[0].cursorRow).toBe(0);
       expect(state.undoStack[0].cursorCol).toBe(5);
+    });
+  });
+
+  describe('delete_word_left action', () => {
+    it('should delete a simple word', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 11,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['hello ']);
+      expect(state.cursorCol).toBe(6);
+    });
+
+    it('should delete a path segment', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['path/to/file'],
+        cursorRow: 0,
+        cursorCol: 12,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['path/to/']);
+      expect(state.cursorCol).toBe(8);
+    });
+
+    it('should delete variable_name parts', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['variable_name'],
+        cursorRow: 0,
+        cursorCol: 13,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['variable_']);
+      expect(state.cursorCol).toBe(9);
+    });
+
+    it('should act like backspace at the beginning of a line', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello', 'world'],
+        cursorRow: 1,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['helloworld']);
+      expect(state.cursorRow).toBe(0);
+      expect(state.cursorCol).toBe(5);
+    });
+  });
+
+  describe('delete_word_right action', () => {
+    it('should delete a simple word', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['world']);
+      expect(state.cursorCol).toBe(0);
+    });
+
+    it('should delete a path segment', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['path/to/file'],
+        cursorRow: 0,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      let state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['/to/file']);
+      state = textBufferReducer(state, action);
+      expect(state.lines).toEqual(['to/file']);
+    });
+
+    it('should delete variable_name parts', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['variable_name'],
+        cursorRow: 0,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['_name']);
+      expect(state.cursorCol).toBe(0);
+    });
+
+    it('should act like delete at the end of a line', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello', 'world'],
+        cursorRow: 0,
+        cursorCol: 5,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['helloworld']);
+      expect(state.cursorRow).toBe(0);
+      expect(state.cursorCol).toBe(5);
     });
   });
 });
@@ -888,7 +1006,7 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
-    it('should handle inserts that contain delete characters ', () => {
+    it('should handle inserts that contain delete characters', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: 'abcde',
@@ -906,7 +1024,7 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
-    it('should handle inserts with a mix of regular and delete characters ', () => {
+    it('should handle inserts with a mix of regular and delete characters', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: 'abcde',
@@ -1274,6 +1392,45 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       );
       expect(getBufferState(result).text).toBe('Pasted Text');
     });
+
+    it('should not strip popular emojis', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const emojis = '🐍🐳🦀🦄';
+      act(() =>
+        result.current.handleInput({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: emojis,
+        }),
+      );
+      expect(getBufferState(result).text).toBe(emojis);
+    });
+  });
+
+  describe('stripAnsi', () => {
+    it('should correctly strip ANSI escape codes', () => {
+      const textWithAnsi = '\x1B[31mHello\x1B[0m World';
+      expect(stripAnsi(textWithAnsi)).toBe('Hello World');
+    });
+
+    it('should handle multiple ANSI codes', () => {
+      const textWithMultipleAnsi = '\x1B[1m\x1B[34mBold Blue\x1B[0m Text';
+      expect(stripAnsi(textWithMultipleAnsi)).toBe('Bold Blue Text');
+    });
+
+    it('should not modify text without ANSI codes', () => {
+      const plainText = 'Plain text';
+      expect(stripAnsi(plainText)).toBe('Plain text');
+    });
+
+    it('should handle empty string', () => {
+      expect(stripAnsi('')).toBe('');
+    });
   });
 });
 
@@ -1588,6 +1745,97 @@ describe('textBufferReducer vim operations', () => {
       expect(afterPaste.lines).toEqual(['new1', 'new2', 'new3', 'new4']);
       expect(afterPaste.cursorRow).toBe(3);
       expect(afterPaste.cursorCol).toBe(4);
+    });
+  });
+});
+
+describe('Unicode helper functions', () => {
+  describe('findWordEndInLine with Unicode', () => {
+    it('should handle combining characters', () => {
+      // café with combining accent
+      const cafeWithCombining = 'cafe\u0301';
+      const result = findWordEndInLine(cafeWithCombining + ' test', 0);
+      expect(result).toBe(3); // End of 'café' at base character 'e', not combining accent
+    });
+
+    it('should handle precomposed characters with diacritics', () => {
+      // café with precomposed é (U+00E9)
+      const cafePrecomposed = 'café';
+      const result = findWordEndInLine(cafePrecomposed + ' test', 0);
+      expect(result).toBe(3); // End of 'café' at precomposed character 'é'
+    });
+
+    it('should return null when no word end found', () => {
+      const result = findWordEndInLine('   ', 0);
+      expect(result).toBeNull(); // No word end found in whitespace-only string string
+    });
+  });
+
+  describe('findNextWordStartInLine with Unicode', () => {
+    it('should handle right-to-left text', () => {
+      const result = findNextWordStartInLine('hello مرحبا world', 0);
+      expect(result).toBe(6); // Start of Arabic word
+    });
+
+    it('should handle Chinese characters', () => {
+      const result = findNextWordStartInLine('hello 你好 world', 0);
+      expect(result).toBe(6); // Start of Chinese word
+    });
+
+    it('should return null at end of line', () => {
+      const result = findNextWordStartInLine('hello', 10);
+      expect(result).toBeNull();
+    });
+
+    it('should handle combining characters', () => {
+      // café with combining accent + next word
+      const textWithCombining = 'cafe\u0301 test';
+      const result = findNextWordStartInLine(textWithCombining, 0);
+      expect(result).toBe(6); // Start of 'test' after 'café ' (combining char makes string longer)
+    });
+
+    it('should handle precomposed characters with diacritics', () => {
+      // café with precomposed é + next word
+      const textPrecomposed = 'café test';
+      const result = findNextWordStartInLine(textPrecomposed, 0);
+      expect(result).toBe(5); // Start of 'test' after 'café '
+    });
+  });
+
+  describe('isWordCharStrict with Unicode', () => {
+    it('should return true for ASCII word characters', () => {
+      expect(isWordCharStrict('a')).toBe(true);
+      expect(isWordCharStrict('Z')).toBe(true);
+      expect(isWordCharStrict('0')).toBe(true);
+      expect(isWordCharStrict('_')).toBe(true);
+    });
+
+    it('should return false for punctuation', () => {
+      expect(isWordCharStrict('.')).toBe(false);
+      expect(isWordCharStrict(',')).toBe(false);
+      expect(isWordCharStrict('!')).toBe(false);
+    });
+
+    it('should return true for non-Latin scripts', () => {
+      expect(isWordCharStrict('你')).toBe(true); // Chinese character
+      expect(isWordCharStrict('م')).toBe(true); // Arabic character
+    });
+
+    it('should return false for whitespace', () => {
+      expect(isWordCharStrict(' ')).toBe(false);
+      expect(isWordCharStrict('\t')).toBe(false);
+    });
+  });
+
+  describe('cpLen with Unicode', () => {
+    it('should handle combining characters', () => {
+      expect(cpLen('é')).toBe(1); // Precomposed
+      expect(cpLen('e\u0301')).toBe(2); // e + combining acute
+    });
+
+    it('should handle Chinese and Arabic text', () => {
+      expect(cpLen('hello 你好 world')).toBe(14); // 5 + 1 + 2 + 1 + 5 = 14
+      expect(cpLen('hello مرحبا world')).toBe(17);
     });
   });
 });

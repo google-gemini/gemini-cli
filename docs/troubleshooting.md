@@ -19,6 +19,11 @@ This guide provides solutions to common issues and debugging tips, including top
     [Google AI Studio](http://aistudio.google.com/app/apikey), which also includes a
     separate free tier.
 
+- **Error: `UNABLE_TO_GET_ISSUER_CERT_LOCALLY` or `unable to get local issuer certificate`**
+  - **Cause:** You may be on a corporate network with a firewall that intercepts and inspects SSL/TLS traffic. This often requires a custom root CA certificate to be trusted by Node.js.
+  - **Solution:** Set the `NODE_EXTRA_CA_CERTS` environment variable to the absolute path of your corporate root CA certificate file.
+    - Example: `export NODE_EXTRA_CA_CERTS=/path/to/your/corporate-ca.crt`
+
 ## Frequently asked questions (FAQs)
 
 - **Q: How do I update Gemini CLI to the latest version?**
@@ -67,7 +72,19 @@ This guide provides solutions to common issues and debugging tips, including top
 - **DEBUG mode not working from project .env file**
   - **Issue:** Setting `DEBUG=true` in a project's `.env` file doesn't enable debug mode for gemini-cli.
   - **Cause:** The `DEBUG` and `DEBUG_MODE` variables are automatically excluded from project `.env` files to prevent interference with gemini-cli behavior.
-  - **Solution:** Use a `.gemini/.env` file instead, or configure the `excludedProjectEnvVars` setting in your `settings.json` to exclude fewer variables.
+  - **Solution:** Use a `.gemini/.env` file instead, or configure the `advanced.excludedEnvVars` setting in your `settings.json` to exclude fewer variables.
+
+## Exit Codes
+
+The Gemini CLI uses specific exit codes to indicate the reason for termination. This is especially useful for scripting and automation.
+
+| Exit Code | Error Type                 | Description                                                                                         |
+| --------- | -------------------------- | --------------------------------------------------------------------------------------------------- |
+| 41        | `FatalAuthenticationError` | An error occurred during the authentication process.                                                |
+| 42        | `FatalInputError`          | Invalid or missing input was provided to the CLI. (non-interactive mode only)                       |
+| 44        | `FatalSandboxError`        | An error occurred with the sandboxing environment (e.g., Docker, Podman, or Seatbelt).              |
+| 52        | `FatalConfigError`         | A configuration file (`settings.json`) is invalid or contains errors.                               |
+| 53        | `FatalTurnLimitedError`    | The maximum number of conversational turns for the session was reached. (non-interactive mode only) |
 
 ## Debugging Tips
 

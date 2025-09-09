@@ -5,11 +5,12 @@
  */
 
 import { vi, describe, expect, it, afterEach, beforeEach } from 'vitest';
-import * as child_process from 'child_process';
+import * as child_process from 'node:child_process';
 import {
   isGitHubRepository,
   getGitRepoRoot,
   getLatestGitHubRelease,
+  getGitHubRepoInfo,
 } from './gitUtils.js';
 
 vi.mock('child_process');
@@ -41,6 +42,39 @@ describe('isGitHubRepository', async () => {
       origin  https://github.com/sethvargo/gemini-cli (push)
     `);
     expect(isGitHubRepository()).toBe(true);
+  });
+});
+
+describe('getGitHubRepoInfo', async () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('throws an error if github repo info cannot be determined', async () => {
+    vi.mocked(child_process.execSync).mockImplementation((): string => {
+      throw new Error('oops');
+    });
+    expect(() => {
+      getGitHubRepoInfo();
+    }).toThrowError(/oops/);
+  });
+
+  it('throws an error if owner/repo could not be determined', async () => {
+    vi.mocked(child_process.execSync).mockReturnValueOnce('');
+    expect(() => {
+      getGitHubRepoInfo();
+    }).toThrowError(/Owner & repo could not be extracted from remote URL/);
+  });
+
+  it('returns the owner and repo', async () => {
+    vi.mocked(child_process.execSync).mockReturnValueOnce(
+      'https://github.com/owner/repo.git ',
+    );
+    expect(getGitHubRepoInfo()).toEqual({ owner: 'owner', repo: 'repo' });
   });
 });
 
@@ -86,7 +120,7 @@ describe('getLatestRelease', async () => {
 
   it('throws an error if the fetch fails', async () => {
     global.fetch = vi.fn(() => Promise.reject('nope'));
-    expect(getLatestGitHubRelease()).rejects.toThrowError(
+    await expect(getLatestGitHubRelease()).rejects.toThrowError(
       /Unable to determine the latest/,
     );
   });
@@ -98,7 +132,7 @@ describe('getLatestRelease', async () => {
         json: () => Promise.resolve({ foo: 'bar' }),
       } as Response),
     );
-    expect(getLatestGitHubRelease()).rejects.toThrowError(
+    await expect(getLatestGitHubRelease()).rejects.toThrowError(
       /Unable to determine the latest/,
     );
   });
@@ -110,6 +144,6 @@ describe('getLatestRelease', async () => {
         json: () => Promise.resolve({ tag_name: 'v1.2.3' }),
       } as Response),
     );
-    expect(getLatestGitHubRelease()).resolves.toBe('v1.2.3');
+    await expect(getLatestGitHubRelease()).resolves.toBe('v1.2.3');
   });
 });

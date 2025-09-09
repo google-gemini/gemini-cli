@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as child_process from 'child_process';
-import * as process from 'process';
-import { glob } from 'glob';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as os from 'os';
-import { fileURLToPath } from 'url';
-import { DetectedIde } from './detect-ide.js';
+import * as child_process from 'node:child_process';
+import * as process from 'node:process';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import { DetectedIde, getIdeInfo, type IdeInfo } from './detect-ide.js';
+import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
 
-const VSCODE_COMMAND = process.platform === 'win32' ? 'code.cmd' : 'code';
-const VSCODE_COMPANION_EXTENSION_FOLDER = 'vscode-ide-companion';
+function getVsCodeCommand(platform: NodeJS.Platform = process.platform) {
+  return platform === 'win32' ? 'code.cmd' : 'code';
+}
 
 export interface IdeInstaller {
   install(): Promise<InstallResult>;
@@ -25,23 +25,34 @@ export interface InstallResult {
   message: string;
 }
 
-async function findVsCodeCommand(): Promise<string | null> {
+async function findVsCodeCommand(
+  platform: NodeJS.Platform = process.platform,
+): Promise<string | null> {
   // 1. Check PATH first.
+  const vscodeCommand = getVsCodeCommand(platform);
   try {
-    child_process.execSync(
-      process.platform === 'win32'
-        ? `where.exe ${VSCODE_COMMAND}`
-        : `command -v ${VSCODE_COMMAND}`,
-      { stdio: 'ignore' },
-    );
-    return VSCODE_COMMAND;
+    if (platform === 'win32') {
+      const result = child_process
+        .execSync(`where.exe ${vscodeCommand}`)
+        .toString()
+        .trim();
+      // `where.exe` can return multiple paths. Return the first one.
+      const firstPath = result.split(/\r?\n/)[0];
+      if (firstPath) {
+        return firstPath;
+      }
+    } else {
+      child_process.execSync(`command -v ${vscodeCommand}`, {
+        stdio: 'ignore',
+      });
+      return vscodeCommand;
+    }
   } catch {
     // Not in PATH, continue to check common locations.
   }
 
   // 2. Check common installation locations.
   const locations: string[] = [];
-  const platform = process.platform;
   const homeDir = os.homedir();
 
   if (platform === 'darwin') {
@@ -61,7 +72,7 @@ async function findVsCodeCommand(): Promise<string | null> {
     // Windows
     locations.push(
       path.join(
-        process.env.ProgramFiles || 'C:\\Program Files',
+        process.env['ProgramFiles'] || 'C:\\Program Files',
         'Microsoft VS Code',
         'bin',
         'code.cmd',
@@ -89,9 +100,14 @@ async function findVsCodeCommand(): Promise<string | null> {
 
 class VsCodeInstaller implements IdeInstaller {
   private vsCodeCommand: Promise<string | null>;
+  private readonly ideInfo: IdeInfo;
 
-  constructor() {
-    this.vsCodeCommand = findVsCodeCommand();
+  constructor(
+    readonly ide: DetectedIde,
+    readonly platform = process.platform,
+  ) {
+    this.vsCodeCommand = findVsCodeCommand(platform);
+    this.ideInfo = getIdeInfo(ide);
   }
 
   async install(): Promise<InstallResult> {
@@ -99,58 +115,34 @@ class VsCodeInstaller implements IdeInstaller {
     if (!commandPath) {
       return {
         success: false,
-        message: `VS Code CLI not found. Please ensure 'code' is in your system's PATH. For help, see https://code.visualstudio.com/docs/configure/command-line#_code-is-not-recognized-as-an-internal-or-external-command. You can also install the companion extension manually from the VS Code marketplace.`,
+        message: `${this.ideInfo.displayName} CLI not found. Please ensure 'code' is in your system's PATH. For help, see https://code.visualstudio.com/docs/configure/command-line#_code-is-not-recognized-as-an-internal-or-external-command. You can also install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the VS Code marketplace.`,
       };
     }
 
-    const bundleDir = path.dirname(fileURLToPath(import.meta.url));
-    // The VSIX file is copied to the bundle directory as part of the build.
-    let vsixFiles = glob.sync(path.join(bundleDir, '*.vsix'));
-    if (vsixFiles.length === 0) {
-      // If the VSIX file is not in the bundle, it might be a dev
-      // environment running with `npm start`. Look for it in the original
-      // package location, relative to the bundle dir.
-      const devPath = path.join(
-        bundleDir, // .../packages/core/dist/src/ide
-        '..', // .../packages/core/dist/src
-        '..', // .../packages/core/dist
-        '..', // .../packages/core
-        '..', // .../packages
-        VSCODE_COMPANION_EXTENSION_FOLDER,
-        '*.vsix',
-      );
-      vsixFiles = glob.sync(devPath);
-    }
-    if (vsixFiles.length === 0) {
-      return {
-        success: false,
-        message:
-          'Could not find the required VS Code companion extension. Please file a bug via /bug.',
-      };
-    }
-
-    const vsixPath = vsixFiles[0];
-    const command = `"${commandPath}" --install-extension "${vsixPath}" --force`;
+    const command = `"${commandPath}" --install-extension google.gemini-cli-vscode-ide-companion --force`;
     try {
       child_process.execSync(command, { stdio: 'pipe' });
       return {
         success: true,
-        message:
-          'VS Code companion extension was installed successfully. Please restart your terminal to complete the setup.',
+        message: `${this.ideInfo.displayName} companion extension was installed successfully.`,
       };
     } catch (_error) {
       return {
         success: false,
-        message: `Failed to install VS Code companion extension. Please try installing it manually from the VS Code marketplace.`,
+        message: `Failed to install ${this.ideInfo.displayName} companion extension. Please try installing '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' manually from the ${this.ideInfo.displayName} extension marketplace.`,
       };
     }
   }
 }
 
-export function getIdeInstaller(ide: DetectedIde): IdeInstaller | null {
+export function getIdeInstaller(
+  ide: DetectedIde,
+  platform = process.platform,
+): IdeInstaller | null {
   switch (ide) {
     case DetectedIde.VSCode:
-      return new VsCodeInstaller();
+    case DetectedIde.FirebaseStudio:
+      return new VsCodeInstaller(ide, platform);
     default:
       return null;
   }

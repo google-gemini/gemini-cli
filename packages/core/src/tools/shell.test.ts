@@ -30,11 +30,13 @@ import {
   type ShellExecutionResult,
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import * as crypto from 'crypto';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import { EOL } from 'node:os';
+import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import * as summarizer from '../utils/summarizer.js';
+import { ToolErrorType } from './tool-error.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
@@ -56,6 +58,7 @@ describe('ShellTool', () => {
       getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
       getWorkspaceContext: () => createMockWorkspaceContext('.'),
       getGeminiClient: vi.fn(),
+      getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     shellTool = new ShellTool(mockConfig);
@@ -92,22 +95,25 @@ describe('ShellTool', () => {
     });
   });
 
-  describe('validateToolParams', () => {
-    it('should return null for a valid command', () => {
-      expect(shellTool.validateToolParams({ command: 'ls -l' })).toBeNull();
+  describe('build', () => {
+    it('should return an invocation for a valid command', () => {
+      const invocation = shellTool.build({ command: 'ls -l' });
+      expect(invocation).toBeDefined();
     });
 
-    it('should return an error for an empty command', () => {
-      expect(shellTool.validateToolParams({ command: ' ' })).toBe(
+    it('should throw an error for an empty command', () => {
+      expect(() => shellTool.build({ command: ' ' })).toThrow(
         'Command cannot be empty.',
       );
     });
 
-    it('should return an error for a non-existent directory', () => {
+    it('should throw an error for a non-existent directory', () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);
-      expect(
-        shellTool.validateToolParams({ command: 'ls', directory: 'rel/path' }),
-      ).toBe("Directory 'rel/path' is not a registered workspace directory.");
+      expect(() =>
+        shellTool.build({ command: 'ls', directory: 'rel/path' }),
+      ).toThrow(
+        "Directory 'rel/path' is not a registered workspace directory.",
+      );
     });
   });
 
@@ -120,27 +126,24 @@ describe('ShellTool', () => {
       const fullResult: ShellExecutionResult = {
         rawOutput: Buffer.from(result.output || ''),
         output: 'Success',
-        stdout: 'Success',
-        stderr: '',
         exitCode: 0,
         signal: null,
         error: null,
         aborted: false,
         pid: 12345,
+        executionMethod: 'child_process',
         ...result,
       };
       resolveExecutionPromise(fullResult);
     };
 
     it('should wrap command on linux and parse pgrep output', async () => {
-      const promise = shellTool.execute(
-        { command: 'my-command &' },
-        mockAbortSignal,
-      );
+      const invocation = shellTool.build({ command: 'my-command &' });
+      const promise = invocation.execute(mockAbortSignal);
       resolveShellExecution({ pid: 54321 });
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('54321\n54322\n'); // Service PID and background PID
+      vi.mocked(fs.readFileSync).mockReturnValue(`54321${EOL}54322${EOL}`); // Service PID and background PID
 
       const result = await promise;
 
@@ -151,6 +154,9 @@ describe('ShellTool', () => {
         expect.any(String),
         expect.any(Function),
         mockAbortSignal,
+        false,
+        undefined,
+        undefined,
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(tmpFile);
@@ -158,17 +164,17 @@ describe('ShellTool', () => {
 
     it('should not wrap command on windows', async () => {
       vi.mocked(os.platform).mockReturnValue('win32');
-      const promise = shellTool.execute({ command: 'dir' }, mockAbortSignal);
-      resolveExecutionPromise({
+      const invocation = shellTool.build({ command: 'dir' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({
         rawOutput: Buffer.from(''),
         output: '',
-        stdout: '',
-        stderr: '',
         exitCode: 0,
         signal: null,
         error: null,
         aborted: false,
         pid: 12345,
+        executionMethod: 'child_process',
       });
       await promise;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
@@ -176,31 +182,61 @@ describe('ShellTool', () => {
         expect.any(String),
         expect.any(Function),
         mockAbortSignal,
+        false,
+        undefined,
+        undefined,
       );
     });
 
     it('should format error messages correctly', async () => {
       const error = new Error('wrapped command failed');
-      const promise = shellTool.execute(
-        { command: 'user-command' },
-        mockAbortSignal,
-      );
+      const invocation = shellTool.build({ command: 'user-command' });
+      const promise = invocation.execute(mockAbortSignal);
       resolveShellExecution({
         error,
         exitCode: 1,
         output: 'err',
-        stderr: 'err',
         rawOutput: Buffer.from('err'),
-        stdout: '',
         signal: null,
         aborted: false,
         pid: 12345,
+        executionMethod: 'child_process',
       });
 
       const result = await promise;
-      // The final llmContent should contain the user's command, not the wrapper
       expect(result.llmContent).toContain('Error: wrapped command failed');
       expect(result.llmContent).not.toContain('pgrep');
+    });
+
+    it('should return a SHELL_EXECUTE_ERROR for a command failure', async () => {
+      const error = new Error('command failed');
+      const invocation = shellTool.build({ command: 'user-command' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({
+        error,
+        exitCode: 1,
+      });
+
+      const result = await promise;
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.SHELL_EXECUTE_ERROR);
+      expect(result.error?.message).toBe('command failed');
+    });
+
+    it('should throw an error for invalid parameters', () => {
+      expect(() => shellTool.build({ command: '' })).toThrow(
+        'Command cannot be empty.',
+      );
+    });
+
+    it('should throw an error for invalid directory', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      expect(() =>
+        shellTool.build({ command: 'ls', directory: 'nonexistent' }),
+      ).toThrow(
+        `Directory 'nonexistent' is not a registered workspace directory.`,
+      );
     });
 
     it('should summarize output when configured', async () => {
@@ -211,17 +247,17 @@ describe('ShellTool', () => {
         'summarized output',
       );
 
-      const promise = shellTool.execute({ command: 'ls' }, mockAbortSignal);
+      const invocation = shellTool.build({ command: 'ls' });
+      const promise = invocation.execute(mockAbortSignal);
       resolveExecutionPromise({
         output: 'long output',
         rawOutput: Buffer.from('long output'),
-        stdout: 'long output',
-        stderr: '',
         exitCode: 0,
         signal: null,
         error: null,
         aborted: false,
         pid: 12345,
+        executionMethod: 'child_process',
       });
 
       const result = await promise;
@@ -243,9 +279,8 @@ describe('ShellTool', () => {
       });
       vi.mocked(fs.existsSync).mockReturnValue(true); // Pretend the file exists
 
-      await expect(
-        shellTool.execute({ command: 'a-command' }, mockAbortSignal),
-      ).rejects.toThrow(error);
+      const invocation = shellTool.build({ command: 'a-command' });
+      await expect(invocation.execute(mockAbortSignal)).rejects.toThrow(error);
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
       expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(tmpFile);
@@ -262,16 +297,12 @@ describe('ShellTool', () => {
       });
 
       it('should throttle text output updates', async () => {
-        const promise = shellTool.execute(
-          { command: 'stream' },
-          mockAbortSignal,
-          updateOutputMock,
-        );
+        const invocation = shellTool.build({ command: 'stream' });
+        const promise = invocation.execute(mockAbortSignal, updateOutputMock);
 
         // First chunk, should be throttled.
         mockShellOutputCallback({
           type: 'data',
-          stream: 'stdout',
           chunk: 'hello ',
         });
         expect(updateOutputMock).not.toHaveBeenCalled();
@@ -282,34 +313,29 @@ describe('ShellTool', () => {
         // Send a second chunk. THIS event triggers the update with the CUMULATIVE content.
         mockShellOutputCallback({
           type: 'data',
-          stream: 'stderr',
           chunk: 'world',
         });
 
         // It should have been called once now with the combined output.
         expect(updateOutputMock).toHaveBeenCalledOnce();
-        expect(updateOutputMock).toHaveBeenCalledWith('hello \nworld');
+        expect(updateOutputMock).toHaveBeenCalledWith('hello world');
 
         resolveExecutionPromise({
           rawOutput: Buffer.from(''),
           output: '',
-          stdout: '',
-          stderr: '',
           exitCode: 0,
           signal: null,
           error: null,
           aborted: false,
           pid: 12345,
+          executionMethod: 'child_process',
         });
         await promise;
       });
 
       it('should immediately show binary detection message and throttle progress', async () => {
-        const promise = shellTool.execute(
-          { command: 'cat img' },
-          mockAbortSignal,
-          updateOutputMock,
-        );
+        const invocation = shellTool.build({ command: 'cat img' });
+        const promise = invocation.execute(mockAbortSignal, updateOutputMock);
 
         mockShellOutputCallback({ type: 'binary_detected' });
         expect(updateOutputMock).toHaveBeenCalledOnce();
@@ -341,13 +367,12 @@ describe('ShellTool', () => {
         resolveExecutionPromise({
           rawOutput: Buffer.from(''),
           output: '',
-          stdout: '',
-          stderr: '',
           exitCode: 0,
           signal: null,
           error: null,
           aborted: false,
           pid: 12345,
+          executionMethod: 'child_process',
         });
         await promise;
       });
@@ -355,10 +380,10 @@ describe('ShellTool', () => {
   });
 
   describe('shouldConfirmExecute', () => {
-    it('should request confirmation for a new command and whitelist it on "Always"', async () => {
+    it('should request confirmation for a new command and allowlist it on "Always"', async () => {
       const params = { command: 'npm install' };
-      const confirmation = await shellTool.shouldConfirmExecute(
-        params,
+      const invocation = shellTool.build(params);
+      const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
 
@@ -370,26 +395,36 @@ describe('ShellTool', () => {
         ToolConfirmationOutcome.ProceedAlways,
       );
 
-      // Should now be whitelisted
-      const secondConfirmation = await shellTool.shouldConfirmExecute(
-        { command: 'npm test' },
+      // Should now be allowlisted
+      const secondInvocation = shellTool.build({ command: 'npm test' });
+      const secondConfirmation = await secondInvocation.shouldConfirmExecute(
         new AbortController().signal,
       );
       expect(secondConfirmation).toBe(false);
     });
 
-    it('should skip confirmation if validation fails', async () => {
-      const confirmation = await shellTool.shouldConfirmExecute(
-        { command: '' },
-        new AbortController().signal,
-      );
-      expect(confirmation).toBe(false);
+    it('should throw an error if validation fails', () => {
+      expect(() => shellTool.build({ command: '' })).toThrow();
+    });
+  });
+
+  describe('getDescription', () => {
+    it('should return the windows description when on windows', () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      const shellTool = new ShellTool(mockConfig);
+      expect(shellTool.description).toMatchSnapshot();
+    });
+
+    it('should return the non-windows description when not on windows', () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      const shellTool = new ShellTool(mockConfig);
+      expect(shellTool.description).toMatchSnapshot();
     });
   });
 });
 
-describe('validateToolParams', () => {
-  it('should return null for valid directory', () => {
+describe('build', () => {
+  it('should return an invocation for valid directory', () => {
     const config = {
       getCoreTools: () => undefined,
       getExcludeTools: () => undefined,
@@ -398,14 +433,14 @@ describe('validateToolParams', () => {
         createMockWorkspaceContext('/root', ['/users/test']),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
-    const result = shellTool.validateToolParams({
+    const invocation = shellTool.build({
       command: 'ls',
       directory: 'test',
     });
-    expect(result).toBeNull();
+    expect(invocation).toBeDefined();
   });
 
-  it('should return error for directory outside workspace', () => {
+  it('should throw an error for directory outside workspace', () => {
     const config = {
       getCoreTools: () => undefined,
       getExcludeTools: () => undefined,
@@ -414,10 +449,11 @@ describe('validateToolParams', () => {
         createMockWorkspaceContext('/root', ['/users/test']),
     } as unknown as Config;
     const shellTool = new ShellTool(config);
-    const result = shellTool.validateToolParams({
-      command: 'ls',
-      directory: 'test2',
-    });
-    expect(result).toContain('is not a registered workspace directory');
+    expect(() =>
+      shellTool.build({
+        command: 'ls',
+        directory: 'test2',
+      }),
+    ).toThrow('is not a registered workspace directory');
   });
 });

@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SlashCommand, CommandContext, CommandKind } from './types.js';
+import type { SlashCommand, CommandContext } from './types.js';
+import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
-import * as os from 'os';
-import * as path from 'path';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { loadServerHierarchicalMemory } from '@google/gemini-cli-core';
 
 export function expandHomeDir(p: string): string {
@@ -103,9 +104,11 @@ export const directoryCommand: SlashCommand = {
                 config.getDebugMode(),
                 config.getFileService(),
                 config.getExtensionContextFilePaths(),
-                context.services.settings.merged.memoryImportFormat || 'tree', // Use setting or default to 'tree'
+                config.getFolderTrust(),
+                context.services.settings.merged.context?.importFormat ||
+                  'tree', // Use setting or default to 'tree'
                 config.getFileFilteringOptions(),
-                context.services.settings.merged.memoryDiscoveryMaxDirs,
+                context.services.settings.merged.context?.discoveryMaxDirs,
               );
             config.setUserMemory(memoryContent);
             config.setGeminiMdFileCount(fileCount);
@@ -138,13 +141,11 @@ export const directoryCommand: SlashCommand = {
 
         if (errors.length > 0) {
           addItem(
-            {
-              type: MessageType.ERROR,
-              text: errors.join('\n'),
-            },
+            { type: MessageType.ERROR, text: errors.join('\n') },
             Date.now(),
           );
         }
+        return;
       },
     },
     {

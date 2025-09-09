@@ -4,27 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
+  Part,
   PartListUnion,
   GenerateContentResponse,
   FunctionCall,
   FunctionDeclaration,
   FinishReason,
+  GenerateContentResponseUsageMetadata,
 } from '@google/genai';
-import {
+import type {
   ToolCallConfirmationDetails,
   ToolResult,
   ToolResultDisplay,
 } from '../tools/tools.js';
-import { ToolErrorType } from '../tools/tool-error.js';
-import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import type { ToolErrorType } from '../tools/tool-error.js';
+import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import {
   getErrorMessage,
   UnauthorizedError,
   toFriendlyError,
 } from '../utils/errors.js';
-import { GeminiChat } from './geminiChat.js';
+import type { GeminiChat } from './geminiChat.js';
 
 // Define a structure for tools passed to the server
 export interface ServerTool {
@@ -53,7 +55,13 @@ export enum GeminiEventType {
   MaxSessionTurns = 'max_session_turns',
   Finished = 'finished',
   LoopDetected = 'loop_detected',
+  Citation = 'citation',
+  Retry = 'retry',
 }
+
+export type ServerGeminiRetryEvent = {
+  type: GeminiEventType.Retry;
+};
 
 export interface StructuredError {
   message: string;
@@ -62,6 +70,11 @@ export interface StructuredError {
 
 export interface GeminiErrorEventValue {
   error: StructuredError;
+}
+
+export interface GeminiFinishedEventValue {
+  reason: FinishReason | undefined;
+  usageMetadata: GenerateContentResponseUsageMetadata | undefined;
 }
 
 export interface ToolCallRequestInfo {
@@ -74,10 +87,11 @@ export interface ToolCallRequestInfo {
 
 export interface ToolCallResponseInfo {
   callId: string;
-  responseParts: PartListUnion;
+  responseParts: Part[];
   resultDisplay: ToolResultDisplay | undefined;
   error: Error | undefined;
   errorType: ToolErrorType | undefined;
+  outputFile?: string | undefined;
 }
 
 export interface ServerToolCallConfirmationDetails {
@@ -124,9 +138,24 @@ export type ServerGeminiErrorEvent = {
   value: GeminiErrorEventValue;
 };
 
+export enum CompressionStatus {
+  /** The compression was successful */
+  COMPRESSED = 1,
+
+  /** The compression failed due to the compression inflating the token count */
+  COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
+
+  /** The compression failed due to an error counting tokens */
+  COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
+
+  /** The compression was not necessary and no action was taken */
+  NOOP,
+}
+
 export interface ChatCompressionInfo {
   originalTokenCount: number;
   newTokenCount: number;
+  compressionStatus: CompressionStatus;
 }
 
 export type ServerGeminiChatCompressedEvent = {
@@ -140,47 +169,53 @@ export type ServerGeminiMaxSessionTurnsEvent = {
 
 export type ServerGeminiFinishedEvent = {
   type: GeminiEventType.Finished;
-  value: FinishReason;
+  value: GeminiFinishedEventValue;
 };
 
 export type ServerGeminiLoopDetectedEvent = {
   type: GeminiEventType.LoopDetected;
 };
 
+export type ServerGeminiCitationEvent = {
+  type: GeminiEventType.Citation;
+  value: string;
+};
+
 // The original union type, now composed of the individual types
 export type ServerGeminiStreamEvent =
+  | ServerGeminiChatCompressedEvent
+  | ServerGeminiCitationEvent
   | ServerGeminiContentEvent
+  | ServerGeminiErrorEvent
+  | ServerGeminiFinishedEvent
+  | ServerGeminiLoopDetectedEvent
+  | ServerGeminiMaxSessionTurnsEvent
+  | ServerGeminiThoughtEvent
+  | ServerGeminiToolCallConfirmationEvent
   | ServerGeminiToolCallRequestEvent
   | ServerGeminiToolCallResponseEvent
-  | ServerGeminiToolCallConfirmationEvent
   | ServerGeminiUserCancelledEvent
-  | ServerGeminiErrorEvent
-  | ServerGeminiChatCompressedEvent
-  | ServerGeminiThoughtEvent
-  | ServerGeminiMaxSessionTurnsEvent
-  | ServerGeminiFinishedEvent
-  | ServerGeminiLoopDetectedEvent;
+  | ServerGeminiRetryEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
-  readonly pendingToolCalls: ToolCallRequestInfo[];
-  private debugResponses: GenerateContentResponse[];
-  finishReason: FinishReason | undefined;
+  readonly pendingToolCalls: ToolCallRequestInfo[] = [];
+  private debugResponses: GenerateContentResponse[] = [];
+  private pendingCitations = new Set<string>();
+  finishReason: FinishReason | undefined = undefined;
 
   constructor(
     private readonly chat: GeminiChat,
     private readonly prompt_id: string,
-  ) {
-    this.pendingToolCalls = [];
-    this.debugResponses = [];
-    this.finishReason = undefined;
-  }
+  ) {}
   // The run method yields simpler events suitable for server logic
   async *run(
     req: PartListUnion,
     signal: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
+      // Note: This assumes `sendMessageStream` yields events like
+      // { type: StreamEventType.RETRY } or { type: StreamEventType.CHUNK, value: GenerateContentResponse }
       const responseStream = await this.chat.sendMessageStream(
         {
           message: req,
@@ -191,12 +226,22 @@ export class Turn {
         this.prompt_id,
       );
 
-      for await (const resp of responseStream) {
+      for await (const streamEvent of responseStream) {
         if (signal?.aborted) {
           yield { type: GeminiEventType.UserCancelled };
-          // Do not add resp to debugResponses if aborted before processing
           return;
         }
+
+        // Handle the new RETRY event
+        if (streamEvent.type === 'retry') {
+          yield { type: GeminiEventType.Retry };
+          continue; // Skip to the next event in the stream
+        }
+
+        // Assuming other events are chunks with a `value` property
+        const resp = streamEvent.value as GenerateContentResponse;
+        if (!resp) continue; // Skip if there's no response body
+
         this.debugResponses.push(resp);
 
         const thoughtPart = resp.candidates?.[0]?.content?.parts?.[0];
@@ -235,26 +280,43 @@ export class Turn {
           }
         }
 
+        for (const citation of getCitations(resp)) {
+          this.pendingCitations.add(citation);
+        }
+
         // Check if response was truncated or stopped for various reasons
         const finishReason = resp.candidates?.[0]?.finishReason;
 
+        // This is the key change: Only yield 'Finished' if there is a finishReason.
         if (finishReason) {
+          if (this.pendingCitations.size > 0) {
+            yield {
+              type: GeminiEventType.Citation,
+              value: `Citations:\n${[...this.pendingCitations].sort().join('\n')}`,
+            };
+            this.pendingCitations.clear();
+          }
+
           this.finishReason = finishReason;
           yield {
             type: GeminiEventType.Finished,
-            value: finishReason as FinishReason,
+            value: {
+              reason: finishReason,
+              usageMetadata: resp.usageMetadata,
+            },
           };
         }
       }
     } catch (e) {
-      const error = toFriendlyError(e);
-      if (error instanceof UnauthorizedError) {
-        throw error;
-      }
       if (signal.aborted) {
         yield { type: GeminiEventType.UserCancelled };
         // Regular cancellation error, fail gracefully.
         return;
+      }
+
+      const error = toFriendlyError(e);
+      if (error instanceof UnauthorizedError) {
+        throw error;
       }
 
       const contextForReport = [...this.chat.getHistory(/*curated*/ true), req];
@@ -275,6 +337,7 @@ export class Turn {
         message: getErrorMessage(error),
         status,
       };
+      await this.chat.maybeIncludeSchemaDepthContext(structuredError);
       yield { type: GeminiEventType.Error, value: { error: structuredError } };
       return;
     }
@@ -306,4 +369,15 @@ export class Turn {
   getDebugResponses(): GenerateContentResponse[] {
     return this.debugResponses;
   }
+}
+
+function getCitations(resp: GenerateContentResponse): string[] {
+  return (resp.candidates?.[0]?.citationMetadata?.citations ?? [])
+    .filter((citation) => citation.uri !== undefined)
+    .map((citation) => {
+      if (citation.title) {
+        return `(${citation.title}) ${citation.uri}`;
+      }
+      return citation.uri!;
+    });
 }

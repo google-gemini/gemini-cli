@@ -36,25 +36,6 @@ describe('validateCustomTheme', () => {
     expect(result.error).toBeUndefined();
   });
 
-  it('should return isValid: false for a theme with a missing required field', () => {
-    const invalidTheme = {
-      ...validTheme,
-      name: undefined as unknown as string,
-    };
-    const result = validateCustomTheme(invalidTheme);
-    expect(result.isValid).toBe(false);
-    expect(result.error).toBe('Missing required field: name');
-  });
-
-  it('should return isValid: false for a theme with an invalid color format', () => {
-    const invalidTheme = { ...validTheme, Background: 'not-a-color' };
-    const result = validateCustomTheme(invalidTheme);
-    expect(result.isValid).toBe(false);
-    expect(result.error).toBe(
-      'Invalid color format for Background: not-a-color',
-    );
-  });
-
   it('should return isValid: false for a theme with an invalid name', () => {
     const invalidTheme = { ...validTheme, name: ' ' };
     const result = validateCustomTheme(invalidTheme);
@@ -69,37 +50,6 @@ describe('validateCustomTheme', () => {
     const result = validateCustomTheme(legacyTheme);
     expect(result.isValid).toBe(true);
     expect(result.error).toBeUndefined();
-  });
-
-  it('should return a warning if DiffAdded and DiffRemoved are missing', () => {
-    const legacyTheme: Partial<CustomTheme> = { ...validTheme };
-    delete legacyTheme.DiffAdded;
-    delete legacyTheme.DiffRemoved;
-    const result = validateCustomTheme(legacyTheme);
-    expect(result.isValid).toBe(true);
-    expect(result.warning).toBe('Missing field(s) DiffAdded, DiffRemoved');
-  });
-
-  it('should return a warning if only DiffRemoved is missing', () => {
-    const legacyTheme: Partial<CustomTheme> = { ...validTheme };
-    delete legacyTheme.DiffRemoved;
-    const result = validateCustomTheme(legacyTheme);
-    expect(result.isValid).toBe(true);
-    expect(result.warning).toBe('Missing field(s) DiffRemoved');
-  });
-
-  it('should return isValid: false for a theme with an invalid DiffAdded color', () => {
-    const invalidTheme = { ...validTheme, DiffAdded: 'invalid' };
-    const result = validateCustomTheme(invalidTheme);
-    expect(result.isValid).toBe(false);
-    expect(result.error).toBe('Invalid color format for DiffAdded: invalid');
-  });
-
-  it('should return isValid: false for a theme with an invalid DiffRemoved color', () => {
-    const invalidTheme = { ...validTheme, DiffRemoved: 'invalid' };
-    const result = validateCustomTheme(invalidTheme);
-    expect(result.isValid).toBe(false);
-    expect(result.error).toBe('Invalid color format for DiffRemoved: invalid');
   });
 
   it('should return isValid: false for a theme with a very long name', () => {

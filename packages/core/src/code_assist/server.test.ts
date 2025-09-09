@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
 import { UserTierId } from './types.js';
@@ -12,6 +12,10 @@ import { UserTierId } from './types.js';
 vi.mock('google-auth-library');
 
 describe('CodeAssistServer', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
   it('should be able to be constructed', () => {
     const auth = new OAuth2Client();
     const server = new CodeAssistServer(
@@ -210,5 +214,42 @@ describe('CodeAssistServer', () => {
         contents: [{ role: 'user', parts: [{ text: 'request' }] }],
       }),
     ).rejects.toThrow();
+  });
+
+  it('should handle VPC-SC errors when calling loadCodeAssist', async () => {
+    const client = new OAuth2Client();
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
+    const mockVpcScError = {
+      response: {
+        data: {
+          error: {
+            details: [
+              {
+                reason: 'SECURITY_POLICY_VIOLATED',
+              },
+            ],
+          },
+        },
+      },
+    };
+    vi.spyOn(server, 'requestPost').mockRejectedValue(mockVpcScError);
+
+    const response = await server.loadCodeAssist({
+      metadata: {},
+    });
+
+    expect(server.requestPost).toHaveBeenCalledWith(
+      'loadCodeAssist',
+      expect.any(Object),
+    );
+    expect(response).toEqual({
+      currentTier: { id: UserTierId.STANDARD },
+    });
   });
 });

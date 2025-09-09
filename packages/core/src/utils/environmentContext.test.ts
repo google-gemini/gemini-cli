@@ -17,7 +17,7 @@ import {
   getEnvironmentContext,
   getDirectoryContextString,
 } from './environmentContext.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { getFolderStructure } from './getFolderStructure.js';
 
 vi.mock('../config/config.js');
@@ -89,7 +89,7 @@ describe('getEnvironmentContext', () => {
       }),
       getFileService: vi.fn(),
       getFullContext: vi.fn().mockReturnValue(false),
-      getToolRegistry: vi.fn().mockResolvedValue(mockToolRegistry),
+      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
     };
 
     vi.mocked(getFolderStructure).mockResolvedValue('Mock Folder Structure');
@@ -106,7 +106,8 @@ describe('getEnvironmentContext', () => {
     expect(parts.length).toBe(1);
     const context = parts[0].text;
 
-    expect(context).toContain("Today's date is Tuesday, August 5, 2025");
+    expect(context).toContain("Today's date is");
+    expect(context).toContain("(formatted according to the user's locale)");
     expect(context).toContain(`My operating system is: ${process.platform}`);
     expect(context).toContain(
       "I'm currently working in the directory: /test/dir",

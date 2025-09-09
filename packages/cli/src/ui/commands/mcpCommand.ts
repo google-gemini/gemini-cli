@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   SlashCommand,
   SlashCommandActionReturn,
   CommandContext,
-  CommandKind,
   MessageActionReturn,
 } from './types.js';
+import { CommandKind } from './types.js';
+import type { DiscoveredMCPPrompt } from '@google/gemini-cli-core';
 import {
-  DiscoveredMCPPrompt,
   DiscoveredMCPTool,
   getMCPDiscoveryState,
   getMCPServerStatus,
@@ -20,6 +20,7 @@ import {
   MCPServerStatus,
   mcpServerRequiresOAuth,
   getErrorMessage,
+  MCPOAuthTokenStorage,
 } from '@google/gemini-cli-core';
 
 const COLOR_GREEN = '\u001b[32m';
@@ -44,7 +45,7 @@ const getMcpStatus = async (
     };
   }
 
-  const toolRegistry = await config.getToolRegistry();
+  const toolRegistry = config.getToolRegistry();
   if (!toolRegistry) {
     return {
       type: 'message',
@@ -141,9 +142,10 @@ const getMcpStatus = async (
         const { MCPOAuthTokenStorage } = await import(
           '@google/gemini-cli-core'
         );
-        const hasToken = await MCPOAuthTokenStorage.getToken(serverName);
+        const tokenStorage = new MCPOAuthTokenStorage();
+        const hasToken = await tokenStorage.getCredentials(serverName);
         if (hasToken) {
-          const isExpired = MCPOAuthTokenStorage.isTokenExpired(hasToken.token);
+          const isExpired = tokenStorage.isTokenExpired(hasToken.token);
           if (isExpired) {
             message += ` ${COLOR_YELLOW}(OAuth token expired)${RESET_COLOR}`;
           } else {
@@ -385,11 +387,8 @@ const authCommand: SlashCommand = {
 
       // Pass the MCP server URL for OAuth discovery
       const mcpServerUrl = server.httpUrl || server.url;
-      await MCPOAuthProvider.authenticate(
-        serverName,
-        oauthConfig,
-        mcpServerUrl,
-      );
+      const authProvider = new MCPOAuthProvider(new MCPOAuthTokenStorage());
+      await authProvider.authenticate(serverName, oauthConfig, mcpServerUrl);
 
       context.ui.addItem(
         {
@@ -400,7 +399,7 @@ const authCommand: SlashCommand = {
       );
 
       // Trigger tool re-discovery to pick up authenticated server
-      const toolRegistry = await config.getToolRegistry();
+      const toolRegistry = config.getToolRegistry();
       if (toolRegistry) {
         context.ui.addItem(
           {
@@ -416,6 +415,9 @@ const authCommand: SlashCommand = {
       if (geminiClient) {
         await geminiClient.setTools();
       }
+
+      // Reload the slash commands to reflect the changes.
+      context.ui.reloadCommands();
 
       return {
         type: 'message',
@@ -468,7 +470,7 @@ const listCommand: SlashCommand = {
 
 const refreshCommand: SlashCommand = {
   name: 'refresh',
-  description: 'Refresh the list of MCP servers and tools',
+  description: 'Restarts MCP servers.',
   kind: CommandKind.BUILT_IN,
   action: async (
     context: CommandContext,
@@ -482,7 +484,7 @@ const refreshCommand: SlashCommand = {
       };
     }
 
-    const toolRegistry = await config.getToolRegistry();
+    const toolRegistry = config.getToolRegistry();
     if (!toolRegistry) {
       return {
         type: 'message',
@@ -494,18 +496,21 @@ const refreshCommand: SlashCommand = {
     context.ui.addItem(
       {
         type: 'info',
-        text: 'Refreshing MCP servers and tools...',
+        text: 'Restarting MCP servers...',
       },
       Date.now(),
     );
 
-    await toolRegistry.discoverMcpTools();
+    await toolRegistry.restartMcpServers();
 
     // Update the client with the new tools
     const geminiClient = config.getGeminiClient();
     if (geminiClient) {
       await geminiClient.setTools();
     }
+
+    // Reload the slash commands to reflect the changes.
+    context.ui.reloadCommands();
 
     return getMcpStatus(context, false, false, false);
   },

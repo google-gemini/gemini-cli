@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   AnyToolInvocation,
-  AuthType,
   CompletedToolCall,
   ContentGeneratorConfig,
-  EditTool,
   ErroredToolCall,
+} from '../index.js';
+import {
+  AuthType,
+  EditTool,
   GeminiClient,
   ToolConfirmationOutcome,
   ToolErrorType,
@@ -18,7 +20,7 @@ import {
 } from '../index.js';
 import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import {
   EVENT_API_REQUEST,
   EVENT_API_RESPONSE,
@@ -26,6 +28,9 @@ import {
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
+  EVENT_MALFORMED_JSON_RESPONSE,
+  EVENT_FILE_OPERATION,
+  EVENT_RIPGREP_FALLBACK,
 } from './constants.js';
 import {
   logApiRequest,
@@ -34,21 +39,33 @@ import {
   logUserPrompt,
   logToolCall,
   logFlashFallback,
+  logChatCompression,
+  logMalformedJsonResponse,
+  logFileOperation,
+  logRipgrepFallback,
 } from './loggers.js';
+import { ToolCallDecision } from './tool-call-decision.js';
 import {
   ApiRequestEvent,
   ApiResponseEvent,
   StartSessionEvent,
-  ToolCallDecision,
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  RipgrepFallbackEvent,
+  MalformedJsonResponseEvent,
+  makeChatCompressionEvent,
+  FileOperationEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
+import { FileOperation } from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect } from 'vitest';
-import { GenerateContentResponseUsageMetadata } from '@google/genai';
+import type { GenerateContentResponseUsageMetadata } from '@google/genai';
 import * as uiTelemetry from './uiTelemetry.js';
+import { makeFakeConfig } from '../test-utils/config.js';
+import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
+import { UserAccountManager } from '../utils/userAccountManager.js';
 
 describe('loggers', () => {
   const mockLogger = {
@@ -59,13 +76,57 @@ describe('loggers', () => {
   };
 
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(true);
     vi.spyOn(logs, 'getLogger').mockReturnValue(mockLogger);
     vi.spyOn(uiTelemetry.uiTelemetryService, 'addEvent').mockImplementation(
       mockUiEvent.addEvent,
     );
+    vi.spyOn(
+      UserAccountManager.prototype,
+      'getCachedGoogleAccount',
+    ).mockReturnValue('test-user@example.com');
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T00:00:00.000Z'));
+  });
+
+  describe('logChatCompression', () => {
+    beforeEach(() => {
+      vi.spyOn(metrics, 'recordChatCompressionMetrics');
+      vi.spyOn(ClearcutLogger.prototype, 'logChatCompressionEvent');
+    });
+
+    it('logs the chat compression event to Clearcut', () => {
+      const mockConfig = makeFakeConfig();
+
+      const event = makeChatCompressionEvent({
+        tokens_before: 9001,
+        tokens_after: 9000,
+      });
+
+      logChatCompression(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logChatCompressionEvent,
+      ).toHaveBeenCalledWith(event);
+    });
+
+    it('records the chat compression event to OTEL', () => {
+      const mockConfig = makeFakeConfig();
+
+      logChatCompression(
+        mockConfig,
+        makeChatCompressionEvent({
+          tokens_before: 9001,
+          tokens_after: 9000,
+        }),
+      );
+
+      expect(metrics.recordChatCompressionMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        { tokens_before: 9001, tokens_after: 9000 },
+      );
+    });
   });
 
   describe('logCliConfiguration', () => {
@@ -105,6 +166,7 @@ describe('loggers', () => {
         body: 'CLI configuration loaded.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_CLI_CONFIG,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -118,6 +180,9 @@ describe('loggers', () => {
           file_filtering_respect_git_ignore: true,
           debug_mode: true,
           mcp_servers: 'test-server',
+          mcp_servers_count: 1,
+          mcp_tools: undefined,
+          mcp_tools_count: undefined,
         },
       });
     });
@@ -145,10 +210,13 @@ describe('loggers', () => {
         body: 'User prompt. Length: 11.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_USER_PROMPT,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           prompt_length: 11,
           prompt: 'test-prompt',
+          prompt_id: 'prompt-id-8',
+          auth_type: 'vertex-ai',
         },
       });
     });
@@ -163,8 +231,9 @@ describe('loggers', () => {
       } as unknown as Config;
       const event = new UserPromptEvent(
         11,
-        'test-prompt',
+        'prompt-id-9',
         AuthType.CLOUD_SHELL,
+        'test-prompt',
       );
 
       logUserPrompt(mockConfig, event);
@@ -173,9 +242,12 @@ describe('loggers', () => {
         body: 'User prompt. Length: 11.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_USER_PROMPT,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           prompt_length: 11,
+          prompt_id: 'prompt-id-9',
+          auth_type: 'cloud-shell',
         },
       });
     });
@@ -227,6 +299,7 @@ describe('loggers', () => {
         body: 'API response from test-model. Status: 200. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_API_RESPONSE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           [SemanticAttributes.HTTP_STATUS_CODE]: 200,
@@ -242,6 +315,7 @@ describe('loggers', () => {
           response_text: 'test-response',
           prompt_id: 'prompt-id-1',
           auth_type: 'oauth-personal',
+          error: undefined,
         },
       });
 
@@ -291,6 +365,7 @@ describe('loggers', () => {
         body: 'API response from test-model. Status: 200. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           ...event,
           'event.name': EVENT_API_RESPONSE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
@@ -328,6 +403,7 @@ describe('loggers', () => {
         body: 'API request to test-model.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -346,6 +422,7 @@ describe('loggers', () => {
         body: 'API request to test-model.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -370,11 +447,65 @@ describe('loggers', () => {
         body: 'Switching to flash as Fallback.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_FLASH_FALLBACK,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           auth_type: 'vertex-ai',
         },
       });
+    });
+  });
+
+  describe('logRipgrepFallback', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logRipgrepFallbackEvent');
+    });
+
+    it('should log ripgrep fallback event', () => {
+      const event = new RipgrepFallbackEvent();
+
+      logRipgrepFallback(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logRipgrepFallbackEvent,
+      ).toHaveBeenCalled();
+
+      const emittedEvent = mockLogger.emit.mock.calls[0][0];
+      expect(emittedEvent.body).toBe('Switching to grep as fallback.');
+      expect(emittedEvent.attributes).toEqual(
+        expect.objectContaining({
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_RIPGREP_FALLBACK,
+          error: undefined,
+        }),
+      );
+    });
+
+    it('should log ripgrep fallback event with an error', () => {
+      const event = new RipgrepFallbackEvent('rg not found');
+
+      logRipgrepFallback(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logRipgrepFallbackEvent,
+      ).toHaveBeenCalled();
+
+      const emittedEvent = mockLogger.emit.mock.calls[0][0];
+      expect(emittedEvent.body).toBe('Switching to grep as fallback.');
+      expect(emittedEvent.attributes).toEqual(
+        expect.objectContaining({
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_RIPGREP_FALLBACK,
+          error: 'rg not found',
+        }),
+      );
     });
   });
 
@@ -448,8 +579,23 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
-          resultDisplay: undefined,
+          responseParts: [{ text: 'test-response' }],
+          resultDisplay: {
+            fileDiff: 'diff',
+            fileName: 'file.txt',
+            originalContent: 'old content',
+            newContent: 'new content',
+            diffStat: {
+              model_added_lines: 1,
+              model_removed_lines: 2,
+              model_added_chars: 3,
+              model_removed_chars: 4,
+              user_added_lines: 5,
+              user_removed_lines: 6,
+              user_added_chars: 7,
+              user_removed_chars: 8,
+            },
+          },
           error: undefined,
           errorType: undefined,
         },
@@ -466,6 +612,7 @@ describe('loggers', () => {
         body: 'Tool call: test-function. Decision: accept. Success: true. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -481,6 +628,19 @@ describe('loggers', () => {
           success: true,
           decision: ToolCallDecision.ACCEPT,
           prompt_id: 'prompt-id-1',
+          tool_type: 'native',
+          error: undefined,
+          error_type: undefined,
+          metadata: {
+            model_added_lines: 1,
+            model_removed_lines: 2,
+            model_added_chars: 3,
+            model_removed_chars: 4,
+            user_added_lines: 5,
+            user_removed_lines: 6,
+            user_added_chars: 7,
+            user_removed_chars: 8,
+          },
         },
       });
 
@@ -490,6 +650,7 @@ describe('loggers', () => {
         100,
         true,
         ToolCallDecision.ACCEPT,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -513,7 +674,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -529,6 +690,7 @@ describe('loggers', () => {
         body: 'Tool call: test-function. Decision: reject. Success: false. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -544,6 +706,10 @@ describe('loggers', () => {
           success: false,
           decision: ToolCallDecision.REJECT,
           prompt_id: 'prompt-id-2',
+          tool_type: 'native',
+          error: undefined,
+          error_type: undefined,
+          metadata: undefined,
         },
       });
 
@@ -553,6 +719,7 @@ describe('loggers', () => {
         100,
         false,
         ToolCallDecision.REJECT,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -577,7 +744,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -595,6 +762,7 @@ describe('loggers', () => {
         body: 'Tool call: test-function. Decision: modify. Success: true. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -610,6 +778,10 @@ describe('loggers', () => {
           success: true,
           decision: ToolCallDecision.MODIFY,
           prompt_id: 'prompt-id-3',
+          tool_type: 'native',
+          error: undefined,
+          error_type: undefined,
+          metadata: undefined,
         },
       });
 
@@ -619,6 +791,7 @@ describe('loggers', () => {
         100,
         true,
         ToolCallDecision.MODIFY,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -643,7 +816,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
@@ -660,6 +833,7 @@ describe('loggers', () => {
         body: 'Tool call: test-function. Success: true. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -674,6 +848,11 @@ describe('loggers', () => {
           duration_ms: 100,
           success: true,
           prompt_id: 'prompt-id-4',
+          tool_type: 'native',
+          decision: undefined,
+          error: undefined,
+          error_type: undefined,
+          metadata: undefined,
         },
       });
 
@@ -683,6 +862,7 @@ describe('loggers', () => {
         100,
         true,
         undefined,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -707,7 +887,7 @@ describe('loggers', () => {
         },
         response: {
           callId: 'test-call-id',
-          responseParts: 'test-response',
+          responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
           error: {
             name: 'test-error-type',
@@ -725,6 +905,7 @@ describe('loggers', () => {
         body: 'Tool call: test-function. Success: false. Duration: 100ms.',
         attributes: {
           'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -743,6 +924,9 @@ describe('loggers', () => {
           error_type: ToolErrorType.UNKNOWN,
           'error.type': ToolErrorType.UNKNOWN,
           prompt_id: 'prompt-id-5',
+          tool_type: 'native',
+          decision: undefined,
+          metadata: undefined,
         },
       });
 
@@ -752,6 +936,7 @@ describe('loggers', () => {
         100,
         false,
         undefined,
+        'native',
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -759,6 +944,92 @@ describe('loggers', () => {
         'event.name': EVENT_TOOL_CALL,
         'event.timestamp': '2025-01-01T00:00:00.000Z',
       });
+    });
+  });
+
+  describe('logMalformedJsonResponse', () => {
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logMalformedJsonResponseEvent');
+    });
+
+    it('logs the event to Clearcut and OTEL', () => {
+      const mockConfig = makeFakeConfig();
+      const event = new MalformedJsonResponseEvent('test-model');
+
+      logMalformedJsonResponse(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logMalformedJsonResponseEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Malformed JSON response from test-model.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_MALFORMED_JSON_RESPONSE,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          model: 'test-model',
+        },
+      });
+    });
+  });
+
+  describe('logFileOperation', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getTargetDir: () => 'target-dir',
+      getUsageStatisticsEnabled: () => true,
+      getTelemetryEnabled: () => true,
+      getTelemetryLogPromptsEnabled: () => true,
+    } as Config;
+
+    const mockMetrics = {
+      recordFileOperationMetric: vi.fn(),
+    };
+
+    beforeEach(() => {
+      vi.spyOn(metrics, 'recordFileOperationMetric').mockImplementation(
+        mockMetrics.recordFileOperationMetric,
+      );
+    });
+
+    it('should log a file operation event', () => {
+      const event = new FileOperationEvent(
+        'test-tool',
+        FileOperation.READ,
+        10,
+        'text/plain',
+        '.txt',
+        'typescript',
+      );
+
+      logFileOperation(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'File operation: read. Lines: 10.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_FILE_OPERATION,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          tool_name: 'test-tool',
+          operation: 'read',
+          lines: 10,
+          mimetype: 'text/plain',
+          extension: '.txt',
+          programming_language: 'typescript',
+        },
+      });
+
+      expect(mockMetrics.recordFileOperationMetric).toHaveBeenCalledWith(
+        mockConfig,
+        'read',
+        10,
+        'text/plain',
+        '.txt',
+        'typescript',
+      );
     });
   });
 });

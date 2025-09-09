@@ -4,27 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import crypto from 'crypto';
-import { Config } from '../config/config.js';
-import {
-  BaseTool,
+import fs from 'node:fs';
+import path from 'node:path';
+import os, { EOL } from 'node:os';
+import crypto from 'node:crypto';
+import type { Config } from '../config/config.js';
+import { ToolErrorType } from './tool-error.js';
+import type {
+  ToolInvocation,
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
-  ToolConfirmationOutcome,
-  Icon,
 } from './tools.js';
-import { Type } from '@google/genai';
-import { SchemaValidator } from '../utils/schemaValidator.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  ToolConfirmationOutcome,
+  Kind,
+} from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
-import {
-  ShellExecutionService,
-  ShellOutputEvent,
-} from '../services/shellExecutionService.js';
+import type { ShellOutputEvent } from '../services/shellExecutionService.js';
+import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import {
   getCommandRoots,
@@ -40,130 +41,49 @@ export interface ShellToolParams {
   directory?: string;
 }
 
-export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
-  static Name: string = 'run_shell_command';
-  private allowlist: Set<string> = new Set();
-
-  constructor(private readonly config: Config) {
-    super(
-      ShellTool.Name,
-      'Shell',
-      `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
-
-      The following information is returned:
-
-      Command: Executed command.
-      Directory: Directory (relative to project root) where command was executed, or \`(root)\`.
-      Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Error: Error or \`(none)\` if no error was reported for the subprocess.
-      Exit Code: Exit code or \`(none)\` if terminated by signal.
-      Signal: Signal number or \`(none)\` if no signal was received.
-      Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\``,
-      Icon.Terminal,
-      {
-        type: Type.OBJECT,
-        properties: {
-          command: {
-            type: Type.STRING,
-            description: 'Exact bash command to execute as `bash -c <command>`',
-          },
-          description: {
-            type: Type.STRING,
-            description:
-              'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
-          },
-          directory: {
-            type: Type.STRING,
-            description:
-              '(OPTIONAL) Directory to run the command in, if not the project root directory. Must be relative to the project root directory and must already exist.',
-          },
-        },
-        required: ['command'],
-      },
-      false, // output is not markdown
-      true, // output can be updated
-    );
+class ShellToolInvocation extends BaseToolInvocation<
+  ShellToolParams,
+  ToolResult
+> {
+  constructor(
+    private readonly config: Config,
+    params: ShellToolParams,
+    private readonly allowlist: Set<string>,
+  ) {
+    super(params);
   }
 
-  getDescription(params: ShellToolParams): string {
-    let description = `${params.command}`;
+  getDescription(): string {
+    let description = `${this.params.command}`;
     // append optional [in directory]
     // note description is needed even if validation fails due to absolute path
-    if (params.directory) {
-      description += ` [in ${params.directory}]`;
+    if (this.params.directory) {
+      description += ` [in ${this.params.directory}]`;
     }
     // append optional (description), replacing any line breaks with spaces
-    if (params.description) {
-      description += ` (${params.description.replace(/\n/g, ' ')})`;
+    if (this.params.description) {
+      description += ` (${this.params.description.replace(/\n/g, ' ')})`;
     }
     return description;
   }
 
-  validateToolParams(params: ShellToolParams): string | null {
-    const commandCheck = isCommandAllowed(params.command, this.config);
-    if (!commandCheck.allowed) {
-      if (!commandCheck.reason) {
-        console.error(
-          'Unexpected: isCommandAllowed returned false without a reason',
-        );
-        return `Command is not allowed: ${params.command}`;
-      }
-      return commandCheck.reason;
-    }
-    const errors = SchemaValidator.validate(this.schema.parameters, params);
-    if (errors) {
-      return errors;
-    }
-    if (!params.command.trim()) {
-      return 'Command cannot be empty.';
-    }
-    if (getCommandRoots(params.command).length === 0) {
-      return 'Could not identify command root to obtain permission from user.';
-    }
-    if (params.directory) {
-      if (path.isAbsolute(params.directory)) {
-        return 'Directory cannot be absolute. Please refer to workspace directories by their name.';
-      }
-      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
-      const matchingDirs = workspaceDirs.filter(
-        (dir) => path.basename(dir) === params.directory,
-      );
-
-      if (matchingDirs.length === 0) {
-        return `Directory '${params.directory}' is not a registered workspace directory.`;
-      }
-
-      if (matchingDirs.length > 1) {
-        return `Directory name '${params.directory}' is ambiguous as it matches multiple workspace directories.`;
-      }
-    }
-    return null;
-  }
-
-  async shouldConfirmExecute(
-    params: ShellToolParams,
+  override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.validateToolParams(params)) {
-      return false; // skip confirmation, execute call will fail immediately
-    }
-
-    const command = stripShellWrapper(params.command);
+    const command = stripShellWrapper(this.params.command);
     const rootCommands = [...new Set(getCommandRoots(command))];
     const commandsToConfirm = rootCommands.filter(
       (command) => !this.allowlist.has(command),
     );
 
     if (commandsToConfirm.length === 0) {
-      return false; // already approved and whitelisted
+      return false; // already approved and allowlisted
     }
 
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',
-      command: params.command,
+      command: this.params.command,
       rootCommand: commandsToConfirm.join(', '),
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
@@ -175,21 +95,12 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
   }
 
   async execute(
-    params: ShellToolParams,
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
+    terminalColumns?: number,
+    terminalRows?: number,
   ): Promise<ToolResult> {
-    const strippedCommand = stripShellWrapper(params.command);
-    const validationError = this.validateToolParams({
-      ...params,
-      command: strippedCommand,
-    });
-    if (validationError) {
-      return {
-        llmContent: validationError,
-        returnDisplay: validationError,
-      };
-    }
+    const strippedCommand = stripShellWrapper(this.params.command);
 
     if (signal.aborted) {
       return {
@@ -217,16 +128,15 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
       const cwd = path.resolve(
         this.config.getTargetDir(),
-        params.directory || '',
+        this.params.directory || '',
       );
 
-      let cumulativeStdout = '';
-      let cumulativeStderr = '';
-
+      let cumulativeOutput = '';
+      let outputChunks: string[] = [cumulativeOutput];
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
 
-      const { result: resultPromise } = ShellExecutionService.execute(
+      const { result: resultPromise } = await ShellExecutionService.execute(
         commandToExecute,
         cwd,
         (event: ShellOutputEvent) => {
@@ -239,16 +149,12 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
           switch (event.type) {
             case 'data':
-              if (isBinaryStream) break; // Don't process text if we are in binary mode
-              if (event.stream === 'stdout') {
-                cumulativeStdout += event.chunk;
-              } else {
-                cumulativeStderr += event.chunk;
-              }
-              currentDisplayOutput =
-                cumulativeStdout +
-                (cumulativeStderr ? `\n${cumulativeStderr}` : '');
+              if (isBinaryStream) break;
+              outputChunks.push(event.chunk);
               if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
+                cumulativeOutput = outputChunks.join('');
+                outputChunks = [cumulativeOutput];
+                currentDisplayOutput = cumulativeOutput;
                 shouldUpdate = true;
               }
               break;
@@ -278,6 +184,9 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
           }
         },
         signal,
+        this.config.getShouldUseNodePtyShell(),
+        terminalColumns,
+        terminalRows,
       );
 
       const result = await resultPromise;
@@ -287,7 +196,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
         if (fs.existsSync(tempFilePath)) {
           const pgrepLines = fs
             .readFileSync(tempFilePath, 'utf8')
-            .split('\n')
+            .split(EOL)
             .filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
@@ -309,7 +218,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       if (result.aborted) {
         llmContent = 'Command was cancelled by user before it could complete.';
         if (result.output.trim()) {
-          llmContent += ` Below is the output (on stdout and stderr) before it was cancelled:\n${result.output}`;
+          llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
@@ -317,14 +226,13 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
         const finalError = result.error
-          ? result.error.message.replace(commandToExecute, params.command)
+          ? result.error.message.replace(commandToExecute, this.params.command)
           : '(none)';
 
         llmContent = [
-          `Command: ${params.command}`,
-          `Directory: ${params.directory || '(root)'}`,
-          `Stdout: ${result.stdout || '(empty)'}`,
-          `Stderr: ${result.stderr || '(empty)'}`,
+          `Command: ${this.params.command}`,
+          `Directory: ${this.params.directory || '(root)'}`,
+          `Output: ${result.output || '(empty)'}`,
           `Error: ${finalError}`, // Use the cleaned error string.
           `Exit Code: ${result.exitCode ?? '(none)'}`,
           `Signal: ${result.signal ?? '(none)'}`,
@@ -359,27 +267,151 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       }
 
       const summarizeConfig = this.config.getSummarizeToolOutputConfig();
-      if (summarizeConfig && summarizeConfig[this.name]) {
+      const executionError = result.error
+        ? {
+            error: {
+              message: result.error.message,
+              type: ToolErrorType.SHELL_EXECUTE_ERROR,
+            },
+          }
+        : {};
+      if (summarizeConfig && summarizeConfig[ShellTool.Name]) {
         const summary = await summarizeToolOutput(
           llmContent,
           this.config.getGeminiClient(),
           signal,
-          summarizeConfig[this.name].tokenBudget,
+          summarizeConfig[ShellTool.Name].tokenBudget,
         );
         return {
           llmContent: summary,
           returnDisplay: returnDisplayMessage,
+          ...executionError,
         };
       }
 
       return {
         llmContent,
         returnDisplay: returnDisplayMessage,
+        ...executionError,
       };
     } finally {
       if (fs.existsSync(tempFilePath)) {
         fs.unlinkSync(tempFilePath);
       }
     }
+  }
+}
+
+function getShellToolDescription(): string {
+  const returnedInfo = `
+
+      The following information is returned:
+
+      Command: Executed command.
+      Directory: Directory (relative to project root) where command was executed, or \`(root)\`.
+      Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+      Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+      Error: Error or \`(none)\` if no error was reported for the subprocess.
+      Exit Code: Exit code or \`(none)\` if terminated by signal.
+      Signal: Signal number or \`(none)\` if no signal was received.
+      Background PIDs: List of background processes started or \`(none)\`.
+      Process Group PGID: Process group started or \`(none)\``;
+
+  if (os.platform() === 'win32') {
+    return `This tool executes a given shell command as \`cmd.exe /c <command>\`. Command can start background processes using \`start /b\`.${returnedInfo}`;
+  } else {
+    return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
+  }
+}
+
+function getCommandDescription(): string {
+  if (os.platform() === 'win32') {
+    return 'Exact command to execute as `cmd.exe /c <command>`';
+  } else {
+    return 'Exact bash command to execute as `bash -c <command>`';
+  }
+}
+
+export class ShellTool extends BaseDeclarativeTool<
+  ShellToolParams,
+  ToolResult
+> {
+  static Name: string = 'run_shell_command';
+  private allowlist: Set<string> = new Set();
+
+  constructor(private readonly config: Config) {
+    super(
+      ShellTool.Name,
+      'Shell',
+      getShellToolDescription(),
+      Kind.Execute,
+      {
+        type: 'object',
+        properties: {
+          command: {
+            type: 'string',
+            description: getCommandDescription(),
+          },
+          description: {
+            type: 'string',
+            description:
+              'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
+          },
+          directory: {
+            type: 'string',
+            description:
+              '(OPTIONAL) Directory to run the command in, if not the project root directory. Must be relative to the project root directory and must already exist.',
+          },
+        },
+        required: ['command'],
+      },
+      false, // output is not markdown
+      true, // output can be updated
+    );
+  }
+
+  protected override validateToolParamValues(
+    params: ShellToolParams,
+  ): string | null {
+    const commandCheck = isCommandAllowed(params.command, this.config);
+    if (!commandCheck.allowed) {
+      if (!commandCheck.reason) {
+        console.error(
+          'Unexpected: isCommandAllowed returned false without a reason',
+        );
+        return `Command is not allowed: ${params.command}`;
+      }
+      return commandCheck.reason;
+    }
+    if (!params.command.trim()) {
+      return 'Command cannot be empty.';
+    }
+    if (getCommandRoots(params.command).length === 0) {
+      return 'Could not identify command root to obtain permission from user.';
+    }
+    if (params.directory) {
+      if (path.isAbsolute(params.directory)) {
+        return 'Directory cannot be absolute. Please refer to workspace directories by their name.';
+      }
+      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
+      const matchingDirs = workspaceDirs.filter(
+        (dir) => path.basename(dir) === params.directory,
+      );
+
+      if (matchingDirs.length === 0) {
+        return `Directory '${params.directory}' is not a registered workspace directory.`;
+      }
+
+      if (matchingDirs.length > 1) {
+        return `Directory name '${params.directory}' is ambiguous as it matches multiple workspace directories.`;
+      }
+    }
+    return null;
+  }
+
+  protected createInvocation(
+    params: ShellToolParams,
+  ): ToolInvocation<ShellToolParams, ToolResult> {
+    return new ShellToolInvocation(this.config, params, this.allowlist);
   }
 }

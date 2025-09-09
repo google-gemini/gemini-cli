@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState, useRef } from 'react';
-import { Text, Box, useInput } from 'ink';
+import type React from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { Text, Box } from 'ink';
 import { Colors } from '../../colors.js';
+import { useKeypress } from '../../hooks/useKeypress.js';
 
 /**
  * Represents a single option for the RadioButtonSelect.
@@ -54,7 +56,7 @@ export function RadioButtonSelect<T>({
   initialIndex = 0,
   onSelect,
   onHighlight,
-  isFocused,
+  isFocused = true,
   showScrollArrows = false,
   maxItemsToShow = 10,
   showNumbers = true,
@@ -63,7 +65,6 @@ export function RadioButtonSelect<T>({
   const [scrollOffset, setScrollOffset] = useState(0);
   const [numberInput, setNumberInput] = useState('');
   const numberInputTimer = useRef<NodeJS.Timeout | null>(null);
-
   useEffect(() => {
     const newScrollOffset = Math.max(
       0,
@@ -85,9 +86,10 @@ export function RadioButtonSelect<T>({
     [],
   );
 
-  useInput(
-    (input, key) => {
-      const isNumeric = showNumbers && /^[0-9]$/.test(input);
+  useKeypress(
+    (key) => {
+      const { sequence, name } = key;
+      const isNumeric = showNumbers && /^[0-9]$/.test(sequence);
 
       // Any key press that is not a digit should clear the number input buffer.
       if (!isNumeric && numberInputTimer.current) {
@@ -95,21 +97,21 @@ export function RadioButtonSelect<T>({
         setNumberInput('');
       }
 
-      if (input === 'k' || key.upArrow) {
+      if (name === 'k' || name === 'up') {
         const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
         setActiveIndex(newIndex);
         onHighlight?.(items[newIndex]!.value);
         return;
       }
 
-      if (input === 'j' || key.downArrow) {
+      if (name === 'j' || name === 'down') {
         const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
         setActiveIndex(newIndex);
         onHighlight?.(items[newIndex]!.value);
         return;
       }
 
-      if (key.return) {
+      if (name === 'return') {
         onSelect(items[activeIndex]!.value);
         return;
       }
@@ -120,7 +122,7 @@ export function RadioButtonSelect<T>({
           clearTimeout(numberInputTimer.current);
         }
 
-        const newNumberInput = numberInput + input;
+        const newNumberInput = numberInput + sequence;
         setNumberInput(newNumberInput);
 
         const targetIndex = Number.parseInt(newNumberInput, 10) - 1;
@@ -154,7 +156,7 @@ export function RadioButtonSelect<T>({
         }
       }
     },
-    { isActive: isFocused && items.length > 0 },
+    { isActive: !!(isFocused && items.length > 0) },
   );
 
   const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
@@ -192,7 +194,10 @@ export function RadioButtonSelect<T>({
         return (
           <Box key={item.label} alignItems="center">
             <Box minWidth={2} flexShrink={0}>
-              <Text color={isSelected ? Colors.AccentGreen : Colors.Foreground}>
+              <Text
+                color={isSelected ? Colors.AccentGreen : Colors.Foreground}
+                aria-hidden
+              >
                 {isSelected ? '●' : ' '}
               </Text>
             </Box>
@@ -200,6 +205,7 @@ export function RadioButtonSelect<T>({
               marginRight={1}
               flexShrink={0}
               minWidth={itemNumberText.length}
+              aria-state={{ checked: isSelected }}
             >
               <Text color={numberColor}>{itemNumberText}</Text>
             </Box>
