@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import type React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../../colors.js';
 import type { SettingEnumOption } from '../../../config/settingsSchema.js';
@@ -25,22 +26,30 @@ export function EnumSelector({
   isActive,
   onValueChange: _onValueChange,
 }: EnumSelectorProps): React.JSX.Element {
-  // Guard against empty options array
-  if (!options || options.length === 0) {
-    return <Box />;
-  }
-
   const [currentIndex, setCurrentIndex] = useState(() => {
+    // Guard against empty options array
+    if (!options || options.length === 0) {
+      return 0;
+    }
     const index = options.findIndex((option) => option.value === currentValue);
     return index >= 0 ? index : 0;
   });
 
   // Update index when currentValue changes externally
   useEffect(() => {
+    // Guard against empty options array
+    if (!options || options.length === 0) {
+      return;
+    }
     const index = options.findIndex((option) => option.value === currentValue);
     // Always update index, defaulting to 0 if value not found
     setCurrentIndex(index >= 0 ? index : 0);
   }, [currentValue, options]);
+
+  // Guard against empty options array
+  if (!options || options.length === 0) {
+    return <Box />;
+  }
 
   // Left/right navigation is handled by parent component
   // This component is purely for display
