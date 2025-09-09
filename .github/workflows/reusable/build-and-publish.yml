@@ -1,0 +1,79 @@
+name: 'Build and Publish'
+
+on:
+  workflow_call:
+    inputs:
+      release_version:
+        description: 'The version to publish.'
+        required: true
+        type: 'string'
+      npm_tag:
+        description: 'The npm tag to publish with.'
+        required: true
+        type: 'string'
+      dry_run:
+        description: 'Whether to run in dry-run mode.'
+        required: false
+        type: 'boolean'
+        default: true
+    secrets:
+      WOMBAT_TOKEN_CORE:
+        required: true
+      WOMBAT_TOKEN_CLI:
+        required: true
+
+jobs:
+  build_and_publish:
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install Dependencies'
+        run: npm ci
+
+      - name: 'Update package versions'
+        run: npm run release:version ${{ inputs.release_version }}
+
+      - name: 'Build and Prepare Packages'
+        run: |-
+          npm run build:packages
+          npm run prepare:package
+
+      - name: 'Configure npm for publishing'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://wombat-dressing-room.appspot.com'
+          scope: '@google'
+
+      - name: 'Publish @google/gemini-cli-core'
+        env:
+          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+        run: |-
+          npm publish \
+            --dry-run="${{ inputs.dry_run }}" \
+            --workspace="@google/gemini-cli-core" \
+            --tag="${{ inputs.npm_tag }}"
+
+      - name: 'Install latest core package'
+        if: ${{ !inputs.dry_run }}
+        run: |-
+          npm install "@google/gemini-cli-core@${{ inputs.release_version }}" \
+          --workspace="@google/gemini-cli" \
+          --save-exact
+
+      - name: 'Publish @google/gemini-cli'
+        env:
+          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+        run: |-
+          npm publish \
+            --dry-run="${{ inputs.dry_run }}" \
+            --workspace="@google/gemini-cli" \
+            --tag="${{ inputs.npm_tag }}"

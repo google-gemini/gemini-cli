@@ -7,6 +7,9 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import semver from 'semver';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 
 function getShortSha() {
   return execSync('git rev-parse --short HEAD').toString().trim();
@@ -36,16 +39,24 @@ function getPreviousReleaseTag(isNightly) {
   }
 }
 
-export function getReleaseVersion() {
-  const isNightly = process.env.IS_NIGHTLY === 'true';
-  const isPreview = process.env.IS_PREVIEW === 'true';
-  const manualVersion = process.env.MANUAL_VERSION;
+export function calculateNextVersion(version) {
+  const parsedVersion = semver.parse(version);
+  if (!parsedVersion) {
+    throw new Error(`Invalid version string: ${version}`);
+  }
+  return `${parsedVersion.major}.${parsedVersion.minor + 1}.0-nightly`;
+}
 
+export function getReleaseVersion(type, version) {
   let releaseTag;
   const versionFromPackage = getVersionFromPackageJson();
 
-  if (isNightly) {
-    console.error('Calculating next nightly version...');
+  if (type === 'stable') {
+    releaseTag = `v${semver.parse(version).version}`;
+  } else if (type === 'preview') {
+    const nextVersion = semver.inc(version, 'minor');
+    releaseTag = `v${nextVersion}-preview`;
+  } else if (type === 'nightly') {
     const now = new Date();
     const year = now.getUTCFullYear().toString();
     const month = (now.getUTCMonth() + 1).toString().padStart(2, '0');
@@ -53,36 +64,12 @@ export function getReleaseVersion() {
     const date = `${year}${month}${day}`;
     const sha = getShortSha();
     releaseTag = `v${versionFromPackage}.${date}.${sha}`;
-  } else if (isPreview) {
-    console.error('Calculating next preview version...');
-    releaseTag = `v${versionFromPackage.replace('-nightly', '-preview')}`;
-  } else if (manualVersion) {
-    console.error(`Using manual version: ${manualVersion}`);
-    releaseTag = manualVersion;
   } else {
-    // Stable release
-    releaseTag = `v${versionFromPackage.replace('-nightly', '')}`;
+    throw new Error(`Invalid release type: ${type}`);
   }
 
   if (!releaseTag) {
     throw new Error('Error: Version could not be determined.');
-  }
-
-  if (!releaseTag.startsWith('v')) {
-    console.error("Version is missing 'v' prefix. Prepending it.");
-    releaseTag = `v${releaseTag}`;
-  }
-
-  if (releaseTag.includes('+')) {
-    throw new Error(
-      'Error: Versions with build metadata (+) are not supported for releases. Please use a pre-release version (e.g., v1.2.3-alpha.4) instead.',
-    );
-  }
-
-  if (!releaseTag.match(/^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$/)) {
-    throw new Error(
-      'Error: Version must be in the format vX.Y.Z or vX.Y.Z-prerelease',
-    );
   }
 
   const releaseVersion = releaseTag.substring(1);
@@ -91,14 +78,25 @@ export function getReleaseVersion() {
     npmTag = releaseVersion.split('-')[1].split('.')[0];
   }
 
-  const previousReleaseTag = getPreviousReleaseTag(isNightly);
+  const previousReleaseTag = getPreviousReleaseTag(type === 'nightly');
 
   return { releaseTag, releaseVersion, npmTag, previousReleaseTag };
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
+  const argv = yargs(hideBin(process.argv))
+    .option('type', {
+      describe: 'The type of release',
+      choices: ['stable', 'preview', 'nightly'],
+      demandOption: true,
+    })
+    .option('version', {
+      describe: 'The base version to use for stable and preview releases',
+      type: 'string',
+    }).parse();
+
   try {
-    const versions = getReleaseVersion();
+    const versions = getReleaseVersion(argv.type, argv.version);
     console.log(JSON.stringify(versions));
   } catch (error) {
     console.error(error.message);
