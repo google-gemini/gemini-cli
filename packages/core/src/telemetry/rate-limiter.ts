@@ -11,9 +11,12 @@
 export class RateLimiter {
   private lastRecordTimes: Map<string, number> = new Map();
   private readonly minIntervalMs: number;
+  private static readonly HIGH_PRIORITY_DIVISOR = 2;
 
   constructor(minIntervalMs: number = 60000) {
-    // Default: 1 minute
+    if (minIntervalMs < 0) {
+      throw new Error('minIntervalMs must be non-negative.');
+    }
     this.minIntervalMs = minIntervalMs;
   }
 
@@ -29,7 +32,7 @@ export class RateLimiter {
 
     // Use shorter interval for high priority events (e.g., memory leaks)
     const interval = isHighPriority
-      ? this.minIntervalMs / 2
+      ? Math.round(this.minIntervalMs / RateLimiter.HIGH_PRIORITY_DIVISOR)
       : this.minIntervalMs;
 
     if (now - lastRecordTime >= interval) {
@@ -51,10 +54,16 @@ export class RateLimiter {
   /**
    * Get time until next allowed recording for a metric
    */
-  getTimeUntilNextAllowed(metricKey: string): number {
+  getTimeUntilNextAllowed(
+    metricKey: string,
+    isHighPriority: boolean = false,
+  ): number {
     const now = Date.now();
     const lastRecordTime = this.lastRecordTimes.get(metricKey) || 0;
-    const nextAllowedTime = lastRecordTime + this.minIntervalMs;
+    const interval = isHighPriority
+      ? Math.round(this.minIntervalMs / RateLimiter.HIGH_PRIORITY_DIVISOR)
+      : this.minIntervalMs;
+    const nextAllowedTime = lastRecordTime + interval;
 
     return Math.max(0, nextAllowedTime - now);
   }
@@ -104,7 +113,6 @@ export class RateLimiter {
    * Remove old entries to prevent memory leaks
    */
   cleanup(maxAgeMs: number = 3600000): void {
-    // Default: 1 hour
     const cutoffTime = Date.now() - maxAgeMs;
 
     for (const [key, time] of this.lastRecordTimes.entries()) {
