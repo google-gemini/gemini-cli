@@ -335,8 +335,16 @@ export enum EventMetadataKey {
   // ==========================================================================
   // Extension Install Event Keys
   // ===========================================================================
+
+  // Logs the name of the extension.
   GEMINI_CLI_EXTENSION_NAME = 85,
+
+  // Logs the version of the extension.
   GEMINI_CLI_EXTENSION_VERSION = 86,
+
+  // Logs the source of the extension.
   GEMINI_CLI_EXTENSION_SOURCE = 87,
+
+  // Logs the status of the extension install.
   GEMINI_CLI_EXTENSION_INSTALL_STATUS = 88,
 }
