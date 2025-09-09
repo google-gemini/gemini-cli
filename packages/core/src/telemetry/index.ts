@@ -59,3 +59,10 @@ export {
   stopGlobalMemoryMonitoring,
 } from './memory-monitor.js';
 export type { MemorySnapshot, ProcessMetrics } from './memory-monitor.js';
+export {
+  ActivityMonitor,
+  initializeActivityMonitor,
+  getActivityMonitor,
+  startGlobalActivityMonitoring,
+  stopGlobalActivityMonitoring,
+} from './activity-monitor.js';
