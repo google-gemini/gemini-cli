@@ -138,7 +138,7 @@ describe('mcp-client', () => {
       await client.connect();
       await client.discover({} as Config);
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
-      expect(consoleWarnSpy).toHaveBeenCalledOnce();
+      expect(consoleWarnSpy).toHaveBeenCalledTimes(2);
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
           `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
@@ -564,6 +564,111 @@ describe('mcp-client', () => {
         type: 'object',
         properties: {},
       };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for a schema with $ref (JSON Schema reference)', () => {
+      const schema = {
+        $ref: '#/definitions/MyType',
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for a schema with conditional logic (if/then/else)', () => {
+      const schema = {
+        if: { type: 'string' },
+        then: { type: 'string', minLength: 1 },
+        else: { type: 'number' },
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for a schema with not keyword', () => {
+      const schema = {
+        not: { type: 'string' },
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for a schema with const keyword', () => {
+      const schema = {
+        const: 'specific-value',
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for a schema with enum keyword', () => {
+      const schema = {
+        enum: ['option1', 'option2', 'option3'],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for complex schema with $ref in nested properties', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          data: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                child: { $ref: '#/properties/data/items' },
+              },
+            },
+          },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should validate recursive schemas with if/then/else in subschemas', () => {
+      const schema = {
+        if: { properties: { type: { const: 'user' } } },
+        then: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            email: { type: 'string' },
+          },
+        },
+        else: {
+          type: 'object',
+          properties: {
+            id: { type: 'number' },
+          },
+        },
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return false for invalid conditional schemas', () => {
+      const schema = {
+        if: { type: 'string' },
+        then: { invalidProperty: 'this has no valid schema keywords' },
+      };
+      expect(hasValidTypes(schema)).toBe(false);
+    });
+
+    it('should return true for schema with only metadata properties', () => {
+      const schema = {
+        title: 'My Schema',
+        description: 'A schema with only metadata',
+        default: 'defaultValue',
+        examples: ['example1', 'example2'],
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for items without type in conditional context', () => {
+      const schema = {
+        items: { type: 'string' },
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for empty schema object', () => {
+      const schema = {};
       expect(hasValidTypes(schema)).toBe(true);
     });
   });

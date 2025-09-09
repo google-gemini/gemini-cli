@@ -581,6 +581,56 @@ export function hasValidTypes(schema: unknown): boolean {
   }
 
   const s = schema as Record<string, unknown>;
+  
+  // Empty schema objects are valid (they accept anything)
+  if (Object.keys(s).length === 0) {
+    return true;
+  }
+
+  // Check for JSON Schema references - these are valid without a type
+  if (s['$ref']) {
+    return true;
+  }
+
+  // Check for JSON Schema keywords that are valid without a type (but don't contain subschemas to validate)
+  const validWithoutType = [
+    'const', 'enum', 'default',
+    'dependentRequired', 'minContains', 'maxContains',
+    // String constraints
+    'minLength', 'maxLength', 'pattern', 'format',
+    // Number constraints  
+    'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf',
+    // Array constraints
+    'minItems', 'maxItems', 'uniqueItems',
+    // Object constraints
+    'minProperties', 'maxProperties', 'required',
+    // Content-related keywords
+    'contentMediaType', 'contentEncoding'
+  ];
+
+  // Check for combinations of metadata keywords that make a schema valid
+  const metadataKeywords = ['title', 'description', 'examples'];
+  const hasMultipleMetadata = metadataKeywords.filter(keyword => s[keyword] !== undefined).length >= 2;
+  
+  if (validWithoutType.some(keyword => s[keyword] !== undefined) || hasMultipleMetadata) {
+    return true;
+  }
+  
+  // Special case: properties without type is valid when used in conditional schemas
+  if (s['properties'] && !s['type'] && typeof s['properties'] === 'object' && s['properties'] !== null) {
+    // This is valid if all properties have valid types
+    for (const prop of Object.values(s['properties'])) {
+      if (!hasValidTypes(prop)) {
+        return false;
+      }
+    }
+    return true;
+  }
+  
+  // Special case: items without type is valid for arrays when used in conditional schemas
+  if (s['items'] && !s['type'] && !s['properties']) {
+    return hasValidTypes(s['items']);
+  }
 
   if (!s['type']) {
     // These keywords contain an array of schemas that should be validated.
@@ -598,6 +648,109 @@ export function hasValidTypes(schema: unknown): boolean {
           }
         }
       }
+    }
+
+    // Check for keywords that contain subschemas requiring recursive validation
+    // patternProperties: object with pattern keys mapping to schemas
+    if (s['patternProperties'] && typeof s['patternProperties'] === 'object' && s['patternProperties'] !== null) {
+      hasSubSchema = true;
+      for (const subSchema of Object.values(s['patternProperties'])) {
+        if (!hasValidTypes(subSchema)) {
+          return false;
+        }
+      }
+    }
+
+    // additionalProperties: can be a schema or boolean
+    if (s['additionalProperties'] && typeof s['additionalProperties'] === 'object') {
+      hasSubSchema = true;
+      if (!hasValidTypes(s['additionalProperties'])) {
+        return false;
+      }
+    }
+
+    // additionalItems: can be a schema or boolean
+    if (s['additionalItems'] && typeof s['additionalItems'] === 'object') {
+      hasSubSchema = true;
+      if (!hasValidTypes(s['additionalItems'])) {
+        return false;
+      }
+    }
+
+    // dependencies: can contain schemas (not just string arrays)
+    if (s['dependencies'] && typeof s['dependencies'] === 'object' && s['dependencies'] !== null) {
+      hasSubSchema = true;
+      for (const dep of Object.values(s['dependencies'])) {
+        if (typeof dep === 'object' && dep !== null && !Array.isArray(dep)) {
+          if (!hasValidTypes(dep)) {
+            return false;
+          }
+        }
+      }
+    }
+
+    // dependentSchemas: object with property names mapping to schemas
+    if (s['dependentSchemas'] && typeof s['dependentSchemas'] === 'object' && s['dependentSchemas'] !== null) {
+      hasSubSchema = true;
+      for (const subSchema of Object.values(s['dependentSchemas'])) {
+        if (!hasValidTypes(subSchema)) {
+          return false;
+        }
+      }
+    }
+
+    // unevaluatedProperties: can be a schema or boolean
+    if (s['unevaluatedProperties'] && typeof s['unevaluatedProperties'] === 'object') {
+      hasSubSchema = true;
+      if (!hasValidTypes(s['unevaluatedProperties'])) {
+        return false;
+      }
+    }
+
+    // unevaluatedItems: can be a schema or boolean
+    if (s['unevaluatedItems'] && typeof s['unevaluatedItems'] === 'object') {
+      hasSubSchema = true;
+      if (!hasValidTypes(s['unevaluatedItems'])) {
+        return false;
+      }
+    }
+
+    // contains: schema for validating array items
+    if (s['contains'] && typeof s['contains'] === 'object') {
+      hasSubSchema = true;
+      if (!hasValidTypes(s['contains'])) {
+        return false;
+      }
+    }
+
+    // propertyNames: schema for validating property names
+    if (s['propertyNames'] && typeof s['propertyNames'] === 'object') {
+      hasSubSchema = true;
+      if (!hasValidTypes(s['propertyNames'])) {
+        return false;
+      }
+    }
+
+    // contentSchema: schema for validating string content
+    if (s['contentSchema'] && typeof s['contentSchema'] === 'object') {
+      hasSubSchema = true;
+      if (!hasValidTypes(s['contentSchema'])) {
+        return false;
+      }
+    }
+
+    // Check for conditional schemas (if/then/else)
+    if (s['if'] || s['then'] || s['else']) {
+      hasSubSchema = true;
+      if (s['if'] && !hasValidTypes(s['if'])) return false;
+      if (s['then'] && !hasValidTypes(s['then'])) return false;
+      if (s['else'] && !hasValidTypes(s['else'])) return false;
+    }
+
+    // Check for 'not' schema
+    if (s['not']) {
+      hasSubSchema = true;
+      if (!hasValidTypes(s['not'])) return false;
     }
 
     // If the node itself is missing a type and had no subschemas, then it isn't valid.
@@ -663,6 +816,11 @@ export async function discoverTools(
             `Skipping tool '${funcDecl.name}' from MCP server '${mcpServerName}' ` +
               `because it has missing types in its parameter schema. Please file an ` +
               `issue with the owner of the MCP server.`,
+          );
+          // Always log the schema for now to help debug
+          console.warn(
+            `Schema for '${funcDecl.name}':`,
+            JSON.stringify(funcDecl.parametersJsonSchema, null, 2),
           );
           continue;
         }
