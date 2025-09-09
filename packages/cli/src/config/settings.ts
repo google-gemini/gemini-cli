@@ -29,6 +29,10 @@ import {
 } from './settingsSchema.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge } from '../utils/deepMerge.js';
+import {
+  updateSettingsFilePreservingFormat,
+  trackEnvVarMappings,
+} from '../utils/preserveOriginalFormat.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
@@ -353,6 +357,7 @@ export class LoadedSettings {
     workspace: SettingsFile,
     isTrusted: boolean,
     migratedInMemorScopes: Set<SettingScope>,
+    envVarMappings: Map<SettingScope, ReturnType<typeof trackEnvVarMappings>> = new Map(),
   ) {
     this.system = system;
     this.systemDefaults = systemDefaults;
@@ -360,6 +365,7 @@ export class LoadedSettings {
     this.workspace = workspace;
     this.isTrusted = isTrusted;
     this.migratedInMemorScopes = migratedInMemorScopes;
+    this.envVarMappings = envVarMappings;
     this._merged = this.computeMergedSettings();
   }
 
@@ -369,6 +375,7 @@ export class LoadedSettings {
   readonly workspace: SettingsFile;
   readonly isTrusted: boolean;
   readonly migratedInMemorScopes: Set<SettingScope>;
+  readonly envVarMappings: Map<SettingScope, ReturnType<typeof trackEnvVarMappings>>;
 
   private _merged: Settings;
 
@@ -405,7 +412,8 @@ export class LoadedSettings {
     const settingsFile = this.forScope(scope);
     setNestedProperty(settingsFile.settings, key, value);
     this._merged = this.computeMergedSettings();
-    saveSettings(settingsFile);
+    const envMappings = this.envVarMappings.get(scope) || [];
+    saveSettings(settingsFile, envMappings);
   }
 }
 
@@ -517,6 +525,7 @@ export function loadSettings(
   const systemSettingsPath = getSystemSettingsPath();
   const systemDefaultsPath = getSystemDefaultsPath();
   const migratedInMemorScopes = new Set<SettingScope>();
+  const envVarMappings = new Map<SettingScope, ReturnType<typeof trackEnvVarMappings>>();
 
   // Resolve paths to their canonical representation to handle symlinks
   const resolvedWorkspaceDir = path.resolve(workspaceDir);
@@ -640,10 +649,20 @@ export function loadSettings(
   // the settings to avoid a cycle
   loadEnvironment(tempMergedSettings);
 
-  // Now that the environment is loaded, resolve variables in the settings.
+  // Now that the environment is loaded, track and resolve variables in the settings.
+  // Track environment variable mappings before resolution
+  const systemOriginal = structuredClone(systemSettings);
+  const userOriginal = structuredClone(userSettings);
+  const workspaceOriginal = structuredClone(workspaceSettings);
+  
   systemSettings = resolveEnvVarsInObject(systemSettings);
   userSettings = resolveEnvVarsInObject(userSettings);
   workspaceSettings = resolveEnvVarsInObject(workspaceSettings);
+  
+  // Track which values came from environment variables
+  envVarMappings.set(SettingScope.System, trackEnvVarMappings(systemSettings, systemOriginal));
+  envVarMappings.set(SettingScope.User, trackEnvVarMappings(userSettings, userOriginal));
+  envVarMappings.set(SettingScope.Workspace, trackEnvVarMappings(workspaceSettings, workspaceOriginal));
 
   // Create LoadedSettings first
 
@@ -675,10 +694,14 @@ export function loadSettings(
     },
     isTrusted,
     migratedInMemorScopes,
+    envVarMappings,
   );
 }
 
-export function saveSettings(settingsFile: SettingsFile): void {
+export function saveSettings(
+  settingsFile: SettingsFile,
+  envVarMappings: ReturnType<typeof trackEnvVarMappings> = [],
+): void {
   try {
     // Ensure the directory exists
     const dirPath = path.dirname(settingsFile.path);
@@ -693,10 +716,11 @@ export function saveSettings(settingsFile: SettingsFile): void {
       ) as Settings;
     }
 
-    fs.writeFileSync(
+    // Use the new format-preserving update function
+    updateSettingsFilePreservingFormat(
       settingsFile.path,
-      JSON.stringify(settingsToSave, null, 2),
-      'utf-8',
+      settingsToSave as Record<string, unknown>,
+      envVarMappings,
     );
   } catch (error) {
     console.error('Error saving user settings file:', error);
