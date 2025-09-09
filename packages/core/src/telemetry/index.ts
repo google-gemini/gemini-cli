@@ -50,3 +50,19 @@ export type { TelemetryEvent } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 export * from './uiTelemetry.js';
+export {
+  MemoryMonitor,
+  initializeMemoryMonitor,
+  getMemoryMonitor,
+  recordCurrentMemoryUsage,
+  startGlobalMemoryMonitoring,
+  stopGlobalMemoryMonitoring,
+} from './memory-monitor.js';
+export type { MemorySnapshot, ProcessMetrics } from './memory-monitor.js';
+export {
+  ActivityMonitor,
+  initializeActivityMonitor,
+  getActivityMonitor,
+  startGlobalActivityMonitoring,
+  stopGlobalActivityMonitoring,
+} from './activity-monitor.js';
