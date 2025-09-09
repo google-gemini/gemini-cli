@@ -5,6 +5,10 @@
  */
 
 import { z } from 'zod';
+import {
+  IDE_MAX_OPEN_FILES,
+  IDE_MAX_SELECTED_TEXT_LENGTH,
+} from './constants.js';
 import type { IdeContext } from './types.js';
 
 export const IdeDiffAcceptedNotificationSchema = z.object({
@@ -92,6 +96,57 @@ export function createIdeContextStore() {
    * @param newIdeContext The new IDE context from the IDE.
    */
   function setIdeContext(newIdeContext: IdeContext): void {
+    const { workspaceState } = newIdeContext;
+    if (!workspaceState) {
+      ideContextState = newIdeContext;
+      notifySubscribers();
+      return;
+    }
+
+    const { openFiles } = workspaceState;
+
+    if (openFiles && openFiles.length > 0) {
+      // Sort by timestamp descending (newest first)
+      openFiles.sort((a, b) => b.timestamp - a.timestamp);
+
+      // The most recent file is now at index 0.
+      const mostRecentFile = openFiles[0];
+
+      // If the most recent file is not active, then no file is active.
+      if (!mostRecentFile.isActive) {
+        openFiles.forEach((file) => {
+          file.isActive = false;
+          file.cursor = undefined;
+          file.selectedText = undefined;
+        });
+      } else {
+        // The most recent file is active. Ensure it's the only one.
+        openFiles.forEach((file, index: number) => {
+          if (index !== 0) {
+            file.isActive = false;
+            file.cursor = undefined;
+            file.selectedText = undefined;
+          }
+        });
+
+        // Truncate selected text in the active file
+        if (
+          mostRecentFile.selectedText &&
+          mostRecentFile.selectedText.length > IDE_MAX_SELECTED_TEXT_LENGTH
+        ) {
+          mostRecentFile.selectedText =
+            mostRecentFile.selectedText.substring(
+              0,
+              IDE_MAX_SELECTED_TEXT_LENGTH,
+            ) + '... [TRUNCATED]';
+        }
+      }
+
+      // Truncate files list
+      if (openFiles.length > IDE_MAX_OPEN_FILES) {
+        workspaceState.openFiles = openFiles.slice(0, IDE_MAX_OPEN_FILES);
+      }
+    }
     ideContextState = newIdeContext;
     notifySubscribers();
   }
