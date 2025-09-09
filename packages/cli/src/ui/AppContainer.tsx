@@ -68,7 +68,6 @@ import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
-import { setExtensionUpdateHandler } from '../utils/handleExtensionAutoUpdate.js';
 import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
@@ -176,11 +175,6 @@ export const AppContainer = (props: AppContainerProps) => {
     () => setUpdateHandler(historyManager.addItem, setUpdateInfo),
     [historyManager.addItem],
   );
-
-  useEffect(() => {
-    const cleanup = setExtensionUpdateHandler(historyManager.addItem);
-    return cleanup;
-  }, [historyManager.addItem]);
 
   // Watch for model changes (e.g., from Flash fallback)
   useEffect(() => {

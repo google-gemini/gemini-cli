@@ -12,8 +12,10 @@ import {
   EXTENSIONS_CONFIG_FILENAME,
   INSTALL_METADATA_FILENAME,
   annotateActiveExtensions,
+  checkForExtensionUpdates,
   disableExtension,
   enableExtension,
+  ExtensionUpdateStatus,
   installExtension,
   loadExtension,
   loadExtensions,
@@ -849,6 +851,106 @@ describe('updateExtension', () => {
     expect(updatedConfig.version).toBe('1.1.0');
   });
 });
+
+describe('checkForExtensionUpdates', () => {
+  let tempHomeDir: string;
+  let userExtensionsDir: string;
+
+  beforeEach(() => {
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-cli-test-home-'),
+    );
+    vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
+    userExtensionsDir = path.join(tempHomeDir, GEMINI_DIR, 'extensions');
+    fs.mkdirSync(userExtensionsDir, { recursive: true });
+    Object.values(mockGit).forEach((fn) => fn.mockReset());
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
+  });
+
+  it('should return UpdateAvailable for a git extension with updates', async () => {
+    const extensionDir = createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'test-extension',
+      version: '1.0.0',
+    });
+    const extension = loadExtension(extensionDir)!;
+    extension.installMetadata = {
+      source: 'https://some.git/repo',
+      type: 'git',
+    };
+
+    mockGit.getRemotes.mockResolvedValue([
+      { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
+    ]);
+    mockGit.listRemote.mockResolvedValue('remoteHash	HEAD');
+    mockGit.revparse.mockResolvedValue('localHash');
+
+    const results = await checkForExtensionUpdates([extension]);
+    const result = results.get('test-extension');
+    expect(result?.status).toBe(ExtensionUpdateStatus.UpdateAvailable);
+  });
+
+  it('should return UpToDate for a git extension with no updates', async () => {
+    const extensionDir = createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'test-extension',
+      version: '1.0.0',
+    });
+    const extension = loadExtension(extensionDir)!;
+    extension.installMetadata = {
+      source: 'https://some.git/repo',
+      type: 'git',
+    };
+
+    mockGit.getRemotes.mockResolvedValue([
+      { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
+    ]);
+    mockGit.listRemote.mockResolvedValue('sameHash	HEAD');
+    mockGit.revparse.mockResolvedValue('sameHash');
+
+    const results = await checkForExtensionUpdates([extension]);
+    const result = results.get('test-extension');
+    expect(result?.status).toBe(ExtensionUpdateStatus.UpToDate);
+  });
+
+  it('should return NotUpdatable for a non-git extension', async () => {
+    const extensionDir = createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'local-extension',
+      version: '1.0.0',
+    });
+    const extension = loadExtension(extensionDir)!;
+    extension.installMetadata = { source: '/local/path', type: 'local' };
+
+    const results = await checkForExtensionUpdates([extension]);
+    const result = results.get('local-extension');
+    expect(result?.status).toBe(ExtensionUpdateStatus.NotUpdatable);
+  });
+
+  it('should return Error when git check fails', async () => {
+    const extensionDir = createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'error-extension',
+      version: '1.0.0',
+    });
+    const extension = loadExtension(extensionDir)!;
+    extension.installMetadata = {
+      source: 'https://some.git/repo',
+      type: 'git',
+    };
+
+    mockGit.getRemotes.mockRejectedValue(new Error('Git error'));
+
+    const results = await checkForExtensionUpdates([extension]);
+    const result = results.get('error-extension');
+    expect(result?.status).toBe(ExtensionUpdateStatus.Error);
+    expect(result?.error).toContain('Failed to check for updates');
+  });
+});
+
 
 describe('disableExtension', () => {
   let tempWorkspaceDir: string;

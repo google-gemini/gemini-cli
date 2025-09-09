@@ -24,10 +24,6 @@ import { getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
-import {
-  extensionUpdateEventEmitter,
-  ExtensionUpdateEvent,
-} from '../utils/extensionUpdateEventEmitter.js';
 import { randomUUID } from 'node:crypto';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
@@ -684,51 +680,85 @@ export async function updateAllUpdatableExtensions(
   );
 }
 
-export async function checkForExtensionUpdates(extensions: Extension[]) {
+
+export enum ExtensionUpdateStatus {
+  UpdateAvailable,
+  UpToDate,
+  Error,
+  NotUpdatable,
+}
+
+export interface ExtensionUpdateCheckResult {
+  status: ExtensionUpdateStatus;
+  error?: string;
+}
+
+export async function checkForExtensionUpdates(
+  extensions: Extension[],
+): Promise<Map<string, ExtensionUpdateCheckResult>> {
+  const results = new Map<string, ExtensionUpdateCheckResult>();
+
   for (const extension of extensions) {
-    if (extension.installMetadata?.type === 'git') {
-      try {
-        const git = simpleGit(extension.path);
-        const remotes = await git.getRemotes(true);
-        if (remotes.length === 0) {
-          continue;
-        }
-        const remoteUrl = remotes[0].refs.fetch;
-        if (!remoteUrl) {
-          continue;
-        }
+    if (extension.installMetadata?.type !== 'git') {
+      results.set(extension.config.name, {
+        status: ExtensionUpdateStatus.NotUpdatable,
+      });
+      continue;
+    }
 
-        // Determine the ref to check on the remote.
-        const refToCheck = extension.installMetadata.ref || 'HEAD';
-
-        const lsRemoteOutput = await git.listRemote([remoteUrl, refToCheck]);
-
-        if (
-          typeof lsRemoteOutput !== 'string' ||
-          lsRemoteOutput.trim() === ''
-        ) {
-          continue;
-        }
-
-        const remoteHash = lsRemoteOutput.split('\t')[0];
-        const localHash = await git.revparse(['HEAD']);
-
-        if (remoteHash && remoteHash !== localHash) {
-          const message = `An update is available for extension "${extension.config.name}". Run "gemini extensions update ${extension.config.name}" to update.`;
-          extensionUpdateEventEmitter.emit(
-            ExtensionUpdateEvent.UpdateAvailable,
-            message,
-          );
-        }
-      } catch (error) {
-        const errorMessage = `Failed to check for updates for extension "${
-          extension.config.name
-        }": ${getErrorMessage(error)}`;
-        extensionUpdateEventEmitter.emit(
-          ExtensionUpdateEvent.LogError,
-          errorMessage,
-        );
+    try {
+      const git = simpleGit(extension.path);
+      const remotes = await git.getRemotes(true);
+      if (remotes.length === 0) {
+        results.set(extension.config.name, {
+          status: ExtensionUpdateStatus.UpToDate,
+        });
+        continue;
       }
+      const remoteUrl = remotes[0].refs.fetch;
+      if (!remoteUrl) {
+        results.set(extension.config.name, {
+          status: ExtensionUpdateStatus.UpToDate,
+        });
+        continue;
+      }
+
+      // Determine the ref to check on the remote.
+      const refToCheck = extension.installMetadata.ref || 'HEAD';
+
+      const lsRemoteOutput = await git.listRemote([remoteUrl, refToCheck]);
+
+      if (
+        typeof lsRemoteOutput !== 'string' ||
+        lsRemoteOutput.trim() === ''
+      ) {
+        results.set(extension.config.name, {
+          status: ExtensionUpdateStatus.UpToDate,
+        });
+        continue;
+      }
+
+      const remoteHash = lsRemoteOutput.split('\t')[0];
+      const localHash = await git.revparse(['HEAD']);
+
+      if (remoteHash && remoteHash !== localHash) {
+        results.set(extension.config.name, {
+          status: ExtensionUpdateStatus.UpdateAvailable,
+        });
+      } else {
+        results.set(extension.config.name, {
+          status: ExtensionUpdateStatus.UpToDate,
+        });
+      }
+    } catch (error) {
+      results.set(extension.config.name, {
+        status: ExtensionUpdateStatus.Error,
+        error: `Failed to check for updates for extension "${
+          extension.config.name
+        }": ${getErrorMessage(error)}`,
+      });
     }
   }
+
+  return results;
 }
