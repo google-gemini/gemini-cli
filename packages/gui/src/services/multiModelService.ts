@@ -41,6 +41,8 @@ interface ElectronAPI {
     getCurrentToolset: () => Promise<string[]>;
     addCustomRole: (role: RoleDefinition) => Promise<void>;
     addCustomTemplate: (template: Omit<PresetTemplate, 'isBuiltin'>) => Promise<void>;
+    updateCustomTemplate: (id: string, updates: Partial<Omit<PresetTemplate, 'id' | 'isBuiltin'>>) => Promise<void>;
+    deleteCustomTemplate: (id: string) => Promise<void>;
     // Session management
     createSession: (sessionId: string, title?: string) => Promise<void>;
     switchSession: (sessionId: string) => Promise<void>;
@@ -60,6 +62,8 @@ interface ElectronAPI {
     checkEnvApiKey: (providerType: string) => Promise<{ detected: boolean; source: string }>;
     setApiKeyPreference: (providerType: string) => Promise<{ success: boolean; error?: string }>;
     setOAuthPreference: (providerType: string) => Promise<{ success: boolean; error?: string }>;
+    getApprovalMode: () => Promise<'default' | 'autoEdit' | 'yolo'>;
+    setApprovalMode: (mode: 'default' | 'autoEdit' | 'yolo') => Promise<void>;
   };
 }
 
@@ -456,6 +460,22 @@ class MultiModelService {
     await this.api.addCustomTemplate(template);
   }
 
+  async updateCustomTemplate(id: string, updates: Partial<Omit<PresetTemplate, 'id' | 'isBuiltin'>>): Promise<void> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    await this.api.updateCustomTemplate(id, updates);
+  }
+
+  async deleteCustomTemplate(id: string): Promise<void> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    await this.api.deleteCustomTemplate(id);
+  }
+
   // Session management methods
   async createSession(sessionId: string, title?: string): Promise<void> {
     if (!this.initialized) {
@@ -568,6 +588,22 @@ class MultiModelService {
     }
 
     return await this.api.setOAuthPreference(providerType);
+  }
+
+  async getApprovalMode(): Promise<'default' | 'autoEdit' | 'yolo'> {
+    if (!this.initialized) {
+      return 'default';
+    }
+
+    return await this.api.getApprovalMode();
+  }
+
+  async setApprovalMode(mode: 'default' | 'autoEdit' | 'yolo'): Promise<void> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    await this.api.setApprovalMode(mode);
   }
 }
 

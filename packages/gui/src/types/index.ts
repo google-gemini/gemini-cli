@@ -77,26 +77,38 @@ export interface RoleDefinition {
   };
 }
 
-export interface PresetTemplate {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  variables: TemplateVariable[];
-  content: string;
-  tags: string[];
-  isBuiltin: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+export interface TemplateVariable {
+  readonly name: string;
+  readonly type: 'text' | 'number' | 'boolean' | 'file_path' | 'directory_path';
+  readonly description: string;
+  readonly required: boolean;
+  readonly defaultValue?: string | number | boolean;
+  readonly placeholder?: string;
+  readonly validation?: {
+    readonly pattern?: string;
+    readonly minLength?: number;
+    readonly maxLength?: number;
+    readonly min?: number;
+    readonly max?: number;
+  };
 }
 
-export interface TemplateVariable {
-  name: string;
-  type: 'text' | 'number' | 'boolean' | 'select' | 'multiline';
-  description: string;
-  required: boolean;
-  defaultValue?: any;
-  options?: any[];
+export interface PresetTemplate {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly category: string;
+  readonly icon: string;
+  readonly template: string;
+  readonly variables: readonly TemplateVariable[];
+  readonly tags: readonly string[];
+  readonly author?: string;
+  readonly version: string;
+  readonly lastModified: Date;
+  readonly usageCount?: number;
+  readonly isBuiltin: boolean;
+  // GUI-specific field for simplified templates
+  readonly content?: string;
 }
 
 export interface ChatSession {
@@ -149,6 +161,7 @@ export interface WorkspaceConfig {
   name: string;
   directories: string[];
   createdAt: Date;
+  lastUsed: Date;
   description?: string;
 }
 
@@ -244,13 +257,11 @@ export interface AppState {
   language: Language;
   theme: ThemeMode;
   sidebarCollapsed: boolean;
+  initialized: boolean;
   
   // Role system
   currentRole: string;
   customRoles: RoleDefinition[];
   builtinRoles: RoleDefinition[];
-  
-  // Templates
-  templates: PresetTemplate[];
 }
 

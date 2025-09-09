@@ -157,16 +157,33 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
         else if (event.type === 'tool_call') {
           // Finalize current assistant message streaming first
           if (currentAssistantMessageId && assistantContent.trim()) {
+            // Update the existing message with final content
+            const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
+            if (currentSession) {
+              const messageIndex = currentSession.messages.findIndex(m => m.id === currentAssistantMessageId);
+              if (messageIndex >= 0) {
+                const updatedMessages = [...currentSession.messages];
+                updatedMessages[messageIndex] = {
+                  ...updatedMessages[messageIndex],
+                  content: assistantContent,
+                  toolCalls: event.toolCall ? [event.toolCall] : undefined
+                };
+                
+                updateSession(activeSessionId, {
+                  messages: updatedMessages,
+                  updatedAt: new Date()
+                });
+              }
+            }
+            
             setStreaming(false);
             setStreamingMessage('');
             // Reset for next message
             assistantContent = '';
             currentAssistantMessageId = null;
             hasCreatedInitialMessage = false;
-          }
-          
-          // Create a separate message for tool calls immediately
-          if (event.toolCall) {
+          } else if (event.toolCall) {
+            // Create a new message for tool calls if there's no current assistant message
             const toolCallMessage: ChatMessage = {
               id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-tool-call`,
               role: 'assistant',

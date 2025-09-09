@@ -8,8 +8,7 @@ import type {
   AuthConfig,
   Language,
   ThemeMode,
-  RoleDefinition,
-  PresetTemplate 
+  RoleDefinition
 } from '@/types';
 
 interface AppStore extends AppState {
@@ -27,6 +26,7 @@ interface AppStore extends AppState {
   
   setCurrentWorkspace: (workspace: WorkspaceConfig | null) => void;
   addWorkspace: (workspace: WorkspaceConfig) => void;
+  updateWorkspace: (workspaceId: string, updates: Partial<WorkspaceConfig>) => void;
   removeWorkspace: (workspaceId: string) => void;
   
   setLanguage: (language: Language) => void;
@@ -38,8 +38,9 @@ interface AppStore extends AppState {
   removeCustomRole: (roleId: string) => void;
   setBuiltinRoles: (roles: RoleDefinition[]) => void;
   
-  addTemplate: (template: PresetTemplate) => void;
-  removeTemplate: (templateId: string) => void;
+  setInitialized: (initialized: boolean) => void;
+  
+  // Note: Template management moved to backend system via multiModelService
 }
 
 export const useAppStore = create<AppStore>()(
@@ -56,10 +57,10 @@ export const useAppStore = create<AppStore>()(
       language: 'en',
       theme: 'system',
       sidebarCollapsed: false,
+      initialized: false,
       currentRole: 'software_engineer',
       customRoles: [],
       builtinRoles: [],
-      templates: [],
 
       // Actions
       setActiveSession: (sessionId: string | null) =>
@@ -145,6 +146,17 @@ export const useAppStore = create<AppStore>()(
           workspaces: [...state.workspaces, workspace],
         })),
 
+      updateWorkspace: (workspaceId: string, updates: Partial<WorkspaceConfig>) =>
+        set((state) => ({
+          workspaces: state.workspaces.map((workspace) =>
+            workspace.id === workspaceId ? { ...workspace, ...updates } : workspace
+          ),
+          currentWorkspace:
+            state.currentWorkspace?.id === workspaceId
+              ? { ...state.currentWorkspace, ...updates }
+              : state.currentWorkspace,
+        })),
+
       removeWorkspace: (workspaceId: string) =>
         set((state) => ({
           workspaces: state.workspaces.filter((w) => w.id !== workspaceId),
@@ -179,15 +191,10 @@ export const useAppStore = create<AppStore>()(
       setBuiltinRoles: (roles: RoleDefinition[]) =>
         set({ builtinRoles: roles }),
 
-      addTemplate: (template: PresetTemplate) =>
-        set((state) => ({
-          templates: [...state.templates, template],
-        })),
+      setInitialized: (initialized: boolean) =>
+        set({ initialized }),
 
-      removeTemplate: (templateId: string) =>
-        set((state) => ({
-          templates: state.templates.filter((t) => t.id !== templateId),
-        })),
+      // Note: Template management moved to backend system via multiModelService
     }),
     {
       name: 'gemini-cli-gui',

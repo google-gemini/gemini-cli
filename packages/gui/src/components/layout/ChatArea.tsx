@@ -1,18 +1,36 @@
-import React, { useRef } from 'react';
+import { useRef, forwardRef, useImperativeHandle } from 'react';
 import { MessageList } from '@/components/chat/MessageList';
 import { MessageInput } from '@/components/chat/MessageInput';
 import { EmptyState } from '@/components/chat/EmptyState';
 import { CompressionNotification } from '@/components/chat/CompressionNotification';
+import { ToolModeStatusBar } from '@/components/chat/ToolModeStatusBar';
 import { useAppStore } from '@/stores/appStore';
 import { useChatStore } from '@/stores/chatStore';
 import { AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ToolConfirmationOutcome } from '@/types';
+import { multiModelService } from '@/services/multiModelService';
 
-export const ChatArea: React.FC = () => {
+interface ChatAreaHandle {
+  setMessage: (message: string) => void;
+  refreshTemplates?: () => void;
+}
+
+interface ChatAreaProps {
+  onTemplateRefresh?: () => void;
+}
+
+export const ChatArea = forwardRef<ChatAreaHandle, ChatAreaProps>(({ onTemplateRefresh }, ref) => {
   const { sessions, activeSessionId } = useAppStore();
-  const { isStreaming, isThinking, streamingMessage, error, setError, compressionNotification, setCompressionNotification, toolConfirmation } = useChatStore();
+  const { isStreaming, isThinking, streamingMessage, error, setError, compressionNotification, setCompressionNotification, toolConfirmation, setApprovalMode } = useChatStore();
   const messageInputRef = useRef<{ setMessage: (message: string) => void }>(null);
+
+  useImperativeHandle(ref, () => ({
+    setMessage: (message: string) => {
+      messageInputRef.current?.setMessage(message);
+    },
+    refreshTemplates: onTemplateRefresh
+  }));
 
   const activeSession = sessions.find(session => session.id === activeSessionId);
 
@@ -21,16 +39,32 @@ export const ChatArea: React.FC = () => {
     messageInputRef.current?.setMessage(prompt);
   };
 
-  const handleToolConfirmation = (outcome: ToolConfirmationOutcome) => {
+  const handleToolConfirmation = async (outcome: ToolConfirmationOutcome) => {
     if (toolConfirmation?.onConfirm) {
       toolConfirmation.onConfirm(outcome);
+    }
+    
+    // Update approval mode state when user clicks "Always allow" (after calling original handler)
+    if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+      // Determine the new approval mode based on the tool type
+      const newMode = toolConfirmation?.type === 'edit' ? 'autoEdit' : 'yolo';
+      
+      try {
+        // Update both frontend state and backend configuration
+        await multiModelService.setApprovalMode(newMode);
+        setApprovalMode(newMode);
+        console.log(`Approval mode updated to: ${newMode}`);
+      } catch (error) {
+        console.error('Failed to update approval mode:', error);
+        // Don't update frontend state if backend update fails
+      }
     }
   };
 
   const showEmptyState = !activeSession || (activeSession && activeSession.messages.length === 0);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
       {/* Error notification */}
       {error && (
         <div className="mx-4 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start gap-3">
@@ -70,10 +104,14 @@ export const ChatArea: React.FC = () => {
           streamingContent={streamingMessage}
           toolConfirmation={toolConfirmation}
           onToolConfirm={handleToolConfirmation}
+          onTemplateSaved={onTemplateRefresh}
         />
       )}
+      
+      {/* Tool mode status bar */}
+      <ToolModeStatusBar />
       
       <MessageInput disabled={!activeSession} ref={messageInputRef} />
     </div>    
   );
-};
+});

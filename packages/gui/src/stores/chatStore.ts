@@ -9,6 +9,7 @@ interface ChatState {
   streamingMessage: string;
   compressionNotification: CompressionInfo | null; // Show compression notification
   toolConfirmation: ToolCallConfirmationDetails | null; // Tool confirmation request
+  approvalMode: 'default' | 'autoEdit' | 'yolo'; // Current tool approval mode
   
   // Actions
   setLoading: (loading: boolean) => void;
@@ -18,6 +19,7 @@ interface ChatState {
   setStreamingMessage: (message: string) => void;
   setCompressionNotification: (info: CompressionInfo | null) => void;
   setToolConfirmation: (confirmation: ToolCallConfirmationDetails | null) => void;
+  setApprovalMode: (mode: 'default' | 'autoEdit' | 'yolo') => void;
   addMessage: (sessionId: string, message: ChatMessage) => void;
   updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => void;
 }
@@ -30,6 +32,7 @@ export const useChatStore = create<ChatState>()((set) => ({
   streamingMessage: '',
   compressionNotification: null,
   toolConfirmation: null,
+  approvalMode: 'default',
 
   setLoading: (loading: boolean) => set({ isLoading: loading }),
   
@@ -46,6 +49,8 @@ export const useChatStore = create<ChatState>()((set) => ({
   setCompressionNotification: (info: CompressionInfo | null) => set({ compressionNotification: info }),
   
   setToolConfirmation: (confirmation: ToolCallConfirmationDetails | null) => set({ toolConfirmation: confirmation }),
+  
+  setApprovalMode: (mode: 'default' | 'autoEdit' | 'yolo') => set({ approvalMode: mode }),
 
   addMessage: (_sessionId: string, _message: ChatMessage) => {
     // This will be handled by appStore for persistence

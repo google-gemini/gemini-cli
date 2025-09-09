@@ -16,7 +16,6 @@ import { useAppStore } from '@/stores/appStore';
 import { multiModelService } from '@/services/multiModelService';
 import { cn } from '@/utils/cn';
 import type { ChatSession } from '@/types';
-import { WorkspacePanel } from '@/components/workspace/WorkspacePanel';
 
 export const Sidebar: React.FC = () => {
   const {
@@ -37,9 +36,11 @@ export const Sidebar: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
 
-  const filteredSessions = sessions.filter(session =>
-    session.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredSessions = sessions
+    .filter(session =>
+      session.title.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); // Sort by updatedAt descending (newest first)
 
   const createNewSession = async () => {
     const newSession: ChatSession = {
@@ -158,7 +159,7 @@ export const Sidebar: React.FC = () => {
 
   if (sidebarCollapsed) {
     return (
-      <div className="w-16 bg-card border-r border-border flex flex-col items-center py-4 space-y-4">
+      <div className="fixed left-0 top-0 h-full w-16 bg-card border-r border-border flex flex-col items-center py-4 space-y-4 z-40">
         <Button
           variant="ghost"
           size="icon"
@@ -283,8 +284,6 @@ export const Sidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* Workspace Panel */}
-      <WorkspacePanel />
       
       {/* Footer - removed Authentication Settings button */}
       <div className="p-4 border-t border-border">

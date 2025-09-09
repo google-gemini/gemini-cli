@@ -6,13 +6,19 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import { format } from 'date-fns';
-import { Bot, User, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Bot, User, AlertCircle, ChevronDown, ChevronRight, BookTemplate } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Card, CardContent } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { TypingIndicator } from './TypingIndicator';
 import ToolConfirmationMessage from './ToolConfirmationMessage';
-import type { ChatMessage } from '@/types';
+import { multiModelService } from '@/services/multiModelService';
+import type { ChatMessage, ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolCall } from '@/types';
 import 'katex/dist/katex.min.css';
+
+// React Markdown component props interface
+// Note: Using any here due to react-markdown's complex internal types
+// The actual props we use are type-safe within the function
 
 // Tool response format detection and parsing
 interface ParsedToolResponse {
@@ -30,7 +36,7 @@ interface ParsedThinkingContent {
 
 function parseThinkingContent(content: string): ParsedThinkingContent {
   const thinkingSections: string[] = [];
-  let remainingContent = content;
+  const remainingContent = content;
 
   // Extract all <think>...</think> sections
   const thinkRegex = /<think>([\s\S]*?)<\/think>/g;
@@ -157,8 +163,9 @@ interface MessageListProps {
   isStreaming?: boolean;
   isThinking?: boolean;
   streamingContent?: string;
-  toolConfirmation?: any | null;
-  onToolConfirm?: (outcome: any) => void;
+  toolConfirmation?: ToolCallConfirmationDetails | null;
+  onToolConfirm?: (outcome: ToolConfirmationOutcome) => void;
+  onTemplateSaved?: () => void;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
@@ -168,27 +175,101 @@ export const MessageList: React.FC<MessageListProps> = ({
   streamingContent,
   toolConfirmation,
   onToolConfirm,
+  onTemplateSaved,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lastMessageCountRef = useRef(messages.length);
+  const shouldAutoScrollRef = useRef(true);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Save message as template function
+  const saveAsTemplate = async (message: ChatMessage) => {
+    try {
+      const template = {
+        id: `template-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: `Template ${new Date().toLocaleString()}`,
+        description: 'User message saved as template',
+        category: 'user_generated',
+        icon: '💬',
+        template: message.content,
+        variables: [],
+        tags: ['user', 'saved'],
+        version: '1.0.0',
+        lastModified: new Date(),
+        content: message.content
+      };
+      
+      await multiModelService.addCustomTemplate(template);
+      console.log('Template saved successfully');
+      
+      // Refresh the template list in the sidebar
+      if (onTemplateSaved) {
+        onTemplateSaved();
+      }
+    } catch (error) {
+      console.error('Failed to save template:', error);
+    }
   };
 
+  const scrollToBottom = (smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ 
+      behavior: smooth ? 'smooth' : 'auto' 
+    });
+  };
+
+  const checkIfAtBottom = () => {
+    if (!containerRef.current) return true;
+    
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const threshold = 100; // pixels from bottom
+    return scrollHeight - scrollTop - clientHeight < threshold;
+  };
+
+  const handleScroll = () => {
+    shouldAutoScrollRef.current = checkIfAtBottom();
+  };
+
+  // Only scroll when new messages are added and user is at bottom
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, streamingContent, isThinking]);
+    const newMessageAdded = messages.length > lastMessageCountRef.current;
+    lastMessageCountRef.current = messages.length;
+    
+    if (newMessageAdded && shouldAutoScrollRef.current) {
+      scrollToBottom();
+    }
+  }, [messages]);
+
+  // Handle streaming content updates more smoothly
+  useEffect(() => {
+    if (isStreaming && streamingContent && shouldAutoScrollRef.current) {
+      // Use requestAnimationFrame to throttle scroll updates during streaming
+      requestAnimationFrame(() => {
+        scrollToBottom(false); // Instant scroll for streaming to avoid lag
+      });
+    }
+  }, [streamingContent, isStreaming]);
+
+  // Scroll when thinking starts (for initial response)
+  useEffect(() => {
+    if (isThinking && shouldAutoScrollRef.current) {
+      scrollToBottom();
+    }
+  }, [isThinking]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+    <div 
+      ref={containerRef}
+      className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
+      onScroll={handleScroll}
+    >
       {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} />
+        <MessageBubble key={message.id} message={message} onSaveAsTemplate={saveAsTemplate} />
       ))}
       
       {/* Show tool confirmation if present */}
       {toolConfirmation && onToolConfirm && (
         <div className="flex justify-center">
-          <div className="max-w-2xl w-full">
+          <div className="w-full">
             <ToolConfirmationMessage 
               confirmationDetails={toolConfirmation}
               onConfirm={onToolConfirm}
@@ -200,8 +281,10 @@ export const MessageList: React.FC<MessageListProps> = ({
       {/* Show thinking indicator when AI is processing */}
       {isThinking && <TypingIndicator />}
       
-      {/* Show streaming content when AI is responding */}
-      {isStreaming && streamingContent && (
+      {/* Show streaming content when AI is responding - only if content is unique */}
+      {isStreaming && streamingContent && !messages.some(msg => 
+        msg.role === 'assistant' && msg.content === streamingContent
+      ) && (
         <MessageBubble
           message={{
             id: 'streaming',
@@ -210,6 +293,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             timestamp: new Date(),
           }}
           isStreaming
+          onSaveAsTemplate={saveAsTemplate}
         />
       )}
       
@@ -252,10 +336,10 @@ const ThinkingSection: React.FC<{ thinkingSections: string[] }> = ({ thinkingSec
 };
 
 // Component to display tool calls with expandable parameters
-const ToolCallDisplay: React.FC<{ toolCall: any }> = ({ toolCall }) => {
+const ToolCallDisplay: React.FC<{ toolCall: ToolCall }> = ({ toolCall }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const formatArguments = (args: any, truncate = true) => {
+  const formatArguments = (args: Record<string, unknown>, truncate = true) => {
     if (!args || typeof args !== 'object') return '';
     
     const entries = Object.entries(args);
@@ -275,15 +359,13 @@ const ToolCallDisplay: React.FC<{ toolCall: any }> = ({ toolCall }) => {
       return hasMore ? `${formatted}, ...` : formatted;
     } else {
       // Show full version
-      return entries.map(([key, value]) => {
-        return `${key}: ${JSON.stringify(value)}`;
-      }).join(', ');
+      return entries.map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join(', ');
     }
   };
 
   const hasComplexArgs = toolCall.arguments && Object.keys(toolCall.arguments).length > 3;
   const hasLongValues = toolCall.arguments && Object.values(toolCall.arguments).some(
-    (value: any) => typeof value === 'string' && value.length > 30
+    (value: unknown) => typeof value === 'string' && value.length > 30
   );
   const shouldShowExpand = hasComplexArgs || hasLongValues;
 
@@ -375,11 +457,12 @@ const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ t
               </button>
             )}
           </div>
-          {(Markdown as any)({ 
-            remarkPlugins: [remarkGfm], 
-            rehypePlugins: [rehypeHighlight], 
-            children: previewContent 
-          })}
+          <Markdown 
+            remarkPlugins={[remarkGfm]} 
+            rehypePlugins={[rehypeHighlight]}
+          >
+            {previewContent}
+          </Markdown>
         </div>
       </div>
     </div>
@@ -389,9 +472,11 @@ const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ t
 interface MessageBubbleProps {
   message: ChatMessage;
   isStreaming?: boolean;
+  onSaveAsTemplate?: (message: ChatMessage) => void;
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) => {
+
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onSaveAsTemplate }) => {
   // Check if this message is actually a tool response (regardless of role)
   const toolResponse = parseToolResponse(message);
   const isUser = message.role === 'user' && !toolResponse; // User only if not a tool response
@@ -402,7 +487,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
     return (
       <div className="flex justify-center">
         <div className="bg-muted rounded-lg px-3 py-2 text-sm text-muted-foreground max-w-2xl">
-          {(Markdown as any)({ remarkPlugins: [remarkGfm], rehypePlugins: [rehypeHighlight], children: message.content })}
+          <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+            {message.content}
+          </Markdown>
         </div>
       </div>
     );
@@ -413,7 +500,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
   }
 
   return (
-    <div className={cn("flex gap-3 max-w-4xl", isUser ? "ml-auto flex-row-reverse" : "")}>
+    <div className={cn("flex gap-3 max-w-4xl group", isUser ? "ml-auto flex-row-reverse" : "")}>
       {/* Avatar */}
       <div className={cn(
         "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
@@ -454,10 +541,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
                             "prose-pre:bg-muted prose-pre:text-foreground",
                             "prose-code:bg-muted prose-code:text-foreground prose-code:px-1 prose-code:rounded"
                           )}>
-                            {(Markdown as any)({
-                              remarkPlugins: [remarkGfm, remarkMath],
-                              rehypePlugins: [rehypeKatex, rehypeHighlight],
-                              components: {
+                            <Markdown
+                              remarkPlugins={[remarkGfm, remarkMath]}
+                              rehypePlugins={[rehypeKatex, rehypeHighlight]}
+                              components={{
                                 code(props: any) {
                                   const { inline, className, children, ...rest } = props;
                                   const match = /language-(\w+)/.exec(className || '');
@@ -474,9 +561,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
                                     </code>
                                   );
                                 },
-                              },
-                              children: mainContent
-                            })}
+                              }}
+                            >
+                              {mainContent}
+                            </Markdown>
                           </div>
                         )}
                       </>
@@ -490,10 +578,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
                         "prose-pre:bg-muted prose-pre:text-foreground",
                         "prose-code:bg-muted prose-code:text-foreground prose-code:px-1 prose-code:rounded"
                       )}>
-                        {(Markdown as any)({
-                          remarkPlugins: [remarkGfm, remarkMath],
-                          rehypePlugins: [rehypeKatex, rehypeHighlight],
-                          components: {
+                        <Markdown
+                          remarkPlugins={[remarkGfm, remarkMath]}
+                          rehypePlugins={[rehypeKatex, rehypeHighlight]}
+                          components={{
                             code(props: any) {
                               const { inline, className, children, ...rest } = props;
                               const match = /language-(\w+)/.exec(className || '');
@@ -510,9 +598,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
                                 </code>
                               );
                             },
-                          },
-                          children: message.content
-                        })}
+                          }}
+                        >
+                          {message.content}
+                        </Markdown>
                       </div>
                     );
                   }
@@ -530,15 +619,35 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming }) =
               </div>
             )}
 
-            {/* Timestamp */}
+            {/* Timestamp and Actions */}
             <div className={cn(
-              "text-xs mt-2 pt-2 border-t border-border/20 flex items-center gap-1",
+              "text-xs mt-2 pt-2 border-t border-border/20",
               isUser ? "text-primary-foreground/70" : "text-muted-foreground"
             )}>
-              <time dateTime={message.timestamp.toISOString()} title={format(message.timestamp, 'yyyy-MM-dd HH:mm:ss')}>
-                {format(message.timestamp, 'HH:mm')}
-              </time>
-              {isStreaming && <span className="animate-pulse">●</span>}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <time dateTime={message.timestamp.toISOString()} title={format(message.timestamp, 'yyyy-MM-dd HH:mm:ss')}>
+                    {format(message.timestamp, 'HH:mm')}
+                  </time>
+                  {isStreaming && <span className="animate-pulse">●</span>}
+                </div>
+                
+                {/* Save as Template Button - only for user messages */}
+                {isUser && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onSaveAsTemplate?.(message)}
+                    className={cn(
+                      "h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity",
+                      isUser ? "hover:bg-primary-foreground/20 text-primary-foreground/50 hover:text-primary-foreground" : "hover:bg-muted"
+                    )}
+                    title="Save as template"
+                  >
+                    <BookTemplate size={12} />
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
