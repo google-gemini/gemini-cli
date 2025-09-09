@@ -44,4 +44,23 @@ export class AcpFileSystemService implements FileSystemService {
       sessionId: this.sessionId,
     });
   }
+
+  async unlink(filePath: string): Promise<void> {
+    if (!this.capabilities.unlink) {
+      return this.fallback.unlink(filePath);
+    }
+    // TODO: acp.Client doesn't have an unlink method yet.
+    return this.fallback.unlink(filePath);
+  }
+
+  async mkdir(
+    dirPath: string,
+    options?: { recursive: boolean },
+  ): Promise<void> {
+    if (!this.capabilities.mkdir) {
+      return this.fallback.mkdir(dirPath, options);
+    }
+    // TODO: acp.Client doesn't have a mkdir method yet.
+    return this.fallback.mkdir(dirPath, options);
+  }
 }
