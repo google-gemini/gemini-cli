@@ -20,15 +20,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 'Get Nightly Version'
-        id: 'nightly_version'
-        run: |
-          VERSION_JSON=$(node scripts/get-release-version.js --type nightly)
-          echo "RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)" >> "${GITHUB_OUTPUT}"
-          echo "RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
-          echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
-          echo "PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
-
       - name: 'Set dry_run flag'
         id: 'vars'
         run: |
@@ -65,11 +56,3 @@ jobs:
           release_branch: 'main'
           previous_tag: ${{ steps.nightly_version.outputs.PREVIOUS_TAG }}
           dry_run: ${{ steps.vars.outputs.is_dry_run }}
-
-      - name: 'Create Nightly GitHub Release'
-        uses: ./.github/workflows/reusable/create-github-release.yml
-        with:
-          release_tag: ${{ steps.nightly_version.outputs.RELEASE_TAG }}
-          release_branch: 'main'
-          previous_tag: ${{ steps.nightly_version.outputs.PREVIOUS_TAG }}
-          dry_run: ${{ github.event.inputs.dry_run }}
