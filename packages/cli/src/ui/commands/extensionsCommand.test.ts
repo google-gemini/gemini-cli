@@ -145,8 +145,8 @@ describe('extensionsCommand', () => {
         {
           type: MessageType.INFO,
           text:
-            'Extension "ext-one" successfully updated: 1.0.0 → 1.0.1.\n' +
-            'Extension "ext-two" successfully updated: 2.0.0 → 2.0.1.',
+            'Extension "ext-one" successfully updated: 1.0.0 → 1.0.1. Restart gemini-cli to see the changes.\n' +
+            'Extension "ext-two" successfully updated: 2.0.0 → 2.0.1. Restart gemini-cli to see the changes.',
         },
         expect.any(Number),
       );
@@ -176,7 +176,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'Extension "ext-one" successfully updated: 1.0.0 → 1.0.1.',
+          text: 'Extension "ext-one" successfully updated: 1.0.0 → 1.0.1. Restart gemini-cli to see the changes.',
         },
         expect.any(Number),
       );
@@ -213,14 +213,14 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'Extension "ext-one" successfully updated: 1.0.0 → 1.0.1.',
+          text: 'Extension "ext-one" successfully updated: 1.0.0 → 1.0.1. Restart gemini-cli to see the changes.',
         },
         expect.any(Number),
       );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'Extension "ext-two" successfully updated: 2.0.0 → 2.0.1.',
+          text: 'Extension "ext-two" successfully updated: 2.0.0 → 2.0.1. Restart gemini-cli to see the changes.',
         },
         expect.any(Number),
       );

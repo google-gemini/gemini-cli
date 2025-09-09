@@ -47,7 +47,7 @@ async function listAction(context: CommandContext) {
 }
 
 const updateOutput = (info: ExtensionUpdateInfo) =>
-  `Extension "${info.name}" successfully updated: ${info.originalVersion} → ${info.updatedVersion}.`;
+  `Extension "${info.name}" successfully updated: ${info.originalVersion} → ${info.updatedVersion}. Restart gemini-cli to see the changes.`;
 
 async function updateAction(context: CommandContext, args: string) {
   const updateArgs = args.split(' ').filter((value) => value.length > 0);
