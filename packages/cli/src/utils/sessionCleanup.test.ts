@@ -405,6 +405,420 @@ describe('Session Cleanup', () => {
     });
   });
 
+  describe('Specific cleanup scenarios', () => {
+    it('should delete sessions that exceed the cutoff date', async () => {
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: {
+          sessionRetention: {
+            enabled: true,
+            maxAge: '7d', // Keep sessions for 7 days
+          },
+        },
+      };
+
+      // Create sessions with specific dates
+      const now = new Date();
+      const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+      const eightDaysAgo = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000);
+      const fifteenDaysAgo = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
+
+      const testSessions: SessionInfo[] = [
+        {
+          id: 'current',
+          file: 'session-current',
+          fileName: 'session-current.json',
+          startTime: now.toISOString(),
+          lastUpdated: now.toISOString(),
+          messageCount: 1,
+          displayName: 'Current',
+          firstUserMessage: 'Current',
+          isCurrentSession: true,
+          index: 1,
+        },
+        {
+          id: 'session5d',
+          file: 'session-5d',
+          fileName: 'session-5d.json',
+          startTime: fiveDaysAgo.toISOString(),
+          lastUpdated: fiveDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '5 days old',
+          firstUserMessage: '5 days',
+          isCurrentSession: false,
+          index: 2,
+        },
+        {
+          id: 'session8d',
+          file: 'session-8d',
+          fileName: 'session-8d.json',
+          startTime: eightDaysAgo.toISOString(),
+          lastUpdated: eightDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '8 days old',
+          firstUserMessage: '8 days',
+          isCurrentSession: false,
+          index: 3,
+        },
+        {
+          id: 'session15d',
+          file: 'session-15d',
+          fileName: 'session-15d.json',
+          startTime: fifteenDaysAgo.toISOString(),
+          lastUpdated: fifteenDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '15 days old',
+          firstUserMessage: '15 days',
+          isCurrentSession: false,
+          index: 4,
+        },
+      ];
+
+      mockGetSessionFiles.mockResolvedValue(testSessions);
+
+      // Mock successful file operations
+      mockFs.access.mockResolvedValue(undefined);
+      mockFs.readFile.mockResolvedValue(
+        JSON.stringify({
+          sessionId: 'test',
+          messages: [],
+          startTime: '2025-01-01T00:00:00Z',
+          lastUpdated: '2025-01-01T00:00:00Z',
+        }),
+      );
+      mockFs.unlink.mockResolvedValue(undefined);
+
+      const result = await cleanupExpiredSessions(config, settings);
+
+      // Should delete sessions older than 7 days (8d and 15d sessions)
+      expect(result.scanned).toBe(4);
+      expect(result.deleted).toBe(2);
+      expect(result.skipped).toBe(2); // Current + 5d session
+
+      // Verify which files were deleted
+      const unlinkCalls = mockFs.unlink.mock.calls.map((call) => call[0]);
+      expect(unlinkCalls).toContain(
+        path.join('/tmp/test-project', 'chats', 'session-8d.json'),
+      );
+      expect(unlinkCalls).toContain(
+        path.join('/tmp/test-project', 'chats', 'session-15d.json'),
+      );
+      expect(unlinkCalls).not.toContain(
+        path.join('/tmp/test-project', 'chats', 'session-5d.json'),
+      );
+    });
+
+    it('should NOT delete sessions within the cutoff date', async () => {
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: {
+          sessionRetention: {
+            enabled: true,
+            maxAge: '14d', // Keep sessions for 14 days
+          },
+        },
+      };
+
+      // Create sessions all within the retention period
+      const now = new Date();
+      const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const thirteenDaysAgo = new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000);
+
+      const testSessions: SessionInfo[] = [
+        {
+          id: 'current',
+          file: 'session-current',
+          fileName: 'session-current.json',
+          startTime: now.toISOString(),
+          lastUpdated: now.toISOString(),
+          messageCount: 1,
+          displayName: 'Current',
+          firstUserMessage: 'Current',
+          isCurrentSession: true,
+          index: 1,
+        },
+        {
+          id: 'session1d',
+          file: 'session-1d',
+          fileName: 'session-1d.json',
+          startTime: oneDayAgo.toISOString(),
+          lastUpdated: oneDayAgo.toISOString(),
+          messageCount: 1,
+          displayName: '1 day old',
+          firstUserMessage: '1 day',
+          isCurrentSession: false,
+          index: 2,
+        },
+        {
+          id: 'session7d',
+          file: 'session-7d',
+          fileName: 'session-7d.json',
+          startTime: sevenDaysAgo.toISOString(),
+          lastUpdated: sevenDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '7 days old',
+          firstUserMessage: '7 days',
+          isCurrentSession: false,
+          index: 3,
+        },
+        {
+          id: 'session13d',
+          file: 'session-13d',
+          fileName: 'session-13d.json',
+          startTime: thirteenDaysAgo.toISOString(),
+          lastUpdated: thirteenDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '13 days old',
+          firstUserMessage: '13 days',
+          isCurrentSession: false,
+          index: 4,
+        },
+      ];
+
+      mockGetSessionFiles.mockResolvedValue(testSessions);
+
+      // Mock successful file operations
+      mockFs.access.mockResolvedValue(undefined);
+      mockFs.readFile.mockResolvedValue(
+        JSON.stringify({
+          sessionId: 'test',
+          messages: [],
+          startTime: '2025-01-01T00:00:00Z',
+          lastUpdated: '2025-01-01T00:00:00Z',
+        }),
+      );
+      mockFs.unlink.mockResolvedValue(undefined);
+
+      const result = await cleanupExpiredSessions(config, settings);
+
+      // Should NOT delete any sessions as all are within 14 days
+      expect(result.scanned).toBe(4);
+      expect(result.deleted).toBe(0);
+      expect(result.skipped).toBe(4);
+      expect(result.errors).toHaveLength(0);
+
+      // Verify no files were deleted
+      expect(mockFs.unlink).not.toHaveBeenCalled();
+    });
+
+    it('should keep N most recent deletable sessions', async () => {
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: {
+          sessionRetention: {
+            enabled: true,
+            maxCount: 3, // Keep only 3 most recent sessions
+          },
+        },
+      };
+
+      // Create 6 sessions with different timestamps
+      const now = new Date();
+      const sessions: SessionInfo[] = [
+        {
+          id: 'current',
+          file: 'session-current',
+          fileName: 'session-current.json',
+          startTime: now.toISOString(),
+          lastUpdated: now.toISOString(),
+          messageCount: 1,
+          displayName: 'Current (newest)',
+          firstUserMessage: 'Current',
+          isCurrentSession: true,
+          index: 1,
+        },
+      ];
+
+      // Add 5 more sessions with decreasing timestamps
+      for (let i = 1; i <= 5; i++) {
+        const daysAgo = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        sessions.push({
+          id: `session${i}`,
+          file: `session-${i}d`,
+          fileName: `session-${i}d.json`,
+          startTime: daysAgo.toISOString(),
+          lastUpdated: daysAgo.toISOString(),
+          messageCount: 1,
+          displayName: `${i} days old`,
+          firstUserMessage: `${i} days`,
+          isCurrentSession: false,
+          index: i + 1,
+        });
+      }
+
+      mockGetSessionFiles.mockResolvedValue(sessions);
+
+      // Mock successful file operations
+      mockFs.access.mockResolvedValue(undefined);
+      mockFs.readFile.mockResolvedValue(
+        JSON.stringify({
+          sessionId: 'test',
+          messages: [],
+          startTime: '2025-01-01T00:00:00Z',
+          lastUpdated: '2025-01-01T00:00:00Z',
+        }),
+      );
+      mockFs.unlink.mockResolvedValue(undefined);
+
+      const result = await cleanupExpiredSessions(config, settings);
+
+      // Should keep current + 2 most recent (1d and 2d), delete 3d, 4d, 5d
+      expect(result.scanned).toBe(6);
+      expect(result.deleted).toBe(3);
+      expect(result.skipped).toBe(3);
+
+      // Verify which files were deleted (should be the 3 oldest)
+      const unlinkCalls = mockFs.unlink.mock.calls.map((call) => call[0]);
+      expect(unlinkCalls).toContain(
+        path.join('/tmp/test-project', 'chats', 'session-3d.json'),
+      );
+      expect(unlinkCalls).toContain(
+        path.join('/tmp/test-project', 'chats', 'session-4d.json'),
+      );
+      expect(unlinkCalls).toContain(
+        path.join('/tmp/test-project', 'chats', 'session-5d.json'),
+      );
+
+      // Verify which files were NOT deleted
+      expect(unlinkCalls).not.toContain(
+        path.join('/tmp/test-project', 'chats', 'session-current.json'),
+      );
+      expect(unlinkCalls).not.toContain(
+        path.join('/tmp/test-project', 'chats', 'session-1d.json'),
+      );
+      expect(unlinkCalls).not.toContain(
+        path.join('/tmp/test-project', 'chats', 'session-2d.json'),
+      );
+    });
+
+    it('should handle combined maxAge and maxCount retention (most restrictive wins)', async () => {
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: {
+          sessionRetention: {
+            enabled: true,
+            maxAge: '10d', // Keep sessions for 10 days
+            maxCount: 2, // But also keep only 2 most recent
+          },
+        },
+      };
+
+      // Create sessions where maxCount is more restrictive
+      const now = new Date();
+      const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+      const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const twelveDaysAgo = new Date(now.getTime() - 12 * 24 * 60 * 60 * 1000);
+
+      const testSessions: SessionInfo[] = [
+        {
+          id: 'current',
+          file: 'session-current',
+          fileName: 'session-current.json',
+          startTime: now.toISOString(),
+          lastUpdated: now.toISOString(),
+          messageCount: 1,
+          displayName: 'Current',
+          firstUserMessage: 'Current',
+          isCurrentSession: true,
+          index: 1,
+        },
+        {
+          id: 'session3d',
+          file: 'session-3d',
+          fileName: 'session-3d.json',
+          startTime: threeDaysAgo.toISOString(),
+          lastUpdated: threeDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '3 days old',
+          firstUserMessage: '3 days',
+          isCurrentSession: false,
+          index: 2,
+        },
+        {
+          id: 'session5d',
+          file: 'session-5d',
+          fileName: 'session-5d.json',
+          startTime: fiveDaysAgo.toISOString(),
+          lastUpdated: fiveDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '5 days old',
+          firstUserMessage: '5 days',
+          isCurrentSession: false,
+          index: 3,
+        },
+        {
+          id: 'session7d',
+          file: 'session-7d',
+          fileName: 'session-7d.json',
+          startTime: sevenDaysAgo.toISOString(),
+          lastUpdated: sevenDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '7 days old',
+          firstUserMessage: '7 days',
+          isCurrentSession: false,
+          index: 4,
+        },
+        {
+          id: 'session12d',
+          file: 'session-12d',
+          fileName: 'session-12d.json',
+          startTime: twelveDaysAgo.toISOString(),
+          lastUpdated: twelveDaysAgo.toISOString(),
+          messageCount: 1,
+          displayName: '12 days old',
+          firstUserMessage: '12 days',
+          isCurrentSession: false,
+          index: 5,
+        },
+      ];
+
+      mockGetSessionFiles.mockResolvedValue(testSessions);
+
+      // Mock successful file operations
+      mockFs.access.mockResolvedValue(undefined);
+      mockFs.readFile.mockResolvedValue(
+        JSON.stringify({
+          sessionId: 'test',
+          messages: [],
+          startTime: '2025-01-01T00:00:00Z',
+          lastUpdated: '2025-01-01T00:00:00Z',
+        }),
+      );
+      mockFs.unlink.mockResolvedValue(undefined);
+
+      const result = await cleanupExpiredSessions(config, settings);
+
+      // Should delete:
+      // - session12d (exceeds maxAge of 10d)
+      // - session7d and session5d (exceed maxCount of 2, keeping current + 3d)
+      expect(result.scanned).toBe(5);
+      expect(result.deleted).toBe(3);
+      expect(result.skipped).toBe(2); // Current + 3d session
+
+      // Verify which files were deleted
+      const unlinkCalls = mockFs.unlink.mock.calls.map((call) => call[0]);
+      expect(unlinkCalls).toContain(
+        path.join('/tmp/test-project', 'chats', 'session-5d.json'),
+      );
+      expect(unlinkCalls).toContain(
+        path.join('/tmp/test-project', 'chats', 'session-7d.json'),
+      );
+      expect(unlinkCalls).toContain(
+        path.join('/tmp/test-project', 'chats', 'session-12d.json'),
+      );
+
+      // Verify which files were NOT deleted
+      expect(unlinkCalls).not.toContain(
+        path.join('/tmp/test-project', 'chats', 'session-current.json'),
+      );
+      expect(unlinkCalls).not.toContain(
+        path.join('/tmp/test-project', 'chats', 'session-3d.json'),
+      );
+    });
+  });
+
   describe('Configuration validation', () => {
     it('should require either maxAge or maxCount', async () => {
       const config = createMockConfig({
