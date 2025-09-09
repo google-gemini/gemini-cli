@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
 
 interface TableRendererProps {
@@ -89,7 +89,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     return (
       <Text>
         {isHeader ? (
-          <Text bold color={Colors.AccentCyan}>
+          <Text bold color={theme.text.link}>
             <RenderInline text={cellContent} />
           </Text>
         ) : (
