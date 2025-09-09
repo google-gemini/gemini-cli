@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
-import { render, Box, Text } from 'ink';
-import Spinner from 'ink-spinner';
-import { AppWrapper } from './ui/App.js';
+import React from 'react';
+import { render } from 'ink';
+import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
@@ -36,12 +35,12 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
-  logIdeConnection,
-  IdeConnectionEvent,
-  IdeConnectionType,
-  FatalConfigError,
   uiTelemetryService,
 } from '@google/gemini-cli-core';
+import {
+  initializeApp,
+  type InitializationResult,
+} from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
@@ -51,6 +50,10 @@ import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { writeFileSync } from 'node:fs';
+import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
+import { VimModeProvider } from './ui/contexts/VimModeContext.js';
+import { KeypressProvider } from './ui/contexts/KeypressContext.js';
+import { useKittyKeyboardProtocol } from './ui/hooks/useKittyKeyboardProtocol.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -113,38 +116,6 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   process.exit(0);
 }
 
-const InitializingComponent = ({ initialTotal }: { initialTotal: number }) => {
-  const [total, setTotal] = useState(initialTotal);
-  const [connected, setConnected] = useState(0);
-
-  useEffect(() => {
-    const onStart = ({ count }: { count: number }) => setTotal(count);
-    const onChange = () => {
-      setConnected((val) => val + 1);
-    };
-
-    appEvents.on('mcp-servers-discovery-start', onStart);
-    appEvents.on('mcp-server-connected', onChange);
-    appEvents.on('mcp-server-error', onChange);
-
-    return () => {
-      appEvents.off('mcp-servers-discovery-start', onStart);
-      appEvents.off('mcp-server-connected', onChange);
-      appEvents.off('mcp-server-error', onChange);
-    };
-  }, []);
-
-  const message = `Connecting to MCP servers... (${connected}/${total})`;
-
-  return (
-    <Box>
-      <Text>
-        <Spinner /> {message}
-      </Text>
-    </Box>
-  );
-};
-
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
 
 export function setupUnhandledRejectionHandler() {
@@ -173,24 +144,46 @@ export async function startInteractiveUI(
   config: Config,
   settings: LoadedSettings,
   startupWarnings: string[],
-  workspaceRoot: string,
+  workspaceRoot: string = process.cwd(),
+  initializationResult: InitializationResult,
 ) {
   const version = await getCliVersion();
-  // Detect and enable Kitty keyboard protocol once at startup
-  await detectAndEnableKittyProtocol();
   setWindowTitle(basename(workspaceRoot), settings);
+
+  // Create wrapper component to use hooks inside render
+  const AppWrapper = () => {
+    const kittyProtocolStatus = useKittyKeyboardProtocol();
+    return (
+      <SettingsContext.Provider value={settings}>
+        <KeypressProvider
+          kittyProtocolEnabled={kittyProtocolStatus.enabled}
+          config={config}
+          debugKeystrokeLogging={settings.merged.general?.debugKeystrokeLogging}
+        >
+          <SessionStatsProvider>
+            <VimModeProvider settings={settings}>
+              <AppContainer
+                config={config}
+                settings={settings}
+                startupWarnings={startupWarnings}
+                version={version}
+                initializationResult={initializationResult}
+              />
+            </VimModeProvider>
+          </SessionStatsProvider>
+        </KeypressProvider>
+      </SettingsContext.Provider>
+    );
+  };
+
   const instance = render(
     <React.StrictMode>
-      <SettingsContext.Provider value={settings}>
-        <AppWrapper
-          config={config}
-          settings={settings}
-          startupWarnings={startupWarnings}
-          version={version}
-        />
-      </SettingsContext.Provider>
+      <AppWrapper />
     </React.StrictMode>,
-    { exitOnCtrlC: false, isScreenReaderEnabled: config.getScreenReader() },
+    {
+      exitOnCtrlC: false,
+      isScreenReaderEnabled: config.getScreenReader(),
+    },
   );
 
   checkForUpdates()
@@ -209,21 +202,12 @@ export async function startInteractiveUI(
 
 export async function main() {
   setupUnhandledRejectionHandler();
-  const workspaceRoot = process.cwd();
-  const settings = loadSettings(workspaceRoot);
+  const settings = loadSettings();
 
   await cleanupCheckpoints();
-  if (settings.errors.length > 0) {
-    const errorMessages = settings.errors.map(
-      (error) => `Error in ${error.path}: ${error.message}`,
-    );
-    throw new FatalConfigError(
-      `${errorMessages.join('\n')}\nPlease fix the configuration file(s) and try again.`,
-    );
-  }
 
   const argv = await parseArguments(settings.merged);
-  const extensions = loadExtensions(workspaceRoot);
+  const extensions = loadExtensions();
   const config = await loadCliConfig(
     settings.merged,
     extensions,
@@ -231,6 +215,24 @@ export async function main() {
     argv,
   );
 
+  const wasRaw = process.stdin.isRaw;
+  let kittyProtocolDetectionComplete: Promise<boolean> | undefined;
+  if (config.isInteractive() && !wasRaw) {
+    // Set this as early as possible to avoid spurious characters from
+    // input showing up in the output.
+    process.stdin.setRawMode(true);
+
+    // This cleanup isn't strictly needed but may help in certain situations.
+    process.on('SIGTERM', () => {
+      process.stdin.setRawMode(wasRaw);
+    });
+    process.on('SIGINT', () => {
+      process.stdin.setRawMode(wasRaw);
+    });
+
+    // Detect and enable Kitty keyboard protocol once at startup.
+    kittyProtocolDetectionComplete = detectAndEnableKittyProtocol();
+  }
   if (argv.sessionSummary) {
     registerCleanup(() => {
       const metrics = uiTelemetryService.getMetrics();
@@ -280,40 +282,18 @@ export async function main() {
 
   setMaxSizedBoxDebugging(config.getDebugMode());
 
-  const mcpServers = config.getMcpServers();
-  const mcpServersCount = mcpServers ? Object.keys(mcpServers).length : 0;
-
-  let spinnerInstance;
-  if (config.isInteractive() && mcpServersCount > 0) {
-    spinnerInstance = render(
-      <InitializingComponent initialTotal={mcpServersCount} />,
-    );
-  }
-
-  await config.initialize();
-
-  if (spinnerInstance) {
-    // Small UX detail to show the completion message for a bit before unmounting.
-    await new Promise((f) => setTimeout(f, 100));
-    spinnerInstance.clear();
-    spinnerInstance.unmount();
-  }
-
-  if (config.getIdeMode()) {
-    await config.getIdeClient().connect();
-    logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
-  }
-
   // Load custom themes from settings
   themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
 
   if (settings.merged.ui?.theme) {
     if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
-      // The useThemeCommand hook in App.tsx will handle opening the dialog.
+      // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
       console.warn(`Warning: Theme "${settings.merged.ui?.theme}" not found.`);
     }
   }
+
+  const initializationResult = await initializeApp(config, settings);
 
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
@@ -398,14 +378,25 @@ export async function main() {
   let input = config.getQuestion();
   const startupWarnings = [
     ...(await getStartupWarnings()),
-    ...(await getUserStartupWarnings(workspaceRoot)),
+    ...(await getUserStartupWarnings()),
   ];
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {
-    await startInteractiveUI(config, settings, startupWarnings, workspaceRoot);
+    // Need kitty detection to be complete before we can start the interactive UI.
+    await kittyProtocolDetectionComplete;
+    await startInteractiveUI(
+      config,
+      settings,
+      startupWarnings,
+      process.cwd(),
+      initializationResult,
+    );
     return;
   }
+
+  await config.initialize();
+
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
   if (!process.stdin.isTTY) {
@@ -435,6 +426,7 @@ export async function main() {
     settings.merged.security?.auth?.selectedType,
     settings.merged.security?.auth?.useExternal,
     config,
+    settings,
   );
 
   if (config.getDebugMode()) {
