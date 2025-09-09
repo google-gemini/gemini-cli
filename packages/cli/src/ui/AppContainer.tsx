@@ -134,6 +134,8 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
 
+  const [isConfigInitialized, setConfigInitialized] = useState(false);
+
   // Auto-accept indicator
   const showAutoAcceptIndicator = useAutoAcceptIndicator({
     config,
@@ -157,16 +159,22 @@ export const AppContainer = (props: AppContainerProps) => {
   const staticExtraHeight = 3;
 
   useEffect(() => {
+    (async () => {
+      // Note: the program will not work if this fails so let errors be
+      // handled by the global catch.
+      await config.initialize();
+      setConfigInitialized(true);
+    })();
     registerCleanup(async () => {
       const ideClient = await IdeClient.getInstance();
       await ideClient.disconnect();
     });
   }, [config]);
 
-  useEffect(() => {
-    const cleanup = setUpdateHandler(historyManager.addItem, setUpdateInfo);
-    return cleanup;
-  }, [historyManager.addItem]);
+  useEffect(
+    () => setUpdateHandler(historyManager.addItem, setUpdateInfo),
+    [historyManager.addItem],
+  );
 
   // Watch for model changes (e.g., from Flash fallback)
   useEffect(() => {
@@ -517,6 +525,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const { messageQueue, addMessage, clearQueue, getQueuedMessagesText } =
     useMessageQueue({
+      isConfigInitialized,
       streamingState,
       submitQuery,
     });
@@ -612,6 +621,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   useEffect(() => {
     if (
       initialPrompt &&
+      isConfigInitialized &&
       !initialPromptSubmitted.current &&
       !isAuthenticating &&
       !isAuthDialogOpen &&
@@ -625,6 +635,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     }
   }, [
     initialPrompt,
+    isConfigInitialized,
     handleFinalSubmit,
     isAuthenticating,
     isAuthDialogOpen,
@@ -668,7 +679,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
-    useFolderTrust(settings, config, setIsTrustedFolder, refreshStatic);
+    useFolderTrust(settings, setIsTrustedFolder, refreshStatic);
   const { needsRestart: ideNeedsRestart } = useIdeTrustListener();
   const isInitialMount = useRef(true);
 
@@ -926,6 +937,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isThemeDialogOpen,
       themeError,
       isAuthenticating,
+      isConfigInitialized,
       authError,
       isAuthDialogOpen,
       editorError,
@@ -997,6 +1009,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isThemeDialogOpen,
       themeError,
       isAuthenticating,
+      isConfigInitialized,
       authError,
       isAuthDialogOpen,
       editorError,
