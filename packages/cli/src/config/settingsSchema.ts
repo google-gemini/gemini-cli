@@ -854,7 +854,7 @@ const SETTINGS_SCHEMA = {
         label: 'Auto Configure Max Old Space Size',
         category: 'Advanced',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Automatically configure Node.js memory limits',
         showInDialog: false,
       },

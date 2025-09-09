@@ -36,6 +36,9 @@ This guide provides solutions to common issues and debugging tips, including top
 
     Refer to [Gemini CLI Configuration](./cli/configuration.md) for more details.
 
+- **Q: Why is Gemini CLI using so much memory?**
+  - A: Gemini CLI automatically configures its memory usage to optimize performance and prevent out-of-memory errors. This feature is enabled by default. If you are experiencing issues with memory consumption, you can disable this feature by setting `advanced.autoConfigureMemory` to `false` in your `settings.json` file. See [Configuration: advanced.autoConfigureMemory](./cli/configuration.md#advanced) for more details.
+
 - **Q: Why don't I see cached token counts in my stats output?**
   - A: Cached token information is only displayed when cached tokens are being used. This feature is available for API key users (Gemini API key or Google Cloud Vertex AI) but not for OAuth users (such as Google Personal/Enterprise accounts like Google Gmail or Google Workspace, respectively). This is because the Gemini Code Assist API does not support cached content creation. You can still view your total token usage using the `/stats` command in Gemini CLI.
 

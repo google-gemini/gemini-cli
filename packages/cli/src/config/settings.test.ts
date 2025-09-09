@@ -121,6 +121,23 @@ describe('Settings Loading and Merging', () => {
   });
 
   describe('loadSettings', () => {
+    it('should have advanced.autoConfigureMemory as true by default', () => {
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const userSettingsContent = { advanced: { autoConfigureMemory: true } };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.advanced?.autoConfigureMemory).toBe(true);
+    });
+
     it('should load empty settings if no files exist', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.system.settings).toEqual({});

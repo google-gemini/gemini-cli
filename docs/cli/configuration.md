@@ -258,8 +258,8 @@ Settings are organized into categories. All settings should be placed within the
 #### `advanced`
 
 - **`advanced.autoConfigureMemory`** (boolean):
-  - **Description:** Automatically configure Node.js memory limits.
-  - **Default:** `false`
+  - **Description:** Automatically configure Node.js memory limits. This is enabled by default to reduce out-of-memory errors.
+  - **Default:** `true`
 
 - **`advanced.dnsResolutionOrder`** (string):
   - **Description:** The DNS resolution order.

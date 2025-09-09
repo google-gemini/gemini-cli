@@ -19,6 +19,10 @@ import {
   METRIC_INVALID_CHUNK_COUNT,
   METRIC_CONTENT_RETRY_COUNT,
   METRIC_CONTENT_RETRY_FAILURE_COUNT,
+  METRIC_MAX_OLD_SPACE_SIZE,
+  METRIC_TOTAL_HEAP_SIZE,
+  METRIC_USED_HEAP_SIZE,
+  METRIC_OOM_ERROR_COUNT,
 } from './constants.js';
 import type { Config } from '../config/config.js';
 
@@ -39,6 +43,10 @@ let chatCompressionCounter: Counter | undefined;
 let invalidChunkCounter: Counter | undefined;
 let contentRetryCounter: Counter | undefined;
 let contentRetryFailureCounter: Counter | undefined;
+let maxOldSpaceSizeHistogram: Histogram | undefined;
+let totalHeapSizeHistogram: Histogram | undefined;
+let usedHeapSizeHistogram: Histogram | undefined;
+let oomErrorCounter: Counter | undefined;
 let isMetricsInitialized = false;
 
 function getCommonAttributes(config: Config): Attributes {
@@ -110,6 +118,25 @@ export function initializeMetrics(config: Config): void {
       valueType: ValueType.INT,
     },
   );
+  maxOldSpaceSizeHistogram = meter.createHistogram(METRIC_MAX_OLD_SPACE_SIZE, {
+    description: 'The value of the --max-old-space-size flag.',
+    unit: 'By',
+    valueType: ValueType.INT,
+  });
+  totalHeapSizeHistogram = meter.createHistogram(METRIC_TOTAL_HEAP_SIZE, {
+    description: 'The total heap size of the Node.js process.',
+    unit: 'By',
+    valueType: ValueType.INT,
+  });
+  usedHeapSizeHistogram = meter.createHistogram(METRIC_USED_HEAP_SIZE, {
+    description: 'The used heap size of the Node.js process.',
+    unit: 'By',
+    valueType: ValueType.INT,
+  });
+  oomErrorCounter = meter.createCounter(METRIC_OOM_ERROR_COUNT, {
+    description: 'An event that is logged when an OOM error occurs.',
+    valueType: ValueType.INT,
+  });
 
   const sessionCounter = meter.createCounter(METRIC_SESSION_COUNT, {
     description: 'Count of CLI sessions started.',
@@ -266,4 +293,32 @@ export function recordContentRetry(config: Config): void {
 export function recordContentRetryFailure(config: Config): void {
   if (!contentRetryFailureCounter || !isMetricsInitialized) return;
   contentRetryFailureCounter.add(1, getCommonAttributes(config));
+}
+
+export function recordMemoryMetrics(
+  config: Config,
+  maxOldSpaceSize: number,
+  totalHeapSize: number,
+  usedHeapSize: number,
+): void {
+  if (
+    !maxOldSpaceSizeHistogram ||
+    !totalHeapSizeHistogram ||
+    !usedHeapSizeHistogram ||
+    !isMetricsInitialized
+  )
+    return;
+
+  const metricAttributes: Attributes = {
+    ...getCommonAttributes(config),
+  };
+
+  maxOldSpaceSizeHistogram.record(maxOldSpaceSize, metricAttributes);
+  totalHeapSizeHistogram.record(totalHeapSize, metricAttributes);
+  usedHeapSizeHistogram.record(usedHeapSize, metricAttributes);
+}
+
+export function recordOomError(config: Config): void {
+  if (!oomErrorCounter || !isMetricsInitialized) return;
+  oomErrorCounter.add(1, getCommonAttributes(config));
 }

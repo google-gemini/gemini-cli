@@ -37,3 +37,7 @@ export const METRIC_INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
 export const METRIC_CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
 export const METRIC_CONTENT_RETRY_FAILURE_COUNT =
   'gemini_cli.chat.content_retry_failure.count';
+export const METRIC_MAX_OLD_SPACE_SIZE = 'gemini_cli.memory.max_old_space_size';
+export const METRIC_TOTAL_HEAP_SIZE = 'gemini_cli.memory.total_heap_size';
+export const METRIC_USED_HEAP_SIZE = 'gemini_cli.memory.used_heap_size';
+export const METRIC_OOM_ERROR_COUNT = 'gemini_cli.memory.oom_error_count';
