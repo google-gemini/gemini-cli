@@ -49,9 +49,9 @@ export interface GenerateJsonOptions {
 }
 
 /**
- * A service dedicated to stateless, utility-focused LLM calls.
+ * A client dedicated to stateless, utility-focused LLM calls.
  */
-export class LlmUtilityService {
+export class BaseLlmClient {
   // Default configuration for utility tasks
   private readonly defaultUtilityConfig: GenerateContentConfig = {
     temperature: 0,

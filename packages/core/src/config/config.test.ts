@@ -122,9 +122,9 @@ vi.mock('../ide/ide-client.js', () => ({
   },
 }));
 
-import { LlmUtilityService } from '../core/llmUtilityService.js';
+import { BaseLlmClient } from '../core/baseLlmClient.js';
 
-vi.mock('../core/llmUtilityService.js');
+vi.mock('../core/baseLlmClient.js');
 
 describe('Server Config (config.ts)', () => {
   const MODEL = 'gemini-pro';
@@ -779,7 +779,7 @@ describe('setApprovalMode with folder trust', () => {
   });
 });
 
-describe('LlmUtilityService Lifecycle', () => {
+describe('BaseLlmClient Lifecycle', () => {
   const MODEL = 'gemini-pro';
   const SANDBOX: SandboxConfig = {
     command: 'docker',
@@ -808,14 +808,14 @@ describe('LlmUtilityService Lifecycle', () => {
     usageStatisticsEnabled: false,
   };
 
-  it('should throw an error if getLlmUtilityService is called before refreshAuth', () => {
+  it('should throw an error if getBaseLlmClient is called before refreshAuth', () => {
     const config = new Config(baseParams);
-    expect(() => config.getLlmUtilityService()).toThrow(
-      'LlmUtilityService not initialized. Ensure authentication has occurred and GeminiClient is ready.',
+    expect(() => config.getBaseLlmClient()).toThrow(
+      'BaseLlmClient not initialized. Ensure authentication has occurred and ContentGenerator is ready.',
     );
   });
 
-  it('should successfully initialize LlmUtilityService after refreshAuth is called', async () => {
+  it('should successfully initialize BaseLlmClient after refreshAuth is called', async () => {
     const config = new Config(baseParams);
     const authType = AuthType.USE_GEMINI;
     const mockContentConfig = { model: 'gemini-flash', apiKey: 'test-key' };
@@ -825,9 +825,9 @@ describe('LlmUtilityService Lifecycle', () => {
     await config.refreshAuth(authType);
 
     // Should not throw
-    const llmService = config.getLlmUtilityService();
+    const llmService = config.getBaseLlmClient();
     expect(llmService).toBeDefined();
-    expect(LlmUtilityService).toHaveBeenCalledWith(
+    expect(BaseLlmClient).toHaveBeenCalledWith(
       config.getContentGenerator(),
       config,
     );

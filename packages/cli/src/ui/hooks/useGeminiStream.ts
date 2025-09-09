@@ -706,12 +706,12 @@ export const useGeminiStream = (
       if (!prompt_id) {
         prompt_id = config.getSessionId() + '########' + getPromptCount();
       }
-      return promptIdContext.run({ promptId: prompt_id! }, async () => {
+      return promptIdContext.run(prompt_id, async () => {
         const { queryToSend, shouldProceed } = await prepareQueryForGemini(
           query,
           userMessageTimestamp,
           abortSignal,
-          prompt_id!,
+          prompt_id,
         );
 
         if (!shouldProceed || queryToSend === null) {
@@ -730,7 +730,7 @@ export const useGeminiStream = (
           const stream = geminiClient.sendMessageStream(
             queryToSend,
             abortSignal,
-            prompt_id!,
+            prompt_id,
           );
           const processingStatus = await processGeminiStreamEvents(
             stream,

@@ -25,7 +25,7 @@ export async function runNonInteractive(
   input: string,
   prompt_id: string,
 ): Promise<void> {
-  return promptIdContext.run({ promptId: prompt_id }, async () => {
+  return promptIdContext.run(prompt_id, async () => {
     const consolePatcher = new ConsolePatcher({
       stderr: true,
       debugMode: config.getDebugMode(),

@@ -15,10 +15,7 @@ import {
 } from 'vitest';
 
 import type { GenerateContentResponse } from '@google/genai';
-import {
-  LlmUtilityService,
-  type GenerateJsonOptions,
-} from './llmUtilityService.js';
+import { BaseLlmClient, type GenerateJsonOptions } from './baseLlmClient.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { Config } from '../config/config.js';
 import { AuthType } from './contentGenerator.js';
@@ -61,8 +58,8 @@ const createMockResponse = (text: string): GenerateContentResponse =>
     candidates: [{ content: { role: 'model', parts: [{ text }] }, index: 0 }],
   }) as GenerateContentResponse;
 
-describe('LlmUtilityService', () => {
-  let service: LlmUtilityService;
+describe('BaseLlmClient', () => {
+  let client: BaseLlmClient;
   let abortController: AbortController;
   let defaultOptions: GenerateJsonOptions;
 
@@ -72,7 +69,7 @@ describe('LlmUtilityService', () => {
     vi.mocked(getErrorMessage).mockImplementation((e) =>
       e instanceof Error ? e.message : String(e),
     );
-    service = new LlmUtilityService(mockContentGenerator, mockConfig);
+    client = new BaseLlmClient(mockContentGenerator, mockConfig);
     abortController = new AbortController();
     defaultOptions = {
       contents: [{ role: 'user', parts: [{ text: 'Give me a color.' }] }],
@@ -92,7 +89,7 @@ describe('LlmUtilityService', () => {
       const mockResponse = createMockResponse('{"color": "blue"}');
       mockGenerateContent.mockResolvedValue(mockResponse);
 
-      const result = await service.generateJson(defaultOptions);
+      const result = await client.generateJson(defaultOptions);
 
       expect(result).toEqual({ color: 'blue' });
 
@@ -127,7 +124,7 @@ describe('LlmUtilityService', () => {
         config: { temperature: 0.8, topK: 10 },
       };
 
-      await service.generateJson(options);
+      await client.generateJson(options);
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -151,7 +148,7 @@ describe('LlmUtilityService', () => {
         systemInstruction,
       };
 
-      await service.generateJson(options);
+      await client.generateJson(options);
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -173,7 +170,7 @@ describe('LlmUtilityService', () => {
         promptId: customPromptId,
       };
 
-      await service.generateJson(options);
+      await client.generateJson(options);
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.any(Object),
@@ -189,7 +186,7 @@ describe('LlmUtilityService', () => {
         createMockResponse(malformedResponse),
       );
 
-      const result = await service.generateJson(defaultOptions);
+      const result = await client.generateJson(defaultOptions);
 
       expect(result).toEqual({ color: 'purple' });
       expect(logMalformedJsonResponse).toHaveBeenCalledTimes(1);
@@ -209,7 +206,7 @@ describe('LlmUtilityService', () => {
         createMockResponse(responseWithWhitespace),
       );
 
-      const result = await service.generateJson(defaultOptions);
+      const result = await client.generateJson(defaultOptions);
 
       expect(result).toEqual({ color: 'orange' });
       expect(logMalformedJsonResponse).not.toHaveBeenCalled();
@@ -220,8 +217,8 @@ describe('LlmUtilityService', () => {
     it('should throw and report error for empty response', async () => {
       mockGenerateContent.mockResolvedValue(createMockResponse(''));
 
-      // The final error message includes the prefix added by the service's outer catch block.
-      await expect(service.generateJson(defaultOptions)).rejects.toThrow(
+      // The final error message includes the prefix added by the client's outer catch block.
+      await expect(client.generateJson(defaultOptions)).rejects.toThrow(
         'Failed to generate JSON content: API returned an empty response for generateJson.',
       );
 
@@ -239,7 +236,7 @@ describe('LlmUtilityService', () => {
       const invalidJson = '{"color": "blue"'; // missing closing brace
       mockGenerateContent.mockResolvedValue(createMockResponse(invalidJson));
 
-      await expect(service.generateJson(defaultOptions)).rejects.toThrow(
+      await expect(client.generateJson(defaultOptions)).rejects.toThrow(
         /^Failed to generate JSON content: Failed to parse API response as JSON:/,
       );
 
@@ -257,7 +254,7 @@ describe('LlmUtilityService', () => {
       // Simulate the generator failing
       mockGenerateContent.mockRejectedValue(apiError);
 
-      await expect(service.generateJson(defaultOptions)).rejects.toThrow(
+      await expect(client.generateJson(defaultOptions)).rejects.toThrow(
         'Failed to generate JSON content: Service Unavailable (503)',
       );
 
@@ -285,7 +282,7 @@ describe('LlmUtilityService', () => {
         abortSignal: abortController.signal,
       };
 
-      await expect(service.generateJson(options)).rejects.toThrow(abortError);
+      await expect(client.generateJson(options)).rejects.toThrow(abortError);
 
       // Crucially, it should not report a cancellation as an application error
       expect(reportError).not.toHaveBeenCalled();

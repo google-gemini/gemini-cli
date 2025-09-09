@@ -11,13 +11,13 @@ import {
   type SearchReplaceEdit,
 } from './llm-edit-fixer.js';
 import { promptIdContext } from './promptIdContext.js';
-import type { LlmUtilityService } from '../core/llmUtilityService.js';
+import type { BaseLlmClient } from '../core/baseLlmClient.js';
 
-// Mock the LlmUtilityService
+// Mock the BaseLlmClient
 const mockGenerateJson = vi.fn();
-const mockLlmUtilityService = {
+const mockBaseLlmClient = {
   generateJson: mockGenerateJson,
-} as unknown as LlmUtilityService;
+} as unknown as BaseLlmClient;
 
 describe('FixLLMEditWithInstruction', () => {
   const instruction = 'Replace the title';
@@ -48,15 +48,14 @@ describe('FixLLMEditWithInstruction', () => {
     const testPromptId = 'test-prompt-id-12345';
     mockGenerateJson.mockResolvedValue(mockApiResponse);
 
-    // Run the function within the context
-    await promptIdContext.run({ promptId: testPromptId }, async () => {
+    await promptIdContext.run(testPromptId, async () => {
       await FixLLMEditWithInstruction(
         instruction,
         old_string,
         new_string,
         error,
         current_content,
-        mockLlmUtilityService,
+        mockBaseLlmClient,
         abortSignal,
       );
     });
@@ -83,7 +82,7 @@ describe('FixLLMEditWithInstruction', () => {
       new_string,
       error,
       current_content,
-      mockLlmUtilityService,
+      mockBaseLlmClient,
       abortSignal,
     );
 
@@ -108,16 +107,16 @@ describe('FixLLMEditWithInstruction', () => {
 
   it('should construct the user prompt correctly', async () => {
     mockGenerateJson.mockResolvedValue(mockApiResponse);
-    const testPromptId = 'test-prompt-id-prompt-construction';
+    const promptId = 'test-prompt-id-prompt-construction';
 
-    await promptIdContext.run({ promptId: testPromptId }, async () => {
+    await promptIdContext.run(promptId, async () => {
       await FixLLMEditWithInstruction(
         instruction,
         old_string,
         new_string,
         error,
         current_content,
-        mockLlmUtilityService,
+        mockBaseLlmClient,
         abortSignal,
       );
     });
@@ -140,7 +139,7 @@ describe('FixLLMEditWithInstruction', () => {
     mockGenerateJson.mockResolvedValue(mockApiResponse);
     const testPromptId = 'test-prompt-id-caching';
 
-    await promptIdContext.run({ promptId: testPromptId }, async () => {
+    await promptIdContext.run(testPromptId, async () => {
       // First call - should call the API
       const result1 = await FixLLMEditWithInstruction(
         instruction,
@@ -148,7 +147,7 @@ describe('FixLLMEditWithInstruction', () => {
         new_string,
         error,
         current_content,
-        mockLlmUtilityService,
+        mockBaseLlmClient,
         abortSignal,
       );
 
@@ -159,7 +158,7 @@ describe('FixLLMEditWithInstruction', () => {
         new_string,
         error,
         current_content,
-        mockLlmUtilityService,
+        mockBaseLlmClient,
         abortSignal,
       );
 
@@ -174,7 +173,7 @@ describe('FixLLMEditWithInstruction', () => {
     mockGenerateJson.mockResolvedValue(mockApiResponse);
     const testPromptId = 'test-prompt-id-cache-miss';
 
-    await promptIdContext.run({ promptId: testPromptId }, async () => {
+    await promptIdContext.run(testPromptId, async () => {
       // First call
       await FixLLMEditWithInstruction(
         instruction,
@@ -182,7 +181,7 @@ describe('FixLLMEditWithInstruction', () => {
         new_string,
         error,
         current_content,
-        mockLlmUtilityService,
+        mockBaseLlmClient,
         abortSignal,
       );
 
@@ -193,7 +192,7 @@ describe('FixLLMEditWithInstruction', () => {
         new_string,
         error,
         current_content,
-        mockLlmUtilityService,
+        mockBaseLlmClient,
         abortSignal,
       );
 

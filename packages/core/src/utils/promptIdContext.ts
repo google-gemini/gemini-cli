@@ -6,8 +6,4 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-interface PromptContext {
-  promptId: string;
-}
-
-export const promptIdContext = new AsyncLocalStorage<PromptContext>();
+export const promptIdContext = new AsyncLocalStorage<string>();
