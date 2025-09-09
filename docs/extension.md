@@ -1,5 +1,7 @@
 # Gemini CLI Extensions
 
+*This documentation is up-to-date with the v0.4.0 release*
+
 Gemini CLI extensions package prompts, MCP servers, and custom commands into a familiar and user-friendly format. With extensions, you can expand the capabilities of Gemini CLI and share those capabilities with others. They are designed to be easily installable and shareable.
 
 ## Extension Management
