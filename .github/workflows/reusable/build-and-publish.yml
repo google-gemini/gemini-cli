@@ -3,6 +3,10 @@ name: 'Build and Publish'
 on:
   workflow_call:
     inputs:
+      ref:
+        description: 'The branch or ref to checkout.'
+        required: true
+        type: 'string'
       release_version:
         description: 'The version to publish.'
         required: true
