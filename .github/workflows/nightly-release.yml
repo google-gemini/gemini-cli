@@ -36,6 +36,7 @@ jobs:
       - name: 'Get Nightly Version'
         id: 'nightly_version'
         run: |
+          npm install
           VERSION_JSON=$(node scripts/get-release-version.js --type nightly)
           echo "RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)" >> "${GITHUB_OUTPUT}"
           echo "RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
