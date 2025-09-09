@@ -7,6 +7,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
 import { activate } from './extension.js';
+import { DetectedIde, detectIdeFromEnv } from '@google/gemini-cli-core';
+
+vi.mock('@google/gemini-cli-core', async () => {
+  const actual = await vi.importActual('@google/gemini-cli-core');
+  return {
+    ...actual,
+    detectIdeFromEnv: vi.fn(() => DetectedIde.VSCode),
+  };
+});
 
 vi.mock('vscode', () => ({
   window: {
@@ -178,6 +187,18 @@ describe('activate', () => {
         }),
       } as Response);
 
+      const showInformationMessageMock = vi.mocked(
+        vscode.window.showInformationMessage,
+      );
+
+      await activate(context);
+
+      expect(showInformationMessageMock).not.toHaveBeenCalled();
+    });
+
+    it('does not show the notification for Firebase Studio', async () => {
+      vi.mocked(detectIdeFromEnv).mockReturnValue(DetectedIde.FirebaseStudio);
+      vi.mocked(context.globalState.get).mockReturnValue(undefined);
       const showInformationMessageMock = vi.mocked(
         vscode.window.showInformationMessage,
       );
