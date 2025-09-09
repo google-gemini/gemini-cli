@@ -3,8 +3,14 @@
 .env~
 
 # gemini-cli settings
-.gemini/
-!gemini/config.yaml
+# We want to keep the .gemini in the root of the repo and ignore any .gemini
+# in subdirectories. In our root .gemini we want to allow for version control
+# for subcommands.
+**/.gemini/
+!/.gemini/
+.gemini/*
+!.gemini/config.yaml
+!.gemini/commands/
 
 # Note: .gemini-clipboard/ is NOT in gitignore so Gemini can access pasted images
 
