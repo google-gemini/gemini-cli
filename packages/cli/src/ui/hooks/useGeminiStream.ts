@@ -32,6 +32,9 @@ import {
   ApprovalMode,
   parseAndFormatApiError,
   ToolConfirmationOutcome,
+  getCodeAssistServer,
+  UserTierId,
+  recordUserActivity,
   promptIdContext,
   WRITE_FILE_TOOL_NAME,
   tokenLimit,
@@ -74,12 +77,16 @@ enum StreamProcessingStatus {
 
 const EDIT_TOOL_NAMES = new Set(['replace', WRITE_FILE_TOOL_NAME]);
 
-function showCitations(settings: LoadedSettings): boolean {
+function showCitations(
+  settings: LoadedSettings,
+  config: Config,
+): boolean {
   const enabled = settings?.merged?.ui?.showCitations;
   if (enabled !== undefined) {
     return enabled;
   }
-  return true;
+  const server = getCodeAssistServer(config);
+  return (server && server.userTier !== UserTierId.FREE) ?? false;
 }
 
 /**
@@ -390,6 +397,8 @@ export const useGeminiStream = (
                   prompt_id,
                 };
                 scheduleToolCalls([toolCallRequest], abortSignal);
+                // Record activity: tool call scheduled
+                recordUserActivity();
                 return { queryToSend: null, shouldProceed: false };
               }
               case 'submit_prompt': {
@@ -444,6 +453,8 @@ export const useGeminiStream = (
             { type: MessageType.USER, text: trimmedQuery },
             userMessageTimestamp,
           );
+          // Record activity: user input received
+          recordUserActivity();
           localQueryToSendToGemini = trimmedQuery;
         }
       } else {
@@ -592,7 +603,7 @@ export const useGeminiStream = (
 
   const handleCitationEvent = useCallback(
     (text: string, userMessageTimestamp: number) => {
-      if (!showCitations(settings)) {
+      if (!showCitations(settings, config)) {
         return;
       }
 
@@ -602,7 +613,7 @@ export const useGeminiStream = (
       }
       addItem({ type: MessageType.INFO, text }, userMessageTimestamp);
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings, config],
   );
 
   const handleFinishedEvent = useCallback(
@@ -817,8 +828,9 @@ export const useGeminiStream = (
             (streamingState === StreamingState.Responding ||
               streamingState === StreamingState.WaitingForConfirmation) &&
             !options?.isContinuation
-          )
+          ) {
             return;
+          }
 
           const userMessageTimestamp = Date.now();
 
@@ -867,6 +879,8 @@ export const useGeminiStream = (
 
             setIsResponding(true);
             setInitError(null);
+            // Record activity: stream starting
+            recordUserActivity();
 
             // Store query and prompt_id for potential retry on loop detection
             lastQueryRef.current = queryToSend;
@@ -956,6 +970,8 @@ export const useGeminiStream = (
               if (activeQueryIdRef.current === queryId) {
                 setIsResponding(false);
               }
+              // Record activity: stream ending
+              recordUserActivity();
             }
           });
         },
