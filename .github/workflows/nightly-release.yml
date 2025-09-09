@@ -44,7 +44,7 @@ jobs:
 
   build_and_publish:
     needs: get_version
-    uses: ./.github/workflows/reusable/build-and-publish.yml
+    uses: ./.github/workflows/build-and-publish.yml
     with:
       ref: 'main'
       release_version: ${{ needs.get_version.outputs.RELEASE_VERSION }}
@@ -56,7 +56,7 @@ jobs:
 
   create_release:
     needs: [get_version, build_and_publish]
-    uses: ./.github/workflows/reusable/create-github-release.yml
+    uses: ./.github/workflows/create-github-release.yml
     with:
       release_tag: ${{ needs.get_version.outputs.RELEASE_TAG }}
       release_branch: 'main'

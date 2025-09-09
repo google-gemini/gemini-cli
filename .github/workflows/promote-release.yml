@@ -53,7 +53,7 @@ jobs:
 
   promote_to_stable:
     needs: get_versions
-    uses: ./.github/workflows/reusable/build-and-publish.yml
+    uses: ./.github/workflows/build-and-publish.yml
     with:
       ref: ${{ needs.get_versions.outputs.PREVIEW_TAG }}
       release_version: ${{ needs.get_versions.outputs.STABLE_RELEASE_VERSION }}
@@ -65,7 +65,7 @@ jobs:
 
   create_stable_release:
     needs: [get_versions, promote_to_stable]
-    uses: ./.github/workflows/reusable/create-github-release.yml
+    uses: ./.github/workflows/create-github-release.yml
     with:
       release_tag: ${{ needs.get_versions.outputs.STABLE_RELEASE_TAG }}
       release_branch: ${{ needs.get_versions.outputs.PREVIEW_TAG }}
@@ -74,7 +74,7 @@ jobs:
 
   create_preview:
     needs: get_versions
-    uses: ./.github/workflows/reusable/build-and-publish.yml
+    uses: ./.github/workflows/build-and-publish.yml
     with:
       ref: ${{ needs.get_versions.outputs.MAIN_SHA }}
       release_version: ${{ needs.get_versions.outputs.PREVIEW_RELEASE_VERSION }}
@@ -86,7 +86,7 @@ jobs:
 
   create_preview_release:
     needs: [get_versions, create_preview]
-    uses: ./.github/workflows/reusable/create-github-release.yml
+    uses: ./.github/workflows/create-github-release.yml
     with:
       release_tag: ${{ needs.get_versions.outputs.PREVIEW_RELEASE_TAG }}
       release_branch: ${{ needs.get_versions.outputs.MAIN_SHA }}
