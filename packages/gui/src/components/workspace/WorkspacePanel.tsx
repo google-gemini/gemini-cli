@@ -12,12 +12,15 @@ import { Input } from '@/components/ui/Input';
 import { useAppStore } from '@/stores/appStore';
 import { useWorkspaceDirectories } from '@/hooks';
 import { cn } from '@/utils/cn';
+import type { WorkspaceConfig } from '@/types';
 
 export const WorkspacePanel: React.FC = () => {
   const {
     workspaces,
     currentWorkspace,
-    setCurrentWorkspace
+    setCurrentWorkspace,
+    addWorkspace,
+    updateWorkspace
   } = useAppStore();
   
   const {
@@ -37,10 +40,37 @@ export const WorkspacePanel: React.FC = () => {
 
     setAdding(true);
     try {
-      await addWorkspaceDirectory(newDirectoryPath.trim());
+      const directoryPath = newDirectoryPath.trim();
+      
+      // Add directory to working directories
+      await addWorkspaceDirectory(directoryPath);
+      
+      // Create workspace name from directory path
+      const directoryName = directoryPath.split(/[\\/]/).pop() || directoryPath;
+      const workspaceName = `${directoryName}`;
+      
+      // Check if a workspace with this directory already exists
+      const existingWorkspace = workspaces.find(ws => 
+        ws.directories.includes(directoryPath)
+      );
+      
+      if (!existingWorkspace) {
+        // Create new workspace for this directory
+        const newWorkspace: WorkspaceConfig = {
+          id: `workspace-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name: workspaceName,
+          directories: [directoryPath],
+          createdAt: new Date(),
+          lastUsed: new Date()
+        };
+        
+        addWorkspace(newWorkspace);
+        console.log('Created new workspace for directory:', workspaceName, directoryPath);
+      }
+      
       setNewDirectoryPath('');
       setShowAddForm(false);
-      console.log('Added working directory:', newDirectoryPath.trim());
+      console.log('Added working directory:', directoryPath);
     } catch (error) {
       console.error('Failed to add directory:', error);
     } finally {
@@ -73,8 +103,11 @@ export const WorkspacePanel: React.FC = () => {
 
   const handleWorkspaceSelect = async (workspace: typeof workspaces[0]) => {
     try {
+      // Update workspace lastUsed time
+      updateWorkspace(workspace.id, { lastUsed: new Date() });
+      
       // Set as current workspace in frontend
-      setCurrentWorkspace(workspace);
+      setCurrentWorkspace({ ...workspace, lastUsed: new Date() });
       
       // Add all directories from this workspace to active working directories
       const newActiveDirectories = [...new Set([...activeDirectories, ...workspace.directories])];
@@ -227,7 +260,14 @@ export const WorkspacePanel: React.FC = () => {
             <span className="text-xs font-medium text-muted-foreground">Recent Workspaces</span>
           </div>
           <div className="space-y-1">
-            {workspaces.slice(0, 3).map((workspace) => (
+            {workspaces
+              .sort((a, b) => {
+                const aTime = a.lastUsed instanceof Date ? a.lastUsed.getTime() : new Date(a.lastUsed || 0).getTime();
+                const bTime = b.lastUsed instanceof Date ? b.lastUsed.getTime() : new Date(b.lastUsed || 0).getTime();
+                return bTime - aTime;
+              })
+              .slice(0, 3)
+              .map((workspace) => (
               <div
                 key={workspace.id}
                 className={cn(

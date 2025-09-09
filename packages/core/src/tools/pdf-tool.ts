@@ -180,7 +180,7 @@ class PDFInvocation extends BaseToolInvocation<PDFParams, PDFResult> {
           return await this.splitPDF(file, pages, output);
           
         case 'extracttext':
-          return await this.extractText(file, pages);
+          return await this.extractText(file, pages, output);
           
         case 'search':
           if (!query || query.trim().length === 0) {
@@ -379,7 +379,7 @@ ${outputFiles.map((filePath, index) => `${index + 1}. ${path.basename(filePath)}
     }
   }
 
-  private async extractText(file: string, pages?: string): Promise<PDFResult> {
+  private async extractText(file: string, pages?: string, output?: string): Promise<PDFResult> {
     try {
       const buffer = await fs.readFile(file);
       let pdfDoc: PDFLibDocument;
@@ -417,16 +417,31 @@ ${outputFiles.map((filePath, index) => `${index + 1}. ${path.basename(filePath)}
         }
       }
       
+      // Combine all text for output file
+      const allText = Object.entries(pageTexts)
+        .sort(([a], [b]) => parseInt(a, 10) - parseInt(b, 10))
+        .map(([pageNum, text]) => `Page ${pageNum}:\n${text}`)
+        .join('\n\n');
+      
+      // Write to output file if specified
+      let outputFile: string | undefined;
+      if (output) {
+        await fs.writeFile(output, allText, 'utf8');
+        outputFile = output;
+      }
+      
       return {
         success: true,
         file,
         op: 'extracttext',
         pageTexts,
         pageCount,
-        llmContent: `pdf(extracttext): Extracted text from ${pageNumbers.length} pages:
+        outputFile,
+        text: allText,
+        llmContent: `pdf(extracttext): Extracted text from ${pageNumbers.length} pages${outputFile ? ` and saved to "${outputFile}"` : ''}:
 ${Object.entries(pageTexts).map(([pageNum, text]) => `**Page ${pageNum}:**
 ${text}`).join('\n\n')}`,
-        returnDisplay: `pdf(extracttext): Extracted text from ${pageNumbers.length} pages`
+        returnDisplay: `pdf(extracttext): Extracted text from ${pageNumbers.length} pages${outputFile ? ` and saved to file` : ''}`
       };
     } catch (error) {
       return this.createErrorResult(`Failed to extract text: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1742,11 +1757,11 @@ export class PDFTool extends BackupableTool<PDFParams, PDFResult> {
           op: {
             type: 'string',
             enum: ['create', 'merge', 'split', 'extracttext', 'search', 'info', 'undo'], // 'hanko', 'toimage'],
-            description: 'Operation: split=save pages as PDF files, extracttext=get text content, search=find text in entire PDF, info=get PDF info' // , toimage=convert PDF pages to PNG images for visual analysis
+            description: 'Operation: split=save pages as PDF files, extracttext=get text content (use output param to save to file), search=find text in entire PDF, info=get PDF info' // , toimage=convert PDF pages to PNG images for visual analysis
           },
           pages: { type: 'string', description: 'OPTIONAL page numbers/ranges (1-based): "1-3,5,7-10". If not specified, processes ALL pages' },
           query: { type: 'string', description: 'Search text query (REQUIRED for search operation)' },
-          output: { type: 'string', description: 'Output file path' },
+          output: { type: 'string', description: 'Output file path (for extracttext: saves text to file; for split/create: output PDF file)' },
           text: { type: 'string', description: 'Text content to add' },
           position: {
             type: 'object',

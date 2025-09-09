@@ -65,7 +65,8 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ onClose })
         id: `workspace-${Date.now()}`,
         name: newWorkspacePath.split(/[/\\]/).pop() || 'New Workspace',
         directories: [newWorkspacePath.trim()],
-        createdAt: new Date()
+        createdAt: new Date(),
+        lastUsed: new Date()
       };
       
       addWorkspace(newWorkspace);

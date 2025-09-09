@@ -14,6 +14,7 @@ import type {
   ModelProviderType
 } from '../providers/types.js';
 import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
 import type { BaseModelProvider } from '../providers/BaseModelProvider.js';
 import type { ToolCallRequestInfo, ChatCompressionInfo } from '../core/turn.js';
 import { ModelProviderFactory } from '../providers/ModelProviderFactory.js';
@@ -640,6 +641,41 @@ export class MultiModelSystem {
    */
   getConfig(): Config {
     return this.config;
+  }
+
+  getApprovalMode(): 'default' | 'autoEdit' | 'yolo' {
+    const mode = this.config.getApprovalMode();
+    // Map ApprovalMode enum to string literals
+    switch (mode) {
+      case ApprovalMode.DEFAULT:
+        return 'default';
+      case ApprovalMode.AUTO_EDIT:  
+        return 'autoEdit';
+      case ApprovalMode.YOLO:
+        return 'yolo';
+      default:
+        return 'default';
+    }
+  }
+
+  setApprovalMode(mode: 'default' | 'autoEdit' | 'yolo'): void {
+    // Map string literals to ApprovalMode enum
+    let approvalModeValue: ApprovalMode;
+    switch (mode) {
+      case 'default':
+        approvalModeValue = ApprovalMode.DEFAULT;
+        break;
+      case 'autoEdit':
+        approvalModeValue = ApprovalMode.AUTO_EDIT;
+        break;
+      case 'yolo':
+        approvalModeValue = ApprovalMode.YOLO;
+        break;
+      default:
+        approvalModeValue = ApprovalMode.DEFAULT;
+        break;
+    }
+    this.config.setApprovalMode(approvalModeValue);
   }
 
   private getProviderKey(config: ModelProviderConfig): string {

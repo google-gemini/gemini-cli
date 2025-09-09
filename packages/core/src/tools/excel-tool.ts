@@ -1460,9 +1460,11 @@ export class ExcelTool extends BaseDeclarativeTool<ExcelParams, ExcelResult> {
             type: 'array', 
             items: { 
               type: 'array',
-              items: { type: 'string' }
+              items: { 
+                type: ['string', 'number', 'boolean', 'null']
+              }
             },
-            description: 'Data rows (strings starting with = are formulas)'
+            description: 'Data rows (strings starting with = are formulas, numbers, booleans, and null values are also supported)'
           },
           style: { type: 'object', description: 'Cell styling options' },
           validation: { type: 'object', description: 'Data validation rules' },

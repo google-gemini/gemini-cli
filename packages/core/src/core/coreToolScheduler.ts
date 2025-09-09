@@ -406,7 +406,7 @@ export class CoreToolScheduler {
                     id: currentCall.request.callId,
                     name: currentCall.request.name,
                     response: {
-                      error: `[Operation Cancelled] Reason: ${auxiliaryData}`,
+                      error: `Tool call cancelled by user. ${auxiliaryData}`,
                     },
                   },
                 },
@@ -766,7 +766,7 @@ export class CoreToolScheduler {
       this.setStatusInternal(
         callId,
         'cancelled',
-        'User did not allow tool call',
+        'User declined to authorize this tool execution. Please respect the user\'s decision and either try a different approach or ask for clarification about their concerns.',
       );
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;

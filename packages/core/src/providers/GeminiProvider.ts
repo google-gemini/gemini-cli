@@ -21,7 +21,8 @@ import type {
   GenerateContentResponse,
   GenerateContentParameters,
   Models,
-  GenerateContentConfig
+  GenerateContentConfig,
+  FunctionResponse
 } from '@google/genai';
 import type { OAuth2Client } from 'google-auth-library';
 
@@ -636,13 +637,19 @@ export class GeminiProvider extends BaseModelProvider {
       systemInstruction = systemMessages.map(m => m.content).join('\n\n');
     }
     
-    // Convert conversation messages
-    for (const msg of messages.filter(m => m.role !== 'system')) {
+    // Group messages and handle tool responses properly
+    const nonSystemMessages = messages.filter(m => m.role !== 'system');
+    let i = 0;
+    
+    while (i < nonSystemMessages.length) {
+      const msg = nonSystemMessages[i];
+      
       if (msg.role === 'user') {
         contents.push({
           role: 'user',
           parts: [{ text: msg.content }]
         });
+        i++;
       } else if (msg.role === 'assistant') {
         const parts: Array<{ text?: string; functionCall?: { id: string; name: string; args: Record<string, unknown> } }> = [];
         
@@ -664,6 +671,7 @@ export class GeminiProvider extends BaseModelProvider {
           }
         }
         
+        
         // Only add the message if we have parts
         if (parts.length > 0) {
           contents.push({
@@ -671,9 +679,55 @@ export class GeminiProvider extends BaseModelProvider {
             parts: parts
           });
         }
+        
+        i++;
+        
+        // Now check if the next messages are tool responses for this assistant message
+        const toolResponses: Array<{ functionResponse: FunctionResponse }> = [];
+        let j = i;
+        
+        while (j < nonSystemMessages.length && nonSystemMessages[j].role === 'tool') {
+          const toolMsg = nonSystemMessages[j];
+          try {
+            const parsedContent = JSON.parse(toolMsg.content);
+            if (parsedContent.__gemini_function_response) {
+              toolResponses.push({
+                functionResponse: parsedContent.__gemini_function_response
+              });
+            } else {
+              // Standard tool response
+              toolResponses.push({
+                functionResponse: {
+                  id: toolMsg.tool_call_id || 'unknown_id',
+                  name: toolMsg.name || 'unknown',
+                  response: parsedContent
+                }
+              });
+            }
+          } catch {
+            // Not JSON, treat as plain text response
+            toolResponses.push({
+              functionResponse: {
+                id: toolMsg.tool_call_id || 'unknown_id',
+                name: toolMsg.name || 'unknown',
+                response: { result: toolMsg.content }
+              }
+            });
+          }
+          j++;
+        }
+        
+        // If we have tool responses, add them as a single user message
+        if (toolResponses.length > 0) {
+          contents.push({
+            role: 'user',
+            parts: toolResponses
+          });
+          i = j; // Skip past the processed tool responses
+        }
+        
       } else if (msg.role === 'tool') {
-        // Tool responses should be handled as function responses from user role
-        // Check if this is a Gemini-formatted function response
+        // This handles standalone tool responses (shouldn't happen with the new logic above)
         try {
           const parsedContent = JSON.parse(msg.content);
           if (parsedContent.__gemini_function_response) {
@@ -709,6 +763,9 @@ export class GeminiProvider extends BaseModelProvider {
             }]
           });
         }
+        i++;
+      } else {
+        i++;
       }
     }
     

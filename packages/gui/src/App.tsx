@@ -123,10 +123,18 @@ export const App: React.FC = () => {
           useAppStore.setState({ sessions: [] });
           
           for (const sessionInfo of sessionsInfo) {
+            // Create placeholder messages array based on messageCount
+            const placeholderMessages = Array.from({ length: sessionInfo.messageCount }, (_, index) => ({
+              id: `${sessionInfo.id}-placeholder-${index}`,
+              role: 'user' as const,
+              content: '',
+              timestamp: new Date()
+            }));
+            
             const session: ChatSession = {
               id: sessionInfo.id,
               title: sessionInfo.title,
-              messages: [], // Will be loaded when session is selected
+              messages: placeholderMessages, // Show correct count but will be replaced when session is selected
               createdAt: sessionInfo.lastUpdated, // Using lastUpdated as approximation
               updatedAt: sessionInfo.lastUpdated,
               provider: currentProvider as ModelProviderType,
@@ -170,6 +178,19 @@ export const App: React.FC = () => {
         } catch (error) {
           console.error('Failed to load sessions from backend:', error);
         }
+
+        // Pre-load templates to ensure they're available when TemplatePanel mounts
+        try {
+          console.log('Pre-loading templates...');
+          const templates = await multiModelService.getAllTemplatesAsync();
+          console.log('Pre-loaded', templates.length, 'templates successfully');
+        } catch (error) {
+          console.error('Failed to pre-load templates:', error);
+        }
+
+        // Mark initialization as complete
+        useAppStore.getState().setInitialized(true);
+        console.log('App initialization completed');
         
       } catch (error) {
         console.error('Failed to initialize MultiModelService:', error);
