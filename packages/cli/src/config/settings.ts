@@ -329,155 +329,20 @@ function mergeSettings(
 ): Settings {
   const safeWorkspace = isTrusted ? workspace : ({} as Settings);
 
-  // folderTrust is not supported at workspace level.
-  const { security, ...restOfWorkspace } = safeWorkspace;
-  const safeWorkspaceWithoutFolderTrust = security
-    ? {
-        ...restOfWorkspace,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        security: (({ folderTrust, ...rest }) => rest)(security),
-      }
-    : {
-        ...restOfWorkspace,
-        security: {},
-      };
-
   // Settings are merged with the following precedence (last one wins for
   // single values):
   // 1. System Defaults
   // 2. User Settings
   // 3. Workspace Settings
   // 4. System Settings (as overrides)
-  //
-  // For properties that are arrays (e.g., includeDirectories), the arrays
-  // are concatenated. For objects (e.g., customThemes), they are merged.
-  return {
-    ...systemDefaults,
-    ...user,
-    ...safeWorkspaceWithoutFolderTrust,
-    ...system,
-    general: {
-      ...(systemDefaults.general || {}),
-      ...(user.general || {}),
-      ...(safeWorkspaceWithoutFolderTrust.general || {}),
-      ...(system.general || {}),
-    },
-    ui: {
-      ...(systemDefaults.ui || {}),
-      ...(user.ui || {}),
-      ...(safeWorkspaceWithoutFolderTrust.ui || {}),
-      ...(system.ui || {}),
-      customThemes: {
-        ...(systemDefaults.ui?.customThemes || {}),
-        ...(user.ui?.customThemes || {}),
-        ...(safeWorkspaceWithoutFolderTrust.ui?.customThemes || {}),
-        ...(system.ui?.customThemes || {}),
-      },
-    },
-    ide: {
-      ...(systemDefaults.ide || {}),
-      ...(user.ide || {}),
-      ...(safeWorkspaceWithoutFolderTrust.ide || {}),
-      ...(system.ide || {}),
-    },
-    privacy: {
-      ...(systemDefaults.privacy || {}),
-      ...(user.privacy || {}),
-      ...(safeWorkspaceWithoutFolderTrust.privacy || {}),
-      ...(system.privacy || {}),
-    },
-    telemetry: {
-      ...(systemDefaults.telemetry || {}),
-      ...(user.telemetry || {}),
-      ...(safeWorkspaceWithoutFolderTrust.telemetry || {}),
-      ...(system.telemetry || {}),
-    },
-    security: {
-      ...(systemDefaults.security || {}),
-      ...(user.security || {}),
-      ...(safeWorkspaceWithoutFolderTrust.security || {}),
-      ...(system.security || {}),
-    },
-    mcp: {
-      ...(systemDefaults.mcp || {}),
-      ...(user.mcp || {}),
-      ...(safeWorkspaceWithoutFolderTrust.mcp || {}),
-      ...(system.mcp || {}),
-    },
-    mcpServers: {
-      ...(systemDefaults.mcpServers || {}),
-      ...(user.mcpServers || {}),
-      ...(safeWorkspaceWithoutFolderTrust.mcpServers || {}),
-      ...(system.mcpServers || {}),
-    },
-    tools: {
-      ...(systemDefaults.tools || {}),
-      ...(user.tools || {}),
-      ...(safeWorkspaceWithoutFolderTrust.tools || {}),
-      ...(system.tools || {}),
-    },
-    context: {
-      ...(systemDefaults.context || {}),
-      ...(user.context || {}),
-      ...(safeWorkspaceWithoutFolderTrust.context || {}),
-      ...(system.context || {}),
-      includeDirectories: [
-        ...(systemDefaults.context?.includeDirectories || []),
-        ...(user.context?.includeDirectories || []),
-        ...(safeWorkspaceWithoutFolderTrust.context?.includeDirectories || []),
-        ...(system.context?.includeDirectories || []),
-      ],
-    },
-    model: {
-      ...(systemDefaults.model || {}),
-      ...(user.model || {}),
-      ...(safeWorkspaceWithoutFolderTrust.model || {}),
-      ...(system.model || {}),
-      chatCompression: {
-        ...(systemDefaults.model?.chatCompression || {}),
-        ...(user.model?.chatCompression || {}),
-        ...(safeWorkspaceWithoutFolderTrust.model?.chatCompression || {}),
-        ...(system.model?.chatCompression || {}),
-      },
-    },
-    advanced: {
-      ...(systemDefaults.advanced || {}),
-      ...(user.advanced || {}),
-      ...(safeWorkspaceWithoutFolderTrust.advanced || {}),
-      ...(system.advanced || {}),
-      excludedEnvVars: [
-        ...new Set([
-          ...(systemDefaults.advanced?.excludedEnvVars || []),
-          ...(user.advanced?.excludedEnvVars || []),
-          ...(safeWorkspaceWithoutFolderTrust.advanced?.excludedEnvVars || []),
-          ...(system.advanced?.excludedEnvVars || []),
-        ]),
-      ],
-    },
-    extensions: {
-      ...(systemDefaults.extensions || {}),
-      ...(user.extensions || {}),
-      ...(safeWorkspaceWithoutFolderTrust.extensions || {}),
-      ...(system.extensions || {}),
-      disabled: [
-        ...new Set([
-          ...(systemDefaults.extensions?.disabled || []),
-          ...(user.extensions?.disabled || []),
-          ...(safeWorkspaceWithoutFolderTrust.extensions?.disabled || []),
-          ...(system.extensions?.disabled || []),
-        ]),
-      ],
-      workspacesWithMigrationNudge: [
-        ...new Set([
-          ...(systemDefaults.extensions?.workspacesWithMigrationNudge || []),
-          ...(user.extensions?.workspacesWithMigrationNudge || []),
-          ...(safeWorkspaceWithoutFolderTrust.extensions
-            ?.workspacesWithMigrationNudge || []),
-          ...(system.extensions?.workspacesWithMigrationNudge || []),
-        ]),
-      ],
-    },
-  };
+  return customDeepMerge(
+    getMergeStrategyForPath,
+    {}, // Start with an empty object
+    systemDefaults,
+    user,
+    safeWorkspace,
+    system,
+  ) as Settings;
 }
 
 export class LoadedSettings {
