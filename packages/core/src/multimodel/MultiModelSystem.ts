@@ -21,7 +21,13 @@ import { ProviderConfigManager } from '../providers/ProviderConfigManager.js';
 import { RoleManager } from '../roles/RoleManager.js';
 import { WorkspaceManager } from '../utils/WorkspaceManager.js';
 import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
+import { CoreToolScheduler } from '../core/coreToolScheduler.js';
+import type { 
+  ToolCallConfirmationDetails, 
+  ToolConfirmationOutcome  
+} from '../tools/tools.js';
 import { CompressionStatus } from '../core/turn.js';
+import type { ToolCallResponseInfo } from '../core/turn.js';
 import { SessionManager } from '../sessions/SessionManager.js';
 import { getCompressionPrompt } from '../core/prompts.js';
 // import { findIndexAfterFraction } from '../core/client.js';
@@ -36,6 +42,7 @@ export class MultiModelSystem {
   private currentProvider: ModelProviderConfig | null = null;
   private config: Config;
   private initializedProviders: Map<string, BaseModelProvider> = new Map();
+  private toolConfirmationHandler?: (details: ToolCallConfirmationDetails) => Promise<ToolConfirmationOutcome>;
   // Static mapping of model names to their tool call formats
   private static readonly MODEL_FORMATS: Record<string, 'openai' | 'harmony' | 'gemini' | 'qwen'> = {
     // Harmony format models (gpt-oss family)
@@ -168,6 +175,13 @@ export class MultiModelSystem {
   }
 
   /**
+   * Set the tool confirmation handler
+   */
+  setToolConfirmationHandler(handler: (details: ToolCallConfirmationDetails) => Promise<ToolConfirmationOutcome>): void {
+    this.toolConfirmationHandler = handler;
+  }
+
+  /**
    * Initialize the MultiModelSystem
    */
   async initialize(): Promise<void> {
@@ -215,7 +229,7 @@ export class MultiModelSystem {
 
     // Add turn limit like nonInteractiveCli.ts to prevent infinite loops
     let turnCount = 0;
-    const MAX_TURNS = this.config.getMaxSessionTurns() >= 0 ? this.config.getMaxSessionTurns() : 10;
+    const MAX_TURNS = this.config.getMaxSessionTurns() >= 0 ? this.config.getMaxSessionTurns() : 20;
 
     while (true) {
       turnCount++;
@@ -281,9 +295,14 @@ export class MultiModelSystem {
       // Get the updated history after potential compression
       const currentHistory = sessionManager.getHistory();
       const limitedMessages = this.limitContextSize(currentHistory);
-      // console.log('[MultiModelSystem] Using limited conversation history:', limitedMessages.length, '/', fullHistory.length, 'messages');
-      // print limitedMessages for debugging
-      console.log('[MultiModelSystem] Limited Messages:', limitedMessages);
+      console.log(`[MultiModelSystem] Turn ${turnCount}: Using ${limitedMessages.length}/${currentHistory.length} messages after context limiting`);
+      
+      // Debug: Print last few messages to see tool responses
+      const lastFewMessages = limitedMessages.slice(-3);
+      console.log('[MultiModelSystem] Last 3 messages in history:');
+      lastFewMessages.forEach((msg, idx) => {
+        console.log(`  [${idx}] ${msg.role}: ${msg.content?.substring(0, 100)}...${msg.toolCalls ? ` [${msg.toolCalls.length} tool calls]` : ''}`);
+      });
 
       // Enhance messages with system prompt, role and workspace context
       const enhancedMessages = await this.enhanceMessagesWithRole(limitedMessages, roleId);
@@ -388,7 +407,39 @@ export class MultiModelSystem {
         // Execute each tool call and create individual tool response messages
         for (const requestInfo of toolCallRequests) {
           try {
-            const toolResponse = await executeToolCall(this.config, requestInfo, signal);
+            let toolResponse;
+            
+            // Use CoreToolScheduler with confirmation support if handler is available
+            if (this.toolConfirmationHandler) {
+              toolResponse = await new Promise<ToolCallResponseInfo>((resolve, reject) => {
+                new CoreToolScheduler({
+                  config: this.config,
+                  getPreferredEditor: () => undefined,
+                  onEditorClose: () => {},
+                  onAllToolCallsComplete: async (completedToolCalls) => {
+                    resolve(completedToolCalls[0].response);
+                  },
+                  // Pass the confirmation handler from GUI
+                  onToolCallsUpdate: async (toolCallsUpdate) => {
+                    if (toolCallsUpdate.some(tc => tc.status === 'awaiting_approval')) {
+                      const waitingCall = toolCallsUpdate.find(tc => tc.status === 'awaiting_approval');
+                      if (waitingCall && 'confirmationDetails' in waitingCall && this.toolConfirmationHandler) {
+                        // Call our confirmation handler to get user's decision
+                        const outcome = await this.toolConfirmationHandler(waitingCall.confirmationDetails);
+                        // Call the scheduler's onConfirm method with the outcome
+                        await waitingCall.confirmationDetails.onConfirm(outcome);
+                        return;
+                      }
+                    }
+                  }
+                })
+                .schedule(requestInfo, signal)
+                .catch(reject);
+              });
+            } else {
+              // Fallback to non-interactive execution
+              toolResponse = await executeToolCall(this.config, requestInfo, signal);
+            }
             
             if (toolResponse.error) {
               console.error(`[MultiModelSystem] Tool call failed:`, toolResponse.error);
@@ -485,7 +536,10 @@ export class MultiModelSystem {
           }
         }
         
-        // Continue to next iteration to let LLM process all tool responses
+        // After all tools are executed, let the natural conversation flow continue
+        console.log(`[MultiModelSystem] Tool execution completed for ${toolCallRequests.length} tools. Continuing conversation...`);
+        
+        // Continue the conversation loop to let LLM process tool responses naturally
         continue;
       } 
       else {
