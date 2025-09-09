@@ -25,12 +25,17 @@ import { render } from 'ink-testing-library';
 import { waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog as BaseSettingsDialog } from './SettingsDialog.js';
+import type { ComponentProps } from 'react';
 import { LoadedSettings } from '../../config/settings.js';
 import { VimModeProvider } from '../contexts/VimModeContext.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 // Provide required dimensions via a thin test wrapper to avoid
 // touching every call site in this large test file.
-const SettingsDialog = (props: any) => (
+type SettingsDialogProps = Omit<
+  ComponentProps<typeof BaseSettingsDialog>,
+  'availableTerminalHeight' | 'availableTerminalWidth'
+>;
+const SettingsDialog = (props: SettingsDialogProps) => (
   <BaseSettingsDialog
     availableTerminalHeight={40}
     availableTerminalWidth={100}

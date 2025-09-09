@@ -45,7 +45,6 @@ interface SettingsDialogProps {
   availableTerminalWidth: number;
 }
 
-
 export function SettingsDialog({
   settings,
   onSelect,
@@ -212,13 +211,7 @@ export function SettingsDialog({
         },
       };
     });
-  }, [
-    pendingSettings,
-    selectedScope,
-    settings,
-    vimEnabled,
-    toggleVimEnabled,
-  ]);
+  }, [pendingSettings, selectedScope, settings, vimEnabled, toggleVimEnabled]);
 
   // Generic edit state
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -346,7 +339,10 @@ export function SettingsDialog({
   };
 
   // Memoize the settings items for performance - use just the function since it's stable now
-  const items = React.useMemo(() => generateSettingsItems(), [generateSettingsItems]);
+  const items = React.useMemo(
+    () => generateSettingsItems(),
+    [generateSettingsItems],
+  );
 
   const DIALOG_PADDING = 2;
   const SETTINGS_TITLE_HEIGHT = 2;
@@ -390,11 +386,11 @@ export function SettingsDialog({
   // Apply compact visibility with hysteresis
   if (currentAvailableTerminalHeight < COMPACT_HIDE_THRESHOLD) {
     showScopeSelection = false;
-    totalFixedHeight -= (SCOPE_SELECTION_HEIGHT + SPACING_HEIGHT);
+    totalFixedHeight -= SCOPE_SELECTION_HEIGHT + SPACING_HEIGHT;
   } else if (currentAvailableTerminalHeight < COMPACT_SHOW_THRESHOLD) {
     // Between thresholds, keep scope hidden to avoid flicker.
     showScopeSelection = false;
-    totalFixedHeight -= (SCOPE_SELECTION_HEIGHT + SPACING_HEIGHT);
+    totalFixedHeight -= SCOPE_SELECTION_HEIGHT + SPACING_HEIGHT;
   }
 
   if (totalFixedHeight > currentAvailableTerminalHeight) {
@@ -403,7 +399,7 @@ export function SettingsDialog({
   }
 
   if (totalFixedHeight > currentAvailableTerminalHeight && showScopeSelection) {
-    totalFixedHeight -= (SCOPE_SELECTION_HEIGHT + SPACING_HEIGHT);
+    totalFixedHeight -= SCOPE_SELECTION_HEIGHT + SPACING_HEIGHT;
     showScopeSelection = false;
   }
 
@@ -413,7 +409,8 @@ export function SettingsDialog({
 
   const availableHeightForSettings = Math.max(
     MINIMUM_SETTINGS_HEIGHT,
-    currentAvailableTerminalHeight - (totalFixedHeight - MINIMUM_SETTINGS_HEIGHT),
+    currentAvailableTerminalHeight -
+      (totalFixedHeight - MINIMUM_SETTINGS_HEIGHT),
   );
 
   let compactSpacing = false;
@@ -434,9 +431,13 @@ export function SettingsDialog({
 
   const effectiveMaxItemsToShow = Math.min(maxVisibleItems, items.length);
 
-  const visibleItems = items.slice(scrollOffset, scrollOffset + effectiveMaxItemsToShow);
+  const visibleItems = items.slice(
+    scrollOffset,
+    scrollOffset + effectiveMaxItemsToShow,
+  );
 
-  const showScrollUp = items.length > effectiveMaxItemsToShow && scrollOffset > 0;
+  const showScrollUp =
+    items.length > effectiveMaxItemsToShow && scrollOffset > 0;
   const showScrollDown =
     items.length > effectiveMaxItemsToShow &&
     scrollOffset + effectiveMaxItemsToShow < items.length;
@@ -459,7 +460,12 @@ export function SettingsDialog({
       }
       return current;
     });
-  }, [availableTerminalHeight, effectiveMaxItemsToShow, items.length, scrollOffset]);
+  }, [
+    availableTerminalHeight,
+    effectiveMaxItemsToShow,
+    items.length,
+    scrollOffset,
+  ]);
 
   const currentFocusedSection = !showScopeSelection ? 'settings' : focusSection;
 
@@ -570,7 +576,9 @@ export function SettingsDialog({
           setActiveSettingIndex(newIndex);
           // Adjust scroll offset for wrap-around
           if (newIndex === items.length - 1) {
-            setScrollOffset(Math.max(0, items.length - effectiveMaxItemsToShow));
+            setScrollOffset(
+              Math.max(0, items.length - effectiveMaxItemsToShow),
+            );
           } else if (newIndex < scrollOffset) {
             setScrollOffset(newIndex);
           }
@@ -657,16 +665,16 @@ export function SettingsDialog({
                     ? defaultValue
                     : false
                   : typeof defaultValue === 'number' ||
-                    typeof defaultValue === 'string'
+                      typeof defaultValue === 'string'
                     ? defaultValue
                     : undefined;
               const immediateSettingsObject =
                 toSaveValue !== undefined
                   ? setPendingSettingValueAny(
-                    currentSetting.value,
-                    toSaveValue,
-                    {} as Settings,
-                  )
+                      currentSetting.value,
+                      toSaveValue,
+                      {} as Settings,
+                    )
                   : ({} as Settings);
 
               saveModifiedSettings(
@@ -747,13 +755,13 @@ export function SettingsDialog({
   const DEFAULT_LABEL_WIDTH = 50;
   const labelColumnWidth = availableTerminalWidth
     ? Math.max(
-      12,
-      Math.min(
-        DEFAULT_LABEL_WIDTH,
-        // Allocate roughly 55% of provided width to labels if width supplied
-        Math.floor(availableTerminalWidth * 0.55),
-      ),
-    )
+        12,
+        Math.min(
+          DEFAULT_LABEL_WIDTH,
+          // Allocate roughly 55% of provided width to labels if width supplied
+          Math.floor(availableTerminalWidth * 0.55),
+        ),
+      )
     : DEFAULT_LABEL_WIDTH;
 
   return (
@@ -768,10 +776,7 @@ export function SettingsDialog({
       width="100%"
     >
       <Box flexDirection="column" flexGrow={1}>
-        <Text
-          bold={currentFocusedSection === 'settings'}
-          wrap="truncate"
-        >
+        <Text bold={currentFocusedSection === 'settings'} wrap="truncate">
           {currentFocusedSection === 'settings' ? '> ' : '  '}Settings
         </Text>
         <Box height={1} />
