@@ -12,36 +12,26 @@ on:
         default: true
 
 jobs:
-  get_version:
-    runs-on: ubuntu-latest
-    outputs:
-      RELEASE_TAG: ${{ steps.nightly_version.outputs.RELEASE_TAG }}
-      RELEASE_VERSION: ${{ steps.nightly_version.outputs.RELEASE_VERSION }}
-      NPM_TAG: ${{ steps.nightly_version.outputs.NPM_TAG }}
-      PREVIOUS_TAG: ${{ steps.nightly_version.outputs.PREVIOUS_TAG }}
-      IS_DRY_RUN: ${{ steps.vars.outputs.is_dry_run }}
+  release:
+    runs-on: 'ubuntu-latest'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
           fetch-depth: 0
+
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+
       - name: 'Install Dependencies'
         run: npm ci
+
       - name: 'Build get-release-version script'
         run: npm run build:get-release-version
-      - name: 'Set dry_run flag'
-        id: 'vars'
-        run: |
-          is_dry_run="false"
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.dry_run }}" == "true" ]]; then
-            is_dry_run="true"
-          fi
-          echo "is_dry_run=${is_dry_run}" >> "${GITHUB_OUTPUT}"
+
       - name: 'Get Nightly Version'
         id: 'nightly_version'
         run: |
@@ -51,23 +41,54 @@ jobs:
           echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
 
-  build_and_publish:
-    needs: get_version
-    uses: ./.github/workflows/build-and-publish.yml
-    with:
-      ref: 'main'
-      release_version: ${{ needs.get_version.outputs.RELEASE_VERSION }}
-      npm_tag: ${{ needs.get_version.outputs.NPM_TAG }}
-      dry_run: ${{ needs.get_version.outputs.IS_DRY_RUN == 'true' }}
-    secrets:
-      WOMBAT_TOKEN_CORE: ${{ secrets.WOMBAT_TOKEN_CORE }}
-      WOMBAT_TOKEN_CLI: ${{ secrets.WOMBAT_TOKEN_CLI }}
+      - name: 'Build and Prepare Packages'
+        run: |-
+          npm run build:packages
+          npm run prepare:package
 
-  create_release:
-    needs: [get_version, build_and_publish]
-    uses: ./.github/workflows/create-github-release.yml
-    with:
-      release_tag: ${{ needs.get_version.outputs.RELEASE_TAG }}
-      release_branch: 'main'
-      previous_tag: ${{ needs.get_version.outputs.PREVIOUS_TAG }}
-      dry_run: ${{ needs.get_version.outputs.IS_DRY_RUN == 'true' }}
+      - name: 'Configure npm for publishing'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://wombat-dressing-room.appspot.com'
+          scope: '@google'
+
+      - name: 'Publish @google/gemini-cli-core'
+        env:
+          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+        run: |-
+          npm publish \
+            --dry-run="${{ github.event.inputs.dry_run }}" \
+            --workspace="@google/gemini-cli-core" \
+            --tag="${{ steps.nightly_version.outputs.NPM_TAG }}"
+
+      - name: 'Install latest core package'
+        if: ${{ !github.event.inputs.dry_run }}
+        run: |-
+          npm install "@google/gemini-cli-core@${{ steps.nightly_version.outputs.RELEASE_VERSION }}" \
+          --workspace="@google/gemini-cli" \
+          --save-exact
+
+      - name: 'Publish @google/gemini-cli'
+        env:
+          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+        run: |-
+          npm publish \
+            --dry-run="${{ github.event.inputs.dry_run }}" \
+            --workspace="@google/gemini-cli" \
+            --tag="${{ steps.nightly_version.outputs.NPM_TAG }}"
+
+      - name: 'Bundle'
+        run: npm run bundle
+
+      - name: 'Create Nightly GitHub Release'
+        if: ${{ !github.event.inputs.dry_run }}
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |-
+          gh release create "${{ steps.nightly_version.outputs.RELEASE_TAG }}" \
+            bundle/gemini.js \
+            --target "main" \
+            --title "Release ${{ steps.nightly_version.outputs.RELEASE_TAG }}" \
+            --notes-start-tag "${{ steps.nightly_version.outputs.PREVIOUS_TAG }}" \
+            --generate-notes

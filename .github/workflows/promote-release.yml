@@ -10,39 +10,34 @@ on:
         default: true
 
 jobs:
-  get_versions:
-    runs-on: ubuntu-latest
-    outputs:
-      MAIN_SHA: ${{ steps.main_sha.outputs.SHA }}
-      PREVIEW_TAG: ${{ steps.preview_tag.outputs.TAG }}
-      STABLE_RELEASE_TAG: ${{ steps.stable_version.outputs.RELEASE_TAG }}
-      STABLE_RELEASE_VERSION: ${{ steps.stable_version.outputs.RELEASE_VERSION }}
-      STABLE_NPM_TAG: ${{ steps.stable_version.outputs.NPM_TAG }}
-      STABLE_PREVIOUS_TAG: ${{ steps.stable_version.outputs.PREVIOUS_TAG }}
-      PREVIEW_RELEASE_TAG: ${{ steps.preview_version.outputs.RELEASE_TAG }}
-      PREVIEW_RELEASE_VERSION: ${{ steps.preview_version.outputs.RELEASE_VERSION }}
-      PREVIEW_NPM_TAG: ${{ steps.preview_version.outputs.NPM_TAG }}
-      PREVIEW_PREVIOUS_TAG: ${{ steps.preview_version.outputs.PREVIOUS_TAG }}
+  promote:
+    runs-on: 'ubuntu-latest'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
           fetch-depth: 0
+
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+
       - name: 'Install Dependencies'
         run: npm ci
+
       - name: 'Build get-release-version script'
         run: npm run build:get-release-version
+
       - name: 'Get main SHA'
         id: 'main_sha'
         run: echo "SHA=$(git rev-parse main)" >> $GITHUB_OUTPUT
+
       - name: 'Get latest preview tag'
         id: 'preview_tag'
         run: echo "TAG=$(git describe --tags --abbrev=0 --match 'v*-preview')" >> $GITHUB_OUTPUT
+
       - name: 'Get Stable Version'
         id: 'stable_version'
         run: |
@@ -51,6 +46,32 @@ jobs:
           echo "RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
+
+      - name: 'Promote Preview to Stable'
+        run: |
+          git checkout ${{ steps.preview_tag.outputs.TAG }}
+          npm ci
+          npm run release:version ${{ steps.stable_version.outputs.RELEASE_VERSION }}
+          npm run build:packages
+          npm run prepare:package
+          npm publish --workspace="@google/gemini-cli-core" --tag="${{ steps.stable_version.outputs.NPM_TAG }}" --dry-run=${{ github.event.inputs.dry_run }}
+          npm publish --workspace="@google/gemini-cli" --tag="${{ steps.stable_version.outputs.NPM_TAG }}" --dry-run=${{ github.event.inputs.dry_run }}
+        env:
+          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+
+      - name: 'Create Stable GitHub Release'
+        if: ${{ !github.event.inputs.dry_run }}
+        run: |
+          npm run bundle
+          gh release create "${{ steps.stable_version.outputs.RELEASE_TAG }}" \
+            bundle/gemini.js \
+            --target "${{ steps.preview_tag.outputs.TAG }}" \
+            --title "Release ${{ steps.stable_version.outputs.RELEASE_TAG }}" \
+            --notes-start-tag "${{ steps.stable_version.outputs.PREVIOUS_TAG }}" \
+            --generate-notes
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+
       - name: 'Get Preview Version'
         id: 'preview_version'
         run: |
@@ -60,61 +81,36 @@ jobs:
           echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
 
-  promote_to_stable:
-    needs: get_versions
-    uses: ./.github/workflows/build-and-publish.yml
-    with:
-      ref: ${{ needs.get_versions.outputs.PREVIEW_TAG }}
-      release_version: ${{ needs.get_versions.outputs.STABLE_RELEASE_VERSION }}
-      npm_tag: ${{ needs.get_versions.outputs.STABLE_NPM_TAG }}
-      dry_run: ${{ github.event.inputs.dry_run == 'true' }}
-    secrets:
-      WOMBAT_TOKEN_CORE: ${{ secrets.WOMBAT_TOKEN_CORE }}
-      WOMBAT_TOKEN_CLI: ${{ secrets.WOMBAT_TOKEN_CLI }}
+      - name: 'Create Next Preview from main'
+        run: |
+          git checkout ${{ steps.main_sha.outputs.SHA }}
+          npm ci
+          npm run release:version ${{ steps.preview_version.outputs.RELEASE_VERSION }}
+          npm run build:packages
+          npm run prepare:package
+          npm publish --workspace="@google/gemini-cli-core" --tag="${{ steps.preview_version.outputs.NPM_TAG }}" --dry-run=${{ github.event.inputs.dry_run }}
+          npm publish --workspace="@google/gemini-cli" --tag="${{ steps.preview_version.outputs.NPM_TAG }}" --dry-run=${{ github.event.inputs.dry_run }}
+        env:
+          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
 
-  create_stable_release:
-    needs: [get_versions, promote_to_stable]
-    uses: ./.github/workflows/create-github-release.yml
-    with:
-      release_tag: ${{ needs.get_versions.outputs.STABLE_RELEASE_TAG }}
-      release_branch: ${{ needs.get_versions.outputs.PREVIEW_TAG }}
-      previous_tag: ${{ needs.get_versions.outputs.STABLE_PREVIOUS_TAG }}
-      dry_run: ${{ github.event.inputs.dry_run == 'true' }}
+      - name: 'Create Preview GitHub Release'
+        if: ${{ !github.event.inputs.dry_run }}
+        run: |
+          npm run bundle
+          gh release create "${{ steps.preview_version.outputs.RELEASE_TAG }}" \
+            bundle/gemini.js \
+            --target "${{ steps.main_sha.outputs.SHA }}" \
+            --title "Release ${{ steps.preview_version.outputs.RELEASE_TAG }}" \
+            --notes-start-tag "${{ steps.stable_version.outputs.RELEASE_TAG }}" \
+            --generate-notes
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
 
-  create_preview:
-    needs: get_versions
-    uses: ./.github/workflows/build-and-publish.yml
-    with:
-      ref: ${{ needs.get_versions.outputs.MAIN_SHA }}
-      release_version: ${{ needs.get_versions.outputs.PREVIEW_RELEASE_VERSION }}
-      npm_tag: ${{ needs.get_versions.outputs.PREVIEW_NPM_TAG }}
-      dry_run: ${{ github.event.inputs.dry_run == 'true' }}
-    secrets:
-      WOMBAT_TOKEN_CORE: ${{ secrets.WOMBAT_TOKEN_CORE }}
-      WOMBAT_TOKEN_CLI: ${{ secrets.WOMBAT_TOKEN_CLI }}
-
-  create_preview_release:
-    needs: [get_versions, create_preview]
-    uses: ./.github/workflows/create-github-release.yml
-    with:
-      release_tag: ${{ needs.get_versions.outputs.PREVIEW_RELEASE_TAG }}
-      release_branch: ${{ needs.get_versions.outputs.MAIN_SHA }}
-      previous_tag: ${{ needs.get_versions.outputs.STABLE_RELEASE_TAG }}
-      dry_run: ${{ github.event.inputs.dry_run == 'true' }}
-
-  prepare_next_nightly:
-    needs: [get_versions, create_preview_release]
-    runs-on: ubuntu-latest
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
-        with:
-          fetch-depth: 0
       - name: 'Prepare main for Next Nightly'
         if: ${{ !github.event.inputs.dry_run }}
         run: |
-          NEXT_NIGHTLY_VERSION=$(node -e "console.log(require('./scripts/get-release-version.js').calculateNextVersion('${{ needs.get_versions.outputs.PREVIEW_RELEASE_VERSION }}'))")
-          git checkout ${{ needs.get_versions.outputs.MAIN_SHA }}
+          NEXT_NIGHTLY_VERSION=$(node -e "console.log(require('./scripts/get-release-version.js').calculateNextVersion('${{ steps.preview_version.outputs.RELEASE_VERSION }}'))")
+          git checkout ${{ steps.main_sha.outputs.SHA }}
           git checkout -b release/prepare-nightly-${NEXT_NIGHTLY_VERSION}
           npm run release:version ${NEXT_NIGHTLY_VERSION}
           git add .
@@ -123,4 +119,4 @@ jobs:
           gh pr create --title "chore(release): Prepare for next nightly version ${NEXT_NIGHTLY_VERSION}" --body "Automated PR to update the version in main." --base main
           gh pr merge --auto --merge
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
