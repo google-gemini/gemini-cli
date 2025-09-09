@@ -51,18 +51,6 @@ export type StreamEvent =
   | { type: StreamEventType.CHUNK; value: GenerateContentResponse }
   | { type: StreamEventType.RETRY };
 
-export enum StreamEventType {
-  /** A regular content chunk from the API. */
-  CHUNK = 'chunk',
-  /** A signal that a retry is about to happen. The UI should discard any partial
-   * content from the attempt that just failed. */
-  RETRY = 'retry',
-}
-
-export type StreamEvent =
-  | { type: StreamEventType.CHUNK; value: GenerateContentResponse }
-  | { type: StreamEventType.RETRY };
-
 /**
  * Options for retrying due to invalid content from the model.
  */

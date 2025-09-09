@@ -339,6 +339,7 @@ function mergeSettings(
       }
     : {
         ...restOfWorkspace,
+        security: {},
       };
 
   // Settings are merged with the following precedence (last one wins for
