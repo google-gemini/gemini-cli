@@ -58,7 +58,7 @@ jobs:
       ref: 'main'
       release_version: ${{ needs.get_version.outputs.RELEASE_VERSION }}
       npm_tag: ${{ needs.get_version.outputs.NPM_TAG }}
-      dry_run: ${{ needs.get_version.outputs.IS_DRY_RUN }}
+      dry_run: ${{ needs.get_version.outputs.IS_DRY_RUN == 'true' }}
     secrets:
       WOMBAT_TOKEN_CORE: ${{ secrets.WOMBAT_TOKEN_CORE }}
       WOMBAT_TOKEN_CLI: ${{ secrets.WOMBAT_TOKEN_CLI }}
@@ -70,4 +70,4 @@ jobs:
       release_tag: ${{ needs.get_version.outputs.RELEASE_TAG }}
       release_branch: 'main'
       previous_tag: ${{ needs.get_version.outputs.PREVIOUS_TAG }}
-      dry_run: ${{ needs.get_version.outputs.IS_DRY_RUN }}
+      dry_run: ${{ needs.get_version.outputs.IS_DRY_RUN == 'true' }}

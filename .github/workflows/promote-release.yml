@@ -67,7 +67,7 @@ jobs:
       ref: ${{ needs.get_versions.outputs.PREVIEW_TAG }}
       release_version: ${{ needs.get_versions.outputs.STABLE_RELEASE_VERSION }}
       npm_tag: ${{ needs.get_versions.outputs.STABLE_NPM_TAG }}
-      dry_run: ${{ github.event.inputs.dry_run }}
+      dry_run: ${{ github.event.inputs.dry_run == 'true' }}
     secrets:
       WOMBAT_TOKEN_CORE: ${{ secrets.WOMBAT_TOKEN_CORE }}
       WOMBAT_TOKEN_CLI: ${{ secrets.WOMBAT_TOKEN_CLI }}
@@ -79,7 +79,7 @@ jobs:
       release_tag: ${{ needs.get_versions.outputs.STABLE_RELEASE_TAG }}
       release_branch: ${{ needs.get_versions.outputs.PREVIEW_TAG }}
       previous_tag: ${{ needs.get_versions.outputs.STABLE_PREVIOUS_TAG }}
-      dry_run: ${{ github.event.inputs.dry_run }}
+      dry_run: ${{ github.event.inputs.dry_run == 'true' }}
 
   create_preview:
     needs: get_versions
@@ -88,7 +88,7 @@ jobs:
       ref: ${{ needs.get_versions.outputs.MAIN_SHA }}
       release_version: ${{ needs.get_versions.outputs.PREVIEW_RELEASE_VERSION }}
       npm_tag: ${{ needs.get_versions.outputs.PREVIEW_NPM_TAG }}
-      dry_run: ${{ github.event.inputs.dry_run }}
+      dry_run: ${{ github.event.inputs.dry_run == 'true' }}
     secrets:
       WOMBAT_TOKEN_CORE: ${{ secrets.WOMBAT_TOKEN_CORE }}
       WOMBAT_TOKEN_CLI: ${{ secrets.WOMBAT_TOKEN_CLI }}
@@ -100,7 +100,7 @@ jobs:
       release_tag: ${{ needs.get_versions.outputs.PREVIEW_RELEASE_TAG }}
       release_branch: ${{ needs.get_versions.outputs.MAIN_SHA }}
       previous_tag: ${{ needs.get_versions.outputs.STABLE_RELEASE_TAG }}
-      dry_run: ${{ github.event.inputs.dry_run }}
+      dry_run: ${{ github.event.inputs.dry_run == 'true' }}
 
   prepare_next_nightly:
     needs: [get_versions, create_preview_release]
