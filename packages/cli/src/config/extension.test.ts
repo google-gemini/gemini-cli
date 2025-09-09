@@ -26,6 +26,8 @@ import {
   GEMINI_DIR,
   type GeminiCLIExtension,
   type MCPServerConfig,
+  ClearcutLogger,
+  type Config,
 } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
 import { SettingScope, loadSettings } from './settings.js';
@@ -49,6 +51,22 @@ vi.mock('./trustedFolders.js', async (importOriginal) => {
   return {
     ...actual,
     isWorkspaceTrusted: vi.fn(),
+  };
+});
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const mockLogExtensionInstallEvent = vi.fn();
+  return {
+    ...actual,
+    ClearcutLogger: {
+      getInstance: vi.fn(() => ({
+        logExtensionInstallEvent: mockLogExtensionInstallEvent,
+      })),
+    },
+    Config: vi.fn(),
+    ExtensionInstallEvent: vi.fn(),
   };
 });
 
@@ -518,6 +536,19 @@ describe('installExtension', () => {
       type: 'link',
     });
     fs.rmSync(targetExtDir, { recursive: true, force: true });
+  });
+
+  it('should log to clearcut on successful install', async () => {
+    const sourceExtDir = createExtension({
+      extensionsDir: tempHomeDir,
+      name: 'my-local-extension',
+      version: '1.0.0',
+    });
+
+    await installExtension({ source: sourceExtDir, type: 'local' });
+
+    const logger = ClearcutLogger.getInstance({} as Config);
+    expect(logger?.logExtensionInstallEvent).toHaveBeenCalled();
   });
 });
 

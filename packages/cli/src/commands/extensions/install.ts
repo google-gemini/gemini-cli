@@ -45,10 +45,8 @@ export async function handleInstall(args: InstallArgs) {
       throw new Error('Either --source or --path must be provided.');
     }
 
-    const extensionName = await installExtension(installMetadata);
-    console.log(
-      `Extension "${extensionName}" installed successfully and enabled.`,
-    );
+    const name = await installExtension(installMetadata);
+    console.log(`Extension "${name}" installed successfully and enabled.`);
   } catch (error) {
     console.error(getErrorMessage(error));
     process.exit(1);
