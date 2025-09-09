@@ -47,7 +47,6 @@ export interface ExtensionInstallMetadata {
   source: string;
   type: 'git' | 'local' | 'link';
   ref?: string;
-  subpath?: string;
 }
 
 export interface ExtensionUpdateInfo {
@@ -396,9 +395,6 @@ export async function installExtension(
     tempDir = await ExtensionStorage.createTmpDir();
     await cloneFromGit(installMetadata, tempDir);
     localSourcePath = tempDir;
-    if (installMetadata.subpath) {
-      localSourcePath = path.join(localSourcePath, installMetadata.subpath);
-    }
   } else if (
     installMetadata.type === 'local' ||
     installMetadata.type === 'link'
@@ -503,9 +499,6 @@ export function toOutputString(extension: Extension): string {
     output += `\n Source: ${extension.installMetadata.source} (Type: ${extension.installMetadata.type})`;
     if (extension.installMetadata.ref) {
       output += `\n Ref: ${extension.installMetadata.ref}`;
-    }
-    if (extension.installMetadata.subpath) {
-      output += `\n Subpath: ${extension.installMetadata.subpath}`;
     }
   }
   if (extension.contextFiles.length > 0) {

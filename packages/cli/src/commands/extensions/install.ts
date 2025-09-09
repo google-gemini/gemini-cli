@@ -16,7 +16,6 @@ interface InstallArgs {
   source?: string;
   path?: string;
   ref?: string;
-  subpath?: string;
 }
 
 const ORG_REPO_REGEX = /^[a-zA-Z0-9-]+\/[\w.-]+$/;
@@ -36,14 +35,12 @@ export async function handleInstall(args: InstallArgs) {
           source,
           type: 'git',
           ref: args.ref,
-          subpath: args.subpath,
         };
       } else if (ORG_REPO_REGEX.test(source)) {
         installMetadata = {
           source: `https://github.com/${source}.git`,
           type: 'git',
           ref: args.ref,
-          subpath: args.subpath,
         };
       } else {
         throw new Error(
@@ -88,13 +85,8 @@ export const installCommand: CommandModule = {
         describe: 'The git ref to install from.',
         type: 'string',
       })
-      .option('subpath', {
-        describe: 'The git repo subpath to install from.',
-        type: 'string',
-      })
       .conflicts('source', 'path')
       .conflicts('path', 'ref')
-      .conflicts('path', 'subpath')
       .check((argv) => {
         if (!argv.source && !argv.path) {
           throw new Error('Either source or --path must be provided.');
@@ -106,7 +98,6 @@ export const installCommand: CommandModule = {
       source: argv['source'] as string | undefined,
       path: argv['path'] as string | undefined,
       ref: argv['ref'] as string | undefined,
-      subpath: argv['subpath'] as string | undefined,
     });
   },
 };
