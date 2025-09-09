@@ -9,6 +9,7 @@ import { IDEServer } from './ide-server.js';
 import semver from 'semver';
 import { DiffContentProvider, DiffManager } from './diff-manager.js';
 import { createLogger } from './utils/logger.js';
+import { detectIdeFromEnv, DetectedIde } from '@google/gemini-cli-core';
 
 const CLI_IDE_COMPANION_IDENTIFIER = 'Google.gemini-cli-vscode-ide-companion';
 const INFO_MESSAGE_SHOWN_KEY = 'geminiCliInfoMessageShown';
@@ -133,7 +134,11 @@ export async function activate(context: vscode.ExtensionContext) {
     log(`Failed to start IDE server: ${message}`);
   }
 
-  if (!context.globalState.get(INFO_MESSAGE_SHOWN_KEY)) {
+  const infoMessageEnabled =
+    // the plugin is native to Firebase Studio, don't show the message
+    detectIdeFromEnv() !== DetectedIde.FirebaseStudio;
+
+  if (!context.globalState.get(INFO_MESSAGE_SHOWN_KEY) && infoMessageEnabled) {
     void vscode.window.showInformationMessage(
       'Gemini CLI Companion extension successfully installed.',
     );
