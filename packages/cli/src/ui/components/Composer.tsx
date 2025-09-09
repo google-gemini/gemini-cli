@@ -54,6 +54,9 @@ export const Composer = () => {
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
     nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,
+    hideCWD: settings.merged.ui?.footer?.hideCWD || false,
+    hideSandboxStatus: settings.merged.ui?.footer?.hideSandboxStatus || false,
+    hideModelInfo: settings.merged.ui?.footer?.hideModelInfo || false,
   };
 
   return (
