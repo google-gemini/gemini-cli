@@ -42,8 +42,8 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
   ],
   office_assistant: [
     LSTool,
-    ReadFileTool,
-    WriteFileTool,
+    // ReadFileTool,
+    // WriteFileTool,
     FileTool,
     ShellTool,
     WebTool,

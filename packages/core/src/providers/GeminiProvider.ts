@@ -585,8 +585,7 @@ export class GeminiProvider extends BaseModelProvider {
     
     const toolRegistry = this.configInstance.getToolRegistry();
     this.toolDeclarations = toolRegistry.getFunctionDeclarations();
-    console.log(`[GeminiProvider] Loaded ${this.toolDeclarations.length} tool declarations:`, 
-      this.toolDeclarations.map(tool => tool.name));
+    // Tool declarations loaded
   }
 
   override updateConfig(config: ModelProviderConfig): void {
@@ -713,47 +712,16 @@ export class GeminiProvider extends BaseModelProvider {
       }
     }
     
-    // Debug logging for function call/response matching
-    console.log(`[GeminiProvider] Generated ${contents.length} contents for API request`);
-    
+    // Check for function call/response mismatch
     let functionCallCount = 0;
     let functionResponseCount = 0;
     
-    contents.forEach((content, index) => {
+    contents.forEach((content) => {
       const functionCalls = content.parts?.filter(part => part.functionCall) || [];
       const functionResponses = content.parts?.filter(part => part.functionResponse) || [];
-      
-      if (functionCalls.length > 0) {
-        functionCallCount += functionCalls.length;
-        console.log(`[GeminiProvider] Content[${index}] (role: ${content.role}) has ${functionCalls.length} functionCall(s):`);
-        functionCalls.forEach((part, partIndex) => {
-          console.log(`  - functionCall[${partIndex}]: name="${part.functionCall?.name}", id="${part.functionCall?.id}"`);
-          if (part.functionCall?.args && Object.keys(part.functionCall.args).length > 0) {
-            console.log(`    args: ${JSON.stringify(part.functionCall.args, null, 4)}`);
-          }
-        });
-      }
-      
-      if (functionResponses.length > 0) {
-        functionResponseCount += functionResponses.length;
-        console.log(`[GeminiProvider] Content[${index}] (role: ${content.role}) has ${functionResponses.length} functionResponse(s):`);
-        functionResponses.forEach((part, partIndex) => {
-          console.log(`  - functionResponse[${partIndex}]: name="${part.functionResponse?.name}", id="${part.functionResponse?.id}"`);
-        });
-      }
-      
-      if (content.parts && content.parts.length > 0) {
-        const partTypes = content.parts.map(part => {
-          if (part.text) return 'text';
-          if (part.functionCall) return 'functionCall';
-          if (part.functionResponse) return 'functionResponse';
-          return 'other';
-        }).join(', ');
-        console.log(`[GeminiProvider] Content[${index}] (role: ${content.role}) parts: [${partTypes}]`);
-      }
+      functionCallCount += functionCalls.length;
+      functionResponseCount += functionResponses.length;
     });
-    
-    console.log(`[GeminiProvider] Total function calls: ${functionCallCount}, Total function responses: ${functionResponseCount}`);
     
     if (functionCallCount !== functionResponseCount && (functionCallCount > 0 || functionResponseCount > 0)) {
       console.warn(`[GeminiProvider] ⚠️  Function call/response count mismatch! Calls: ${functionCallCount}, Responses: ${functionResponseCount}`);
@@ -831,14 +799,14 @@ export class GeminiProvider extends BaseModelProvider {
     // Use OAuth Code Assist Server or API key GoogleGenAI based on authentication type
     if (this.codeAssistServer) {
       // OAuth authentication - use CodeAssistServer
-      console.log('[GeminiProvider] Using CodeAssistServer for OAuth request');
+      // console.log('[GeminiProvider] Using CodeAssistServer for OAuth request');
       return Promise.race([
         this.codeAssistServer.generateContent(requestWithSignal, `gui_${Date.now()}`),
         abortPromise
       ]);
     } else if (this.generativeModel) {
       // API key authentication - use GoogleGenAI
-      console.log('[GeminiProvider] Using GoogleGenAI for API key request');
+      // console.log('[GeminiProvider] Using GoogleGenAI for API key request');
       return Promise.race([
         this.generativeModel.generateContent(requestWithSignal),
         abortPromise
