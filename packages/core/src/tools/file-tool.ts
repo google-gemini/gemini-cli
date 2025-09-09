@@ -7,21 +7,34 @@
 import { existsSync, promises as fs } from 'node:fs';
 import path from 'node:path';
 import { glob } from 'glob';
+import type { PartUnion } from '@google/genai';
+import mime from 'mime-types';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  ToolConfirmationOutcome,
 } from './tools.js';
-import type { ToolResult } from './tools.js';
+import type { 
+  ToolResult,
+  ToolCallConfirmationDetails,
+  ToolExecuteConfirmationDetails,
+} from './tools.js';
 import { ToolErrorType } from './tool-error.js';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
 
 interface FileOpsParams {
   /** Operation type */
-  op: 'renameFile' | 'moveFile' | 'copyFile' | 'deleteFile' | 'mkdir' | 'rmdir' | 'batchFile' | 'batchDir';
+  op: 'renameFile' | 'moveFile' | 'copyFile' | 'deleteFile' | 'mkdir' | 'rmdir' | 'batchFile' | 'batchDir' | 'writeFile' | 'appendFile' | 'readFile';
   /** Source file/directory path */
   source?: string;
   /** Target file/directory path (for rename/move/copy) */
   target?: string;
+  /** Content to write/append to file */
+  content?: string;
+  /** File path for write/append/read operations */
+  file_path?: string;
   /** Batch operation type (move, copy, rename, delete) */
   operation?: 'move' | 'copy' | 'rename' | 'delete';
   /** Multiple source files for batch operations */
@@ -32,6 +45,10 @@ interface FileOpsParams {
   sourceDir?: string;
   /** File pattern for batch operations (e.g., "*.xls", "stock_val*") */
   pattern?: string;
+  /** Line number to start reading from (for readFile) */
+  offset?: number;
+  /** Number of lines to read (for readFile) */
+  limit?: number;
 }
 
 interface FileOpsResult extends ToolResult {
@@ -42,12 +59,15 @@ interface FileOpsResult extends ToolResult {
 }
 
 class FileOpsInvocation extends BaseToolInvocation<FileOpsParams, FileOpsResult> {
-  constructor(params: FileOpsParams) {
+  constructor(
+    private readonly config: Config,
+    params: FileOpsParams
+  ) {
     super(params);
   }
 
   getDescription(): string {
-    const { op, source, target, operation, sources, pattern, sourceDir } = this.params;
+    const { op, source, target, operation, sources, pattern, sourceDir, file_path } = this.params;
     
     if (op === 'batchFile') {
       const count = sources?.length || 0;
@@ -63,6 +83,18 @@ class FileOpsInvocation extends BaseToolInvocation<FileOpsParams, FileOpsResult>
       const sourceDirText = sourceDir ? ` from "${sourceDir}"` : '';
       const sourceDesc = count > 0 ? `${count} directories` : `directories${patternText}${sourceDirText}`;
       return `BatchDir ${operation}: ${sourceDesc} to "${target || 'target directory'}"`;
+    }
+
+    if (op === 'writeFile' || op === 'appendFile') {
+      const filePath = file_path || source;
+      const fileName = filePath ? path.basename(filePath) : 'file';
+      return op === 'writeFile' ? `Writing to "${fileName}"` : `Appending to "${fileName}"`;
+    }
+
+    if (op === 'readFile') {
+      const filePath = file_path || source;
+      const fileName = filePath ? path.basename(filePath) : 'file';
+      return `Reading "${fileName}"`;
     }
     
     const baseName = source ? path.basename(source) : 'file';
@@ -106,6 +138,12 @@ class FileOpsInvocation extends BaseToolInvocation<FileOpsParams, FileOpsResult>
           return await this.batchOperation(signal);
         case 'batchDir':
           return await this.batchDirOperation(signal);
+        case 'writeFile':
+          return await this.writeFile(signal);
+        case 'appendFile':
+          return await this.appendFile(signal);
+        case 'readFile':
+          return await this.readFile(signal);
         default:
           throw new Error(`Unknown operation: ${op}`);
       }
@@ -497,6 +535,255 @@ class FileOpsInvocation extends BaseToolInvocation<FileOpsParams, FileOpsResult>
     };
   }
 
+  private async writeFile(signal: AbortSignal): Promise<FileOpsResult> {
+    const { file_path, content } = this.params;
+    
+    if (!file_path) {
+      throw new Error('File path required for writeFile operation');
+    }
+    
+    if (content === undefined) {
+      throw new Error('Content required for writeFile operation');
+    }
+    
+    signal.throwIfAborted();
+    
+    // Ensure parent directory exists
+    const parentDir = path.dirname(file_path);
+    if (parentDir && !existsSync(parentDir)) {
+      await fs.mkdir(parentDir, { recursive: true });
+    }
+    
+    const fileType = this.detectWriteFileType(file_path, content);
+    
+    if (fileType === 'image') {
+      // Handle image file (expect base64 content)
+      try {
+        // Remove data URL prefix if present (e.g., "data:image/png;base64,")
+        const base64Content = content.replace(/^data:image\/[^;]+;base64,/, '');
+        
+        // Validate base64 format
+        if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Content)) {
+          throw new Error('Invalid base64 format for image content');
+        }
+        
+        const imageBuffer = Buffer.from(base64Content, 'base64');
+        await fs.writeFile(file_path, imageBuffer);
+        
+        const message = `Successfully wrote image file: ${file_path}.`;
+        return {
+          success: true,
+          op: 'writeFile',
+          source: file_path,
+          llmContent: message,
+          returnDisplay: message,
+        };
+      } catch (error) {
+        throw new Error(`Failed to write image file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      // Handle text files and special format files (SVG, CSV, JSON, XML, etc.)
+      await fs.writeFile(file_path, content, 'utf8');
+      
+      const message = `Successfully overwrote file: ${file_path}.`;
+      return {
+        success: true,
+        op: 'writeFile',
+        source: file_path,
+        llmContent: message,
+        returnDisplay: message,
+      };
+    }
+  }
+
+  private async appendFile(signal: AbortSignal): Promise<FileOpsResult> {
+    const { file_path, content } = this.params;
+    
+    if (!file_path) {
+      throw new Error('File path required for appendFile operation');
+    }
+    
+    if (content === undefined) {
+      throw new Error('Content required for appendFile operation');
+    }
+    
+    signal.throwIfAborted();
+    
+    // Ensure parent directory exists
+    const parentDir = path.dirname(file_path);
+    if (parentDir && !existsSync(parentDir)) {
+      await fs.mkdir(parentDir, { recursive: true });
+    }
+    
+    // Append to the file
+    await fs.appendFile(file_path, content, 'utf8');
+    
+    const message = `Successfully appended content to file: ${file_path}.`;
+    
+    return {
+      success: true,
+      op: 'appendFile',
+      source: file_path,
+      llmContent: message,
+      returnDisplay: message,
+    };
+  }
+
+  private async readFile(signal: AbortSignal): Promise<FileOpsResult> {
+    const { file_path, offset, limit } = this.params;
+    
+    if (!file_path) {
+      throw new Error('File path required for readFile operation');
+    }
+    
+    if (!existsSync(file_path)) {
+      throw new Error(`File "${file_path}" does not exist`);
+    }
+    
+    signal.throwIfAborted();
+    
+    const fileName = path.basename(file_path);
+    const fileType = this.detectFileType(file_path);
+    
+    if (fileType === 'image') {
+      // Read image file as base64
+      const contentBuffer = await fs.readFile(file_path);
+      const base64Data = contentBuffer.toString('base64');
+      const mimeType = mime.lookup(file_path) || 'application/octet-stream';
+      
+      const imageContent: PartUnion = {
+        inlineData: {
+          data: base64Data,
+          mimeType,
+        },
+      };
+      
+      return {
+        success: true,
+        op: 'readFile',
+        source: file_path,
+        llmContent: imageContent,
+        returnDisplay: `Successfully read image file: ${fileName}`,
+      };
+    } else if (fileType === 'text') {
+      // Read text file with optional pagination
+      const content = await fs.readFile(file_path, 'utf8');
+      const lines = content.split('\n');
+      const totalLines = lines.length;
+      
+      let resultContent: string;
+      let displayMessage: string;
+      
+      if (offset !== undefined || limit !== undefined) {
+        // Apply pagination
+        const startLine = offset || 0;
+        const maxLines = limit || 2000;
+        const endLine = Math.min(startLine + maxLines, totalLines);
+        
+        if (startLine >= totalLines) {
+          throw new Error(`Offset ${startLine} exceeds file length (${totalLines} lines)`);
+        }
+        
+        const selectedLines = lines.slice(startLine, endLine);
+        resultContent = selectedLines.join('\n');
+        
+        const isTruncated = startLine > 0 || endLine < totalLines;
+        if (isTruncated) {
+          const nextOffset = endLine;
+          displayMessage = `Read lines ${startLine + 1}-${endLine} of ${totalLines} from ${fileName}`;
+          if (endLine < totalLines) {
+            resultContent = `IMPORTANT: The file content has been truncated.
+Status: Showing lines ${startLine + 1}-${endLine} of ${totalLines} total lines.
+Action: To read more of the file, use offset: ${nextOffset}.
+
+--- FILE CONTENT (truncated) ---
+${resultContent}`;
+          }
+        } else {
+          displayMessage = `Successfully read file: ${fileName}`;
+        }
+      } else {
+        // Read entire file (up to default limit)
+        const maxLines = 2000;
+        if (totalLines > maxLines) {
+          const selectedLines = lines.slice(0, maxLines);
+          resultContent = selectedLines.join('\n');
+          const nextOffset = maxLines;
+          resultContent = `IMPORTANT: The file content has been truncated.
+Status: Showing lines 1-${maxLines} of ${totalLines} total lines.
+Action: To read more of the file, use offset: ${nextOffset}.
+
+--- FILE CONTENT (truncated) ---
+${resultContent}`;
+          displayMessage = `Read lines 1-${maxLines} of ${totalLines} from ${fileName}`;
+        } else {
+          resultContent = content;
+          displayMessage = `Successfully read file: ${fileName}`;
+        }
+      }
+      
+      return {
+        success: true,
+        op: 'readFile',
+        source: file_path,
+        llmContent: resultContent,
+        returnDisplay: displayMessage,
+      };
+    } else {
+      throw new Error(`Unsupported file type for reading: ${fileName}. Only text and image files are supported.`);
+    }
+  }
+
+  private detectFileType(filePath: string): 'text' | 'image' | 'other' {
+    const ext = path.extname(filePath).toLowerCase();
+    
+    // TypeScript files should be treated as text
+    if (['.ts', '.mts', '.cts', '.tsx'].includes(ext)) {
+      return 'text';
+    }
+    
+    const lookedUpMimeType = mime.lookup(filePath);
+    if (lookedUpMimeType && typeof lookedUpMimeType === 'string') {
+      if (lookedUpMimeType.startsWith('image/')) {
+        return 'image';
+      }
+    }
+    
+    // Common image extensions
+    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg'];
+    if (imageExtensions.includes(ext)) {
+      return 'image';
+    }
+    
+    // Common text extensions and fallback
+    const textExtensions = ['.txt', '.md', '.js', '.py', '.java', '.cpp', '.c', '.h', '.css', '.html', '.xml', '.json', '.yaml', '.yml', '.ini', '.conf', '.log'];
+    if (textExtensions.includes(ext) || (lookedUpMimeType && typeof lookedUpMimeType === 'string' && lookedUpMimeType.startsWith('text/'))) {
+      return 'text';
+    }
+    
+    // Default to text for unknown extensions (can be overridden)
+    return 'text';
+  }
+
+  private detectWriteFileType(filePath: string, content: string): 'text' | 'image' {
+    const ext = path.extname(filePath).toLowerCase();
+    
+    // Binary image extensions (excluding SVG which is text-based)
+    const binaryImageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'];
+    if (binaryImageExtensions.includes(ext)) {
+      return 'image';
+    }
+    
+    // Check if content looks like base64 data URL for images
+    if (content.startsWith('data:image/') || 
+        (content.match(/^[A-Za-z0-9+/]*={0,2}$/) && content.length > 100)) {
+      return 'image';
+    }
+    
+    // Everything else is treated as text (including SVG, CSV, JSON, XML, etc.)
+    return 'text';
+  }
+
   private createSuccessResult(message: string): FileOpsResult {
     return {
       success: true,
@@ -522,10 +809,141 @@ class FileOpsInvocation extends BaseToolInvocation<FileOpsParams, FileOpsResult>
       },
     };
   }
+
+  override async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    // Skip confirmation for YOLO mode
+    if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
+      return false;
+    }
+
+    const params = this.params;
+    const isDestructiveOperation = this.isDestructiveOperation(params);
+    
+    // Only require confirmation for destructive operations
+    if (!isDestructiveOperation) {
+      return false;
+    }
+
+    const operationDescription = this.getOperationDescription(params);
+    const command = this.formatCommandDisplay(params);
+
+    const confirmationDetails: ToolExecuteConfirmationDetails = {
+      type: 'exec',
+      title: `Confirm File Operation`,
+      command,
+      rootCommand: operationDescription,
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          // For file operations, we could set a flag to skip confirmation for similar operations
+          // But since file operations can be varied, we'll keep per-operation confirmation
+        }
+      },
+    };
+
+    return confirmationDetails;
+  }
+
+  private isDestructiveOperation(params: FileOpsParams): boolean {
+    const { op, operation } = params;
+    
+    // Single file destructive operations
+    if (['deleteFile', 'rmdir', 'moveFile'].includes(op)) {
+      return true;
+    }
+    
+    // File writing operations that might overwrite existing content
+    if (['writeFile', 'appendFile'].includes(op)) {
+      return true;
+    }
+    
+    // Batch destructive operations
+    if ((op === 'batchFile' || op === 'batchDir') && ['delete', 'move'].includes(operation || '')) {
+      return true;
+    }
+    
+    // Operations that might overwrite existing files
+    if (['copyFile', 'renameFile'].includes(op)) {
+      return true;
+    }
+    
+    if ((op === 'batchFile' || op === 'batchDir') && ['copy', 'rename'].includes(operation || '')) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  private getOperationDescription(params: FileOpsParams): string {
+    const { op, operation } = params;
+    
+    if (op === 'batchFile' || op === 'batchDir') {
+      return `Batch ${operation} ${op === 'batchFile' ? 'files' : 'directories'}`;
+    }
+    
+    switch (op) {
+      case 'deleteFile':
+        return 'Delete file';
+      case 'rmdir':
+        return 'Remove directory';
+      case 'moveFile':
+        return 'Move file';
+      case 'copyFile':
+        return 'Copy file';
+      case 'renameFile':
+        return 'Rename file';
+      case 'writeFile':
+        return 'Write file';
+      case 'appendFile':
+        return 'Append to file';
+      default:
+        return `File operation: ${op}`;
+    }
+  }
+
+  private formatCommandDisplay(params: FileOpsParams): string {
+    const { op, source, target, sources, pattern, sourceDir, targetDir, operation } = params;
+    
+    if (op === 'batchFile' || op === 'batchDir') {
+      const sourceDesc = sources?.length 
+        ? `${sources.length} items: ${sources.slice(0, 3).join(', ')}${sources.length > 3 ? '...' : ''}`
+        : pattern 
+          ? `pattern "${pattern}" in ${sourceDir || '.'}`
+          : 'multiple items';
+      
+      return `${operation} ${sourceDesc} -> ${targetDir || 'target directory'}`;
+    }
+    
+    const sourceName = source ? path.basename(source) : 'source';
+    const targetName = target ? path.basename(target) : 'target';
+    const filePath = params.file_path ? path.basename(params.file_path) : sourceName;
+    
+    switch (op) {
+      case 'deleteFile':
+        return `rm "${sourceName}"`;
+      case 'rmdir':
+        return `rmdir "${sourceName}"`;
+      case 'moveFile':
+        return `mv "${sourceName}" -> "${targetName}"`;
+      case 'copyFile':
+        return `cp "${sourceName}" -> "${targetName}"`;
+      case 'renameFile':
+        return `rename "${sourceName}" -> "${targetName}"`;
+      case 'mkdir':
+        return `mkdir "${targetName}"`;
+      case 'writeFile':
+        return `write "${filePath}"`;
+      case 'appendFile':
+        return `append "${filePath}"`;
+      default:
+        return `${op} "${sourceName}"`;
+    }
+  }
 }
 
 export class FileTool extends BaseDeclarativeTool<FileOpsParams, FileOpsResult> {
-  constructor() {
+  constructor(private readonly config: Config) {
     super(
       'file_ops',
       'File Operations',
@@ -537,8 +955,8 @@ export class FileTool extends BaseDeclarativeTool<FileOpsParams, FileOpsResult> 
         properties: {
           op: {
             type: 'string',
-            enum: ['renameFile', 'moveFile', 'copyFile', 'deleteFile', 'mkdir', 'rmdir', 'batchFile', 'batchDir'],
-            description: 'Operation: renameFile (single file), moveFile (single file to different location), copyFile (single file), deleteFile (single file), mkdir (create directory), rmdir (remove directory), batchFile (perform operation on multiple files), batchDir (perform operation on multiple directories - REQUIRED for moving/copying multiple directories)'
+            enum: ['renameFile', 'moveFile', 'copyFile', 'deleteFile', 'mkdir', 'rmdir', 'batchFile', 'batchDir', 'writeFile', 'appendFile', 'readFile'],
+            description: 'Operation: renameFile (single file), moveFile (single file to different location), copyFile (single file), deleteFile (single file), mkdir (create directory), rmdir (remove directory), batchFile (perform operation on multiple files), batchDir (perform operation on multiple directories - REQUIRED for moving/copying multiple directories), writeFile (write content to file), appendFile (append content to file), readFile (read file content)'
           },
           source: { 
             type: 'string', 
@@ -569,6 +987,22 @@ export class FileTool extends BaseDeclarativeTool<FileOpsParams, FileOpsResult> 
           pattern: {
             type: 'string',
             description: 'Glob pattern to match files (e.g., "*.pdf", "stock_val*.xls") - used with op: "batch" and sourceDir'
+          },
+          content: {
+            type: 'string',
+            description: 'Content to write or append to file - REQUIRED for writeFile and appendFile operations. For text files: provide text content. For image files (.png, .jpg, .gif, .webp, .bmp): provide base64-encoded content (with or without data URL prefix)'
+          },
+          file_path: {
+            type: 'string',
+            description: 'File path for write/append/read operations - REQUIRED for writeFile, appendFile, and readFile operations'
+          },
+          offset: {
+            type: 'number',
+            description: 'For readFile (text files): 0-based line number to start reading from. Use with limit for pagination.'
+          },
+          limit: {
+            type: 'number',
+            description: 'For readFile (text files): maximum number of lines to read. Use with offset for pagination. Default is 2000 lines.'
           }
         },
         additionalProperties: false
@@ -577,7 +1011,7 @@ export class FileTool extends BaseDeclarativeTool<FileOpsParams, FileOpsResult> 
   }
 
   protected override validateToolParamValues(params: FileOpsParams): string | null {
-    const { op, target, operation, sources, pattern, targetDir } = params;
+    const { op, target, operation, sources, pattern, targetDir, content, file_path, offset, limit } = params;
     
     // Check if operations that require target have target parameter
     if (['renameFile', 'moveFile', 'copyFile'].includes(op) && !target) {
@@ -630,13 +1064,39 @@ export class FileTool extends BaseDeclarativeTool<FileOpsParams, FileOpsResult> 
       
       // Delete operation doesn't require targetDir or target
     }
+
+    // Validate writeFile and appendFile operations
+    if (['writeFile', 'appendFile'].includes(op)) {
+      if (!file_path) {
+        return `${op} operation requires 'file_path' parameter`;
+      }
+      
+      if (content === undefined) {
+        return `${op} operation requires 'content' parameter`;
+      }
+    }
+
+    // Validate readFile operation
+    if (op === 'readFile') {
+      if (!file_path) {
+        return 'readFile operation requires \'file_path\' parameter';
+      }
+      
+      if (offset !== undefined && offset < 0) {
+        return 'offset must be a non-negative number';
+      }
+      
+      if (limit !== undefined && limit <= 0) {
+        return 'limit must be a positive number';
+      }
+    }
     
     return null;
   }
 
   protected createInvocation(params: FileOpsParams): FileOpsInvocation {
-    return new FileOpsInvocation(params);
+    return new FileOpsInvocation(this.config, params);
   }
 }
 
-export const fileTool = new FileTool();
+// export const fileTool = new FileTool(); // Removed: Tools now require config parameter
