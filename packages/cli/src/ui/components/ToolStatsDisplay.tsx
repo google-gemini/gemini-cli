@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { formatDuration } from '../utils/formatters.js';
 import {
   getStatusColor,
@@ -37,7 +37,7 @@ const StatRow: React.FC<{
   return (
     <Box>
       <Box width={TOOL_NAME_COL_WIDTH}>
-        <Text color={Colors.LightBlue}>{name}</Text>
+        <Text color={theme.text.link}>{name}</Text>
       </Box>
       <Box width={CALLS_COL_WIDTH} justifyContent="flex-end">
         <Text>{stats.count}</Text>
@@ -63,7 +63,7 @@ export const ToolStatsDisplay: React.FC = () => {
     return (
       <Box
         borderStyle="round"
-        borderColor={Colors.Gray}
+        borderColor={theme.border.default}
         paddingY={1}
         paddingX={2}
       >
@@ -94,13 +94,13 @@ export const ToolStatsDisplay: React.FC = () => {
   return (
     <Box
       borderStyle="round"
-      borderColor={Colors.Gray}
+      borderColor={theme.border.default}
       flexDirection="column"
       paddingY={1}
       paddingX={2}
       width={70}
     >
-      <Text bold color={Colors.AccentPurple}>
+      <Text bold color={theme.text.accent}>
         Tool Stats For Nerds
       </Text>
       <Box height={1} />
@@ -144,7 +144,7 @@ export const ToolStatsDisplay: React.FC = () => {
         <Box
           width={TOOL_NAME_COL_WIDTH + CALLS_COL_WIDTH + SUCCESS_RATE_COL_WIDTH}
         >
-          <Text color={Colors.LightBlue}>Total Reviewed Suggestions:</Text>
+          <Text color={theme.text.link}>Total Reviewed Suggestions:</Text>
         </Box>
         <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
           <Text>{totalReviewed}</Text>
@@ -157,7 +157,7 @@ export const ToolStatsDisplay: React.FC = () => {
           <Text> » Accepted:</Text>
         </Box>
         <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
-          <Text color={Colors.AccentGreen}>{totalDecisions.accept}</Text>
+          <Text color={theme.status.success}>{totalDecisions.accept}</Text>
         </Box>
       </Box>
       <Box>
@@ -167,7 +167,7 @@ export const ToolStatsDisplay: React.FC = () => {
           <Text> » Rejected:</Text>
         </Box>
         <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
-          <Text color={Colors.AccentRed}>{totalDecisions.reject}</Text>
+          <Text color={theme.status.error}>{totalDecisions.reject}</Text>
         </Box>
       </Box>
       <Box>
@@ -177,7 +177,7 @@ export const ToolStatsDisplay: React.FC = () => {
           <Text> » Modified:</Text>
         </Box>
         <Box width={AVG_DURATION_COL_WIDTH} justifyContent="flex-end">
-          <Text color={Colors.AccentYellow}>{totalDecisions.modify}</Text>
+          <Text color={theme.status.warning}>{totalDecisions.modify}</Text>
         </Box>
       </Box>
 
