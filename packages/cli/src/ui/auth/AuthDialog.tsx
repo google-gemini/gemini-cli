@@ -156,7 +156,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
     >
       <Text bold>Get started</Text>
       <Box marginTop={1}>
-        <Text color={theme.text.primary}>How would you like to authenticate for this project?</Text>
+        <Text color={theme.text.primary}>
+          How would you like to authenticate for this project?
+        </Text>
       </Box>
       <Box marginTop={1}>
         <RadioButtonSelect
@@ -174,7 +176,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
         <Text color={theme.text.secondary}>(Use Enter to select)</Text>
       </Box>
       <Box marginTop={1}>
-        <Text color={theme.text.primary}>Terms of Services and Privacy Notice for Gemini CLI</Text>
+        <Text color={theme.text.primary}>
+          Terms of Services and Privacy Notice for Gemini CLI
+        </Text>
       </Box>
       <Box marginTop={1}>
         <Text color={theme.text.link}>

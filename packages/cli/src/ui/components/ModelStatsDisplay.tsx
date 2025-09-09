@@ -64,7 +64,9 @@ export const ModelStatsDisplay: React.FC = () => {
         paddingY={1}
         paddingX={2}
       >
-        <Text color={theme.text.primary}>No API calls have been made in this session.</Text>
+        <Text color={theme.text.primary}>
+          No API calls have been made in this session.
+        </Text>
       </Box>
     );
   }

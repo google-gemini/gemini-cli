@@ -73,8 +73,12 @@ export function WorkspaceMigrationDialog(props: {
       borderColor={theme.border.default}
       padding={1}
     >
-      <Text bold color={theme.text.primary}>Workspace-level extensions are deprecated{'\n'}</Text>
-      <Text color={theme.text.primary}>Would you like to install them at the user level?</Text>
+      <Text bold color={theme.text.primary}>
+        Workspace-level extensions are deprecated{'\n'}
+      </Text>
+      <Text color={theme.text.primary}>
+        Would you like to install them at the user level?
+      </Text>
       <Text color={theme.text.primary}>
         The extension definition will remain in your workspace directory.
       </Text>
