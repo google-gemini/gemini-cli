@@ -226,6 +226,20 @@ jobs:
           git ls-files | grep -E '\.(yaml|yml)' | xargs yamllint --format github
 
   #
+  # Lint: Inclusive Language
+  #
+  lint_inclusive_language:
+    name: 'Lint (Inclusive Language)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 1
+      - name: 'Run inclusive language check'
+        uses: 'microsoft/InclusivenessAnalyzer@994519a4cd1f0ccc7415fff13b7f287344c420bc' # ratchet:microsoft/InclusivenessAnalyzer@v1.0.1
+
+  #
   # Lint: All
   #
   # This is a virtual job that other jobs depend on to wait for all linters to
@@ -238,6 +252,7 @@ jobs:
       - 'lint_javascript'
       - 'lint_shell'
       - 'lint_yaml'
+      - 'lint_inclusive_language'
     runs-on: 'ubuntu-latest'
     steps:
       - run: |-
