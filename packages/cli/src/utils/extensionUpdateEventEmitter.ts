@@ -16,7 +16,7 @@ interface ExtensionUpdateEventTypes {
   [ExtensionUpdateEvent.LogError]: [message: string];
 }
 
-// An event emitter that queues it's events until a listener is attached for a
+// An event emitter that queues its events until a listener is attached for a
 // given event name, ensuring they actually get delivered to some listener.
 class ExtensionUpdateEventEmitter extends EventEmitter<ExtensionUpdateEventTypes> {
   private eventQueue: Map<string, unknown[][]> = new Map();
