@@ -25,7 +25,9 @@ export const Notifications = () => {
 
   return (
     <>
-      {updateInfo && <UpdateNotification message={updateInfo.message} />}
+      {updateInfo && (
+        <UpdateNotification message={updateInfo.message} showSpinner={true} />
+      )}
       {showStartupWarnings && (
         <Box
           borderStyle="round"

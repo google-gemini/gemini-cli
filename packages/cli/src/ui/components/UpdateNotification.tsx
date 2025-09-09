@@ -10,9 +10,13 @@ import { Colors } from '../colors.js';
 
 interface UpdateNotificationProps {
   message: string;
+  showSpinner?: boolean;
 }
 
-export const UpdateNotification = ({ message }: UpdateNotificationProps) => (
+export const UpdateNotification = ({
+  message,
+  showSpinner = false,
+}: UpdateNotificationProps) => (
   <Box
     borderStyle="round"
     borderColor={Colors.AccentYellow}
@@ -20,7 +24,12 @@ export const UpdateNotification = ({ message }: UpdateNotificationProps) => (
     marginY={1}
   >
     <Text color={Colors.AccentYellow}>
-      <Spinner type="dots" /> {message}
+      {showSpinner && (
+        <>
+          <Spinner type="dots" />{' '}
+        </>
+      )}
+      {message}
     </Text>
   </Box>
 );
