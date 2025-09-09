@@ -209,7 +209,7 @@ describe('ClearcutLogger', () => {
       const cli_version = CLI_VERSION;
       const git_commit_hash = GIT_COMMIT_INFO;
       const prompt_id = 'my-prompt-123';
-      const user_settings = safeJsonStringify([{ smart_edit_enabled: false }]);
+      const user_settings = safeJsonStringify([{ smart_edit_enabled: true }]);
 
       // Setup logger with expected values
       const { logger, loggerConfig } = setup({
@@ -389,6 +389,24 @@ describe('ClearcutLogger', () => {
         EventMetadataKey.GEMINI_CLI_COMPRESSION_TOKENS_AFTER,
         '8000',
       ]);
+    });
+  });
+
+  describe('logRipgrepFallbackEvent', () => {
+    it('logs an event with the proper name', () => {
+      const { logger } = setup();
+      // Spy on flushToClearcut to prevent it from clearing the queue
+      const flushSpy = vi
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .spyOn(logger!, 'flushToClearcut' as any)
+        .mockResolvedValue({ nextRequestWaitMs: 0 });
+
+      logger?.logRipgrepFallbackEvent();
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.RIPGREP_FALLBACK);
+      expect(flushSpy).toHaveBeenCalledOnce();
     });
   });
 

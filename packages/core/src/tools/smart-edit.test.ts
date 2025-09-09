@@ -10,7 +10,17 @@ const mockFixLLMEditWithInstruction = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 
-import { IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
+
+vi.mock('../ide/ide-client.js', () => ({
+  IdeClient: {
+    getInstance: vi.fn(),
+  },
+  IDEConnectionStatus: {
+    Connected: 'connected',
+    Disconnected: 'disconnected',
+  },
+}));
 
 vi.mock('../utils/llm-edit-fixer.js', () => ({
   FixLLMEditWithInstruction: mockFixLLMEditWithInstruction,
@@ -50,6 +60,7 @@ import { ApprovalMode, type Config } from '../config/config.js';
 import { type Content, type Part, type SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
+import type { BaseLlmClient } from '../core/baseLlmClient.js';
 
 describe('SmartEditTool', () => {
   let tool: SmartEditTool;
@@ -57,6 +68,7 @@ describe('SmartEditTool', () => {
   let rootDir: string;
   let mockConfig: Config;
   let geminiClient: any;
+  let baseLlmClient: BaseLlmClient;
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -68,14 +80,18 @@ describe('SmartEditTool', () => {
       generateJson: mockGenerateJson,
     };
 
+    baseLlmClient = {
+      generateJson: mockGenerateJson,
+    } as unknown as BaseLlmClient;
+
     mockConfig = {
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
+      getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
       getFileSystemService: () => new StandardFileSystemService(),
-      getIdeClient: () => undefined,
       getIdeMode: () => false,
       getApiKey: () => 'test-api-key',
       getModel: () => 'test-model',
@@ -449,8 +465,8 @@ describe('SmartEditTool', () => {
           status: IDEConnectionStatus.Connected,
         }),
       };
+      vi.mocked(IdeClient.getInstance).mockResolvedValue(ideClient);
       (mockConfig as any).getIdeMode = () => true;
-      (mockConfig as any).getIdeClient = () => ideClient;
     });
 
     it('should call ideClient.openDiff and update params on confirmation', async () => {
