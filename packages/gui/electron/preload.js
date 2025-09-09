@@ -98,6 +98,7 @@ const electronAPI = {
     createSession: (sessionId, title) => ipcRenderer.invoke('multimodel-create-session', sessionId, title),
     switchSession: (sessionId) => ipcRenderer.invoke('multimodel-switch-session', sessionId),
     deleteSession: (sessionId) => ipcRenderer.invoke('multimodel-delete-session', sessionId),
+    deleteAllSessions: () => ipcRenderer.invoke('multimodel-delete-all-sessions'),
     getCurrentSessionId: () => ipcRenderer.invoke('multimodel-get-current-session-id'),
     getDisplayMessages: (sessionId) => ipcRenderer.invoke('multimodel-get-display-messages', sessionId),
     getSessionsInfo: () => ipcRenderer.invoke('multimodel-get-sessions-info'),
@@ -109,6 +110,13 @@ const electronAPI = {
     checkEnvApiKey: (providerType) => ipcRenderer.invoke('check-env-api-key', providerType),
     setApiKeyPreference: (providerType) => ipcRenderer.invoke('set-api-key-preference', providerType),
     setOAuthPreference: (providerType) => ipcRenderer.invoke('set-oauth-preference', providerType),
+    // Tool confirmation
+    onToolConfirmationRequest: (callback) => {
+      ipcRenderer.on('tool-confirmation-request', callback);
+      // Return cleanup function
+      return () => ipcRenderer.removeListener('tool-confirmation-request', callback);
+    },
+    sendToolConfirmationResponse: (outcome) => ipcRenderer.send('tool-confirmation-response', outcome),
   }
 }
 
