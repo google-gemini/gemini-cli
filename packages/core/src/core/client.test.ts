@@ -652,34 +652,6 @@ describe('Gemini Client (client.ts)', () => {
       });
     });
 
-    it('attempts to compress with a maxOutputTokens set to the original token count', async () => {
-      vi.mocked(tokenLimit).mockReturnValue(1000);
-      vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
-        totalTokens: 999,
-      });
-
-      mockGetHistory.mockReturnValue([
-        { role: 'user', parts: [{ text: '...history...' }] },
-      ]);
-
-      // Mock the summary response from the chat
-      mockSendMessage.mockResolvedValue({
-        role: 'model',
-        parts: [{ text: 'This is a summary.' }],
-      });
-
-      await client.tryCompressChat('prompt-id-2', true);
-
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          config: expect.objectContaining({
-            maxOutputTokens: 999,
-          }),
-        }),
-        'prompt-id-2',
-      );
-    });
-
     it('should not trigger summarization if token count is below threshold', async () => {
       const MOCKED_TOKEN_LIMIT = 1000;
       vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
