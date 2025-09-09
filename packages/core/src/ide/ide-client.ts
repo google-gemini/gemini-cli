@@ -7,14 +7,14 @@
 import * as fs from 'node:fs';
 import { isSubpath } from '../utils/paths.js';
 import { detectIde, type DetectedIde, getIdeInfo } from '../ide/detect-ide.js';
-import type { DiffUpdateResult } from '../ide/ideContext.js';
 import {
   ideContext,
-  IdeContextNotificationSchema,
   IdeDiffAcceptedNotificationSchema,
   IdeDiffClosedNotificationSchema,
   CloseDiffResponseSchema,
-} from '../ide/ideContext.js';
+  type DiffUpdateResult,
+} from './ideContext.js';
+import { IdeContextNotificationSchema } from './types.js';
 import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
