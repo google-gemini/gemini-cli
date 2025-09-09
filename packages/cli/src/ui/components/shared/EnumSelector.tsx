@@ -7,13 +7,13 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../../colors.js';
-import type { SettingOption } from '../../../config/settingsSchema.js';
+import type { SettingEnumOption } from '../../../config/settingsSchema.js';
 
 interface EnumSelectorProps {
-  options: readonly SettingOption[];
-  currentValue: string;
+  options: readonly SettingEnumOption[];
+  currentValue: string | number;
   isActive: boolean;
-  onValueChange: (value: string) => void;
+  onValueChange: (value: string | number) => void;
 }
 
 /**

@@ -38,12 +38,12 @@ export type SettingsValue =
  * (e.g. an enum or true/false) rather than allowing for free form input
  * (like a number or string).
  */
-export const TOGGLE_TYPES: ReadonlySet<SettingsType | undefined> = new Set([
+export const TOGGLE_TYPES: ReadonlySet<SettingsType | undefined> = new Set<SettingsType | undefined>([
   'boolean',
   'enum',
 ]);
 
-interface SettingEnumOption {
+export interface SettingEnumOption {
   value: string | number;
   label: string;
 }
@@ -80,10 +80,6 @@ export interface SettingsSchema {
   [key: string]: SettingDefinition;
 }
 
-export interface SettingOption {
-  label: string;
-  value: string;
-}
 
 export type MemoryImportFormat = 'tree' | 'flat';
 export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
