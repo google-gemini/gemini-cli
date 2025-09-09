@@ -24,6 +24,12 @@ describe('HighWaterMarkTracker', () => {
       const customTracker = new HighWaterMarkTracker(10);
       expect(customTracker).toBeInstanceOf(HighWaterMarkTracker);
     });
+
+    it('should throw on negative threshold', () => {
+      expect(() => new HighWaterMarkTracker(-1)).toThrow(
+        'growthThresholdPercent must be non-negative.',
+      );
+    });
   });
 
   describe('shouldRecordMetric', () => {
@@ -180,8 +186,11 @@ describe('HighWaterMarkTracker', () => {
       // Advance time significantly
       vi.advanceTimersByTime(15000); // 15 seconds
 
-      // Add new reading (should clean up old ones internally)
-      tracker.shouldRecordMetric('heap_used', 1100000);
+      // Explicit cleanup should remove stale entries when age exceeded
+      tracker.cleanup(10000); // 10 seconds
+
+      // Entry should be removed
+      expect(tracker.getHighWaterMark('heap_used')).toBe(0);
 
       vi.useRealTimers();
     });

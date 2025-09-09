@@ -10,9 +10,13 @@
  */
 export class HighWaterMarkTracker {
   private waterMarks: Map<string, number> = new Map();
+  private lastUpdateTimes: Map<string, number> = new Map();
   private readonly growthThresholdPercent: number;
 
   constructor(growthThresholdPercent: number = 5) {
+    if (growthThresholdPercent < 0) {
+      throw new Error('growthThresholdPercent must be non-negative.');
+    }
     this.growthThresholdPercent = growthThresholdPercent;
   }
 
@@ -23,12 +27,16 @@ export class HighWaterMarkTracker {
    * @returns true if this value should trigger a recording
    */
   shouldRecordMetric(metricType: string, currentValue: number): boolean {
+    const now = Date.now();
+    // Track last seen time for cleanup regardless of whether we record
+    this.lastUpdateTimes.set(metricType, now);
     // Get current high-water mark
     const currentWaterMark = this.waterMarks.get(metricType) || 0;
 
     // For first measurement, always record
     if (currentWaterMark === 0) {
       this.waterMarks.set(metricType, currentValue);
+      this.lastUpdateTimes.set(metricType, now);
       return true;
     }
 
@@ -39,6 +47,7 @@ export class HighWaterMarkTracker {
     if (currentValue > thresholdValue) {
       // Update high-water mark
       this.waterMarks.set(metricType, currentValue);
+      this.lastUpdateTimes.set(metricType, now);
       return true;
     }
 
@@ -64,6 +73,7 @@ export class HighWaterMarkTracker {
    */
   resetHighWaterMark(metricType: string): void {
     this.waterMarks.delete(metricType);
+    this.lastUpdateTimes.delete(metricType);
   }
 
   /**
@@ -71,5 +81,20 @@ export class HighWaterMarkTracker {
    */
   resetAllHighWaterMarks(): void {
     this.waterMarks.clear();
+    this.lastUpdateTimes.clear();
+  }
+
+  /**
+   * Remove stale entries to avoid unbounded growth if metric types are variable.
+   * Entries not updated within maxAgeMs will be removed.
+   */
+  cleanup(maxAgeMs: number = 3600000): void {
+    const cutoffTime = Date.now() - maxAgeMs;
+    for (const [metricType, lastTime] of this.lastUpdateTimes.entries()) {
+      if (lastTime < cutoffTime) {
+        this.lastUpdateTimes.delete(metricType);
+        this.waterMarks.delete(metricType);
+      }
+    }
   }
 }
