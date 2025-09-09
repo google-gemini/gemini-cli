@@ -21,16 +21,24 @@ import type {
   ApprovalMode,
   UserTierId,
   DetectedIde,
+  FallbackIntent,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { UpdateObject } from '../utils/updateCheck.js';
+
+export interface ProQuotaDialogRequest {
+  failedModel: string;
+  fallbackModel: string;
+  resolve: (intent: FallbackIntent) => void;
+}
 
 export interface UIState {
   history: HistoryItem[];
   isThemeDialogOpen: boolean;
   themeError: string | null;
   isAuthenticating: boolean;
+  isConfigInitialized: boolean;
   authError: string | null;
   isAuthDialogOpen: boolean;
   editorError: string | null;
@@ -78,9 +86,8 @@ export interface UIState {
   workspaceExtensions: any[]; // Extension[]
   // Quota-related state
   userTier: UserTierId | undefined;
-  isProQuotaDialogOpen: boolean;
+  proQuotaRequest: ProQuotaDialogRequest | null;
   currentModel: string;
-  // New fields for complete state management
   contextFileNames: string[];
   errorCount: number;
   availableTerminalHeight: number | undefined;
