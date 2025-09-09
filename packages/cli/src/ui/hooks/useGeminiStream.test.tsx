@@ -1789,4 +1789,61 @@ describe('useGeminiStream', () => {
       );
     });
   });
+  describe('Retry Logic', () => {
+    it('should clear pending content on retry and display final content', async () => {
+      // ARRANGE: Set up a stream that sends partial content, then a retry event,
+      // then the final successful content.
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          // First attempt (fails)
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'This is partial content',
+          };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: ' from a failed attempt.',
+          };
+          // The retry signal
+          yield { type: ServerGeminiEventType.Retry };
+          // Second attempt (succeeds)
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'This is the final, successful content.',
+          };
+          yield { type: ServerGeminiEventType.Finished, value: 'STOP' };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      // ACT: Submit a query to trigger the stream processing
+      await act(async () => {
+        await result.current.submitQuery('test query');
+      });
+
+      // ASSERT: Wait for the stream to finish and check the final state
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Idle);
+      });
+
+      // Find all the final "gemini" messages that were added to the history
+      const geminiMessageCalls = mockAddItem.mock.calls.filter(
+        (call) => call[0].type === MessageType.GEMINI,
+      );
+
+      // There should be exactly one final gemini message in the history
+      expect(geminiMessageCalls).toHaveLength(1);
+
+      // That one message should contain ONLY the successful content
+      expect(geminiMessageCalls[0][0].text).toBe(
+        'This is the final, successful content.',
+      );
+
+      // Crucially, it should NOT contain the content from the failed attempt
+      expect(geminiMessageCalls[0][0].text).not.toContain(
+        'from a failed attempt',
+      );
+    });
+  });
 });
