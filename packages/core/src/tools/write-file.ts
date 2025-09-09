@@ -205,7 +205,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         }
       } catch (error) {
         // IDE client not available or not connected - continue without IDE confirmation
-        console.log('[WriteFile] IDE client not available, continuing without IDE confirmation');
+        console.log('[WriteFile] IDE client not available, continuing without IDE confirmation', error);
       }
     }
 
