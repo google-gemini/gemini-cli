@@ -220,6 +220,82 @@ For local development and debugging, you can capture telemetry data locally:
 3. View traces at http://localhost:16686 and logs/metrics in the collector log
    file.
 
+## Performance Monitoring
+
+Gemini CLI captures startup timing, memory usage, and operational efficiency so
+you can spot regressions early and understand runtime behavior.
+
+### Memory Monitoring
+
+The memory monitor records snapshots based on user activity, high-water marks,
+and rate limiting to minimize noise while preserving fidelity.
+
+#### Activity-Driven Monitoring
+
+- **Idle detection** pauses monitoring after 30 seconds of inactivity.
+- **Activity triggers** capture snapshots for user input, streaming start/end,
+  tool scheduling, and history updates.
+- **Smart frequency** samples every 10 seconds but records only when recent
+  activity signals meaningful change.
+
+#### High-Water Mark Tracking
+
+- **Growth thresholds** record once memory grows 5% beyond the prior maximum.
+- **Noise filtering** smooths garbage-collection spikes via weighted averages.
+- **Per-metric tracking** maintains independent high-water marks for RSS and
+  heap usage.
+
+#### Rate Limiting
+
+- **Standard interval** limits routine recordings to once per minute.
+- **High-priority events** bypass the standard limit but are capped (for
+  example, once every 30 seconds).
+- **Context awareness** maintains separate cadence for startup, periodic, and
+  activity-triggered events.
+
+#### Memory Metrics Tracked
+
+- **Heap usage** (current and total V8 allocation)
+- **External memory** (C++ objects retained by the runtime)
+- **Resident Set Size (RSS)** (physical memory in use)
+- **Array buffers** (dedicated tracking of ArrayBuffer allocations)
+- **Heap size limit** (configured upper bound for V8)
+
+#### Configuration Example
+
+Configure activity-aware monitoring in `settings.json`:
+
+```json
+{
+  "activityMonitoring": {
+    "enabled": true,
+    "snapshotThrottleMs": 1000,
+    "maxEventBuffer": 100,
+    "triggerActivities": [
+      "user_input_start",
+      "message_added",
+      "tool_call_scheduled",
+      "stream_start"
+    ]
+  }
+}
+```
+
+#### Performance Impact
+
+- **Reduced noise**: inactive sessions emit no telemetry.
+- **Targeted sampling**: activity-driven triggers cut volume by 80–90% compared
+  with naive polling.
+- **Resource awareness**: lightweight tracking avoids additional CPU or memory
+  pressure.
+
+### Performance Scoring and Regression Detection
+
+- **Baseline comparison** tracks changes against stored performance baselines.
+- **Regression detection** flags degradations with severity levels.
+- **Efficiency metrics** cover token usage, API breakdowns, and composite
+  performance scores.
+
 ## Logs and Metrics
 
 The following section describes the structure of logs and metrics generated for
