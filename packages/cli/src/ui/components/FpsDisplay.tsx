@@ -11,7 +11,7 @@ import { Colors } from '../colors.js';
 
 /**
  * Displays an approximate FPS (renders per second) for the Ink UI.
- * Note: This is approximate and includes the update caused by the counter itself once per second.
+ * Note: This is approximate and the render caused by the counter itself once per second is excluded.
  */
 export const FpsDisplay: React.FC = () => {
   const renderCountRef = useRef(0);
