@@ -51,6 +51,7 @@ export const Composer = () => {
     showErrorDetails: uiState.showErrorDetails,
     showMemoryUsage:
       config.getDebugMode() || settings.merged.ui?.showMemoryUsage || false,
+    showFPS: config.getDebugMode() || settings.merged.ui?.showFPS || false,
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
     nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,

@@ -318,6 +318,15 @@ const SETTINGS_SCHEMA = {
         description: 'Show line numbers in the chat.',
         showInDialog: true,
       },
+      showFPS: {
+        type: 'boolean',
+        label: 'Show FPS Counter',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Display an approximate render FPS in the footer.',
+        showInDialog: true,
+      },
       showCitations: {
         type: 'boolean',
         label: 'Show Citations',

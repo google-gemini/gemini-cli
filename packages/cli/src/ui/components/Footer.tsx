@@ -13,6 +13,7 @@ import process from 'node:process';
 import path from 'node:path';
 import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
+import { FpsDisplay } from './FpsDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
 
@@ -33,6 +34,7 @@ export interface FooterProps {
   nightly: boolean;
   vimMode?: string;
   isTrustedFolder?: boolean;
+  showFPS?: boolean;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -49,6 +51,7 @@ export const Footer: React.FC<FooterProps> = ({
   nightly,
   vimMode,
   isTrustedFolder,
+  showFPS,
 }) => {
   const { columns: terminalWidth } = useTerminalSize();
 
@@ -134,6 +137,7 @@ export const Footer: React.FC<FooterProps> = ({
             />
           </Text>
           {showMemoryUsage && <MemoryUsageDisplay />}
+          {showFPS && <FpsDisplay />}
         </Box>
         <Box alignItems="center" paddingLeft={2}>
           {corgiMode && (
