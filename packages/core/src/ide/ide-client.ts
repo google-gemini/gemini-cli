@@ -396,8 +396,10 @@ export class IdeClient {
     (ConnectionConfig & { workspacePath?: string }) | undefined
   > {
     if (!this.ideProcessInfo) {
-      return {};
+      return undefined;
     }
+
+    // For backwards compatability
     try {
       const portFile = path.join(
         os.tmpdir(),
@@ -406,8 +408,82 @@ export class IdeClient {
       const portFileContents = await fs.promises.readFile(portFile, 'utf8');
       return JSON.parse(portFileContents);
     } catch (_) {
+      // For newer extension versions, the file name matches the pattern
+      // /^gemini-ide-server-${pid}-\d+\.json$/. If multiple IDE
+      // windows are open, multiple files matching the pattern are expected to
+      // exist.
+    }
+
+    const portFileDir = path.join(os.tmpdir(), '.gemini', 'ide');
+    let portFiles;
+    try {
+      portFiles = await fs.promises.readdir(portFileDir);
+    } catch (e) {
+      logger.debug('Failed to read IDE connection directory:', e);
       return undefined;
     }
+
+    const fileRegex = new RegExp(
+      `^gemini-ide-server-${this.ideProcessInfo.pid}-\\d+\\.json$`,
+    );
+    const matchingFiles = portFiles
+      .filter((file) => fileRegex.test(file))
+      .sort();
+    if (matchingFiles.length === 0) {
+      return undefined;
+    }
+
+    let fileContents: string[];
+    try {
+      fileContents = await Promise.all(
+        matchingFiles.map((file) =>
+          fs.promises.readFile(path.join(portFileDir, file), 'utf8'),
+        ),
+      );
+    } catch (e) {
+      logger.debug('Failed to read IDE connection config file(s):', e);
+      return undefined;
+    }
+    const parsedContents = fileContents.map((content) => {
+      try {
+        return JSON.parse(content);
+      } catch (e) {
+        logger.debug('Failed to parse JSON from config file: ', e);
+        return undefined;
+      }
+    });
+
+    const validWorkspaces = parsedContents.filter((content) => {
+      if (!content) {
+        return false;
+      }
+      const { isValid } = IdeClient.validateWorkspacePath(
+        content.workspacePath,
+        this.currentIdeDisplayName,
+        process.cwd(),
+      );
+      return isValid;
+    });
+
+    if (validWorkspaces.length === 0) {
+      return undefined;
+    }
+
+    if (validWorkspaces.length === 1) {
+      return validWorkspaces[0];
+    }
+
+    const portFromEnv = this.getPortFromEnv();
+    if (portFromEnv) {
+      const matchingPort = validWorkspaces.find(
+        (content) => content.port === portFromEnv,
+      );
+      if (matchingPort) {
+        return matchingPort;
+      }
+    }
+
+    return validWorkspaces[0];
   }
 
   private createProxyAwareFetch() {
