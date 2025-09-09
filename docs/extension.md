@@ -1,20 +1,20 @@
 # Gemini CLI Extensions
 
-*This documentation is up-to-date with the v0.4.0 release*
+_This documentation is up-to-date with the v0.4.0 release._
 
 Gemini CLI extensions package prompts, MCP servers, and custom commands into a familiar and user-friendly format. With extensions, you can expand the capabilities of Gemini CLI and share those capabilities with others. They are designed to be easily installable and shareable.
 
-## Extension Management
+## Extension management
 
-We offer a suite of extension management tools via `gemini extensions` commands.
+We offer a suite of extension management tools using `gemini extensions` commands.
 
 Note that these commands are not supported from within the CLI, although you can list installed extensions using the `/extensions list` subcommand.
 
-Note that all of these commands will only be reflected in active CLI sessions on re-start.
+Note that all of these commands will only be reflected in active CLI sessions on restart.
 
-### Installing an Extension
+### Installing an extension
 
-You can install an extension using `gemini extensions install` with either a github URL source or `--path=some/local/path`.
+You can install an extension using `gemini extensions install` with either a GitHub URL source or `--path=some/local/path`.
 
 Note that we create a copy of the installed extension, so you will need to run `gemini extensions update` to pull in changes from both locally-defined extensions and those on GitHub.
 
@@ -24,25 +24,25 @@ gemini extensions install https://github.com/google-gemini/gemini-cli-security
 
 This will install the Gemini CLI Security extension, which offers support for a `/security:analyze` command.
 
-### Uninstalling an Extension
+### Uninstalling an extension
 
-To uninstall, run `gemini extensions uninstall extension-name`, so, in the example above:
+To uninstall, run `gemini extensions uninstall extension-name`, so, in the case of the install example:
 
 ```
 gemini extensions uninstall gemini-cli-security
 ```
 
-### Disabling an Extension
+### Disabling an extension
 
 Extensions are, by default, enabled across all workspaces. You can disable an extension entirely or for specific workspace.
 
 For example, `gemini extensions disable extension-name` will disable the extension at the user level, so it will be disabled everywhere. `gemini extensions disable extension-name --scope=Workspace` will only disable the extension in the current workspace.
 
-### Enabling an Extension
+### Enabling an extension
 
 You can re-enable extensions using `gemini extensions enable extension-name`. Note that if an extension is disabled at the user-level, enabling it at the workspace level will not do anything.
 
-### Updating an Extension
+### Updating an extension
 
 For extensions installed from a local path or a git repository, you can explicitly update to the latest version (as reflected in the `gemini-extension.json` `version` field) with `gemini extensions update extension-name`.
 
@@ -52,11 +52,11 @@ You can update all extensions with:
 gemini extensions update --all
 ```
 
-## Extension Creation
+## Extension creation
 
 We offer commands to make extension development easier.
 
-### Create a Boilerplate Extension
+### Create a boilerplate extension
 
 We offer several example extensions `context`, `custom-commands`, `exclude-tools` and `mcp-server`. You can view these examples [here](https://github.com/google-gemini/gemini-cli/tree/main/packages/cli/src/commands/extensions/examples).
 
@@ -66,17 +66,17 @@ To copy one of these examples into a development directory using the type of you
 gemini extensions new --path=path/to/directory --type=custom-commands
 ```
 
-### Link a Local Extension
+### Link a local extension
 
 The `gemini extensions link` command will create a symbolic link from the extension installation directory to the development path.
 
 This is useful so you don't have to run `gemini extensions update` every time you make changes you'd like to test.
 
 ```
-`gemini extensions link path/to/directory`
+gemini extensions link path/to/directory
 ```
 
-## How it Works
+## How it works
 
 On startup, Gemini CLI looks for extensions in `<home>/.gemini/extensions`
 
@@ -110,7 +110,7 @@ The `gemini-extension.json` file contains the configuration for the extension. T
 
 When Gemini CLI starts, it loads all the extensions and merges their configurations. If there are any conflicts, the workspace configuration takes precedence.
 
-### Custom Commands
+### Custom commands
 
 Extensions can provide [custom commands](./cli/commands.md#custom-commands) by placing TOML files in a `commands/` subdirectory within the extension directory. These commands follow the same format as user and project custom commands and use standard naming conventions.
 
@@ -132,7 +132,7 @@ Would provide these commands:
 - `/deploy` - Shows as `[gcp] Custom command from deploy.toml` in help
 - `/gcs:sync` - Shows as `[gcp] Custom command from sync.toml` in help
 
-### Conflict Resolution
+### Conflict resolution
 
 Extension commands have the lowest precedence. When a conflict occurs with user or project commands:
 
