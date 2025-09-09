@@ -7,10 +7,11 @@ import { useAppStore } from '@/stores/appStore';
 import { useChatStore } from '@/stores/chatStore';
 import { AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { ToolConfirmationOutcome } from '@/types';
 
 export const ChatArea: React.FC = () => {
   const { sessions, activeSessionId } = useAppStore();
-  const { isStreaming, isThinking, streamingMessage, error, setError, compressionNotification, setCompressionNotification } = useChatStore();
+  const { isStreaming, isThinking, streamingMessage, error, setError, compressionNotification, setCompressionNotification, toolConfirmation } = useChatStore();
   const messageInputRef = useRef<{ setMessage: (message: string) => void }>(null);
 
   const activeSession = sessions.find(session => session.id === activeSessionId);
@@ -18,6 +19,12 @@ export const ChatArea: React.FC = () => {
   const handlePromptSelect = (prompt: string) => {
     // Focus the message input and set the selected prompt
     messageInputRef.current?.setMessage(prompt);
+  };
+
+  const handleToolConfirmation = (outcome: ToolConfirmationOutcome) => {
+    if (toolConfirmation?.onConfirm) {
+      toolConfirmation.onConfirm(outcome);
+    }
   };
 
   const showEmptyState = !activeSession || (activeSession && activeSession.messages.length === 0);
@@ -52,7 +59,7 @@ export const ChatArea: React.FC = () => {
           onDismiss={() => setCompressionNotification(null)}
         />
       )}
-      
+
       {showEmptyState ? (
         <EmptyState onPromptSelect={handlePromptSelect} />
       ) : (
@@ -61,6 +68,8 @@ export const ChatArea: React.FC = () => {
           isStreaming={isStreaming}
           isThinking={isThinking}
           streamingContent={streamingMessage}
+          toolConfirmation={toolConfirmation}
+          onToolConfirm={handleToolConfirmation}
         />
       )}
       

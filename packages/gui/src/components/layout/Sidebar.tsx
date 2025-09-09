@@ -59,11 +59,11 @@ export const Sidebar: React.FC = () => {
     // Notify backend to create and switch to new session
     try {
       await multiModelService.createSession(newSession.id, newSession.title);
-      console.log('Backend session created:', newSession.id, newSession.title);
+      // console.log('Backend session created:', newSession.id, newSession.title);
       
       // Switch backend to new session to keep frontend and backend in sync
       await multiModelService.switchSession(newSession.id);
-      console.log('Backend switched to new session:', newSession.id);
+      // console.log('Backend switched to new session:', newSession.id);
     } catch (error) {
       console.error('Failed to create/switch to new backend session:', error);
       // If backend fails, remove the session from frontend to keep consistency

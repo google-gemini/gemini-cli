@@ -3,15 +3,15 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { AlertTriangle, Code, Info, Server, FileText } from 'lucide-react';
 
-// Import types from core package
+// Import types from local types to avoid WASM dependencies
 import type {
   ToolCallConfirmationDetails,
   ToolEditConfirmationDetails,
   ToolExecuteConfirmationDetails,
   ToolMcpConfirmationDetails,
   ToolInfoConfirmationDetails,
-} from '@google/gemini-cli-core';
-import { ToolConfirmationOutcome } from '@google/gemini-cli-core';
+} from '@/types';
+import { ToolConfirmationOutcome } from '@/types';
 
 interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
@@ -27,115 +27,137 @@ const ToolConfirmationMessage: React.FC<ToolConfirmationMessageProps> = ({
   };
 
   const renderEditConfirmation = (details: ToolEditConfirmationDetails) => (
-    <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Code className="h-4 w-4 text-orange-600" />
-          File Edit Confirmation
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center gap-2 text-sm">
-          <FileText className="h-4 w-4" />
-          <span className="font-medium">{details.fileName}</span>
-        </div>
-        
-        <div className="bg-white dark:bg-gray-900 rounded-md border">
-          <div className="px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 border-b">
-            Changes Preview:
-          </div>
-          <div className="h-32 overflow-auto p-3">
-            <pre className="text-xs font-mono whitespace-pre-wrap">
-              {details.fileDiff}
-            </pre>
-          </div>
-        </div>
+    <div className="flex gap-3">
+      {/* Assistant Avatar */}
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+        <AlertTriangle className="h-4 w-4 text-orange-600" />
+      </div>
+      
+      {/* Message Content */}
+      <div className="flex-1 min-w-0">
+        <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/10 dark:border-orange-800/50">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-orange-800 dark:text-orange-200">
+              <Code className="h-4 w-4" />
+              Tool wants to edit file
+            </div>
+            
+            <div className="flex items-center gap-2 text-sm">
+              <FileText className="h-4 w-4" />
+              <span className="font-mono text-sm">{details.fileName}</span>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-900 rounded-md border border-orange-200/50 dark:border-orange-800/50">
+              <div className="px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 border-b border-orange-200/50 dark:border-orange-800/50">
+                Changes Preview:
+              </div>
+              <div className="h-32 overflow-auto p-3">
+                <pre className="text-xs font-mono whitespace-pre-wrap">
+                  {details.fileDiff}
+                </pre>
+              </div>
+            </div>
 
-        <div className="text-sm font-medium">Apply this change?</div>
-        
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            onClick={() => handleConfirm(ToolConfirmationOutcome.ProceedOnce)}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            Yes, allow once
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => handleConfirm(ToolConfirmationOutcome.ProceedAlways)}
-          >
-            Yes, allow always
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleConfirm(ToolConfirmationOutcome.ModifyWithEditor)}
-          >
-            Modify with editor
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => handleConfirm(ToolConfirmationOutcome.Cancel)}
-          >
-            No, suggest changes
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+            <div className="text-sm font-medium text-orange-800 dark:text-orange-200">
+              Do you want to apply this change?
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={() => handleConfirm(ToolConfirmationOutcome.ProceedOnce)}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                Allow once
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleConfirm(ToolConfirmationOutcome.ProceedAlways)}
+                className="border-green-600 text-green-700 hover:bg-green-50 dark:border-green-500 dark:text-green-400 dark:hover:bg-green-950"
+              >
+                Always allow
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleConfirm(ToolConfirmationOutcome.ModifyWithEditor)}
+              >
+                Modify with editor
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => handleConfirm(ToolConfirmationOutcome.Cancel)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 
   const renderExecConfirmation = (details: ToolExecuteConfirmationDetails) => (
-    <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-red-600" />
-          Command Execution Confirmation
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="bg-white dark:bg-gray-900 rounded-md border">
-          <div className="px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 border-b">
-            Command to execute:
-          </div>
-          <div className="p-3">
-            <code className="text-sm font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
-              {details.command}
-            </code>
-          </div>
-        </div>
+    <div className="flex gap-3">
+      {/* Assistant Avatar */}
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+        <AlertTriangle className="h-4 w-4 text-red-600" />
+      </div>
+      
+      {/* Message Content */}
+      <div className="flex-1 min-w-0">
+        <Card className="border-red-200 bg-red-50/50 dark:bg-red-950/10 dark:border-red-800/50">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-red-800 dark:text-red-200">
+              <Server className="h-4 w-4" />
+              Tool wants to execute command
+            </div>
+            
+            <div className="bg-white dark:bg-gray-900 rounded-md border border-red-200/50 dark:border-red-800/50">
+              <div className="px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 border-b border-red-200/50 dark:border-red-800/50">
+                Command to execute:
+              </div>
+              <div className="p-3">
+                <code className="text-sm font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded block">
+                  {details.command}
+                </code>
+              </div>
+            </div>
 
-        <div className="text-sm font-medium">
-          Allow execution of: '{details.rootCommand}'?
-        </div>
-        
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            onClick={() => handleConfirm(ToolConfirmationOutcome.ProceedOnce)}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            Yes, allow once
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => handleConfirm(ToolConfirmationOutcome.ProceedAlways)}
-          >
-            Yes, allow always
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => handleConfirm(ToolConfirmationOutcome.Cancel)}
-          >
-            No, suggest changes
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+            <div className="text-sm font-medium text-red-800 dark:text-red-200">
+              Do you want to allow execution of: '{details.rootCommand}'?
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={() => handleConfirm(ToolConfirmationOutcome.ProceedOnce)}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                Allow once
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleConfirm(ToolConfirmationOutcome.ProceedAlways)}
+                className="border-green-600 text-green-700 hover:bg-green-50 dark:border-green-500 dark:text-green-400 dark:hover:bg-green-950"
+              >
+                Always allow
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => handleConfirm(ToolConfirmationOutcome.Cancel)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 
   const renderMcpConfirmation = (details: ToolMcpConfirmationDetails) => (

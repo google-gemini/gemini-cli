@@ -79,7 +79,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
     }
 
     // Start thinking state first
-    console.log('[MessageInput] Setting thinking to true, current state:', { isThinking, isStreaming });
+    // console.log('[MessageInput] Setting thinking to true, current state:', { isThinking, isStreaming });
     setThinking(true);
     setStreamingMessage('');
     setError(null);
@@ -104,12 +104,8 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
       const stream = await multiModelService.sendMessage([newUserMessage]);
 
       let assistantContent = '';
-      const assistantMessage: ChatMessage = {
-        id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-assistant`,
-        role: 'assistant',
-        content: '',
-        timestamp: new Date()
-      };
+      let currentAssistantMessageId: string | null = null;
+      let hasCreatedInitialMessage = false;
 
       for await (const event of stream) {
         setThinking(false);
@@ -118,147 +114,187 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
           setStreaming(true);
           assistantContent += event.content;
           setStreamingMessage(assistantContent);
-        } 
-        else if (event.type === 'tool_call') {
-          // Add tool call to assistant message immediately
-          if (event.toolCall) {
-            if (!assistantMessage.toolCalls) {
-              assistantMessage.toolCalls = [];
-            }
-            assistantMessage.toolCalls.push(event.toolCall);
+          
+          // Create assistant message immediately on first content
+          if (!hasCreatedInitialMessage && assistantContent.trim()) {
+            const assistantMessage: ChatMessage = {
+              id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-assistant`,
+              role: 'assistant',
+              content: assistantContent,
+              timestamp: new Date()
+            };
+            currentAssistantMessageId = assistantMessage.id;
+            hasCreatedInitialMessage = true;
             
-            // Update the session immediately to show the tool call
+            // Add initial assistant message to session immediately
             const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
             if (currentSession) {
-              const existingMessageIndex = currentSession.messages.findIndex(m => m.id === assistantMessage.id);
-              let updatedMessages;
-              
-              if (existingMessageIndex >= 0) {
-                // Update existing message
-                updatedMessages = [...currentSession.messages];
-                updatedMessages[existingMessageIndex] = { ...assistantMessage };
-              } else {
-                // Add new message
-                updatedMessages = [...currentSession.messages, assistantMessage];
-              }
-              
               updateSession(activeSessionId, {
-                messages: updatedMessages,
+                messages: [...currentSession.messages, assistantMessage],
+                updatedAt: new Date()
+              });
+            }
+          } else if (currentAssistantMessageId) {
+            // Update existing assistant message with new content
+            const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
+            if (currentSession) {
+              const messageIndex = currentSession.messages.findIndex(m => m.id === currentAssistantMessageId);
+              if (messageIndex >= 0) {
+                const updatedMessages = [...currentSession.messages];
+                updatedMessages[messageIndex] = {
+                  ...updatedMessages[messageIndex],
+                  content: assistantContent
+                };
+                
+                updateSession(activeSessionId, {
+                  messages: updatedMessages,
+                  updatedAt: new Date()
+                });
+              }
+            }
+          }
+        } 
+        else if (event.type === 'tool_call') {
+          // Finalize current assistant message streaming first
+          if (currentAssistantMessageId && assistantContent.trim()) {
+            setStreaming(false);
+            setStreamingMessage('');
+            // Reset for next message
+            assistantContent = '';
+            currentAssistantMessageId = null;
+            hasCreatedInitialMessage = false;
+          }
+          
+          // Create a separate message for tool calls immediately
+          if (event.toolCall) {
+            const toolCallMessage: ChatMessage = {
+              id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-tool-call`,
+              role: 'assistant',
+              content: '', // Tool calls don't have content, just the calls
+              toolCalls: [event.toolCall],
+              timestamp: new Date()
+            };
+            
+            // Add tool call message to session immediately
+            const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
+            if (currentSession) {
+              updateSession(activeSessionId, {
+                messages: [...currentSession.messages, toolCallMessage],
                 updatedAt: new Date()
               });
             }
           }
         } 
         else if (event.type === 'tool_response') {
-          // Handle tool response events - refresh messages to show tool responses immediately
-          console.log('Tool response received:', event.toolName, event.toolCallId);
-          try {
-            const backendMessages = await multiModelService.getDisplayMessages(activeSessionId);
-            const chatMessages = backendMessages
-              .map((msg, index) => ({
-                id: `${activeSessionId}-${index}`,
-                role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
-                content: msg.content,
-                timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
-                toolCalls: msg.toolCalls
-              }));
+          // Handle tool response events - create tool response message immediately
+          if (event.toolCallId && event.toolName) {
+            const toolResponseMessage: ChatMessage = {
+              id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-tool-response`,
+              role: 'tool',
+              content: event.response?.content || `Tool ${event.toolName} completed`,
+              timestamp: new Date()
+            };
             
-            updateSession(activeSessionId, { 
-              messages: chatMessages,
-              updatedAt: new Date() 
-            });
-            console.log('Updated messages after tool response, total:', chatMessages.length);
-          } catch (error) {
-            console.error('Failed to refresh messages after tool response:', error);
+            // Add tool response message immediately
+            const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
+            if (currentSession) {
+              updateSession(activeSessionId, {
+                messages: [...currentSession.messages, toolResponseMessage],
+                updatedAt: new Date()
+              });
+            }
+            
+            // Reset state for potential next LLM response
+            assistantContent = '';
+            currentAssistantMessageId = null;
+            hasCreatedInitialMessage = false;
           }
         }
         else if (event.type === 'compression') {
-          // Handle compression event - show notification and refresh conversation history
-          console.log('Chat compression occurred:', event.compressionInfo);
+          // Handle compression event - show notification and add info message
           if (event.compressionInfo) {
             setCompressionNotification(event.compressionInfo);
             // Auto-hide notification after 5 seconds
             setTimeout(() => setCompressionNotification(null), 5000);
-          }
-          
-          try {
-            const backendMessages = await multiModelService.getDisplayMessages(activeSessionId);
-            const chatMessages = backendMessages
-              .map((msg, index) => ({
-                id: `${activeSessionId}-${index}`,
-                role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
-                content: msg.content,
-                timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
-                toolCalls: msg.toolCalls
-              }));
             
-            updateSession(activeSessionId, { 
-              messages: chatMessages,
-              updatedAt: new Date() 
-            });
-            console.log('Updated conversation history after compression, total messages:', chatMessages.length);
-          } catch (error) {
-            console.error('Failed to refresh messages after compression:', error);
+            // Add compression info message to chat immediately
+            const compressionMessage: ChatMessage = {
+              id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-compression`,
+              role: 'system',
+              content: `Chat compressed from ${event.compressionInfo.originalTokenCount} to ${event.compressionInfo.newTokenCount} tokens`,
+              timestamp: new Date()
+            };
+            
+            const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
+            if (currentSession) {
+              updateSession(activeSessionId, {
+                messages: [...currentSession.messages, compressionMessage],
+                updatedAt: new Date()
+              });
+            }
           }
         } else if (event.type === 'done' || event.type === 'message_complete') {
-          assistantMessage.content = assistantContent;
-          
-          // Update assistant message in session (may already exist from tool calls)
-          const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
-          if (currentSession) {
-            const existingMessageIndex = currentSession.messages.findIndex(m => m.id === assistantMessage.id);
-            let updatedMessages;
-            
-            if (existingMessageIndex >= 0) {
-              // Update existing message with final content
-              updatedMessages = [...currentSession.messages];
-              updatedMessages[existingMessageIndex] = { ...assistantMessage };
-            } else {
-              // Add new message if it doesn't exist yet
-              updatedMessages = [...currentSession.messages, assistantMessage];
-            }
-            
-            updateSession(activeSessionId, {
-              messages: updatedMessages,
-              updatedAt: new Date()
-            });
-
-            // Refresh messages from backend to get any tool responses
-            // Add a small delay to ensure backend processing is complete
-            setTimeout(async () => {
-              try {
-                // Get updated messages from backend (includes any tool responses)
-                const backendMessages = await multiModelService.getDisplayMessages(activeSessionId);
-                const chatMessages = backendMessages
-                  .map((msg, index) => ({
-                    id: `${activeSessionId}-${index}`,
-                    role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
-                    content: msg.content,
-                    timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
-                    toolCalls: msg.toolCalls
-                  }));
+          // Final content update for streaming message if we had content
+          if (currentAssistantMessageId && assistantContent) {
+            const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
+            if (currentSession) {
+              const messageIndex = currentSession.messages.findIndex(m => m.id === currentAssistantMessageId);
+              if (messageIndex >= 0) {
+                const updatedMessages = [...currentSession.messages];
+                updatedMessages[messageIndex] = {
+                  ...updatedMessages[messageIndex],
+                  content: assistantContent
+                };
                 
-                updateSession(activeSessionId, { 
-                  messages: chatMessages,
-                  updatedAt: new Date() 
+                updateSession(activeSessionId, {
+                  messages: updatedMessages,
+                  updatedAt: new Date()
                 });
-                console.log('Refreshed messages from backend, total:', chatMessages.length);
+              }
+            }
+          }
+          
+          // Clear streaming content since we've finalized the message
+          setStreamingMessage('');
 
-                // Also refresh session info for title updates
-                const sessionsInfo = await multiModelService.getSessionsInfo();
-                const updatedSessionInfo = sessionsInfo.find(s => s.id === activeSessionId);
-                if (updatedSessionInfo && currentSession.title !== updatedSessionInfo.title) {
+          // Refresh messages from backend to get any tool responses
+          // Add a small delay to ensure backend processing is complete
+          setTimeout(async () => {
+            try {
+              // Get updated messages from backend (includes any tool responses)
+              const backendMessages = await multiModelService.getDisplayMessages(activeSessionId);
+              const chatMessages = backendMessages
+                .map((msg, index) => ({
+                  id: `${activeSessionId}-${index}`,
+                  role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
+                  content: msg.content,
+                  timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+                  toolCalls: msg.toolCalls
+                }));
+              
+              updateSession(activeSessionId, { 
+                messages: chatMessages,
+                updatedAt: new Date() 
+              });
+              // console.log('Refreshed messages from backend, total:', chatMessages.length);
+
+              // Also refresh session info for title updates
+              const sessionsInfo = await multiModelService.getSessionsInfo();
+              const updatedSessionInfo = sessionsInfo.find(s => s.id === activeSessionId);
+              if (updatedSessionInfo) {
+                const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
+                if (currentSession && currentSession.title !== updatedSessionInfo.title) {
                   updateSession(activeSessionId, {
                     title: updatedSessionInfo.title,
                     updatedAt: new Date()
                   });
-                  console.log('Updated session title from backend:', updatedSessionInfo.title);
+                  // console.log('Updated session title from backend:', updatedSessionInfo.title);
                 }
-              } catch (error) {
-                console.error('Failed to refresh messages and session info:', error);
               }
-            }, 500); // 500ms delay to ensure backend processing is complete
-          }
+            } catch (error) {
+              console.error('Failed to refresh messages and session info:', error);
+            }
+          }, 500); // 500ms delay to ensure backend processing is complete
           break;
         } 
         else if (event.type === 'error') {
@@ -273,7 +309,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
       console.error('Message sending failed:', errorMessage, error);
       setError(errorMessage);
     } finally {
-      console.log('[MessageInput] Finally block - resetting states');
+      // console.log('[MessageInput] Finally block - resetting states');
       setThinking(false);
       setStreaming(false);
       setStreamingMessage('');

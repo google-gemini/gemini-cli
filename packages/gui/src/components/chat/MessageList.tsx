@@ -10,6 +10,7 @@ import { Bot, User, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { cn } from '@/utils/cn';
 import { Card, CardContent } from '@/components/ui/Card';
 import { TypingIndicator } from './TypingIndicator';
+import ToolConfirmationMessage from './ToolConfirmationMessage';
 import type { ChatMessage } from '@/types';
 import 'katex/dist/katex.min.css';
 
@@ -156,6 +157,8 @@ interface MessageListProps {
   isStreaming?: boolean;
   isThinking?: boolean;
   streamingContent?: string;
+  toolConfirmation?: any | null;
+  onToolConfirm?: (outcome: any) => void;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
@@ -163,6 +166,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   isStreaming,
   isThinking,
   streamingContent,
+  toolConfirmation,
+  onToolConfirm,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -179,6 +184,18 @@ export const MessageList: React.FC<MessageListProps> = ({
       {messages.map((message) => (
         <MessageBubble key={message.id} message={message} />
       ))}
+      
+      {/* Show tool confirmation if present */}
+      {toolConfirmation && onToolConfirm && (
+        <div className="flex justify-center">
+          <div className="max-w-2xl w-full">
+            <ToolConfirmationMessage 
+              confirmationDetails={toolConfirmation}
+              onConfirm={onToolConfirm}
+            />
+          </div>
+        </div>
+      )}
       
       {/* Show thinking indicator when AI is processing */}
       {isThinking && <TypingIndicator />}
