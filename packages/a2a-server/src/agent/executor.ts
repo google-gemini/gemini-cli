@@ -116,8 +116,8 @@ export class CoderAgentExecutor implements AgentExecutor {
 
     const agentSettings = persistedState._agentSettings;
     const config = await this.getConfig(agentSettings, sdkTask.id);
-    const contextId =
-      (metadata['_contextId'] as string) || (sdkTask.contextId as string);
+    const contextId : string =
+      (metadata['_contextId'] as string) || (sdkTask.contextId);
     const runtimeTask = await Task.create(
       sdkTask.id,
       contextId,
@@ -280,10 +280,10 @@ export class CoderAgentExecutor implements AgentExecutor {
     const sdkTask = requestContext.task as SDKTask | undefined;
 
     const taskId = sdkTask?.id || userMessage.taskId || uuidv4();
-    const contextId =
+    const contextId: string =
       userMessage.contextId ||
       sdkTask?.contextId ||
-      sdkTask?.metadata?.['_contextId'] ||
+      (sdkTask?.metadata?.['_contextId'] as string) ||
       uuidv4();
 
     logger.info(
@@ -381,12 +381,52 @@ export class CoderAgentExecutor implements AgentExecutor {
       const agentSettings = userMessage.metadata?.[
         'coderAgent'
       ] as AgentSettings;
-      wrapper = await this.createTask(
-        taskId,
-        contextId as string,
-        agentSettings,
-        eventBus,
-      );
+      try {
+        wrapper = await this.createTask(
+          taskId,
+          contextId,
+          agentSettings,
+          eventBus,
+        );
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Agent execution error';
+        logger.error(
+          `[CoderAgentExecutor] Error creating task ${taskId}:`,
+          error,
+        );
+        const stateChange: StateChange = {
+          kind: CoderAgentEvent.StateChangeEvent,
+        };
+        eventBus.publish({
+          kind: 'status-update',
+          taskId,
+          contextId,
+          status: {
+            state: 'failed',
+            message: {
+              kind: 'message',
+              role: 'agent',
+              parts: [
+                {
+                  kind: 'text',
+                  text: errorMessage,
+                },
+              ],
+              messageId: uuidv4(),
+              taskId,
+              contextId,
+            } as Message,
+          },
+          final: true,
+          metadata: {
+            coderAgent: stateChange,
+            model: 'unknown',
+            error: errorMessage,
+          },
+        });
+        return;
+      }
       const newTaskSDK = wrapper.toSDKTask();
       eventBus.publish({
         ...newTaskSDK,
