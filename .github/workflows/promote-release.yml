@@ -22,11 +22,6 @@ jobs:
       pull-requests: 'write'
 
     steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
-        with:
-          fetch-depth: 0
-
       - name: 'Get main SHA'
         id: 'main_sha'
         run: echo "SHA=$(git rev-parse main)" >> $GITHUB_OUTPUT
