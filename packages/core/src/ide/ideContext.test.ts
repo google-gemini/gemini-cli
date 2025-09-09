@@ -4,21 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import {
+  IDE_MAX_OPEN_FILES,
+  IDE_MAX_SELECTED_TEXT_LENGTH,
+} from './constants.js';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { createIdeContextStore } from './ideContext.js';
-import { FileSchema, IdeContextSchema } from './types.js';
+import {
+  type IdeContext,
+  FileSchema,
+  IdeContextSchema,
+  type File,
+} from './types.js';
 
 describe('ideContext', () => {
   describe('createIdeContextStore', () => {
-    let ideContext: ReturnType<typeof createIdeContextStore>;
+    let ideContextStore: ReturnType<typeof createIdeContextStore>;
 
     beforeEach(() => {
       // Create a fresh, isolated instance for each test
-      ideContext = createIdeContextStore();
+      ideContextStore = createIdeContextStore();
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
     });
 
     it('should return undefined initially for ide context', () => {
-      expect(ideContext.getIdeContext()).toBeUndefined();
+      expect(ideContextStore.getIdeContext()).toBeUndefined();
     });
 
     it('should set and retrieve the ide context', () => {
@@ -35,9 +48,9 @@ describe('ideContext', () => {
         },
       };
 
-      ideContext.setIdeContext(testFile);
+      ideContextStore.setIdeContext(testFile);
 
-      const activeFile = ideContext.getIdeContext();
+      const activeFile = ideContextStore.getIdeContext();
       expect(activeFile).toEqual(testFile);
     });
 
@@ -54,7 +67,7 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContext.setIdeContext(firstFile);
+      ideContextStore.setIdeContext(firstFile);
 
       const secondFile = {
         workspaceState: {
@@ -68,9 +81,9 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContext.setIdeContext(secondFile);
+      ideContextStore.setIdeContext(secondFile);
 
-      const activeFile = ideContext.getIdeContext();
+      const activeFile = ideContextStore.getIdeContext();
       expect(activeFile).toEqual(secondFile);
     });
 
@@ -87,16 +100,16 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContext.setIdeContext(testFile);
-      expect(ideContext.getIdeContext()).toEqual(testFile);
+      ideContextStore.setIdeContext(testFile);
+      expect(ideContextStore.getIdeContext()).toEqual(testFile);
     });
 
     it('should notify subscribers when ide context changes', () => {
       const subscriber1 = vi.fn();
       const subscriber2 = vi.fn();
 
-      ideContext.subscribeToIdeContext(subscriber1);
-      ideContext.subscribeToIdeContext(subscriber2);
+      ideContextStore.subscribeToIdeContext(subscriber1);
+      ideContextStore.subscribeToIdeContext(subscriber2);
 
       const testFile = {
         workspaceState: {
@@ -110,7 +123,7 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContext.setIdeContext(testFile);
+      ideContextStore.setIdeContext(testFile);
 
       expect(subscriber1).toHaveBeenCalledTimes(1);
       expect(subscriber1).toHaveBeenCalledWith(testFile);
@@ -130,7 +143,7 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContext.setIdeContext(newFile);
+      ideContextStore.setIdeContext(newFile);
 
       expect(subscriber1).toHaveBeenCalledTimes(2);
       expect(subscriber1).toHaveBeenCalledWith(newFile);
@@ -142,10 +155,10 @@ describe('ideContext', () => {
       const subscriber1 = vi.fn();
       const subscriber2 = vi.fn();
 
-      const unsubscribe1 = ideContext.subscribeToIdeContext(subscriber1);
-      ideContext.subscribeToIdeContext(subscriber2);
+      const unsubscribe1 = ideContextStore.subscribeToIdeContext(subscriber1);
+      ideContextStore.subscribeToIdeContext(subscriber2);
 
-      ideContext.setIdeContext({
+      ideContextStore.setIdeContext({
         workspaceState: {
           openFiles: [
             {
@@ -162,7 +175,7 @@ describe('ideContext', () => {
 
       unsubscribe1();
 
-      ideContext.setIdeContext({
+      ideContextStore.setIdeContext({
         workspaceState: {
           openFiles: [
             {
@@ -192,13 +205,159 @@ describe('ideContext', () => {
         },
       };
 
-      ideContext.setIdeContext(testFile);
+      ideContextStore.setIdeContext(testFile);
 
-      expect(ideContext.getIdeContext()).toEqual(testFile);
+      expect(ideContextStore.getIdeContext()).toEqual(testFile);
 
-      ideContext.clearIdeContext();
+      ideContextStore.clearIdeContext();
 
-      expect(ideContext.getIdeContext()).toBeUndefined();
+      expect(ideContextStore.getIdeContext()).toBeUndefined();
+    });
+
+    it('should set the context and notify subscribers when no workspaceState is present', () => {
+      const subscriber = vi.fn();
+      ideContextStore.subscribeToIdeContext(subscriber);
+      const context: IdeContext = {};
+      ideContextStore.setIdeContext(context);
+      expect(ideContextStore.getIdeContext()).toBe(context);
+      expect(subscriber).toHaveBeenCalledWith(context);
+    });
+
+    it('should handle an empty openFiles array', () => {
+      const context: IdeContext = {
+        workspaceState: {
+          openFiles: [],
+        },
+      };
+      ideContextStore.setIdeContext(context);
+      expect(
+        ideContextStore.getIdeContext()?.workspaceState?.openFiles,
+      ).toEqual([]);
+    });
+
+    it('should sort openFiles by timestamp in descending order', () => {
+      const context: IdeContext = {
+        workspaceState: {
+          openFiles: [
+            { path: 'file1.ts', timestamp: 100, isActive: false },
+            { path: 'file2.ts', timestamp: 300, isActive: true },
+            { path: 'file3.ts', timestamp: 200, isActive: false },
+          ],
+        },
+      };
+      ideContextStore.setIdeContext(context);
+      const openFiles =
+        ideContextStore.getIdeContext()?.workspaceState?.openFiles;
+      expect(openFiles?.[0]?.path).toBe('file2.ts');
+      expect(openFiles?.[1]?.path).toBe('file3.ts');
+      expect(openFiles?.[2]?.path).toBe('file1.ts');
+    });
+
+    it('should mark only the most recent file as active and clear other active files', () => {
+      const context: IdeContext = {
+        workspaceState: {
+          openFiles: [
+            {
+              path: 'file1.ts',
+              timestamp: 100,
+              isActive: true,
+              selectedText: 'hello',
+            },
+            {
+              path: 'file2.ts',
+              timestamp: 300,
+              isActive: true,
+              cursor: { line: 1, character: 1 },
+              selectedText: 'hello',
+            },
+            {
+              path: 'file3.ts',
+              timestamp: 200,
+              isActive: false,
+              selectedText: 'hello',
+            },
+          ],
+        },
+      };
+      ideContextStore.setIdeContext(context);
+      const openFiles =
+        ideContextStore.getIdeContext()?.workspaceState?.openFiles;
+      expect(openFiles?.[0]?.isActive).toBe(true);
+      expect(openFiles?.[0]?.cursor).toBeDefined();
+      expect(openFiles?.[0]?.selectedText).toBeDefined();
+
+      expect(openFiles?.[1]?.isActive).toBe(false);
+      expect(openFiles?.[1]?.cursor).toBeUndefined();
+      expect(openFiles?.[1]?.selectedText).toBeUndefined();
+
+      expect(openFiles?.[2]?.isActive).toBe(false);
+      expect(openFiles?.[2]?.cursor).toBeUndefined();
+      expect(openFiles?.[2]?.selectedText).toBeUndefined();
+    });
+
+    it('should truncate selectedText if it exceeds the max length', () => {
+      const longText = 'a'.repeat(IDE_MAX_SELECTED_TEXT_LENGTH + 10);
+      const context: IdeContext = {
+        workspaceState: {
+          openFiles: [
+            {
+              path: 'file1.ts',
+              timestamp: 100,
+              isActive: true,
+              selectedText: longText,
+            },
+          ],
+        },
+      };
+      ideContextStore.setIdeContext(context);
+      const selectedText =
+        ideContextStore.getIdeContext()?.workspaceState?.openFiles?.[0]
+          ?.selectedText;
+      expect(selectedText).toHaveLength(
+        IDE_MAX_SELECTED_TEXT_LENGTH + '... [TRUNCATED]'.length,
+      );
+      expect(selectedText?.endsWith('... [TRUNCATED]')).toBe(true);
+    });
+
+    it('should not truncate selectedText if it is within the max length', () => {
+      const shortText = 'a'.repeat(IDE_MAX_SELECTED_TEXT_LENGTH);
+      const context: IdeContext = {
+        workspaceState: {
+          openFiles: [
+            {
+              path: 'file1.ts',
+              timestamp: 100,
+              isActive: true,
+              selectedText: shortText,
+            },
+          ],
+        },
+      };
+      ideContextStore.setIdeContext(context);
+      const selectedText =
+        ideContextStore.getIdeContext()?.workspaceState?.openFiles?.[0]
+          ?.selectedText;
+      expect(selectedText).toBe(shortText);
+    });
+
+    it('should truncate the openFiles list if it exceeds the max length', () => {
+      const files: File[] = Array.from(
+        { length: IDE_MAX_OPEN_FILES + 5 },
+        (_, i) => ({
+          path: `file${i}.ts`,
+          timestamp: i,
+          isActive: false,
+        }),
+      );
+      const context: IdeContext = {
+        workspaceState: {
+          openFiles: files,
+        },
+      };
+      ideContextStore.setIdeContext(context);
+      const openFiles =
+        ideContextStore.getIdeContext()?.workspaceState?.openFiles;
+      expect(openFiles).toHaveLength(IDE_MAX_OPEN_FILES);
     });
   });
 
