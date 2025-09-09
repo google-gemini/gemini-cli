@@ -714,7 +714,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       <Box
         borderStyle="round"
         borderColor={
-          shellModeActive ? theme.status.warning : theme.border.focused
+          shellModeActive
+            ? theme.status.warning
+            : focus
+              ? theme.border.focused
+              : theme.border.default
         }
         paddingX={1}
       >

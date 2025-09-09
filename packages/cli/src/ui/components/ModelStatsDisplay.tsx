@@ -34,13 +34,13 @@ const StatRow: React.FC<StatRowProps> = ({
 }) => (
   <Box>
     <Box width={METRIC_COL_WIDTH}>
-      <Text bold={isSection} color={isSection ? undefined : theme.text.link}>
+      <Text bold={isSection} color={isSection ? theme.text.primary : theme.text.link}>
         {isSubtle ? `  ↳ ${title}` : title}
       </Text>
     </Box>
     {values.map((value, index) => (
       <Box width={MODEL_COL_WIDTH} key={index}>
-        <Text>{value}</Text>
+        <Text color={theme.text.primary}>{value}</Text>
       </Box>
     ))}
   </Box>
@@ -96,11 +96,11 @@ export const ModelStatsDisplay: React.FC = () => {
       {/* Header */}
       <Box>
         <Box width={METRIC_COL_WIDTH}>
-          <Text bold>Metric</Text>
+          <Text bold color={theme.text.primary}>Metric</Text>
         </Box>
         {modelNames.map((name) => (
           <Box width={MODEL_COL_WIDTH} key={name}>
-            <Text bold>{name}</Text>
+            <Text bold color={theme.text.primary}>{name}</Text>
           </Box>
         ))}
       </Box>
@@ -112,6 +112,7 @@ export const ModelStatsDisplay: React.FC = () => {
         borderTop={false}
         borderLeft={false}
         borderRight={false}
+        borderColor={theme.border.default}
       />
 
       {/* API Section */}
