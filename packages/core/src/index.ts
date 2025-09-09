@@ -50,6 +50,7 @@ export * from './utils/workspaceContext.js';
 export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
 export * from './utils/ide-trust.js';
+export * from './utils/promptIdContext.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

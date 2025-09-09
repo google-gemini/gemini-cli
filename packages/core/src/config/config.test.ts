@@ -122,6 +122,10 @@ vi.mock('../ide/ide-client.js', () => ({
   },
 }));
 
+import { BaseLlmClient } from '../core/baseLlmClient.js';
+
+vi.mock('../core/baseLlmClient.js');
+
 describe('Server Config (config.ts)', () => {
   const MODEL = 'gemini-pro';
   const SANDBOX: SandboxConfig = {
@@ -772,5 +776,60 @@ describe('setApprovalMode with folder trust', () => {
       expect(canUseRipgrep).not.toHaveBeenCalled();
       expect(logRipgrepFallback).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('BaseLlmClient Lifecycle', () => {
+  const MODEL = 'gemini-pro';
+  const SANDBOX: SandboxConfig = {
+    command: 'docker',
+    image: 'gemini-cli-sandbox',
+  };
+  const TARGET_DIR = '/path/to/target';
+  const DEBUG_MODE = false;
+  const QUESTION = 'test question';
+  const FULL_CONTEXT = false;
+  const USER_MEMORY = 'Test User Memory';
+  const TELEMETRY_SETTINGS = { enabled: false };
+  const EMBEDDING_MODEL = 'gemini-embedding';
+  const SESSION_ID = 'test-session-id';
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    embeddingModel: EMBEDDING_MODEL,
+    sandbox: SANDBOX,
+    targetDir: TARGET_DIR,
+    debugMode: DEBUG_MODE,
+    question: QUESTION,
+    fullContext: FULL_CONTEXT,
+    userMemory: USER_MEMORY,
+    telemetry: TELEMETRY_SETTINGS,
+    sessionId: SESSION_ID,
+    model: MODEL,
+    usageStatisticsEnabled: false,
+  };
+
+  it('should throw an error if getBaseLlmClient is called before refreshAuth', () => {
+    const config = new Config(baseParams);
+    expect(() => config.getBaseLlmClient()).toThrow(
+      'BaseLlmClient not initialized. Ensure authentication has occurred and ContentGenerator is ready.',
+    );
+  });
+
+  it('should successfully initialize BaseLlmClient after refreshAuth is called', async () => {
+    const config = new Config(baseParams);
+    const authType = AuthType.USE_GEMINI;
+    const mockContentConfig = { model: 'gemini-flash', apiKey: 'test-key' };
+
+    vi.mocked(createContentGeneratorConfig).mockReturnValue(mockContentConfig);
+
+    await config.refreshAuth(authType);
+
+    // Should not throw
+    const llmService = config.getBaseLlmClient();
+    expect(llmService).toBeDefined();
+    expect(BaseLlmClient).toHaveBeenCalledWith(
+      config.getContentGenerator(),
+      config,
+    );
   });
 });
