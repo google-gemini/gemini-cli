@@ -196,8 +196,13 @@ describe('activate', () => {
       expect(showInformationMessageMock).not.toHaveBeenCalled();
     });
 
-    it('does not show the notification for Firebase Studio', async () => {
-      vi.mocked(detectIdeFromEnv).mockReturnValue(DetectedIde.FirebaseStudio);
+    it.each([
+      {
+        ide: DetectedIde.CloudShell,
+      },
+      { ide: DetectedIde.FirebaseStudio },
+    ])('does not show the notification for $ide', async ({ ide }) => {
+      vi.mocked(detectIdeFromEnv).mockReturnValue(ide);
       vi.mocked(context.globalState.get).mockReturnValue(undefined);
       const showInformationMessageMock = vi.mocked(
         vscode.window.showInformationMessage,
