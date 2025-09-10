@@ -618,9 +618,10 @@ export class GeminiProvider extends BaseModelProvider {
   private getMaxTokensForModel(): number {
     const model = this.config.model.toLowerCase();
     
-    if (model.includes('2.5')) return 1048576;
-    if (model.includes('1.5-pro')) return 2097152;
-    if (model.includes('1.5-flash')) return 1048576;
+    if (model.includes('gemini-2.5-pro')) return 1048576;
+    if (model.includes('gemini-2.5-flash')) return 1048576;
+    if (model.includes('gemini-1.5-pro')) return 2097152;
+    if (model.includes('gemini-1.5-flash')) return 1048576;
     
     return 32768;
   }

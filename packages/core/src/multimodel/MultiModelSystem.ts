@@ -228,23 +228,58 @@ export class MultiModelSystem {
 
     const provider = await this.getOrCreateProvider(this.currentProvider!);
 
-    // Add turn limit like nonInteractiveCli.ts to prevent infinite loops
+    // Add intelligent duplicate detection and safety limits
     let turnCount = 0;
-    const MAX_TURNS = this.config.getMaxSessionTurns() >= 0 ? this.config.getMaxSessionTurns() : 20;
+    const MAX_TURNS = 100; // Hard safety limit to prevent any infinite loops
+    const MAX_DUPLICATE_CALLS = this.config.getMaxSessionTurns() >= 0 ? this.config.getMaxSessionTurns() : 20;
+    
+    // Track tool call history for duplicate detection
+    const toolCallHistory: Array<{ name: string; args: any; timestamp: number }> = [];
+    let duplicateCount = 0;
 
     while (true) {
       turnCount++;
+      
+      // Hard safety limit check (100 turns)
       if (turnCount > MAX_TURNS) {
-        console.error(`[MultiModelSystem] Reached maximum turns (${MAX_TURNS}), stopping to prevent infinite loop.`);
+        console.error(`[MultiModelSystem] Reached absolute maximum turns (${MAX_TURNS}), stopping to prevent infinite loop.`);
         
-        // Notify LLM about the tool call limit and how to continue
-        const limitMessage = `\n\n⚠️ **Tool Call Limit Reached**\n\n` +
-          `I've reached the maximum number of consecutive tool calls (${MAX_TURNS}) to prevent infinite loops. ` +
+        const limitMessage = `\n\n⚠️ **Absolute Turn Limit Reached**\n\n` +
+          `I've reached the absolute maximum of ${MAX_TURNS} turns to prevent system overload. ` +
+          `This is a hard safety measure.\n\n` +
+          `**What happened:** I made ${MAX_TURNS} turns in this conversation.\n\n` +
+          `**How to continue:** Please start a new conversation or ask me to compress the chat history.\n\n` +
+          `**Current status:** I'm stopping here for system stability.`;
+        
+        yield {
+          type: 'content_delta',
+          content: limitMessage
+        };
+        
+        const limitNotificationMessage: UniversalMessage = {
+          role: 'assistant',
+          content: limitMessage,
+          timestamp: new Date()
+        };
+        sessionManager.addHistory(limitNotificationMessage);
+        
+        yield {
+          type: 'done'
+        };
+        
+        return;
+      }
+      
+      // Check duplicate tool calls limit
+      if (duplicateCount > MAX_DUPLICATE_CALLS) {
+        console.error(`[MultiModelSystem] Reached maximum duplicate tool calls (${duplicateCount}), stopping to prevent infinite loop.`);
+        
+        const limitMessage = `\n\n⚠️ **Duplicate Tool Call Limit Reached**\n\n` +
+          `I've detected ${duplicateCount} duplicate tool calls, which suggests I might be stuck in a loop. ` +
           `This is a safety measure to ensure system stability.\n\n` +
-          `**What happened:** I made ${MAX_TURNS} consecutive tool calls in this turn.\n\n` +
-          `**How to continue:** Please send me a message (like "continue") to allow more tool calls. ` +
-          `I can then continue with additional tool operations if needed.\n\n` +
-          `**Current status:** I'm pausing here and waiting for your instruction to proceed.`;
+          `**What happened:** I kept making the same tool calls with identical parameters.\n\n` +
+          `**How to continue:** Please provide more specific instructions or ask me to try a different approach.\n\n` +
+          `**Current status:** I'm pausing here and waiting for your guidance to proceed differently.`;
         
         yield {
           type: 'content_delta',
@@ -404,6 +439,38 @@ export class MultiModelSystem {
       
       // Check if we have tool calls to execute (like nonInteractiveCli.ts)
       if (toolCallRequests.length > 0) {
+        // Check for duplicate tool calls before execution
+        for (const requestInfo of toolCallRequests) {
+          const callSignature = {
+            name: requestInfo.name,
+            args: requestInfo.args,
+            timestamp: Date.now()
+          };
+          
+          // Check if this exact call (same name and args) was made recently
+          const isDuplicate = toolCallHistory.some(prevCall => 
+            prevCall.name === callSignature.name &&
+            JSON.stringify(prevCall.args) === JSON.stringify(callSignature.args) &&
+            (callSignature.timestamp - prevCall.timestamp) < 60000 // Within last minute
+          );
+          
+          if (isDuplicate) {
+            duplicateCount++;
+            console.warn(`[MultiModelSystem] Detected duplicate tool call: ${requestInfo.name} (duplicate count: ${duplicateCount})`);
+          } else {
+            // Reset duplicate count for different calls
+            if (duplicateCount > 0) {
+              console.log(`[MultiModelSystem] Tool call changed, resetting duplicate count from ${duplicateCount} to 0`);
+              duplicateCount = 0;
+            }
+          }
+          
+          // Add to history (keep only last 50 calls to prevent memory issues)
+          toolCallHistory.push(callSignature);
+          if (toolCallHistory.length > 50) {
+            toolCallHistory.shift();
+          }
+        }
         
         // Execute each tool call and create individual tool response messages
         for (const requestInfo of toolCallRequests) {
@@ -479,8 +546,14 @@ export class MultiModelSystem {
                 } else if ('functionResponse' in responsePart && responsePart.functionResponse) {
                   // Extract the actual tool result from functionResponse
                   const response = responsePart.functionResponse.response;
-                  if (response && typeof response === 'object' && 'output' in response) {
-                    toolResponseContent = response['output'] as string;
+                  if (response && typeof response === 'object') {
+                    // Check for 'output' field first (standard format)
+                    if ('output' in response && response['output']) {
+                      toolResponseContent = response['output'] as string;
+                    } else {
+                      // For tools like xlwings that don't use 'output' field, use full JSON
+                      toolResponseContent = JSON.stringify(response, null, 2);
+                    }
                   } else {
                     toolResponseContent = JSON.stringify(response, null, 2);
                   }
@@ -753,9 +826,8 @@ export class MultiModelSystem {
     return [...messages]; // Return mutable copy of all messages
     
     // Get max turns from config or use default
-    const DEFAULT_MAX_TURNS = 10;
+    const DEFAULT_MAX_TURNS = 20;
     const maxTurns = this.config.getMaxSessionTurns() >= 0 ? this.config.getMaxSessionTurns() : DEFAULT_MAX_TURNS;
-    
     if (maxTurns <= 0) {
       return [...messages]; // No limit if set to 0 or negative, return mutable copy
     }
@@ -796,7 +868,7 @@ export class MultiModelSystem {
   }
 
   /**
-   * Compress conversation history when token usage approaches provider limits
+   * Compress conversation history when token usage approaches provider limits or turn count exceeds threshold
    */
   private async tryCompressChat(
     provider: BaseModelProvider,
@@ -817,6 +889,13 @@ export class MultiModelSystem {
         compressionStatus: CompressionStatus.NOOP,
       };
     }
+
+    // Count conversation turns (user messages)
+    const conversationMessages = historyArray.filter(m => m.role !== 'system');
+    const userTurns = conversationMessages.filter(m => m.role === 'user').length;
+    const TURN_COMPRESSION_THRESHOLD = 25; // Compress after 25 user turns
+    
+    console.log(`[MultiModelSystem] Turn count check: ${userTurns} user turns vs ${TURN_COMPRESSION_THRESHOLD} threshold`);
 
     // Calculate current token count using provider's countTokens method
     let originalTokenCount = 0;
@@ -854,14 +933,33 @@ export class MultiModelSystem {
     const capabilities = provider.getCapabilityInfo();
     const tokenLimit = capabilities?.maxTokens || 10000;
 
-    // Don't compress if not forced and we are under the limit
+    // Check both token limit and turn count for compression triggers
+    let compressionNeeded = false;
+    let compressionReason = '';
+    
     if (!force) {
-      const threshold = COMPRESSION_TOKEN_THRESHOLD;
-      const thresholdTokens = threshold * tokenLimit;
-      console.log(`[MultiModelSystem] Compression check: ${originalTokenCount} tokens vs ${thresholdTokens} threshold (${threshold} * ${tokenLimit})`);
+      const tokenThreshold = COMPRESSION_TOKEN_THRESHOLD;
+      const thresholdTokens = tokenThreshold * tokenLimit;
+      console.log(`[MultiModelSystem] Compression check: ${originalTokenCount} tokens vs ${thresholdTokens} threshold (${tokenThreshold} * ${tokenLimit})`);
       
-      if (originalTokenCount < thresholdTokens) {
-        console.log(`[MultiModelSystem] No compression needed: ${originalTokenCount} < ${thresholdTokens}`);
+      // Check token threshold
+      if (originalTokenCount >= thresholdTokens) {
+        compressionNeeded = true;
+        compressionReason = `token limit (${originalTokenCount} >= ${thresholdTokens})`;
+      }
+      
+      // Check turn threshold
+      if (userTurns >= TURN_COMPRESSION_THRESHOLD) {
+        compressionNeeded = true;
+        if (compressionReason) {
+          compressionReason += ` and turn limit (${userTurns} >= ${TURN_COMPRESSION_THRESHOLD})`;
+        } else {
+          compressionReason = `turn limit (${userTurns} >= ${TURN_COMPRESSION_THRESHOLD})`;
+        }
+      }
+      
+      if (!compressionNeeded) {
+        console.log(`[MultiModelSystem] No compression needed: ${originalTokenCount} < ${thresholdTokens} tokens and ${userTurns} < ${TURN_COMPRESSION_THRESHOLD} turns`);
         return {
           originalTokenCount,
           newTokenCount: originalTokenCount,
@@ -869,7 +967,9 @@ export class MultiModelSystem {
         };
       }
       
-      console.log(`[MultiModelSystem] Compression triggered: ${originalTokenCount} >= ${thresholdTokens}`);
+      console.log(`[MultiModelSystem] Compression triggered by ${compressionReason}`);
+    } else {
+      compressionReason = 'forced compression';
     }
 
     console.log(`[MultiModelSystem] Starting compression. Original tokens: ${originalTokenCount}, limit: ${tokenLimit}`);
@@ -924,6 +1024,8 @@ export class MultiModelSystem {
 
       // Create new compressed history - DO NOT preserve old system messages
       // Let enhanceMessagesWithRole generate fresh system messages with current role/tools
+      const keptMessages = historyToKeep.filter(msg => msg.role !== 'system');
+      
       const newHistory: UniversalMessage[] = [
         {
           role: 'user',
@@ -933,17 +1035,20 @@ export class MultiModelSystem {
           role: 'assistant',
           content: 'Got it. Thanks for the additional context!',
         },
-        ...historyToKeep.filter(msg => msg.role !== 'system'), // Remove system messages from kept history
+        ...keptMessages
       ];
+      
+      // Fix function call/response balance to prevent 400 errors
+      const balancedHistory = this.fixFunctionCallResponseBalance(newHistory);
 
-      // Update SessionManager with compressed history
-      sessionManager.setHistory(newHistory);
-      console.log(`[MultiModelSystem] Updated SessionManager with compressed history (${newHistory.length} messages)`);
+      // Update SessionManager with compressed and balanced history
+      sessionManager.setHistory(balancedHistory);
+      console.log(`[MultiModelSystem] Updated SessionManager with compressed history (${balancedHistory.length} messages, balanced function calls)`);
 
       // Calculate new token count
       let newTokenCount = 0;
       try {
-        const tokenResult = await provider.countTokens(newHistory);
+        const tokenResult = await provider.countTokens(balancedHistory);
         newTokenCount = tokenResult.totalTokens;
       } catch (error) {
         console.warn('[MultiModelSystem] Could not determine compressed history token count:', error);
@@ -994,6 +1099,57 @@ export class MultiModelSystem {
         compressionStatus: CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
       };
     }
+  }
+
+  /**
+   * Fix function call/response balance to prevent Gemini API 400 errors
+   */
+  private fixFunctionCallResponseBalance(history: UniversalMessage[]): UniversalMessage[] {
+    const balancedHistory: UniversalMessage[] = [];
+    let pendingToolCalls: ToolCall[] = [];
+    
+    for (const message of history) {
+      if (message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0) {
+        // Assistant message with tool calls
+        balancedHistory.push(message);
+        pendingToolCalls.push(...message.toolCalls);
+      } else if (message.role === 'tool' && message.tool_call_id) {
+        // Tool response - check if it matches any pending tool call
+        const matchingCallIndex = pendingToolCalls.findIndex(call => call.id === message.tool_call_id);
+        if (matchingCallIndex !== -1) {
+          // Found matching tool call, add response and remove from pending
+          balancedHistory.push(message);
+          pendingToolCalls.splice(matchingCallIndex, 1);
+        } else {
+          // Orphaned tool response, skip it to maintain balance
+          console.warn(`[MultiModelSystem] Skipping orphaned tool response: ${message.tool_call_id}`);
+        }
+      } else {
+        // Regular message (user, assistant without tool calls, system)
+        // If we have pending tool calls, this breaks the chain - remove them
+        if (pendingToolCalls.length > 0) {
+          console.warn(`[MultiModelSystem] Removing ${pendingToolCalls.length} unmatched tool calls before non-tool message`);
+          pendingToolCalls = [];
+        }
+        balancedHistory.push(message);
+      }
+    }
+    
+    // If we end with pending tool calls, remove the assistant message that created them
+    if (pendingToolCalls.length > 0) {
+      console.warn(`[MultiModelSystem] Removing final assistant message with ${pendingToolCalls.length} unmatched tool calls`);
+      // Find and remove the last assistant message with tool calls
+      for (let i = balancedHistory.length - 1; i >= 0; i--) {
+        const msg = balancedHistory[i];
+        if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {
+          balancedHistory.splice(i, 1);
+          break;
+        }
+      }
+    }
+    
+    console.log(`[MultiModelSystem] Function call balance fixed: ${history.length} -> ${balancedHistory.length} messages`);
+    return balancedHistory;
   }
 
   /**
