@@ -23,7 +23,6 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref }}
           fetch-depth: 0
-          fetch-tags: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -39,8 +38,10 @@ jobs:
 
       - name: Get latest preview tag
         id: preview_tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=$(git describe --tags --abbrev=0 --match="v*-preview*")
+          TAG=$(gh release list --limit 10 --json tagName -q '.[] | select(.tagName | contains("preview")) | .tagName' | sort -V | tail -n 1)
           echo "LATEST_PREVIEW_TAG=$TAG" >> $GITHUB_OUTPUT
 
       - name: Calculate versions
