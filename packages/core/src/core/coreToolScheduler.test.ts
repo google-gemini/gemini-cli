@@ -235,7 +235,11 @@ describe('CoreToolScheduler', () => {
       const mockToolRegistry = {
         getAllToolNames: () => [],
       } as unknown as ToolRegistry;
-      const mockConfig = {
+      const mockConfig = makeMockConfig({
+        getToolRegistry: () => ({
+          getAllToolNames: () => [],
+        } as unknown as ToolRegistry),
+      });
         getToolRegistry: () => mockToolRegistry,
       } as unknown as Config;
 
