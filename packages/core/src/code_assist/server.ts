@@ -95,10 +95,7 @@ export class CodeAssistServer implements ContentGenerator {
   async onboardUser(
     req: OnboardUserRequest,
   ): Promise<LongRunningOperationResponse> {
-    return this.requestPost<LongRunningOperationResponse>(
-      'onboardUser',
-      req,
-    );
+    return this.requestPost<LongRunningOperationResponse>('onboardUser', req);
   }
 
   async loadCodeAssist(
