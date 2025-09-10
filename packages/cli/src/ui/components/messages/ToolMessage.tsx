@@ -175,9 +175,10 @@ const ToolInfo: React.FC<ToolInfo> = ({
         return Colors.Foreground;
       case 'low':
         return Colors.Gray;
-      default:
-        // This should never happen with proper TypeScript typing
-        return Colors.Foreground;
+      default: {
+        const exhaustiveCheck: never = emphasis;
+        return exhaustiveCheck;
+      }
     }
   }, [emphasis]);
   return (
