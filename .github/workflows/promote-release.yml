@@ -1,12 +1,16 @@
-name: Promote Release
+name: 'Promote Release'
 
 on:
   workflow_dispatch:
     inputs:
-      ref:
-        description: 'The branch, tag, or SHA to checkout. Defaults to main.'
+      release_type:
+        description: 'The type of release to perform.'
         required: true
-        default: 'main'
+        type: choice
+        options:
+          - stable
+          - preview
+          - nightly
       dry_run:
         description: 'Run a dry-run of the release process; no branches, npm packages or GitHub releases will be created.'
         required: true
@@ -14,189 +18,89 @@ on:
         default: true
 
 jobs:
-  promote:
-    name: Promote Release
-    runs-on: ubuntu-latest
+  calculate-versions:
+    name: Calculate Versions and Plan
+    runs-on: 'ubuntu-latest'
+    outputs:
+      STABLE_VERSION: ${{ steps.versions.outputs.STABLE_VERSION }}
+      STABLE_SHA: ${{ steps.versions.outputs.STABLE_SHA }}
+      PREVIOUS_STABLE_TAG: ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}
+      PREVIEW_VERSION: ${{ steps.versions.outputs.PREVIEW_VERSION }}
+      PREVIEW_SHA: ${{ steps.versions.outputs.PREVIEW_SHA }}
+      PREVIOUS_PREVIEW_TAG: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}
+      NEXT_NIGHTLY_VERSION: ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}
+      MAIN_SHA: ${{ steps.versions.outputs.MAIN_SHA }}
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
         with:
-          ref: ${{ github.event.inputs.ref }}
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Get latest preview tag
-        id: preview_tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("preview"))] | .[0].tagName')
-          echo "LATEST_PREVIEW_TAG=$TAG" >> $GITHUB_OUTPUT
-
-      - name: Get latest stable tag
-        id: stable_tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | (contains("nightly") or contains("preview")) | not)] | .[0].tagName')
-          echo "LATEST_STABLE_TAG=$TAG" >> $GITHUB_OUTPUT
-
-      - name: Calculate versions
-        id: versions
-        run: |
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          echo "Current version from package.json: $CURRENT_VERSION"
-
-          # Extract major and minor versions
-          MAJOR=$(echo $CURRENT_VERSION | cut -d. -f1)
-          MINOR=$(echo $CURRENT_VERSION | cut -d. -f2)
-
-          # Calculate next nightly version (minor bump)
-          # e.g., 0.6.x -> 0.7.0-nightly
-          NEXT_MINOR=$((MINOR + 1))
-          NEXT_NIGHTLY_VERSION="$MAJOR.$NEXT_MINOR.0-nightly"
-
-          # Calculate next preview version
-          # e.g., 0.6.x -> 0.6.0-preview
-          NEXT_PREVIEW_VERSION="$MAJOR.$MINOR.0-preview"
-
-          STABLE_RELEASE_TAG=$(echo "${{ steps.preview_tag.outputs.LATEST_PREVIEW_TAG }}" | sed 's/-preview.*//')
-          STABLE_RELEASE_VERSION=$(echo "$STABLE_RELEASE_TAG" | sed 's/^v//')
-
-          echo "next_nightly_version=$NEXT_NIGHTLY_VERSION" >> $GITHUB_OUTPUT
-          echo "next_preview_version=$NEXT_PREVIEW_VERSION" >> $GITHUB_OUTPUT
-          echo "stable_release_tag=$STABLE_RELEASE_TAG" >> $GITHUB_OUTPUT
-          echo "stable_release_version=$STABLE_RELEASE_VERSION" >> $GITHUB_OUTPUT
-          echo "stable_npm_tag=latest" >> $GITHUB_OUTPUT
-          echo "stable_previous_tag=${{ steps.stable_tag.outputs.LATEST_STABLE_TAG }}" >> $GITHUB_OUTPUT
-
-      - name: Print calculated versions
-        run: |
-          echo "Dry Run: ${{ github.event.inputs.dry_run }}"
-          echo "---"
-          echo "Current Preview Tag: ${{ steps.preview_tag.outputs.LATEST_PREVIEW_TAG }}"
-          echo "Current Stable Tag: ${{ steps.stable_tag.outputs.LATEST_STABLE_TAG }}"
-          echo "---"
-          echo "Promoting to Stable Release"
-          echo "  Release Tag: ${{ steps.versions.outputs.stable_release_tag }}"
-          echo "  Release Version: ${{ steps.versions.outputs.stable_release_version }}"
-          echo "  NPM Tag: ${{ steps.versions.outputs.stable_npm_tag }}"
-          echo "  Previous Tag for Release Notes: ${{ steps.versions.outputs.stable_previous_tag }}"
-          echo "---"
-          echo "Next Nightly Version: ${{ steps.versions.outputs.next_nightly_version }}"
-          echo "Next Preview Version: ${{ steps.versions.outputs.next_preview_version }}"
-
-      - name: Configure Git User
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        run: |
-          git config user.name "gemini-cli-robot"
-          git config user.email "gemini-cli-robot@google.com"
-
-      - name: Create and switch to a release branch
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        id: release_branch
-        run: |
-          BRANCH_NAME="promote/${{ steps.versions.outputs.stable_release_tag }}"
-          git switch -c "${{ BRANCH_NAME }}"
-          echo "BRANCH_NAME=${{ BRANCH_NAME }}" >> "${GITHUB_OUTPUT}"
-
-      - name: Update package versions
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        run: |
-          npm run release:version ${{ steps.versions.outputs.stable_release_version }}
-
-      - name: Commit and Push package versions
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        run: |
-          git add package.json package-lock.json packages/*/package.json
-          git commit -m "chore(release): ${{ steps.versions.outputs.stable_release_tag }}"
-          git push --set-upstream origin "${{ steps.release_branch.outputs.BRANCH_NAME }}"
-
-      - name: Create Pull Request
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr create \
-            --title "chore(release): Promote ${{ steps.versions.outputs.stable_release_tag }}" \
-            --body "Automated PR to promote ${{ steps.versions.outputs.stable_release_tag }} to stable." \
-            --base "${{ github.event.inputs.ref }}" \
-            --head "${{ steps.release_branch.outputs.BRANCH_NAME }}"
-
-      - name: Enable Auto-Merge
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr merge "${{ steps.release_branch.outputs.BRANCH_NAME }}" --auto --squash
-
-      - name: Build and Prepare Packages
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        run: |
-          npm run build:packages
-          npm run prepare:package
-
-      - name: Configure npm for publishing
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        uses: actions/setup-node@v4
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@v4'
         with:
           node-version-file: '.nvmrc'
-          registry-url: 'https://wombat-dressing-room.appspot.com'
-          scope: '@google'
+          cache: 'npm'
 
-      - name: Publish @google/gemini-cli-core
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CORE }}
-        run: |
-          npm publish \
-            --workspace="@google/gemini-cli-core" \
-            --tag="${{ steps.versions.outputs.stable_npm_tag }}"
+      - name: 'Install Dependencies'
+        run: npm ci
 
-      - name: Install latest core package
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        run: |
-          npm install "@google/gemini-cli-core@${{ steps.versions.outputs.stable_release_version }}" \
-          --workspace="@google/gemini-cli" \
-          --save-exact
-
-      - name: Publish @google/gemini-cli
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CLI }}
-        run: |
-          npm publish \
-            --workspace="@google/gemini-cli" \
-            --tag="${{ steps.versions.outputs.stable_npm_tag }}"
-
-      - name: Create Stable GitHub Release and Tag
-        if: ${{ github.event.inputs.dry_run == 'false' }}
+      - name: 'Calculate Versions and SHAs'
+        id: versions
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.versions.outputs.stable_release_tag }}" \
-            bundle/gemini.js \
-            --target "${{ github.event.inputs.ref }}" \
-            --title "Release ${{ steps.versions.outputs.stable_release_tag }}" \
-            --notes-start-tag "${{ steps.versions.outputs.stable_previous_tag }}" \
-            --generate-notes
+          # Find latest tags
+          LATEST_PREVIEW_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("preview"))] | .[0].tagName')
+          LATEST_STABLE_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | (contains("nightly") or contains("preview")) | not)] | .[0].tagName')
+          LATEST_NIGHTLY_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("nightly"))] | .[0].tagName')
 
-      - name: Create Next Preview GitHub Release and Tag
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Get SHAs for tags and main
+          PREVIEW_SHA=$(git rev-parse "${LATEST_PREVIEW_TAG}^{commit}")
+          NIGHTLY_SHA=$(git rev-parse "${LATEST_NIGHTLY_TAG}^{commit}")
+          MAIN_SHA=$(git rev-parse "origin/main")
+
+          # Calculate new version numbers
+          # Stable version is the preview version without the suffix
+          STABLE_VERSION=$(echo "${LATEST_PREVIEW_TAG}" | sed 's/-preview.*//' | sed 's/^v//')
+
+          # Preview version is the nightly version with a preview suffix
+          PREVIEW_VERSION=$(echo "${LATEST_NIGHTLY_TAG}" | sed 's/-nightly.*//' | sed 's/^v//')-preview
+
+          # Next nightly version is a minor bump on the current package.json version
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          MAJOR=$(echo $CURRENT_VERSION | cut -d. -f1)
+          MINOR=$(echo $CURRENT_VERSION | cut -d. -f2)
+          NEXT_MINOR=$((MINOR + 1))
+          NEXT_NIGHTLY_VERSION="${MAJOR}.${NEXT_MINOR}.0-nightly"
+
+          # Set outputs
+          echo "STABLE_VERSION=${STABLE_VERSION}" >> $GITHUB_OUTPUT
+          echo "STABLE_SHA=${PREVIEW_SHA}" >> $GITHUB_OUTPUT
+          echo "PREVIOUS_STABLE_TAG=${LATEST_STABLE_TAG}" >> $GITHUB_OUTPUT
+          echo "PREVIEW_VERSION=${PREVIEW_VERSION}" >> $GITHUB_OUTPUT
+          echo "PREVIEW_SHA=${NIGHTLY_SHA}" >> $GITHUB_OUTPUT
+          echo "PREVIOUS_PREVIEW_TAG=${LATEST_PREVIEW_TAG}" >> $GITHUB_OUTPUT
+          echo "NEXT_NIGHTLY_VERSION=${NEXT_NIGHTLY_VERSION}" >> $GITHUB_OUTPUT
+          echo "MAIN_SHA=${MAIN_SHA}" >> $GITHUB_OUTPUT
+
+      - name: 'Print Plan'
         run: |
-          gh release create "v${{ steps.versions.outputs.next_preview_version }}" \
-            bundle/gemini.js \
-            --target "${{ github.event.inputs.ref }}" \
-            --title "Release v${{ steps.versions.outputs.next_preview_version }}" \
-            --notes-start-tag "${{ steps.versions.outputs.stable_release_tag }}" \
-            --generate-notes
+          echo "Release Type: ${{ github.event.inputs.release_type }}"
+          echo "Dry Run: ${{ github.event.inputs.dry_run }}"
+          echo ""
+          echo "--- Stable Promotion Plan ---"
+          echo "Source Tag: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}"
+          echo "Source SHA: ${{ steps.versions.outputs.STABLE_SHA }}"
+          echo "New Stable Version: ${{ steps.versions.outputs.STABLE_VERSION }}"
+          echo "Previous Stable Tag for Release Notes: ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}"
+          echo ""
+          echo "--- Preview Promotion Plan ---"
+          echo "Source Tag: $(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("nightly"))] | .[0].tagName')"
+          echo "Source SHA: ${{ steps.versions.outputs.PREVIEW_SHA }}"
+          echo "New Preview Version: ${{ steps.versions.outputs.PREVIEW_VERSION }}"
+          echo ""
+          echo "--- Next Nightly Plan ---"
+          echo "Source SHA: ${{ steps.versions.outputs.MAIN_SHA }}"
+          echo "New Nightly Version: ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
