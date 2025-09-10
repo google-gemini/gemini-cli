@@ -534,7 +534,6 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   describe('tryCompressChat', () => {
-    const mockSendMessage = vi.fn();
     const mockGetHistory = vi.fn();
 
     beforeEach(() => {
@@ -546,7 +545,6 @@ describe('Gemini Client (client.ts)', () => {
         getHistory: mockGetHistory,
         addHistory: vi.fn(),
         setHistory: vi.fn(),
-        sendMessage: mockSendMessage,
       } as unknown as GeminiChat;
     });
 
@@ -559,7 +557,6 @@ describe('Gemini Client (client.ts)', () => {
       const mockChat: Partial<GeminiChat> = {
         getHistory: vi.fn().mockReturnValue(chatHistory),
         setHistory: vi.fn(),
-        sendMessage: vi.fn().mockResolvedValue({ text: 'Summary' }),
       };
       vi.mocked(mockContentGenerator.countTokens)
         .mockResolvedValueOnce({ totalTokens: 1000 })
@@ -697,10 +694,16 @@ describe('Gemini Client (client.ts)', () => {
         .mockResolvedValueOnce({ totalTokens: newTokenCount }); // Second call for the new history
 
       // Mock the summary response from the chat
-      mockSendMessage.mockResolvedValue({
-        role: 'model',
-        parts: [{ text: 'This is a summary.' }],
-      });
+      mockGenerateContentFn.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [{ text: 'This is a summary.' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
 
       await client.tryCompressChat('prompt-id-3');
 
@@ -734,17 +737,23 @@ describe('Gemini Client (client.ts)', () => {
         .mockResolvedValueOnce({ totalTokens: newTokenCount }); // Second call for the new history
 
       // Mock the summary response from the chat
-      mockSendMessage.mockResolvedValue({
-        role: 'model',
-        parts: [{ text: 'This is a summary.' }],
-      });
+      mockGenerateContentFn.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [{ text: 'This is a summary.' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
       const result = await client.tryCompressChat('prompt-id-3');
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
-      expect(mockSendMessage).toHaveBeenCalled();
+      expect(mockGenerateContentFn).toHaveBeenCalled();
 
       // Assert that summarization happened and returned the correct stats
       expect(result).toEqual({
@@ -787,17 +796,23 @@ describe('Gemini Client (client.ts)', () => {
         .mockResolvedValueOnce({ totalTokens: newTokenCount }); // Second call for the new history
 
       // Mock the summary response from the chat
-      mockSendMessage.mockResolvedValue({
-        role: 'model',
-        parts: [{ text: 'This is a summary.' }],
-      });
+      mockGenerateContentFn.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [{ text: 'This is a summary.' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
       const result = await client.tryCompressChat('prompt-id-3');
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
-      expect(mockSendMessage).toHaveBeenCalled();
+      expect(mockGenerateContentFn).toHaveBeenCalled();
 
       // Assert that summarization happened and returned the correct stats
       expect(result).toEqual({
@@ -829,16 +844,22 @@ describe('Gemini Client (client.ts)', () => {
         .mockResolvedValueOnce({ totalTokens: newTokenCount });
 
       // Mock the summary response from the chat
-      mockSendMessage.mockResolvedValue({
-        role: 'model',
-        parts: [{ text: 'This is a summary.' }],
-      });
+      mockGenerateContentFn.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [{ text: 'This is a summary.' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
       const result = await client.tryCompressChat('prompt-id-1', true); // force = true
       const newChat = client.getChat();
 
-      expect(mockSendMessage).toHaveBeenCalled();
+      expect(mockGenerateContentFn).toHaveBeenCalled();
 
       expect(result).toEqual({
         compressionStatus: CompressionStatus.COMPRESSED,
@@ -1503,7 +1524,6 @@ ${JSON.stringify(
         const mockChat: Partial<GeminiChat> = {
           addHistory: vi.fn(),
           setHistory: vi.fn(),
-          sendMessage: vi.fn().mockResolvedValue({ text: 'summary' }),
           // Assume history is not empty for delta checks
           getHistory: vi
             .fn()
@@ -1764,7 +1784,6 @@ ${JSON.stringify(
           addHistory: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]), // Default empty history
           setHistory: vi.fn(),
-          sendMessage: vi.fn().mockResolvedValue({ text: 'summary' }),
         };
         client['chat'] = mockChat as GeminiChat;
 

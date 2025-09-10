@@ -33,6 +33,7 @@ import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
   DEFAULT_THINKING_MODE,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
@@ -836,19 +837,30 @@ export class GeminiClient {
     const historyToCompress = curatedHistory.slice(0, compressBeforeIndex);
     const historyToKeep = curatedHistory.slice(compressBeforeIndex);
 
-    this.getChat().setHistory(historyToCompress);
+    const summaryResponse = await this.config
+      .getContentGenerator()
+      .generateContent(
+        {
+          model: DEFAULT_GEMINI_MODEL,
+          contents: [
+            ...historyToCompress,
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+                },
+              ],
+            },
+          ],
+          config: {
+            systemInstruction: { text: getCompressionPrompt() },
+          },
+        },
+        prompt_id,
+      );
+    const summary = getResponseText(summaryResponse) ?? '';
 
-    const { text: summary } = await this.getChat().sendMessage(
-      {
-        message: {
-          text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
-        },
-        config: {
-          systemInstruction: { text: getCompressionPrompt() },
-        },
-      },
-      prompt_id,
-    );
     const chat = await this.startChat([
       {
         role: 'user',
