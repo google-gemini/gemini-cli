@@ -634,7 +634,7 @@ describe('loggers', () => {
           tool_type: 'native',
           error: undefined,
           error_type: undefined,
-<<<<<<< HEAD
+
           metadata: {
             model_added_lines: 1,
             model_removed_lines: 2,
@@ -645,10 +645,7 @@ describe('loggers', () => {
             user_added_chars: 7,
             user_removed_chars: 8,
           },
-=======
-          metadata: undefined,
           content_length: 13,
->>>>>>> 05b7af72 (Log tool call output size and truncation event)
         },
       });
 
