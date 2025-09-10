@@ -5,8 +5,13 @@ on:
     inputs:
       ref:
         description: 'The branch, tag, or SHA to checkout. Defaults to main.'
-        required: false
+        required: true
         default: 'main'
+      dry_run:
+        description: 'Run a dry-run of the release process; no branches, npm packages or GitHub releases will be created.'
+        required: true
+        type: 'boolean'
+        default: true
 
 jobs:
   calculate-versions:
@@ -17,11 +22,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build get-release-version script
+        run: npm run build:get-release-version
+
+      - name: Get latest preview tag
+        id: preview_tag
+        run: |
+          TAG=$(git describe --tags --abbrev=0 --match="v*-preview*")
+          echo "LATEST_PREVIEW_TAG=$TAG" >> $GITHUB_OUTPUT
 
       - name: Calculate versions
         id: versions
@@ -47,12 +66,28 @@ jobs:
           PREVIOUS_MINOR=$((MINOR - 1))
           NEXT_STABLE_VERSION="$MAJOR.$PREVIOUS_MINOR.0"
 
+          STABLE_VERSION_JSON=$(node dist/get-release-version.js --type stable --version ${{ steps.preview_tag.outputs.LATEST_PREVIEW_TAG }})
+
           echo "next_nightly_version=$NEXT_NIGHTLY_VERSION" >> $GITHUB_OUTPUT
           echo "next_preview_version=$NEXT_PREVIEW_VERSION" >> $GITHUB_OUTPUT
           echo "next_stable_version=$NEXT_STABLE_VERSION" >> $GITHUB_OUTPUT
+          echo "stable_release_tag=$(echo "${STABLE_VERSION_JSON}" | jq -r .releaseTag)" >> $GITHUB_OUTPUT
+          echo "stable_release_version=$(echo "${STABLE_VERSION_JSON}" | jq -r .releaseVersion)" >> $GITHUB_OUTPUT
+          echo "stable_npm_tag=$(echo "${STABLE_VERSION_JSON}" | jq -r .npmTag)" >> $GITHUB_OUTPUT
+          echo "stable_previous_tag=$(echo "${STABLE_VERSION_JSON}" | jq -r .previousReleaseTag)" >> $GITHUB_OUTPUT
 
       - name: Print calculated versions
         run: |
-          echo "Next nightly version: ${{ steps.versions.outputs.next_nightly_version }}"
-          echo "Next preview version: ${{ steps.versions.outputs.next_preview_version }}"
-          echo "Next stable version: ${{ steps.versions.outputs.next_stable_version }}"
+          echo "Dry Run: ${{ github.event.inputs.dry_run }}"
+          echo "---"
+          echo "Current Preview Tag: ${{ steps.preview_tag.outputs.LATEST_PREVIEW_TAG }}"
+          echo "---"
+          echo "Promoting to Stable Release"
+          echo "  Release Tag: ${{ steps.versions.outputs.stable_release_tag }}"
+          echo "  Release Version: ${{ steps.versions.outputs.stable_release_version }}"
+          echo "  NPM Tag: ${{ steps.versions.outputs.stable_npm_tag }}"
+          echo "  Previous Tag for Release Notes: ${{ steps.versions.outputs.stable_previous_tag }}"
+          echo "---"
+          echo "Next Nightly Version: ${{ steps.versions.outputs.next_nightly_version }}"
+          echo "Next Preview Version: ${{ steps.versions.outputs.next_preview_version }}"
+          echo "Next Stable Version (from nightly): ${{ steps.versions.outputs.next_stable_version }}"
