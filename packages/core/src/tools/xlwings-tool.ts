@@ -871,6 +871,17 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
 
     const functions = [
       `
+def column_number_to_letter(col_num):
+    """Convert column number to Excel column letter (1-based)"""
+    if col_num <= 0:
+        return ''
+    result = ''
+    while col_num > 0:
+        col_num -= 1
+        result = chr(65 + (col_num % 26)) + result
+        col_num //= 26
+    return result
+
 def safe_convert_data(data):
     """Convert data to JSON-serializable format while preserving data types"""
     if data is None:
@@ -1117,7 +1128,7 @@ if range_str:
         row = range_str.split(':')[0]
         try:
             last_col = ws.range(f"XFD{row}").end('left').column
-            col_letter = ws.range((int(row), last_col)).column_letter
+            col_letter = column_number_to_letter(last_col)
             full_range_obj = ws.range(f"A{row}:{col_letter}{row}")
             total_last_row = int(row)
         except:
@@ -1164,8 +1175,8 @@ else:
     # Build range based on original range but with row limits
     start_col = full_range_obj.column
     end_col = full_range_obj.last_cell.column
-    start_col_letter = ws.range((1, start_col)).column_letter
-    end_col_letter = ws.range((1, end_col)).column_letter
+    start_col_letter = column_number_to_letter(start_col)
+    end_col_letter = column_number_to_letter(end_col)
     actual_range = f"{start_col_letter}{start_row_actual}:{end_col_letter}{end_row_actual}"
     read_range_obj = ws.range(actual_range)
 
@@ -1994,7 +2005,7 @@ try:
         range_address = used_range.address
         last_row = used_range.last_cell.row
         last_col = used_range.last_cell.column
-        last_col_letter = ws.range((1, last_col)).column_letter
+        last_col_letter = column_number_to_letter(last_col)
     else:
         range_address = "A1"
         last_row = 1
@@ -3356,7 +3367,7 @@ try:
         if col_num < 1:
             raise ValueError(f"Column position must be >= 1, got {col_num}")
         # Convert number to column letter
-        position = ws.range((1, col_num)).column_letter
+        position = column_number_to_letter(col_num)
     elif isinstance(position, str):
         position = position.upper()
         if not position.isalpha():
@@ -3451,15 +3462,15 @@ try:
         col_num = int(position)
         if col_num < 1:
             raise ValueError(f"Column position must be >= 1, got {col_num}")
-        start_col = ws.range((1, col_num)).column_letter
-        end_col = ws.range((1, col_num + count - 1)).column_letter
+        start_col = column_number_to_letter(col_num)
+        end_col = column_number_to_letter(col_num + count - 1)
     elif isinstance(position, str):
         position = position.upper()
         if not position.isalpha():
             raise ValueError(f"Invalid column position: {position}")
         start_col = position
         col_num = ws.range(f"{position}1").column
-        end_col = ws.range((1, col_num + count - 1)).column_letter
+        end_col = column_number_to_letter(col_num + count - 1)
     
     # Delete the specified range of columns
     if count == 1:
