@@ -35,21 +35,21 @@ runs:
   using: 'composite'
   steps:
     - name: 'Build and Prepare Packages'
-      working-directory: ${{ inputs.working-directory }}
+      working-directory: '${{ inputs.working-directory }}'
       run: |-
         npm run build:packages
         npm run prepare:package
-      shell: bash
+      shell: 'bash'
 
     - name: 'Configure npm for publishing'
       uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       with:
-        node-version-file: '${{ inputs.working-directory }}//.nvmrc'
+        node-version-file: ''${{ inputs.working-directory }}'//.nvmrc'
         registry-url: 'https://wombat-dressing-room.appspot.com'
         scope: '@google'
 
     - name: 'Publish @google/gemini-cli-core'
-      working-directory: ${{ inputs.working-directory }}
+      working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
       run: |-
@@ -57,19 +57,19 @@ runs:
           --dry-run="${{ inputs.dry-run }}" \
           --workspace="@google/gemini-cli-core" \
           --tag="${{ inputs.npm-tag }}"
-      shell: bash
+      shell: 'bash'
 
     - name: 'Install latest core package'
-      working-directory: ${{ inputs.working-directory }}
-      if: inputs.dry-run == 'false'
+      working-directory: '${{ inputs.working-directory }}'
+      if: 'inputs.dry-run == ''false'''
       run: |-
         npm install "@google/gemini-cli-core@${{ inputs.release-version }}" \
         --workspace="@google/gemini-cli" \
         --save-exact
-      shell: bash
+      shell: 'bash'
 
     - name: 'Publish @google/gemini-cli'
-      working-directory: ${{ inputs.working-directory }}
+      working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
       run: |-
@@ -77,16 +77,16 @@ runs:
           --dry-run="${{ inputs.dry-run }}" \
           --workspace="@google/gemini-cli" \
           --tag="${{ inputs.npm-tag }}"
-      shell: bash
+      shell: 'bash'
 
     - name: 'Bundle'
-      working-directory: ${{ inputs.working-directory }}
+      working-directory: '${{ inputs.working-directory }}'
       run: npm run bundle
-      shell: bash
+      shell: 'bash'
 
     - name: 'Create GitHub Release'
-      working-directory: ${{ inputs.working-directory }}
-      if: inputs.dry-run == 'false'
+      working-directory: '${{ inputs.working-directory }}'
+      if: 'inputs.dry-run == ''false'''
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
       run: |-
@@ -96,4 +96,4 @@ runs:
           --title "Release v${{ inputs.release-version }}" \
           --notes-start-tag "${{ inputs.previous-tag }}" \
           --generate-notes
-      shell: bash
+      shell: 'bash'
