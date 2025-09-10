@@ -16,6 +16,12 @@ export interface FilterFilesOptions {
   respectGeminiIgnore?: boolean;
 }
 
+export interface FilterReport {
+  filteredPaths: string[];
+  gitIgnoredCount: number;
+  geminiIgnoredCount: number;
+}
+
 export class FileDiscoveryService {
   private gitIgnoreFilter: GitIgnoreFilter | null = null;
   private geminiIgnoreFilter: GitIgnoreFilter | null = null;
@@ -63,6 +69,42 @@ export class FileDiscoveryService {
       }
       return true;
     });
+  }
+
+  /**
+   * Filters a list of file paths based on git ignore rules and returns a report
+   * with counts of ignored files.
+   */
+  filterFilesWithReport(
+    filePaths: string[],
+    opts: FilterFilesOptions = {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    },
+  ): FilterReport {
+    const filteredPaths: string[] = [];
+    let gitIgnoredCount = 0;
+    let geminiIgnoredCount = 0;
+
+    for (const filePath of filePaths) {
+      if (opts.respectGitIgnore && this.shouldGitIgnoreFile(filePath)) {
+        gitIgnoredCount++;
+        continue;
+      }
+
+      if (opts.respectGeminiIgnore && this.shouldGeminiIgnoreFile(filePath)) {
+        geminiIgnoredCount++;
+        continue;
+      }
+
+      filteredPaths.push(filePath);
+    }
+
+    return {
+      filteredPaths,
+      gitIgnoredCount,
+      geminiIgnoredCount,
+    };
   }
 
   /**

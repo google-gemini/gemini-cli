@@ -662,6 +662,7 @@ const SETTINGS_SCHEMA = {
         default: undefined as string[] | undefined,
         description: 'Tool names to exclude from discovery.',
         showInDialog: false,
+        mergeStrategy: MergeStrategy.UNION,
       },
       discoveryCommand: {
         type: 'string',
