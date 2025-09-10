@@ -148,12 +148,13 @@ describe('Global Activity Detector Functions', () => {
   });
 
   describe('recordUserActivity', () => {
-    it('should initialize detector if not exists', () => {
+    it('should not initialize detector when none exists', () => {
       expect(getActivityDetector()).toBeNull();
 
-      recordUserActivity();
+      expect(() => recordUserActivity()).not.toThrow();
 
-      expect(getActivityDetector()).toBeInstanceOf(ActivityDetector);
+      // Detector remains uninitialized; call is a no-op
+      expect(getActivityDetector()).toBeNull();
     });
 
     it('should record activity on existing detector', () => {
