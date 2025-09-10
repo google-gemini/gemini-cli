@@ -126,21 +126,19 @@ jobs:
         if: ${{ github.event.inputs.dry_run == 'false' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH_NAME: ${{ steps.release_branch.outputs.BRANCH_NAME }}
         run: |
           gh pr create \
             --title "chore(release): Promote ${{ steps.versions.outputs.stable_release_tag }}" \
-            --body "Automated PR to promote ${{ steps.versions.outputs.stable_release_tag }} to stable."
+            --body "Automated PR to promote ${{ steps.versions.outputs.stable_release_tag }} to stable." \
             --base "${{ github.event.inputs.ref }}" \
-            --head "${BRANCH_NAME}"
+            --head "${{ steps.release_branch.outputs.BRANCH_NAME }}"
 
       - name: Enable Auto-Merge
         if: ${{ github.event.inputs.dry_run == 'false' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH_NAME: ${{ steps.release_branch.outputs.BRANCH_NAME }}
         run: |
-          gh pr merge "${BRANCH_NAME}" --auto --squash
+          gh pr merge "${{ steps.release_branch.outputs.BRANCH_NAME }}" --auto --squash
 
       - name: Build and Prepare Packages
         if: ${{ github.event.inputs.dry_run == 'false' }}
