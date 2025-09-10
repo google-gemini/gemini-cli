@@ -8,7 +8,13 @@ import type {
   MCPServerConfig,
   GeminiCLIExtension,
 } from '@google/gemini-cli-core';
-import { GEMINI_DIR, Storage } from '@google/gemini-cli-core';
+import {
+  GEMINI_DIR,
+  Storage,
+  ClearcutLogger,
+  Config,
+  ExtensionInstallEvent,
+} from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -18,6 +24,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
+import { randomUUID } from 'node:crypto';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
@@ -81,6 +88,10 @@ export class ExtensionStorage {
 }
 
 export function getWorkspaceExtensions(workspaceDir: string): Extension[] {
+  // If the workspace dir is the user extensions dir, there are no workspace extensions.
+  if (path.resolve(workspaceDir) === path.resolve(os.homedir())) {
+    return [];
+  }
   return loadExtensionsFromDir(workspaceDir);
 }
 
@@ -346,83 +357,120 @@ export async function installExtension(
   installMetadata: ExtensionInstallMetadata,
   cwd: string = process.cwd(),
 ): Promise<string> {
-  const settings = loadSettings(cwd).merged;
-  if (!isWorkspaceTrusted(settings)) {
-    throw new Error(
-      `Could not install extension from untrusted folder at ${installMetadata.source}`,
-    );
-  }
-
-  const extensionsDir = ExtensionStorage.getUserExtensionsDir();
-  await fs.promises.mkdir(extensionsDir, { recursive: true });
-
-  // Convert relative paths to absolute paths for the metadata file.
-  if (
-    !path.isAbsolute(installMetadata.source) &&
-    (installMetadata.type === 'local' || installMetadata.type === 'link')
-  ) {
-    installMetadata.source = path.resolve(cwd, installMetadata.source);
-  }
-
-  let localSourcePath: string;
-  let tempDir: string | undefined;
-  let newExtensionName: string | undefined;
-
-  if (installMetadata.type === 'git') {
-    tempDir = await ExtensionStorage.createTmpDir();
-    await cloneFromGit(installMetadata.source, tempDir);
-    localSourcePath = tempDir;
-  } else if (
-    installMetadata.type === 'local' ||
-    installMetadata.type === 'link'
-  ) {
-    localSourcePath = installMetadata.source;
-  } else {
-    throw new Error(`Unsupported install type: ${installMetadata.type}`);
-  }
+  const config = new Config({
+    sessionId: randomUUID(),
+    targetDir: process.cwd(),
+    cwd: process.cwd(),
+    model: '',
+    debugMode: false,
+  });
+  const logger = ClearcutLogger.getInstance(config);
+  let newExtensionConfig: ExtensionConfig | null = null;
+  let localSourcePath: string | undefined;
 
   try {
-    const newExtensionConfig = await loadExtensionConfig(localSourcePath);
-    if (!newExtensionConfig) {
+    const settings = loadSettings(cwd).merged;
+    if (!isWorkspaceTrusted(settings)) {
       throw new Error(
-        `Invalid extension at ${installMetadata.source}. Please make sure it has a valid gemini-extension.json file.`,
+        `Could not install extension from untrusted folder at ${installMetadata.source}`,
       );
     }
 
-    newExtensionName = newExtensionConfig.name;
-    const extensionStorage = new ExtensionStorage(newExtensionName);
-    const destinationPath = extensionStorage.getExtensionDir();
+    const extensionsDir = ExtensionStorage.getUserExtensionsDir();
+    await fs.promises.mkdir(extensionsDir, { recursive: true });
 
-    const installedExtensions = loadUserExtensions();
     if (
-      installedExtensions.some(
-        (installed) => installed.config.name === newExtensionName,
-      )
+      !path.isAbsolute(installMetadata.source) &&
+      (installMetadata.type === 'local' || installMetadata.type === 'link')
     ) {
-      throw new Error(
-        `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
+      installMetadata.source = path.resolve(cwd, installMetadata.source);
+    }
+
+    let tempDir: string | undefined;
+
+    if (installMetadata.type === 'git') {
+      tempDir = await ExtensionStorage.createTmpDir();
+      await cloneFromGit(installMetadata.source, tempDir);
+      localSourcePath = tempDir;
+    } else if (
+      installMetadata.type === 'local' ||
+      installMetadata.type === 'link'
+    ) {
+      localSourcePath = installMetadata.source;
+    } else {
+      throw new Error(`Unsupported install type: ${installMetadata.type}`);
+    }
+
+    try {
+      newExtensionConfig = await loadExtensionConfig(localSourcePath);
+      if (!newExtensionConfig) {
+        throw new Error(
+          `Invalid extension at ${installMetadata.source}. Please make sure it has a valid gemini-extension.json file.`,
+        );
+      }
+
+      const newExtensionName = newExtensionConfig.name;
+      const extensionStorage = new ExtensionStorage(newExtensionName);
+      const destinationPath = extensionStorage.getExtensionDir();
+
+      const installedExtensions = loadUserExtensions();
+      if (
+        installedExtensions.some(
+          (installed) => installed.config.name === newExtensionName,
+        )
+      ) {
+        throw new Error(
+          `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
+        );
+      }
+
+      await fs.promises.mkdir(destinationPath, { recursive: true });
+
+      if (installMetadata.type === 'local' || installMetadata.type === 'git') {
+        await copyExtension(localSourcePath, destinationPath);
+      }
+
+      const metadataString = JSON.stringify(installMetadata, null, 2);
+      const metadataPath = path.join(
+        destinationPath,
+        INSTALL_METADATA_FILENAME,
       );
+      await fs.promises.writeFile(metadataPath, metadataString);
+    } finally {
+      if (tempDir) {
+        await fs.promises.rm(tempDir, { recursive: true, force: true });
+      }
     }
 
-    await fs.promises.mkdir(destinationPath, { recursive: true });
+    logger?.logExtensionInstallEvent(
+      new ExtensionInstallEvent(
+        newExtensionConfig!.name,
+        newExtensionConfig!.version,
+        installMetadata.source,
+        'success',
+      ),
+    );
 
-    if (installMetadata.type === 'local' || installMetadata.type === 'git') {
-      await copyExtension(localSourcePath, destinationPath);
+    return newExtensionConfig!.name;
+  } catch (error) {
+    // Attempt to load config from the source path even if installation fails
+    // to get the name and version for logging.
+    if (!newExtensionConfig && localSourcePath) {
+      newExtensionConfig = await loadExtensionConfig(localSourcePath);
     }
-
-    const metadataString = JSON.stringify(installMetadata, null, 2);
-    const metadataPath = path.join(destinationPath, INSTALL_METADATA_FILENAME);
-    await fs.promises.writeFile(metadataPath, metadataString);
-  } finally {
-    if (tempDir) {
-      await fs.promises.rm(tempDir, { recursive: true, force: true });
-    }
+    logger?.logExtensionInstallEvent(
+      new ExtensionInstallEvent(
+        newExtensionConfig?.name ?? '',
+        newExtensionConfig?.version ?? '',
+        installMetadata.source,
+        'error',
+      ),
+    );
+    throw error;
   }
-
-  return newExtensionName;
 }
 
-async function loadExtensionConfig(
+export async function loadExtensionConfig(
   extensionDir: string,
 ): Promise<ExtensionConfig | null> {
   const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
