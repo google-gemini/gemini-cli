@@ -68,7 +68,8 @@ jobs:
           PREVIOUS_MINOR=$((MINOR - 1))
           NEXT_STABLE_VERSION="$MAJOR.$PREVIOUS_MINOR.0"
 
-          STABLE_VERSION_JSON=$(node dist/get-release-version.js --type stable --version ${{ steps.preview_tag.outputs.LATEST_PREVIEW_TAG }})
+          CLEAN_PREVIEW_TAG=$(echo "${{ steps.preview_tag.outputs.LATEST_PREVIEW_TAG }}" | sed 's/^v//' | sed 's/-preview.*//')
+          STABLE_VERSION_JSON=$(node dist/get-release-version.js --type stable --version $CLEAN_PREVIEW_TAG)
 
           echo "next_nightly_version=$NEXT_NIGHTLY_VERSION" >> $GITHUB_OUTPUT
           echo "next_preview_version=$NEXT_PREVIEW_VERSION" >> $GITHUB_OUTPUT
