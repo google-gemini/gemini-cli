@@ -9,11 +9,11 @@ import { Box, Text } from 'ink';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
-import { Colors } from '../../colors.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { TOOL_STATUS } from '../../constants.js';
+import { theme } from '../../semantic-colors.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -120,7 +120,7 @@ const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
 }) => (
   <Box minWidth={STATUS_INDICATOR_WIDTH}>
     {status === ToolCallStatus.Pending && (
-      <Text color={Colors.AccentGreen}>{TOOL_STATUS.PENDING}</Text>
+      <Text color={theme.status.success}>{TOOL_STATUS.PENDING}</Text>
     )}
     {status === ToolCallStatus.Executing && (
       <GeminiRespondingSpinner
@@ -129,22 +129,22 @@ const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
       />
     )}
     {status === ToolCallStatus.Success && (
-      <Text color={Colors.AccentGreen} aria-label={'Success:'}>
+      <Text color={theme.status.success} aria-label={'Success:'}>
         {TOOL_STATUS.SUCCESS}
       </Text>
     )}
     {status === ToolCallStatus.Confirming && (
-      <Text color={Colors.AccentYellow} aria-label={'Confirming:'}>
+      <Text color={theme.status.warning} aria-label={'Confirming:'}>
         {TOOL_STATUS.CONFIRMING}
       </Text>
     )}
     {status === ToolCallStatus.Canceled && (
-      <Text color={Colors.AccentYellow} aria-label={'Canceled:'} bold>
+      <Text color={theme.status.warning} aria-label={'Canceled:'} bold>
         {TOOL_STATUS.CANCELED}
       </Text>
     )}
     {status === ToolCallStatus.Error && (
-      <Text color={Colors.AccentRed} aria-label={'Error:'} bold>
+      <Text color={theme.status.error} aria-label={'Error:'} bold>
         {TOOL_STATUS.ERROR}
       </Text>
     )}
@@ -166,11 +166,11 @@ const ToolInfo: React.FC<ToolInfo> = ({
   const nameColor = React.useMemo<string>(() => {
     switch (emphasis) {
       case 'high':
-        return Colors.Foreground;
+        return theme.text.primary;
       case 'medium':
-        return Colors.Foreground;
+        return theme.text.primary;
       case 'low':
-        return Colors.Gray;
+        return theme.text.secondary;
       default: {
         const exhaustiveCheck: never = emphasis;
         return exhaustiveCheck;
@@ -186,14 +186,14 @@ const ToolInfo: React.FC<ToolInfo> = ({
         <Text color={nameColor} bold>
           {name}
         </Text>{' '}
-        <Text color={Colors.Gray}>{description}</Text>
+        <Text color={theme.text.secondary}>{description}</Text>
       </Text>
     </Box>
   );
 };
 
 const TrailingIndicator: React.FC = () => (
-  <Text color={Colors.Foreground} wrap="truncate">
+  <Text color={theme.text.primary} wrap="truncate">
     {' '}
     ←
   </Text>
