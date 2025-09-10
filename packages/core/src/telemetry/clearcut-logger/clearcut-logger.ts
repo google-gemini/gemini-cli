@@ -620,11 +620,11 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_COMPRESSION_TOKENS_BEFORE,
-        value: JSON.stringify(event.tokens_before),
+        value: `${event.tokens_before}`,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_COMPRESSION_TOKENS_AFTER,
-        value: JSON.stringify(event.tokens_after),
+        value: `${event.tokens_after}`,
       },
     ];
 
@@ -917,7 +917,7 @@ export class ClearcutLogger {
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
-        value: JSON.stringify(totalAccounts),
+        value: `${totalAccounts}`,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
