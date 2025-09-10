@@ -290,8 +290,9 @@ export async function truncateAndSaveToFile(
     truncatedLines.push(...lines);
   } else if (truncateLines > 0 && truncateLines < 5) {
     // Simple head/tail view for small limits (1-4 lines)
-    const headCount = Math.ceil(truncateLines / 2);
-    const tailCount = truncateLines - headCount;
+    const contentLinesToShow = Math.max(0, truncateLines - 1); // Reserve 1 line for the marker
+    const headCount = Math.ceil(contentLinesToShow / 2);
+    const tailCount = contentLinesToShow - headCount;
     const headLines = lines.slice(0, headCount);
     const tailLines = lines.slice(-tailCount);
 
@@ -302,9 +303,10 @@ export async function truncateAndSaveToFile(
     }
   } else if (truncateLines >= 5) {
     // Three-part view for larger limits (5+ lines)
-    const head = Math.floor(truncateLines / 3);
-    const tail = Math.floor(truncateLines / 3);
-    const middle = truncateLines - head - tail;
+    const contentLinesToShow = truncateLines - 2; // Reserve 2 lines for markers
+    const head = Math.floor(contentLinesToShow / 3);
+    const tail = Math.floor(contentLinesToShow / 3);
+    const middle = contentLinesToShow - head - tail;
     
     const beginning = lines.slice(0, head);
     const end = lines.slice(-tail);
