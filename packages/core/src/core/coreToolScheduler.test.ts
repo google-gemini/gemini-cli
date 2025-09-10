@@ -252,19 +252,6 @@ describe('CoreToolScheduler', () => {
   expect(suggestion).toBe('');
 });
 
-      const scheduler = new CoreToolScheduler({
-        config: mockConfig,
-        getPreferredEditor: () => 'vscode',
-        onEditorClose: vi.fn(),
-      });
-
-      // @ts-expect-error accessing private method
-      const suggestion = scheduler.getToolSuggestion('unknown_tool');
-      expect(suggestion).toBe('');
-    });
-  });
-});
-
 describe('CoreToolScheduler with payload', () => {
   it('should update args and diff and execute tool when payload is provided', async () => {
     const mockTool = new MockModifiableTool();
