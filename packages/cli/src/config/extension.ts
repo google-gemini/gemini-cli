@@ -83,9 +83,7 @@ export class ExtensionStorage {
   }
 
   static async createTmpDir(): Promise<string> {
-    return await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'gemini-extension'),
-    );
+    return fs.promises.mkdtemp(path.join(os.tmpdir(), 'gemini-extension'));
   }
 }
 
@@ -591,7 +589,6 @@ export async function uninstallExtension(
   );
   manager.remove(extensionName);
   const storage = new ExtensionStorage(extensionName);
-
   await fs.promises.rm(storage.getExtensionDir(), {
     recursive: true,
     force: true,

@@ -77,7 +77,7 @@ async function getServerStatus(
   server: MCPServerConfig,
 ): Promise<MCPServerStatus> {
   // Test all server types by attempting actual connection
-  return await testMCPConnection(serverName, server);
+  return testMCPConnection(serverName, server);
 }
 
 export async function listMcpServers(): Promise<void> {
