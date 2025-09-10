@@ -62,6 +62,7 @@ import {
   RipgrepFallbackEvent,
 } from '../telemetry/types.js';
 import type { FallbackModelHandler } from '../fallback/types.js';
+import { OutputFormat } from '../output/types.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
@@ -106,6 +107,10 @@ export interface TelemetrySettings {
   otlpProtocol?: 'grpc' | 'http';
   logPrompts?: boolean;
   outfile?: string;
+}
+
+export interface OutputSettings {
+  format?: OutputFormat;
 }
 
 export interface GeminiCLIExtension {
@@ -232,6 +237,7 @@ export interface ConfigParameters {
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
+  output?: OutputSettings;
 }
 
 export class Config {
@@ -316,6 +322,7 @@ export class Config {
   private readonly useSmartEdit: boolean;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
+  private readonly outputSettings: OutputSettings;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -401,6 +408,9 @@ export class Config {
     this.eventEmitter = params.eventEmitter;
     this.policyEngine = new PolicyEngine(params.policyEngineConfig);
     this.messageBus = new MessageBus(this.policyEngine);
+    this.outputSettings = {
+      format: params.output?.format ?? OutputFormat.TEXT,
+    };
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -886,6 +896,12 @@ export class Config {
 
   getUseSmartEdit(): boolean {
     return this.useSmartEdit;
+  }
+
+  getOutputFormat(): OutputFormat {
+    return this.outputSettings?.format
+      ? this.outputSettings.format
+      : OutputFormat.TEXT;
   }
 
   async getGitService(): Promise<GitService> {

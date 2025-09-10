@@ -78,6 +78,12 @@ export class IdeClient {
   private diffResponses = new Map<string, (result: DiffUpdateResult) => void>();
   private statusListeners = new Set<(state: IDEConnectionState) => void>();
   private trustChangeListeners = new Set<(isTrusted: boolean) => void>();
+  /**
+   * A mutex to ensure that only one diff view is open in the IDE at a time.
+   * This prevents race conditions and UI issues in IDEs like VSCode that
+   * can't handle multiple diff views being opened simultaneously.
+   */
+  private diffMutex = Promise.resolve();
 
   private constructor() {}
 
@@ -202,10 +208,16 @@ export class IdeClient {
     filePath: string,
     newContent?: string,
   ): Promise<DiffUpdateResult> {
-    return new Promise<DiffUpdateResult>((resolve, reject) => {
+    const release = await this.acquireMutex();
+
+    const promise = new Promise<DiffUpdateResult>((resolve, reject) => {
+      if (!this.client) {
+        // The promise will be rejected, and the finally block below will release the mutex.
+        return reject(new Error('IDE client is not connected.'));
+      }
       this.diffResponses.set(filePath, resolve);
       this.client
-        ?.callTool({
+        .callTool({
           name: `openDiff`,
           arguments: {
             filePath,
@@ -214,9 +226,42 @@ export class IdeClient {
         })
         .catch((err) => {
           logger.debug(`callTool for ${filePath} failed:`, err);
+          this.diffResponses.delete(filePath);
           reject(err);
         });
     });
+
+    // Ensure the mutex is released only after the diff interaction is complete.
+    promise.finally(release);
+
+    return promise;
+  }
+
+  /**
+   * Acquires a lock to ensure sequential execution of critical sections.
+   *
+   * This method implements a promise-based mutex. It works by chaining promises.
+   * Each call to `acquireMutex` gets the current `diffMutex` promise. It then
+   * creates a *new* promise (`newMutex`) that will be resolved when the caller
+   * invokes the returned `release` function. The `diffMutex` is immediately
+   * updated to this `newMutex`.
+   *
+   * The method returns a promise that resolves with the `release` function only
+   * *after* the *previous* `diffMutex` promise has resolved. This creates a
+   * queue where each subsequent operation must wait for the previous one to release
+   * the lock.
+   *
+   * @returns A promise that resolves to a function that must be called to
+   *   release the lock.
+   */
+  private acquireMutex(): Promise<() => void> {
+    let release: () => void;
+    const newMutex = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const oldMutex = this.diffMutex;
+    this.diffMutex = newMutex;
+    return oldMutex.then(() => release);
   }
 
   async closeDiff(
