@@ -26,11 +26,16 @@ inputs:
   previous-tag:
     description: 'The previous tag to use for generating release notes.'
     required: true
+  working-directory:
+    description: 'The working directory to run the steps in.'
+    required: false
+    default: '.'
 
 runs:
   using: "composite"
   steps:
     - name: 'Build and Prepare Packages'
+      working-directory: ${{ inputs.working-directory }}
       run: |-
         npm run build:packages
         npm run prepare:package
@@ -39,11 +44,12 @@ runs:
     - name: 'Configure npm for publishing'
       uses: 'actions/setup-node@v4'
       with:
-        node-version-file: '.nvmrc'
+        node-version-file: '${{ inputs.working-directory }}//.nvmrc'
         registry-url: 'https://wombat-dressing-room.appspot.com'
         scope: '@google'
 
     - name: 'Publish @google/gemini-cli-core'
+      working-directory: ${{ inputs.working-directory }}
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
       run: |-
@@ -54,6 +60,7 @@ runs:
       shell: bash
 
     - name: 'Install latest core package'
+      working-directory: ${{ inputs.working-directory }}
       if: inputs.dry-run == 'false'
       run: |-
         npm install "@google/gemini-cli-core@${{ inputs.release-version }}" \
@@ -62,6 +69,7 @@ runs:
       shell: bash
 
     - name: 'Publish @google/gemini-cli'
+      working-directory: ${{ inputs.working-directory }}
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
       run: |-
@@ -72,10 +80,12 @@ runs:
       shell: bash
 
     - name: 'Bundle'
+      working-directory: ${{ inputs.working-directory }}
       run: npm run bundle
       shell: bash
 
     - name: 'Create GitHub Release'
+      working-directory: ${{ inputs.working-directory }}
       if: inputs.dry-run == 'false'
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'

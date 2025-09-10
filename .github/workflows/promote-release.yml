@@ -107,10 +107,16 @@ jobs:
             previous-tag: ${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}
 
     steps:
+      - name: 'Checkout workflow files'
+        uses: 'actions/checkout@v4'
+        with:
+          ref: 'mk/revertable-release-fix'
+
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@v4'
         with:
           ref: ${{ matrix.sha }}
+          path: 'release'
 
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@v4'
@@ -119,14 +125,17 @@ jobs:
           cache: 'npm'
 
       - name: 'Install Dependencies'
+        working-directory: ./release
         run: npm ci
 
       - name: 'Configure Git User'
+        working-directory: ./release
         run: |-
           git config user.name "gemini-cli-robot"
           git config user.email "gemini-cli-robot@google.com"
 
       - name: 'Create and switch to a release branch'
+        working-directory: ./release
         id: 'release_branch'
         run: |
           BRANCH_NAME="release/v${{ matrix.version }}"
@@ -134,10 +143,12 @@ jobs:
           echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
 
       - name: 'Update package versions'
+        working-directory: ./release
         run: |-
           npm run release:version "${{ matrix.version }}"
 
       - name: 'Commit and Conditionally Push package versions'
+        working-directory: ./release
         env:
           BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           DRY_RUN: '${{ github.event.inputs.dry_run }}'
@@ -163,6 +174,7 @@ jobs:
           dry-run: ${{ github.event.inputs.dry_run }}
           release-branch: ${{ steps.release_branch.outputs.BRANCH_NAME }}
           previous-tag: ${{ matrix.previous-tag }}
+          working-directory: ./release
 
   nightly-pr:
     name: Create Nightly PR
