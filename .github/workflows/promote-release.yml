@@ -105,8 +105,8 @@ jobs:
         id: release_branch
         run: |
           BRANCH_NAME="promote/${{ steps.versions.outputs.stable_release_tag }}"
-          git switch -c "${BRANCH_NAME}"
-          echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
+          git switch -c "${{ BRANCH_NAME }}"
+          echo "BRANCH_NAME=${{ BRANCH_NAME }}" >> "${GITHUB_OUTPUT}"
 
       - name: Update package versions
         if: ${{ github.event.inputs.dry_run == 'false' }}
@@ -130,7 +130,7 @@ jobs:
         run: |
           gh pr create \
             --title "chore(release): Promote ${{ steps.versions.outputs.stable_release_tag }}" \
-            --body "Automated PR to promote ${{ steps.versions.outputs.stable_release_tag }} to stable."
+            --body "Automated PR to promote ${{ steps.versions.outputs.stable_release_tag }} to stable." \
             --base "${{ github.event.inputs.ref }}" \
             --head "${BRANCH_NAME}"
 
@@ -141,3 +141,66 @@ jobs:
           BRANCH_NAME: ${{ steps.release_branch.outputs.BRANCH_NAME }}
         run: |
           gh pr merge "${BRANCH_NAME}" --auto --squash
+
+      - name: Build and Prepare Packages
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          npm run build:packages
+          npm run prepare:package
+
+      - name: Configure npm for publishing
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://wombat-dressing-room.appspot.com'
+          scope: '@google'
+
+      - name: Publish @google/gemini-cli-core
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CORE }}
+        run: |
+          npm publish \
+            --workspace="@google/gemini-cli-core" \
+            --tag="${{ steps.versions.outputs.stable_npm_tag }}"
+
+      - name: Install latest core package
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          npm install "@google/gemini-cli-core@${{ steps.versions.outputs.stable_release_version }}" \
+          --workspace="@google/gemini-cli" \
+          --save-exact
+
+      - name: Publish @google/gemini-cli
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CLI }}
+        run: |
+          npm publish \
+            --workspace="@google/gemini-cli" \
+            --tag="${{ steps.versions.outputs.stable_npm_tag }}"
+
+      - name: Create Stable GitHub Release and Tag
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.versions.outputs.stable_release_tag }}" \
+            bundle/gemini.js \
+            --target "${{ github.event.inputs.ref }}" \
+            --title "Release ${{ steps.versions.outputs.stable_release_tag }}" \
+            --notes-start-tag "${{ steps.versions.outputs.stable_previous_tag }}" \
+            --generate-notes
+
+      - name: Create Next Preview GitHub Release and Tag
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.versions.outputs.next_preview_version }}" \
+            bundle/gemini.js \
+            --target "${{ github.event.inputs.ref }}" \
+            --title "Release v${{ steps.versions.outputs.next_preview_version }}" \
+            --notes-start-tag "${{ steps.versions.outputs.stable_release_tag }}" \
+            --generate-notes
