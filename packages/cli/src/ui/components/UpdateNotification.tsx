@@ -5,19 +5,31 @@
  */
 
 import { Box, Text } from 'ink';
+import Spinner from 'ink-spinner';
 import { Colors } from '../colors.js';
 
 interface UpdateNotificationProps {
   message: string;
+  showSpinner?: boolean;
 }
 
-export const UpdateNotification = ({ message }: UpdateNotificationProps) => (
+export const UpdateNotification = ({
+  message,
+  showSpinner = false,
+}: UpdateNotificationProps) => (
   <Box
     borderStyle="round"
     borderColor={Colors.AccentYellow}
     paddingX={1}
     marginY={1}
   >
-    <Text color={Colors.AccentYellow}>{message}</Text>
+    <Text color={Colors.AccentYellow}>
+      {showSpinner && (
+        <>
+          <Spinner type="dots" />{' '}
+        </>
+      )}
+      {message}
+    </Text>
   </Box>
 );
