@@ -33,6 +33,7 @@ import {
 } from '../utils/editCorrector.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
+import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
 
 const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
 
@@ -43,15 +44,27 @@ vi.mock('../ide/ide-client.js', () => ({
   IdeClient: {
     getInstance: vi.fn(),
   },
+  IDEConnectionStatus: {
+    Connected: 'connected',
+    Disconnected: 'disconnected',
+    Connecting: 'connecting',
+  },
 }));
 let mockGeminiClientInstance: Mocked<GeminiClient>;
 const mockEnsureCorrectEdit = vi.fn<typeof ensureCorrectEdit>();
 const mockEnsureCorrectFileContent = vi.fn<typeof ensureCorrectFileContent>();
+const mockIdeClient = {
+  getConnectionStatus: vi.fn(),
+  openDiff: vi.fn(),
+};
 
 // Wire up the mocked functions to be used by the actual module imports
 vi.mocked(ensureCorrectEdit).mockImplementation(mockEnsureCorrectEdit);
 vi.mocked(ensureCorrectFileContent).mockImplementation(
   mockEnsureCorrectFileContent,
+);
+vi.mocked(IdeClient.getInstance).mockResolvedValue(
+  mockIdeClient as unknown as IdeClient,
 );
 
 // Mock Config
@@ -436,6 +449,82 @@ describe('WriteFileTool', () => {
       expect(confirmation.fileDiff).toMatch(
         originalContent.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&'),
       );
+    });
+
+    describe('with IDE integration', () => {
+      beforeEach(() => {
+        // Enable IDE mode and set connection status for these tests
+        mockConfigInternal.getIdeMode.mockReturnValue(true);
+        mockIdeClient.getConnectionStatus.mockReturnValue({
+          status: IDEConnectionStatus.Connected,
+        });
+        mockIdeClient.openDiff.mockResolvedValue({
+          status: 'accepted',
+          content: 'ide-modified-content',
+        });
+      });
+
+      it('should call openDiff and await it when in IDE mode and connected', async () => {
+        const filePath = path.join(rootDir, 'ide_confirm_file.txt');
+        const params = { file_path: filePath, content: 'test' };
+        const invocation = tool.build(params);
+
+        const confirmation = (await invocation.shouldConfirmExecute(
+          abortSignal,
+        )) as ToolEditConfirmationDetails;
+
+        expect(mockIdeClient.openDiff).toHaveBeenCalledWith(
+          filePath,
+          'test', // The corrected content
+        );
+        // Ensure the promise is awaited by checking the result
+        expect(confirmation.ideConfirmation).toBeDefined();
+        await confirmation.ideConfirmation; // Should resolve
+      });
+
+      it('should not call openDiff if not in IDE mode', async () => {
+        mockConfigInternal.getIdeMode.mockReturnValue(false);
+        const filePath = path.join(rootDir, 'ide_disabled_file.txt');
+        const params = { file_path: filePath, content: 'test' };
+        const invocation = tool.build(params);
+
+        await invocation.shouldConfirmExecute(abortSignal);
+
+        expect(mockIdeClient.openDiff).not.toHaveBeenCalled();
+      });
+
+      it('should not call openDiff if IDE is not connected', async () => {
+        mockIdeClient.getConnectionStatus.mockReturnValue({
+          status: IDEConnectionStatus.Disconnected,
+        });
+        const filePath = path.join(rootDir, 'ide_disconnected_file.txt');
+        const params = { file_path: filePath, content: 'test' };
+        const invocation = tool.build(params);
+
+        await invocation.shouldConfirmExecute(abortSignal);
+
+        expect(mockIdeClient.openDiff).not.toHaveBeenCalled();
+      });
+
+      it('should update params.content with IDE content when onConfirm is called', async () => {
+        const filePath = path.join(rootDir, 'ide_onconfirm_file.txt');
+        const params = { file_path: filePath, content: 'original-content' };
+        const invocation = tool.build(params);
+
+        // This is the key part: get the confirmation details
+        const confirmation = (await invocation.shouldConfirmExecute(
+          abortSignal,
+        )) as ToolEditConfirmationDetails;
+
+        // The `onConfirm` function should exist on the details object
+        expect(confirmation.onConfirm).toBeDefined();
+
+        // Call `onConfirm` to trigger the logic that updates the content
+        await confirmation.onConfirm!(ToolConfirmationOutcome.ProceedOnce);
+
+        // Now, check if the original `params` object (captured by the invocation) was modified
+        expect(invocation.params.content).toBe('ide-modified-content');
+      });
     });
   });
 
