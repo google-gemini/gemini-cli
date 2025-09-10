@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
@@ -78,6 +78,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [escPressCount, setEscPressCount] = useState(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [pendingPastes, setPendingPastes] = useState<PendingPasteItem[]>([]);
+  const pastePlaceholders = useMemo(
+    () => pendingPastes.map((p) => p.placeholder),
+    [pendingPastes],
+  );
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [recentPasteTime, setRecentPasteTime] = useState<number | null>(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -845,6 +849,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 const tokens = parseInputForHighlighting(
                   lineText,
                   visualIdxInRenderedSet,
+                  pastePlaceholders,
                 );
                 const cursorVisualRow =
                   cursorVisualRowAbsolute - scrollVisualRow;
@@ -888,9 +893,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   }
 
                   const color =
-                    token.type === 'command' || token.type === 'file'
-                      ? theme.text.accent
-                      : undefined;
+                    token.type === 'placeholder'
+                      ? theme.status.success
+                      : token.type === 'command' || token.type === 'file'
+                        ? theme.text.accent
+                        : undefined;
 
                   renderedLine.push(
                     <Text key={`token-${tokenIdx}`} color={color}>
