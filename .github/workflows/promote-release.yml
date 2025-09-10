@@ -105,8 +105,8 @@ jobs:
         id: release_branch
         run: |
           BRANCH_NAME="promote/${{ steps.versions.outputs.stable_release_tag }}"
-          git switch -c "${{ BRANCH_NAME }}"
-          echo "BRANCH_NAME=${{ BRANCH_NAME }}" >> "${{ GITHUB_OUTPUT }}"
+          git switch -c "${BRANCH_NAME}"
+          echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
 
       - name: Update package versions
         if: ${{ github.event.inputs.dry_run == 'false' }}
@@ -115,12 +115,10 @@ jobs:
 
       - name: Commit and Push package versions
         if: ${{ github.event.inputs.dry_run == 'false' }}
-        env:
-          BRANCH_NAME: ${{ steps.release_branch.outputs.BRANCH_NAME }}
         run: |
           git add package.json package-lock.json packages/*/package.json
           git commit -m "chore(release): ${{ steps.versions.outputs.stable_release_tag }}"
-          git push --set-upstream origin "${{ BRANCH_NAME }}"
+          git push --set-upstream origin "${{ steps.release_branch.outputs.BRANCH_NAME }}"
 
       - name: Create Pull Request
         if: ${{ github.event.inputs.dry_run == 'false' }}
@@ -129,7 +127,7 @@ jobs:
         run: |
           gh pr create \
             --title "chore(release): Promote ${{ steps.versions.outputs.stable_release_tag }}" \
-            --body "Automated PR to promote ${{ steps.versions.outputs.stable_release_tag }} to stable."
+            --body "Automated PR to promote ${{ steps.versions.outputs.stable_release_tag }} to stable." \
             --base "${{ github.event.inputs.ref }}" \
             --head "${{ steps.release_branch.outputs.BRANCH_NAME }}"
 
