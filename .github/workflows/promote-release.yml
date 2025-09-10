@@ -174,60 +174,19 @@ jobs:
             echo "Dry run enabled. Skipping push."
           fi
 
-      - name: 'Build and Prepare Packages'
-        run: |-
-          npm run build:packages
-          npm run prepare:package
-
-      - name: 'Configure npm for publishing'
-        uses: 'actions/setup-node@v4'
+      - name: 'Publish Release'
+        uses: ./.github/actions/publish-release
         with:
-          node-version-file: '.nvmrc'
-          registry-url: 'https://wombat-dressing-room.appspot.com'
-          scope: '@google'
+          release-version: ${{ steps.vars.outputs.VERSION }}
+          npm-tag: ${{ steps.vars.outputs.NPM_TAG }}
+          wombat-token-core: ${{ secrets.WOMBAT_TOKEN_CORE }}
+          wombat-token-cli: ${{ secrets.WOMBAT_TOKEN_CLI }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          dry-run: ${{ github.event.inputs.dry_run }}
+          release-branch: ${{ steps.release_branch.outputs.BRANCH_NAME }}
+          previous-tag: ${{ steps.vars.outputs.PREVIOUS_TAG }}
 
-      - name: 'Publish @google/gemini-cli-core'
-        env:
-          DRY_RUN: '${{ github.event.inputs.dry_run }}'
-          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CORE }}'
-        run: |-
-          npm publish \
-            --dry-run="${DRY_RUN}" \
-            --workspace="@google/gemini-cli-core" \
-            --tag="${{ steps.vars.outputs.NPM_TAG }}"
-
-      - name: 'Install latest core package'
-        if: github.event.inputs.dry_run == 'false'
-        run: |-
-          npm install "@google/gemini-cli-core@${{ steps.vars.outputs.VERSION }}" \
-          --workspace="@google/gemini-cli" \
-          --save-exact
-
-      - name: 'Publish @google/gemini-cli'
-        env:
-          DRY_RUN: '${{ github.event.inputs.dry_run }}'
-          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
-        run: |-
-          npm publish \
-            --dry-run="${DRY_RUN}" \
-            --workspace="@google/gemini-cli" \
-            --tag="${{ steps.vars.outputs.NPM_TAG }}"
-
-      - name: 'Create GitHub Release and Tag'
-        if: github.event.inputs.dry_run == 'false'
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          RELEASE_BRANCH: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
-          RELEASE_TAG: 'v${{ steps.vars.outputs.VERSION }}'
-          PREVIOUS_TAG: '${{ steps.vars.outputs.PREVIOUS_TAG }}'
-        run: |-
-          gh release create "${RELEASE_TAG}" \
-            --target "${RELEASE_BRANCH}" \
-            --title "Release ${RELEASE_TAG}" \
-            --notes-start-tag "${PREVIOUS_TAG}" \
-            --generate-notes
-
-  nightly-pr:
+nightly-pr:
     name: Create Nightly PR
     needs: calculate-versions
     if: github.event.inputs.release_type == 'nightly'

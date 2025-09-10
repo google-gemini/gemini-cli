@@ -43,54 +43,14 @@ jobs:
           echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
 
-      - name: 'Build and Prepare Packages'
-        run: |-
-          npm run build:packages
-          npm run prepare:package
-
-      - name: 'Configure npm for publishing'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+      - name: 'Publish Release'
+        uses: ./.github/actions/publish-release
         with:
-          node-version-file: '.nvmrc'
-          registry-url: 'https://wombat-dressing-room.appspot.com'
-          scope: '@google'
-
-      - name: 'Publish @google/gemini-cli-core'
-        env:
-          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CORE }}'
-        run: |-
-          npm publish \
-            --dry-run="${{ github.event.inputs.dry_run }}" \
-            --workspace="@google/gemini-cli-core" \
-            --tag="${{ steps.nightly_version.outputs.NPM_TAG }}"
-
-      - name: 'Install latest core package'
-        if: ${{ !github.event.inputs.dry_run }}
-        run: |-
-          npm install "@google/gemini-cli-core@${{ steps.nightly_version.outputs.RELEASE_VERSION }}" \
-          --workspace="@google/gemini-cli" \
-          --save-exact
-
-      - name: 'Publish @google/gemini-cli'
-        env:
-          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
-        run: |-
-          npm publish \
-            --dry-run="${{ github.event.inputs.dry_run }}" \
-            --workspace="@google/gemini-cli" \
-            --tag="${{ steps.nightly_version.outputs.NPM_TAG }}"
-
-      - name: 'Bundle'
-        run: npm run bundle
-
-      - name: 'Create Nightly GitHub Release'
-        if: ${{ !github.event.inputs.dry_run }}
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        run: |-
-          gh release create "${{ steps.nightly_version.outputs.RELEASE_TAG }}" \
-            bundle/gemini.js \
-            --target "main" \
-            --title "Release ${{ steps.nightly_version.outputs.RELEASE_TAG }}" \
-            --notes-start-tag "${{ steps.nightly_version.outputs.PREVIOUS_TAG }}" \
-            --generate-notes
+          release-version: ${{ steps.nightly_version.outputs.RELEASE_VERSION }}
+          npm-tag: ${{ steps.nightly_version.outputs.NPM_TAG }}
+          wombat-token-core: ${{ secrets.WOMBAT_TOKEN_CORE }}
+          wombat-token-cli: ${{ secrets.WOMBAT_TOKEN_CLI }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          dry-run: ${{ github.event.inputs.dry_run }}
+          release-branch: 'main'
+          previous-tag: ${{ steps.nightly_version.outputs.PREVIOUS_TAG }}
