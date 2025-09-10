@@ -88,6 +88,10 @@ export class ExtensionStorage {
 }
 
 export function getWorkspaceExtensions(workspaceDir: string): Extension[] {
+  // If the workspace dir is the user extensions dir, there are no workspace extensions.
+  if (path.resolve(workspaceDir) === path.resolve(os.homedir())) {
+    return [];
+  }
   return loadExtensionsFromDir(workspaceDir);
 }
 
