@@ -278,33 +278,47 @@ export async function truncateAndSaveToFile(
     fileContent = lines.join('\n');
   }
 
-  // Improved truncation strategy: show more context and provide better navigation
-  // Handle edge cases for small truncateLines values
-  const head = truncateLines < 3 ? (truncateLines >= 1 ? 1 : 0) : Math.floor(truncateLines / 3);
-  const tail = truncateLines < 3 ? (truncateLines >= 2 ? 1 : 0) : Math.floor(truncateLines / 3);
-  const middle = truncateLines - head - tail;
-  
-  const beginning = lines.slice(0, head);
-  const end = lines.slice(-tail);
-  
-  // Build truncated content using array to preserve empty lines
+  // Improved truncation strategy with adaptive approach based on truncateLines value
+  // For small truncation limits, a simple head/tail view is clearer and less verbose
+  // For larger limits, a three-part view provides better context
   const truncatedLines: string[] = [];
-  truncatedLines.push(...beginning);
-
   const hiddenLines = lines.length - truncateLines;
 
-  if (middle > 0) {
-    // Add some middle lines for better context
-    const middleStart = Math.floor(lines.length / 2) - Math.floor(middle / 2);
-    const middleLines = lines.slice(middleStart, middleStart + middle);
-    truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
-    truncatedLines.push(...middleLines);
-    truncatedLines.push('... [MORE CONTENT TRUNCATED] ...');
-  } else {
-    truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
-  }
+  if (truncateLines > 0 && truncateLines < 5) {
+    // Simple head/tail view for small limits (1-4 lines)
+    const headCount = Math.ceil(truncateLines / 2);
+    const tailCount = truncateLines - headCount;
+    const headLines = lines.slice(0, headCount);
+    const tailLines = lines.slice(-tailCount);
 
-  truncatedLines.push(...end);
+    truncatedLines.push(...headLines);
+    if (hiddenLines > 0) {
+      truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
+    }
+    if (tailCount > 0) {
+      truncatedLines.push(...tailLines);
+    }
+  } else if (truncateLines >= 5) {
+    // Three-part view for larger limits (5+ lines)
+    const head = Math.floor(truncateLines / 3);
+    const tail = Math.floor(truncateLines / 3);
+    const middle = truncateLines - head - tail;
+    
+    const beginning = lines.slice(0, head);
+    const end = lines.slice(-tail);
+    truncatedLines.push(...beginning);
+
+    if (middle > 0) {
+      const middleStart = Math.floor(lines.length / 2) - Math.floor(middle / 2);
+      const middleLines = lines.slice(middleStart, middleStart + middle);
+      truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
+      truncatedLines.push(...middleLines);
+      truncatedLines.push('... [MORE CONTENT TRUNCATED] ...');
+    } else if (hiddenLines > 0) {
+      truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
+    }
+    truncatedLines.push(...end);
+  }
 
   const truncatedContent = truncatedLines.join('\n');
 

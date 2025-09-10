@@ -1460,4 +1460,49 @@ describe('truncateAndSaveToFile', () => {
     );
   });
 
+  it('should use simple head/tail view for small truncateLines values', async () => {
+    // Create content that exceeds the threshold (40,000 bytes)
+    const lines = Array.from({ length: 1000 }, (_, i) => `Line ${i + 1}: ${'x'.repeat(50)}`); // Each line ~60 chars, total ~60,000 chars
+    const content = lines.join('\n');
+    const callId = 'test-small-truncate';
+    const projectTempDir = '/tmp';
+    const smallTruncateLines = 3; // Test with small value
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      smallTruncateLines,
+    );
+
+    // For small truncateLines (3), should use simple head/tail view
+    // headCount = ceil(3/2) = 2, tailCount = 1
+    const headCount = Math.ceil(smallTruncateLines / 2);
+    const tailCount = smallTruncateLines - headCount;
+    const headLines = lines.slice(0, headCount);
+    const tailLines = lines.slice(-tailCount);
+
+    // Build expected truncated content using simple head/tail view
+    const truncatedLines: string[] = [];
+    truncatedLines.push(...headLines);
+    truncatedLines.push(`... [CONTENT TRUNCATED - ${lines.length - smallTruncateLines} lines hidden] ...`);
+    truncatedLines.push(...tailLines);
+    
+    const expectedTruncated = truncatedLines.join('\n');
+
+    expect(result.content).toContain(
+      'Tool output was too large and has been truncated',
+    );
+    expect(result.content).toContain('Truncated part of the output (' + lines.length + ' lines total, showing ' + smallTruncateLines + ' lines):');
+    expect(result.content).toContain(expectedTruncated);
+    expect(result.content).toContain('Line 1'); // First line
+    expect(result.content).toContain('Line 2'); // Second line  
+    expect(result.content).toContain('Line 1000'); // Last line
+    expect(result.content).not.toContain('Line 500'); // Should not contain middle lines
+    expect(result.content).not.toContain('... [MORE CONTENT TRUNCATED] ...'); // Should not have middle section marker
+  });
+
   });
