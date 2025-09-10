@@ -256,7 +256,7 @@ export class GeminiChat {
     const inlineDataParts: Part[] = this.extractInlineDataParts(userContent);
     const requestContents = this.getHistory(true).concat(userContent);
     for (const inlineDataPart of inlineDataParts) {
-      requestContents.push({ role: 'user', parts: [inlineDataPart] });
+      requestContents.push({ role: 'user', parts: [inlineDataPart] } as Content );
     }
 
     let response: GenerateContentResponse;
@@ -406,7 +406,7 @@ export class GeminiChat {
     this.history.push(userContent);
     const requestContents = this.getHistory(true);
     for (const inlineDataPart of inlineDataParts) {
-      requestContents.push({ role: 'user', parts: [inlineDataPart] });
+      requestContents.push({ role: 'user', parts: [inlineDataPart] } as Content);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-this-alias
