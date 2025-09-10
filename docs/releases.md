@@ -68,11 +68,12 @@ There are two ways to create a patch pull request:
 
 After a pull request has been merged, a maintainer can add a comment on that same PR with the following format:
 
-`/patch <channel>`
+`/patch <channel> [--dry-run]`
 
 - **channel**: `stable` or `preview`
+- **--dry-run** (optional): If included, the workflow will run in dry-run mode. This will create the PR with "[DRY RUN]" in the title, and merging it will trigger a dry run of the final release, so nothing is actually published.
 
-Example: `/patch stable`
+Example: `/patch stable --dry-run`
 
 The workflow will automatically find the merge commit SHA and begin the patch process. If the PR is not yet merged, it will post a comment indicating the failure.
 

@@ -14,6 +14,8 @@ jobs:
         uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
         with:
           script: |
+            const body = context.payload.pull_request.body;
+            const isDryRun = body.includes('[DRY RUN]');
             const ref = context.payload.pull_request.base.ref;
             const channel = ref.includes('preview') ? 'preview' : 'stable';
             github.rest.actions.createWorkflowDispatch({
@@ -23,6 +25,6 @@ jobs:
               ref: ref,
               inputs: {
                 type: channel,
-                dry_run: 'false'
+                dry_run: isDryRun.toString()
               }
             })

@@ -16,6 +16,8 @@ jobs:
           commands: patch
           permission: write
           issue-type: pull-request
+          static-args: |
+            dry_run=false
 
       - name: 'Get PR Status'
         id: pr_status
@@ -40,7 +42,8 @@ jobs:
               ref: 'main',
               inputs: {
                 commit: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}',
-                channel: args.channel
+                channel: args.channel,
+                dry_run: args.dry_run
               }
             })
 

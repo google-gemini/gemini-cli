@@ -14,6 +14,11 @@ on:
         options:
           - 'stable'
           - 'preview'
+      dry_run:
+        description: 'Whether to run in dry-run mode.'
+        required: false
+        type: 'boolean'
+        default: false
 
 jobs:
   create-patch:
@@ -45,9 +50,9 @@ jobs:
         if: "github.event.inputs.channel == 'stable'"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=stable'
+        run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=stable --dry-run=${{ github.event.inputs.dry_run }}'
 
       - name: 'Create Patch for Preview'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }}'
+        run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}'

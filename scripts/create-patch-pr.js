@@ -24,51 +24,67 @@ async function main() {
       choices: ['stable', 'preview'],
       demandOption: true,
     })
+    .option('dry-run', {
+      description: 'Whether to run in dry-run mode.',
+      type: 'boolean',
+      default: false,
+    })
     .help()
     .alias('help', 'h')
     .argv;
 
-  console.log(`Starting patch process for commit: ${argv.commit}`);
-  console.log(`Targeting channel: ${argv.channel}`);
+  const { commit, channel, dryRun } = argv;
 
-  const latestTag = getLatestTag(argv.channel);
-  console.log(`Found latest tag for ${argv.channel}: ${latestTag}`);
+  console.log(`Starting patch process for commit: ${commit}`);
+  console.log(`Targeting channel: ${channel}`);
+  if (dryRun) {
+    console.log('Running in dry-run mode.');
+  }
+
+  const latestTag = getLatestTag(channel);
+  console.log(`Found latest tag for ${channel}: ${latestTag}`);
 
   const releaseBranch = `release/${latestTag}`;
-  const hotfixBranch = `hotfix/${latestTag}/cherry-pick-${argv.commit.substring(0, 7)}`;
+  const hotfixBranch = `hotfix/${latestTag}/cherry-pick-${commit.substring(0, 7)}`;
 
   // Create the release branch from the tag if it doesn't exist.
   if (!branchExists(releaseBranch)) {
     console.log(`Release branch ${releaseBranch} does not exist. Creating it from tag ${latestTag}...`);
-    run(`git checkout -b ${releaseBranch} ${latestTag}`);
-    run(`git push origin ${releaseBranch}`);
+    run(`git checkout -b ${releaseBranch} ${latestTag}`, dryRun);
+    run(`git push origin ${releaseBranch}`, dryRun);
   } else {
     console.log(`Release branch ${releaseBranch} already exists.`);
   }
 
   // Create the hotfix branch from the release branch.
   console.log(`Creating hotfix branch ${hotfixBranch} from ${releaseBranch}...`);
-  run(`git checkout -b ${hotfixBranch} ${releaseBranch}`);
+  run(`git checkout -b ${hotfixBranch} ${releaseBranch}`, dryRun);
 
   // Cherry-pick the commit.
-  console.log(`Cherry-picking commit ${argv.commit} into ${hotfixBranch}...`);
-  run(`git cherry-pick ${argv.commit}`);
+  console.log(`Cherry-picking commit ${commit} into ${hotfixBranch}...`);
+  run(`git cherry-pick ${commit}`, dryRun);
 
   // Push the hotfix branch.
   console.log(`Pushing hotfix branch ${hotfixBranch} to origin...`);
-  run(`git push --set-upstream origin ${hotfixBranch}`);
+  run(`git push --set-upstream origin ${hotfixBranch}`, dryRun);
 
   // Create the pull request.
   console.log(`Creating pull request from ${hotfixBranch} to ${releaseBranch}...`);
-  const prTitle = `fix(patch): cherry-pick ${argv.commit.substring(0, 7)} to ${releaseBranch}`;
-  const prBody = `This PR automatically cherry-picks commit ${argv.commit} to patch the ${argv.channel} release.`;
-  run(`gh pr create --base ${releaseBranch} --head ${hotfixBranch} --title "${prTitle}" --body "${prBody}"`);
+  const prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch}`;
+  let prBody = `This PR automatically cherry-picks commit ${commit} to patch the ${channel} release.`;
+  if (dryRun) {
+    prBody += '\n\n**[DRY RUN]**';
+  }
+  run(`gh pr create --base ${releaseBranch} --head ${hotfixBranch} --title "${prTitle}" --body "${prBody}"`, dryRun);
 
   console.log('Patch process completed successfully!');
 }
 
-function run(command) {
+function run(command, dryRun = false) {
   console.log(`> ${command}`);
+  if (dryRun) {
+    return;
+  }
   try {
     return execSync(command).toString().trim();
   } catch (err) {
