@@ -69,6 +69,7 @@ async function updateAction(context: CommandContext, args: string) {
         },
         Date.now(),
       );
+      return;
     }
 
     // Filter to the actually updated ones.
