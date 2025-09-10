@@ -29,7 +29,7 @@
 	// --- POST CREATE COMMAND ---
 	// This now runs after all the features have been installed.
 	// It's focused only on project-specific setup.
-	"postCreateCommand": "npm install && npm run build",
+    "postCreateCommand": "npm install && npm run build",
 
 	// VS Code extensions to install inside the container.
 	"customizations": {
