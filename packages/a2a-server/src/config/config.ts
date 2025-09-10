@@ -108,9 +108,10 @@ export async function loadConfig(
     logger.info('[Config] Using Gemini API Key');
     await config.refreshAuth(AuthType.USE_GEMINI);
   } else {
-    logger.error(
-      `[Config] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.`,
-    );
+    const errorMessage =
+      '[Config] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.';
+    logger.error(errorMessage);
+    throw new Error(errorMessage);
   }
 
   return config;
