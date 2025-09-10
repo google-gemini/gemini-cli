@@ -286,7 +286,7 @@ See our [Contributing Guide](./CONTRIBUTING.md) for development setup, coding st
 
 Check our [Official Roadmap](https://github.com/orgs/google-gemini/projects/11/) for planned features and priorities.
 
-## 📖 Resources
+## 📖 Resource
 
 - **[Official Roadmap](./ROADMAP.md)** - See what's coming next
 - **[NPM Package](https://www.npmjs.com/package/@google/gemini-cli)** - Package registry

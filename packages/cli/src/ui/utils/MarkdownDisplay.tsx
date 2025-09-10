@@ -32,7 +32,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   isPending,
   availableTerminalHeight,
   terminalWidth,
-}) => {
+}: MarkdownDisplayProps) => {
   if (!text) return <></>;
 
   const lines = text.split(EOL);
@@ -61,7 +61,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
     }
   }
 
-  lines.forEach((line, index) => {
+  lines.forEach((line: string, index: number) => {
     const key = `line-${index}`;
 
     if (inCodeBlock) {
@@ -110,7 +110,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
         lines[index + 1].match(tableSeparatorRegex)
       ) {
         inTable = true;
-        tableHeaders = tableRowMatch[1].split('|').map((cell) => cell.trim());
+        tableHeaders = tableRowMatch[1].split('|').map((cell: string) => cell.trim());
         tableRows = [];
       } else {
         // Not a table, treat as regular text
@@ -126,7 +126,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       // Skip separator line - already handled
     } else if (inTable && tableRowMatch) {
       // Add table row
-      const cells = tableRowMatch[1].split('|').map((cell) => cell.trim());
+      const cells = tableRowMatch[1].split('|').map((cell: string) => cell.trim());
       // Ensure row has same column count as headers
       while (cells.length < tableHeaders.length) {
         cells.push('');
@@ -299,7 +299,7 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
   isPending,
   availableTerminalHeight,
   terminalWidth,
-}) => {
+}: RenderCodeBlockProps) => {
   const settings = useSettings();
   const MIN_LINES_FOR_MESSAGE = 1; // Minimum lines to show before the "generating more" message
   const RESERVED_LINES = 2; // Lines reserved for the message itself and potential padding
@@ -338,10 +338,13 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
   }
 
   const fullContent = content.join('\n');
+  
+  // For completed responses, always show the full content without height restrictions
+  // The MaxSizedBox parent component will handle overall height constraints
   const colorizedCode = colorizeCode(
     fullContent,
     lang,
-    availableTerminalHeight,
+    undefined, // Don't limit height for completed responses
     terminalWidth - CODE_BLOCK_PREFIX_PADDING,
     undefined,
     settings,
@@ -373,7 +376,7 @@ const RenderListItemInternal: React.FC<RenderListItemProps> = ({
   type,
   marker,
   leadingWhitespace = '',
-}) => {
+}: RenderListItemProps) => {
   const prefix = type === 'ol' ? `${marker}. ` : `${marker} `;
   const prefixWidth = prefix.length;
   const indentation = leadingWhitespace.length;
@@ -407,7 +410,7 @@ const RenderTableInternal: React.FC<RenderTableProps> = ({
   headers,
   rows,
   terminalWidth,
-}) => (
+}: RenderTableProps) => (
   <TableRenderer headers={headers} rows={rows} terminalWidth={terminalWidth} />
 );
 

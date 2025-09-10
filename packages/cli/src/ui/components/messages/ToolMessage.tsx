@@ -14,6 +14,7 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { TOOL_STATUS } from '../../constants.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -42,6 +43,10 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   emphasis = 'medium',
   renderOutputAsMarkdown = true,
 }) => {
+  // Use user configuration for showing full long responses
+  const settings = useSettings();
+  const showFullLongResponses = settings.merged.tools?.showFullLongResponses ?? true;
+  
   const availableHeight = availableTerminalHeight
     ? Math.max(
         availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
@@ -49,15 +54,14 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
       )
     : undefined;
 
-  // Long tool call response in MarkdownDisplay doesn't respect availableTerminalHeight properly,
-  // we're forcing it to not render as markdown when the response is too long, it will fallback
-  // to render as plain text, which is contained within the terminal using MaxSizedBox
-  if (availableHeight) {
+  // Only force disable markdown rendering for extremely long responses when showFullLongResponses is disabled
+  // When showFullLongResponses is enabled, we want to preserve markdown formatting and let MaxSizedBox handle scrolling
+  if (!showFullLongResponses && availableHeight && typeof resultDisplay === 'string' && resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
     renderOutputAsMarkdown = false;
   }
 
   const childWidth = terminalWidth - 3; // account for padding.
-  if (typeof resultDisplay === 'string') {
+  if (typeof resultDisplay === 'string' && !showFullLongResponses) {
     if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
       // Truncate the result display to fit within the available width.
       resultDisplay =
@@ -84,13 +88,13 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                 <MarkdownDisplay
                   text={resultDisplay}
                   isPending={false}
-                  availableTerminalHeight={availableHeight}
+                  availableTerminalHeight={showFullLongResponses ? undefined : availableHeight}
                   terminalWidth={childWidth}
                 />
               </Box>
             )}
             {typeof resultDisplay === 'string' && !renderOutputAsMarkdown && (
-              <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
+              <MaxSizedBox maxHeight={showFullLongResponses ? undefined : availableHeight} maxWidth={childWidth}>
                 <Box>
                   <Text wrap="wrap">{resultDisplay}</Text>
                 </Box>
@@ -117,7 +121,7 @@ type ToolStatusIndicatorProps = {
 
 const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
   status,
-}) => (
+}: ToolStatusIndicatorProps) => (
   <Box minWidth={STATUS_INDICATOR_WIDTH}>
     {status === ToolCallStatus.Pending && (
       <Text color={Colors.AccentGreen}>{TOOL_STATUS.PENDING}</Text>
@@ -162,7 +166,7 @@ const ToolInfo: React.FC<ToolInfo> = ({
   description,
   status,
   emphasis,
-}) => {
+}: ToolInfo) => {
   const nameColor = React.useMemo<string>(() => {
     switch (emphasis) {
       case 'high':
@@ -171,10 +175,9 @@ const ToolInfo: React.FC<ToolInfo> = ({
         return Colors.Foreground;
       case 'low':
         return Colors.Gray;
-      default: {
-        const exhaustiveCheck: never = emphasis;
-        return exhaustiveCheck;
-      }
+      default:
+        // This should never happen with proper TypeScript typing
+        return Colors.Foreground;
     }
   }, [emphasis]);
   return (

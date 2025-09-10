@@ -278,11 +278,29 @@ export async function truncateAndSaveToFile(
     fileContent = lines.join('\n');
   }
 
-  const head = Math.floor(truncateLines / 5);
+  // Improved truncation strategy: show more context and provide better navigation
+  // Handle edge cases for small truncateLines values
+  const head = truncateLines < 3 ? (truncateLines >= 1 ? 1 : 0) : Math.floor(truncateLines / 3);
+  const tail = truncateLines < 3 ? (truncateLines >= 2 ? 1 : 0) : Math.floor(truncateLines / 3);
+  const middle = truncateLines - head - tail;
+  
   const beginning = lines.slice(0, head);
-  const end = lines.slice(-(truncateLines - head));
-  const truncatedContent =
-    beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
+  const end = lines.slice(-tail);
+  
+  let truncatedContent = beginning.join('\n');
+  
+  if (middle > 0) {
+    // Add some middle lines for better context
+    const middleStart = Math.floor(lines.length / 2) - Math.floor(middle / 2);
+    const middleLines = lines.slice(middleStart, middleStart + middle);
+    truncatedContent += '\n... [CONTENT TRUNCATED - ' + (lines.length - truncateLines) + ' lines hidden] ...\n';
+    truncatedContent += middleLines.join('\n');
+    truncatedContent += '\n... [MORE CONTENT TRUNCATED] ...\n';
+  } else {
+    truncatedContent += '\n... [CONTENT TRUNCATED - ' + (lines.length - truncateLines) + ' lines hidden] ...\n';
+  }
+  
+  truncatedContent += end.join('\n');
 
   // Sanitize callId to prevent path traversal.
   const safeFileName = `${path.basename(callId)}.output`;
@@ -297,9 +315,9 @@ To read the complete output, use the ${ReadFileTool.Name} tool with the absolute
 - ${ReadFileTool.Name} tool with offset=0, limit=100 to see the first 100 lines
 - ${ReadFileTool.Name} tool with offset=N to skip N lines from the beginning
 - ${ReadFileTool.Name} tool with limit=M to read only M lines at a time
-The truncated output below shows the beginning and end of the content. The marker '... [CONTENT TRUNCATED] ...' indicates where content was removed.
-This allows you to efficiently examine different parts of the output without loading the entire file.
-Truncated part of the output:
+The truncated output below shows the beginning, middle, and end of the content to provide better context.
+Use the file path above to read the complete output.
+Truncated part of the output (${lines.length} lines total, showing ${truncateLines} lines):
 ${truncatedContent}`,
       outputFile,
     };

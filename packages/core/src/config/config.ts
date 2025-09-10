@@ -126,8 +126,8 @@ export const DEFAULT_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
   respectGeminiIgnore: true,
 };
 
-export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 4_000_000;
-export const DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES = 1000;
+export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 10_000_000;
+export const DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES = 5000;
 
 export class MCPServerConfig {
   constructor(

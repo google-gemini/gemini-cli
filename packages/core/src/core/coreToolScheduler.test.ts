@@ -1262,17 +1262,26 @@ describe('truncateAndSaveToFile', () => {
       content,
     );
 
-    // Should contain the first and last lines with 1/5 head and 4/5 tail
-    const head = Math.floor(TRUNCATE_LINES / 5);
+    // Should contain the first, middle, and last lines with new truncation strategy
+    const head = Math.floor(TRUNCATE_LINES / 3);
+    const tail = Math.floor(TRUNCATE_LINES / 3);
+    const middle = TRUNCATE_LINES - head - tail;
     const beginning = lines.slice(0, head);
-    const end = lines.slice(-(TRUNCATE_LINES - head));
-    const expectedTruncated =
-      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
+    const end = lines.slice(-tail);
+    
+    // The new format includes middle section for better context
+    const middleStart = Math.floor(lines.length / 2) - Math.floor(middle / 2);
+    const middleLines = lines.slice(middleStart, middleStart + middle);
+    
+    const expectedTruncated = 
+      beginning.join('\n') + '\n... [CONTENT TRUNCATED - ' + (lines.length - TRUNCATE_LINES) + ' lines hidden] ...\n' +
+      middleLines.join('\n') + '\n... [MORE CONTENT TRUNCATED] ...\n' +
+      end.join('\n');
 
     expect(result.content).toContain(
       'Tool output was too large and has been truncated',
     );
-    expect(result.content).toContain('Truncated part of the output:');
+    expect(result.content).toContain('Truncated part of the output (' + lines.length + ' lines total, showing ' + TRUNCATE_LINES + ' lines):');
     expect(result.content).toContain(expectedTruncated);
   });
 
@@ -1308,16 +1317,26 @@ describe('truncateAndSaveToFile', () => {
       expectedFileContent,
     );
 
-    // Should contain the first and last lines with 1/5 head and 4/5 tail of the wrapped content
-    const head = Math.floor(TRUNCATE_LINES / 5);
+    // Should contain the first, middle, and last lines with new truncation strategy
+    const head = Math.floor(TRUNCATE_LINES / 3);
+    const tail = Math.floor(TRUNCATE_LINES / 3);
+    const middle = TRUNCATE_LINES - head - tail;
     const beginning = wrappedLines.slice(0, head);
-    const end = wrappedLines.slice(-(TRUNCATE_LINES - head));
-    const expectedTruncated =
-      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
+    const end = wrappedLines.slice(-tail);
+    
+    // The new format includes middle section for better context
+    const middleStart = Math.floor(wrappedLines.length / 2) - Math.floor(middle / 2);
+    const middleLines = wrappedLines.slice(middleStart, middleStart + middle);
+    
+    const expectedTruncated = 
+      beginning.join('\n') + '\n... [CONTENT TRUNCATED - ' + (wrappedLines.length - TRUNCATE_LINES) + ' lines hidden] ...\n' +
+      middleLines.join('\n') + '\n... [MORE CONTENT TRUNCATED] ...\n' +
+      end.join('\n');
+
     expect(result.content).toContain(
       'Tool output was too large and has been truncated',
     );
-    expect(result.content).toContain('Truncated part of the output:');
+    expect(result.content).toContain('Truncated part of the output (' + wrappedLines.length + ' lines total, showing ' + TRUNCATE_LINES + ' lines):');
     expect(result.content).toContain(expectedTruncated);
   });
 
@@ -1430,4 +1449,5 @@ describe('truncateAndSaveToFile', () => {
       expectedFileContent,
     );
   });
-});
+
+  });
