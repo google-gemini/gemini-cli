@@ -23,6 +23,8 @@ import { ZipTool } from './zip-tool.js';
 import { FileTool } from './file-tool.js';
 import { WebTool } from './web-tool.js';
 import { TodoTool } from './todo-tool.js';
+import { PythonEmbeddedTool } from './python-embedded-tool.js';
+import { XlwingsTool } from './xlwings-tool.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolClass = any;
@@ -38,7 +40,9 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     ShellTool,
     GrepTool,
     ReadManyFilesTool,
-    MemoryTool
+    MemoryTool,
+    PythonEmbeddedTool,
+    XlwingsTool
   ],
   office_assistant: [
     LSTool,
@@ -48,10 +52,12 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     ShellTool,
     WebTool,
     ExcelTool,
+    XlwingsTool,
     PDFTool,
     ZipTool,
     TodoTool,
-    MemoryTool
+    MemoryTool,
+    PythonEmbeddedTool
   ],
   translator: [
     ReadFileTool,
@@ -72,7 +78,8 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     ShellTool,
     RipGrepTool,
     // WebSearchTool,
-    ExcelTool
+    ExcelTool,
+    XlwingsTool
   ]
 };
 
