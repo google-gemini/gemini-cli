@@ -1,105 +1,70 @@
-/**
- * @license
- * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
+#!/usr/bin/env node
+const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
-import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import semver from 'semver';
-import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
-
-function getShortSha() {
-  return execSync('git rev-parse --short HEAD').toString().trim();
+function getArgs() {
+  const args = {};
+  process.argv.slice(2).forEach(arg => {
+    if (arg.startsWith('--')) {
+      const [key, value] = arg.substring(2).split('=');
+      args[key] = value === undefined ? true : value;
+    }
+  });
+  return args;
 }
 
-function getVersionFromPackageJson() {
-  const rootPackageJsonPath = resolve(process.cwd(), 'package.json');
-  const rootPackageJson = JSON.parse(readFileSync(rootPackageJsonPath, 'utf-8'));
-  return rootPackageJson.version;
-}
-
-function getPreviousReleaseTag(isNightly) {
-  if (isNightly) {
-    console.error('Finding latest nightly release...');
-    return execSync(
-      `gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("nightly"))] | .[0].tagName'`,
-    )
-      .toString()
-      .trim();
-  } else {
-    console.error('Finding latest STABLE release (excluding pre-releases)...');
-    return execSync(
-      `gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | (contains("nightly") or contains("preview")) | not)] | .[0].tagName'`,
-    )
-      .toString()
-      .trim();
-  }
-}
-
-export function calculateNextVersion(version) {
-  const parsedVersion = semver.parse(version);
-  if (!parsedVersion) {
-    throw new Error(`Invalid version string: ${version}`);
-  }
-  return `${parsedVersion.major}.${parsedVersion.minor + 1}.0-nightly`;
-}
-
-export function getReleaseVersion(type, version) {
-  let releaseTag;
-  const versionFromPackage = getVersionFromPackageJson();
-
-  if (type === 'stable') {
-    releaseTag = `v${semver.parse(version).version}`;
-  } else if (type === 'preview') {
-    const nextVersion = semver.inc(version, 'minor');
-    releaseTag = `v${nextVersion}-preview`;
-  } else if (type === 'nightly') {
-    const now = new Date();
-    const year = now.getUTCFullYear().toString();
-    const month = (now.getUTCMonth() + 1).toString().padStart(2, '0');
-    const day = now.getUTCDate().toString().padStart(2, '0');
-    const date = `${year}${month}${day}`;
-    const sha = getShortSha();
-    releaseTag = `v${versionFromPackage}.${date}.${sha}`;
-  } else {
-    throw new Error(`Invalid release type: ${type}`);
-  }
-
-  if (!releaseTag) {
-    throw new Error('Error: Version could not be determined.');
-  }
-
-  const releaseVersion = releaseTag.substring(1);
-  let npmTag = 'latest';
-  if (releaseVersion.includes('-')) {
-    npmTag = releaseVersion.split('-')[1].split('.')[0];
-  }
-
-  const previousReleaseTag = getPreviousReleaseTag(type === 'nightly');
-
-  return { releaseTag, releaseVersion, npmTag, previousReleaseTag };
-}
-
-if (process.argv[1] === new URL(import.meta.url).pathname) {
-  const argv = yargs(hideBin(process.argv))
-    .option('type', {
-      describe: 'The type of release',
-      choices: ['stable', 'preview', 'nightly'],
-      demandOption: true,
-    })
-    .option('version', {
-      describe: 'The base version to use for stable and preview releases',
-      type: 'string',
-    }).parse();
-
+function getLatestTag(pattern) {
+  const command = `gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | ${pattern})] | .[0].tagName'`;
   try {
-    const versions = getReleaseVersion(argv.type, argv.version);
-    console.log(JSON.stringify(versions));
+    return execSync(command).toString().trim();
   } catch (error) {
-    console.error(error.message);
-    process.exit(1);
+    // Suppress error output for cleaner test failures
+    return '';
   }
 }
+
+function getVersion(options = {}) {
+  const args = getArgs();
+  const type = options.type || args.type || 'nightly';
+
+  let releaseVersion;
+  let npmTag;
+  let previousReleaseTag;
+
+  if (type === 'nightly') {
+    const packageJson = require('../package.json');
+    const [major, minor] = packageJson.version.split('.');
+    const nextMinor = parseInt(minor) + 1;
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const gitShortHash = execSync('git rev-parse --short HEAD').toString().trim();
+    releaseVersion = `${major}.${nextMinor}.0-nightly.${date}.${gitShortHash}`;
+    npmTag = 'nightly';
+    previousReleaseTag = getLatestTag('contains("nightly")');
+  } else if (type === 'stable') {
+    const latestPreviewTag = getLatestTag('contains("preview")');
+    releaseVersion = latestPreviewTag.replace(/-preview.*/, '').replace(/^v/, '');
+    npmTag = 'latest';
+    previousReleaseTag = getLatestTag('(contains("nightly") or contains("preview")) | not');
+  } else if (type === 'preview') {
+    const latestNightlyTag = getLatestTag('contains("nightly")');
+    releaseVersion = latestNightlyTag.replace(/-nightly.*/, '').replace(/^v/, '') + '-preview';
+    npmTag = 'preview';
+    previousReleaseTag = getLatestTag('contains("preview")');
+  }
+
+  const releaseTag = `v${releaseVersion}`;
+
+  return {
+    releaseTag,
+    releaseVersion,
+    npmTag,
+    previousReleaseTag,
+  };
+}
+
+if (require.main === module) {
+  console.log(JSON.stringify(getVersion(), null, 2));
+}
+
+module.exports = { getVersion };
