@@ -1,126 +1,58 @@
-name: 'Promote Release'
+name: Promote Release
 
 on:
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: 'Run a dry-run of the release process; no branches, npm packages or GitHub releases will be created.'
-        required: true
-        type: 'boolean'
-        default: true
+      ref:
+        description: 'The branch, tag, or SHA to checkout. Defaults to main.'
+        required: false
+        default: 'main'
 
 jobs:
-  promote:
-    runs-on: 'ubuntu-latest'
+  calculate-versions:
+    name: Calculate Release Versions
+    runs-on: ubuntu-latest
     steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: ${{ github.event.inputs.ref }}
 
-      - name: 'Setup Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
+          node-version: '20'
 
-      - name: 'Install Dependencies'
-        run: npm ci
-
-      - name: 'Build get-release-version script'
-        run: npm run build:get-release-version
-
-      - name: 'Get main SHA'
-        id: 'main_sha'
-        run: echo "SHA=$(git rev-parse main)" >> $GITHUB_OUTPUT
-
-      - name: 'Get latest preview tag'
-        id: 'preview_tag'
-        run: echo "TAG=$(git describe --tags --abbrev=0 --match 'v*-preview')" >> $GITHUB_OUTPUT
-
-      - name: 'Get Stable Version'
-        id: 'stable_version'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Calculate versions
+        id: versions
         run: |
-          VERSION_JSON=$(node dist/get-release-version.js --type stable --version ${{ steps.preview_tag.outputs.TAG }})
-          echo "RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)" >> "${GITHUB_OUTPUT}"
-          echo "RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
-          echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
-          echo "PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current version from package.json: $CURRENT_VERSION"
 
-      - name: 'Promote Preview to Stable'
-        run: |
-          git checkout ${{ steps.preview_tag.outputs.TAG }}
-          npm ci
-          npm run release:version ${{ steps.stable_version.outputs.RELEASE_VERSION }}
-          npm run build:packages
-          npm run prepare:package
-          npm publish --workspace="@google/gemini-cli-core" --tag="${{ steps.stable_version.outputs.NPM_TAG }}" --dry-run=${{ github.event.inputs.dry_run }}
-          npm publish --workspace="@google/gemini-cli" --tag="${{ steps.stable_version.outputs.NPM_TAG }}" --dry-run=${{ github.event.inputs.dry_run }}
-        env:
-          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          # Extract major and minor versions
+          MAJOR=$(echo $CURRENT_VERSION | cut -d. -f1)
+          MINOR=$(echo $CURRENT_VERSION | cut -d. -f2)
 
-      - name: 'Create Stable GitHub Release'
-        if: ${{ !github.event.inputs.dry_run }}
-        run: |
-          npm run bundle
-          gh release create "${{ steps.stable_version.outputs.RELEASE_TAG }}" \
-            bundle/gemini.js \
-            --target "${{ steps.preview_tag.outputs.TAG }}" \
-            --title "Release ${{ steps.stable_version.outputs.RELEASE_TAG }}" \
-            --notes-start-tag "${{ steps.stable_version.outputs.PREVIOUS_TAG }}" \
-            --generate-notes
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          # Calculate next nightly version (minor bump)
+          # e.g., 0.6.x -> 0.7.0-nightly
+          NEXT_MINOR=$((MINOR + 1))
+          NEXT_NIGHTLY_VERSION="$MAJOR.$NEXT_MINOR.0-nightly"
 
-      - name: 'Get Preview Version'
-        id: 'preview_version'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION_JSON=$(node dist/get-release-version.js --type preview --version ${{ steps.stable_version.outputs.RELEASE_TAG }})
-          echo "RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)" >> "${GITHUB_OUTPUT}"
-          echo "RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
-          echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
-          echo "PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
+          # Calculate next preview version
+          # e.g., 0.6.x -> 0.6.0-preview
+          NEXT_PREVIEW_VERSION="$MAJOR.$MINOR.0-preview"
 
-      - name: 'Create Next Preview from main'
-        run: |
-          git checkout ${{ steps.main_sha.outputs.SHA }}
-          npm ci
-          npm run release:version ${{ steps.preview_version.outputs.RELEASE_VERSION }}
-          npm run build:packages
-          npm run prepare:package
-          npm publish --workspace="@google/gemini-cli-core" --tag="${{ steps.preview_version.outputs.NPM_TAG }}" --dry-run=${{ github.event.inputs.dry_run }}
-          npm publish --workspace="@google/gemini-cli" --tag="${{ steps.preview_version.outputs.NPM_TAG }}" --dry-run=${{ github.event.inputs.dry_run }}
-        env:
-          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          # Calculate next stable version (minor decrement)
+          # e.g., 0.6.x -> 0.5.0
+          PREVIOUS_MINOR=$((MINOR - 1))
+          NEXT_STABLE_VERSION="$MAJOR.$PREVIOUS_MINOR.0"
 
-      - name: 'Create Preview GitHub Release'
-        if: ${{ !github.event.inputs.dry_run }}
-        run: |
-          npm run bundle
-          gh release create "${{ steps.preview_version.outputs.RELEASE_TAG }}" \
-            bundle/gemini.js \
-            --target "${{ steps.main_sha.outputs.SHA }}" \
-            --title "Release ${{ steps.preview_version.outputs.RELEASE_TAG }}" \
-            --notes-start-tag "${{ steps.stable_version.outputs.RELEASE_TAG }}" \
-            --generate-notes
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          echo "next_nightly_version=$NEXT_NIGHTLY_VERSION" >> $GITHUB_OUTPUT
+          echo "next_preview_version=$NEXT_PREVIEW_VERSION" >> $GITHUB_OUTPUT
+          echo "next_stable_version=$NEXT_STABLE_VERSION" >> $GITHUB_OUTPUT
 
-      - name: 'Prepare main for Next Nightly'
-        if: ${{ !github.event.inputs.dry_run }}
+      - name: Print calculated versions
         run: |
-          NEXT_NIGHTLY_VERSION=$(node -e "console.log(require('./scripts/get-release-version.js').calculateNextVersion('${{ steps.preview_version.outputs.RELEASE_VERSION }}'))")
-          git checkout ${{ steps.main_sha.outputs.SHA }}
-          git checkout -b release/prepare-nightly-${NEXT_NIGHTLY_VERSION}
-          npm run release:version ${NEXT_NIGHTLY_VERSION}
-          git add .
-          git commit -m "chore(release): Prepare for next nightly version ${NEXT_NIGHTLY_VERSION}"
-          git push -u origin release/prepare-nightly-${NEXT_NIGHTLY_VERSION}
-          gh pr create --title "chore(release): Prepare for next nightly version ${NEXT_NIGHTLY_VERSION}" --body "Automated PR to update the version in main." --base main
-          gh pr merge --auto --merge
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          echo "Next nightly version: ${{ steps.versions.outputs.next_nightly_version }}"
+          echo "Next preview version: ${{ steps.versions.outputs.next_preview_version }}"
+          echo "Next stable version: ${{ steps.versions.outputs.next_stable_version }}"
