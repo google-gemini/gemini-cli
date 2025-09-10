@@ -18,8 +18,10 @@ import {
   getSpecificMimeType,
 } from '../utils/fileUtils.js';
 import type { PartListUnion } from '@google/genai';
-import type { Config } from '../config/config.js';
-import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
+import {
+  type Config,
+  DEFAULT_FILE_FILTERING_OPTIONS,
+} from '../config/config.js';
 import { FileOperation } from '../telemetry/metrics.js';
 import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
@@ -173,20 +175,6 @@ ${finalExclusionPatternsForDescription
       useDefaultExcludes = true,
     } = this.params;
 
-    const defaultFileIgnores =
-      this.config.getFileFilteringOptions() ?? DEFAULT_FILE_FILTERING_OPTIONS;
-
-    const fileFilteringOptions = {
-      respectGitIgnore:
-        this.params.file_filtering_options?.respect_git_ignore ??
-        defaultFileIgnores.respectGitIgnore, // Use the property from the returned object
-      respectGeminiIgnore:
-        this.params.file_filtering_options?.respect_gemini_ignore ??
-        defaultFileIgnores.respectGeminiIgnore, // Use the property from the returned object
-    };
-    // Get centralized file discovery service
-    const fileDiscovery = this.config.getFileService();
-
     const filesToConsider = new Set<string>();
     const skippedFiles: Array<{ path: string; reason: string }> = [];
     const processedFilesRelativePaths: string[] = [];
@@ -227,71 +215,37 @@ ${finalExclusionPatternsForDescription
           allEntries.add(entry);
         }
       }
-      const entries = Array.from(allEntries);
+      const relativeEntries = Array.from(allEntries).map((p) =>
+        path.relative(this.config.getTargetDir(), p),
+      );
 
-      const gitFilteredEntries = fileFilteringOptions.respectGitIgnore
-        ? fileDiscovery
-            .filterFiles(
-              entries.map((p) => path.relative(this.config.getTargetDir(), p)),
-              {
-                respectGitIgnore: true,
-                respectGeminiIgnore: false,
-              },
-            )
-            .map((p) => path.resolve(this.config.getTargetDir(), p))
-        : entries;
+      const fileDiscovery = this.config.getFileService();
+      const { filteredPaths, gitIgnoredCount, geminiIgnoredCount } =
+        fileDiscovery.filterFilesWithReport(relativeEntries, {
+          respectGitIgnore:
+            this.params.file_filtering_options?.respect_git_ignore ??
+            this.config.getFileFilteringOptions().respectGitIgnore ??
+            DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
+          respectGeminiIgnore:
+            this.params.file_filtering_options?.respect_gemini_ignore ??
+            this.config.getFileFilteringOptions().respectGeminiIgnore ??
+            DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
+        });
 
-      // Apply gemini ignore filtering if enabled
-      const finalFilteredEntries = fileFilteringOptions.respectGeminiIgnore
-        ? fileDiscovery
-            .filterFiles(
-              gitFilteredEntries.map((p) =>
-                path.relative(this.config.getTargetDir(), p),
-              ),
-              {
-                respectGitIgnore: false,
-                respectGeminiIgnore: true,
-              },
-            )
-            .map((p) => path.resolve(this.config.getTargetDir(), p))
-        : gitFilteredEntries;
-
-      let gitIgnoredCount = 0;
-      let geminiIgnoredCount = 0;
-
-      for (const absoluteFilePath of entries) {
+      for (const relativePath of filteredPaths) {
         // Security check: ensure the glob library didn't return something outside the workspace.
+
+        const fullPath = path.resolve(this.config.getTargetDir(), relativePath);
         if (
-          !this.config
-            .getWorkspaceContext()
-            .isPathWithinWorkspace(absoluteFilePath)
+          !this.config.getWorkspaceContext().isPathWithinWorkspace(fullPath)
         ) {
           skippedFiles.push({
-            path: absoluteFilePath,
-            reason: `Security: Glob library returned path outside workspace. Path: ${absoluteFilePath}`,
+            path: fullPath,
+            reason: `Security: Glob library returned path outside workspace. Path: ${fullPath}`,
           });
           continue;
         }
-
-        // Check if this file was filtered out by git ignore
-        if (
-          fileFilteringOptions.respectGitIgnore &&
-          !gitFilteredEntries.includes(absoluteFilePath)
-        ) {
-          gitIgnoredCount++;
-          continue;
-        }
-
-        // Check if this file was filtered out by gemini ignore
-        if (
-          fileFilteringOptions.respectGeminiIgnore &&
-          !finalFilteredEntries.includes(absoluteFilePath)
-        ) {
-          geminiIgnoredCount++;
-          continue;
-        }
-
-        filesToConsider.add(absoluteFilePath);
+        filesToConsider.add(fullPath);
       }
 
       // Add info about git-ignored files if any were filtered
