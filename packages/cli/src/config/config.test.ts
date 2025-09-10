@@ -1972,6 +1972,55 @@ describe('loadCliConfig fileFiltering', () => {
   );
 });
 
+describe('Output Format Configuration', () => {
+  const originalArgv = process.argv;
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.restoreAllMocks();
+  });
+
+  it('should default to text format when no setting or flag is provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {} as Settings,
+      [],
+      'test-session',
+      argv,
+    );
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.TEXT);
+  });
+
+  it('should use the format from settings when no flag is provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { output: { format: 'json' } };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.JSON);
+  });
+
+  it('should use the format from the flag when provided', async () => {
+    process.argv = ['node', 'script.js', '--output-format', 'json'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {} as Settings,
+      [],
+      'test-session',
+      argv,
+    );
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.JSON);
+  });
+
+  it('should prioritize the flag over the setting', async () => {
+    process.argv = ['node', 'script.js', '--output-format', 'text'];
+    const settings: Settings = { output: { format: 'json' } };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.TEXT);
+  });
+});
+
 describe('parseArguments with positional prompt', () => {
   const originalArgv = process.argv;
 

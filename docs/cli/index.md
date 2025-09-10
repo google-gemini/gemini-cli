@@ -27,3 +27,19 @@ Gemini CLI executes the command and prints the output to your terminal. Note tha
 ```bash
 gemini -p "What is fine tuning?"
 ```
+
+For non-interactive usage with structured output, use the `--output-format json` flag for scripting and automation.
+
+Get structured JSON output for scripting:
+
+```bash
+gemini -p "What is fine tuning?" --output-format json
+# Output:
+# {
+#   "response": "Fine tuning is...",
+#   "stats": {
+#     "models": { "gemini-2.5-flash": { "tokens": {"total": 45} } }
+#   },
+#   "error": null
+# }
+```

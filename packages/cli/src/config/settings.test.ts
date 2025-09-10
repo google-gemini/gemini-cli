@@ -1078,6 +1078,30 @@ describe('Settings Loading and Merging', () => {
       });
     });
 
+    it('should merge output format settings, with workspace taking precedence', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        output: { format: 'text' },
+      };
+      const workspaceSettingsContent = {
+        output: { format: 'json' },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.output?.format).toBe('json');
+    });
+
     it('should handle chatCompression when only in user settings', () => {
       (mockFsExistsSync as Mock).mockImplementation(
         (p: fs.PathLike) => p === USER_SETTINGS_PATH,
