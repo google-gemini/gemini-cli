@@ -1,3 +1,4 @@
+.github/actions/publish-release/action.yml
 **/bundle
 **/coverage
 **/dist
