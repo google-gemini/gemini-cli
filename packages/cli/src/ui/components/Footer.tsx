@@ -10,14 +10,11 @@ import { theme } from '../semantic-colors.js';
 import { shortenPath, tildeifyPath } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
-import path from 'node:path';
 import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
-
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
-import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 
 export interface FooterProps {
   model: string;
@@ -52,20 +49,15 @@ export const Footer: React.FC<FooterProps> = ({
 }) => {
   const { columns: terminalWidth } = useTerminalSize();
 
-  const isNarrow = isNarrowWidth(terminalWidth);
-
-  // Adjust path length based on terminal width
-  const pathLength = Math.max(20, Math.floor(terminalWidth * 0.4));
-  const displayPath = isNarrow
-    ? path.basename(tildeifyPath(targetDir))
-    : shortenPath(tildeifyPath(targetDir), pathLength);
+  const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
+  const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
 
   return (
     <Box
       justifyContent="space-between"
       width="100%"
-      flexDirection={isNarrow ? 'column' : 'row'}
-      alignItems={isNarrow ? 'flex-start' : 'center'}
+      flexDirection="row"
+      alignItems="center"
     >
       <Box>
         {debugMode && <DebugProfiler />}
@@ -94,12 +86,10 @@ export const Footer: React.FC<FooterProps> = ({
 
       {/* Middle Section: Centered Trust/Sandbox Info */}
       <Box
-        flexGrow={isNarrow ? 0 : 1}
+        flexGrow={1}
         alignItems="center"
-        justifyContent={isNarrow ? 'flex-start' : 'center'}
+        justifyContent="center"
         display="flex"
-        paddingX={isNarrow ? 0 : 1}
-        paddingTop={isNarrow ? 1 : 0}
       >
         {isTrustedFolder === false ? (
           <Text color={theme.status.warning}>untrusted</Text>
@@ -117,20 +107,23 @@ export const Footer: React.FC<FooterProps> = ({
           </Text>
         ) : (
           <Text color={theme.status.error}>
-            no sandbox <Text color={theme.text.secondary}>(see /docs)</Text>
+            no sandbox
+            {terminalWidth >= 100 && (
+              <Text color={theme.text.secondary}> (see /docs)</Text>
+            )}
           </Text>
         )}
       </Box>
 
       {/* Right Section: Gemini Label and Console Summary */}
-      <Box alignItems="center" paddingTop={isNarrow ? 1 : 0}>
+      <Box alignItems="center" justifyContent="flex-end">
         <Box alignItems="center">
           <Text color={theme.text.accent}>
-            {isNarrow ? '' : ' '}
             {model}{' '}
             <ContextUsageDisplay
               promptTokenCount={promptTokenCount}
               model={model}
+              terminalWidth={terminalWidth}
             />
           </Text>
           {showMemoryUsage && <MemoryUsageDisplay />}
