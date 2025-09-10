@@ -186,7 +186,7 @@ jobs:
           release-branch: ${{ steps.release_branch.outputs.BRANCH_NAME }}
           previous-tag: ${{ steps.vars.outputs.PREVIOUS_TAG }}
 
-nightly-pr:
+  nightly-pr:
     name: Create Nightly PR
     needs: calculate-versions
     if: github.event.inputs.release_type == 'nightly'
