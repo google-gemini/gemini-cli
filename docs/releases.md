@@ -66,14 +66,15 @@ There are two ways to create a patch pull request:
 
 **Option A: From a GitHub Comment (Recommended)**
 
-On any pull request, a maintainer can add a comment with the following format:
+After a pull request has been merged, a maintainer can add a comment on that same PR with the following format:
 
-`/patch <channel> <commit_sha>`
+`/patch <channel>`
 
 - **channel**: `stable` or `preview`
-- **commit_sha**: The full SHA of the commit on `main` to cherry-pick.
 
-Example: `/patch stable 12345abcdef...`
+Example: `/patch stable`
+
+The workflow will automatically find the merge commit SHA and begin the patch process. If the PR is not yet merged, it will post a comment indicating the failure.
 
 **Option B: Manually Triggering the Workflow**
 

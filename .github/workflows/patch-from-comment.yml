@@ -9,28 +9,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 'Slash Command Dispatch'
+        id: slash_command
         uses: peter-evans/slash-command-dispatch@40877f718dce0101edfc7aea2b3800cc192f9ed5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commands: patch
           permission: write
           issue-type: pull-request
-          static-args: |
-            commit=${{ github.event.comment.html_url }}
-      
-      - name: 'Dispatch Patch Workflow'
-        if: steps.slash-command-dispatch.outputs.dispatched == 'true'
+
+      - name: 'Get PR Status'
+        id: pr_status
+        if: steps.slash_command.outputs.dispatched == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr view ${{ github.event.issue.number }} --json mergeCommit,state > pr_status.json
+          echo "MERGE_COMMIT_SHA=$(jq -r .mergeCommit.oid pr_status.json)" >> $GITHUB_OUTPUT
+          echo "STATE=$(jq -r .state pr_status.json)" >> $GITHUB_OUTPUT
+
+      - name: 'Dispatch if Merged'
+        if: steps.pr_status.outputs.STATE == 'MERGED'
         uses: actions/github-script@v6
         with:
           script: |
-            const args = JSON.parse('${{ steps.slash-command-dispatch.outputs.command-arguments }}');
+            const args = JSON.parse('${{ steps.slash_command.outputs.command-arguments }}');
             github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'create-patch-pr.yml',
               ref: 'main',
               inputs: {
-                commit: args.commit,
+                commit: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}',
                 channel: args.channel
               }
             })
+
+      - name: 'Comment on Failure'
+        if: steps.pr_status.outputs.STATE != 'MERGED'
+        uses: peter-evans/create-or-update-comment@v2
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            :x: The `/patch` command failed. This pull request must be merged before a patch can be created.
