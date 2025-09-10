@@ -350,6 +350,4 @@ export enum EventMetadataKey {
 
   // Logs the status of the extension install.
   GEMINI_CLI_EXTENSION_INSTALL_STATUS = 88,
-
-  // next
 }
