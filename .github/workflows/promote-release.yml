@@ -75,10 +75,10 @@ jobs:
             previous-tag: ${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}
 
     steps:
-      - name: 'Checkout workflow files'
+      - name: 'Checkout main'
         uses: 'actions/checkout@v4'
         with:
-          ref: 'mk/revertable-release-fix'
+          ref: 'main'
 
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@v4'
