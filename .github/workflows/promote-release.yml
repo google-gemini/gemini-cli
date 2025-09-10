@@ -14,13 +14,13 @@ jobs:
     name: 'Calculate Versions and Plan'
     runs-on: 'ubuntu-latest'
     outputs:
-      STABLE_VERSION: "${{ steps.versions.outputs.STABLE_VERSION }}"
-      STABLE_SHA: "${{ steps.versions.outputs.STABLE_SHA }}"
-      PREVIOUS_STABLE_TAG: "${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}"
-      PREVIEW_VERSION: "${{ steps.versions.outputs.PREVIEW_VERSION }}"
-      PREVIEW_SHA: "${{ steps.versions.outputs.PREVIEW_SHA }}"
-      PREVIOUS_PREVIEW_TAG: "${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}"
-      NEXT_NIGHTLY_VERSION: "${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
+      STABLE_VERSION: '${{ steps.versions.outputs.STABLE_VERSION }}'
+      STABLE_SHA: '${{ steps.versions.outputs.STABLE_SHA }}'
+      PREVIOUS_STABLE_TAG: '${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}'
+      PREVIEW_VERSION: '${{ steps.versions.outputs.PREVIEW_VERSION }}'
+      PREVIEW_SHA: '${{ steps.versions.outputs.PREVIEW_SHA }}'
+      PREVIOUS_PREVIEW_TAG: '${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}'
+      NEXT_NIGHTLY_VERSION: '${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}'
 
     steps:
       - name: 'Checkout'
@@ -40,7 +40,7 @@ jobs:
       - name: 'Calculate Versions and SHAs'
         id: 'versions'
         env:
-          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
           set -e
           STABLE_JSON=$(node scripts/get-release-version.js --type=stable)
@@ -67,15 +67,15 @@ jobs:
       matrix:
         include:
           - channel: 'stable'
-            version: "${{ needs.calculate-versions.outputs.STABLE_VERSION }}"
-            sha: "${{ needs.calculate-versions.outputs.STABLE_SHA }}"
+            version: '${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
+            sha: '${{ needs.calculate-versions.outputs.STABLE_SHA }}'
             npm-tag: 'latest'
-            previous-tag: "${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}"
+            previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}'
           - channel: 'preview'
-            version: "${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}"
-            sha: "${{ needs.calculate-versions.outputs.PREVIEW_SHA }}"
+            version: '${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
+            sha: '${{ needs.calculate-versions.outputs.PREVIEW_SHA }}'
             npm-tag: 'preview'
-            previous-tag: "${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}"
+            previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}'
 
     steps:
       - name: 'Checkout main'
@@ -86,7 +86,7 @@ jobs:
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
-          ref: "${{ matrix.sha }}"
+          ref: '${{ matrix.sha }}'
           path: 'release'
 
       - name: 'Setup Node.js'
@@ -136,14 +136,14 @@ jobs:
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
-          release-version: "${{ matrix.version }}"
-          npm-tag: "${{ matrix.npm-tag }}"
-          wombat-token-core: "${{ secrets.WOMBAT_TOKEN_CORE }}"
-          wombat-token-cli: "${{ secrets.WOMBAT_TOKEN_CLI }}"
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
-          dry-run: "${{ github.event.inputs.dry_run }}"
-          release-branch: "${{ steps.release_branch.outputs.BRANCH_NAME }}"
-          previous-tag: "${{ matrix.previous-tag }}"
+          release-version: '${{ matrix.version }}'
+          npm-tag: '${{ matrix.npm-tag }}'
+          wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+          wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          dry-run: '${{ github.event.inputs.dry_run }}'
+          release-branch: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+          previous-tag: '${{ matrix.previous-tag }}'
           working-directory: './release'
 
   nightly-pr:
@@ -200,7 +200,7 @@ jobs:
       - name: 'Create and Approve Pull Request'
         if: ${{ github.event.inputs.dry_run == 'false' }}
         env:
-          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
         run: |
           gh pr create \

@@ -1,5 +1,3 @@
-.github/**/*.yml
-.github/**/*.yaml
 **/bundle
 **/coverage
 **/dist
