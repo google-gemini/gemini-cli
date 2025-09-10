@@ -108,16 +108,31 @@ jobs:
   promote:
     name: Promote Release
     needs: calculate-versions
-    if: github.event.inputs.release_type == 'preview'
+    if: github.event.inputs.release_type == 'preview' || github.event.inputs.release_type == 'stable'
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'
       packages: 'write'
     steps:
+      - name: Set promotion variables
+        id: vars
+        run: |
+          if [ "${{ github.event.inputs.release_type }}" == "preview" ]; then
+            echo "SHA=${{ needs.calculate-versions.outputs.PREVIEW_SHA }}" >> $GITHUB_OUTPUT
+            echo "VERSION=${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}" >> $GITHUB_OUTPUT
+            echo "NPM_TAG=preview" >> $GITHUB_OUTPUT
+            echo "PREVIOUS_TAG=${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.inputs.release_type }}" == "stable" ]; then
+            echo "SHA=${{ needs.calculate-versions.outputs.STABLE_SHA }}" >> $GITHUB_OUTPUT
+            echo "VERSION=${{ needs.calculate-versions.outputs.STABLE_VERSION }}" >> $GITHUB_OUTPUT
+            echo "NPM_TAG=latest" >> $GITHUB_OUTPUT
+            echo "PREVIOUS_TAG=${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@v4'
         with:
-          ref: ${{ needs.calculate-versions.outputs.PREVIEW_SHA }}
+          ref: ${{ steps.vars.outputs.SHA }}
 
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@v4'
@@ -136,19 +151,19 @@ jobs:
       - name: 'Create and switch to a release branch'
         id: 'release_branch'
         run: |
-          BRANCH_NAME="release/v${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}"
+          BRANCH_NAME="release/v${{ steps.vars.outputs.VERSION }}"
           git switch -c "${BRANCH_NAME}"
           echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
 
       - name: 'Update package versions'
         run: |-
-          npm run release:version "${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}"
+          npm run release:version "${{ steps.vars.outputs.VERSION }}"
 
       - name: 'Commit and Conditionally Push package versions'
         env:
           BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           DRY_RUN: '${{ github.event.inputs.dry_run }}'
-          RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
+          RELEASE_TAG: 'v${{ steps.vars.outputs.VERSION }}'
         run: |-
           git add package.json package-lock.json packages/*/package.json
           git commit -m "chore(release): ${RELEASE_TAG}"
@@ -179,12 +194,12 @@ jobs:
           npm publish \
             --dry-run="${DRY_RUN}" \
             --workspace="@google/gemini-cli-core" \
-            --tag="preview"
+            --tag="${{ steps.vars.outputs.NPM_TAG }}"
 
       - name: 'Install latest core package'
         if: github.event.inputs.dry_run == 'false'
         run: |-
-          npm install "@google/gemini-cli-core@${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}" \
+          npm install "@google/gemini-cli-core@${{ steps.vars.outputs.VERSION }}" \
           --workspace="@google/gemini-cli" \
           --save-exact
 
@@ -196,122 +211,15 @@ jobs:
           npm publish \
             --dry-run="${DRY_RUN}" \
             --workspace="@google/gemini-cli" \
-            --tag="preview"
+            --tag="${{ steps.vars.outputs.NPM_TAG }}"
 
       - name: 'Create GitHub Release and Tag'
         if: github.event.inputs.dry_run == 'false'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_BRANCH: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
-          RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
-          PREVIOUS_TAG: '${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}'
-        run: |-
-          gh release create "${RELEASE_TAG}" \
-            --target "${RELEASE_BRANCH}" \
-            --title "Release ${RELEASE_TAG}" \
-            --notes-start-tag "$PREVIOUS_TAG" \
-            --generate-notes
-
-  promote-stable:
-    name: Promote Release to Stable
-    needs: calculate-versions
-    if: github.event.inputs.release_type == 'stable'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'write'
-      packages: 'write'
-    steps:
-      - name: 'Checkout correct SHA'
-        uses: 'actions/checkout@v4'
-        with:
-          ref: ${{ needs.calculate-versions.outputs.STABLE_SHA }}
-
-      - name: 'Setup Node.js'
-        uses: 'actions/setup-node@v4'
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
-      - name: 'Install Dependencies'
-        run: npm ci
-
-      - name: 'Configure Git User'
-        run: |-
-          git config user.name "gemini-cli-robot"
-          git config user.email "gemini-cli-robot@google.com"
-
-      - name: 'Create and switch to a release branch'
-        id: 'release_branch'
-        run: |
-          BRANCH_NAME="release/v${{ needs.calculate-versions.outputs.STABLE_VERSION }}"
-          git switch -c "${BRANCH_NAME}"
-          echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
-
-      - name: 'Update package versions'
-        run: |-
-          npm run release:version "${{ needs.calculate-versions.outputs.STABLE_VERSION }}"
-
-      - name: 'Commit and Conditionally Push package versions'
-        env:
-          BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
-          DRY_RUN: '${{ github.event.inputs.dry_run }}'
-          RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
-        run: |-
-          git add package.json package-lock.json packages/*/package.json
-          git commit -m "chore(release): ${RELEASE_TAG}"
-          if [[ "${DRY_RUN}" == "false" ]]; then
-            echo "Pushing release branch to remote..."
-            git push --set-upstream origin "${BRANCH_NAME}" --follow-tags
-          else
-            echo "Dry run enabled. Skipping push."
-          fi
-
-      - name: 'Build and Prepare Packages'
-        run: |-
-          npm run build:packages
-          npm run prepare:package
-
-      - name: 'Configure npm for publishing'
-        uses: 'actions/setup-node@v4'
-        with:
-          node-version-file: '.nvmrc'
-          registry-url: 'https://wombat-dressing-room.appspot.com'
-          scope: '@google'
-
-      - name: 'Publish @google/gemini-cli-core'
-        env:
-          DRY_RUN: '${{ github.event.inputs.dry_run }}'
-          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CORE }}'
-        run: |-
-          npm publish \
-            --dry-run="${DRY_RUN}" \
-            --workspace="@google/gemini-cli-core" \
-            --tag="latest"
-
-      - name: 'Install latest core package'
-        if: github.event.inputs.dry_run == 'false'
-        run: |-
-          npm install "@google/gemini-cli-core@${{ needs.calculate-versions.outputs.STABLE_VERSION }}" \
-          --workspace="@google/gemini-cli" \
-          --save-exact
-
-      - name: 'Publish @google/gemini-cli'
-        env:
-          DRY_RUN: '${{ github.event.inputs.dry_run }}'
-          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
-        run: |-
-          npm publish \
-            --dry-run="${DRY_RUN}" \
-            --workspace="@google/gemini-cli" \
-            --tag="latest"
-
-      - name: 'Create GitHub Release and Tag'
-        if: github.event.inputs.dry_run == 'false'
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          RELEASE_BRANCH: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
-          RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
-          PREVIOUS_TAG: '${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}'
+          RELEASE_TAG: 'v${{ steps.vars.outputs.VERSION }}'
+          PREVIOUS_TAG: '${{ steps.vars.outputs.PREVIOUS_TAG }}'
         run: |-
           gh release create "${RELEASE_TAG}" \
             --target "${RELEASE_BRANCH}" \
