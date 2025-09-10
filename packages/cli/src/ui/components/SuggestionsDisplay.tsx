@@ -80,10 +80,7 @@ export function SuggestionsDisplay({
         );
 
         return (
-          <Box
-            key={`${suggestion.value}-${originalIndex}`}
-            flexDirection="row"
-          >
+          <Box key={`${suggestion.value}-${originalIndex}`} flexDirection="row">
             <Box width={commandColumnWidth} flexShrink={0}>
               <Box>
                 {labelElement}
