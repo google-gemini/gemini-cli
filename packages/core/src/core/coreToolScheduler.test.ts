@@ -1505,11 +1505,32 @@ describe('truncateAndSaveToFile', () => {
     expect(result.content).not.toContain('... [MORE CONTENT TRUNCATED] ...'); // Should not have middle section marker
   });
 
-  // Note: Test for showing all lines when content length is within truncateLines limit 
-  // has been removed as it's impossible to create content that exceeds the byte threshold
-  // but doesn't get wrapped into more lines than truncateLines. The wrapping logic
-  // ensures that long lines get broken into 120-char chunks, making it difficult to
-  // create a realistic test scenario for this edge case.
+  it('should handle content that gets wrapped and then exceeds truncateLines limit', async () => {
+    // Create a single line that exceeds the byte threshold and will be wrapped into more lines than truncateLines
+    // Original: 1 line, 130,000 chars (> 40,000 threshold)
+    // After wrapping: ceil(130000 / 120) = 1084 lines (> 1000 truncateLines)
+    const singleLongLine = `Line 1: ${'x'.repeat(129980)}`; // Total ~130,000 chars
+    const content = singleLongLine;
+    const callId = 'test-wrap-and-truncate';
+    const projectTempDir = '/tmp';
+    const truncateLines = 1000;
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      truncateLines,
+    );
+
+    // Should show truncation message since wrapped lines (1084) > truncateLines (1000)
+    expect(result.content).toContain('Tool output was too large and has been truncated');
+    expect(result.content).toContain('Truncated part of the output');
+    expect(result.content).toContain('showing 1000 lines');
+    expect(result.content).toContain('Line 1: xxx'); // Should contain beginning of the long line
+  });
 
   it('should handle truncateLines = 0 correctly', async () => {
     // Create content that exceeds the threshold (40,000 bytes)
