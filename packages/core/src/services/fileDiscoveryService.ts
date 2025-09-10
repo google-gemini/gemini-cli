@@ -24,13 +24,7 @@ export class FileDiscoveryService {
   constructor(projectRoot: string) {
     this.projectRoot = path.resolve(projectRoot);
     if (isGitRepository(this.projectRoot)) {
-      const parser = new GitIgnoreParser(this.projectRoot);
-      try {
-        parser.loadGitRepoPatterns();
-      } catch (_error) {
-        // ignore file not found
-      }
-      this.gitIgnoreFilter = parser;
+      this.gitIgnoreFilter = new GitIgnoreParser(this.projectRoot);
     }
     this.geminiIgnoreFilter = new GeminiIgnoreParser(this.projectRoot);
   }
