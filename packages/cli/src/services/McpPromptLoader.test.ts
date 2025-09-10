@@ -233,6 +233,8 @@ describe('McpPromptLoader', () => {
         const context = {
           invocation: {
             raw: '/find ',
+            name: 'find',
+            args: ''
           },
         } as CommandContext;
         const suggestions = await completion(context, '');
@@ -254,6 +256,8 @@ describe('McpPromptLoader', () => {
         const context = {
           invocation: {
             raw: '/find --name="test-name" --age="6" ',
+            name: 'find',
+            args: '--name="test-name" --age="6"'
           },
         } as CommandContext;
         const suggestions = await completion(context, '');

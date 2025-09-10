@@ -149,23 +149,19 @@ export class McpPromptLoader implements ICommandLoader {
             if (!prompt || !prompt.arguments || !invocation) {
               return [];
             }
-            const emptyFlagArguments = prompt.arguments.map(
-              (argument) => `--${argument.name}="`,
-            );
-
-            let promptInputs = this.parseArgs(invocation.args, prompt.arguments);
+            const indexOfFirstSpace = invocation.raw.indexOf(' ') + 1;
+            let promptInputs = indexOfFirstSpace === 0 ? {} : this.parseArgs(invocation.raw.substring(indexOfFirstSpace), prompt.arguments);
             if (promptInputs instanceof Error) {
               promptInputs = {};
             }
 
-            const unusedArguments = emptyFlagArguments.filter(
-              (flagArgument) => {
-                const regex = new RegExp(`${flagArgument}([^"]*)"`);
-                return !regex.test(invocation.raw);
-              },
-            );
+            const providedArgNames = Object.keys(promptInputs);
+            const unusedArguments =
+              prompt.arguments
+                .filter((arg) => !(providedArgNames.includes(arg.name) && promptInputs[arg.name]))
+                .map((argument) => `--${argument.name}="`) || [];
 
-            const exactlyMatchingArgumentAtTheEnd = unusedArguments.filter(
+            const exactlyMatchingArgumentAtTheEnd = prompt.arguments.map((argument) => `--${argument.name}="`).filter(
               (flagArgument) => {
                 const regex = new RegExp(`${flagArgument}[^"]*$`);
                 return regex.test(invocation.raw);
