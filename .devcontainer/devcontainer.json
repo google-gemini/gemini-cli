@@ -1,0 +1,44 @@
+{
+	// A name for the dev container, which will be shown in VS Code.
+	"name": "Gemini CLI Dev Container",
+
+	// Use a foundational Ubuntu image as the base.
+	// This provides a clean starting point to avoid potential base image issues.
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+
+	// "Features" are the recommended way to add software and tools to your container.
+	"features": {
+		// Add Node.js v20 to the base Ubuntu image.
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "20.19.0"
+		},
+		// Installs common utilities like jq, curl, git, etc.
+		"ghcr.io/devcontainers/features/common-utils:2": {
+			"installZsh": "false",
+			"upgradePackages": "true"
+		},
+		// Installs the GitHub CLI (gh).
+		"ghcr.io/devcontainers/features/github-cli:1": {},
+		
+		// Installs Docker and the Docker CLI inside your dev container.
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {
+			"version": "latest"
+		}
+	},
+
+	// --- POST CREATE COMMAND ---
+	// This now runs after all the features have been installed.
+	// It's focused only on project-specific setup.
+	"postCreateCommand": "npm install && npm run build",
+
+	// VS Code extensions to install inside the container.
+	"customizations": {
+		"vscode": {
+			"extensions": []
+		}
+	},
+
+	// The user to run as inside the container. The base:ubuntu image creates 'vscode'.
+	"remoteUser": "vscode"
+}
+
