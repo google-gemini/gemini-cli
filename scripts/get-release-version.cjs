@@ -5,7 +5,7 @@ const path = require('path');
 
 function getArgs() {
   const args = {};
-  process.argv.slice(2).forEach(arg => {
+  process.argv.slice(2).forEach((arg) => {
     if (arg.startsWith('--')) {
       const [key, value] = arg.substring(2).split('=');
       args[key] = value === undefined ? true : value;
@@ -37,18 +37,25 @@ function getVersion(options = {}) {
     const [major, minor] = packageJson.version.split('.');
     const nextMinor = parseInt(minor) + 1;
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const gitShortHash = execSync('git rev-parse --short HEAD').toString().trim();
+    const gitShortHash = execSync('git rev-parse --short HEAD')
+      .toString()
+      .trim();
     releaseVersion = `${major}.${nextMinor}.0-nightly.${date}.${gitShortHash}`;
     npmTag = 'nightly';
     previousReleaseTag = getLatestTag('contains("nightly")');
   } else if (type === 'stable') {
     const latestPreviewTag = getLatestTag('contains("preview")');
-    releaseVersion = latestPreviewTag.replace(/-preview.*/, '').replace(/^v/, '');
+    releaseVersion = latestPreviewTag
+      .replace(/-preview.*/, '')
+      .replace(/^v/, '');
     npmTag = 'latest';
-    previousReleaseTag = getLatestTag('(contains("nightly") or contains("preview")) | not');
+    previousReleaseTag = getLatestTag(
+      '(contains("nightly") or contains("preview")) | not',
+    );
   } else if (type === 'preview') {
     const latestNightlyTag = getLatestTag('contains("nightly")');
-    releaseVersion = latestNightlyTag.replace(/-nightly.*/, '').replace(/^v/, '') + '-preview';
+    releaseVersion =
+      latestNightlyTag.replace(/-nightly.*/, '').replace(/^v/, '') + '-preview';
     npmTag = 'preview';
     previousReleaseTag = getLatestTag('contains("preview")');
   }

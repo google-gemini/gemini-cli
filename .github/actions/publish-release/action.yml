@@ -32,7 +32,7 @@ inputs:
     default: '.'
 
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
     - name: 'Build and Prepare Packages'
       working-directory: ${{ inputs.working-directory }}
