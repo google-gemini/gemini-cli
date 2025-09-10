@@ -1487,7 +1487,7 @@ describe('truncateAndSaveToFile', () => {
     const headCount = Math.ceil(contentLinesToShow / 2);
     const tailCount = contentLinesToShow - headCount;
     const headLines = lines.slice(0, headCount);
-    const tailLines = lines.slice(-tailCount);
+    const tailLines = tailCount > 0 ? lines.slice(-tailCount) : [];
 
     // Build expected truncated content using simple head/tail view (corrected logic)
     const truncatedLines: string[] = [];
