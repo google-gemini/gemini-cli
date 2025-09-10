@@ -110,7 +110,7 @@ jobs:
       - name: 'Checkout workflow files'
         uses: 'actions/checkout@v4'
         with:
-          ref: 'mk/revertable-release-fix'
+          ref: 'mk/update-version-process'
 
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@v4'
