@@ -42,48 +42,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -e
-          # Find latest tags
-          LATEST_PREVIEW_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("preview"))] | .[0].tagName')
-          LATEST_STABLE_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | (contains("nightly") or contains("preview")) | not)] | .[0].tagName')
-          LATEST_NIGHTLY_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("nightly"))] | .[0].tagName')
-
-          if [ -z "$LATEST_PREVIEW_TAG" ]; then
-            echo "Error: Could not find latest preview tag."
-            exit 1
-          fi
-          if [ -z "$LATEST_STABLE_TAG" ]; then
-            echo "Error: Could not find latest stable tag."
-            exit 1
-          fi
-          if [ -z "$LATEST_NIGHTLY_TAG" ]; then
-            echo "Error: Could not find latest nightly tag."
-            exit 1
-          fi
-
-          # Get SHAs for tags
-          PREVIEW_SHA=$(git rev-parse "${LATEST_PREVIEW_TAG}^{commit}")
-          NIGHTLY_SHA=$(git rev-parse "${LATEST_NIGHTLY_TAG}^{commit}")
-
-          # Calculate new version numbers
-          STABLE_VERSION=$(echo "${LATEST_PREVIEW_TAG}" | sed 's/-preview.*//' | sed 's/^v//')
-          PREVIEW_VERSION=$(echo "${LATEST_NIGHTLY_TAG}" | sed 's/-nightly.*//' | sed 's/^v//')-preview
-          
-          # Next nightly version is a minor bump on the current package.json version
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          MAJOR=$(echo $CURRENT_VERSION | cut -d. -f1)
-          MINOR=$(echo $CURRENT_VERSION | cut -d. -f2)
-          NEXT_MINOR=$((MINOR + 1))
-          NEXT_NIGHTLY_VERSION="${MAJOR}.${NEXT_MINOR}.0-nightly"
-
-          # Set outputs
-          echo "STABLE_VERSION=${STABLE_VERSION}" >> $GITHUB_OUTPUT
-          echo "STABLE_SHA=${PREVIEW_SHA}" >> $GITHUB_OUTPUT
-          echo "PREVIOUS_STABLE_TAG=${LATEST_STABLE_TAG}" >> $GITHUB_OUTPUT
-          echo "PREVIEW_VERSION=${PREVIEW_VERSION}" >> $GITHUB_OUTPUT
-          echo "PREVIEW_SHA=${NIGHTLY_SHA}" >> $GITHUB_OUTPUT
-          echo "PREVIOUS_PREVIEW_TAG=${LATEST_PREVIEW_TAG}" >> $GITHUB_OUTPUT
-          echo "NEXT_NIGHTLY_VERSION=${NEXT_NIGHTLY_VERSION}" >> $GITHUB_OUTPUT
+          STABLE_JSON=$(node scripts/get-release-version.js --type=stable)
+          PREVIEW_JSON=$(node scripts/get-release-version.js --type=preview)
+          NIGHTLY_JSON=$(node scripts/get-release-version.js --type=nightly)
+          echo "STABLE_VERSION=$(echo "${STABLE_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
+          echo "STABLE_SHA=$(git rev-parse "$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
+          echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
+          echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
+          echo "PREVIEW_SHA=$(git rev-parse "$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
+          echo "PREVIOUS_PREVIEW_TAG=$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
+          echo "NEXT_NIGHTLY_VERSION=$(echo "${NIGHTLY_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
 
   promote:
     name: Promote to ${{ matrix.channel }}

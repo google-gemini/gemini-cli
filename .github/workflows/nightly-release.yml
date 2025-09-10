@@ -29,15 +29,12 @@ jobs:
       - name: 'Install Dependencies'
         run: npm ci
 
-      - name: 'Build get-release-version script'
-        run: npm run build:get-release-version
-
       - name: 'Get Nightly Version'
         id: 'nightly_version'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION_JSON=$(node dist/get-release-version.js --type nightly)
+          VERSION_JSON=$(node scripts/get-release-version.js --type=nightly)
           echo "RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)" >> "${GITHUB_OUTPUT}"
           echo "RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
