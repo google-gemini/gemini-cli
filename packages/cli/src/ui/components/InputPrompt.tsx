@@ -712,8 +712,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const { inlineGhost, additionalLines } = getGhostTextLines();
 
-  const showAutoAcceptStyling = !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
-  const showYoloStyling = !shellModeActive && approvalMode === ApprovalMode.YOLO;
+  const showAutoAcceptStyling =
+    !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
+  const showYoloStyling =
+    !shellModeActive && approvalMode === ApprovalMode.YOLO;
 
   return (
     <>
