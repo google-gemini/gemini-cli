@@ -30,6 +30,7 @@ import {
   EVENT_FLASH_FALLBACK,
   EVENT_MALFORMED_JSON_RESPONSE,
   EVENT_FILE_OPERATION,
+  EVENT_RIPGREP_FALLBACK,
 } from './constants.js';
 import {
   logApiRequest,
@@ -41,6 +42,7 @@ import {
   logChatCompression,
   logMalformedJsonResponse,
   logFileOperation,
+  logRipgrepFallback,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -50,6 +52,7 @@ import {
   ToolCallEvent,
   UserPromptEvent,
   FlashFallbackEvent,
+  RipgrepFallbackEvent,
   MalformedJsonResponseEvent,
   makeChatCompressionEvent,
   FileOperationEvent,
@@ -453,6 +456,59 @@ describe('loggers', () => {
     });
   });
 
+  describe('logRipgrepFallback', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logRipgrepFallbackEvent');
+    });
+
+    it('should log ripgrep fallback event', () => {
+      const event = new RipgrepFallbackEvent();
+
+      logRipgrepFallback(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logRipgrepFallbackEvent,
+      ).toHaveBeenCalled();
+
+      const emittedEvent = mockLogger.emit.mock.calls[0][0];
+      expect(emittedEvent.body).toBe('Switching to grep as fallback.');
+      expect(emittedEvent.attributes).toEqual(
+        expect.objectContaining({
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_RIPGREP_FALLBACK,
+          error: undefined,
+        }),
+      );
+    });
+
+    it('should log ripgrep fallback event with an error', () => {
+      const event = new RipgrepFallbackEvent('rg not found');
+
+      logRipgrepFallback(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logRipgrepFallbackEvent,
+      ).toHaveBeenCalled();
+
+      const emittedEvent = mockLogger.emit.mock.calls[0][0];
+      expect(emittedEvent.body).toBe('Switching to grep as fallback.');
+      expect(emittedEvent.attributes).toEqual(
+        expect.objectContaining({
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_RIPGREP_FALLBACK,
+          error: 'rg not found',
+        }),
+      );
+    });
+  });
+
   describe('logToolCall', () => {
     const cfg1 = {
       getSessionId: () => 'test-session-id',
@@ -524,7 +580,22 @@ describe('loggers', () => {
         response: {
           callId: 'test-call-id',
           responseParts: [{ text: 'test-response' }],
-          resultDisplay: undefined,
+          resultDisplay: {
+            fileDiff: 'diff',
+            fileName: 'file.txt',
+            originalContent: 'old content',
+            newContent: 'new content',
+            diffStat: {
+              model_added_lines: 1,
+              model_removed_lines: 2,
+              model_added_chars: 3,
+              model_removed_chars: 4,
+              user_added_lines: 5,
+              user_removed_lines: 6,
+              user_added_chars: 7,
+              user_removed_chars: 8,
+            },
+          },
           error: undefined,
           errorType: undefined,
         },
@@ -560,7 +631,16 @@ describe('loggers', () => {
           tool_type: 'native',
           error: undefined,
           error_type: undefined,
-          metadata: undefined,
+          metadata: {
+            model_added_lines: 1,
+            model_removed_lines: 2,
+            model_added_chars: 3,
+            model_removed_chars: 4,
+            user_added_lines: 5,
+            user_removed_lines: 6,
+            user_added_chars: 7,
+            user_removed_chars: 8,
+          },
         },
       });
 
