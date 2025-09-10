@@ -130,7 +130,7 @@ jobs:
         run: |
           gh pr create \
             --title "chore(release): Promote ${{ steps.versions.outputs.stable_release_tag }}" \
-            --body "Automated PR to promote ${{ steps.versions.outputs.stable_release_tag }} to stable." \
+            --body "Automated PR to promote ${{ steps.versions.outputs.stable_release_tag }} to stable."
             --base "${{ github.event.inputs.ref }}" \
             --head "${BRANCH_NAME}"
 
