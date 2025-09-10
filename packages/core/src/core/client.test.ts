@@ -538,9 +538,11 @@ describe('Gemini Client (client.ts)', () => {
     const mockGetHistory = vi.fn();
 
     beforeEach(() => {
-      vi.mock('./tokenLimits', () => ({
-        tokenLimit: vi.fn(),
+      const tokenLimits = vi.hoisted(() => ({
+        tokenLimit: vi.fn(() => 1000),
+        getOutputTokenLimit: vi.fn(() => 8192),
       }));
+      vi.mock('./tokenLimits', () => tokenLimits);
 
       client['chat'] = {
         getHistory: mockGetHistory,
@@ -876,6 +878,18 @@ describe('Gemini Client (client.ts)', () => {
         setHistory: vi.fn(),
         sendMessage: mockSendMessage,
       } as unknown as GeminiChat;
+
+      const mockGenerator: Partial<ContentGenerator> = {
+        countTokens: mockCountTokens,
+      };
+
+      // mock the model has been changed between calls of `countTokens`
+      const firstCurrentModel = initialModel + '-changed-1';
+      const secondCurrentModel = initialModel + '-changed-2';
+      vi.spyOn(client['config'], 'getModel')
+        .mockReturnValueOnce(firstCurrentModel)
+        .mockReturnValueOnce(secondCurrentModel)
+        .mockReturnValueOnce(secondCurrentModel);
 
       client['chat'] = mockChat;
       client['startChat'] = vi.fn().mockResolvedValue(mockChat);

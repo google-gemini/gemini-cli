@@ -30,3 +30,17 @@ export function tokenLimit(model: Model): TokenCount {
       return DEFAULT_TOKEN_LIMIT;
   }
 }
+
+export function getOutputTokenLimit(model: Model): TokenCount {
+  // Based on https://ai.google.dev/models/gemini
+  switch (model) {
+    case 'gemini-2.5-pro':
+    case 'gemini-2.5-flash':
+    case 'gemini-2.5-flash-lite':
+      return 65536;
+    case 'gemini-1.5-pro':
+    case 'gemini-1.5-flash':
+    default:
+      return 8192;
+  }
+}
