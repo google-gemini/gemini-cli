@@ -1273,10 +1273,15 @@ describe('truncateAndSaveToFile', () => {
     const middleStart = Math.floor(lines.length / 2) - Math.floor(middle / 2);
     const middleLines = lines.slice(middleStart, middleStart + middle);
     
-    const expectedTruncated = 
-      beginning.join('\n') + '\n... [CONTENT TRUNCATED - ' + (lines.length - TRUNCATE_LINES) + ' lines hidden] ...\n' +
-      middleLines.join('\n') + '\n... [MORE CONTENT TRUNCATED] ...\n' +
-      end.join('\n');
+    // Build expected truncated content using array to preserve empty lines
+    const truncatedLines: string[] = [];
+    truncatedLines.push(...beginning);
+    truncatedLines.push('... [CONTENT TRUNCATED - ' + (lines.length - TRUNCATE_LINES) + ' lines hidden] ...');
+    truncatedLines.push(...middleLines);
+    truncatedLines.push('... [MORE CONTENT TRUNCATED] ...');
+    truncatedLines.push(...end);
+    
+    const expectedTruncated = truncatedLines.join('\n');
 
     expect(result.content).toContain(
       'Tool output was too large and has been truncated',
@@ -1328,10 +1333,15 @@ describe('truncateAndSaveToFile', () => {
     const middleStart = Math.floor(wrappedLines.length / 2) - Math.floor(middle / 2);
     const middleLines = wrappedLines.slice(middleStart, middleStart + middle);
     
-    const expectedTruncated = 
-      beginning.join('\n') + '\n... [CONTENT TRUNCATED - ' + (wrappedLines.length - TRUNCATE_LINES) + ' lines hidden] ...\n' +
-      middleLines.join('\n') + '\n... [MORE CONTENT TRUNCATED] ...\n' +
-      end.join('\n');
+    // Build expected truncated content using array to preserve empty lines
+    const truncatedLines: string[] = [];
+    truncatedLines.push(...beginning);
+    truncatedLines.push('... [CONTENT TRUNCATED - ' + (wrappedLines.length - TRUNCATE_LINES) + ' lines hidden] ...');
+    truncatedLines.push(...middleLines);
+    truncatedLines.push('... [MORE CONTENT TRUNCATED] ...');
+    truncatedLines.push(...end);
+    
+    const expectedTruncated = truncatedLines.join('\n');
 
     expect(result.content).toContain(
       'Tool output was too large and has been truncated',

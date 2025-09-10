@@ -287,20 +287,26 @@ export async function truncateAndSaveToFile(
   const beginning = lines.slice(0, head);
   const end = lines.slice(-tail);
   
-  let truncatedContent = beginning.join('\n');
-  
+  // Build truncated content using array to preserve empty lines
+  const truncatedLines: string[] = [];
+  truncatedLines.push(...beginning);
+
+  const hiddenLines = lines.length - truncateLines;
+
   if (middle > 0) {
     // Add some middle lines for better context
     const middleStart = Math.floor(lines.length / 2) - Math.floor(middle / 2);
     const middleLines = lines.slice(middleStart, middleStart + middle);
-    truncatedContent += '\n... [CONTENT TRUNCATED - ' + (lines.length - truncateLines) + ' lines hidden] ...\n';
-    truncatedContent += middleLines.join('\n');
-    truncatedContent += '\n... [MORE CONTENT TRUNCATED] ...\n';
+    truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
+    truncatedLines.push(...middleLines);
+    truncatedLines.push('... [MORE CONTENT TRUNCATED] ...');
   } else {
-    truncatedContent += '\n... [CONTENT TRUNCATED - ' + (lines.length - truncateLines) + ' lines hidden] ...\n';
+    truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
   }
-  
-  truncatedContent += end.join('\n');
+
+  truncatedLines.push(...end);
+
+  const truncatedContent = truncatedLines.join('\n');
 
   // Sanitize callId to prevent path traversal.
   const safeFileName = `${path.basename(callId)}.output`;
