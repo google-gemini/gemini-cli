@@ -18,6 +18,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
   private projectRoot: string;
   private ig: Ignore = ignore();
   private patterns: string[] = [];
+  private readonly maxScannedDirs = 200;
 
   constructor(projectRoot: string) {
     this.projectRoot = path.resolve(projectRoot);
@@ -33,34 +34,44 @@ export class GitIgnoreParser implements GitIgnoreFilter {
     this.findAndLoadGitignoreFiles(this.projectRoot);
   }
 
-  private findAndLoadGitignoreFiles(dir: string): void {
-    const relativeDir = path.relative(this.projectRoot, dir);
+  private findAndLoadGitignoreFiles(startDir: string): void {
+    const queue: string[] = [startDir];
+    let scannedDirs = 0;
+    let queueHead = 0;
 
-    // For sub-directories, check if they are ignored before proceeding.
-    // The root directory (relativeDir === '') should not be checked.
-    if (relativeDir && this.isIgnored(relativeDir)) {
-      return;
-    }
+    while (queueHead < queue.length && scannedDirs < this.maxScannedDirs) {
+      const dir = queue[queueHead];
+      queueHead++;
+      scannedDirs++;
 
-    // Load patterns from .gitignore in the current directory
-    const gitignorePath = path.join(dir, '.gitignore');
-    if (fs.existsSync(gitignorePath)) {
-      this.loadPatterns(path.relative(this.projectRoot, gitignorePath));
-    }
+      const relativeDir = path.relative(this.projectRoot, dir);
 
-    // Recurse into subdirectories
-    try {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.name === '.git') {
-          continue;
-        }
-        if (entry.isDirectory()) {
-          this.findAndLoadGitignoreFiles(path.join(dir, entry.name));
-        }
+      // For sub-directories, check if they are ignored before proceeding.
+      // The root directory (relativeDir === '') should not be checked.
+      if (relativeDir && this.isIgnored(relativeDir)) {
+        continue;
       }
-    } catch (_error) {
-      // ignore readdir errors
+
+      // Load patterns from .gitignore in the current directory
+      const gitignorePath = path.join(dir, '.gitignore');
+      if (fs.existsSync(gitignorePath)) {
+        this.loadPatterns(path.relative(this.projectRoot, gitignorePath));
+      }
+
+      // Recurse into subdirectories
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.name === '.git') {
+            continue;
+          }
+          if (entry.isDirectory()) {
+            queue.push(path.join(dir, entry.name));
+          }
+        }
+      } catch (_error) {
+        // ignore readdir errors
+      }
     }
   }
 
