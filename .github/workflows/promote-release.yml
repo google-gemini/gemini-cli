@@ -108,7 +108,7 @@ jobs:
           git switch -c "${{ BRANCH_NAME }}"
           echo "BRANCH_NAME=${{ BRANCH_NAME }}" >> "${GITHUB_OUTPUT}"
 
-      - name: Update package versions to stable
+      - name: Update package versions
         if: ${{ github.event.inputs.dry_run == 'false' }}
         run: |
           npm run release:version ${{ steps.versions.outputs.stable_release_version }}
@@ -152,14 +152,14 @@ jobs:
           registry-url: 'https://wombat-dressing-room.appspot.com'
           scope: '@google'
 
-      - name: Publish @google/gemini-cli-core to stable
+      - name: Publish @google/gemini-cli-core
         if: ${{ github.event.inputs.dry_run == 'false' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CORE }}
         run: |
           npm publish \
             --workspace="@google/gemini-cli-core" \
-            --tag="latest"
+            --tag="${{ steps.versions.outputs.stable_npm_tag }}"
 
       - name: Install latest core package
         if: ${{ github.event.inputs.dry_run == 'false' }}
@@ -168,14 +168,14 @@ jobs:
           --workspace="@google/gemini-cli" \
           --save-exact
 
-      - name: Publish @google/gemini-cli to stable
+      - name: Publish @google/gemini-cli
         if: ${{ github.event.inputs.dry_run == 'false' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CLI }}
         run: |
           npm publish \
             --workspace="@google/gemini-cli" \
-            --tag="latest"
+            --tag="${{ steps.versions.outputs.stable_npm_tag }}"
 
       - name: Create Stable GitHub Release and Tag
         if: ${{ github.event.inputs.dry_run == 'false' }}
@@ -188,36 +188,6 @@ jobs:
             --title "Release ${{ steps.versions.outputs.stable_release_tag }}" \
             --notes-start-tag "${{ steps.versions.outputs.stable_previous_tag }}" \
             --generate-notes
-
-      - name: Update package versions to preview
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        run: |
-          npm run release:version ${{ steps.versions.outputs.next_preview_version }}
-
-      - name: Publish @google/gemini-cli-core to preview
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CORE }}
-        run: |
-          npm publish \
-            --workspace="@google/gemini-cli-core" \
-            --tag="preview"
-
-      - name: Install latest core package for preview
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        run: |
-          npm install "@google/gemini-cli-core@${{ steps.versions.outputs.next_preview_version }}" \
-          --workspace="@google/gemini-cli" \
-          --save-exact
-
-      - name: Publish @google/gemini-cli to preview
-        if: ${{ github.event.inputs.dry_run == 'false' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CLI }}
-        run: |
-          npm publish \
-            --workspace="@google/gemini-cli" \
-            --tag="preview"
 
       - name: Create Next Preview GitHub Release and Tag
         if: ${{ github.event.inputs.dry_run == 'false' }}
