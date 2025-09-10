@@ -42,10 +42,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -e
           # Find latest tags
           LATEST_PREVIEW_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("preview"))] | .[0].tagName')
           LATEST_STABLE_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | (contains("nightly") or contains("preview")) | not)] | .[0].tagName')
           LATEST_NIGHTLY_TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | contains("nightly"))] | .[0].tagName')
+
+          if [ -z "$LATEST_PREVIEW_TAG" ]; then
+            echo "Error: Could not find latest preview tag."
+            exit 1
+          fi
+          if [ -z "$LATEST_STABLE_TAG" ]; then
+            echo "Error: Could not find latest stable tag."
+            exit 1
+          fi
+          if [ -z "$LATEST_NIGHTLY_TAG" ]; then
+            echo "Error: Could not find latest nightly tag."
+            exit 1
+          fi
 
           # Get SHAs for tags
           PREVIEW_SHA=$(git rev-parse "${LATEST_PREVIEW_TAG}^{commit}")
