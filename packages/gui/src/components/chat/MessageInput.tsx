@@ -208,7 +208,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
             const toolResponseMessage: ChatMessage = {
               id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-tool-response`,
               role: 'tool',
-              content: event.response?.content || `Tool ${event.toolName} completed`,
+              content: event.response?.content || (event.response ? JSON.stringify(event.response, null, 2) : `Tool ${event.toolName} completed`),
               timestamp: new Date()
             };
             

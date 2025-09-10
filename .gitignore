@@ -48,3 +48,9 @@ gha-creds-*.json
 packages/core/dotnet-processor/bin/
 packages/core/dotnet-processor/obj/
 packages/core/temp/
+
+# Python embedded environment - ignore installed packages
+packages/python-3.13.7/Lib/
+packages/python-3.13.7/Scripts/
+packages/python-3.13.7/__pycache__/
+packages/python-3.13.7/get-pip.py
