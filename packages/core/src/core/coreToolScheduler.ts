@@ -335,7 +335,7 @@ To read the complete output, use the ${ReadFileTool.Name} tool with the absolute
 - ${ReadFileTool.Name} tool with offset=0, limit=100 to see the first 100 lines
 - ${ReadFileTool.Name} tool with offset=N to skip N lines from the beginning
 - ${ReadFileTool.Name} tool with limit=M to read only M lines at a time
-The truncated output below shows the beginning, middle, and end of the content to provide better context.
+The truncated output below provides a preview of the content to provide better context.
 Use the file path above to read the complete output.
 Truncated part of the output (${lines.length} lines total, showing ${Math.min(lines.length, Math.max(0, truncateLines))} lines):
 ${truncatedContent}`,
