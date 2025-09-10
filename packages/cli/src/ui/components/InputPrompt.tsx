@@ -719,11 +719,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   let statusColor: string | undefined;
   if (shellModeActive) {
-    statusColor = theme.status.warning;
+    statusColor = theme.ui.symbol;
   } else if (showYoloStyling) {
     statusColor = theme.status.error;
   } else if (showAutoAcceptStyling) {
-    statusColor = theme.status.success;
+    statusColor = theme.status.warning;
   }
 
   return (
