@@ -62,6 +62,21 @@ If a critical bug that is already fixed on `main` needs to be patched on a `stab
 
 ### 1. Create the Patch Pull Request
 
+There are two ways to create a patch pull request:
+
+**Option A: From a GitHub Comment (Recommended)**
+
+On any pull request, a maintainer can add a comment with the following format:
+
+`/patch <channel> <commit_sha>`
+
+- **channel**: `stable` or `preview`
+- **commit_sha**: The full SHA of the commit on `main` to cherry-pick.
+
+Example: `/patch stable 12345abcdef...`
+
+**Option B: Manually Triggering the Workflow**
+
 Navigate to the **Actions** tab and run the **Create Patch PR** workflow.
 
 - **Commit**: The full SHA of the commit on `main` that you want to cherry-pick.

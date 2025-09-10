@@ -1,0 +1,36 @@
+name: 'Patch from Comment'
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  slash-command:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Slash Command Dispatch'
+        uses: peter-evans/slash-command-dispatch@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commands: patch
+          permission: write
+          issue-type: pull-request
+          static-args: |
+            commit=${{ github.event.comment.html_url }}
+      
+      - name: 'Dispatch Patch Workflow'
+        if: steps.slash-command-dispatch.outputs.dispatched == 'true'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const args = JSON.parse('${{ steps.slash-command-dispatch.outputs.command-arguments }}');
+            github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'create-patch-pr.yml',
+              ref: 'main',
+              inputs: {
+                commit: args.commit,
+                channel: args.channel
+              }
+            })
