@@ -12,7 +12,11 @@ import {
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 
-function ruleMatches(rule: PolicyRule, toolCall: FunctionCall): boolean {
+function ruleMatches(
+  rule: PolicyRule,
+  toolCall: FunctionCall,
+  stringifiedArgs: string | undefined,
+): boolean {
   // Check tool name if specified
   if (rule.toolName && toolCall.name !== rule.toolName) {
     return false;
@@ -25,8 +29,10 @@ function ruleMatches(rule: PolicyRule, toolCall: FunctionCall): boolean {
       return false;
     }
     // Use stable JSON stringification with sorted keys to ensure consistent matching
-    const argsString = stableStringify(toolCall.args);
-    if (!rule.argsPattern.test(argsString)) {
+    if (
+      stringifiedArgs === undefined ||
+      !rule.argsPattern.test(stringifiedArgs)
+    ) {
       return false;
     }
   }
@@ -51,9 +57,15 @@ export class PolicyEngine {
    * Check if a tool call is allowed based on the configured policies.
    */
   check(toolCall: FunctionCall): PolicyDecision {
+    let stringifiedArgs: string | undefined;
+    // Compute stringified args once before the loop
+    if (toolCall.args && this.rules.some((rule) => rule.argsPattern)) {
+      stringifiedArgs = stableStringify(toolCall.args);
+    }
+
     // Find the first matching rule (already sorted by priority)
     for (const rule of this.rules) {
-      if (ruleMatches(rule, toolCall)) {
+      if (ruleMatches(rule, toolCall, stringifiedArgs)) {
         return this.applyNonInteractiveMode(rule.decision);
       }
     }
