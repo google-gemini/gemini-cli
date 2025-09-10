@@ -63,7 +63,7 @@ export async function cleanupExpiredSessions(
     // Determine which sessions to delete
     const sessionsToDelete = await identifyExpiredSessions(
       sessionFiles,
-      retentionConfig
+      retentionConfig,
     );
 
     // Perform cleanup
@@ -105,7 +105,7 @@ export async function cleanupExpiredSessions(
  */
 async function identifyExpiredSessions(
   sessions: SessionInfo[],
-  retentionConfig: SessionRetentionSettings
+  retentionConfig: SessionRetentionSettings,
 ): Promise<SessionInfo[]> {
   const now = new Date();
   const expiredSessions: SessionInfo[] = [];
@@ -131,10 +131,11 @@ async function identifyExpiredSessions(
   );
 
   // Calculate how many deletable sessions to keep (accounting for the active session)
-  const hasActiveSession = sortedSessions.some(s => s.isCurrentSession);
-  const maxDeletableSessions = retentionConfig.maxCount && hasActiveSession
-    ? Math.max(0, retentionConfig.maxCount - 1)
-    : retentionConfig.maxCount;
+  const hasActiveSession = sortedSessions.some((s) => s.isCurrentSession);
+  const maxDeletableSessions =
+    retentionConfig.maxCount && hasActiveSession
+      ? Math.max(0, retentionConfig.maxCount - 1)
+      : retentionConfig.maxCount;
 
   for (let i = 0; i < deletableSessions.length; i++) {
     const session = deletableSessions[i];

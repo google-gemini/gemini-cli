@@ -141,7 +141,9 @@ export const useGeminiStream = (
               .getChat()
               .recordCompletedToolCalls(completedToolCallsFromScheduler);
           } catch (error) {
-            console.error('Error recording completed tool call information');
+            console.error(
+              `Error recording completed tool call information: ${error}`,
+            );
           }
 
           // Handle tool response submission immediately when tools complete

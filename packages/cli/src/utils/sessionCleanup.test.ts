@@ -426,51 +426,27 @@ describe('Session Cleanup', () => {
       const testSessions: SessionInfo[] = [
         {
           id: 'current',
-          file: 'session-current',
           fileName: 'session-current.json',
-          startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
-          messageCount: 1,
-          displayName: 'Current',
-          firstUserMessage: 'Current',
           isCurrentSession: true,
-          index: 1,
         },
         {
           id: 'session5d',
-          file: 'session-5d',
           fileName: 'session-5d.json',
-          startTime: fiveDaysAgo.toISOString(),
           lastUpdated: fiveDaysAgo.toISOString(),
-          messageCount: 1,
-          displayName: '5 days old',
-          firstUserMessage: '5 days',
           isCurrentSession: false,
-          index: 2,
         },
         {
           id: 'session8d',
-          file: 'session-8d',
           fileName: 'session-8d.json',
-          startTime: eightDaysAgo.toISOString(),
           lastUpdated: eightDaysAgo.toISOString(),
-          messageCount: 1,
-          displayName: '8 days old',
-          firstUserMessage: '8 days',
           isCurrentSession: false,
-          index: 3,
         },
         {
           id: 'session15d',
-          file: 'session-15d',
           fileName: 'session-15d.json',
-          startTime: fifteenDaysAgo.toISOString(),
           lastUpdated: fifteenDaysAgo.toISOString(),
-          messageCount: 1,
-          displayName: '15 days old',
-          firstUserMessage: '15 days',
           isCurrentSession: false,
-          index: 4,
         },
       ];
 
@@ -523,56 +499,34 @@ describe('Session Cleanup', () => {
       const now = new Date();
       const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const thirteenDaysAgo = new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000);
+      const thirteenDaysAgo = new Date(
+        now.getTime() - 13 * 24 * 60 * 60 * 1000,
+      );
 
       const testSessions: SessionInfo[] = [
         {
           id: 'current',
-          file: 'session-current',
           fileName: 'session-current.json',
-          startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
-          messageCount: 1,
-          displayName: 'Current',
-          firstUserMessage: 'Current',
           isCurrentSession: true,
-          index: 1,
         },
         {
           id: 'session1d',
-          file: 'session-1d',
           fileName: 'session-1d.json',
-          startTime: oneDayAgo.toISOString(),
           lastUpdated: oneDayAgo.toISOString(),
-          messageCount: 1,
-          displayName: '1 day old',
-          firstUserMessage: '1 day',
           isCurrentSession: false,
-          index: 2,
         },
         {
           id: 'session7d',
-          file: 'session-7d',
           fileName: 'session-7d.json',
-          startTime: sevenDaysAgo.toISOString(),
           lastUpdated: sevenDaysAgo.toISOString(),
-          messageCount: 1,
-          displayName: '7 days old',
-          firstUserMessage: '7 days',
           isCurrentSession: false,
-          index: 3,
         },
         {
           id: 'session13d',
-          file: 'session-13d',
           fileName: 'session-13d.json',
-          startTime: thirteenDaysAgo.toISOString(),
           lastUpdated: thirteenDaysAgo.toISOString(),
-          messageCount: 1,
-          displayName: '13 days old',
-          firstUserMessage: '13 days',
           isCurrentSession: false,
-          index: 4,
         },
       ];
 
@@ -618,15 +572,9 @@ describe('Session Cleanup', () => {
       const sessions: SessionInfo[] = [
         {
           id: 'current',
-          file: 'session-current',
           fileName: 'session-current.json',
-          startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
-          messageCount: 1,
-          displayName: 'Current (newest)',
-          firstUserMessage: 'Current',
           isCurrentSession: true,
-          index: 1,
         },
       ];
 
@@ -635,15 +583,9 @@ describe('Session Cleanup', () => {
         const daysAgo = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
         sessions.push({
           id: `session${i}`,
-          file: `session-${i}d`,
           fileName: `session-${i}d.json`,
-          startTime: daysAgo.toISOString(),
           lastUpdated: daysAgo.toISOString(),
-          messageCount: 1,
-          displayName: `${i} days old`,
-          firstUserMessage: `${i} days`,
           isCurrentSession: false,
-          index: i + 1,
         });
       }
 
@@ -714,63 +656,33 @@ describe('Session Cleanup', () => {
       const testSessions: SessionInfo[] = [
         {
           id: 'current',
-          file: 'session-current',
           fileName: 'session-current.json',
-          startTime: now.toISOString(),
           lastUpdated: now.toISOString(),
-          messageCount: 1,
-          displayName: 'Current',
-          firstUserMessage: 'Current',
           isCurrentSession: true,
-          index: 1,
         },
         {
           id: 'session3d',
-          file: 'session-3d',
           fileName: 'session-3d.json',
-          startTime: threeDaysAgo.toISOString(),
           lastUpdated: threeDaysAgo.toISOString(),
-          messageCount: 1,
-          displayName: '3 days old',
-          firstUserMessage: '3 days',
           isCurrentSession: false,
-          index: 2,
         },
         {
           id: 'session5d',
-          file: 'session-5d',
           fileName: 'session-5d.json',
-          startTime: fiveDaysAgo.toISOString(),
           lastUpdated: fiveDaysAgo.toISOString(),
-          messageCount: 1,
-          displayName: '5 days old',
-          firstUserMessage: '5 days',
           isCurrentSession: false,
-          index: 3,
         },
         {
           id: 'session7d',
-          file: 'session-7d',
           fileName: 'session-7d.json',
-          startTime: sevenDaysAgo.toISOString(),
           lastUpdated: sevenDaysAgo.toISOString(),
-          messageCount: 1,
-          displayName: '7 days old',
-          firstUserMessage: '7 days',
           isCurrentSession: false,
-          index: 4,
         },
         {
           id: 'session12d',
-          file: 'session-12d',
           fileName: 'session-12d.json',
-          startTime: twelveDaysAgo.toISOString(),
           lastUpdated: twelveDaysAgo.toISOString(),
-          messageCount: 1,
-          displayName: '12 days old',
-          firstUserMessage: '12 days',
           isCurrentSession: false,
-          index: 5,
         },
       ];
 
