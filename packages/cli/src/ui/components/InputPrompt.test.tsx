@@ -1788,4 +1788,36 @@ describe('InputPrompt', () => {
       unmount();
     });
   });
+
+  describe('snapshots', () => {
+    it('should render correctly in shell mode', async () => {
+      props.shellModeActive = true;
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+      expect(stdout.lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('should render correctly when accepting edits', async () => {
+      props.approvalMode = ApprovalMode.AUTO_EDIT;
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+      expect(stdout.lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('should render correctly in yolo mode', async () => {
+      props.approvalMode = ApprovalMode.YOLO;
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+      expect(stdout.lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+  });
 });
