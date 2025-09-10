@@ -3,7 +3,7 @@ description: 'Builds, prepares, and publishes the gemini-cli packages to npm and
 
 inputs:
   release-version:
-    description: 'The version to release (e.g., v0.1.11).'
+    description: 'The version to release (e.g., 0.1.11).'
     required: true
   npm-tag:
     description: 'The npm tag to publish with (e.g., latest, preview, nightly).'
