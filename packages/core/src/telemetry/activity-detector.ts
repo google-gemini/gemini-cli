@@ -71,8 +71,9 @@ export function getActivityDetector(): ActivityDetector | null {
  * Record user activity (convenience function for CLI to call)
  */
 export function recordUserActivity(): void {
-  const detector = globalActivityDetector || initializeActivityDetector();
-  detector.recordActivity();
+  // Do not implicitly initialize here to avoid locking in default timeout
+  // when a custom timeout may be set later via initializeActivityDetector().
+  globalActivityDetector?.recordActivity();
 }
 
 /**
