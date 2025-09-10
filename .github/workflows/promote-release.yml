@@ -220,7 +220,8 @@ jobs:
     permissions:
       contents: 'write'
       packages: 'write'
-    steps:      - name: 'Checkout correct SHA'
+    steps:
+      - name: 'Checkout correct SHA'
         uses: 'actions/checkout@v4'
         with:
           ref: ${{ needs.calculate-versions.outputs.STABLE_SHA }}
