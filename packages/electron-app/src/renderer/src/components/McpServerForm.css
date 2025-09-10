@@ -1,0 +1,81 @@
+.mcp-server-form {
+  padding: 20px;
+  background-color: #252526;
+  border-radius: 8px;
+}
+
+.mcp-server-form h3 {
+  margin-top: 0;
+  font-size: 20px;
+  border-bottom: 1px solid #3c3c3c;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+
+.mcp-server-form h4 {
+  font-size: 16px;
+  color: #007acc;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #3c3c3c;
+  padding-bottom: 5px;
+}
+
+.mcp-server-form h5 {
+  font-size: 14px;
+  color: #a0a0a0;
+  margin-top: 15px;
+  margin-bottom: 10px;
+}
+
+.mcp-server-form .form-item {
+  margin-bottom: 15px;
+}
+
+.mcp-server-form .form-item label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.mcp-server-form .form-item input[type='text'],
+.mcp-server-form .form-item input[type='number'],
+.mcp-server-form .form-item textarea {
+  width: 100%;
+  padding: 8px;
+  background-color: #3c3c3c;
+  color: #d4d4d4;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.mcp-server-form .form-item textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.mcp-server-form .form-item input[type='checkbox'] {
+  width: auto;
+  margin-right: 10px;
+}
+
+.mcp-server-form .form-actions {
+  margin-top: 30px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mcp-server-form .form-actions button {
+  margin-left: 10px;
+  padding: 10px 15px;
+  background-color: #007acc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mcp-server-form .form-actions button:hover {
+  background-color: #005a9e;
+}
