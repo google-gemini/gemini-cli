@@ -79,8 +79,8 @@ export const Footer: React.FC<FooterProps> = ({
         <Box>
           {debugMode && <DebugProfiler />}
           {vimMode && <Text color={theme.text.secondary}>[{vimMode}] </Text>}
-          {!hideCWD && (
-            nightly ? (
+          {!hideCWD &&
+            (nightly ? (
               <Gradient colors={theme.ui.gradient}>
                 <Text>
                   {displayPath}
@@ -94,8 +94,7 @@ export const Footer: React.FC<FooterProps> = ({
                   <Text color={theme.text.secondary}> ({branchName}*)</Text>
                 )}
               </Text>
-            )
-          )}
+            ))}
           {debugMode && (
             <Text color={theme.status.error}>
               {' ' + (debugMessage || '--debug')}
@@ -137,7 +136,10 @@ export const Footer: React.FC<FooterProps> = ({
       )}
 
       {/* Right Section: Gemini Label and Console Summary */}
-      {(!hideModelInfo || showMemoryUsage || corgiMode || (!showErrorDetails && errorCount > 0)) && (
+      {(!hideModelInfo ||
+        showMemoryUsage ||
+        corgiMode ||
+        (!showErrorDetails && errorCount > 0)) && (
         <Box alignItems="center" paddingTop={isNarrow ? 1 : 0}>
           {!hideModelInfo && (
             <Box alignItems="center">
