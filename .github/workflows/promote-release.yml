@@ -226,3 +226,70 @@ jobs:
             --title "Release ${RELEASE_TAG}" \
             --notes-start-tag "${PREVIOUS_TAG}" \
             --generate-notes
+
+  nightly-pr:
+    name: Create Nightly PR
+    needs: calculate-versions
+    if: github.event.inputs.release_type == 'nightly'
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'write'
+      pull-requests: 'write'
+    steps:
+      - name: 'Checkout main'
+        uses: 'actions/checkout@v4'
+        with:
+          ref: 'main'
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@v4'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install Dependencies'
+        run: npm ci
+
+      - name: 'Configure Git User'
+        run: |-
+          git config user.name "gemini-cli-robot"
+          git config user.email "gemini-cli-robot@google.com"
+
+      - name: 'Create and switch to a new branch'
+        id: 'release_branch'
+        run: |
+          BRANCH_NAME="chore/nightly-version-bump-${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          git switch -c "${BRANCH_NAME}"
+          echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
+
+      - name: 'Update package versions'
+        run: |-
+          npm run release:version "${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+
+      - name: 'Commit and Push package versions'
+        env:
+          BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+          DRY_RUN: '${{ github.event.inputs.dry_run }}'
+        run: |-
+          git add package.json package-lock.json packages/*/package.json
+          git commit -m "chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          if [[ "${DRY_RUN}" == "false" ]]; then
+            echo "Pushing release branch to remote..."
+            git push --set-upstream origin "${BRANCH_NAME}"
+          else
+            echo "Dry run enabled. Skipping push."
+          fi
+
+      - name: 'Create and Approve Pull Request'
+        if: github.event.inputs.dry_run == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+        run: |
+          gh pr create \
+            --title "chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}" \
+            --body "Automated version bump to prepare for the next nightly release." \
+            --base "main" \
+            --head "${BRANCH_NAME}" \
+            --fill
+          gh pr merge --auto --squash
