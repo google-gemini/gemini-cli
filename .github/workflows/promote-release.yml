@@ -42,7 +42,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG=$(gh release list --limit 10 --json tagName -q '.[] | select(.tagName | contains("preview")) | .tagName' | sort -V | tail -n 1)
-          echo "LATEST_PREVIEW_TAG=$TAG" >> $GITHUB_OUTPUT
+          echo "LATEST_PREVIEW_TAG=v$TAG" >> $GITHUB_OUTPUT
 
       - name: Calculate versions
         id: versions
