@@ -49,7 +49,158 @@ jobs:
           TAG=$(gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | (contains("nightly") or contains("preview")) | not)] | .[0].tagName')
           echo "LATEST_STABLE_TAG=$TAG" >> $GITHUB_OUTPUT
 
-      - name: Print Tags
+      - name: Calculate versions
+        id: versions
         run: |
-          echo "Latest Preview Tag: ${{ steps.preview_tag.outputs.LATEST_PREVIEW_TAG }}"
-          echo "Latest Stable Tag: ${{ steps.stable_tag.outputs.LATEST_STABLE_TAG }}"
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current version from package.json: $CURRENT_VERSION"
+
+          # Extract major and minor versions
+          MAJOR=$(echo $CURRENT_VERSION | cut -d. -f1)
+          MINOR=$(echo $CURRENT_VERSION | cut -d. -f2)
+
+          # Calculate next nightly version (minor bump)
+          # e.g., 0.6.x -> 0.7.0-nightly
+          NEXT_MINOR=$((MINOR + 1))
+          NEXT_NIGHTLY_VERSION="$MAJOR.$NEXT_MINOR.0-nightly"
+
+          # Calculate next preview version
+          # e.g., 0.6.x -> 0.6.0-preview
+          NEXT_PREVIEW_VERSION="$MAJOR.$MINOR.0-preview"
+
+          STABLE_RELEASE_TAG=$(echo "${{ steps.preview_tag.outputs.LATEST_PREVIEW_TAG }}" | sed 's/-preview.*//')
+          STABLE_RELEASE_VERSION=$(echo "$STABLE_RELEASE_TAG" | sed 's/^v//')
+
+          echo "next_nightly_version=$NEXT_NIGHTLY_VERSION" >> $GITHUB_OUTPUT
+          echo "next_preview_version=$NEXT_PREVIEW_VERSION" >> $GITHUB_OUTPUT
+          echo "stable_release_tag=$STABLE_RELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "stable_release_version=$STABLE_RELEASE_VERSION" >> $GITHUB_OUTPUT
+          echo "stable_npm_tag=latest" >> $GITHUB_OUTPUT
+          echo "stable_previous_tag=${{ steps.stable_tag.outputs.LATEST_STABLE_TAG }}" >> $GITHUB_OUTPUT
+
+      - name: Print calculated versions
+        run: |
+          echo "Dry Run: ${{ github.event.inputs.dry_run }}"
+          echo "---"
+          echo "Current Preview Tag: ${{ steps.preview_tag.outputs.LATEST_PREVIEW_TAG }}"
+          echo "Current Stable Tag: ${{ steps.stable_tag.outputs.LATEST_STABLE_TAG }}"
+          echo "---"
+          echo "Promoting to Stable Release"
+          echo "  Release Tag: ${{ steps.versions.outputs.stable_release_tag }}"
+          echo "  Release Version: ${{ steps.versions.outputs.stable_release_version }}"
+          echo "  NPM Tag: ${{ steps.versions.outputs.stable_npm_tag }}"
+          echo "  Previous Tag for Release Notes: ${{ steps.versions.outputs.stable_previous_tag }}"
+          echo "---"
+          echo "Next Nightly Version: ${{ steps.versions.outputs.next_nightly_version }}"
+          echo "Next Preview Version: ${{ steps.versions.outputs.next_preview_version }}"
+
+      - name: Configure Git User
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          git config user.name "gemini-cli-robot"
+          git config user.email "gemini-cli-robot@google.com"
+
+      - name: Create and switch to a release branch
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        id: release_branch
+        run: |
+          BRANCH_NAME="promote/${{ steps.versions.outputs.stable_release_tag }}"
+          git switch -c "${{ BRANCH_NAME }}"
+          echo "BRANCH_NAME=${{ BRANCH_NAME }}" >> "${{ GITHUB_OUTPUT }}"
+
+      - name: Update package versions
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          npm run release:version ${{ steps.versions.outputs.stable_release_version }}
+
+      - name: Commit and Push package versions
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          BRANCH_NAME: ${{ steps.release_branch.outputs.BRANCH_NAME }}
+        run: |
+          git add package.json package-lock.json packages/*/package.json
+          git commit -m "chore(release): ${{ steps.versions.outputs.stable_release_tag }}"
+          git push --set-upstream origin "${{ BRANCH_NAME }}"
+
+      - name: Create Pull Request
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ steps.release_branch.outputs.BRANCH_NAME }}
+        run: |
+          gh pr create \
+            --title "chore(release): Promote ${{ steps.versions.outputs.stable_release_tag }}" \
+            --body "Automated PR to promote ${{ steps.versions.outputs.stable_release_tag }} to stable."
+            --base "${{ github.event.inputs.ref }}" \
+            --head "${{ BRANCH_NAME }}"
+
+      - name: Enable Auto-Merge
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ steps.release_branch.outputs.BRANCH_NAME }}
+        run: |
+          gh pr merge "${{ BRANCH_NAME }}" --auto --squash
+
+      - name: Build and Prepare Packages
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          npm run build:packages
+          npm run prepare:package
+
+      - name: Configure npm for publishing
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://wombat-dressing-room.appspot.com'
+          scope: '@google'
+
+      - name: Publish @google/gemini-cli-core
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CORE }}
+        run: |
+          npm publish \
+            --workspace="@google/gemini-cli-core" \
+            --tag="${{ steps.versions.outputs.stable_npm_tag }}"
+
+      - name: Install latest core package
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          npm install "@google/gemini-cli-core@${{ steps.versions.outputs.stable_release_version }}" \
+          --workspace="@google/gemini-cli" \
+          --save-exact
+
+      - name: Publish @google/gemini-cli
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.WOMBAT_TOKEN_CLI }}
+        run: |
+          npm publish \
+            --workspace="@google/gemini-cli" \
+            --tag="${{ steps.versions.outputs.stable_npm_tag }}"
+
+      - name: Create Stable GitHub Release and Tag
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.versions.outputs.stable_release_tag }}" \
+            bundle/gemini.js \
+            --target "${{ github.event.inputs.ref }}" \
+            --title "Release ${{ steps.versions.outputs.stable_release_tag }}" \
+            --notes-start-tag "${{ steps.versions.outputs.stable_previous_tag }}" \
+            --generate-notes
+
+      - name: Create Next Preview GitHub Release and Tag
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.versions.outputs.next_preview_version }}" \
+            bundle/gemini.js \
+            --target "${{ github.event.inputs.ref }}" \
+            --title "Release v${{ steps.versions.outputs.next_preview_version }}" \
+            --notes-start-tag "${{ steps.versions.outputs.stable_release_tag }}" \
+            --generate-notes
