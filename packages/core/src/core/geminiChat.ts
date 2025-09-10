@@ -206,6 +206,7 @@ export class GeminiChat {
    * ```
    */
   async sendMessageStream(
+    model: string,
     params: SendMessageParameters,
     prompt_id: string,
   ): Promise<AsyncGenerator<StreamEvent>> {
@@ -253,6 +254,7 @@ export class GeminiChat {
             }
 
             const stream = await self.makeApiCallAndProcessStream(
+              model,
               requestContents,
               params,
               prompt_id,
@@ -317,18 +319,16 @@ export class GeminiChat {
   }
 
   private async makeApiCallAndProcessStream(
+    model: string,
     requestContents: Content[],
     params: SendMessageParameters,
     prompt_id: string,
     userContent: Content,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    let currentAttemptModel: string | undefined;
-
     const apiCall = () => {
       const modelToUse = this.config.isInFallbackMode()
         ? DEFAULT_GEMINI_FLASH_MODEL
-        : this.config.getModel();
-      currentAttemptModel = modelToUse;
+        : model;
 
       if (
         this.config.getQuotaErrorOccurred() &&
@@ -352,15 +352,7 @@ export class GeminiChat {
     const onPersistent429Callback = async (
       authType?: string,
       error?: unknown,
-    ) => {
-      if (!currentAttemptModel) return null;
-      return await handleFallback(
-        this.config,
-        currentAttemptModel,
-        authType,
-        error,
-      );
-    };
+    ) => await handleFallback(this.config, model, authType, error);
 
     const streamResponse = await retryWithBackoff(apiCall, {
       shouldRetry: (error: unknown) => {
