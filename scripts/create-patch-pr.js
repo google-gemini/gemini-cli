@@ -30,8 +30,7 @@ async function main() {
       default: false,
     })
     .help()
-    .alias('help', 'h')
-    .argv;
+    .alias('help', 'h').argv;
 
   const { commit, channel, dryRun } = argv;
 
@@ -51,7 +50,9 @@ async function main() {
 
   // Create the release branch from the tag if it doesn't exist.
   if (!branchExists(releaseBranch)) {
-    console.log(`Release branch ${releaseBranch} does not exist. Creating it from tag ${latestTag}...`);
+    console.log(
+      `Release branch ${releaseBranch} does not exist. Creating it from tag ${latestTag}...`,
+    );
     run(`git checkout -b ${releaseBranch} ${latestTag}`, dryRun);
     run(`git push origin ${releaseBranch}`, dryRun);
   } else {
@@ -59,7 +60,9 @@ async function main() {
   }
 
   // Create the hotfix branch from the release branch.
-  console.log(`Creating hotfix branch ${hotfixBranch} from ${releaseBranch}...`);
+  console.log(
+    `Creating hotfix branch ${hotfixBranch} from ${releaseBranch}...`,
+  );
   run(`git checkout -b ${hotfixBranch} origin/${releaseBranch}`, dryRun);
 
   // Cherry-pick the commit.
@@ -71,13 +74,18 @@ async function main() {
   run(`git push --set-upstream origin ${hotfixBranch}`, dryRun);
 
   // Create the pull request.
-  console.log(`Creating pull request from ${hotfixBranch} to ${releaseBranch}...`);
+  console.log(
+    `Creating pull request from ${hotfixBranch} to ${releaseBranch}...`,
+  );
   const prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch}`;
   let prBody = `This PR automatically cherry-picks commit ${commit} to patch the ${channel} release.`;
   if (dryRun) {
     prBody += '\n\n**[DRY RUN]**';
   }
-  run(`gh pr create --base ${releaseBranch} --head ${hotfixBranch} --title "${prTitle}" --body "${prBody}"`, dryRun);
+  run(
+    `gh pr create --base ${releaseBranch} --head ${hotfixBranch} --title "${prTitle}" --body "${prBody}"`,
+    dryRun,
+  );
 
   console.log('Patch process completed successfully!');
 }
@@ -99,7 +107,7 @@ function branchExists(branchName) {
   try {
     execSync(`git ls-remote --exit-code --heads origin ${branchName}`);
     return true;
-  } catch (e) {
+  } catch (_e) {
     return false;
   }
 }
@@ -108,8 +116,8 @@ function getLatestTag(channel) {
   console.log(`Fetching latest tag for channel: ${channel}...`);
   const pattern =
     channel === 'stable'
-      ? "'(contains(\"nightly\") or contains(\"preview\")) | not'"
-      : "'(contains(\"preview\"))'";
+      ? '\'(contains("nightly") or contains("preview")) | not\''
+      : '\'(contains("preview"))\'';
   const command = `gh release list --limit 30 --json tagName | jq -r '[.[] | select(.tagName | ${pattern})] | .[0].tagName'`;
   try {
     return execSync(command).toString().trim();

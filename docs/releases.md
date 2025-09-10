@@ -85,6 +85,7 @@ Navigate to the **Actions** tab and run the **Create Patch PR** workflow.
 - **Channel**: The channel you want to patch (`stable` or `preview`).
 
 This workflow will automatically:
+
 1. Find the latest release tag for the channel.
 2. Create a release branch from that tag if one doesn't exist (e.g., `release/v0.5.1`).
 3. Create a new hotfix branch from the release branch.
@@ -102,6 +103,7 @@ Review the automatically created pull request(s) to ensure the cherry-pick was s
 ### 3. Automatic Release
 
 Upon merging the pull request, a final workflow is automatically triggered. It will:
+
 1. Run the `patch-release` workflow.
 2. Build and test the patched code.
 3. Publish the new patch version to npm.
