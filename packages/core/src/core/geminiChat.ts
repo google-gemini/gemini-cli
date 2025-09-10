@@ -182,6 +182,38 @@ export class GeminiChat {
   setSystemInstruction(sysInstr: string) {
     this.generationConfig.systemInstruction = sysInstr;
   }
+
+  /**
+   * Extract inlineData parts from userContent if userContent is functionResponse
+   *
+   * @remark
+   * userContent modified after this call - inlineData parts are removed
+   * @param userContent
+   * @returns an Array of inlineData parts from userContents if it is functionResponse
+   *
+   */
+
+  extractInlineDataParts(userContent: Content): Part[] {
+    const inlineParts: Part[] = [];
+    if (
+      userContent.parts &&
+      userContent.parts.length &&
+      userContent.parts[0].functionResponse
+    ) {
+      for (const part of userContent.parts) {
+        if (part.inlineData) {
+          inlineParts.push(part);
+        }
+      }
+      for (let i = userContent.parts.length - 1; i >= 0; --i) {
+        if (userContent.parts[i].inlineData) {
+          userContent.parts.splice(i, 1);
+        }
+      }
+    }
+    return inlineParts;
+  }
+
   /**
    * Sends a message to the model and returns the response.
    *
@@ -220,7 +252,12 @@ export class GeminiChat {
         content: userMessage,
       });
     }
+
+    const inlineDataParts: Part[] = this.extractInlineDataParts(userContent);
     const requestContents = this.getHistory(true).concat(userContent);
+    for (const inlineDataPart of inlineDataParts) {
+      requestContents.push({ role: 'user', parts: [inlineDataPart] });
+    }
 
     let response: GenerateContentResponse;
 
@@ -363,10 +400,14 @@ export class GeminiChat {
         content: userMessageContent,
       });
     }
+    const inlineDataParts: Part[] = this.extractInlineDataParts(userContent);
 
     // Add user content to history ONCE before any attempts.
     this.history.push(userContent);
     const requestContents = this.getHistory(true);
+    for (const inlineDataPart of inlineDataParts) {
+      requestContents.push({ role: 'user', parts: [inlineDataPart] });
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
