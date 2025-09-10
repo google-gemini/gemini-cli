@@ -339,12 +339,12 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
 
   const fullContent = content.join('\n');
   
-  // For completed responses, always show the full content without height restrictions
-  // The MaxSizedBox parent component will handle overall height constraints
+  // Respect user settings for height restrictions on completed responses
+  const showFullLongResponses = settings.merged.tools?.showFullLongResponses ?? true;
   const colorizedCode = colorizeCode(
     fullContent,
     lang,
-    undefined, // Don't limit height for completed responses
+    showFullLongResponses ? undefined : availableTerminalHeight,
     terminalWidth - CODE_BLOCK_PREFIX_PADDING,
     undefined,
     settings,

@@ -307,15 +307,12 @@ export async function truncateAndSaveToFile(
     const beginning = lines.slice(0, head);
     const end = lines.slice(-tail);
     truncatedLines.push(...beginning);
-
-    if (middle > 0) {
+    if (hiddenLines > 0) {
       const middleStart = Math.floor(lines.length / 2) - Math.floor(middle / 2);
       const middleLines = lines.slice(middleStart, middleStart + middle);
       truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
       truncatedLines.push(...middleLines);
       truncatedLines.push('... [MORE CONTENT TRUNCATED] ...');
-    } else if (hiddenLines > 0) {
-      truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
     }
     truncatedLines.push(...end);
   }
