@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { getVersion } from '../get-release-version.js';
+import { getVersion } from '../get-release-version.cjs';
 import { execSync } from 'child_process';
 import fs from 'fs';
 

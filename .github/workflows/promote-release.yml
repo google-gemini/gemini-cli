@@ -42,9 +42,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          STABLE_JSON=$(node scripts/get-release-version.js --type=stable)
-          PREVIEW_JSON=$(node scripts/get-release-version.js --type=preview)
-          NIGHTLY_JSON=$(node scripts/get-release-version.js --type=nightly)
+          STABLE_JSON=$(node scripts/get-release-version.cjs --type=stable)
+          PREVIEW_JSON=$(node scripts/get-release-version.cjs --type=preview)
+          NIGHTLY_JSON=$(node scripts/get-release-version.cjs --type=nightly)
           echo "STABLE_VERSION=$(echo "${STABLE_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           echo "STABLE_SHA=$(git rev-parse "$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
