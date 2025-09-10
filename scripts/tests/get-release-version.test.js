@@ -6,8 +6,8 @@ import fs from 'fs';
 vi.mock('child_process');
 vi.mock('fs');
 
-vi.mock('../get-release-version.js', async () => {
-  const actual = await vi.importActual('../get-release-version.js');
+vi.mock('../get-release-version.cjs', async () => {
+  const actual = await vi.importActual('../get-release-version.cjs');
   return {
     ...actual,
     getVersion: (options) => {
@@ -33,7 +33,7 @@ describe('getReleaseVersion', () => {
 
   describe('Nightly Workflow Logic', () => {
     it('should calculate the next nightly version based on package.json', async () => {
-      const { getVersion } = await import('../get-release-version.js');
+      const { getVersion } = await import('../get-release-version.cjs');
       const result = getVersion({ type: 'nightly' });
 
       expect(result.releaseVersion).toBe('0.6.0-nightly.20250911.a1b2c3d');
