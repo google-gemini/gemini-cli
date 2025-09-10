@@ -745,13 +745,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 (r:){' '}
               </Text>
             ) : (
-              '! '
+              '!'
             )
           ) : showYoloStyling ? (
-            '* '
+            '*'
           ) : (
-            '> '
-          )}
+            '>'
+          )}{' '}
         </Text>
         <Box flexGrow={1} flexDirection="column">
           {buffer.text.length === 0 && placeholder ? (
