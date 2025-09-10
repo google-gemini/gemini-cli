@@ -151,8 +151,8 @@ describe('findIndexAfterFraction', () => {
     // 0: 66
     // 1: 66 + 68 = 134
     // 2: 134 + 66 = 200
-    // 200 >= 166.5, so index is 2
-    expect(findIndexAfterFraction(history, 0.5)).toBe(2);
+    // 200 >= 166.5, so index is 3
+    expect(findIndexAfterFraction(history, 0.5)).toBe(3);
   });
 
   it('should handle a fraction that results in the last index', () => {
@@ -160,8 +160,8 @@ describe('findIndexAfterFraction', () => {
     // ...
     // 3: 200 + 68 = 268
     // 4: 268 + 65 = 333
-    // 333 >= 299.7, so index is 4
-    expect(findIndexAfterFraction(history, 0.9)).toBe(4);
+    // 333 >= 299.7, so index is 5
+    expect(findIndexAfterFraction(history, 0.9)).toBe(5);
   });
 
   it('should handle an empty history', () => {
@@ -169,7 +169,7 @@ describe('findIndexAfterFraction', () => {
   });
 
   it('should handle a history with only one item', () => {
-    expect(findIndexAfterFraction(history.slice(0, 1), 0.5)).toBe(0);
+    expect(findIndexAfterFraction(history.slice(0, 1), 0.5)).toBe(1);
   });
 
   it('should handle history with weird parts', () => {
@@ -178,7 +178,7 @@ describe('findIndexAfterFraction', () => {
       { role: 'model', parts: [{ fileData: { fileUri: 'derp' } }] },
       { role: 'user', parts: [{ text: 'Message 2' }] },
     ];
-    expect(findIndexAfterFraction(historyWithEmptyParts, 0.5)).toBe(1);
+    expect(findIndexAfterFraction(historyWithEmptyParts, 0.5)).toBe(2);
   });
 });
 

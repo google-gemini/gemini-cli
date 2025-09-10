@@ -87,10 +87,10 @@ export function findIndexAfterFraction(
 
   let charactersSoFar = 0;
   for (let i = 0; i < contentLengths.length; i++) {
-    charactersSoFar += contentLengths[i];
     if (charactersSoFar >= targetCharacters) {
       return i;
     }
+    charactersSoFar += contentLengths[i];
   }
   return contentLengths.length;
 }
