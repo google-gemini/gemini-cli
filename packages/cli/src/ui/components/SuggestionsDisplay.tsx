@@ -5,7 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { PrepareLabel } from './PrepareLabel.js';
 import { CommandKind } from '../commands/types.js';
 export interface Suggestion {
@@ -56,12 +56,12 @@ export function SuggestionsDisplay({
 
   return (
     <Box flexDirection="column" paddingX={1} width={width}>
-      {scrollOffset > 0 && <Text color={Colors.Foreground}>▲</Text>}
+      {scrollOffset > 0 && <Text color={theme.text.primary}>▲</Text>}
 
       {visibleSuggestions.map((suggestion, index) => {
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
-        const textColor = isActive ? Colors.AccentPurple : Colors.Gray;
+        const textColor = isActive ? theme.text.accent : theme.text.secondary;
         const labelElement = (
           <PrepareLabel
             label={suggestion.label}
@@ -82,7 +82,7 @@ export function SuggestionsDisplay({
                       <Box flexShrink={0} paddingRight={2}>
                         {labelElement}
                         {suggestion.commandKind === CommandKind.MCP_PROMPT && (
-                          <Text color={Colors.Gray}> [MCP]</Text>
+                          <Text color={theme.text.secondary}> [MCP]</Text>
                         )}
                       </Box>
                     ) : (

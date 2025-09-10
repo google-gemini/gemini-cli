@@ -7,7 +7,7 @@
 import { Box, Text } from 'ink';
 import { useAppContext } from '../contexts/AppContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { StreamingState } from '../types.js';
 import { UpdateNotification } from './UpdateNotification.js';
 
@@ -29,13 +29,13 @@ export const Notifications = () => {
       {showStartupWarnings && (
         <Box
           borderStyle="round"
-          borderColor={Colors.AccentYellow}
+          borderColor={theme.status.warning}
           paddingX={1}
           marginY={1}
           flexDirection="column"
         >
           {startupWarnings.map((warning, index) => (
-            <Text key={index} color={Colors.AccentYellow}>
+            <Text key={index} color={theme.status.warning}>
               {warning}
             </Text>
           ))}
@@ -44,14 +44,14 @@ export const Notifications = () => {
       {showInitError && (
         <Box
           borderStyle="round"
-          borderColor={Colors.AccentRed}
+          borderColor={theme.status.error}
           paddingX={1}
           marginBottom={1}
         >
-          <Text color={Colors.AccentRed}>
+          <Text color={theme.status.error}>
             Initialization Error: {initError}
           </Text>
-          <Text color={Colors.AccentRed}>
+          <Text color={theme.status.error}>
             {' '}
             Please check API key and configuration.
           </Text>

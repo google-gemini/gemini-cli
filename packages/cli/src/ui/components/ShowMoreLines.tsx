@@ -8,7 +8,7 @@ import { Box, Text } from 'ink';
 import { useOverflowState } from '../contexts/OverflowContext.js';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 
 interface ShowMoreLinesProps {
   constrainHeight: boolean;
@@ -32,7 +32,7 @@ export const ShowMoreLines = ({ constrainHeight }: ShowMoreLinesProps) => {
 
   return (
     <Box>
-      <Text color={Colors.Gray} wrap="truncate">
+      <Text color={theme.text.secondary} wrap="truncate">
         Press ctrl-s to show more lines
       </Text>
     </Box>
