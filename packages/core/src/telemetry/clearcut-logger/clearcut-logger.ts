@@ -871,26 +871,26 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
-        value: event.tool_name,
+        value: JSON.stringify(event.tool_name),
       },
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_ORIGINAL_LENGTH,
-        value: String(event.original_content_length),
+        value: JSON.stringify(event.original_content_length),
       },
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_TRUNCATED_LENGTH,
-        value: String(event.truncated_content_length),
+        value: JSON.stringify(event.truncated_content_length),
       },
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_THRESHOLD,
-        value: String(event.threshold),
+        value: JSON.stringify(event.threshold),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_LINES,
-        value: String(event.lines),
+        value: JSON.stringify(event.lines),
       },
     ];
 
