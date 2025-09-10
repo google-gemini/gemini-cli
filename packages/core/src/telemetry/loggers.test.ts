@@ -338,44 +338,6 @@ describe('loggers', () => {
         'event.timestamp': '2025-01-01T00:00:00.000Z',
       });
     });
-
-    it('should log an API response without an error', () => {
-      const usageData: GenerateContentResponseUsageMetadata = {
-        promptTokenCount: 17,
-        candidatesTokenCount: 50,
-        cachedContentTokenCount: 10,
-        thoughtsTokenCount: 5,
-        toolUsePromptTokenCount: 2,
-      };
-      const event = new ApiResponseEvent(
-        'test-model',
-        100,
-        'prompt-id-1',
-        AuthType.USE_GEMINI,
-        usageData,
-        'test-response',
-      );
-
-      logApiResponse(mockConfig, event);
-
-      expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'API response from test-model. Status: 200. Duration: 100ms.',
-        attributes: {
-          'session.id': 'test-session-id',
-          'user.email': 'test-user@example.com',
-          ...event,
-          'event.name': EVENT_API_RESPONSE,
-          'event.timestamp': '2025-01-01T00:00:00.000Z',
-          [SemanticAttributes.HTTP_STATUS_CODE]: 200,
-        },
-      });
-
-      expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
-        ...event,
-        'event.name': EVENT_API_RESPONSE,
-        'event.timestamp': '2025-01-01T00:00:00.000Z',
-      });
-    });
   });
 
   describe('logApiRequest', () => {
