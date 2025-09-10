@@ -1269,11 +1269,11 @@ describe('truncateAndSaveToFile', () => {
     const middle = contentLinesToShow - head - tail;
     const beginning = lines.slice(0, head);
     const end = lines.slice(-tail);
-    
+
     // The new format includes middle section for better context
     const middleStart = Math.floor(lines.length / 2) - Math.floor(middle / 2);
     const middleLines = lines.slice(middleStart, middleStart + middle);
-    
+
     // Build expected truncated content using array to preserve empty lines
     const truncatedLines: string[] = [];
     truncatedLines.push(...beginning);
@@ -1281,7 +1281,7 @@ describe('truncateAndSaveToFile', () => {
     truncatedLines.push(...middleLines);
     truncatedLines.push('... [MORE CONTENT TRUNCATED] ...');
     truncatedLines.push(...end);
-    
+
     const expectedTruncated = truncatedLines.join('\n');
 
     expect(result.content).toContain(
@@ -1331,11 +1331,11 @@ describe('truncateAndSaveToFile', () => {
     const middle = contentLinesToShow - head - tail;
     const beginning = wrappedLines.slice(0, head);
     const end = wrappedLines.slice(-tail);
-    
+
     // The new format includes middle section for better context
     const middleStart = Math.floor(wrappedLines.length / 2) - Math.floor(middle / 2);
     const middleLines = wrappedLines.slice(middleStart, middleStart + middle);
-    
+
     // Build expected truncated content using array to preserve empty lines
     const truncatedLines: string[] = [];
     truncatedLines.push(...beginning);
@@ -1343,7 +1343,7 @@ describe('truncateAndSaveToFile', () => {
     truncatedLines.push(...middleLines);
     truncatedLines.push('... [MORE CONTENT TRUNCATED] ...');
     truncatedLines.push(...end);
-    
+
     const expectedTruncated = truncatedLines.join('\n');
 
     expect(result.content).toContain(
@@ -1481,10 +1481,10 @@ describe('truncateAndSaveToFile', () => {
       smallTruncateLines,
     );
 
-// For truncateLines < 5, we reserve 1 line for marker
-    const contentLinesToShow = Math.max(0, smallTruncateLines - 1);
-    const headCount = Math.ceil(contentLinesToShow / 2);
-    const tailCount = contentLinesToShow - headCount;
+    // For small truncateLines (3), should use simple head/tail view
+    // headCount = ceil(3/2) = 2, tailCount = 1
+    const headCount = Math.ceil(smallTruncateLines / 2);
+    const tailCount = smallTruncateLines - headCount;
     const headLines = lines.slice(0, headCount);
     const tailLines = tailCount > 0 ? lines.slice(-tailCount) : [];
 
@@ -1493,7 +1493,7 @@ describe('truncateAndSaveToFile', () => {
     truncatedLines.push(...headLines);
     truncatedLines.push(`... [CONTENT TRUNCATED - ${lines.length - smallTruncateLines} lines hidden] ...`);
     truncatedLines.push(...tailLines);
-    
+
     const expectedTruncated = truncatedLines.join('\n');
 
     expect(result.content).toContain(
