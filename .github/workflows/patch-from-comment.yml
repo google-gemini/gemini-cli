@@ -29,7 +29,7 @@ jobs:
 
       - name: 'Dispatch if Merged'
         if: steps.pr_status.outputs.STATE == 'MERGED'
-        uses: actions/github-script@v6
+        uses: actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325
         with:
           script: |
             const args = JSON.parse('${{ steps.slash_command.outputs.command-arguments }}');
@@ -46,7 +46,7 @@ jobs:
 
       - name: 'Comment on Failure'
         if: steps.pr_status.outputs.STATE != 'MERGED'
-        uses: peter-evans/create-or-update-comment@v2
+        uses: peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |

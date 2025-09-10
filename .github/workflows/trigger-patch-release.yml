@@ -11,7 +11,7 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Trigger Patch Release'
-        uses: 'actions/github-script@v6'
+        uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
         with:
           script: |
             const ref = context.payload.pull_request.base.ref;
