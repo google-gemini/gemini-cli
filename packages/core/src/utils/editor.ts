@@ -225,5 +225,6 @@ export async function openDiff(
     }
   } catch (error) {
     console.error(error);
+    throw error;
   }
 }
