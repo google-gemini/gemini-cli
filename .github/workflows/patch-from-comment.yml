@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 'Slash Command Dispatch'
-        uses: peter-evans/slash-command-dispatch@v2
+        uses: peter-evans/slash-command-dispatch@40877f718dce0101edfc7aea2b3800cc192f9ed5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commands: patch
