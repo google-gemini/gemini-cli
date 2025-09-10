@@ -7,14 +7,14 @@
 import * as fs from 'node:fs';
 import { isSubpath } from '../utils/paths.js';
 import { detectIde, type DetectedIde, getIdeInfo } from '../ide/detect-ide.js';
-import type { DiffUpdateResult } from '../ide/ideContext.js';
 import {
   ideContext,
-  IdeContextNotificationSchema,
   IdeDiffAcceptedNotificationSchema,
   IdeDiffClosedNotificationSchema,
   CloseDiffResponseSchema,
-} from '../ide/ideContext.js';
+  type DiffUpdateResult,
+} from './ideContext.js';
+import { IdeContextNotificationSchema } from './types.js';
 import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -65,7 +65,7 @@ function getRealPath(path: string): string {
  * Manages the connection to and interaction with the IDE server.
  */
 export class IdeClient {
-  private static instance: IdeClient;
+  private static instancePromise: Promise<IdeClient> | null = null;
   private client: Client | undefined = undefined;
   private state: IDEConnectionState = {
     status: IDEConnectionStatus.Disconnected,
@@ -81,19 +81,21 @@ export class IdeClient {
 
   private constructor() {}
 
-  static async getInstance(): Promise<IdeClient> {
-    if (!IdeClient.instance) {
-      const client = new IdeClient();
-      client.ideProcessInfo = await getIdeProcessInfo();
-      client.currentIde = detectIde(client.ideProcessInfo);
-      if (client.currentIde) {
-        client.currentIdeDisplayName = getIdeInfo(
-          client.currentIde,
-        ).displayName;
-      }
-      IdeClient.instance = client;
+  static getInstance(): Promise<IdeClient> {
+    if (!IdeClient.instancePromise) {
+      IdeClient.instancePromise = (async () => {
+        const client = new IdeClient();
+        client.ideProcessInfo = await getIdeProcessInfo();
+        client.currentIde = detectIde(client.ideProcessInfo);
+        if (client.currentIde) {
+          client.currentIdeDisplayName = getIdeInfo(
+            client.currentIde,
+          ).displayName;
+        }
+        return client;
+      })();
     }
-    return IdeClient.instance;
+    return IdeClient.instancePromise;
   }
 
   addStatusChangeListener(listener: (state: IDEConnectionState) => void) {
@@ -394,8 +396,10 @@ export class IdeClient {
     (ConnectionConfig & { workspacePath?: string }) | undefined
   > {
     if (!this.ideProcessInfo) {
-      return {};
+      return undefined;
     }
+
+    // For backwards compatability
     try {
       const portFile = path.join(
         os.tmpdir(),
@@ -404,8 +408,82 @@ export class IdeClient {
       const portFileContents = await fs.promises.readFile(portFile, 'utf8');
       return JSON.parse(portFileContents);
     } catch (_) {
+      // For newer extension versions, the file name matches the pattern
+      // /^gemini-ide-server-${pid}-\d+\.json$/. If multiple IDE
+      // windows are open, multiple files matching the pattern are expected to
+      // exist.
+    }
+
+    const portFileDir = path.join(os.tmpdir(), '.gemini', 'ide');
+    let portFiles;
+    try {
+      portFiles = await fs.promises.readdir(portFileDir);
+    } catch (e) {
+      logger.debug('Failed to read IDE connection directory:', e);
       return undefined;
     }
+
+    const fileRegex = new RegExp(
+      `^gemini-ide-server-${this.ideProcessInfo.pid}-\\d+\\.json$`,
+    );
+    const matchingFiles = portFiles
+      .filter((file) => fileRegex.test(file))
+      .sort();
+    if (matchingFiles.length === 0) {
+      return undefined;
+    }
+
+    let fileContents: string[];
+    try {
+      fileContents = await Promise.all(
+        matchingFiles.map((file) =>
+          fs.promises.readFile(path.join(portFileDir, file), 'utf8'),
+        ),
+      );
+    } catch (e) {
+      logger.debug('Failed to read IDE connection config file(s):', e);
+      return undefined;
+    }
+    const parsedContents = fileContents.map((content) => {
+      try {
+        return JSON.parse(content);
+      } catch (e) {
+        logger.debug('Failed to parse JSON from config file: ', e);
+        return undefined;
+      }
+    });
+
+    const validWorkspaces = parsedContents.filter((content) => {
+      if (!content) {
+        return false;
+      }
+      const { isValid } = IdeClient.validateWorkspacePath(
+        content.workspacePath,
+        this.currentIdeDisplayName,
+        process.cwd(),
+      );
+      return isValid;
+    });
+
+    if (validWorkspaces.length === 0) {
+      return undefined;
+    }
+
+    if (validWorkspaces.length === 1) {
+      return validWorkspaces[0];
+    }
+
+    const portFromEnv = this.getPortFromEnv();
+    if (portFromEnv) {
+      const matchingPort = validWorkspaces.find(
+        (content) => content.port === portFromEnv,
+      );
+      if (matchingPort) {
+        return matchingPort;
+      }
+    }
+
+    return validWorkspaces[0];
   }
 
   private createProxyAwareFetch() {

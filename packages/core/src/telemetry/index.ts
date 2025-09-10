@@ -60,3 +60,5 @@ export {
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 export * from './uiTelemetry.js';
+export { HighWaterMarkTracker } from './high-water-mark-tracker.js';
+export { RateLimiter } from './rate-limiter.js';
