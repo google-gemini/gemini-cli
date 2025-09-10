@@ -325,11 +325,26 @@ export async function truncateAndSaveToFile(
   // Sanitize callId to prevent path traversal.
   const safeFileName = `${path.basename(callId)}.output`;
   const outputFile = path.join(projectTempDir, safeFileName);
+  
   try {
     await fs.writeFile(outputFile, fileContent);
 
-    return {
-      content: `Tool output was too large and has been truncated.
+    // If content was not actually truncated (hiddenLines <= 0), show a different message
+    if (hiddenLines <= 0) {
+      return {
+        content: `Tool output was large and has been saved to file.
+The full output has been saved to: ${outputFile}
+To read the complete output, use the ${ReadFileTool.Name} tool with the absolute file path above. For large files, you can use the offset and limit parameters to read specific sections:
+- ${ReadFileTool.Name} tool with offset=0, limit=100 to see the first 100 lines
+- ${ReadFileTool.Name} tool with offset=N to skip N lines from the beginning
+- ${ReadFileTool.Name} tool with limit=M to read only M lines at a time
+The complete output is shown below:
+${truncatedContent}`,
+        outputFile,
+      };
+    } else {
+      return {
+        content: `Tool output was too large and has been truncated.
 The full output has been saved to: ${outputFile}
 To read the complete output, use the ${ReadFileTool.Name} tool with the absolute file path above. For large files, you can use the offset and limit parameters to read specific sections:
 - ${ReadFileTool.Name} tool with offset=0, limit=100 to see the first 100 lines
@@ -339,8 +354,9 @@ The truncated output below provides a preview of the content to provide better c
 Use the file path above to read the complete output.
 Truncated part of the output (${lines.length} lines total, showing ${Math.min(lines.length, Math.max(0, truncateLines))} lines):
 ${truncatedContent}`,
-      outputFile,
-    };
+        outputFile,
+      };
+    }
   } catch (_error) {
     return {
       content:
