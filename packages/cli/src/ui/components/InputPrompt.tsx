@@ -713,6 +713,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const { inlineGhost, additionalLines } = getGhostTextLines();
 
   const showAutoAcceptStyling = !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
+  const showYoloStyling = !shellModeActive && approvalMode === ApprovalMode.YOLO;
 
   return (
     <>
@@ -721,9 +722,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         borderColor={
           shellModeActive
             ? theme.status.warning
-            : showAutoAcceptStyling
-              ? theme.status.success
-              : theme.border.focused
+            : showYoloStyling
+              ? theme.status.error
+              : showAutoAcceptStyling
+                ? theme.status.success
+                : theme.border.focused
         }
         paddingX={1}
       >
@@ -731,9 +734,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           color={
             shellModeActive
               ? theme.status.warning
-              : showAutoAcceptStyling
-                ? theme.status.success
-                : theme.text.accent
+              : showYoloStyling
+                ? theme.status.error
+                : showAutoAcceptStyling
+                  ? theme.status.success
+                  : theme.text.accent
           }
         >
           {shellModeActive ? (
@@ -747,6 +752,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             ) : (
               '! '
             )
+          ) : showYoloStyling ? (
+            '* '
           ) : (
             '> '
           )}
