@@ -32,7 +32,7 @@ import { customDeepMerge } from '../utils/deepMerge.js';
 import {
   updateSettingsFilePreservingFormat,
   trackEnvVarMappings,
-} from '../utils/preserveOriginalFormat.js';
+} from '../utils/commentJson.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
@@ -357,7 +357,10 @@ export class LoadedSettings {
     workspace: SettingsFile,
     isTrusted: boolean,
     migratedInMemorScopes: Set<SettingScope>,
-    envVarMappings: Map<SettingScope, ReturnType<typeof trackEnvVarMappings>> = new Map(),
+    envVarMappings: Map<
+      SettingScope,
+      ReturnType<typeof trackEnvVarMappings>
+    > = new Map(),
   ) {
     this.system = system;
     this.systemDefaults = systemDefaults;
@@ -375,7 +378,10 @@ export class LoadedSettings {
   readonly workspace: SettingsFile;
   readonly isTrusted: boolean;
   readonly migratedInMemorScopes: Set<SettingScope>;
-  readonly envVarMappings: Map<SettingScope, ReturnType<typeof trackEnvVarMappings>>;
+  readonly envVarMappings: Map<
+    SettingScope,
+    ReturnType<typeof trackEnvVarMappings>
+  >;
 
   private _merged: Settings;
 
@@ -525,7 +531,10 @@ export function loadSettings(
   const systemSettingsPath = getSystemSettingsPath();
   const systemDefaultsPath = getSystemDefaultsPath();
   const migratedInMemorScopes = new Set<SettingScope>();
-  const envVarMappings = new Map<SettingScope, ReturnType<typeof trackEnvVarMappings>>();
+  const envVarMappings = new Map<
+    SettingScope,
+    ReturnType<typeof trackEnvVarMappings>
+  >();
 
   // Resolve paths to their canonical representation to handle symlinks
   const resolvedWorkspaceDir = path.resolve(workspaceDir);
@@ -654,15 +663,24 @@ export function loadSettings(
   const systemOriginal = structuredClone(systemSettings);
   const userOriginal = structuredClone(userSettings);
   const workspaceOriginal = structuredClone(workspaceSettings);
-  
+
   systemSettings = resolveEnvVarsInObject(systemSettings);
   userSettings = resolveEnvVarsInObject(userSettings);
   workspaceSettings = resolveEnvVarsInObject(workspaceSettings);
-  
+
   // Track which values came from environment variables
-  envVarMappings.set(SettingScope.System, trackEnvVarMappings(systemSettings, systemOriginal));
-  envVarMappings.set(SettingScope.User, trackEnvVarMappings(userSettings, userOriginal));
-  envVarMappings.set(SettingScope.Workspace, trackEnvVarMappings(workspaceSettings, workspaceOriginal));
+  envVarMappings.set(
+    SettingScope.System,
+    trackEnvVarMappings(systemSettings, systemOriginal),
+  );
+  envVarMappings.set(
+    SettingScope.User,
+    trackEnvVarMappings(userSettings, userOriginal),
+  );
+  envVarMappings.set(
+    SettingScope.Workspace,
+    trackEnvVarMappings(workspaceSettings, workspaceOriginal),
+  );
 
   // Create LoadedSettings first
 
