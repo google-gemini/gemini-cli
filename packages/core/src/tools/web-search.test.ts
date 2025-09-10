@@ -11,6 +11,11 @@ import { WebSearchTool } from './web-search.js';
 import type { Config } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
 import { ToolErrorType } from './tool-error.js';
+import { ToolConfirmationOutcome } from './tools.js';
+import type { PolicyEngine } from '../policy/policy-engine.js';
+import { PolicyDecision } from '../policy/types.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { EventEmitter } from 'node:events';
 
 // Mock GeminiClient and Config constructor
 vi.mock('../core/client.js');
@@ -19,12 +24,25 @@ vi.mock('../config/config.js');
 describe('WebSearchTool', () => {
   const abortSignal = new AbortController().signal;
   let mockGeminiClient: GeminiClient;
+  let mockPolicyEngine: PolicyEngine;
+  let mockMessageBus: MessageBus;
   let tool: WebSearchTool;
+  let mockConfigInstance: Config;
 
   beforeEach(() => {
-    const mockConfigInstance = {
+    // Create mock PolicyEngine
+    mockPolicyEngine = {
+      check: vi.fn().mockReturnValue(PolicyDecision.ASK_USER),
+    } as unknown as PolicyEngine;
+    
+    // Create mock MessageBus
+    mockMessageBus = new EventEmitter() as unknown as MessageBus;
+    
+    mockConfigInstance = {
       getGeminiClient: () => mockGeminiClient,
       getProxy: () => undefined,
+      getPolicyEngine: () => mockPolicyEngine,
+      getMessageBus: () => mockMessageBus,
     } as unknown as Config;
     mockGeminiClient = new GeminiClient(mockConfigInstance);
     tool = new WebSearchTool(mockConfigInstance);
@@ -246,6 +264,114 @@ Sources:
         'Search results for "multibyte query" returned.',
       );
       expect(result.sources).toHaveLength(3);
+    });
+  });
+
+  describe('PolicyEngine Integration', () => {
+    it('should allow execution when policy returns ALLOW', async () => {
+      const params: WebSearchToolParams = { query: 'safe query' };
+      const invocation = tool.build(params);
+      
+      // Mock policy to return ALLOW
+      vi.mocked(mockPolicyEngine.check).mockReturnValue(PolicyDecision.ALLOW);
+      
+      const confirmationResult = await invocation.shouldConfirmExecute?.(abortSignal);
+      expect(confirmationResult).toBe(false); // No confirmation needed
+      expect(mockPolicyEngine.check).toHaveBeenCalledWith({
+        name: 'google_web_search',
+        args: params,
+      });
+    });
+
+    it('should throw error when policy returns DENY', async () => {
+      const params: WebSearchToolParams = { query: 'blocked query' };
+      const invocation = tool.build(params);
+      
+      // Mock policy to return DENY
+      vi.mocked(mockPolicyEngine.check).mockReturnValue(PolicyDecision.DENY);
+      
+      await expect(invocation.shouldConfirmExecute?.(abortSignal)).rejects.toThrow(
+        'Web search blocked by policy for query: "blocked query"'
+      );
+      expect(mockPolicyEngine.check).toHaveBeenCalledWith({
+        name: 'google_web_search',
+        args: params,
+      });
+    });
+
+    it('should request user confirmation when policy returns ASK_USER', async () => {
+      const params: WebSearchToolParams = { query: 'needs confirmation' };
+      const invocation = tool.build(params);
+      
+      // Mock policy to return ASK_USER
+      vi.mocked(mockPolicyEngine.check).mockReturnValue(PolicyDecision.ASK_USER);
+      
+      const confirmationResult = await invocation.shouldConfirmExecute?.(abortSignal);
+      expect(confirmationResult).toBeTruthy();
+      
+      if (confirmationResult && typeof confirmationResult !== 'boolean') {
+        expect(confirmationResult.type).toBe('info');
+        expect(confirmationResult.title).toBe('Confirm Web Search');
+        if ('prompt' in confirmationResult) {
+          expect(confirmationResult.prompt).toBe('Allow web search for: "needs confirmation"?');
+        }
+        expect(confirmationResult.onConfirm).toBeDefined();
+      }
+      
+      expect(mockPolicyEngine.check).toHaveBeenCalledWith({
+        name: 'google_web_search',
+        args: params,
+      });
+    });
+
+    it('should handle onConfirm callback for ProceedAlways', async () => {
+      const params: WebSearchToolParams = { query: 'always allow this' };
+      const invocation = tool.build(params);
+      
+      // Mock policy to return ASK_USER
+      vi.mocked(mockPolicyEngine.check).mockReturnValue(PolicyDecision.ASK_USER);
+      
+      // Spy on console.log to verify the callback behavior
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      
+      const confirmationResult = await invocation.shouldConfirmExecute?.(abortSignal);
+      
+      if (confirmationResult && typeof confirmationResult !== 'boolean' && confirmationResult.onConfirm) {
+        await confirmationResult.onConfirm(ToolConfirmationOutcome.ProceedAlways);
+        expect(consoleSpy).toHaveBeenCalledWith(
+          'User chose to always allow web searches like: "always allow this"'
+        );
+      }
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('should use different PolicyEngine decisions for different queries', async () => {
+      const safeParams: WebSearchToolParams = { query: 'weather today' };
+      const unsafeParams: WebSearchToolParams = { query: 'hack password' };
+      
+      // Configure different responses for different queries
+      vi.mocked(mockPolicyEngine.check).mockImplementation((toolCall) => {
+        const args = toolCall.args as unknown as WebSearchToolParams;
+        if (args.query.includes('hack')) {
+          return PolicyDecision.DENY;
+        }
+        if (args.query.includes('weather')) {
+          return PolicyDecision.ALLOW;
+        }
+        return PolicyDecision.ASK_USER;
+      });
+      
+      // Test safe query
+      const safeInvocation = tool.build(safeParams);
+      const safeResult = await safeInvocation.shouldConfirmExecute?.(abortSignal);
+      expect(safeResult).toBe(false);
+      
+      // Test unsafe query
+      const unsafeInvocation = tool.build(unsafeParams);
+      await expect(unsafeInvocation.shouldConfirmExecute?.(abortSignal)).rejects.toThrow(
+        'Web search blocked by policy'
+      );
     });
   });
 });

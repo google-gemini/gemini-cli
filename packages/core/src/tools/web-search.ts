@@ -4,15 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { GroundingMetadata } from '@google/genai';
-import type { ToolInvocation, ToolResult } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import type { GroundingMetadata, FunctionCall } from '@google/genai';
+import type { ToolInvocation, ToolResult, ToolCallConfirmationDetails } from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind, ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
 import { getErrorMessage } from '../utils/errors.js';
 import { type Config } from '../config/config.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { PolicyDecision } from '../policy/types.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -69,6 +70,46 @@ class WebSearchToolInvocation extends BaseToolInvocation<
 
   override getDescription(): string {
     return `Searching the web for: "${this.params.query}"`;
+  }
+
+  override async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    // Get the policy engine to check if confirmation is needed
+    const policyEngine = this.config.getPolicyEngine();
+    
+    // Create a FunctionCall object for the PolicyEngine
+    const toolCall: FunctionCall = {
+      name: WebSearchTool.Name,
+      args: { ...this.params },
+    };
+    
+    // First check the policy engine directly for immediate decisions
+    const decision = policyEngine.check(toolCall);
+    
+    if (decision === PolicyDecision.ALLOW) {
+      return false; // No confirmation needed, proceed
+    }
+    
+    if (decision === PolicyDecision.DENY) {
+      throw new Error(`Web search blocked by policy for query: "${this.params.query}"`);
+    }
+    
+    // For ASK_USER, we need to return confirmation details
+    // The actual UI will handle this through the MessageBus
+    return {
+      type: 'info',
+      title: 'Confirm Web Search',
+      prompt: `Allow web search for: "${this.params.query}"?`,
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        // In the future, we might want to update rules based on the outcome
+        // For now, just log the decision
+        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          // Could add a rule to always allow web searches with similar patterns
+          console.log(`User chose to always allow web searches like: "${this.params.query}"`);
+        }
+      },
+    };
   }
 
   async execute(signal: AbortSignal): Promise<WebSearchToolResult> {
