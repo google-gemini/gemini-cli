@@ -95,6 +95,8 @@ This workflow will automatically:
 
 Review the automatically created pull request(s) to ensure the cherry-pick was successful and the changes are correct. Once approved, merge the pull request.
 
+**Security Note:** The `release/*` branches are protected by branch protection rules. A pull request to one of these branches requires at least one review from a code owner before it can be merged. This ensures that no unauthorized code is released.
+
 ### 3. Automatic Release
 
 Upon merging the pull request, a final workflow is automatically triggered. It will:
