@@ -77,6 +77,9 @@ export enum EventMetadataKey {
   // Logs the tool call error type, if any.
   GEMINI_CLI_TOOL_CALL_ERROR_TYPE = 19,
 
+  // Logs the MCP server name.
+  GEMINI_CLI_TOOL_MCP_SERVER = 89,
+
   // ==========================================================================
   // GenAI API Request Event Keys
   // ===========================================================================
@@ -347,4 +350,6 @@ export enum EventMetadataKey {
 
   // Logs the status of the extension install.
   GEMINI_CLI_EXTENSION_INSTALL_STATUS = 88,
+
+  // next
 }
