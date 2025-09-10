@@ -294,11 +294,11 @@ export async function truncateAndSaveToFile(
     const headCount = Math.ceil(contentLinesToShow / 2);
     const tailCount = contentLinesToShow - headCount;
     const headLines = lines.slice(0, headCount);
-    const tailLines = lines.slice(-tailCount);
 
     truncatedLines.push(...headLines);
     truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
     if (tailCount > 0) {
+      const tailLines = lines.slice(-tailCount);
       truncatedLines.push(...tailLines);
     }
   } else if (truncateLines >= 5) {
