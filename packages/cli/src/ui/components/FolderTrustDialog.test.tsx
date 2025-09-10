@@ -98,7 +98,15 @@ describe('FolderTrustDialog', () => {
     });
   });
 
-  describe('parentFolder display', () => {
+  describe('directory display', () => {
+    it('should correctly display the folder name for a nested directory', () => {
+      mockedCwd.mockReturnValue('/home/user/project');
+      const { lastFrame } = renderWithProviders(
+        <FolderTrustDialog onSelect={vi.fn()} />,
+      );
+      expect(lastFrame()).toContain('Trust folder (project)');
+    });
+
     it('should correctly display the parent folder name for a nested directory', () => {
       mockedCwd.mockReturnValue('/home/user/project');
       const { lastFrame } = renderWithProviders(

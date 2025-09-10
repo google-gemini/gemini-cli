@@ -46,11 +46,12 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     { isActive: !!isRestarting },
   );
 
+  const dirName = path.basename(process.cwd());
   const parentFolder = path.basename(path.dirname(process.cwd()));
 
   const options: Array<RadioSelectItem<FolderTrustChoice>> = [
     {
-      label: 'Trust folder',
+      label: `Trust folder (${dirName})`,
       value: FolderTrustChoice.TRUST_FOLDER,
     },
     {
