@@ -20,6 +20,8 @@ export * from './core/geminiRequest.js';
 export * from './core/coreToolScheduler.js';
 export * from './core/nonInteractiveToolExecutor.js';
 
+export * from './fallback/types.js';
+
 export * from './code_assist/codeAssist.js';
 export * from './code_assist/oauth2.js';
 export * from './code_assist/server.js';
@@ -48,6 +50,7 @@ export * from './utils/workspaceContext.js';
 export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
 export * from './utils/ide-trust.js';
+export * from './utils/promptIdContext.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -62,6 +65,7 @@ export * from './ide/ide-installer.js';
 export { getIdeInfo, DetectedIde } from './ide/detect-ide.js';
 export { type IdeInfo } from './ide/detect-ide.js';
 export * from './ide/constants.js';
+export * from './ide/types.js';
 
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
