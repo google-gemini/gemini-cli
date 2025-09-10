@@ -19,7 +19,7 @@ async function main() {
       demandOption: true,
     })
     .option('channel', {
-      alias: 'h',
+      alias: 'ch',
       description: 'The release channel to patch.',
       choices: ['stable', 'preview'],
       demandOption: true,
@@ -41,6 +41,8 @@ async function main() {
     console.log('Running in dry-run mode.');
   }
 
+  run('git fetch --all --tags --prune', dryRun);
+
   const latestTag = getLatestTag(channel);
   console.log(`Found latest tag for ${channel}: ${latestTag}`);
 
@@ -58,7 +60,7 @@ async function main() {
 
   // Create the hotfix branch from the release branch.
   console.log(`Creating hotfix branch ${hotfixBranch} from ${releaseBranch}...`);
-  run(`git checkout -b ${hotfixBranch} ${releaseBranch}`, dryRun);
+  run(`git checkout -b ${hotfixBranch} origin/${releaseBranch}`, dryRun);
 
   // Cherry-pick the commit.
   console.log(`Cherry-picking commit ${commit} into ${hotfixBranch}...`);
@@ -95,7 +97,7 @@ function run(command, dryRun = false) {
 
 function branchExists(branchName) {
   try {
-    execSync(`git rev-parse --verify ${branchName}`);
+    execSync(`git ls-remote --exit-code --heads origin ${branchName}`);
     return true;
   } catch (e) {
     return false;
@@ -108,7 +110,7 @@ function getLatestTag(channel) {
     channel === 'stable'
       ? "'(contains(\"nightly\") or contains(\"preview\")) | not'"
       : "'(contains(\"preview\"))'";
-  const command = `gh release list --limit 1 --json tagName | jq -r '[.[] | select(.tagName | ${pattern})] | .[0].tagName'`;
+  const command = `gh release list --limit 30 --json tagName | jq -r '[.[] | select(.tagName | ${pattern})] | .[0].tagName'`;
   try {
     return execSync(command).toString().trim();
   } catch (err) {
