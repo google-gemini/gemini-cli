@@ -200,8 +200,6 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         ? ideClient.openDiff(this.params.file_path, correctedContent)
         : undefined;
 
-    await ideConfirmation;
-
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
       title: `Confirm Write: ${shortenPath(relativePath)}`,

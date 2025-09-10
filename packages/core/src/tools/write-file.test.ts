@@ -34,6 +34,7 @@ import {
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
+import type { DiffUpdateResult } from '../ide/ideContext.js';
 
 const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
 
@@ -524,6 +525,35 @@ describe('WriteFileTool', () => {
 
         // Now, check if the original `params` object (captured by the invocation) was modified
         expect(invocation.params.content).toBe('ide-modified-content');
+      });
+
+      it('should not await ideConfirmation promise', async () => {
+        const filePath = path.join(rootDir, 'ide_no_await_file.txt');
+        const params = { file_path: filePath, content: 'test' };
+        const invocation = tool.build(params);
+
+        let diffPromiseResolved = false;
+        const diffPromise = new Promise<DiffUpdateResult>((resolve) => {
+          setTimeout(() => {
+            diffPromiseResolved = true;
+            resolve({ status: 'accepted', content: 'ide-modified-content' });
+          }, 50); // A small delay to ensure the check happens before resolution
+        });
+        mockIdeClient.openDiff.mockReturnValue(diffPromise);
+
+        const confirmation = (await invocation.shouldConfirmExecute(
+          abortSignal,
+        )) as ToolEditConfirmationDetails;
+
+        // This is the key check: the confirmation details should be returned
+        // *before* the diffPromise is resolved.
+        expect(diffPromiseResolved).toBe(false);
+        expect(confirmation).toBeDefined();
+        expect(confirmation.ideConfirmation).toBe(diffPromise);
+
+        // Now, we can await the promise to let the test finish cleanly.
+        await diffPromise;
+        expect(diffPromiseResolved).toBe(true);
       });
     });
   });
