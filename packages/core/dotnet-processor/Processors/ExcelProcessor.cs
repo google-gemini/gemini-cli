@@ -34,6 +34,8 @@ public class ExcelProcessor : IProcessor
                 "cols" => await ManageCols(request.Parameters),
                 "style" => await StyleRange(request.Parameters),
                 "validate" => await AddValidation(request.Parameters),
+                "get_used_range" => await GetUsedRangeOperation(request.Parameters),
+                "get_last_row" => await GetLastRowOperation(request.Parameters),
                 _ => ProcessResponse.CreateFailure($"Unsupported operation: {request.Operation}")
             };
         }
@@ -48,6 +50,9 @@ public class ExcelProcessor : IProcessor
         var file = parameters.GetProperty("file").GetString();
         var sheet = parameters.TryGetProperty("sheet", out var sheetElement) ? sheetElement.GetString() : null;
         var range = parameters.TryGetProperty("range", out var rangeElement) ? rangeElement.GetString() : null;
+        var maxRows = parameters.TryGetProperty("maxRows", out var maxRowsElement) ? maxRowsElement.GetInt32() : 100;
+        var startRow = parameters.TryGetProperty("startRow", out var startRowElement) ? startRowElement.GetInt32() : 1;
+        var summaryMode = parameters.TryGetProperty("summaryMode", out var summaryModeElement) && summaryModeElement.GetBoolean();
 
         if (string.IsNullOrEmpty(file))
             return ProcessResponse.CreateFailure("File parameter is required");
@@ -84,11 +89,11 @@ public class ExcelProcessor : IProcessor
                     return ProcessResponse.CreateFailure($"Sheet '{sheet}' not found. Available sheets: {string.Join(", ", availableSheets)}");
                 }
 
-                var result = ReadWorksheetData(worksheet, range);
+                var result = ReadWorksheetDataWithPagination(worksheet, range, startRow, maxRows, summaryMode);
                 var usedRange = GetUsedRange(worksheet);
                 
                 return ProcessResponse.CreateSuccess(
-                    $"excel(read): Read {result.RowCount} rows from {worksheet.Name}\nData preview:\n{FormatDataPreview(result.Data)}",
+                    result.Message,
                     $"excel(read): Read {result.RowCount} rows from {worksheet.Name}",
                     new Dictionary<string, object?>
                     {
@@ -97,7 +102,10 @@ public class ExcelProcessor : IProcessor
                         ["colCount"] = result.ColCount,
                         ["sheet"] = worksheet.Name,
                         ["usedRange"] = usedRange,
-                        ["formulas"] = result.Formulas
+                        ["formulas"] = result.Formulas,
+                        ["progress"] = result.Progress,
+                        ["dataSummary"] = result.DataSummary,
+                        ["message"] = result.Message
                     }
                 );
             }
@@ -1878,6 +1886,112 @@ public class ExcelProcessor : IProcessor
 
     #region Helper Methods
 
+    private (object[][] Data, int RowCount, int ColCount, FormulaInfo[] Formulas, object? Progress, object? DataSummary, string Message) ReadWorksheetDataWithPagination(IXLWorksheet worksheet, string? range, int startRow, int maxRows, bool summaryMode)
+    {
+        // First, get the total range to calculate statistics
+        var totalUsedRange = worksheet.RangeUsed();
+        var totalRows = totalUsedRange?.RowCount() ?? 0;
+        var totalCols = totalUsedRange?.ColumnCount() ?? 0;
+        var totalCells = totalRows * totalCols;
+
+        // Adjust startRow to be 1-based and valid
+        startRow = Math.Max(startRow, 1);
+        var endRow = Math.Min(startRow + maxRows - 1, totalRows);
+        var rowsToRead = Math.Max(0, endRow - startRow + 1);
+
+        var data = new List<object[]>();
+        var formulas = new List<FormulaInfo>();
+
+        if (totalUsedRange != null && totalRows > 0)
+        {
+            // Determine the range to read
+            IXLRange readRange;
+            if (!string.IsNullOrEmpty(range))
+            {
+                // Use specified range but limit rows
+                var specifiedRange = worksheet.Range(range);
+                var startCol = specifiedRange.FirstColumn().ColumnNumber();
+                var endCol = specifiedRange.LastColumn().ColumnNumber();
+                var actualStartRow = Math.Max(startRow, specifiedRange.FirstRow().RowNumber());
+                var actualEndRow = Math.Min(endRow, specifiedRange.LastRow().RowNumber());
+                
+                if (actualStartRow <= actualEndRow)
+                {
+                    readRange = worksheet.Range(actualStartRow, startCol, actualEndRow, endCol);
+                }
+                else
+                {
+                    readRange = worksheet.Range(startRow, startCol, startRow, endCol); // Single row fallback
+                }
+            }
+            else
+            {
+                // Use full used range but limit rows
+                var startCol = totalUsedRange.FirstColumn().ColumnNumber();
+                var endCol = totalUsedRange.LastColumn().ColumnNumber();
+                readRange = worksheet.Range(startRow, startCol, Math.Min(endRow, totalRows), endCol);
+            }
+
+            // Read the data
+            foreach (var row in readRange.Rows())
+            {
+                var rowData = new List<object>();
+                foreach (var cell in row.Cells())
+                {
+                    var cellInfo = GetCellValue(cell);
+                    rowData.Add(cellInfo.Value);
+                    
+                    if (cellInfo.IsFormula && !string.IsNullOrEmpty(cellInfo.Formula))
+                    {
+                        formulas.Add(new FormulaInfo
+                        {
+                            Cell = cell.Address.ToString(),
+                            Formula = cellInfo.Formula,
+                            Value = cellInfo.CalculatedValue
+                        });
+                    }
+                }
+                data.Add(rowData.ToArray());
+            }
+        }
+
+        // Calculate progress information
+        var progress = new
+        {
+            totalRows = totalRows,
+            totalColumns = totalCols,
+            totalCells = totalCells,
+            rowsRead = rowsToRead,
+            startRow = startRow,
+            endRow = endRow,
+            hasMoreData = endRow < totalRows,
+            remainingRows = Math.Max(0, totalRows - endRow),
+            completionPercentage = totalRows > 0 ? Math.Round((double)endRow / totalRows * 100, 1) : 100.0
+        };
+
+        // Create data summary if needed
+        object? dataSummary = null;
+        if (summaryMode || totalRows > maxRows * 2)
+        {
+            dataSummary = new
+            {
+                sampleRows = data.Take(3).ToArray(),
+                dataTypes = data.Count > 0 && data[0].Length > 0 ? 
+                    data[0].Select(cell => cell?.GetType().Name ?? "null").ToArray() : 
+                    new string[0],
+                rowCount = data.Count,
+                columnCount = data.Count > 0 ? data[0].Length : 0
+            };
+        }
+
+        // Create progress message
+        var message = progress.hasMoreData 
+            ? $"excel(read): Read {rowsToRead} rows (rows {startRow}-{endRow}) out of {totalRows} total rows from {worksheet.Name}. {progress.remainingRows} rows remaining.\nData preview:\n{FormatDataPreview(data.ToArray())}"
+            : $"excel(read): Read all {rowsToRead} rows from {worksheet.Name}.\nData preview:\n{FormatDataPreview(data.ToArray())}";
+
+        return (data.ToArray(), data.Count, data.FirstOrDefault()?.Length ?? 0, formulas.ToArray(), progress, dataSummary, message);
+    }
+
     private (object[][] Data, int RowCount, int ColCount, FormulaInfo[] Formulas) ReadWorksheetData(IXLWorksheet worksheet, string? range)
     {
         var data = new List<object[]>();
@@ -1910,11 +2024,11 @@ public class ExcelProcessor : IProcessor
         }
         else
         {
-            // Read used range, limited to first 20 rows for performance
+            // Read used range with reasonable limit
             var usedRange = worksheet.RangeUsed();
             if (usedRange != null)
             {
-                var maxRows = Math.Min(usedRange.RowCount(), 20);
+                var maxRows = Math.Min(usedRange.RowCount(), 100); // Increased from 20 to 100
                 for (int r = 1; r <= maxRows; r++)
                 {
                     var rowData = new List<object>();
@@ -2134,6 +2248,142 @@ public class ExcelProcessor : IProcessor
                   .Replace("_", "\\_")
                   .Replace("`", "\\`")
                   .Replace("#", "\\#");
+    }
+
+    private async Task<ProcessResponse> GetUsedRangeOperation(JsonElement parameters)
+    {
+        var file = parameters.GetProperty("file").GetString();
+        var sheet = parameters.TryGetProperty("sheet", out var sheetElement) ? sheetElement.GetString() : null;
+
+        if (string.IsNullOrEmpty(file))
+            return ProcessResponse.CreateFailure("File parameter is required");
+
+        if (!File.Exists(file))
+            return ProcessResponse.CreateFailure($"File not found: {file}");
+
+        try
+        {
+            using var workbook = new XLWorkbook(file);
+
+            IXLWorksheet worksheet;
+            if (!string.IsNullOrEmpty(sheet))
+            {
+                worksheet = workbook.Worksheets.FirstOrDefault(w => w.Name == sheet);
+                if (worksheet == null)
+                {
+                    var availableSheets = workbook.Worksheets.Select(w => w.Name).ToArray();
+                    return ProcessResponse.CreateFailure($"Sheet '{sheet}' not found. Available sheets: {string.Join(", ", availableSheets)}");
+                }
+            }
+            else
+            {
+                worksheet = workbook.Worksheets.FirstOrDefault();
+                if (worksheet == null)
+                {
+                    return ProcessResponse.CreateFailure("No worksheets found in Excel file");
+                }
+            }
+
+            var usedRange = worksheet.RangeUsed();
+            if (usedRange == null)
+            {
+                return ProcessResponse.CreateSuccess(
+                    $"excel(get_used_range): No data found in sheet '{worksheet.Name}'",
+                    $"excel(get_used_range): No data found in {worksheet.Name}",
+                    new Dictionary<string, object?>
+                    {
+                        ["file"] = file,
+                        ["sheet"] = worksheet.Name,
+                        ["usedRange"] = "A1:A1",
+                        ["lastRow"] = 0,
+                        ["lastColumn"] = "A"
+                    }
+                );
+            }
+
+            var usedRangeAddress = $"{usedRange.FirstCell().Address.ToString()}:{usedRange.LastCell().Address.ToString()}";
+            var lastRow = usedRange.LastRow().RowNumber();
+            var lastColumn = GetColumnLetter(usedRange.LastColumn().ColumnNumber());
+
+            return ProcessResponse.CreateSuccess(
+                $"excel(get_used_range): Sheet '{worksheet.Name}' used range: {usedRangeAddress} ({usedRange.RowCount()} rows × {usedRange.ColumnCount()} columns)",
+                $"excel(get_used_range): Used range {usedRangeAddress}",
+                new Dictionary<string, object?>
+                {
+                    ["file"] = file,
+                    ["sheet"] = worksheet.Name,
+                    ["usedRange"] = usedRangeAddress,
+                    ["lastRow"] = lastRow,
+                    ["lastColumn"] = lastColumn
+                }
+            );
+        }
+        catch (Exception ex)
+        {
+            return ProcessResponse.CreateFailure($"Failed to get used range: {ex.Message}");
+        }
+    }
+
+    private async Task<ProcessResponse> GetLastRowOperation(JsonElement parameters)
+    {
+        var file = parameters.GetProperty("file").GetString();
+        var sheet = parameters.TryGetProperty("sheet", out var sheetElement) ? sheetElement.GetString() : null;
+
+        if (string.IsNullOrEmpty(file))
+            return ProcessResponse.CreateFailure("File parameter is required");
+
+        if (!File.Exists(file))
+            return ProcessResponse.CreateFailure($"File not found: {file}");
+
+        try
+        {
+            using var workbook = new XLWorkbook(file);
+
+            IXLWorksheet worksheet;
+            if (!string.IsNullOrEmpty(sheet))
+            {
+                worksheet = workbook.Worksheets.FirstOrDefault(w => w.Name == sheet);
+                if (worksheet == null)
+                {
+                    var availableSheets = workbook.Worksheets.Select(w => w.Name).ToArray();
+                    return ProcessResponse.CreateFailure($"Sheet '{sheet}' not found. Available sheets: {string.Join(", ", availableSheets)}");
+                }
+            }
+            else
+            {
+                worksheet = workbook.Worksheets.FirstOrDefault();
+                if (worksheet == null)
+                {
+                    return ProcessResponse.CreateFailure("No worksheets found in Excel file");
+                }
+            }
+
+            var usedRange = worksheet.RangeUsed();
+            int lastRow = 0;
+            string lastColumn = "A";
+
+            if (usedRange != null)
+            {
+                lastRow = usedRange.LastRow().RowNumber();
+                lastColumn = GetColumnLetter(usedRange.LastColumn().ColumnNumber());
+            }
+
+            return ProcessResponse.CreateSuccess(
+                $"excel(get_last_row): Sheet '{worksheet.Name}' last row with data: {lastRow}, last column: {lastColumn}",
+                $"excel(get_last_row): Last row {lastRow}, last column {lastColumn}",
+                new Dictionary<string, object?>
+                {
+                    ["file"] = file,
+                    ["sheet"] = worksheet.Name,
+                    ["lastRow"] = lastRow,
+                    ["lastColumn"] = lastColumn
+                }
+            );
+        }
+        catch (Exception ex)
+        {
+            return ProcessResponse.CreateFailure($"Failed to get last row: {ex.Message}");
+        }
     }
 
     #endregion
