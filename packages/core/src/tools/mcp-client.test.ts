@@ -136,9 +136,83 @@ describe('mcp-client', () => {
         false,
       );
       await client.connect();
-      await client.discover({} as Config);
+      const mockConfig = {
+        getDebugMode: vi.fn().mockReturnValue(true),
+      } as unknown as Config;
+      await client.discover(mockConfig);
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
       expect(consoleWarnSpy).toHaveBeenCalledTimes(2);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
+          `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
+      );
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('should skip schema logging when debug mode is disabled', async () => {
+      const consoleWarnSpy = vi
+        .spyOn(console, 'warn')
+        .mockImplementation(() => {});
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      vi.mocked(GenAiLib.mcpToTool).mockReturnValue({
+        tool: () =>
+          Promise.resolve({
+            functionDeclarations: [
+              {
+                name: 'validTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: { type: 'string' },
+                  },
+                },
+              },
+              {
+                name: 'invalidTool',
+                parametersJsonSchema: {
+                  type: 'object',
+                  properties: {
+                    param1: { description: 'a param with no type' },
+                  },
+                },
+              },
+            ],
+          }),
+      } as unknown as GenAiLib.CallableTool);
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+      } as unknown as ToolRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        {} as PromptRegistry,
+        {} as WorkspaceContext,
+        false,
+      );
+      await client.connect();
+      const mockConfig = {
+        getDebugMode: vi.fn().mockReturnValue(false),
+      } as unknown as Config;
+      await client.discover(mockConfig);
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce(); // validTool should be registered
+      expect(consoleWarnSpy).toHaveBeenCalledTimes(1); // Only the first warn, not the schema log
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
           `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,

@@ -593,7 +593,7 @@ export function hasValidTypes(schema: unknown): boolean {
   }
 
   // Check for JSON Schema keywords that are valid without a type (but don't contain subschemas to validate)
-  const validWithoutType = [
+  const validWithoutType = new Set([
     'const', 'enum', 'default',
     'dependentRequired', 'minContains', 'maxContains',
     // String constraints
@@ -606,13 +606,13 @@ export function hasValidTypes(schema: unknown): boolean {
     'minProperties', 'maxProperties', 'required',
     // Content-related keywords
     'contentMediaType', 'contentEncoding'
-  ];
+  ]);
 
   // Check for combinations of metadata keywords that make a schema valid
-  const metadataKeywords = ['title', 'description', 'examples'];
-  const hasMultipleMetadata = metadataKeywords.filter(keyword => s[keyword] !== undefined).length >= 2;
+  const metadataKeywords = new Set(['title', 'description', 'examples']);
+  const hasMultipleMetadata = Object.keys(s).filter(key => metadataKeywords.has(key)).length >= 2;
   
-  if (validWithoutType.some(keyword => s[keyword] !== undefined) || hasMultipleMetadata) {
+  if (Object.keys(s).some(key => validWithoutType.has(key)) || hasMultipleMetadata) {
     return true;
   }
   
@@ -817,11 +817,13 @@ export async function discoverTools(
               `because it has missing types in its parameter schema. Please file an ` +
               `issue with the owner of the MCP server.`,
           );
-          // Always log the schema for now to help debug
-          console.warn(
-            `Schema for '${funcDecl.name}':`,
-            JSON.stringify(funcDecl.parametersJsonSchema, null, 2),
-          );
+          // Log the schema only in debug mode to help debug
+          if (cliConfig.getDebugMode()) {
+            console.warn(
+              `Schema for '${funcDecl.name}':`,
+              JSON.stringify(funcDecl.parametersJsonSchema, null, 2),
+            );
+          }
           continue;
         }
 
