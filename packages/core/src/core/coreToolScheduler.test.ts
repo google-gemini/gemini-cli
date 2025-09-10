@@ -28,6 +28,7 @@ import {
 } from '../index.js';
 import type { Part, PartListUnion } from '@google/genai';
 import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
+import { makeMockConfig } from '../test-utils/config';
 
 class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
   static readonly Name = 'testApprovalTool';
@@ -232,16 +233,24 @@ describe('CoreToolScheduler', () => {
     });
 
     it('should return an empty string if no tools are available', () => {
-      const mockToolRegistry = {
+  // Use the repo's test helper and override the tool registry to simulate "no tools".
+  const mockConfig = makeMockConfig({
+    getToolRegistry: () =>
+      ({
         getAllToolNames: () => [],
-      } as unknown as ToolRegistry;
-      const mockConfig = makeMockConfig({
-        getToolRegistry: () => ({
-          getAllToolNames: () => [],
-        } as unknown as ToolRegistry),
-      });
-        getToolRegistry: () => mockToolRegistry,
-      } as unknown as Config;
+      } as unknown as ToolRegistry),
+  });
+
+  const scheduler = new CoreToolScheduler({
+    config: mockConfig,
+    getPreferredEditor: () => 'vscode',
+    onEditorClose: vi.fn(),
+  });
+
+  // @ts-expect-error accessing private method
+  const suggestion = scheduler.getToolSuggestion('unknown_tool');
+  expect(suggestion).toBe('');
+});
 
       const scheduler = new CoreToolScheduler({
         config: mockConfig,
