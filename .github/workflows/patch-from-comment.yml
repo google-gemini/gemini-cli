@@ -25,9 +25,9 @@ jobs:
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
-          gh pr view ${{ github.event.issue.number }} --json mergeCommit,state > pr_status.json
-          echo "MERGE_COMMIT_SHA=$(jq -r .mergeCommit.oid pr_status.json)" >> $GITHUB_OUTPUT
-          echo "STATE=$(jq -r .state pr_status.json)" >> $GITHUB_OUTPUT
+          gh pr view "${{ github.event.issue.number }}" --json mergeCommit,state > pr_status.json
+          echo "MERGE_COMMIT_SHA=$(jq -r .mergeCommit.oid pr_status.json)" >> "$GITHUB_OUTPUT"
+          echo "STATE=$(jq -r .state pr_status.json)" >> "$GITHUB_OUTPUT"
 
       - name: 'Dispatch if Merged'
         if: steps.pr_status.outputs.STATE == 'MERGED'
