@@ -315,7 +315,6 @@ describe('loggers', () => {
           response_text: 'test-response',
           prompt_id: 'prompt-id-1',
           auth_type: 'oauth-personal',
-          error: undefined,
         },
       });
 
@@ -324,7 +323,6 @@ describe('loggers', () => {
         'test-model',
         100,
         200,
-        undefined,
       );
 
       expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
@@ -341,7 +339,7 @@ describe('loggers', () => {
       });
     });
 
-    it('should log an API response with an error', () => {
+    it('should log an API response without an error', () => {
       const usageData: GenerateContentResponseUsageMetadata = {
         promptTokenCount: 17,
         candidatesTokenCount: 50,
@@ -356,7 +354,6 @@ describe('loggers', () => {
         AuthType.USE_GEMINI,
         usageData,
         'test-response',
-        'test-error',
       );
 
       logApiResponse(mockConfig, event);
@@ -369,7 +366,7 @@ describe('loggers', () => {
           ...event,
           'event.name': EVENT_API_RESPONSE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
-          'error.message': 'test-error',
+          [SemanticAttributes.HTTP_STATUS_CODE]: 200,
         },
       });
 
