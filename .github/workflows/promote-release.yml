@@ -42,13 +42,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          STABLE_JSON=$(node scripts/get-release-version.cjs --type=stable)
-          PREVIEW_JSON=$(node scripts/get-release-version.cjs --type=preview)
-          NIGHTLY_JSON=$(node scripts/get-release-version.cjs --type=nightly)
+          set -e
+          STABLE_JSON=$(node scripts/get-release-version.js --type=stable)
+          PREVIEW_JSON=$(node scripts/get-release-version.js --type=preview)
+          NIGHTLY_JSON=$(node scripts/get-release-version.js --type=nightly)
           echo "STABLE_VERSION=$(echo "${STABLE_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
+          # shellcheck disable=SC1083
           echo "STABLE_SHA=$(git rev-parse "$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
+          # shellcheck disable=SC1083
           echo "PREVIEW_SHA=$(git rev-parse "$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_PREVIEW_TAG=$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "NEXT_NIGHTLY_VERSION=$(echo "${NIGHTLY_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"

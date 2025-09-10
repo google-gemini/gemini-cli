@@ -1,7 +1,18 @@
 #!/usr/bin/env node
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function getArgs() {
   const args = {};
@@ -18,13 +29,13 @@ function getLatestTag(pattern) {
   const command = `gh release list --limit 100 --json tagName | jq -r '[.[] | select(.tagName | ${pattern})] | .[0].tagName'`;
   try {
     return execSync(command).toString().trim();
-  } catch (error) {
+  } catch {
     // Suppress error output for cleaner test failures
     return '';
   }
 }
 
-function getVersion(options = {}) {
+export function getVersion(options = {}) {
   const args = getArgs();
   const type = options.type || args.type || 'nightly';
 
@@ -33,7 +44,9 @@ function getVersion(options = {}) {
   let previousReleaseTag;
 
   if (type === 'nightly') {
-    const packageJson = require('../package.json');
+    const packageJson = JSON.parse(
+      readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8'),
+    );
     const [major, minor] = packageJson.version.split('.');
     const nextMinor = parseInt(minor) + 1;
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -70,8 +83,6 @@ function getVersion(options = {}) {
   };
 }
 
-if (require.main === module) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   console.log(JSON.stringify(getVersion(), null, 2));
 }
-
-module.exports = { getVersion };

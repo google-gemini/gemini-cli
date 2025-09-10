@@ -1,13 +1,18 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { getVersion } from '../get-release-version.cjs';
-import { execSync } from 'child_process';
-import fs from 'fs';
+import { getVersion } from '../get-release-version.js';
+import { execSync } from 'node:child_process';
 
-vi.mock('child_process');
-vi.mock('fs');
+vi.mock('node:child_process');
+vi.mock('node:fs');
 
-vi.mock('../get-release-version.cjs', async () => {
-  const actual = await vi.importActual('../get-release-version.cjs');
+vi.mock('../get-release-version.js', async () => {
+  const actual = await vi.importActual('../get-release-version.js');
   return {
     ...actual,
     getVersion: (options) => {
@@ -33,7 +38,7 @@ describe('getReleaseVersion', () => {
 
   describe('Nightly Workflow Logic', () => {
     it('should calculate the next nightly version based on package.json', async () => {
-      const { getVersion } = await import('../get-release-version.cjs');
+      const { getVersion } = await import('../get-release-version.js');
       const result = getVersion({ type: 'nightly' });
 
       expect(result.releaseVersion).toBe('0.6.0-nightly.20250911.a1b2c3d');
@@ -48,8 +53,8 @@ describe('getReleaseVersion', () => {
       const latestStable = 'v0.4.0';
 
       vi.mocked(execSync).mockImplementation((command) => {
-        if (command.includes('preview')) return latestPreview;
         if (command.includes('not')) return latestStable;
+        if (command.includes('contains("preview")')) return latestPreview;
         return '';
       });
 
