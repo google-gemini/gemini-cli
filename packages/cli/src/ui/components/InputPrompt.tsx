@@ -718,12 +718,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     !shellModeActive && approvalMode === ApprovalMode.YOLO;
 
   let statusColor: string | undefined;
+  let statusText = '';
   if (shellModeActive) {
     statusColor = theme.ui.symbol;
+    statusText = 'Shell mode';
   } else if (showYoloStyling) {
     statusColor = theme.status.error;
+    statusText = 'YOLO mode';
   } else if (showAutoAcceptStyling) {
     statusColor = theme.status.warning;
+    statusText = 'Accepting edits';
   }
 
   return (
@@ -735,7 +739,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
         paddingX={1}
       >
-        <Text color={statusColor ?? theme.text.accent}>
+        <Text
+          color={statusColor ?? theme.text.accent}
+          aria-label={statusText || undefined}
+        >
           {shellModeActive ? (
             reverseSearchActive ? (
               <Text
