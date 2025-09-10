@@ -34,13 +34,15 @@ describe('GitIgnoreParser', () => {
   });
 
   describe('Basic ignore behaviors', () => {
-    it('should not ignore files when no .gitignore exists', async () => {
+    beforeEach(async () => {
       await setupGitRepo();
+    });
+
+    it('should not ignore files when no .gitignore exists', async () => {
       expect(parser.isIgnored('file.txt')).toBe(false);
     });
 
     it('should ignore files based on a root .gitignore', async () => {
-      await setupGitRepo();
       const gitignoreContent = `
 # Comment
 node_modules/
@@ -60,7 +62,6 @@ node_modules/
     });
 
     it('should handle git exclude file', async () => {
-      await setupGitRepo();
       await createTestFile(
         path.join('.git', 'info', 'exclude'),
         'temp/\n*.tmp',
@@ -207,8 +208,11 @@ src/*.tmp
   });
 
   describe('precedence rules', () => {
-    it('should prioritize nested .gitignore over root .gitignore', async () => {
+    beforeEach(async () => {
       await setupGitRepo();
+    });
+
+    it('should prioritize nested .gitignore over root .gitignore', async () => {
       await createTestFile('.gitignore', '*.log');
       await createTestFile('a/b/.gitignore', '!special.log');
 
@@ -217,7 +221,6 @@ src/*.tmp
     });
 
     it('should prioritize .gitignore over .git/info/exclude', async () => {
-      await setupGitRepo();
       // Exclude all .log files
       await createTestFile(path.join('.git', 'info', 'exclude'), '*.log');
       // But make an exception in the root .gitignore
