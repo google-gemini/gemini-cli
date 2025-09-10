@@ -4,33 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box } from 'ink';
-import { StreamingContext } from './contexts/StreamingContext.js';
-import { Notifications } from './components/Notifications.js';
-import { MainContent } from './components/MainContent.js';
-import { DialogManager } from './components/DialogManager.js';
-import { Composer } from './components/Composer.js';
 import { useUIState } from './contexts/UIStateContext.js';
 import { QuittingDisplay } from './components/QuittingDisplay.js';
+import { useScreenReaderLayout } from './layouts/useScreenReaderLayout.js';
+import { ScreenReaderAppLayout } from './layouts/ScreenReaderAppLayout.js';
+import { DefaultAppLayout } from './layouts/DefaultAppLayout.js';
 
 export const App = () => {
   const uiState = useUIState();
+  const layout = useScreenReaderLayout();
 
   if (uiState.quittingMessages) {
     return <QuittingDisplay />;
   }
 
-  return (
-    <StreamingContext.Provider value={uiState.streamingState}>
-      <Box flexDirection="column" width="90%">
-        <MainContent />
+  // Use appropriate layout based on screen reader mode
+  if (layout.mode === 'screenReader') {
+    return <ScreenReaderAppLayout />;
+  }
 
-        <Box flexDirection="column" ref={uiState.mainControlsRef}>
-          <Notifications />
-
-          {uiState.dialogsVisible ? <DialogManager /> : <Composer />}
-        </Box>
-      </Box>
-    </StreamingContext.Provider>
-  );
+  return <DefaultAppLayout />;
 };
