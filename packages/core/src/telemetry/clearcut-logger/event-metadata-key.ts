@@ -77,6 +77,9 @@ export enum EventMetadataKey {
   // Logs the tool call error type, if any.
   GEMINI_CLI_TOOL_CALL_ERROR_TYPE = 19,
 
+  // Logs the length of tool output
+  GEMINI_CLI_TOOL_CALL_CONTENT_LENGTH = 93,
+
   // ==========================================================================
   // GenAI API Request Event Keys
   // ===========================================================================
