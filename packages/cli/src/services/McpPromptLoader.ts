@@ -145,25 +145,30 @@ export class McpPromptLoader implements ICommandLoader {
             commandContext: CommandContext,
             partialArg: string,
           ) => {
-            const rawInvocation = commandContext.invocation?.raw;
-            if (!prompt || !prompt.arguments || !rawInvocation) {
+            const invocation = commandContext.invocation;
+            if (!prompt || !prompt.arguments || !invocation) {
               return [];
             }
             const emptyFlagArguments = prompt.arguments.map(
               (argument) => `--${argument.name}="`,
             );
 
+            let promptInputs = this.parseArgs(invocation.args, prompt.arguments);
+            if (promptInputs instanceof Error) {
+              promptInputs = {};
+            }
+
             const unusedArguments = emptyFlagArguments.filter(
               (flagArgument) => {
                 const regex = new RegExp(`${flagArgument}([^"]*)"`);
-                return !regex.test(rawInvocation);
+                return !regex.test(invocation.raw);
               },
             );
 
             const exactlyMatchingArgumentAtTheEnd = unusedArguments.filter(
               (flagArgument) => {
                 const regex = new RegExp(`${flagArgument}[^"]*$`);
-                return regex.test(rawInvocation);
+                return regex.test(invocation.raw);
               },
             );
 
