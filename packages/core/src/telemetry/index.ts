@@ -30,7 +30,6 @@ export {
   logConversationFinishedEvent,
   logKittySequenceOverflow,
   logResearchOptIn,
-  logResearchFeedback,
   logChatCompression,
 } from './loggers.js';
 export type {
@@ -38,7 +37,6 @@ export type {
   ChatCompressionEvent,
   TelemetryEvent,
   ResearchOptInEvent,
-  ResearchFeedbackEvent,
 } from './types.js';
 export {
   SlashCommandStatus,
@@ -54,7 +52,6 @@ export {
   KittySequenceOverflowEvent,
   makeSlashCommandEvent,
   makeResearchOptInEvent,
-  makeResearchFeedbackEvent,
   makeChatCompressionEvent,
 } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';

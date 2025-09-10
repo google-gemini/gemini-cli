@@ -21,8 +21,6 @@ import {
   SERVICE_NAME,
   EVENT_SLASH_COMMAND,
   EVENT_RESEARCH_OPT_IN,
-  EVENT_RESEARCH_FEEDBACK,
-  truncateFeedbackContent,
   EVENT_CONVERSATION_FINISHED,
   EVENT_CHAT_COMPRESSION,
   EVENT_MALFORMED_JSON_RESPONSE,
@@ -48,7 +46,6 @@ import type {
   ConversationFinishedEvent,
   KittySequenceOverflowEvent,
   ResearchOptInEvent,
-  ResearchFeedbackEvent,
   ChatCompressionEvent,
   MalformedJsonResponseEvent,
   InvalidChunkEvent,
@@ -574,33 +571,6 @@ export function logResearchOptIn(
   logger.emit(logRecord);
 }
 
-export function logResearchFeedback(
-  config: Config,
-  event: ResearchFeedbackEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logResearchFeedbackEvent(event);
-  if (!isTelemetrySdkInitialized()) return;
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    feedback_type: event.feedback_type,
-    ...(event.feedback_content && {
-      feedback_content: truncateFeedbackContent(event.feedback_content),
-    }),
-    ...(event.user_id && { user_id: event.user_id }),
-    'event.name': EVENT_RESEARCH_FEEDBACK,
-    'event.timestamp': event['event.timestamp'],
-    // Convert survey_responses to string to comply with LogAttributes type
-    ...(event.survey_responses && {
-      survey_responses: safeJsonStringify(event.survey_responses),
-    }),
-  };
-  const logger = logs.getLogger(SERVICE_NAME);
-  const logRecord: LogRecord = {
-    body: `Research feedback: ${event.feedback_type}`,
-    attributes,
-  };
-  logger.emit(logRecord);
-}
 
 export function logMalformedJsonResponse(
   config: Config,

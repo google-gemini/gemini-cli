@@ -452,30 +452,6 @@ export function makeResearchOptInEvent({
   };
 }
 
-export interface ResearchFeedbackEvent extends BaseTelemetryEvent {
-  'event.name': 'research_feedback';
-  'event.timestamp': string;
-  feedback_type: 'survey' | 'conversational' | 'web';
-  feedback_content?: string;
-  survey_responses?: Record<string, unknown>;
-  user_id?: string;
-}
-
-export function makeResearchFeedbackEvent({
-  feedback_type,
-  feedback_content,
-  survey_responses,
-  user_id,
-}: Omit<ResearchFeedbackEvent, CommonFields>): ResearchFeedbackEvent {
-  return {
-    'event.name': 'research_feedback',
-    'event.timestamp': new Date().toISOString(),
-    feedback_type,
-    feedback_content,
-    survey_responses,
-    user_id,
-  };
-}
 
 export class FileOperationEvent implements BaseTelemetryEvent {
   'event.name': 'file_operation';
@@ -576,7 +552,6 @@ export type TelemetryEvent =
   | ConversationFinishedEvent
   | SlashCommandEvent
   | ResearchOptInEvent
-  | ResearchFeedbackEvent
   | FileOperationEvent
   | FileOperationEvent
   | InvalidChunkEvent

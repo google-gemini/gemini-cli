@@ -943,16 +943,6 @@ const SETTINGS_SCHEMA = {
     },
   },
 
-  skipNextSpeakerCheck: {
-    type: 'boolean',
-    label: 'Skip Next Speaker Check',
-    category: 'General',
-    requiresRestart: false,
-    default: false,
-    description: 'Skip the next speaker check.',
-    showInDialog: true,
-  },
-
   researchOptIn: {
     type: 'boolean',
     label: 'Research Participation',

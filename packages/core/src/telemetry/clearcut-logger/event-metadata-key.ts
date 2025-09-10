@@ -276,14 +276,8 @@ export enum EventMetadataKey {
   // Logs the user ID for research events
   GEMINI_CLI_RESEARCH_USER_ID = 68,
 
-  // Logs the type of research feedback
-  GEMINI_CLI_RESEARCH_FEEDBACK_TYPE = 69,
-
-  // Logs the content of research feedback
-  GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT = 70,
-
   // Logs survey responses for research feedback (JSON stringified)
-  GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 71,
+  GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 69,
 
   // ==========================================================================
   // File Operation Event Keys

@@ -20,7 +20,6 @@ import type {
   ConversationFinishedEvent,
   KittySequenceOverflowEvent,
   ResearchOptInEvent,
-  ResearchFeedbackEvent,
   ChatCompressionEvent,
   FileOperationEvent,
   InvalidChunkEvent,
@@ -36,7 +35,6 @@ import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { DetectedIde, detectIdeFromEnv } from '../../ide/detect-ide.js';
-import { truncateFeedbackContent } from '../constants.js';
 
 export enum EventNames {
   START_SESSION = 'start_session',
@@ -57,7 +55,6 @@ export enum EventNames {
   KITTY_SEQUENCE_OVERFLOW = 'kitty_sequence_overflow',
   CHAT_COMPRESSION = 'chat_compression',
   RESEARCH_OPT_IN = 'research_opt_in',
-  RESEARCH_FEEDBACK = 'research_feedback',
   CONVERSATION_FINISHED = 'conversation_finished',
   INVALID_CHUNK = 'invalid_chunk',
   CONTENT_RETRY = 'content_retry',
@@ -447,7 +444,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
-        value: JSON.stringify(event.function_name),
+        value: `${event.function_name}`,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_DECISION,
@@ -463,15 +460,15 @@ export class ClearcutLogger {
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_ERROR_MESSAGE,
-        value: JSON.stringify(event.error),
+        value: `${event.error}`,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_ERROR_TYPE,
-        value: JSON.stringify(event.error_type),
+        value: `${event.error_type}`,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_TYPE,
-        value: JSON.stringify(event.tool_type),
+        value: `${event.tool_type}`,
       },
     ];
 
@@ -502,11 +499,11 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
-        value: JSON.stringify(event.tool_name),
+        value: `${event.tool_name}`,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_TYPE,
-        value: JSON.stringify(event.operation),
+        value: `${event.operation}`,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_LINES,
@@ -514,11 +511,11 @@ export class ClearcutLogger {
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_MIMETYPE,
-        value: JSON.stringify(event.mimetype),
+        value: `${event.mimetype}`,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_FILE_OPERATION_EXTENSION,
-        value: JSON.stringify(event.extension),
+        value: `${event.extension}`,
       },
     ];
 
@@ -538,7 +535,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
-        value: JSON.stringify(event.model),
+        value: `${event.model}`,
       },
     ];
 
@@ -550,7 +547,7 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_RESPONSE_MODEL,
-        value: JSON.stringify(event.model),
+        value: `${event.model}`,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_RESPONSE_STATUS_CODE,
@@ -599,11 +596,11 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_MODEL,
-        value: JSON.stringify(event.model),
+        value: `${event.model}`,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_TYPE,
-        value: JSON.stringify(event.error_type),
+        value: `${event.error_type}`,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_STATUS_CODE,
@@ -684,21 +681,21 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_NAME,
-        value: JSON.stringify(event.command),
+        value: `${event.command}`,
       },
     ];
 
     if (event.subcommand) {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_SUBCOMMAND,
-        value: JSON.stringify(event.subcommand),
+        value: `${event.subcommand}`,
       });
     }
 
     if (event.status) {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SLASH_COMMAND_STATUS,
-        value: JSON.stringify(event.status),
+        value: `${event.status}`,
       });
     }
 
@@ -711,7 +708,7 @@ export class ClearcutLogger {
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_MALFORMED_JSON_RESPONSE_MODEL,
-        value: JSON.stringify(event.model),
+        value: `${event.model}`,
       },
     ];
 
@@ -788,7 +785,7 @@ export class ClearcutLogger {
     if (event.contact_email) {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_CONTACT_EMAIL,
-        value: JSON.stringify(event.contact_email),
+        value: `${event.contact_email}`,
       });
     }
 
@@ -796,7 +793,7 @@ export class ClearcutLogger {
     if (event.user_id) {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_USER_ID,
-        value: JSON.stringify(event.user_id),
+        value: `${event.user_id}`,
       });
     }
 
@@ -804,46 +801,6 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
-  logResearchFeedbackEvent(event: ResearchFeedbackEvent): void {
-    const data: EventValue[] = [];
-
-    // Add feedback_type if available
-    if (event.feedback_type) {
-      data.push({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_FEEDBACK_TYPE,
-        value: JSON.stringify(event.feedback_type),
-      });
-    }
-
-    // Add feedback_content if available
-    if (event.feedback_content) {
-      data.push({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT,
-        value: JSON.stringify(truncateFeedbackContent(event.feedback_content)),
-      });
-    }
-
-    // Add user_id if available
-    if (event.user_id) {
-      data.push({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_USER_ID,
-        value: JSON.stringify(event.user_id),
-      });
-    }
-
-    // Add survey_responses if available
-    if (event.survey_responses) {
-      data.push({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_SURVEY_RESPONSES,
-        value: safeJsonStringify(event.survey_responses),
-      });
-    }
-
-    this.enqueueLogEvent(
-      this.createLogEvent(EventNames.RESEARCH_FEEDBACK, data),
-    );
-    this.flushIfNeeded();
-  }
 
   logEndSessionEvent(): void {
     // Flush immediately on session end.
