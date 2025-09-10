@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Box } from 'ink';
-import { StreamingContext } from '../contexts/StreamingContext.js';
 import { Notifications } from '../components/Notifications.js';
 import { MainContent } from '../components/MainContent.js';
 import { DialogManager } from '../components/DialogManager.js';
@@ -17,16 +16,14 @@ export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
 
   return (
-    <StreamingContext.Provider value={uiState.streamingState}>
-      <Box flexDirection="column" width="90%">
-        <MainContent />
+    <Box flexDirection="column" width="90%">
+      <MainContent />
 
-        <Box flexDirection="column" ref={uiState.mainControlsRef}>
-          <Notifications />
+      <Box flexDirection="column" ref={uiState.mainControlsRef}>
+        <Notifications />
 
-          {uiState.dialogsVisible ? <DialogManager /> : <Composer />}
-        </Box>
+        {uiState.dialogsVisible ? <DialogManager /> : <Composer />}
       </Box>
-    </StreamingContext.Provider>
+    </Box>
   );
 };

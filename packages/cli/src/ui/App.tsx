@@ -5,6 +5,7 @@
  */
 
 import { useUIState } from './contexts/UIStateContext.js';
+import { StreamingContext } from './contexts/StreamingContext.js';
 import { QuittingDisplay } from './components/QuittingDisplay.js';
 import { useScreenReaderLayout } from './layouts/useScreenReaderLayout.js';
 import { ScreenReaderAppLayout } from './layouts/ScreenReaderAppLayout.js';
@@ -18,10 +19,13 @@ export const App = () => {
     return <QuittingDisplay />;
   }
 
-  // Use appropriate layout based on screen reader mode
-  if (layout.mode === 'screenReader') {
-    return <ScreenReaderAppLayout />;
-  }
-
-  return <DefaultAppLayout />;
+  return (
+    <StreamingContext.Provider value={uiState.streamingState}>
+      {layout.mode === 'screenReader' ? (
+        <ScreenReaderAppLayout />
+      ) : (
+        <DefaultAppLayout />
+      )}
+    </StreamingContext.Provider>
+  );
 };

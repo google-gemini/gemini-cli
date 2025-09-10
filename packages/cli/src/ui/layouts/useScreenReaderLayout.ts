@@ -14,7 +14,7 @@ export interface LayoutConfig {
 
 export const useScreenReaderLayout = (): LayoutConfig => {
   const isScreenReader = useIsScreenReaderEnabled();
-  
+
   return {
     shouldUseStatic: !isScreenReader,
     shouldShowFooterInComposer: !isScreenReader,
