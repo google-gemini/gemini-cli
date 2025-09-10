@@ -150,7 +150,13 @@ export class McpPromptLoader implements ICommandLoader {
               return [];
             }
             const indexOfFirstSpace = invocation.raw.indexOf(' ') + 1;
-            let promptInputs = indexOfFirstSpace === 0 ? {} : this.parseArgs(invocation.raw.substring(indexOfFirstSpace), prompt.arguments);
+            let promptInputs =
+              indexOfFirstSpace === 0
+                ? {}
+                : this.parseArgs(
+                    invocation.raw.substring(indexOfFirstSpace),
+                    prompt.arguments,
+                  );
             if (promptInputs instanceof Error) {
               promptInputs = {};
             }
@@ -158,15 +164,21 @@ export class McpPromptLoader implements ICommandLoader {
             const providedArgNames = Object.keys(promptInputs);
             const unusedArguments =
               prompt.arguments
-                .filter((arg) => !(providedArgNames.includes(arg.name) && promptInputs[arg.name]))
+                .filter(
+                  (arg) =>
+                    !(
+                      providedArgNames.includes(arg.name) &&
+                      promptInputs[arg.name]
+                    ),
+                )
                 .map((argument) => `--${argument.name}="`) || [];
 
-            const exactlyMatchingArgumentAtTheEnd = prompt.arguments.map((argument) => `--${argument.name}="`).filter(
-              (flagArgument) => {
+            const exactlyMatchingArgumentAtTheEnd = prompt.arguments
+              .map((argument) => `--${argument.name}="`)
+              .filter((flagArgument) => {
                 const regex = new RegExp(`${flagArgument}[^"]*$`);
                 return regex.test(invocation.raw);
-              },
-            );
+              });
 
             if (exactlyMatchingArgumentAtTheEnd.length === 1) {
               if (exactlyMatchingArgumentAtTheEnd[0] === partialArg) {
