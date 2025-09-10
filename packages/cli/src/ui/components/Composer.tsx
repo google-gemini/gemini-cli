@@ -14,7 +14,7 @@ import { InputPrompt } from './InputPrompt.js';
 import { Footer, type FooterProps } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
@@ -112,14 +112,18 @@ export const Composer = () => {
       >
         <Box>
           {process.env['GEMINI_SYSTEM_MD'] && (
-            <Text color={Colors.AccentRed}>|⌐■_■| </Text>
+            <Text color={theme.status.error}>|⌐■_■| </Text>
           )}
           {uiState.ctrlCPressedOnce ? (
-            <Text color={Colors.AccentYellow}>Press Ctrl+C again to exit.</Text>
+            <Text color={theme.status.warning}>
+              Press Ctrl+C again to exit.
+            </Text>
           ) : uiState.ctrlDPressedOnce ? (
-            <Text color={Colors.AccentYellow}>Press Ctrl+D again to exit.</Text>
+            <Text color={theme.status.warning}>
+              Press Ctrl+D again to exit.
+            </Text>
           ) : uiState.showEscapePrompt ? (
-            <Text color={Colors.Gray}>Press Esc again to clear.</Text>
+            <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
           ) : (
             !settings.merged.ui?.hideContextSummary && (
               <ContextSummaryDisplay
