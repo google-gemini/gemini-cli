@@ -717,31 +717,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const showYoloStyling =
     !shellModeActive && approvalMode === ApprovalMode.YOLO;
 
+  let statusColor: string | undefined;
+  if (shellModeActive) {
+    statusColor = theme.status.warning;
+  } else if (showYoloStyling) {
+    statusColor = theme.status.error;
+  } else if (showAutoAcceptStyling) {
+    statusColor = theme.status.success;
+  }
+
   return (
     <>
       <Box
         borderStyle="round"
-        borderColor={
-          shellModeActive
-            ? theme.status.warning
-            : showYoloStyling
-              ? theme.status.error
-              : showAutoAcceptStyling
-                ? theme.status.success
-                : theme.border.focused
-        }
+        borderColor={statusColor ?? theme.border.focused}
         paddingX={1}
       >
         <Text
-          color={
-            shellModeActive
-              ? theme.status.warning
-              : showYoloStyling
-                ? theme.status.error
-                : showAutoAcceptStyling
-                  ? theme.status.success
-                  : theme.text.accent
-          }
+          color={statusColor ?? theme.text.accent}
         >
           {shellModeActive ? (
             reverseSearchActive ? (
