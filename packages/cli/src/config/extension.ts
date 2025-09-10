@@ -710,14 +710,16 @@ export async function checkForExtensionUpdates(
       const remotes = await git.getRemotes(true);
       if (remotes.length === 0) {
         results.set(extension.config.name, {
-          status: ExtensionUpdateStatus.UpToDate,
+          status: ExtensionUpdateStatus.Error,
+          error: 'No git remotes found.',
         });
         continue;
       }
       const remoteUrl = remotes[0].refs.fetch;
       if (!remoteUrl) {
         results.set(extension.config.name, {
-          status: ExtensionUpdateStatus.UpToDate,
+          status: ExtensionUpdateStatus.Error,
+          error: `No fetch URL found for git remote ${remotes[0].name}.`,
         });
         continue;
       }
@@ -729,7 +731,8 @@ export async function checkForExtensionUpdates(
 
       if (typeof lsRemoteOutput !== 'string' || lsRemoteOutput.trim() === '') {
         results.set(extension.config.name, {
-          status: ExtensionUpdateStatus.UpToDate,
+          status: ExtensionUpdateStatus.Error,
+          error: `Git ref ${refToCheck} not found.`,
         });
         continue;
       }
@@ -737,13 +740,18 @@ export async function checkForExtensionUpdates(
       const remoteHash = lsRemoteOutput.split('\t')[0];
       const localHash = await git.revparse(['HEAD']);
 
-      if (remoteHash && remoteHash !== localHash) {
+      if (!remoteHash) {
         results.set(extension.config.name, {
-          status: ExtensionUpdateStatus.UpdateAvailable,
+          status: ExtensionUpdateStatus.Error,
+          error: `Unable to parse hash from git ls-remote output "${lsRemoteOutput}"`,
+        });
+      } else if (remoteHash === localHash) {
+        results.set(extension.config.name, {
+          status: ExtensionUpdateStatus.UpToDate,
         });
       } else {
         results.set(extension.config.name, {
-          status: ExtensionUpdateStatus.UpToDate,
+          status: ExtensionUpdateStatus.UpdateAvailable,
         });
       }
     } catch (error) {
