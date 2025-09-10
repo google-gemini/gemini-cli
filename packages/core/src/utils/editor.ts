@@ -180,7 +180,7 @@ export async function openDiff(
       case 'cursor':
       case 'zed':
         // Use spawn for GUI-based editors to avoid blocking the entire process
-        return new Promise((resolve, reject) => {
+        return await new Promise<void>((resolve, reject) => {
           const childProcess = spawn(diffCommand.command, diffCommand.args, {
             stdio: 'inherit',
             shell: true,
