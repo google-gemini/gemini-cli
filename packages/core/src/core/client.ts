@@ -33,7 +33,6 @@ import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
   DEFAULT_THINKING_MODE,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
@@ -841,7 +840,7 @@ export class GeminiClient {
       .getContentGenerator()
       .generateContent(
         {
-          model: DEFAULT_GEMINI_MODEL,
+          model,
           contents: [
             ...historyToCompress,
             {
