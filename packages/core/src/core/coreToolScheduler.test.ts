@@ -1485,7 +1485,7 @@ describe('truncateAndSaveToFile', () => {
     const headLines = lines.slice(0, headCount);
     const tailLines = lines.slice(-tailCount);
 
-    // Build expected truncated content using simple head/tail view
+    // Build expected truncated content using simple head/tail view (new logic)
     const truncatedLines: string[] = [];
     truncatedLines.push(...headLines);
     truncatedLines.push(`... [CONTENT TRUNCATED - ${lines.length - smallTruncateLines} lines hidden] ...`);
@@ -1503,6 +1503,74 @@ describe('truncateAndSaveToFile', () => {
     expect(result.content).toContain('Line 1000'); // Last line
     expect(result.content).not.toContain('Line 500'); // Should not contain middle lines
     expect(result.content).not.toContain('... [MORE CONTENT TRUNCATED] ...'); // Should not have middle section marker
+  });
+
+  it('should show all lines when content length is within truncateLines limit', async () => {
+    const lines = Array.from({ length: 10 }, (_, i) => `Line ${i + 1}`);
+    const content = lines.join('\n');
+    const callId = 'test-no-truncation';
+    const projectTempDir = '/tmp';
+    const truncateLines = 15; // More than enough lines
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      truncateLines,
+    );
+
+    // Should not contain truncation message since lines.length <= truncateLines
+    expect(result.content).not.toContain('CONTENT TRUNCATED');
+    expect(result.content).toContain(content); // Should contain full content
+  });
+
+  it('should handle truncateLines = 0 correctly', async () => {
+    // Create content that exceeds the threshold (40,000 bytes)
+    const lines = Array.from({ length: 1000 }, (_, i) => `Line ${i + 1}: ${'x'.repeat(50)}`); // Each line ~60 chars, total ~60,000 chars
+    const content = lines.join('\n');
+    const callId = 'test-zero-truncate';
+    const projectTempDir = '/tmp';
+    const truncateLines = 0;
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      truncateLines,
+    );
+
+    // Should show only truncation message, no content lines
+    expect(result.content).toContain('... [CONTENT TRUNCATED - 1000 lines hidden] ...');
+    expect(result.content).not.toContain('Line 1'); // Should not contain any actual lines
+  });
+
+  it('should handle negative truncateLines correctly', async () => {
+    // Create content that exceeds the threshold (40,000 bytes)
+    const lines = Array.from({ length: 1000 }, (_, i) => `Line ${i + 1}: ${'x'.repeat(50)}`); // Each line ~60 chars, total ~60,000 chars
+    const content = lines.join('\n');
+    const callId = 'test-negative-truncate';
+    const projectTempDir = '/tmp';
+    const truncateLines = -5;
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      truncateLines,
+    );
+
+    // Should show only truncation message, no content lines
+    expect(result.content).toContain('... [CONTENT TRUNCATED - 1000 lines hidden] ...');
+    expect(result.content).not.toContain('Line 1'); // Should not contain any actual lines
   });
 
   });

@@ -284,7 +284,11 @@ export async function truncateAndSaveToFile(
   const truncatedLines: string[] = [];
   const hiddenLines = lines.length - truncateLines;
 
-  if (truncateLines > 0 && truncateLines < 5) {
+  if (hiddenLines <= 0) {
+    // If the number of lines is less than or equal to the truncation limit,
+    // show all lines without truncation.
+    truncatedLines.push(...lines);
+  } else if (truncateLines > 0 && truncateLines < 5) {
     // Simple head/tail view for small limits (1-4 lines)
     const headCount = Math.ceil(truncateLines / 2);
     const tailCount = truncateLines - headCount;
@@ -292,9 +296,7 @@ export async function truncateAndSaveToFile(
     const tailLines = lines.slice(-tailCount);
 
     truncatedLines.push(...headLines);
-    if (hiddenLines > 0) {
-      truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
-    }
+    truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
     if (tailCount > 0) {
       truncatedLines.push(...tailLines);
     }
@@ -306,15 +308,16 @@ export async function truncateAndSaveToFile(
     
     const beginning = lines.slice(0, head);
     const end = lines.slice(-tail);
+    const middleStart = Math.floor(lines.length / 2) - Math.floor(middle / 2);
+    const middleLines = lines.slice(middleStart, middleStart + middle);
     truncatedLines.push(...beginning);
-    if (hiddenLines > 0) {
-      const middleStart = Math.floor(lines.length / 2) - Math.floor(middle / 2);
-      const middleLines = lines.slice(middleStart, middleStart + middle);
-      truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
-      truncatedLines.push(...middleLines);
-      truncatedLines.push('... [MORE CONTENT TRUNCATED] ...');
-    }
+    truncatedLines.push(`... [CONTENT TRUNCATED - ${hiddenLines} lines hidden] ...`);
+    truncatedLines.push(...middleLines);
+    truncatedLines.push('... [MORE CONTENT TRUNCATED] ...');
     truncatedLines.push(...end);
+  } else {
+    // Handle truncateLines <= 0. Show no lines, just the truncation message.
+    truncatedLines.push(`... [CONTENT TRUNCATED - ${lines.length} lines hidden] ...`);
   }
 
   const truncatedContent = truncatedLines.join('\n');
