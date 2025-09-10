@@ -170,6 +170,7 @@ export const Composer = () => {
           commandContext={uiState.commandContext}
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
+          approvalMode={showAutoAcceptIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
           focus={uiState.isFocused}
           vimHandleInput={uiActions.vimHandleInput}

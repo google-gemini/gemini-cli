@@ -23,6 +23,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
+import { ApprovalMode } from '@google/gemini-cli-core';
 import { parseInputForHighlighting } from '../utils/highlight.js';
 import {
   clipboardHasImage,
@@ -46,6 +47,7 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  approvalMode: ApprovalMode;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
 }
@@ -64,6 +66,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  approvalMode,
   onEscapePromptChange,
   vimHandleInput,
 }) => {
@@ -709,17 +712,29 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const { inlineGhost, additionalLines } = getGhostTextLines();
 
+  const showAutoAcceptStyling = !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
+
   return (
     <>
       <Box
         borderStyle="round"
         borderColor={
-          shellModeActive ? theme.status.warning : theme.border.focused
+          shellModeActive
+            ? theme.status.warning
+            : showAutoAcceptStyling
+              ? theme.status.success
+              : theme.border.focused
         }
         paddingX={1}
       >
         <Text
-          color={shellModeActive ? theme.status.warning : theme.text.accent}
+          color={
+            shellModeActive
+              ? theme.status.warning
+              : showAutoAcceptStyling
+                ? theme.status.success
+                : theme.text.accent
+          }
         >
           {shellModeActive ? (
             reverseSearchActive ? (
