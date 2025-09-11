@@ -1929,7 +1929,7 @@ describe('useGeminiStream', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: 'info',
-          text: 'A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted. Loop detection remains enabled.',
+          text: 'A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.',
         },
         expect.any(Number),
       );
@@ -1969,7 +1969,7 @@ describe('useGeminiStream', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: 'info',
-          text: 'A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted. Loop detection remains enabled.',
+          text: 'A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.',
         },
         expect.any(Number),
       );
