@@ -153,6 +153,12 @@ export const useGeminiStream = (
   );
 
   const loopDetectedRef = useRef(false);
+  const [
+    loopDetectionConfirmationRequest,
+    setLoopDetectionConfirmationRequest,
+  ] = useState<{
+    onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
+  } | null>(null);
 
   const onExec = useCallback(async (done: Promise<void>) => {
     setIsResponding(true);
@@ -588,15 +594,38 @@ export const useGeminiStream = (
     [addItem, config],
   );
 
+  const handleLoopDetectionConfirmation = useCallback(
+    (result: { userSelection: 'disable' | 'keep' }) => {
+      setLoopDetectionConfirmationRequest(null);
+
+      if (result.userSelection === 'disable') {
+        config.getGeminiClient().getLoopDetectionService().disableForSession();
+        addItem(
+          {
+            type: 'info',
+            text: `Loop detection has been disabled for this session. Please try your request again.`,
+          },
+          Date.now(),
+        );
+      } else {
+        addItem(
+          {
+            type: 'info',
+            text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
+          },
+          Date.now(),
+        );
+      }
+    },
+    [config, addItem],
+  );
+
   const handleLoopDetectedEvent = useCallback(() => {
-    addItem(
-      {
-        type: 'info',
-        text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
-      },
-      Date.now(),
-    );
-  }, [addItem]);
+    // Show the confirmation dialog to choose whether to disable loop detection
+    setLoopDetectionConfirmationRequest({
+      onComplete: handleLoopDetectionConfirmation,
+    });
+  }, [handleLoopDetectionConfirmation]);
 
   const processGeminiStreamEvents = useCallback(
     async (
@@ -1045,5 +1074,6 @@ export const useGeminiStream = (
     pendingHistoryItems,
     thought,
     cancelOngoingRequest,
+    loopDetectionConfirmationRequest,
   };
 };
