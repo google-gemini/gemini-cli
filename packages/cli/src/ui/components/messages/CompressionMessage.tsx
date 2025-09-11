@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
 import { Box, Text } from 'ink';
 import type { CompressionProps } from '../../types.js';
 import Spinner from 'ink-spinner';
 import { theme } from '../../semantic-colors.js';
 import { SCREEN_READER_MODEL_PREFIX } from '../../textConstants.js';
+import { CompressionStatus } from '@google/gemini-cli-core';
 
 export interface CompressionDisplayProps {
   compression: CompressionProps;
@@ -19,18 +19,46 @@ export interface CompressionDisplayProps {
  * Compression messages appear when the /compress command is run, and show a loading spinner
  * while compression is in progress, followed up by some compression stats.
  */
-export const CompressionMessage: React.FC<CompressionDisplayProps> = ({
+export function CompressionMessage({
   compression,
-}) => {
-  const text = compression.isPending
-    ? 'Compressing chat history'
-    : `Chat history compressed from ${compression.originalTokenCount ?? 'unknown'}` +
-      ` to ${compression.newTokenCount ?? 'unknown'} tokens.`;
+}: CompressionDisplayProps): React.JSX.Element {
+  const { isPending, originalTokenCount, newTokenCount, compressionStatus } =
+    compression;
+
+  const originalTokens = originalTokenCount ?? 0;
+  const newTokens = newTokenCount ?? 0;
+
+  const getCompressionText = () => {
+    if (isPending) {
+      return 'Compressing chat history';
+    }
+
+    switch (compressionStatus) {
+      case CompressionStatus.COMPRESSED:
+        return `Chat history compressed from ${originalTokens} to ${newTokens} tokens.`;
+      case CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT:
+        // For smaller histories (< 50k tokens), compression overhead likely exceeds benefits
+        if (originalTokens < 50000) {
+          return 'Compression was not beneficial for this history size.';
+        }
+        // For larger histories where compression should work but didn't,
+        // this suggests an issue with the compression process itself
+        return 'Chat history compression did not reduce size. This may indicate issues with the compression prompt.';
+      case CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR:
+        return 'Could not compress chat history due to a token counting error.';
+      case CompressionStatus.NOOP:
+        return 'Chat history is already compressed.';
+      default:
+        return '';
+    }
+  };
+
+  const text = getCompressionText();
 
   return (
     <Box flexDirection="row">
       <Box marginRight={1}>
-        {compression.isPending ? (
+        {isPending ? (
           <Spinner type="dots" />
         ) : (
           <Text color={theme.text.accent}>✦</Text>
@@ -48,4 +76,4 @@ export const CompressionMessage: React.FC<CompressionDisplayProps> = ({
       </Box>
     </Box>
   );
-};
+}
