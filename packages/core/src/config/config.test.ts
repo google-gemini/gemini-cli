@@ -206,9 +206,7 @@ describe('Server Config (config.ts)', () => {
     it('should refresh auth and update config', async () => {
       const config = new Config(baseParams);
       const authType = AuthType.USE_GEMINI;
-      const newModel = 'gemini-flash';
       const mockContentConfig = {
-        model: newModel,
         apiKey: 'test-key',
       };
 
@@ -226,10 +224,8 @@ describe('Server Config (config.ts)', () => {
         config,
         authType,
       );
-      // Verify that contentGeneratorConfig is updated with the new model
+      // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
-      expect(config.getContentGeneratorConfig().model).toBe(newModel);
-      expect(config.getModel()).toBe(newModel); // getModel() should return the updated model
       expect(GeminiClient).toHaveBeenCalledWith(config);
       // Verify that fallback mode is reset
       expect(config.isInFallbackMode()).toBe(false);
