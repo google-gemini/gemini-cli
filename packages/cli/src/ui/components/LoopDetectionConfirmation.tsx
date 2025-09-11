@@ -8,6 +8,7 @@ import { Box, Text } from 'ink';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { theme } from '../semantic-colors.js';
 
 export type LoopDetectionConfirmationResult = {
   userSelection: 'disable' | 'keep';
@@ -33,13 +34,13 @@ export function LoopDetectionConfirmation({
 
   const OPTIONS: Array<RadioSelectItem<LoopDetectionConfirmationResult>> = [
     {
-      label: 'No, keep loop detection enabled and stop (esc)',
+      label: 'Keep loop detection enabled (esc)',
       value: {
         userSelection: 'keep',
       },
     },
     {
-      label: 'Yes, disable loop detection for this session',
+      label: 'Disable loop detection for this session',
       value: {
         userSelection: 'disable',
       },
@@ -50,26 +51,38 @@ export function LoopDetectionConfirmation({
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor="yellow"
-      padding={1}
+      borderColor={theme.status.warning}
       width="100%"
       marginLeft={1}
     >
-      <Box marginBottom={1} flexDirection="column">
-        <Text>
-          <Text color="yellow">⚠️ </Text>
-          Loop Detection Alert
-        </Text>
-        <Text dimColor>
-          A potential loop was detected. This can happen due to repetitive tool
-          calls or other model behavior patterns.
-        </Text>
-        <Text dimColor>
-          Would you like to disable loop detection for this session and
-          continue?
-        </Text>
+      <Box paddingX={1} paddingY={0} flexDirection="column">
+        <Box minHeight={1}>
+          <Box minWidth={3}>
+            <Text color={theme.status.warning} aria-label="Loop detected:">
+              ?
+            </Text>
+          </Box>
+          <Box>
+            <Text wrap="truncate-end">
+              <Text color={theme.text.primary} bold>
+                A potential loop was detected
+              </Text>{' '}
+            </Text>
+          </Box>
+        </Box>
+        <Box width="100%" marginTop={1}>
+          <Box flexDirection="column">
+            <Text color={theme.text.secondary}>
+              This can happen due to repetitive tool calls or other model
+              behavior. Do you want to keep loop detection enabled or disable it
+              for this session?
+            </Text>
+            <Box marginTop={1}>
+              <RadioButtonSelect items={OPTIONS} onSelect={onComplete} />
+            </Box>
+          </Box>
+        </Box>
       </Box>
-      <RadioButtonSelect items={OPTIONS} onSelect={onComplete} />
     </Box>
   );
 }
