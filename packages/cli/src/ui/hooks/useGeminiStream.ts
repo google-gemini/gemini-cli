@@ -102,6 +102,10 @@ export const useGeminiStream = (
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
   onEditorClose: () => void,
   onCancelSubmit: () => void,
+  setShellInputFocused: (value: boolean) => void,
+  terminalWidth: number,
+  terminalHeight: number,
+  isShellFocused?: boolean,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -141,7 +145,6 @@ export const useGeminiStream = (
         }
       },
       config,
-      setPendingHistoryItem,
       getPreferredEditor,
       onEditorClose,
     );
@@ -152,21 +155,49 @@ export const useGeminiStream = (
     [toolCalls],
   );
 
+  const activeToolPtyId = useMemo(() => {
+    const executingShellTool = toolCalls?.find(
+      (tc) =>
+        tc.status === 'executing' && tc.request.name === 'run_shell_command',
+    );
+    if (executingShellTool) {
+      return (executingShellTool as { pid?: number }).pid;
+    }
+    return undefined;
+  }, [toolCalls]);
+
   const loopDetectedRef = useRef(false);
+  const [
+    loopDetectionConfirmationRequest,
+    setLoopDetectionConfirmationRequest,
+  ] = useState<{
+    onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
+  } | null>(null);
 
   const onExec = useCallback(async (done: Promise<void>) => {
     setIsResponding(true);
     await done;
     setIsResponding(false);
   }, []);
-  const { handleShellCommand } = useShellCommandProcessor(
+  const { handleShellCommand, activeShellPtyId } = useShellCommandProcessor(
     addItem,
     setPendingHistoryItem,
     onExec,
     onDebugMessage,
     config,
     geminiClient,
+    setShellInputFocused,
+    terminalWidth,
+    terminalHeight,
   );
+
+  const activePtyId = activeShellPtyId || activeToolPtyId;
+
+  useEffect(() => {
+    if (!activePtyId) {
+      setShellInputFocused(false);
+    }
+  }, [activePtyId, setShellInputFocused]);
 
   const streamingState = useMemo(() => {
     if (toolCalls.some((tc) => tc.status === 'awaiting_approval')) {
@@ -234,17 +265,19 @@ export const useGeminiStream = (
     setPendingHistoryItem(null);
     onCancelSubmit();
     setIsResponding(false);
+    setShellInputFocused(false);
   }, [
     streamingState,
     addItem,
     setPendingHistoryItem,
     onCancelSubmit,
     pendingHistoryItemRef,
+    setShellInputFocused,
   ]);
 
   useKeypress(
     (key) => {
-      if (key.name === 'escape') {
+      if (key.name === 'escape' && !isShellFocused) {
         cancelOngoingRequest();
       }
     },
@@ -588,15 +621,38 @@ export const useGeminiStream = (
     [addItem, config],
   );
 
+  const handleLoopDetectionConfirmation = useCallback(
+    (result: { userSelection: 'disable' | 'keep' }) => {
+      setLoopDetectionConfirmationRequest(null);
+
+      if (result.userSelection === 'disable') {
+        config.getGeminiClient().getLoopDetectionService().disableForSession();
+        addItem(
+          {
+            type: 'info',
+            text: `Loop detection has been disabled for this session. Please try your request again.`,
+          },
+          Date.now(),
+        );
+      } else {
+        addItem(
+          {
+            type: 'info',
+            text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
+          },
+          Date.now(),
+        );
+      }
+    },
+    [config, addItem],
+  );
+
   const handleLoopDetectedEvent = useCallback(() => {
-    addItem(
-      {
-        type: 'info',
-        text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
-      },
-      Date.now(),
-    );
-  }, [addItem]);
+    // Show the confirmation dialog to choose whether to disable loop detection
+    setLoopDetectionConfirmationRequest({
+      onComplete: handleLoopDetectionConfirmation,
+    });
+  }, [handleLoopDetectionConfirmation]);
 
   const processGeminiStreamEvents = useCallback(
     async (
@@ -1045,5 +1101,7 @@ export const useGeminiStream = (
     pendingHistoryItems,
     thought,
     cancelOngoingRequest,
+    activePtyId,
+    loopDetectionConfirmationRequest,
   };
 };
