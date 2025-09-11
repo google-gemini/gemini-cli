@@ -187,6 +187,30 @@ const SETTINGS_SCHEMA = {
       },
     },
   },
+  output: {
+    type: 'object',
+    label: 'Output',
+    category: 'General',
+    requiresRestart: false,
+    default: {},
+    description: 'Settings for the CLI output.',
+    showInDialog: false,
+    properties: {
+      format: {
+        type: 'enum',
+        label: 'Output Format',
+        category: 'General',
+        requiresRestart: false,
+        default: 'text',
+        description: 'The format of the CLI output.',
+        showInDialog: true,
+        options: [
+          { value: 'text', label: 'Text' },
+          { value: 'json', label: 'JSON' },
+        ],
+      },
+    },
+  },
 
   ui: {
     type: 'object',
@@ -662,6 +686,7 @@ const SETTINGS_SCHEMA = {
         default: undefined as string[] | undefined,
         description: 'Tool names to exclude from discovery.',
         showInDialog: false,
+        mergeStrategy: MergeStrategy.UNION,
       },
       discoveryCommand: {
         type: 'string',
