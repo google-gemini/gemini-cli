@@ -71,6 +71,9 @@ import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
 import type { EventEmitter } from 'node:events';
+import { MessageBus } from '../confirmation-bus/message-bus.js';
+import { PolicyEngine } from '../policy/policy-engine.js';
+import type { PolicyEngineConfig } from '../policy/types.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 
@@ -233,6 +236,7 @@ export interface ConfigParameters {
   enableToolOutputTruncation?: boolean;
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
+  policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
 }
 
@@ -316,6 +320,8 @@ export class Config {
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useSmartEdit: boolean;
+  private readonly messageBus: MessageBus;
+  private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
 
   constructor(params: ConfigParameters) {
@@ -400,6 +406,8 @@ export class Config {
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
+    this.policyEngine = new PolicyEngine(params.policyEngineConfig);
+    this.messageBus = new MessageBus(this.policyEngine);
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
@@ -906,6 +914,14 @@ export class Config {
 
   getFileExclusions(): FileExclusions {
     return this.fileExclusions;
+  }
+
+  getMessageBus(): MessageBus {
+    return this.messageBus;
+  }
+
+  getPolicyEngine(): PolicyEngine {
+    return this.policyEngine;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
