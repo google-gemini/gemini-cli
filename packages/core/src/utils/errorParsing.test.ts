@@ -372,4 +372,55 @@ describe('parseAndFormatApiError', () => {
       'upgrade to a Gemini Code Assist Standard or Enterprise plan',
     );
   });
+
+  describe('invalid image handling', () => {
+    const createImageRequest = (mimeType: string = 'image/jpeg') => [
+      'Hello',
+      {
+        inlineData: {
+          mimeType,
+          data: 'base64encodedimagedata',
+        },
+      },
+    ];
+    const expectedAppendedText =
+      'Image is possibly corrupt or has high dimensions.';
+
+    it('should append invalid image context when error mentions invalid image and request contains image', () => {
+      const errorMessage = 'Provided image is not valid.';
+      const request = createImageRequest();
+
+      const result = parseAndFormatApiError(
+        errorMessage,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        request,
+      );
+
+      expect(result).toBe(
+        `[API Error: Provided image is not valid.]\n${expectedAppendedText}`,
+      );
+    });
+
+    it('should not append invalid image context if last request did not have attached image', () => {
+      const error: StructuredError = {
+        message: 'Provided image is not valid.',
+        status: 400,
+      };
+      const request = ['Text in previous request'];
+
+      const result = parseAndFormatApiError(
+        error,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        request,
+      );
+
+      expect(result).toBe(`[API Error: Provided image is not valid.]`);
+    });
+  });
 });
