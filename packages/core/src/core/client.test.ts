@@ -39,8 +39,9 @@ import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { setSimulate429 } from '../utils/testUtils.js';
 import { tokenLimit } from './tokenLimits.js';
-import { ideContext } from '../ide/ideContext.js';
+import { ideContextStore } from '../ide/ideContext.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
+import type { ModelRouterService } from '../routing/modelRouterService.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -234,7 +235,7 @@ describe('Gemini Client (client.ts)', () => {
     mockContentGenerator = {
       generateContent: mockGenerateContentFn,
       generateContentStream: vi.fn(),
-      countTokens: vi.fn(),
+      countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
       embedContent: vi.fn(),
       batchEmbedContents: vi.fn(),
     } as unknown as ContentGenerator;
@@ -248,7 +249,6 @@ describe('Gemini Client (client.ts)', () => {
     };
     const fileService = new FileDiscoveryService('/test/dir');
     const contentGeneratorConfig: ContentGeneratorConfig = {
-      model: 'test-model',
       apiKey: 'test-key',
       vertexai: false,
       authType: AuthType.USE_GEMINI,
@@ -281,6 +281,9 @@ describe('Gemini Client (client.ts)', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getGeminiClient: vi.fn(),
+      getModelRouterService: vi.fn().mockReturnValue({
+        route: vi.fn().mockResolvedValue({ model: 'default-routed-model' }),
+      }),
       isInFallbackMode: vi.fn().mockReturnValue(false),
       setFallbackMode: vi.fn(),
       getChatCompression: vi.fn().mockReturnValue(undefined),
@@ -1004,7 +1007,7 @@ describe('Gemini Client (client.ts)', () => {
 
     it('should include editor context when ideMode is enabled', async () => {
       // Arrange
-      vi.mocked(ideContext.getIdeContext).mockReturnValue({
+      vi.mocked(ideContextStore.get).mockReturnValue({
         workspaceState: {
           openFiles: [
             {
@@ -1053,7 +1056,7 @@ describe('Gemini Client (client.ts)', () => {
       }
 
       // Assert
-      expect(ideContext.getIdeContext).toHaveBeenCalled();
+      expect(ideContextStore.get).toHaveBeenCalled();
       const expectedContext = `
 Here is the user's editor context as a JSON object. This is for your information only.
 \`\`\`json
@@ -1083,7 +1086,7 @@ ${JSON.stringify(
 
     it('should not add context if ideMode is enabled but no open files', async () => {
       // Arrange
-      vi.mocked(ideContext.getIdeContext).mockReturnValue({
+      vi.mocked(ideContextStore.get).mockReturnValue({
         workspaceState: {
           openFiles: [],
         },
@@ -1115,8 +1118,13 @@ ${JSON.stringify(
       }
 
       // Assert
-      expect(ideContext.getIdeContext).toHaveBeenCalled();
+      expect(ideContextStore.get).toHaveBeenCalled();
+      // The `turn.run` method is now called with the model name as the first
+      // argument. We use `expect.any(String)` because this test is
+      // concerned with the IDE context logic, not the model routing,
+      // which is tested in its own dedicated suite.
       expect(mockTurnRunFn).toHaveBeenCalledWith(
+        expect.any(String),
         initialRequest,
         expect.any(Object),
       );
@@ -1124,7 +1132,7 @@ ${JSON.stringify(
 
     it('should add context if ideMode is enabled and there is one active file', async () => {
       // Arrange
-      vi.mocked(ideContext.getIdeContext).mockReturnValue({
+      vi.mocked(ideContextStore.get).mockReturnValue({
         workspaceState: {
           openFiles: [
             {
@@ -1164,7 +1172,7 @@ ${JSON.stringify(
       }
 
       // Assert
-      expect(ideContext.getIdeContext).toHaveBeenCalled();
+      expect(ideContextStore.get).toHaveBeenCalled();
       const expectedContext = `
 Here is the user's editor context as a JSON object. This is for your information only.
 \`\`\`json
@@ -1193,7 +1201,7 @@ ${JSON.stringify(
 
     it('should add context if ideMode is enabled and there are open files but no active file', async () => {
       // Arrange
-      vi.mocked(ideContext.getIdeContext).mockReturnValue({
+      vi.mocked(ideContextStore.get).mockReturnValue({
         workspaceState: {
           openFiles: [
             {
@@ -1234,7 +1242,7 @@ ${JSON.stringify(
       }
 
       // Assert
-      expect(ideContext.getIdeContext).toHaveBeenCalled();
+      expect(ideContextStore.get).toHaveBeenCalled();
       const expectedContext = `
 Here is the user's editor context as a JSON object. This is for your information only.
 \`\`\`json
@@ -1506,6 +1514,178 @@ ${JSON.stringify(
       );
     });
 
+    describe('Model Routing', () => {
+      let mockRouterService: { route: Mock };
+
+      beforeEach(() => {
+        mockRouterService = {
+          route: vi
+            .fn()
+            .mockResolvedValue({ model: 'routed-model', reason: 'test' }),
+        };
+        vi.mocked(mockConfig.getModelRouterService).mockReturnValue(
+          mockRouterService as unknown as ModelRouterService,
+        );
+
+        mockTurnRunFn.mockReturnValue(
+          (async function* () {
+            yield { type: 'content', value: 'Hello' };
+          })(),
+        );
+      });
+
+      it('should use the model router service to select a model on the first turn', async () => {
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-1',
+        );
+        await fromAsync(stream); // consume stream
+
+        expect(mockConfig.getModelRouterService).toHaveBeenCalled();
+        expect(mockRouterService.route).toHaveBeenCalled();
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          'routed-model', // The model from the router
+          [{ text: 'Hi' }],
+          expect.any(Object),
+        );
+      });
+
+      it('should use the same model for subsequent turns in the same prompt (stickiness)', async () => {
+        // First turn
+        let stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-1',
+        );
+        await fromAsync(stream);
+
+        expect(mockRouterService.route).toHaveBeenCalledTimes(1);
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          'routed-model',
+          [{ text: 'Hi' }],
+          expect.any(Object),
+        );
+
+        // Second turn
+        stream = client.sendMessageStream(
+          [{ text: 'Continue' }],
+          new AbortController().signal,
+          'prompt-1',
+        );
+        await fromAsync(stream);
+
+        // Router should not be called again
+        expect(mockRouterService.route).toHaveBeenCalledTimes(1);
+        // Should stick to the first model
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          'routed-model',
+          [{ text: 'Continue' }],
+          expect.any(Object),
+        );
+      });
+
+      it('should reset the sticky model and re-route when the prompt_id changes', async () => {
+        // First prompt
+        let stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-1',
+        );
+        await fromAsync(stream);
+
+        expect(mockRouterService.route).toHaveBeenCalledTimes(1);
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          'routed-model',
+          [{ text: 'Hi' }],
+          expect.any(Object),
+        );
+
+        // New prompt
+        mockRouterService.route.mockResolvedValue({
+          model: 'new-routed-model',
+          reason: 'test',
+        });
+        stream = client.sendMessageStream(
+          [{ text: 'A new topic' }],
+          new AbortController().signal,
+          'prompt-2',
+        );
+        await fromAsync(stream);
+
+        // Router should be called again for the new prompt
+        expect(mockRouterService.route).toHaveBeenCalledTimes(2);
+        // Should use the newly routed model
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          'new-routed-model',
+          [{ text: 'A new topic' }],
+          expect.any(Object),
+        );
+      });
+
+      it('should use the fallback model and bypass routing when in fallback mode', async () => {
+        vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(true);
+        mockRouterService.route.mockResolvedValue({
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+          reason: 'fallback',
+        });
+
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-1',
+        );
+        await fromAsync(stream);
+
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          DEFAULT_GEMINI_FLASH_MODEL,
+          [{ text: 'Hi' }],
+          expect.any(Object),
+        );
+      });
+
+      it('should stick to the fallback model for the entire sequence even if fallback mode ends', async () => {
+        // Start the sequence in fallback mode
+        vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(true);
+        mockRouterService.route.mockResolvedValue({
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+          reason: 'fallback',
+        });
+        let stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-fallback-stickiness',
+        );
+        await fromAsync(stream);
+
+        // First call should use fallback model
+        expect(mockTurnRunFn).toHaveBeenCalledWith(
+          DEFAULT_GEMINI_FLASH_MODEL,
+          [{ text: 'Hi' }],
+          expect.any(Object),
+        );
+
+        // End fallback mode
+        vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(false);
+
+        // Second call in the same sequence
+        stream = client.sendMessageStream(
+          [{ text: 'Continue' }],
+          new AbortController().signal,
+          'prompt-fallback-stickiness',
+        );
+        await fromAsync(stream);
+
+        // Router should still not be called, and it should stick to the fallback model
+        expect(mockTurnRunFn).toHaveBeenCalledTimes(2); // Ensure it was called again
+        expect(mockTurnRunFn).toHaveBeenLastCalledWith(
+          DEFAULT_GEMINI_FLASH_MODEL, // Still the fallback model
+          [{ text: 'Continue' }],
+          expect.any(Object),
+        );
+      });
+    });
+
     describe('Editor context delta', () => {
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Hello' };
@@ -1656,7 +1836,7 @@ ${JSON.stringify(
           };
 
           // Setup current context
-          vi.mocked(ideContext.getIdeContext).mockReturnValue({
+          vi.mocked(ideContextStore.get).mockReturnValue({
             workspaceState: {
               openFiles: [
                 { ...currentActiveFile, isActive: true, timestamp: Date.now() },
@@ -1718,7 +1898,7 @@ ${JSON.stringify(
         };
 
         // Setup current context (same as previous)
-        vi.mocked(ideContext.getIdeContext).mockReturnValue({
+        vi.mocked(ideContextStore.get).mockReturnValue({
           workspaceState: {
             openFiles: [
               { ...activeFile, isActive: true, timestamp: Date.now() },
@@ -1788,7 +1968,7 @@ ${JSON.stringify(
         client['chat'] = mockChat as GeminiChat;
 
         vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
-        vi.mocked(ideContext.getIdeContext).mockReturnValue({
+        vi.mocked(ideContextStore.get).mockReturnValue({
           workspaceState: {
             openFiles: [{ path: '/path/to/file.ts', timestamp: Date.now() }],
           },
@@ -1885,7 +2065,7 @@ ${JSON.stringify(
             openFiles: [{ path: '/path/to/fileA.ts', timestamp: Date.now() }],
           },
         };
-        vi.mocked(ideContext.getIdeContext).mockReturnValue(initialIdeContext);
+        vi.mocked(ideContextStore.get).mockReturnValue(initialIdeContext);
 
         // Act: Send the tool response
         let stream = client.sendMessageStream(
@@ -1944,7 +2124,7 @@ ${JSON.stringify(
             openFiles: [{ path: '/path/to/fileB.ts', timestamp: Date.now() }],
           },
         };
-        vi.mocked(ideContext.getIdeContext).mockReturnValue(newIdeContext);
+        vi.mocked(ideContextStore.get).mockReturnValue(newIdeContext);
 
         // Act: Send a new, regular user message
         stream = client.sendMessageStream(
@@ -1985,7 +2165,7 @@ ${JSON.stringify(
             ],
           },
         };
-        vi.mocked(ideContext.getIdeContext).mockReturnValue(contextA);
+        vi.mocked(ideContextStore.get).mockReturnValue(contextA);
 
         // Act: Send a regular message to establish the initial context
         let stream = client.sendMessageStream(
@@ -2028,7 +2208,7 @@ ${JSON.stringify(
             ],
           },
         };
-        vi.mocked(ideContext.getIdeContext).mockReturnValue(contextB);
+        vi.mocked(ideContextStore.get).mockReturnValue(contextB);
 
         // Act: Send the tool response
         stream = client.sendMessageStream(
@@ -2083,7 +2263,7 @@ ${JSON.stringify(
             ],
           },
         };
-        vi.mocked(ideContext.getIdeContext).mockReturnValue(contextC);
+        vi.mocked(ideContextStore.get).mockReturnValue(contextC);
 
         // Act: Send a new, regular user message
         stream = client.sendMessageStream(
