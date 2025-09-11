@@ -86,10 +86,10 @@ export function findIndexAfterFraction(
 
   let charactersSoFar = 0;
   for (let i = 0; i < contentLengths.length; i++) {
-    charactersSoFar += contentLengths[i];
     if (charactersSoFar >= targetCharacters) {
       return i;
     }
+    charactersSoFar += contentLengths[i];
   }
   return contentLengths.length;
 }
@@ -184,6 +184,10 @@ export class GeminiClient {
 
   getChatRecordingService(): ChatRecordingService | undefined {
     return this.chat?.getChatRecordingService();
+  }
+
+  getLoopDetectionService(): LoopDetectionService {
+    return this.loopDetector;
   }
 
   async addDirectoryContext(): Promise<void> {
@@ -836,19 +840,30 @@ export class GeminiClient {
     const historyToCompress = curatedHistory.slice(0, compressBeforeIndex);
     const historyToKeep = curatedHistory.slice(compressBeforeIndex);
 
-    this.getChat().setHistory(historyToCompress);
+    const summaryResponse = await this.config
+      .getContentGenerator()
+      .generateContent(
+        {
+          model,
+          contents: [
+            ...historyToCompress,
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+                },
+              ],
+            },
+          ],
+          config: {
+            systemInstruction: { text: getCompressionPrompt() },
+          },
+        },
+        prompt_id,
+      );
+    const summary = getResponseText(summaryResponse) ?? '';
 
-    const { text: summary } = await this.getChat().sendMessage(
-      {
-        message: {
-          text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
-        },
-        config: {
-          systemInstruction: { text: getCompressionPrompt() },
-        },
-      },
-      prompt_id,
-    );
     const chat = await this.startChat([
       {
         role: 'user',
