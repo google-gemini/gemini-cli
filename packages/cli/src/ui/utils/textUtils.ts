@@ -6,6 +6,7 @@
 
 import stripAnsi from 'strip-ansi';
 import { stripVTControlCharacters } from 'node:util';
+import stringWidth from 'string-width';
 
 /**
  * Calculates the maximum width of a multi-line ASCII art string.
@@ -26,10 +27,39 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
  *  code units so that surrogate‑pair emoji count as one "column".)
  * ---------------------------------------------------------------------- */
 
+// Cache for code points to reduce GC pressure
+const codePointsCache = new Map<string, string[]>();
+const MAX_STRING_LENGTH_TO_CACHE = 1000;
+
 export function toCodePoints(str: string): string[] {
-  // [...str] or Array.from both iterate by UTF‑32 code point, handling
-  // surrogate pairs correctly.
-  return Array.from(str);
+  // ASCII fast path - check if all chars are ASCII (0-127)
+  let isAscii = true;
+  for (let i = 0; i < str.length; i++) {
+    if (str.charCodeAt(i) > 127) {
+      isAscii = false;
+      break;
+    }
+  }
+  if (isAscii) {
+    return str.split('');
+  }
+
+  // Cache short strings
+  if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
+    const cached = codePointsCache.get(str);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  const result = Array.from(str);
+
+  // Cache result (unlimited like Ink)
+  if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
+    codePointsCache.set(str, result);
+  }
+
+  return result;
 }
 
 export function cpLen(str: string): number {
@@ -86,3 +116,33 @@ export function stripUnsafeCharacters(str: string): string {
     })
     .join('');
 }
+
+// String width caching for performance optimization
+const stringWidthCache = new Map<string, number>();
+
+/**
+ * Cached version of stringWidth function for better performance
+ * Follows Ink's approach with unlimited cache (no eviction)
+ */
+export const getCachedStringWidth = (str: string): number => {
+  // ASCII printable chars have width 1
+  if (/^[\x20-\x7E]*$/.test(str)) {
+    return str.length;
+  }
+
+  if (stringWidthCache.has(str)) {
+    return stringWidthCache.get(str)!;
+  }
+
+  const width = stringWidth(str);
+  stringWidthCache.set(str, width);
+
+  return width;
+};
+
+/**
+ * Clear the string width cache
+ */
+export const clearStringWidthCache = (): void => {
+  stringWidthCache.clear();
+};
