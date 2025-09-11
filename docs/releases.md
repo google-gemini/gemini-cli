@@ -58,50 +58,58 @@ After one week (On the following Tuesday) with all signals a go, we will manuall
 
 ## Patching Releases
 
-If a critical bug needs to be fixed before the next scheduled release, follow this process to create a patch.
+If a critical bug that is already fixed on `main` needs to be patched on a `stable` or `preview` release, the process is now highly automated.
 
-### 1. Create a Hotfix Branch
+### 1. Create the Patch Pull Request
 
-First, create a new branch for your fix. The source for this branch depends on whether you are patching a stable or a preview release.
+There are two ways to create a patch pull request:
 
-- **For a stable release patch:**
-  Create a branch from the Git tag of the version you need to patch. Tag names are formatted as `vx.y.z`.
+**Option A: From a GitHub Comment (Recommended)**
 
-  ```bash
-  # Example: Create a hotfix branch for v0.2.0
-  git checkout v0.2.0 -b hotfix/issue-123-fix-for-v0.2.0
-  ```
+After a pull request has been merged, a maintainer can add a comment on that same PR with the following format:
 
-- **For a preview release patch:**
-  Create a branch from the existing preview release branch, which is formatted as `release/vx.y.z-preview.n`.
+`/patch <channel> [--dry-run]`
 
-  ```bash
-  # Example: Create a hotfix branch for a preview release
-  git checkout release/v0.2.0-preview.0 && git checkout -b hotfix/issue-456-fix-for-preview
-  ```
+- **channel**: `stable` or `preview`
+- **--dry-run** (optional): If included, the workflow will run in dry-run mode. This will create the PR with "[DRY RUN]" in the title, and merging it will trigger a dry run of the final release, so nothing is actually published.
 
-### 2. Implement the Fix
+Example: `/patch stable --dry-run`
 
-In your new hotfix branch, either create a new commit with the fix or cherry-pick an existing commit from the `main` branch. Merge your changes into the source of the hotfix branch (ex. https://github.com/google-gemini/gemini-cli/pull/6850).
+The workflow will automatically find the merge commit SHA and begin the patch process. If the PR is not yet merged, it will post a comment indicating the failure.
 
-### 3. Perform the Release
+**Option B: Manually Triggering the Workflow**
 
-Follow the manual release process using the "Release" GitHub Actions workflow.
+Navigate to the **Actions** tab and run the **Create Patch PR** workflow.
 
-- **Version**: For stable patches, increment the patch version (e.g., `v0.2.0` -> `v0.2.1`). For preview patches, increment the preview number (e.g., `v0.2.0-preview.0` -> `v0.2.0-preview.1`).
-- **Ref**: Use your source branch as the reference (ex. `release/v0.2.0-preview.0`)
+- **Commit**: The full SHA of the commit on `main` that you want to cherry-pick.
+- **Channel**: The channel you want to patch (`stable` or `preview`).
 
-![How to run a release](assets/release_patch.png)
+This workflow will automatically:
 
-### 4. Update Versions
+1. Find the latest release tag for the channel.
+2. Create a release branch from that tag if one doesn't exist (e.g., `release/v0.5.1`).
+3. Create a new hotfix branch from the release branch.
+4. Cherry-pick your specified commit into the hotfix branch.
+5. Create a pull request from the hotfix branch back to the release branch.
 
-After the hotfix is released, merge the changes back to the appropriate branch.
+**Important:** If you select `stable`, the workflow will run twice, creating one PR for the `stable` channel and a second PR for the `preview` channel.
 
-- **For a stable release hotfix:**
-  Open a pull request to merge the release branch (e.g., `release/0.2.1`) back into `main`. This keeps the version number in `main` up to date.
+### 2. Review and Merge
 
-- **For a preview release hotfix:**
-  Open a pull request to merge the new preview release branch (e.g., `release/v0.2.0-preview.1`) back into the existing preview release branch (`release/v0.2.0-preview.0`) (ex. https://github.com/google-gemini/gemini-cli/pull/6868)
+Review the automatically created pull request(s) to ensure the cherry-pick was successful and the changes are correct. Once approved, merge the pull request.
+
+**Security Note:** The `release/*` branches are protected by branch protection rules. A pull request to one of these branches requires at least one review from a code owner before it can be merged. This ensures that no unauthorized code is released.
+
+### 3. Automatic Release
+
+Upon merging the pull request, a final workflow is automatically triggered. It will:
+
+1. Run the `patch-release` workflow.
+2. Build and test the patched code.
+3. Publish the new patch version to npm.
+4. Create a new GitHub release with the patch notes.
+
+This fully automated process ensures that patches are created and released consistently and reliably.
 
 ## Release Schedule
 
