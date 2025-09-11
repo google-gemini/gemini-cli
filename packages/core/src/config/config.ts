@@ -48,20 +48,14 @@ import {
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
-import { IdeClient } from '../ide/ide-client.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import {
   logCliConfiguration,
-  logIdeConnection,
   logRipgrepFallback,
 } from '../telemetry/loggers.js';
-import {
-  IdeConnectionEvent,
-  IdeConnectionType,
-  RipgrepFallbackEvent,
-} from '../telemetry/types.js';
+import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import type { FallbackModelHandler } from '../fallback/types.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
@@ -438,11 +432,6 @@ export class Config {
       throw Error('Config was already initialized');
     }
     this.initialized = true;
-
-    if (this.getIdeMode()) {
-      await (await IdeClient.getInstance()).connect();
-      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
-    }
 
     // Initialize centralized FileDiscoveryService
     this.getFileService();
