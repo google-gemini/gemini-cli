@@ -4,15 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  type Mock,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type {
   Content,
   GenerateContentConfig,
@@ -933,7 +925,7 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
-          'test-model',
+        'test-model',
         { message: 'test' },
         'prompt-id-retry-fail',
       );
@@ -1328,6 +1320,7 @@ describe('GeminiChat', () => {
       mockHandleFallback.mockResolvedValue(false);
 
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'test stop' },
         'prompt-id-fb2',
       );

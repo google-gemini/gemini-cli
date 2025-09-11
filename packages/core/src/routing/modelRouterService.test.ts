@@ -8,42 +8,43 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ModelRouterService } from './modelRouterService.js';
 import { Config } from '../config/config.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
-import type {
-  RoutingContext,
-  RoutingDecision,
-  RoutingStrategy,
-} from './routingStrategy.js';
+import type { RoutingContext, RoutingDecision } from './routingStrategy.js';
 import { DefaultStrategy } from './strategies/defaultStrategy.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { CompositeStrategy } from './strategies/compositeStrategy.js';
+import { FallbackStrategy } from './strategies/fallbackStrategy.js';
+import { OverrideStrategy } from './strategies/overrideStrategy.js';
 
-// Mock the dependencies
 vi.mock('../config/config.js');
 vi.mock('../core/baseLlmClient.js');
 vi.mock('./strategies/defaultStrategy.js');
+vi.mock('./strategies/compositeStrategy.js');
+vi.mock('./strategies/fallbackStrategy.js');
+vi.mock('./strategies/overrideStrategy.js');
 
 describe('ModelRouterService', () => {
   let service: ModelRouterService;
   let mockConfig: Config;
   let mockBaseLlmClient: BaseLlmClient;
-  let mockStrategy: RoutingStrategy;
   let mockContext: RoutingContext;
+  let mockCompositeStrategy: CompositeStrategy;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Create mock instances
     mockConfig = new Config({} as never);
     mockBaseLlmClient = {} as BaseLlmClient;
     vi.spyOn(mockConfig, 'getBaseLlmClient').mockReturnValue(mockBaseLlmClient);
 
-    // Mock the strategy that the service will instantiate
-    mockStrategy = new DefaultStrategy();
-    vi.mocked(DefaultStrategy).mockImplementation(() => mockStrategy);
+    mockCompositeStrategy = new CompositeStrategy(
+      [new FallbackStrategy(), new OverrideStrategy(), new DefaultStrategy()],
+      'agent-router',
+    );
+    vi.mocked(CompositeStrategy).mockImplementation(
+      () => mockCompositeStrategy,
+    );
 
-    // Instantiate the service to be tested
     service = new ModelRouterService(mockConfig);
 
-    // Create a default context for tests
     mockContext = {
       history: [],
       request: [{ text: 'test prompt' }],
@@ -51,58 +52,44 @@ describe('ModelRouterService', () => {
     };
   });
 
-  it('should initialize with DefaultStrategy by default', () => {
-    expect(DefaultStrategy).toHaveBeenCalled();
-    expect(service['strategy']).toBeInstanceOf(DefaultStrategy);
+  it('should initialize with a CompositeStrategy', () => {
+    expect(CompositeStrategy).toHaveBeenCalled();
+    expect(service['strategy']).toBeInstanceOf(CompositeStrategy);
+  });
+
+  it('should initialize the CompositeStrategy with the correct child strategies in order', () => {
+    // This test relies on the mock implementation detail of the constructor
+    const compositeStrategyArgs = vi.mocked(CompositeStrategy).mock.calls[0];
+    const childStrategies = compositeStrategyArgs[0];
+
+    expect(childStrategies.length).toBe(3);
+    expect(childStrategies[0]).toBeInstanceOf(FallbackStrategy);
+    expect(childStrategies[1]).toBeInstanceOf(OverrideStrategy);
+    expect(childStrategies[2]).toBeInstanceOf(DefaultStrategy);
+    expect(compositeStrategyArgs[1]).toBe('agent-router');
   });
 
   describe('route()', () => {
-    it('should return the Flash model if in fallback mode', async () => {
-      vi.spyOn(mockConfig, 'isInFallbackMode').mockReturnValue(true);
-      const strategySpy = vi.spyOn(mockStrategy, 'route');
-
-      const decision = await service.route(mockContext);
-
-      expect(strategySpy).not.toHaveBeenCalled();
-      expect(decision.model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
-      expect(decision.reason).toContain('In fallback mode');
-      expect(decision.metadata.source).toBe('Fallback');
-    });
-
-    it('should bypass strategy and use explicitModel if provided', async () => {
-      vi.spyOn(mockConfig, 'isInFallbackMode').mockReturnValue(false);
-      const explicitModel = 'explicit-test-model';
-      mockContext.explicitModel = explicitModel;
-
-      const strategySpy = vi.spyOn(mockStrategy, 'route');
-
-      const decision = await service.route(mockContext);
-
-      expect(strategySpy).not.toHaveBeenCalled();
-      expect(decision.model).toBe(explicitModel);
-      expect(decision.reason).toContain(
-        'Routing bypassed by forced model directive',
-      );
-      expect(decision.metadata.source).toBe('Explicit');
-    });
-
-    it('should delegate to the strategy when no override is present', async () => {
-      vi.spyOn(mockConfig, 'isInFallbackMode').mockReturnValue(false);
+    it('should delegate routing to the composite strategy', async () => {
       const strategyDecision: RoutingDecision = {
         model: 'strategy-chosen-model',
-        reason: 'Strategy reasoning',
         metadata: {
-          source: 'Default',
-          latencyMs: 0,
+          source: 'test-router/fallback',
+          latencyMs: 10,
+          reasoning: 'Strategy reasoning',
         },
       };
       const strategySpy = vi
-        .spyOn(mockStrategy, 'route')
+        .spyOn(mockCompositeStrategy, 'route')
         .mockResolvedValue(strategyDecision);
 
       const decision = await service.route(mockContext);
 
-      expect(strategySpy).toHaveBeenCalledWith(mockContext, mockBaseLlmClient);
+      expect(strategySpy).toHaveBeenCalledWith(
+        mockContext,
+        mockConfig,
+        mockBaseLlmClient,
+      );
       expect(decision).toEqual(strategyDecision);
     });
   });

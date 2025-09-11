@@ -524,7 +524,7 @@ export class Config {
 
   setModel(newModel: string): void {
     // Do not allow Pro usage if the user is in fallback mode.
-    if (newModel === DEFAULT_GEMINI_MODEL && this.isInFallbackMode()) {
+    if (newModel.includes('pro') && this.isInFallbackMode()) {
       return;
     }
 

@@ -1625,6 +1625,10 @@ ${JSON.stringify(
 
       it('should use the fallback model and bypass routing when in fallback mode', async () => {
         vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(true);
+        mockRouterService.route.mockResolvedValue({
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+          reason: 'fallback',
+        });
 
         const stream = client.sendMessageStream(
           [{ text: 'Hi' }],
@@ -1633,7 +1637,6 @@ ${JSON.stringify(
         );
         await fromAsync(stream);
 
-        expect(mockRouterService.route).not.toHaveBeenCalled();
         expect(mockTurnRunFn).toHaveBeenCalledWith(
           DEFAULT_GEMINI_FLASH_MODEL,
           [{ text: 'Hi' }],
@@ -1644,6 +1647,10 @@ ${JSON.stringify(
       it('should stick to the fallback model for the entire sequence even if fallback mode ends', async () => {
         // Start the sequence in fallback mode
         vi.mocked(mockConfig.isInFallbackMode).mockReturnValue(true);
+        mockRouterService.route.mockResolvedValue({
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+          reason: 'fallback',
+        });
         let stream = client.sendMessageStream(
           [{ text: 'Hi' }],
           new AbortController().signal,
@@ -1652,7 +1659,6 @@ ${JSON.stringify(
         await fromAsync(stream);
 
         // First call should use fallback model
-        expect(mockRouterService.route).not.toHaveBeenCalled();
         expect(mockTurnRunFn).toHaveBeenCalledWith(
           DEFAULT_GEMINI_FLASH_MODEL,
           [{ text: 'Hi' }],
@@ -1671,7 +1677,6 @@ ${JSON.stringify(
         await fromAsync(stream);
 
         // Router should still not be called, and it should stick to the fallback model
-        expect(mockRouterService.route).not.toHaveBeenCalled();
         expect(mockTurnRunFn).toHaveBeenCalledTimes(2); // Ensure it was called again
         expect(mockTurnRunFn).toHaveBeenLastCalledWith(
           DEFAULT_GEMINI_FLASH_MODEL, // Still the fallback model

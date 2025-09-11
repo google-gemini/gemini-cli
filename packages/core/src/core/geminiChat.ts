@@ -19,7 +19,10 @@ import { toParts } from '../code_assist/converter.js';
 import { createUserContent } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import type { Config } from '../config/config.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import {
+  DEFAULT_GEMINI_FLASH_MODEL,
+  getEffectiveModel,
+} from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from './coreToolScheduler.js';
@@ -326,9 +329,10 @@ export class GeminiChat {
     userContent: Content,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const apiCall = () => {
-      const modelToUse = this.config.isInFallbackMode()
-        ? DEFAULT_GEMINI_FLASH_MODEL
-        : model;
+      const modelToUse = getEffectiveModel(
+        this.config.isInFallbackMode(),
+        model,
+      );
 
       if (
         this.config.getQuotaErrorOccurred() &&

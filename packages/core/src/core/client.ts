@@ -493,7 +493,6 @@ export class GeminiClient {
       history: this.getChat().getHistory(/*curated=*/ true),
       request,
       signal,
-      explicitModel: '',
     };
 
     let modelToUse: string;
@@ -502,13 +501,9 @@ export class GeminiClient {
     if (this.currentSequenceModel) {
       modelToUse = this.currentSequenceModel;
     } else {
-      if (this.config.isInFallbackMode()) {
-        modelToUse = DEFAULT_GEMINI_FLASH_MODEL;
-      } else {
-        const router = this.config.getModelRouterService();
-        const decision = await router.route(routingContext);
-        modelToUse = decision.model;
-      }
+      const router = await this.config.getModelRouterService();
+      const decision = await router.route(routingContext);
+      modelToUse = decision.model;
       // Lock the model for the rest of the sequence
       this.currentSequenceModel = modelToUse;
     }

@@ -5,24 +5,35 @@
  */
 
 import type { Config } from '../config/config.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import type {
   RoutingContext,
   RoutingDecision,
-  RoutingStrategy,
+  TerminalStrategy,
 } from './routingStrategy.js';
 import { DefaultStrategy } from './strategies/defaultStrategy.js';
+import { CompositeStrategy } from './strategies/compositeStrategy.js';
+import { FallbackStrategy } from './strategies/fallbackStrategy.js';
+import { OverrideStrategy } from './strategies/overrideStrategy.js';
 
 /**
  * A centralized service for making model routing decisions.
  */
 export class ModelRouterService {
   private config: Config;
-  private strategy: RoutingStrategy;
+  private strategy: TerminalStrategy;
 
   constructor(config: Config) {
     this.config = config;
-    this.strategy = new DefaultStrategy();
+    this.strategy = this.initializeDefaultStrategy();
+  }
+
+  private initializeDefaultStrategy(): TerminalStrategy {
+    // Initialize the composite strategy with the desired priority order.
+    // The strategies are ordered in order of highest priority.
+    return new CompositeStrategy(
+      [new FallbackStrategy(), new OverrideStrategy(), new DefaultStrategy()],
+      'agent-router',
+    );
   }
 
   /**
@@ -32,32 +43,12 @@ export class ModelRouterService {
    * @returns A promise that resolves to a RoutingDecision.
    */
   async route(context: RoutingContext): Promise<RoutingDecision> {
-    // Return fallback model if in fallback mode.
-    if (this.config.isInFallbackMode()) {
-      return {
-        model: DEFAULT_GEMINI_FLASH_MODEL,
-        reason: `In fallback mode. Using: ${DEFAULT_GEMINI_FLASH_MODEL}`,
-        metadata: {
-          source: 'Fallback',
-          latencyMs: 0,
-        },
-      };
-    }
+    const decision = await this.strategy.route(
+      context,
+      this.config,
+      this.config.getBaseLlmClient(),
+    );
 
-    // Honor the override mechanism.
-    if (context.explicitModel) {
-      const decision: RoutingDecision = {
-        model: context.explicitModel,
-        reason: `Routing bypassed by forced model directive. Using: ${context.explicitModel}`,
-        metadata: {
-          source: 'Explicit',
-          latencyMs: 0,
-        },
-      };
-
-      return decision;
-    }
-
-    return this.strategy.route(context, this.config.getBaseLlmClient());
+    return decision;
   }
 }
