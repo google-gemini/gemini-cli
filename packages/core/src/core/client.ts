@@ -49,6 +49,7 @@ import {
 } from '../telemetry/types.js';
 import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
+import type { RoutingContext } from '../routing/routingStrategy.js';
 
 export function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -118,6 +119,7 @@ export class GeminiClient {
 
   private readonly loopDetector: LoopDetectionService;
   private lastPromptId: string;
+  private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
   private forceFullIdeContext = true;
 
@@ -430,11 +432,11 @@ export class GeminiClient {
     signal: AbortSignal,
     prompt_id: string,
     turns: number = MAX_TURNS,
-    originalModel?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id);
       this.lastPromptId = prompt_id;
+      this.currentSequenceModel = null;
     }
     this.sessionTurnCount++;
     if (
@@ -449,9 +451,6 @@ export class GeminiClient {
     if (!boundedTurns) {
       return new Turn(this.getChat(), prompt_id);
     }
-
-    // Track the original model from the first call to detect model switching
-    const initialModel = originalModel || this.config.getModel();
 
     const compressed = await this.tryCompressChat(prompt_id);
 
@@ -494,7 +493,26 @@ export class GeminiClient {
       return turn;
     }
 
-    const resultStream = turn.run(request, signal);
+    const routingContext: RoutingContext = {
+      history: this.getChat().getHistory(/*curated=*/ true),
+      request,
+      signal,
+    };
+
+    let modelToUse: string;
+
+    // Determine Model (Stickiness vs. Routing)
+    if (this.currentSequenceModel) {
+      modelToUse = this.currentSequenceModel;
+    } else {
+      const router = await this.config.getModelRouterService();
+      const decision = await router.route(routingContext);
+      modelToUse = decision.model;
+      // Lock the model for the rest of the sequence
+      this.currentSequenceModel = modelToUse;
+    }
+
+    const resultStream = turn.run(modelToUse, request, signal);
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
         yield { type: GeminiEventType.LoopDetected };
@@ -506,11 +524,8 @@ export class GeminiClient {
       }
     }
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
-      // Check if model was switched during the call (likely due to quota error)
-      const currentModel = this.config.getModel();
-      if (currentModel !== initialModel) {
-        // Model was switched (likely due to quota error fallback)
-        // Don't continue with recursive call to prevent unwanted Flash execution
+      // Check if next speaker check is needed
+      if (this.config.getQuotaErrorOccurred()) {
         return turn;
       }
 
@@ -540,7 +555,6 @@ export class GeminiClient {
           signal,
           prompt_id,
           boundedTurns - 1,
-          initialModel,
         );
       }
     }

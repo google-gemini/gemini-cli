@@ -255,6 +255,7 @@ class Session {
 
       try {
         const responseStream = await chat.sendMessageStream(
+          this.config.getModel(),
           {
             message: nextMessage?.parts ?? [],
             config: {
