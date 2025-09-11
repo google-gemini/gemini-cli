@@ -558,7 +558,6 @@ export type TelemetryEvent =
   | SlashCommandEvent
   | ResearchOptInEvent
   | FileOperationEvent
-  | FileOperationEvent
   | InvalidChunkEvent
   | ContentRetryEvent
   | ContentRetryFailureEvent

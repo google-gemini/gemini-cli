@@ -280,7 +280,7 @@ export enum EventMetadataKey {
   GEMINI_CLI_RESEARCH_USER_ID = 68,
 
   // Logs survey responses for research feedback (JSON stringified)
-  GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 69,
+  GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 71,
 
   // ==========================================================================
   // File Operation Event Keys
