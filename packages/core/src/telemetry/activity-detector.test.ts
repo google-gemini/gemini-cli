@@ -113,7 +113,6 @@ describe('ActivityDetector', () => {
 });
 
 describe('Global Activity Detector Functions', () => {
-
   describe('global instance', () => {
     it('should expose a global ActivityDetector via getActivityDetector', () => {
       const detector = getActivityDetector();
