@@ -174,6 +174,37 @@ describe('useShellCommandProcessor', () => {
     expect(mockGeminiClient.addHistory).toHaveBeenCalled();
   });
 
+  it('should handle carriage returns in history elegantly', async () => {
+    const { result } = renderProcessorHook();
+
+    act(() => {
+      result.current.handleShellCommand(
+        'echo "test\rme\nand\ryou"',
+        new AbortController().signal,
+      );
+    });
+    const execPromise = onExecMock.mock.calls[0][0];
+
+    act(() => {
+      resolveExecutionPromise(createMockServiceResult({ output: 'mest\nyou' }));
+    });
+    await act(async () => await execPromise);
+
+    expect(setPendingHistoryItemMock).toHaveBeenCalledWith(null);
+    expect(addItemToHistoryMock).toHaveBeenCalledTimes(2); // Initial + final
+    expect(addItemToHistoryMock.mock.calls[1][0]).toEqual(
+      expect.objectContaining({
+        tools: [
+          expect.objectContaining({
+            status: ToolCallStatus.Success,
+            resultDisplay: 'mest\nyou',
+          }),
+        ],
+      }),
+    );
+    expect(mockGeminiClient.addHistory).toHaveBeenCalled();
+  });
+
   it('should handle command failure and display error status', async () => {
     const { result } = renderProcessorHook();
 
