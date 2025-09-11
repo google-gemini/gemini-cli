@@ -1,0 +1,23 @@
+{
+  "name": "@examples/input-prompt-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.tsx",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@google/gemini-cli": "file:../../packages/cli",
+    "@google/gemini-cli-core": "file:../../packages/core",
+    "ink": "^6.2.3",
+    "react": "^19.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.3",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

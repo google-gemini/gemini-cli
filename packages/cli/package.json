@@ -8,6 +8,10 @@
   },
   "type": "module",
   "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./ui": "./dist/src/ui.js"
+  },
   "bin": {
     "gemini": "dist/index.js"
   },

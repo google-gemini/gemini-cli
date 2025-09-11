@@ -6,7 +6,8 @@
   },
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "ui-examples/*"
   ],
   "private": "true",
   "repository": {
