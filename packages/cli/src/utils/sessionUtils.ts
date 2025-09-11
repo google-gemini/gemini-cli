@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SESSION_FILE_PREFIX, type ConversationRecord } from '@google/gemini-cli-core';
+import {
+  SESSION_FILE_PREFIX,
+  type ConversationRecord,
+} from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 

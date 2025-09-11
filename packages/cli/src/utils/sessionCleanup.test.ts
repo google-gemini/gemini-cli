@@ -125,7 +125,7 @@ describe('Session Cleanup', () => {
       expect(result.deleted).toBe(0);
       expect(debugSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          'Session cleanup disabled: Invalid maxAge format',
+          'Session cleanup disabled: Error: Invalid retention period format',
         ),
       );
 
@@ -855,7 +855,11 @@ describe('Session Cleanup', () => {
 
       expect(result.scanned).toBe(0);
       expect(debugSpy).toHaveBeenCalledWith(
-        expect.stringContaining(`Invalid maxAge format: ${input}`),
+        expect.stringContaining(
+          input === '0d'
+            ? 'Invalid retention period: 0d. Value must be greater than 0'
+            : `Invalid retention period format: ${input}`,
+        ),
       );
 
       debugSpy.mockRestore();
@@ -1003,7 +1007,7 @@ describe('Session Cleanup', () => {
 
         expect(result.scanned).toBe(0);
         expect(debugSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Invalid maxAge format: 30'),
+          expect.stringContaining('Invalid retention period format: 30'),
         );
 
         debugSpy.mockRestore();
@@ -1030,7 +1034,7 @@ describe('Session Cleanup', () => {
 
         expect(result.scanned).toBe(0);
         expect(debugSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Invalid maxAge format: 30x'),
+          expect.stringContaining('Invalid retention period format: 30x'),
         );
 
         debugSpy.mockRestore();
@@ -1057,7 +1061,7 @@ describe('Session Cleanup', () => {
 
         expect(result.scanned).toBe(0);
         expect(debugSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Invalid maxAge format: d'),
+          expect.stringContaining('Invalid retention period format: d'),
         );
 
         debugSpy.mockRestore();
@@ -1084,7 +1088,7 @@ describe('Session Cleanup', () => {
 
         expect(result.scanned).toBe(0);
         expect(debugSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Invalid maxAge format: 1.5d'),
+          expect.stringContaining('Invalid retention period format: 1.5d'),
         );
 
         debugSpy.mockRestore();
@@ -1111,7 +1115,7 @@ describe('Session Cleanup', () => {
 
         expect(result.scanned).toBe(0);
         expect(debugSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Invalid maxAge format: -5d'),
+          expect.stringContaining('Invalid retention period format: -5d'),
         );
 
         debugSpy.mockRestore();
@@ -1461,7 +1465,7 @@ describe('Session Cleanup', () => {
         expect(result.scanned).toBe(0);
         // Should fail on first validation error (maxAge format)
         expect(debugSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Invalid maxAge format'),
+          expect.stringContaining('Invalid retention period format'),
         );
 
         debugSpy.mockRestore();
@@ -1491,7 +1495,7 @@ describe('Session Cleanup', () => {
         // Should reject due to invalid maxAge format
         expect(result.scanned).toBe(0);
         expect(debugSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Invalid maxAge format'),
+          expect.stringContaining('Invalid retention period format'),
         );
 
         debugSpy.mockRestore();
