@@ -458,7 +458,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
     setIsProcessing,
     setGeminiMdFileCount,
     slashCommandActions,
+<<<<<<< HEAD
     extensionsUpdateState,
+=======
+>>>>>>> ad21c109 (Fix MCP prompt slash commands not appearing. (#8290))
     isConfigInitialized,
   );
 
