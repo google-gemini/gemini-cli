@@ -17,12 +17,11 @@ import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { WorkspaceMigrationDialog } from './WorkspaceMigrationDialog.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '@google/gemini-cli-core';
 import process from 'node:process';
 
 // Props for DialogManager
@@ -37,8 +36,8 @@ export const DialogManager = () => {
 
   if (uiState.showIdeRestartPrompt) {
     return (
-      <Box borderStyle="round" borderColor={Colors.AccentYellow} paddingX={1}>
-        <Text color={Colors.AccentYellow}>
+      <Box borderStyle="round" borderColor={theme.status.warning} paddingX={1}>
+        <Text color={theme.status.warning}>
           Workspace trust has changed. Press &apos;r&apos; to restart Gemini to
           apply the changes.
         </Text>
@@ -54,11 +53,11 @@ export const DialogManager = () => {
       />
     );
   }
-  if (uiState.isProQuotaDialogOpen) {
+  if (uiState.proQuotaRequest) {
     return (
       <ProQuotaDialog
-        currentModel={uiState.currentModel}
-        fallbackModel={DEFAULT_GEMINI_FLASH_MODEL}
+        failedModel={uiState.proQuotaRequest.failedModel}
+        fallbackModel={uiState.proQuotaRequest.fallbackModel}
         onChoice={uiActions.handleProQuotaChoice}
       />
     );
@@ -107,7 +106,7 @@ export const DialogManager = () => {
       <Box flexDirection="column">
         {uiState.themeError && (
           <Box marginBottom={1}>
-            <Text color={Colors.AccentRed}>{uiState.themeError}</Text>
+            <Text color={theme.status.error}>{uiState.themeError}</Text>
           </Box>
         )}
         <ThemeDialog
@@ -160,7 +159,7 @@ export const DialogManager = () => {
       <Box flexDirection="column">
         {uiState.editorError && (
           <Box marginBottom={1}>
-            <Text color={Colors.AccentRed}>{uiState.editorError}</Text>
+            <Text color={theme.status.error}>{uiState.editorError}</Text>
           </Box>
         )}
         <EditorSettingsDialog

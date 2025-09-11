@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
 import {
@@ -143,8 +151,8 @@ describe('findIndexAfterFraction', () => {
     // 0: 66
     // 1: 66 + 68 = 134
     // 2: 134 + 66 = 200
-    // 200 >= 166.5, so index is 2
-    expect(findIndexAfterFraction(history, 0.5)).toBe(2);
+    // 200 >= 166.5, so index is 3
+    expect(findIndexAfterFraction(history, 0.5)).toBe(3);
   });
 
   it('should handle a fraction that results in the last index', () => {
@@ -152,8 +160,8 @@ describe('findIndexAfterFraction', () => {
     // ...
     // 3: 200 + 68 = 268
     // 4: 268 + 65 = 333
-    // 333 >= 299.7, so index is 4
-    expect(findIndexAfterFraction(history, 0.9)).toBe(4);
+    // 333 >= 299.7, so index is 5
+    expect(findIndexAfterFraction(history, 0.9)).toBe(5);
   });
 
   it('should handle an empty history', () => {
@@ -161,7 +169,7 @@ describe('findIndexAfterFraction', () => {
   });
 
   it('should handle a history with only one item', () => {
-    expect(findIndexAfterFraction(history.slice(0, 1), 0.5)).toBe(0);
+    expect(findIndexAfterFraction(history.slice(0, 1), 0.5)).toBe(1);
   });
 
   it('should handle history with weird parts', () => {
@@ -170,7 +178,7 @@ describe('findIndexAfterFraction', () => {
       { role: 'model', parts: [{ fileData: { fileUri: 'derp' } }] },
       { role: 'user', parts: [{ text: 'Message 2' }] },
     ];
-    expect(findIndexAfterFraction(historyWithEmptyParts, 0.5)).toBe(1);
+    expect(findIndexAfterFraction(historyWithEmptyParts, 0.5)).toBe(2);
   });
 });
 
@@ -212,16 +220,19 @@ describe('Gemini Client (client.ts)', () => {
   let mockContentGenerator: ContentGenerator;
   let mockConfig: Config;
   let client: GeminiClient;
+  let mockGenerateContentFn: Mock;
   beforeEach(async () => {
     vi.resetAllMocks();
+
+    mockGenerateContentFn = vi.fn().mockResolvedValue({
+      candidates: [{ content: { parts: [{ text: '{"key": "value"}' }] } }],
+    });
 
     // Disable 429 simulation for tests
     setSimulate429(false);
 
     mockContentGenerator = {
-      generateContent: vi.fn().mockResolvedValue({
-        candidates: [{ content: { parts: [{ text: '{"key": "value"}' }] } }],
-      }),
+      generateContent: mockGenerateContentFn,
       generateContentStream: vi.fn(),
       countTokens: vi.fn(),
       embedContent: vi.fn(),
@@ -270,6 +281,7 @@ describe('Gemini Client (client.ts)', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getGeminiClient: vi.fn(),
+      isInFallbackMode: vi.fn().mockReturnValue(false),
       setFallbackMode: vi.fn(),
       getChatCompression: vi.fn().mockReturnValue(undefined),
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
@@ -453,6 +465,27 @@ describe('Gemini Client (client.ts)', () => {
         'test-session-id',
       );
     });
+
+    it('should use the Flash model when fallback mode is active', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const schema = { type: 'string' };
+      const abortSignal = new AbortController().signal;
+      const requestedModel = 'gemini-2.5-pro'; // A non-flash model
+
+      // Mock config to be in fallback mode
+      // We access the mock via the client instance which holds the mocked config
+      vi.spyOn(client['config'], 'isInFallbackMode').mockReturnValue(true);
+
+      await client.generateJson(contents, schema, abortSignal, requestedModel);
+
+      // Assert that the Flash model was used, not the requested model
+      expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+        }),
+        'test-session-id',
+      );
+    });
   });
 
   describe('addHistory', () => {
@@ -501,7 +534,6 @@ describe('Gemini Client (client.ts)', () => {
   });
 
   describe('tryCompressChat', () => {
-    const mockSendMessage = vi.fn();
     const mockGetHistory = vi.fn();
 
     beforeEach(() => {
@@ -513,7 +545,6 @@ describe('Gemini Client (client.ts)', () => {
         getHistory: mockGetHistory,
         addHistory: vi.fn(),
         setHistory: vi.fn(),
-        sendMessage: mockSendMessage,
       } as unknown as GeminiChat;
     });
 
@@ -526,7 +557,6 @@ describe('Gemini Client (client.ts)', () => {
       const mockChat: Partial<GeminiChat> = {
         getHistory: vi.fn().mockReturnValue(chatHistory),
         setHistory: vi.fn(),
-        sendMessage: vi.fn().mockResolvedValue({ text: 'Summary' }),
       };
       vi.mocked(mockContentGenerator.countTokens)
         .mockResolvedValueOnce({ totalTokens: 1000 })
@@ -619,34 +649,6 @@ describe('Gemini Client (client.ts)', () => {
       });
     });
 
-    it('attempts to compress with a maxOutputTokens set to the original token count', async () => {
-      vi.mocked(tokenLimit).mockReturnValue(1000);
-      vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
-        totalTokens: 999,
-      });
-
-      mockGetHistory.mockReturnValue([
-        { role: 'user', parts: [{ text: '...history...' }] },
-      ]);
-
-      // Mock the summary response from the chat
-      mockSendMessage.mockResolvedValue({
-        role: 'model',
-        parts: [{ text: 'This is a summary.' }],
-      });
-
-      await client.tryCompressChat('prompt-id-2', true);
-
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          config: expect.objectContaining({
-            maxOutputTokens: 999,
-          }),
-        }),
-        'prompt-id-2',
-      );
-    });
-
     it('should not trigger summarization if token count is below threshold', async () => {
       const MOCKED_TOKEN_LIMIT = 1000;
       vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
@@ -692,10 +694,16 @@ describe('Gemini Client (client.ts)', () => {
         .mockResolvedValueOnce({ totalTokens: newTokenCount }); // Second call for the new history
 
       // Mock the summary response from the chat
-      mockSendMessage.mockResolvedValue({
-        role: 'model',
-        parts: [{ text: 'This is a summary.' }],
-      });
+      mockGenerateContentFn.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [{ text: 'This is a summary.' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
 
       await client.tryCompressChat('prompt-id-3');
 
@@ -729,17 +737,23 @@ describe('Gemini Client (client.ts)', () => {
         .mockResolvedValueOnce({ totalTokens: newTokenCount }); // Second call for the new history
 
       // Mock the summary response from the chat
-      mockSendMessage.mockResolvedValue({
-        role: 'model',
-        parts: [{ text: 'This is a summary.' }],
-      });
+      mockGenerateContentFn.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [{ text: 'This is a summary.' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
       const result = await client.tryCompressChat('prompt-id-3');
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
-      expect(mockSendMessage).toHaveBeenCalled();
+      expect(mockGenerateContentFn).toHaveBeenCalled();
 
       // Assert that summarization happened and returned the correct stats
       expect(result).toEqual({
@@ -782,17 +796,23 @@ describe('Gemini Client (client.ts)', () => {
         .mockResolvedValueOnce({ totalTokens: newTokenCount }); // Second call for the new history
 
       // Mock the summary response from the chat
-      mockSendMessage.mockResolvedValue({
-        role: 'model',
-        parts: [{ text: 'This is a summary.' }],
-      });
+      mockGenerateContentFn.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [{ text: 'This is a summary.' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
       const result = await client.tryCompressChat('prompt-id-3');
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
-      expect(mockSendMessage).toHaveBeenCalled();
+      expect(mockGenerateContentFn).toHaveBeenCalled();
 
       // Assert that summarization happened and returned the correct stats
       expect(result).toEqual({
@@ -824,16 +844,22 @@ describe('Gemini Client (client.ts)', () => {
         .mockResolvedValueOnce({ totalTokens: newTokenCount });
 
       // Mock the summary response from the chat
-      mockSendMessage.mockResolvedValue({
-        role: 'model',
-        parts: [{ text: 'This is a summary.' }],
-      });
+      mockGenerateContentFn.mockResolvedValue({
+        candidates: [
+          {
+            content: {
+              role: 'model',
+              parts: [{ text: 'This is a summary.' }],
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
       const result = await client.tryCompressChat('prompt-id-1', true); // force = true
       const newChat = client.getChat();
 
-      expect(mockSendMessage).toHaveBeenCalled();
+      expect(mockGenerateContentFn).toHaveBeenCalled();
 
       expect(result).toEqual({
         compressionStatus: CompressionStatus.COMPRESSED,
@@ -1498,7 +1524,6 @@ ${JSON.stringify(
         const mockChat: Partial<GeminiChat> = {
           addHistory: vi.fn(),
           setHistory: vi.fn(),
-          sendMessage: vi.fn().mockResolvedValue({ text: 'summary' }),
           // Assume history is not empty for delta checks
           getHistory: vi
             .fn()
@@ -1759,7 +1784,6 @@ ${JSON.stringify(
           addHistory: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]), // Default empty history
           setHistory: vi.fn(),
-          sendMessage: vi.fn().mockResolvedValue({ text: 'summary' }),
         };
         client['chat'] = mockChat as GeminiChat;
 
@@ -2210,32 +2234,28 @@ ${JSON.stringify(
         'test-session-id',
       );
     });
-  });
 
-  describe('handleFlashFallback', () => {
-    it('should use current model from config when checking for fallback', async () => {
-      const initialModel = client['config'].getModel();
-      const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
+    it('should use the Flash model when fallback mode is active', async () => {
+      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
+      const generationConfig = { temperature: 0.5 };
+      const abortSignal = new AbortController().signal;
+      const requestedModel = 'gemini-2.5-pro'; // A non-flash model
 
-      // mock config been changed
-      const currentModel = initialModel + '-changed';
-      const getModelSpy = vi.spyOn(client['config'], 'getModel');
-      getModelSpy.mockReturnValue(currentModel);
+      // Mock config to be in fallback mode
+      vi.spyOn(client['config'], 'isInFallbackMode').mockReturnValue(true);
 
-      const mockFallbackHandler = vi.fn().mockResolvedValue(true);
-      client['config'].flashFallbackHandler = mockFallbackHandler;
-      client['config'].setModel = vi.fn();
-
-      const result = await client['handleFlashFallback'](
-        AuthType.LOGIN_WITH_GOOGLE,
+      await client.generateContent(
+        contents,
+        generationConfig,
+        abortSignal,
+        requestedModel,
       );
 
-      expect(result).toBe(fallbackModel);
-
-      expect(mockFallbackHandler).toHaveBeenCalledWith(
-        currentModel,
-        fallbackModel,
-        undefined,
+      expect(mockGenerateContentFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: DEFAULT_GEMINI_FLASH_MODEL,
+        }),
+        'test-session-id',
       );
     });
   });

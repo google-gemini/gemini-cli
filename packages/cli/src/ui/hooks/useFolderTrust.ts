@@ -5,7 +5,6 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { type Config } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import {
@@ -17,12 +16,12 @@ import * as process from 'node:process';
 
 export const useFolderTrust = (
   settings: LoadedSettings,
-  config: Config,
   onTrustChange: (isTrusted: boolean | undefined) => void,
+  refreshStatic: () => void,
 ) => {
   const [isTrusted, setIsTrusted] = useState<boolean | undefined>(undefined);
   const [isFolderTrustDialogOpen, setIsFolderTrustDialogOpen] = useState(false);
-  const [isRestarting] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
 
   const folderTrust = settings.merged.security?.folderTrust?.enabled;
 
@@ -33,11 +32,19 @@ export const useFolderTrust = (
     onTrustChange(trusted);
   }, [folderTrust, onTrustChange, settings.merged]);
 
+  useEffect(() => {
+    // When the folder trust dialog is about to open/close, we need to force a refresh
+    // of the static content to ensure the Tips are hidden/shown correctly.
+    refreshStatic();
+  }, [isFolderTrustDialogOpen, refreshStatic]);
+
   const handleFolderTrustSelect = useCallback(
     (choice: FolderTrustChoice) => {
       const trustedFolders = loadTrustedFolders();
       const cwd = process.cwd();
       let trustLevel: TrustLevel;
+
+      const wasTrusted = isTrusted ?? true;
 
       switch (choice) {
         case FolderTrustChoice.TRUST_FOLDER:
@@ -54,12 +61,21 @@ export const useFolderTrust = (
       }
 
       trustedFolders.setValue(cwd, trustLevel);
-      const trusted = isWorkspaceTrusted(settings.merged);
-      setIsTrusted(trusted);
-      setIsFolderTrustDialogOpen(false);
-      onTrustChange(trusted);
+      const currentIsTrusted =
+        trustLevel === TrustLevel.TRUST_FOLDER ||
+        trustLevel === TrustLevel.TRUST_PARENT;
+      setIsTrusted(currentIsTrusted);
+      onTrustChange(currentIsTrusted);
+
+      const needsRestart = wasTrusted !== currentIsTrusted;
+      if (needsRestart) {
+        setIsRestarting(true);
+        setIsFolderTrustDialogOpen(true);
+      } else {
+        setIsFolderTrustDialogOpen(false);
+      }
     },
-    [settings.merged, onTrustChange],
+    [onTrustChange, isTrusted],
   );
 
   return {
