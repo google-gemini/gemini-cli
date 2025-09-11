@@ -4,17 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * @license
- * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import { BaseDeclarativeTool, Kind } from './tools.js';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseSubAgentInvocation } from './base-subagent-tool.js';
 import type { Config } from '../config/config.js';
 import type { ContextState } from '../core/subagent.js';
+import { processSingleFileContent } from '../utils/fileUtils.js';
+import fs from 'node:fs';
 
 const SYSTEM_PROMPT = `
 You are **Solution Planner**, an expert AI agent specializing in full-stack software engineering, system design, and meticulous implementation planning.
@@ -160,6 +156,8 @@ This is the task you must investigate and plan for:
 export interface SolutionPlannerInput {
   /** High-level summary of the user's ultimate goal. Provides the "north star". */
   user_objective: string;
+  /** If true, the content of the relevant files will be included in the final report. */
+  include_file_content?: boolean;
 }
 
 /**
@@ -291,6 +289,27 @@ ${stepsXml}
     reportJson: string,
   ): Promise<string> {
     const report = JSON.parse(reportJson) as SolutionPlannerOutput;
+
+    if (this.params.include_file_content) {
+      for (const location of report.relevant_locations) {
+        try {
+          const fileStats = await fs.promises.stat(location.file_path);
+          if (fileStats.isFile()) {
+            const result = await processSingleFileContent(
+              location.file_path,
+              this.config.getTargetDir(),
+              this.config.getFileSystemService(),
+            );
+
+            if (!result.error && typeof result.llmContent === 'string') {
+              location.content = result.llmContent;
+            }
+          }
+        } catch (_e) {
+          // Ignore errors if file doesn't exist or is not accessible
+        }
+      }
+    }
     return this.convertSolutionPlanToXmlString(report);
   }
 }
@@ -314,6 +333,11 @@ export class SolutionPlannerTool extends BaseDeclarativeTool<
             type: 'string',
             description:
               "High-level summary of the user's ultimate goal. This will be the mission for the Solution Planner.",
+          },
+          include_file_content: {
+            type: 'boolean',
+            description:
+              'If true, the content of the relevant files will be included in the final report.',
           },
         },
         required: ['user_objective'],
