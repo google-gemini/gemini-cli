@@ -215,7 +215,9 @@ export function ThemeDialog({
 
           {/* Right Column: Preview */}
           <Box flexDirection="column" width="55%" paddingLeft={2}>
-            <Text bold>Preview</Text>
+            <Text bold color={theme.text.primary}>
+              Preview
+            </Text>
             {/* Get the Theme object for the highlighted theme, fall back to default if not found */}
             {(() => {
               const previewTheme =
