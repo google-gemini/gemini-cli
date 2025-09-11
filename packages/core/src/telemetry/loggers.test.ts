@@ -961,7 +961,6 @@ describe('loggers', () => {
     });
   });
 
-
   describe('logMalformedJsonResponse', () => {
     beforeEach(() => {
       vi.spyOn(ClearcutLogger.prototype, 'logMalformedJsonResponseEvent');

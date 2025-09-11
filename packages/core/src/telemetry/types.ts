@@ -457,7 +457,6 @@ export function makeResearchOptInEvent({
   };
 }
 
-
 export class FileOperationEvent implements BaseTelemetryEvent {
   'event.name': 'file_operation';
   'event.timestamp': string;

@@ -595,7 +595,6 @@ export function logResearchOptIn(
   logger.emit(logRecord);
 }
 
-
 export function logMalformedJsonResponse(
   config: Config,
   event: MalformedJsonResponseEvent,

@@ -807,7 +807,6 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
-
   logEndSessionEvent(): void {
     // Flush immediately on session end.
     this.enqueueLogEvent(this.createLogEvent(EventNames.END_SESSION, []));
@@ -952,7 +951,9 @@ export class ClearcutLogger {
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_AUTH_TYPE,
-        value: JSON.stringify(this.config?.getContentGeneratorConfig()?.authType),
+        value: JSON.stringify(
+          this.config?.getContentGeneratorConfig()?.authType,
+        ),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GOOGLE_ACCOUNTS_COUNT,
