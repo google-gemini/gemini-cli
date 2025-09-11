@@ -1,0 +1,23 @@
+Starting patch process for commit: ad21c109882286b38f996b297daeee4fb8531a49
+Targeting channel: preview
+> git fetch --all --tags --prune
+Fetching latest tag for channel: preview...
+Found latest tag for preview: v0.6.0-preview.2
+Release branch release/v0.6.0-preview.2 does not exist. Creating it from tag v0.6.0-preview.2...
+> git checkout -b release/v0.6.0-preview.2 v0.6.0-preview.2
+Switched to a new branch 'release/v0.6.0-preview.2'
+> git push origin release/v0.6.0-preview.2
+remote: 
+remote: Create a pull request for 'release/v0.6.0-preview.2' on GitHub by visiting:        
+remote:      https://github.com/google-gemini/gemini-cli/pull/new/release/v0.6.0-preview.2        
+remote: 
+To https://github.com/google-gemini/gemini-cli
+ * [new branch]        release/v0.6.0-preview.2 -> release/v0.6.0-preview.2
+Creating hotfix branch hotfix/v0.6.0-preview.2/preview/cherry-pick-ad21c10 from release/v0.6.0-preview.2...
+> git checkout -b hotfix/v0.6.0-preview.2/preview/cherry-pick-ad21c10 origin/release/v0.6.0-preview.2
+Switched to a new branch 'hotfix/v0.6.0-preview.2/preview/cherry-pick-ad21c10'
+Cherry-picking commit ad21c109882286b38f996b297daeee4fb8531a49 into hotfix/v0.6.0-preview.2/preview/cherry-pick-ad21c10...
+⚠️  Cherry-pick has conflicts in 2 file(s):
+   - packages/cli/src/ui/AppContainer.tsx
+   - packages/cli/src/ui/hooks/slashCommandProcessor.ts
+📝 Creating commit with conflict markers for manual resolution...
