@@ -18,6 +18,7 @@ import {
 import type { FileOperation } from './metrics.js';
 export { ToolCallDecision };
 import type { ToolRegistry } from '../tools/tool-registry.js';
+import type { OutputFormat } from '../output/types.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -45,6 +46,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   mcp_servers_count: number;
   mcp_tools_count?: number;
   mcp_tools?: string;
+  output_format: OutputFormat;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
@@ -74,6 +76,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
     this.file_filtering_respect_git_ignore =
       config.getFileFilteringRespectGitIgnore();
     this.mcp_servers_count = mcpServers ? Object.keys(mcpServers).length : 0;
+    this.output_format = config.getOutputFormat();
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
@@ -133,6 +136,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   error_type?: string;
   prompt_id: string;
   tool_type: 'native' | 'mcp';
+  content_length?: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
 
@@ -153,6 +157,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       typeof call.tool !== 'undefined' && call.tool instanceof DiscoveredMCPTool
         ? 'mcp'
         : 'native';
+    this.content_length = call.response.contentLength;
 
     if (
       call.status === 'success' &&
@@ -532,7 +537,8 @@ export type TelemetryEvent =
   | InvalidChunkEvent
   | ContentRetryEvent
   | ContentRetryFailureEvent
-  | ExtensionInstallEvent;
+  | ExtensionInstallEvent
+  | ToolOutputTruncatedEvent;
 
 export class ExtensionInstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_install';
@@ -554,5 +560,36 @@ export class ExtensionInstallEvent implements BaseTelemetryEvent {
     this.extension_version = extension_version;
     this.extension_source = extension_source;
     this.status = status;
+  }
+}
+
+export class ToolOutputTruncatedEvent implements BaseTelemetryEvent {
+  readonly eventName = 'tool_output_truncated';
+  readonly 'event.timestamp' = new Date().toISOString();
+  'event.name': string;
+  tool_name: string;
+  original_content_length: number;
+  truncated_content_length: number;
+  threshold: number;
+  lines: number;
+  prompt_id: string;
+
+  constructor(
+    prompt_id: string,
+    details: {
+      toolName: string;
+      originalContentLength: number;
+      truncatedContentLength: number;
+      threshold: number;
+      lines: number;
+    },
+  ) {
+    this['event.name'] = this.eventName;
+    this.prompt_id = prompt_id;
+    this.tool_name = details.toolName;
+    this.original_content_length = details.originalContentLength;
+    this.truncated_content_length = details.truncatedContentLength;
+    this.threshold = details.threshold;
+    this.lines = details.lines;
   }
 }
