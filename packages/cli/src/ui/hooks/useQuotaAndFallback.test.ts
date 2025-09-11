@@ -57,7 +57,6 @@ describe('useQuotaAndFallback', () => {
     // Spy on the method that requires the private field and mock its return.
     // This is cleaner than modifying the config class for tests.
     vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
-      model: 'gemini-pro',
       authType: AuthType.LOGIN_WITH_GOOGLE,
     });
 
@@ -128,7 +127,6 @@ describe('useQuotaAndFallback', () => {
     it('should return null and take no action if authType is not LOGIN_WITH_GOOGLE', async () => {
       // Override the default mock from beforeEach for this specific test
       vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
-        model: 'gemini-pro',
         authType: AuthType.USE_GEMINI,
       });
 

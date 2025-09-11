@@ -23,6 +23,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
+import { ApprovalMode } from '@google/gemini-cli-core';
 import { parseInputForHighlighting } from '../utils/highlight.js';
 import {
   clipboardHasImage,
@@ -46,8 +47,10 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  approvalMode: ApprovalMode;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
+  isShellFocused?: boolean;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -64,8 +67,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  approvalMode,
   onEscapePromptChange,
   vimHandleInput,
+  isShellFocused,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [escPressCount, setEscPressCount] = useState(0);
@@ -588,7 +593,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
 
   useKeypress(handleInput, {
-    isActive: true,
+    isActive: !isShellFocused,
   });
 
   const linesToRender = buffer.viewportVisualLines;
@@ -709,21 +714,36 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const { inlineGhost, additionalLines } = getGhostTextLines();
 
+  const showAutoAcceptStyling =
+    !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
+  const showYoloStyling =
+    !shellModeActive && approvalMode === ApprovalMode.YOLO;
+
+  let statusColor: string | undefined;
+  let statusText = '';
+  if (shellModeActive) {
+    statusColor = theme.ui.symbol;
+    statusText = 'Shell mode';
+  } else if (showYoloStyling) {
+    statusColor = theme.status.error;
+    statusText = 'YOLO mode';
+  } else if (showAutoAcceptStyling) {
+    statusColor = theme.status.warning;
+    statusText = 'Accepting edits';
+  }
+
   return (
     <>
       <Box
         borderStyle="round"
         borderColor={
-          shellModeActive
-            ? theme.status.warning
-            : focus
-              ? theme.border.focused
-              : theme.border.default
+          statusColor ?? (focus ? theme.border.focused : theme.border.default)
         }
         paddingX={1}
       >
         <Text
-          color={shellModeActive ? theme.status.warning : theme.text.accent}
+          color={statusColor ?? theme.text.accent}
+          aria-label={statusText || undefined}
         >
           {shellModeActive ? (
             reverseSearchActive ? (
@@ -734,11 +754,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 (r:){' '}
               </Text>
             ) : (
-              '! '
+              '!'
             )
+          ) : showYoloStyling ? (
+            '*'
           ) : (
-            '> '
-          )}
+            '>'
+          )}{' '}
         </Text>
         <Box flexGrow={1} flexDirection="column">
           {buffer.text.length === 0 && placeholder ? (
