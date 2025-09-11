@@ -30,7 +30,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { tokenLimit } from './tokenLimits.js';
 import type { ChatRecordingService } from '../services/chatRecordingService.js';
-import type { ContentGenerator } from './contentGenerator.js';
+import { AuthType, type ContentGenerator } from './contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_THINKING_MODE,
@@ -523,7 +523,10 @@ export class GeminiClient {
         return turn;
       }
     }
-    if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
+    const authType = this.config.getContentGeneratorConfig()?.authType;
+    const isCustomProvider = authType === AuthType.USE_DEEPSEEK;
+
+    if (!turn.pendingToolCalls.length && signal && !signal.aborted && !isCustomProvider) {
       // Check if next speaker check is needed
       if (this.config.getQuotaErrorOccurred()) {
         return turn;

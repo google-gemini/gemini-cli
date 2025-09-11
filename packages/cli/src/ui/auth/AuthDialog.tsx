@@ -54,6 +54,7 @@ export function AuthDialog({
       value: AuthType.USE_GEMINI,
     },
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
+    { label: 'Deepseek', value: AuthType.USE_DEEPSEEK },
   ];
 
   if (settings.merged.security?.auth?.enforcedType) {

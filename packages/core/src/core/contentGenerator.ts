@@ -19,6 +19,7 @@ import type { Config } from '../config/config.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { InstallationManager } from '../utils/installationManager.js';
+import { createCustomContentGenerator } from '../adapters/index.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -46,6 +47,7 @@ export enum AuthType {
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
+  USE_DEEPSEEK = 'deepseek'
 }
 
 export type ContentGeneratorConfig = {
@@ -53,6 +55,11 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  // New fields for custom endpoints
+  baseUrl?: string;
+  apiVersion?: string;
+  customHeaders?: Record<string, string>;
+  timeout?: number;
 };
 
 export function createContentGeneratorConfig(
@@ -64,9 +71,16 @@ export function createContentGeneratorConfig(
   const googleCloudProject = process.env['GOOGLE_CLOUD_PROJECT'] || undefined;
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
 
+  // New environment variables for other providers
+  const deepseekAPIKey = process.env['DEEPSEEK_API_KEY'];
+  const customBaseUrl = process.env['CUSTOM_BASE_URL'];
+  const customTimeout = process.env['CUSTOM_TIMEOUT'];
+
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
     proxy: config?.getProxy(),
+    baseUrl: customBaseUrl,
+    timeout: customTimeout ? parseInt(customTimeout, 10) : undefined,
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
@@ -90,6 +104,17 @@ export function createContentGeneratorConfig(
   ) {
     contentGeneratorConfig.apiKey = googleApiKey;
     contentGeneratorConfig.vertexai = true;
+
+    return contentGeneratorConfig;
+  }
+
+  if (authType === AuthType.USE_DEEPSEEK) {
+    if (!deepseekAPIKey) {
+      throw new Error('DEEPSEEK_API_KEY must be set for Deepseek auth type.');
+    }
+
+    contentGeneratorConfig.apiKey = deepseekAPIKey
+    contentGeneratorConfig.baseUrl = customBaseUrl || 'https://api.deepseek.com';
 
     return contentGeneratorConfig;
   }
@@ -146,6 +171,13 @@ export async function createContentGenerator(
     });
     return new LoggingContentGenerator(googleGenAI.models, gcConfig);
   }
+
+  if (
+    config.authType === AuthType.USE_DEEPSEEK
+  ) {
+    return createCustomContentGenerator(config.authType, config)
+  }
+
   throw new Error(
     `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
   );
