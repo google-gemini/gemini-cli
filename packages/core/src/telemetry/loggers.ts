@@ -376,9 +376,7 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
   if (event.response_text) {
     attributes['response_text'] = event.response_text;
   }
-  if (event.error) {
-    attributes['error.message'] = event.error;
-  } else if (event.status_code) {
+  if (event.status_code) {
     if (typeof event.status_code === 'number') {
       attributes[SemanticAttributes.HTTP_STATUS_CODE] = event.status_code;
     }
@@ -395,7 +393,6 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
     event.model,
     event.duration_ms,
     event.status_code,
-    event.error,
   );
   recordTokenUsageMetrics(
     config,

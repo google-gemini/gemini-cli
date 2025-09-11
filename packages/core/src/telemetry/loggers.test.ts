@@ -320,7 +320,6 @@ describe('loggers', () => {
           response_text: 'test-response',
           prompt_id: 'prompt-id-1',
           auth_type: 'oauth-personal',
-          error: undefined,
         },
       });
 
@@ -329,7 +328,6 @@ describe('loggers', () => {
         'test-model',
         100,
         200,
-        undefined,
       );
 
       expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
@@ -338,45 +336,6 @@ describe('loggers', () => {
         50,
         'output',
       );
-
-      expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
-        ...event,
-        'event.name': EVENT_API_RESPONSE,
-        'event.timestamp': '2025-01-01T00:00:00.000Z',
-      });
-    });
-
-    it('should log an API response with an error', () => {
-      const usageData: GenerateContentResponseUsageMetadata = {
-        promptTokenCount: 17,
-        candidatesTokenCount: 50,
-        cachedContentTokenCount: 10,
-        thoughtsTokenCount: 5,
-        toolUsePromptTokenCount: 2,
-      };
-      const event = new ApiResponseEvent(
-        'test-model',
-        100,
-        'prompt-id-1',
-        AuthType.USE_GEMINI,
-        usageData,
-        'test-response',
-        'test-error',
-      );
-
-      logApiResponse(mockConfig, event);
-
-      expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'API response from test-model. Status: 200. Duration: 100ms.',
-        attributes: {
-          'session.id': 'test-session-id',
-          'user.email': 'test-user@example.com',
-          ...event,
-          'event.name': EVENT_API_RESPONSE,
-          'event.timestamp': '2025-01-01T00:00:00.000Z',
-          'error.message': 'test-error',
-        },
-      });
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
         ...event,

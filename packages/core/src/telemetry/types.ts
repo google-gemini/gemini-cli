@@ -236,7 +236,6 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
   model: string;
   status_code?: number | string;
   duration_ms: number;
-  error?: string;
   input_token_count: number;
   output_token_count: number;
   cached_content_token_count: number;
@@ -254,7 +253,6 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
     auth_type?: string,
     usage_data?: GenerateContentResponseUsageMetadata,
     response_text?: string,
-    error?: string,
   ) {
     this['event.name'] = 'api_response';
     this['event.timestamp'] = new Date().toISOString();
@@ -268,7 +266,6 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
     this.tool_token_count = usage_data?.toolUsePromptTokenCount ?? 0;
     this.total_token_count = usage_data?.totalTokenCount ?? 0;
     this.response_text = response_text;
-    this.error = error;
     this.prompt_id = prompt_id;
     this.auth_type = auth_type;
   }

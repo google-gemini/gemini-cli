@@ -6,6 +6,8 @@
 
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
+  // Deleted enums: 24
+
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
   // ==========================================================================
@@ -99,9 +101,6 @@ export enum EventMetadataKey {
 
   // Logs the duration of the API call in milliseconds.
   GEMINI_CLI_API_RESPONSE_DURATION_MS = 23,
-
-  // Logs the error message of the API call, if any.
-  GEMINI_CLI_API_ERROR_MESSAGE = 24,
 
   // Logs the input token count of the API call.
   GEMINI_CLI_API_RESPONSE_INPUT_TOKEN_COUNT = 25,

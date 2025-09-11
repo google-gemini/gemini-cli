@@ -558,10 +558,6 @@ export class ClearcutLogger {
         value: JSON.stringify(event.duration_ms),
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_MESSAGE,
-        value: JSON.stringify(event.error),
-      },
-      {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_INPUT_TOKEN_COUNT,
         value: JSON.stringify(event.input_token_count),
