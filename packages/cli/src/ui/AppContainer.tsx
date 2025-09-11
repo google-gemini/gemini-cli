@@ -211,7 +211,7 @@ export const AppContainer = (props: AppContainerProps) => {
     20,
     Math.floor(terminalWidth * widthFraction) - 3,
   );
-  const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 0.8));
+  const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 1.0));
   const mainAreaWidth = Math.floor(terminalWidth * 0.9);
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
