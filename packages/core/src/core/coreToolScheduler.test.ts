@@ -1481,8 +1481,7 @@ describe('truncateAndSaveToFile', () => {
       smallTruncateLines,
     );
 
-    // For small truncateLines (3), should use simple head/tail view
-    // For truncateLines < 5, we reserve 1 line for marker
+// For truncateLines < 5, we reserve 1 line for marker
     const contentLinesToShow = Math.max(0, smallTruncateLines - 1);
     const headCount = Math.ceil(contentLinesToShow / 2);
     const tailCount = contentLinesToShow - headCount;
