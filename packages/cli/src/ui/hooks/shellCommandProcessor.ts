@@ -189,9 +189,7 @@ export const useShellCommandProcessor = (
 
               // Throttle pending UI updates to avoid excessive re-renders.
               if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                let displayOutput = currentDisplayOutput;
-                if (!config.getShouldUseNodePtyShell())  // node-pty handles CR for us
-                  displayOutput = processCarriageReturns(currentDisplayOutput)
+                const displayOutput = processCarriageReturns(currentDisplayOutput);
                 setPendingHistoryItem({
                   type: 'tool_group',
                   tools: [
