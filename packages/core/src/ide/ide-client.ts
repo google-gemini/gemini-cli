@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import { isSubpath } from '../utils/paths.js';
 import { detectIde, type DetectedIde, getIdeInfo } from '../ide/detect-ide.js';
 import {
-  ideContext,
+  ideContextStore,
   IdeDiffAcceptedNotificationSchema,
   IdeDiffClosedNotificationSchema,
   CloseDiffResponseSchema,
@@ -362,7 +362,7 @@ export class IdeClient {
     }
 
     if (status === IDEConnectionStatus.Disconnected) {
-      ideContext.clearIdeContext();
+      ideContextStore.clear();
     }
   }
 
@@ -562,7 +562,7 @@ export class IdeClient {
     this.client.setNotificationHandler(
       IdeContextNotificationSchema,
       (notification) => {
-        ideContext.setIdeContext(notification.params);
+        ideContextStore.set(notification.params);
         const isTrusted = notification.params.workspaceState?.isTrusted;
         if (isTrusted !== undefined) {
           for (const listener of this.trustChangeListeners) {
