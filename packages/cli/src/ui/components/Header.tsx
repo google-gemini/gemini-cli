@@ -54,17 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
       ) : (
         <Text>{displayTitle}</Text>
       )}
-      {nightly && (
-        <Box width="100%" flexDirection="row" justifyContent="flex-end">
-          {theme.ui.gradient ? (
-            <Gradient colors={theme.ui.gradient}>
-              <Text>v{version}</Text>
-            </Gradient>
-          ) : (
-            <Text>v{version}</Text>
-          )}
-        </Box>
-      )}
+      {/* Version display removed per customization */}
     </Box>
   );
 };

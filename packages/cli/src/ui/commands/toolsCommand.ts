@@ -13,7 +13,7 @@ import { MessageType } from '../types.js';
 
 export const toolsCommand: SlashCommand = {
   name: 'tools',
-  description: 'list available Gemini CLI tools. Usage: /tools [desc]',
+  description: 'list available RAGHU CLI tools. Usage: /tools [desc]',
   kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const subCommand = args?.trim();
@@ -40,7 +40,7 @@ export const toolsCommand: SlashCommand = {
     // Filter out MCP tools by checking for the absence of a serverName property
     const geminiTools = tools.filter((tool) => !('serverName' in tool));
 
-    let message = 'Available Gemini CLI tools:\n\n';
+    let message = 'Available RAGHU CLI tools:\n\n';
 
     if (geminiTools.length > 0) {
       geminiTools.forEach((tool) => {

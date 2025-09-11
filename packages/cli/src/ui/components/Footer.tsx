@@ -13,7 +13,7 @@ import process from 'node:process';
 import path from 'node:path';
 import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
-import { ContextUsageDisplay } from './ContextUsageDisplay.js';
+// ContextUsageDisplay removed per customization
 import { DebugProfiler } from './DebugProfiler.js';
 
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -92,7 +92,7 @@ export const Footer: React.FC<FooterProps> = ({
         )}
       </Box>
 
-      {/* Middle Section: Centered Trust/Sandbox Info */}
+      {/* Middle Section: Centered Trust/Sandbox Info (customized) */}
       <Box
         flexGrow={isNarrow ? 0 : 1}
         alignItems="center"
@@ -115,11 +115,7 @@ export const Footer: React.FC<FooterProps> = ({
               ({process.env['SEATBELT_PROFILE']})
             </Text>
           </Text>
-        ) : (
-          <Text color={theme.status.error}>
-            no sandbox <Text color={theme.text.secondary}>(see /docs)</Text>
-          </Text>
-        )}
+        ) : null}
       </Box>
 
       {/* Right Section: Gemini Label and Console Summary */}
@@ -128,10 +124,6 @@ export const Footer: React.FC<FooterProps> = ({
           <Text color={theme.text.accent}>
             {isNarrow ? '' : ' '}
             {model}{' '}
-            <ContextUsageDisplay
-              promptTokenCount={promptTokenCount}
-              model={model}
-            />
           </Text>
           {showMemoryUsage && <MemoryUsageDisplay />}
         </Box>
