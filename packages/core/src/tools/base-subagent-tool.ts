@@ -64,6 +64,8 @@ export abstract class BaseSubAgentInvocation<
    */
   abstract getOutputSchemaName(): string;
 
+  abstract getOutputSchema(): string;
+
   /**
    * Populates the context state with the necessary variables for the prompt.
    * @param contextState The context state to populate.
@@ -120,7 +122,7 @@ export abstract class BaseSubAgentInvocation<
 
     const outputConfig: OutputConfig = {
       outputs: {
-        report_json: `The final JSON report structured according to the ${this.getOutputSchemaName()} schema.`,
+        report_json: `The final JSON report structured according to the schema:\n${this.getOutputSchema()} `,
       },
     };
 

@@ -12,6 +12,23 @@ import type { ContextState } from '../core/subagent.js';
 import { processSingleFileContent } from '../utils/fileUtils.js';
 import fs from 'node:fs';
 
+
+const OUTPUT_SCHEMA_JSON = `
+\`\`\`json
+{
+    "summary_of_findings": "A brief, one-sentence summary of the architectural role of the discovered files.",
+    "relevant_locations": [
+        {
+            "file_path": "src/services/payment_service.ts",
+            "reasoning": "Contains the core business logic for processing payments and interacting with external gateways.",
+            "key_symbols": ["PaymentService", "processTransaction"]
+        }
+    ],
+    "exploration_trace": "1. Grepped for 'payment'. 2. Read 'payment_service.ts'. 3. Discovered import of 'tax_calculator.ts' and read it. 4. Grepped for 'PaymentService' to find its usage in 'payment_controller.ts'."
+}
+\`\`\`
+`
+
 const SYSTEM_PROMPT = `
 You are **Codebase Investigator**, a hyper-specialized AI agent and an expert in navigating complex software projects.
 You are a sub-agent within a larger development system.
@@ -151,6 +168,10 @@ class CodebaseInvestigatorInvocation extends BaseSubAgentInvocation<
 
   getOutputSchemaName(): string {
     return 'CodebaseInvestigatorOutput';
+  }
+
+  override getOutputSchema(): string {
+    return OUTPUT_SCHEMA_JSON;
   }
 
   populateContextState(contextState: ContextState): void {

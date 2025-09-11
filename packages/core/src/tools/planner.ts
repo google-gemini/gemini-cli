@@ -12,6 +12,56 @@ import type { ContextState } from '../core/subagent.js';
 import { processSingleFileContent } from '../utils/fileUtils.js';
 import fs from 'node:fs';
 
+
+const OUTPUT_SCHEMA_JSON = `
+\`\`\`json
+{
+  "summary_of_analysis": "To add the new discount endpoint, we must modify the main API router, add a new business logic method to the 'InvoiceService', and create a new handler in the 'InvoiceController'.",
+  "solution_strategy": "The approach is to add a new PUT route. The controller will receive the request, call the InvoiceService to fetch the invoice, apply the 10% discount logic within the service, save the updated invoice, and return it.",
+  "relevant_locations": [
+      {
+          "file_path": "src/services/invoice_service.ts",
+          "reasoning": "Contains the core business logic for processing invoices and interacting with external gateways.",
+          "key_symbols": ["InvoiceService", "invoiceRepository", "aplyDiscount"]
+      },
+      {
+          "file_path": "src/controllers/invoice_controller.ts",
+          "reasoning": "Contains controller logic for processing invoices.",
+          "key_symbols": ["applyDiscountHandler", "InvoiceController"]
+      },
+      {
+          "file_path": "src/routes/api_v2_router.ts",
+          "reasoning": "Important to  find the route group for invoices.",
+          "key_symbols": ["invoiceController"]
+      }
+  ],
+  "step_by_step_plan": [
+    {
+      "step_number": 1,
+      "action": "MODIFY_FILE",
+      "file_path": "src/services/invoice_service.ts",
+      "description": "In the 'InvoiceService' class, add a new async public method: 'applyDiscount(invoiceId: string)'. This method must: 1. Fetch the invoice by ID using the 'invoiceRepository'. 2. Check if the invoice exists, throw error if not. 3. Calculate the new total (currentTotal * 0.90). 4. Update the invoice object's 'total' field. 5. Save the updated invoice using 'this.invoiceRepository.save(invoice)'. 6. Return the updated invoice.",
+      "expected_outcome": "The 'InvoiceService' class now has a 'applyDiscount' method with the correct business logic."
+    },
+    {
+      "step_number": 2,
+      "action": "MODIFY_FILE",
+      "file_path": "src/controllers/invoice_controller.ts",
+      "description": "In the 'InvoiceController' class, create a new handler method 'applyDiscountHandler(req, res)'. This handler should: 1. Extract 'invoiceId' from req.params. 2. Call 'this.invoiceService.applyDiscount(invoiceId)' inside a try/catch block. 3. On success, send the updated invoice as a 200 JSON response. 4. On error, send a 404 or 500 status with the error message.",
+      "expected_outcome": "The controller has a new public method to handle the HTTP request and call the service logic."
+    },
+    {
+      "step_number": 3,
+      "action": "MODIFY_FILE",
+      "file_path": "src/routes/api_v2_router.ts",
+      "description": "At the top of the file, ensure 'invoiceController' is imported. Find the route group for invoices. Add a new PUT route: 'router.put("/invoice/discount/:invoiceId", (req, res) => invoiceController.applyDiscountHandler(req, res));'.",
+      "expected_outcome": "The API server now exposes the new 'PUT /api/v2/invoice/discount/:invoiceId' endpoint."
+    }
+  ]
+}
+\`\`\`
+`
+
 const SYSTEM_PROMPT = `
 You are **Solution Planner**, an expert AI agent specializing in full-stack software engineering, system design, and meticulous implementation planning.
 You are a sub-agent within a larger development system.
@@ -214,6 +264,10 @@ class SolutionPlannerInvocation extends BaseSubAgentInvocation<
 
   getOutputSchemaName(): string {
     return 'SolutionPlannerOutput';
+  }
+
+  override getOutputSchema(): string {
+    return OUTPUT_SCHEMA_JSON;
   }
 
   populateContextState(contextState: ContextState): void {
