@@ -5,18 +5,28 @@
  */
 
 import type { Config, ToolCallRequestInfo } from '@google/gemini-cli-core';
+import { CommandService } from './services/CommandService.js';
+import { FileCommandLoader } from './services/FileCommandLoader.js';
+import { type CommandContext } from './ui/commands/types.js';
+import { isSlashCommand } from './ui/utils/commandUtils.js';
+import type { SessionStatsState } from './ui/contexts/SessionContext.js';
+import type { LoadedSettings } from './config/settings.js';
+import { createNoOpUI } from './ui/commands/noOpUi.js';
 import {
   executeToolCall,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   GeminiEventType,
+  Logger,
   FatalInputError,
   promptIdContext,
   OutputFormat,
   JsonFormatter,
   uiTelemetryService,
 } from '@google/gemini-cli-core';
-import type { Content, Part } from '@google/genai';
+
+import type { Content, Part, PartListUnion } from '@google/genai';
+import { parseSlashCommand } from './utils/commands.js';
 
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
@@ -27,8 +37,92 @@ import {
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
 
+/**
+ * Processes a slash command in a non-interactive environment.
+ *
+ * @returns A Promise that resolves to `PartListUnion` if a valid command is
+ *   found and results in a prompt, or `undefined` otherwise.
+ * @throws {FatalInputError} if the command requires user confirmation, which
+ *   is not supported in non-interactive mode.
+ */
+const handleSlashCommand = async (
+  rawQuery: string,
+  abortController: AbortController,
+  config: Config,
+  settings: LoadedSettings,
+): Promise<PartListUnion | undefined> => {
+  const trimmed = rawQuery.trim();
+  if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {
+    return;
+  }
+
+  // Only custom commands are supported for now.
+  const loaders = [new FileCommandLoader(config)];
+  const commandService = await CommandService.create(
+    loaders,
+    abortController.signal,
+  );
+  const commands = commandService.getCommands();
+
+  const { commandToExecute, args } = parseSlashCommand(rawQuery, commands);
+
+  if (commandToExecute) {
+    if (commandToExecute.action) {
+      // Not used by custom commands but may be in the future.
+      const sessionStats: SessionStatsState = {
+        sessionId: config?.getSessionId(),
+        sessionStartTime: new Date(),
+        metrics: uiTelemetryService.getMetrics(),
+        lastPromptTokenCount: 0,
+        promptCount: 1,
+      };
+
+      const logger = new Logger(config?.getSessionId() || '', config?.storage);
+
+      const context: CommandContext = {
+        services: {
+          config,
+          settings,
+          git: undefined,
+          logger,
+        },
+        ui: createNoOpUI(),
+        session: {
+          stats: sessionStats,
+          sessionShellAllowlist: new Set(),
+        },
+        invocation: {
+          raw: trimmed,
+          name: commandToExecute.name,
+          args,
+        },
+      };
+
+      const result = await commandToExecute.action(context, args);
+
+      if (result) {
+        switch (result.type) {
+          case 'submit_prompt':
+            return result.content;
+          case 'confirm_shell_commands':
+            throw new FatalInputError(
+              'Exiting due to a confirmation prompt requested by the command.',
+            );
+          default:
+            throw new FatalInputError(
+              'Exiting due to command result that is not supported in non-interactive mode.',
+            );
+        }
+      }
+    }
+  }
+
+  return;
+};
+
 export async function runNonInteractive(
   config: Config,
+  settings: LoadedSettings,
   input: string,
   prompt_id: string,
 ): Promise<void> {
@@ -52,26 +146,44 @@ export async function runNonInteractive(
 
       const abortController = new AbortController();
 
-      const { processedQuery, shouldProceed } = await handleAtCommand({
-        query: input,
-        config,
-        addItem: (_item, _timestamp) => 0,
-        onDebugMessage: () => {},
-        messageId: Date.now(),
-        signal: abortController.signal,
-      });
+      let query: Part[] | undefined;
 
-      if (!shouldProceed || !processedQuery) {
-        // An error occurred during @include processing (e.g., file not found).
-        // The error message is already logged by handleAtCommand.
-        throw new FatalInputError(
-          'Exiting due to an error processing the @ command.',
+      if (isSlashCommand(input)) {
+        const slashCommandResult = await handleSlashCommand(
+          input,
+          abortController,
+          config,
+          settings,
         );
+        // If a slash command is found and returns a prompt, use it.
+        // Otherwise, slashCommandResult fall through to the default prompt
+        // handling.
+        if (slashCommandResult) {
+          query = slashCommandResult as Part[];
+        }
       }
 
-      let currentMessages: Content[] = [
-        { role: 'user', parts: processedQuery as Part[] },
-      ];
+      if (!query) {
+        const { processedQuery, shouldProceed } = await handleAtCommand({
+          query: input,
+          config,
+          addItem: (_item, _timestamp) => 0,
+          onDebugMessage: () => {},
+          messageId: Date.now(),
+          signal: abortController.signal,
+        });
+
+        if (!shouldProceed || !processedQuery) {
+          // An error occurred during @include processing (e.g., file not found).
+          // The error message is already logged by handleAtCommand.
+          throw new FatalInputError(
+            'Exiting due to an error processing the @ command.',
+          );
+        }
+        query = processedQuery as Part[];
+      }
+
+      let currentMessages: Content[] = [{ role: 'user', parts: query }];
 
       let turnCount = 0;
       while (true) {
