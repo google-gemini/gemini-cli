@@ -76,6 +76,13 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Enable session checkpointing for recovery.
   - **Default:** `false`
 
+#### `output`
+
+- **`output.format`** (string):
+  - **Description:** The format of the CLI output.
+  - **Default:** `"text"`
+  - **Values:** `"text"`, `"json"`
+
 #### `ui`
 
 - **`ui.theme`** (string):
@@ -442,11 +449,18 @@ Arguments passed directly when running the CLI can override other configurations
   - Example: `npm start -- --model gemini-1.5-pro-latest`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a non-interactive mode.
+  - For scripting examples, use the `--output-format json` flag to get structured output.
 - **`--prompt-interactive <your_prompt>`** (**`-i <your_prompt>`**):
   - Starts an interactive session with the provided prompt as the initial input.
   - The prompt is processed within the interactive session, not before it.
   - Cannot be used when piping input from stdin.
   - Example: `gemini -i "explain this code"`
+- **`--output-format <format>`**:
+  - **Description:** Specifies the format of the CLI output for non-interactive mode.
+  - **Values:**
+    - `text`: (Default) The standard human-readable output.
+    - `json`: A machine-readable JSON output.
+  - **Note:** For structured output and scripting, use the `--output-format json` flag.
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
 - **`--sandbox-image`**:

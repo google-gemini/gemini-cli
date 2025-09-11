@@ -29,7 +29,6 @@ describe('createContentGenerator', () => {
     );
     const generator = await createContentGenerator(
       {
-        model: 'test-model',
         authType: AuthType.LOGIN_WITH_GOOGLE,
       },
       mockConfig,
@@ -51,7 +50,6 @@ describe('createContentGenerator', () => {
     vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
     const generator = await createContentGenerator(
       {
-        model: 'test-model',
         apiKey: 'test-api-key',
         authType: AuthType.USE_GEMINI,
       },
@@ -85,7 +83,6 @@ describe('createContentGenerator', () => {
     vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
     const generator = await createContentGenerator(
       {
-        model: 'test-model',
         apiKey: 'test-api-key',
         authType: AuthType.USE_GEMINI,
       },

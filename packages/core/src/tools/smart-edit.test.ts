@@ -10,15 +10,11 @@ const mockFixLLMEditWithInstruction = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 
-import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient } from '../ide/ide-client.js';
 
 vi.mock('../ide/ide-client.js', () => ({
   IdeClient: {
     getInstance: vi.fn(),
-  },
-  IDEConnectionStatus: {
-    Connected: 'connected',
-    Disconnected: 'disconnected',
   },
 }));
 
@@ -60,6 +56,7 @@ import { ApprovalMode, type Config } from '../config/config.js';
 import { type Content, type Part, type SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
+import type { BaseLlmClient } from '../core/baseLlmClient.js';
 
 describe('SmartEditTool', () => {
   let tool: SmartEditTool;
@@ -67,6 +64,7 @@ describe('SmartEditTool', () => {
   let rootDir: string;
   let mockConfig: Config;
   let geminiClient: any;
+  let baseLlmClient: BaseLlmClient;
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -78,8 +76,13 @@ describe('SmartEditTool', () => {
       generateJson: mockGenerateJson,
     };
 
+    baseLlmClient = {
+      generateJson: mockGenerateJson,
+    } as unknown as BaseLlmClient;
+
     mockConfig = {
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
+      getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
@@ -454,9 +457,7 @@ describe('SmartEditTool', () => {
       filePath = path.join(rootDir, testFile);
       ideClient = {
         openDiff: vi.fn(),
-        getConnectionStatus: vi.fn().mockReturnValue({
-          status: IDEConnectionStatus.Connected,
-        }),
+        isDiffingEnabled: vi.fn().mockReturnValue(true),
       };
       vi.mocked(IdeClient.getInstance).mockResolvedValue(ideClient);
       (mockConfig as any).getIdeMode = () => true;

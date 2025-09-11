@@ -55,8 +55,6 @@ async function createMockConfig(
   };
   const config = new Config(configParams);
   await config.initialize();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await config.refreshAuth('test-auth' as any);
 
   // Mock ToolRegistry
   const mockToolRegistry = {
@@ -164,15 +162,13 @@ describe('subagent.ts', () => {
     // Helper to safely access generationConfig from mock calls
     const getGenerationConfigFromMock = (
       callIndex = 0,
-    ): GenerateContentConfig & { systemInstruction?: string | Content } => {
+    ): GenerateContentConfig => {
       const callArgs = vi.mocked(GeminiChat).mock.calls[callIndex];
-      const generationConfig = callArgs?.[2];
+      const generationConfig = callArgs?.[1];
       // Ensure it's defined before proceeding
       expect(generationConfig).toBeDefined();
       if (!generationConfig) throw new Error('generationConfig is undefined');
-      return generationConfig as GenerateContentConfig & {
-        systemInstruction?: string | Content;
-      };
+      return generationConfig as GenerateContentConfig;
     };
 
     describe('create (Tool Validation)', () => {
@@ -347,7 +343,7 @@ describe('subagent.ts', () => {
         );
 
         // Check History (should include environment context)
-        const history = callArgs[3];
+        const history = callArgs[2];
         expect(history).toEqual([
           { role: 'user', parts: [{ text: 'Env Context' }] },
           {
@@ -420,7 +416,7 @@ describe('subagent.ts', () => {
 
         const callArgs = vi.mocked(GeminiChat).mock.calls[0];
         const generationConfig = getGenerationConfigFromMock();
-        const history = callArgs[3];
+        const history = callArgs[2];
 
         expect(generationConfig.systemInstruction).toBeUndefined();
         expect(history).toEqual([
@@ -503,7 +499,7 @@ describe('subagent.ts', () => {
         expect(scope.output.emitted_vars).toEqual({});
         expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
         // Check the initial message
-        expect(mockSendMessageStream.mock.calls[0][0].message).toEqual([
+        expect(mockSendMessageStream.mock.calls[0][1].message).toEqual([
           { text: 'Get Started!' },
         ]);
       });
@@ -547,7 +543,7 @@ describe('subagent.ts', () => {
         expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
 
         // Check the tool response sent back in the second call
-        const secondCallArgs = mockSendMessageStream.mock.calls[0][0];
+        const secondCallArgs = mockSendMessageStream.mock.calls[0][1];
         expect(secondCallArgs.message).toEqual([{ text: 'Get Started!' }]);
       });
 
@@ -609,7 +605,7 @@ describe('subagent.ts', () => {
         );
 
         // Check the response sent back to the model
-        const secondCallArgs = mockSendMessageStream.mock.calls[1][0];
+        const secondCallArgs = mockSendMessageStream.mock.calls[1][1];
         expect(secondCallArgs.message).toEqual([
           { text: 'file1.txt\nfile2.ts' },
         ]);
@@ -657,7 +653,7 @@ describe('subagent.ts', () => {
         await scope.runNonInteractive(new ContextState());
 
         // The agent should send the specific error message from responseParts.
-        const secondCallArgs = mockSendMessageStream.mock.calls[1][0];
+        const secondCallArgs = mockSendMessageStream.mock.calls[1][1];
 
         expect(secondCallArgs.message).toEqual([
           {
@@ -703,7 +699,7 @@ describe('subagent.ts', () => {
         await scope.runNonInteractive(new ContextState());
 
         // Check the nudge message sent in Turn 2
-        const secondCallArgs = mockSendMessageStream.mock.calls[1][0];
+        const secondCallArgs = mockSendMessageStream.mock.calls[1][1];
 
         // We check that the message contains the required variable name and the nudge phrasing.
         expect(secondCallArgs.message[0].text).toContain('required_var');

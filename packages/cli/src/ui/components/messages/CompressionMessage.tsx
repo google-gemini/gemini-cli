@@ -7,7 +7,7 @@
 import { Box, Text } from 'ink';
 import type { CompressionProps } from '../../types.js';
 import Spinner from 'ink-spinner';
-import { Colors } from '../../colors.js';
+import { theme } from '../../semantic-colors.js';
 import { SCREEN_READER_MODEL_PREFIX } from '../../textConstants.js';
 import { CompressionStatus } from '@google/gemini-cli-core';
 
@@ -61,13 +61,13 @@ export function CompressionMessage({
         {isPending ? (
           <Spinner type="dots" />
         ) : (
-          <Text color={Colors.AccentPurple}>✦</Text>
+          <Text color={theme.text.accent}>✦</Text>
         )}
       </Box>
       <Box>
         <Text
           color={
-            compression.isPending ? Colors.AccentPurple : Colors.AccentGreen
+            compression.isPending ? theme.text.accent : theme.status.success
           }
           aria-label={SCREEN_READER_MODEL_PREFIX}
         >
