@@ -386,10 +386,10 @@ const RenderListItemInternal: React.FC<RenderListItemProps> = ({
       flexDirection="row"
     >
       <Box width={prefixWidth}>
-        <Text>{prefix}</Text>
+        <Text color={theme.text.primary}>{prefix}</Text>
       </Box>
       <Box flexGrow={LIST_ITEM_TEXT_FLEX_GROW}>
-        <Text wrap="wrap">
+        <Text wrap="wrap" color={theme.text.primary}>
           <RenderInline text={itemText} />
         </Text>
       </Box>
