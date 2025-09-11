@@ -29,7 +29,7 @@ import {
   type UserTierId,
   DEFAULT_GEMINI_FLASH_MODEL,
   IdeClient,
-  ideContext,
+  ideContextStore,
   getErrorMessage,
   getAllGeminiMdFilenames,
   AuthType,
@@ -707,8 +707,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
   }, [terminalWidth, refreshStatic]);
 
   useEffect(() => {
-    const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
-    setIdeContextState(ideContext.getIdeContext());
+    const unsubscribe = ideContextStore.subscribe(setIdeContextState);
+    setIdeContextState(ideContextStore.get());
     return unsubscribe;
   }, []);
 

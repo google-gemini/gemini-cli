@@ -15,7 +15,7 @@ import {
 import {
   getIdeInstaller,
   IDEConnectionStatus,
-  ideContext,
+  ideContextStore,
   GEMINI_CLI_COMPANION_EXTENSION_NAME,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
@@ -90,7 +90,7 @@ async function getIdeStatusMessageWithFiles(ideClient: IdeClient): Promise<{
   switch (connection.status) {
     case IDEConnectionStatus.Connected: {
       let content = `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}`;
-      const context = ideContext.getIdeContext();
+      const context = ideContextStore.get();
       const openFiles = context?.workspaceState?.openFiles;
       if (openFiles && openFiles.length > 0) {
         content += formatFileList(openFiles);
