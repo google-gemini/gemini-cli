@@ -106,6 +106,7 @@ export function logCliConfiguration(
     mcp_servers_count: event.mcp_servers_count,
     mcp_tools: event.mcp_tools,
     mcp_tools_count: event.mcp_tools_count,
+    output_format: event.output_format,
   };
 
   const logger = logs.getLogger(SERVICE_NAME);

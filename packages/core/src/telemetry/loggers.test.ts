@@ -18,6 +18,7 @@ import {
   ToolErrorType,
   ToolRegistry,
 } from '../index.js';
+import { OutputFormat } from '../output/types.js';
 import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import type { Config } from '../config/config.js';
@@ -157,6 +158,7 @@ describe('loggers', () => {
         getQuestion: () => 'test-question',
         getTargetDir: () => 'target-dir',
         getProxy: () => 'http://test.proxy.com:8080',
+        getOutputFormat: () => OutputFormat.JSON,
       } as unknown as Config;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
@@ -183,6 +185,7 @@ describe('loggers', () => {
           mcp_servers_count: 1,
           mcp_tools: undefined,
           mcp_tools_count: undefined,
+          output_format: 'json',
         },
       });
     });
