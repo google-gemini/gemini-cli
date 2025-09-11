@@ -271,7 +271,6 @@ describe('Session Cleanup', () => {
       expect(result.errors[0].error).toContain('Permission denied');
     });
 
-
     it('should handle empty sessions directory', async () => {
       const config = createMockConfig();
       const settings: Settings = {
@@ -1517,6 +1516,56 @@ describe('Session Cleanup', () => {
 
         debugSpy.mockRestore();
       });
+    });
+
+    it('should never throw an exception, always returning a result', async () => {
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: {
+          sessionRetention: {
+            enabled: true,
+            maxAge: '7d',
+          },
+        },
+      };
+
+      // Mock getSessionFiles to throw an error
+      mockGetSessionFiles.mockRejectedValue(
+        new Error('Failed to read directory'),
+      );
+
+      // Should not throw, should return a result with errors
+      const result = await cleanupExpiredSessions(config, settings);
+
+      expect(result).toBeDefined();
+      expect(result.disabled).toBe(false);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].sessionId).toBe('global');
+      expect(result.errors[0].error).toContain('Failed to read directory');
+    });
+
+    it('should handle unexpected errors without throwing', async () => {
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: {
+          sessionRetention: {
+            enabled: true,
+            maxAge: '7d',
+          },
+        },
+      };
+
+      // Mock getSessionFiles to throw a non-Error object
+      mockGetSessionFiles.mockRejectedValue('String error');
+
+      // Should not throw, should return a result with errors
+      const result = await cleanupExpiredSessions(config, settings);
+
+      expect(result).toBeDefined();
+      expect(result.disabled).toBe(false);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].sessionId).toBe('global');
+      expect(result.errors[0].error).toBe('Unknown error');
     });
   });
 });

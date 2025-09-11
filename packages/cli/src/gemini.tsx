@@ -398,14 +398,7 @@ export async function main() {
   await config.initialize();
 
   // Cleanup sessions after config initialization
-  try {
-    await cleanupExpiredSessions(config, settings.merged);
-  } catch (error) {
-    // Don't let cleanup failures prevent CLI startup
-    if (config.getDebugMode()) {
-      console.debug('Session cleanup failed:', error);
-    }
-  }
+  await cleanupExpiredSessions(config, settings.merged);
 
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
