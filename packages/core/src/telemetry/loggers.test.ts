@@ -18,6 +18,7 @@ import {
   ToolErrorType,
   ToolRegistry,
 } from '../index.js';
+import { OutputFormat } from '../output/types.js';
 import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import type { Config } from '../config/config.js';
@@ -43,6 +44,7 @@ import {
   logMalformedJsonResponse,
   logFileOperation,
   logRipgrepFallback,
+  logToolOutputTruncated,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -56,6 +58,7 @@ import {
   MalformedJsonResponseEvent,
   makeChatCompressionEvent,
   FileOperationEvent,
+  ToolOutputTruncatedEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
@@ -157,6 +160,7 @@ describe('loggers', () => {
         getQuestion: () => 'test-question',
         getTargetDir: () => 'target-dir',
         getProxy: () => 'http://test.proxy.com:8080',
+        getOutputFormat: () => OutputFormat.JSON,
       } as unknown as Config;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
@@ -183,6 +187,7 @@ describe('loggers', () => {
           mcp_servers_count: 1,
           mcp_tools: undefined,
           mcp_tools_count: undefined,
+          output_format: 'json',
         },
       });
     });
@@ -598,6 +603,7 @@ describe('loggers', () => {
           },
           error: undefined,
           errorType: undefined,
+          contentLength: 13,
         },
         tool,
         invocation: {} as AnyToolInvocation,
@@ -631,6 +637,7 @@ describe('loggers', () => {
           tool_type: 'native',
           error: undefined,
           error_type: undefined,
+
           metadata: {
             model_added_lines: 1,
             model_removed_lines: 2,
@@ -641,6 +648,7 @@ describe('loggers', () => {
             user_added_chars: 7,
             user_removed_chars: 8,
           },
+          content_length: 13,
         },
       });
 
@@ -678,6 +686,7 @@ describe('loggers', () => {
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
+          contentLength: undefined,
         },
         durationMs: 100,
         outcome: ToolConfirmationOutcome.Cancel,
@@ -710,6 +719,7 @@ describe('loggers', () => {
           error: undefined,
           error_type: undefined,
           metadata: undefined,
+          content_length: undefined,
         },
       });
 
@@ -748,6 +758,7 @@ describe('loggers', () => {
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
+          contentLength: 13,
         },
         outcome: ToolConfirmationOutcome.ModifyWithEditor,
         tool: new EditTool(mockConfig),
@@ -782,6 +793,7 @@ describe('loggers', () => {
           error: undefined,
           error_type: undefined,
           metadata: undefined,
+          content_length: 13,
         },
       });
 
@@ -820,6 +832,7 @@ describe('loggers', () => {
           resultDisplay: undefined,
           error: undefined,
           errorType: undefined,
+          contentLength: 13,
         },
         tool: new EditTool(mockConfig),
         invocation: {} as AnyToolInvocation,
@@ -853,6 +866,7 @@ describe('loggers', () => {
           error: undefined,
           error_type: undefined,
           metadata: undefined,
+          content_length: 13,
         },
       });
 
@@ -873,6 +887,7 @@ describe('loggers', () => {
     });
 
     it('should log a failed tool call with an error', () => {
+      const errorMessage = 'test-error';
       const call: ErroredToolCall = {
         status: 'error',
         request: {
@@ -889,11 +904,9 @@ describe('loggers', () => {
           callId: 'test-call-id',
           responseParts: [{ text: 'test-response' }],
           resultDisplay: undefined,
-          error: {
-            name: 'test-error-type',
-            message: 'test-error',
-          },
+          error: new Error(errorMessage),
           errorType: ToolErrorType.UNKNOWN,
+          contentLength: errorMessage.length,
         },
         durationMs: 100,
       };
@@ -927,6 +940,7 @@ describe('loggers', () => {
           tool_type: 'native',
           decision: undefined,
           metadata: undefined,
+          content_length: errorMessage.length,
         },
       });
 
@@ -1030,6 +1044,42 @@ describe('loggers', () => {
         '.txt',
         'typescript',
       );
+    });
+  });
+
+  describe('logToolOutputTruncated', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    it('should log a tool output truncated event', () => {
+      const event = new ToolOutputTruncatedEvent('prompt-id-1', {
+        toolName: 'test-tool',
+        originalContentLength: 1000,
+        truncatedContentLength: 100,
+        threshold: 500,
+        lines: 10,
+      });
+
+      logToolOutputTruncated(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Tool output truncated for test-tool.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': 'tool_output_truncated',
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          eventName: 'tool_output_truncated',
+          prompt_id: 'prompt-id-1',
+          tool_name: 'test-tool',
+          original_content_length: 1000,
+          truncated_content_length: 100,
+          threshold: 500,
+          lines: 10,
+        },
+      });
     });
   });
 });
