@@ -18,6 +18,7 @@ import {
 import type { FileOperation } from './metrics.js';
 export { ToolCallDecision };
 import type { ToolRegistry } from '../tools/tool-registry.js';
+import type { OutputFormat } from '../output/types.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -45,6 +46,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   mcp_servers_count: number;
   mcp_tools_count?: number;
   mcp_tools?: string;
+  output_format: OutputFormat;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
@@ -74,6 +76,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
     this.file_filtering_respect_git_ignore =
       config.getFileFilteringRespectGitIgnore();
     this.mcp_servers_count = mcpServers ? Object.keys(mcpServers).length : 0;
+    this.output_format = config.getOutputFormat();
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
@@ -531,4 +534,28 @@ export type TelemetryEvent =
   | FileOperationEvent
   | InvalidChunkEvent
   | ContentRetryEvent
-  | ContentRetryFailureEvent;
+  | ContentRetryFailureEvent
+  | ExtensionInstallEvent;
+
+export class ExtensionInstallEvent implements BaseTelemetryEvent {
+  'event.name': 'extension_install';
+  'event.timestamp': string;
+  extension_name: string;
+  extension_version: string;
+  extension_source: string;
+  status: 'success' | 'error';
+
+  constructor(
+    extension_name: string,
+    extension_version: string,
+    extension_source: string,
+    status: 'success' | 'error',
+  ) {
+    this['event.name'] = 'extension_install';
+    this['event.timestamp'] = new Date().toISOString();
+    this.extension_name = extension_name;
+    this.extension_version = extension_version;
+    this.extension_source = extension_source;
+    this.status = status;
+  }
+}
