@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { cleanupExpiredSessions } from './sessionCleanup.js';
 import type { Settings } from '../config/settings.js';
-import type { Config } from '@google/gemini-cli-core';
+import { SESSION_FILE_PREFIX, type Config } from '@google/gemini-cli-core';
 
 // Create a mock config for integration testing
 function createTestConfig(): Config {
@@ -109,7 +109,7 @@ describe('Session Cleanup Integration', () => {
     // Create an old session file that should be deleted
     const oldSessionFile = path.join(
       chatsDir,
-      'session-2024-12-01T10-00-00-old12345.json',
+      `${SESSION_FILE_PREFIX}2024-12-01T10-00-00-old12345.json`,
     );
     await fs.writeFile(
       oldSessionFile,
@@ -124,7 +124,7 @@ describe('Session Cleanup Integration', () => {
     // Create a recent session file that should be kept
     const recentSessionFile = path.join(
       chatsDir,
-      'session-2025-01-15T10-00-00-recent789.json',
+      `${SESSION_FILE_PREFIX}2025-01-15T10-00-00-recent789.json`,
     );
     await fs.writeFile(
       recentSessionFile,
@@ -139,7 +139,7 @@ describe('Session Cleanup Integration', () => {
     // Create a current session file that should always be kept
     const currentSessionFile = path.join(
       chatsDir,
-      'session-2025-01-20T10-00-00-current123.json',
+      `${SESSION_FILE_PREFIX}2025-01-20T10-00-00-current123.json`,
     );
     await fs.writeFile(
       currentSessionFile,
@@ -183,13 +183,13 @@ describe('Session Cleanup Integration', () => {
       const remainingFiles = await fs.readdir(chatsDir);
       expect(remainingFiles).toHaveLength(2); // Only 2 files should remain
       expect(remainingFiles).toContain(
-        'session-2025-01-15T10-00-00-recent789.json',
+        `${SESSION_FILE_PREFIX}2025-01-15T10-00-00-recent789.json`,
       );
       expect(remainingFiles).toContain(
-        'session-2025-01-20T10-00-00-current123.json',
+        `${SESSION_FILE_PREFIX}2025-01-20T10-00-00-current123.json`,
       );
       expect(remainingFiles).not.toContain(
-        'session-2024-12-01T10-00-00-old12345.json',
+        `${SESSION_FILE_PREFIX}2024-12-01T10-00-00-old12345.json`,
       );
     } finally {
       // Clean up test directory

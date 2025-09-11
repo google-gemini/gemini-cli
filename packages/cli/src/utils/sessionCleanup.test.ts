@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { Config } from '@google/gemini-cli-core';
+import { SESSION_FILE_PREFIX, type Config } from '@google/gemini-cli-core';
 import type { Settings } from '../config/settings.js';
 import { cleanupExpiredSessions } from './sessionCleanup.js';
 import { type SessionInfo, getSessionFiles } from './sessionUtils.js';
@@ -44,25 +44,25 @@ function createTestSessions(): SessionInfo[] {
   return [
     {
       id: 'current123',
-      fileName: 'session-2025-01-20T10-30-00-current12.json',
+      fileName: `${SESSION_FILE_PREFIX}-2025-01-20T10-30-00-current12.json`,
       lastUpdated: now.toISOString(),
       isCurrentSession: true,
     },
     {
       id: 'recent456',
-      fileName: 'session-2025-01-18T15-45-00-recent45.json',
+      fileName: `${SESSION_FILE_PREFIX}-2025-01-18T15-45-00-recent45.json`,
       lastUpdated: oneWeekAgo.toISOString(),
       isCurrentSession: false,
     },
     {
       id: 'old789abc',
-      fileName: 'session-2025-01-10T09-15-00-old789ab.json',
+      fileName: `${SESSION_FILE_PREFIX}-2025-01-10T09-15-00-old789ab.json`,
       lastUpdated: twoWeeksAgo.toISOString(),
       isCurrentSession: false,
     },
     {
       id: 'ancient12',
-      fileName: 'session-2024-12-25T12-00-00-ancient1.json',
+      fileName: `${SESSION_FILE_PREFIX}-2024-12-25T12-00-00-ancient1.json`,
       lastUpdated: oneMonthAgo.toISOString(),
       isCurrentSession: false,
     },
@@ -196,7 +196,7 @@ describe('Session Cleanup', () => {
       const currentSessionPath = path.join(
         '/tmp/test-project',
         'chats',
-        'session-2025-01-20T10-30-00-current12.json',
+        `${SESSION_FILE_PREFIX}-2025-01-20T10-30-00-current12.json`,
       );
       expect(
         unlinkCalls.find((call) => call[0] === currentSessionPath),
@@ -426,25 +426,25 @@ describe('Session Cleanup', () => {
       const testSessions: SessionInfo[] = [
         {
           id: 'current',
-          fileName: 'session-current.json',
+          fileName: `${SESSION_FILE_PREFIX}-current.json`,
           lastUpdated: now.toISOString(),
           isCurrentSession: true,
         },
         {
           id: 'session5d',
-          fileName: 'session-5d.json',
+          fileName: `${SESSION_FILE_PREFIX}-5d.json`,
           lastUpdated: fiveDaysAgo.toISOString(),
           isCurrentSession: false,
         },
         {
           id: 'session8d',
-          fileName: 'session-8d.json',
+          fileName: `${SESSION_FILE_PREFIX}-8d.json`,
           lastUpdated: eightDaysAgo.toISOString(),
           isCurrentSession: false,
         },
         {
           id: 'session15d',
-          fileName: 'session-15d.json',
+          fileName: `${SESSION_FILE_PREFIX}-15d.json`,
           lastUpdated: fifteenDaysAgo.toISOString(),
           isCurrentSession: false,
         },
@@ -474,13 +474,25 @@ describe('Session Cleanup', () => {
       // Verify which files were deleted
       const unlinkCalls = mockFs.unlink.mock.calls.map((call) => call[0]);
       expect(unlinkCalls).toContain(
-        path.join('/tmp/test-project', 'chats', 'session-8d.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-8d.json`,
+        ),
       );
       expect(unlinkCalls).toContain(
-        path.join('/tmp/test-project', 'chats', 'session-15d.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-15d.json`,
+        ),
       );
       expect(unlinkCalls).not.toContain(
-        path.join('/tmp/test-project', 'chats', 'session-5d.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-5d.json`,
+        ),
       );
     });
 
@@ -506,25 +518,25 @@ describe('Session Cleanup', () => {
       const testSessions: SessionInfo[] = [
         {
           id: 'current',
-          fileName: 'session-current.json',
+          fileName: `${SESSION_FILE_PREFIX}-current.json`,
           lastUpdated: now.toISOString(),
           isCurrentSession: true,
         },
         {
           id: 'session1d',
-          fileName: 'session-1d.json',
+          fileName: `${SESSION_FILE_PREFIX}-1d.json`,
           lastUpdated: oneDayAgo.toISOString(),
           isCurrentSession: false,
         },
         {
           id: 'session7d',
-          fileName: 'session-7d.json',
+          fileName: `${SESSION_FILE_PREFIX}-7d.json`,
           lastUpdated: sevenDaysAgo.toISOString(),
           isCurrentSession: false,
         },
         {
           id: 'session13d',
-          fileName: 'session-13d.json',
+          fileName: `${SESSION_FILE_PREFIX}-13d.json`,
           lastUpdated: thirteenDaysAgo.toISOString(),
           isCurrentSession: false,
         },
@@ -572,7 +584,7 @@ describe('Session Cleanup', () => {
       const sessions: SessionInfo[] = [
         {
           id: 'current',
-          fileName: 'session-current.json',
+          fileName: `${SESSION_FILE_PREFIX}-current.json`,
           lastUpdated: now.toISOString(),
           isCurrentSession: true,
         },
@@ -583,7 +595,7 @@ describe('Session Cleanup', () => {
         const daysAgo = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
         sessions.push({
           id: `session${i}`,
-          fileName: `session-${i}d.json`,
+          fileName: `${SESSION_FILE_PREFIX}${i}d.json`,
           lastUpdated: daysAgo.toISOString(),
           isCurrentSession: false,
         });
@@ -613,24 +625,48 @@ describe('Session Cleanup', () => {
       // Verify which files were deleted (should be the 3 oldest)
       const unlinkCalls = mockFs.unlink.mock.calls.map((call) => call[0]);
       expect(unlinkCalls).toContain(
-        path.join('/tmp/test-project', 'chats', 'session-3d.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-3d.json`,
+        ),
       );
       expect(unlinkCalls).toContain(
-        path.join('/tmp/test-project', 'chats', 'session-4d.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-4d.json`,
+        ),
       );
       expect(unlinkCalls).toContain(
-        path.join('/tmp/test-project', 'chats', 'session-5d.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-5d.json`,
+        ),
       );
 
       // Verify which files were NOT deleted
       expect(unlinkCalls).not.toContain(
-        path.join('/tmp/test-project', 'chats', 'session-current.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-current.json`,
+        ),
       );
       expect(unlinkCalls).not.toContain(
-        path.join('/tmp/test-project', 'chats', 'session-1d.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-1d.json`,
+        ),
       );
       expect(unlinkCalls).not.toContain(
-        path.join('/tmp/test-project', 'chats', 'session-2d.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-2d.json`,
+        ),
       );
     });
 
@@ -656,31 +692,31 @@ describe('Session Cleanup', () => {
       const testSessions: SessionInfo[] = [
         {
           id: 'current',
-          fileName: 'session-current.json',
+          fileName: `${SESSION_FILE_PREFIX}-current.json`,
           lastUpdated: now.toISOString(),
           isCurrentSession: true,
         },
         {
           id: 'session3d',
-          fileName: 'session-3d.json',
+          fileName: `${SESSION_FILE_PREFIX}-3d.json`,
           lastUpdated: threeDaysAgo.toISOString(),
           isCurrentSession: false,
         },
         {
           id: 'session5d',
-          fileName: 'session-5d.json',
+          fileName: `${SESSION_FILE_PREFIX}-5d.json`,
           lastUpdated: fiveDaysAgo.toISOString(),
           isCurrentSession: false,
         },
         {
           id: 'session7d',
-          fileName: 'session-7d.json',
+          fileName: `${SESSION_FILE_PREFIX}-7d.json`,
           lastUpdated: sevenDaysAgo.toISOString(),
           isCurrentSession: false,
         },
         {
           id: 'session12d',
-          fileName: 'session-12d.json',
+          fileName: `${SESSION_FILE_PREFIX}-12d.json`,
           lastUpdated: twelveDaysAgo.toISOString(),
           isCurrentSession: false,
         },
@@ -712,21 +748,41 @@ describe('Session Cleanup', () => {
       // Verify which files were deleted
       const unlinkCalls = mockFs.unlink.mock.calls.map((call) => call[0]);
       expect(unlinkCalls).toContain(
-        path.join('/tmp/test-project', 'chats', 'session-5d.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-5d.json`,
+        ),
       );
       expect(unlinkCalls).toContain(
-        path.join('/tmp/test-project', 'chats', 'session-7d.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-7d.json`,
+        ),
       );
       expect(unlinkCalls).toContain(
-        path.join('/tmp/test-project', 'chats', 'session-12d.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-12d.json`,
+        ),
       );
 
       // Verify which files were NOT deleted
       expect(unlinkCalls).not.toContain(
-        path.join('/tmp/test-project', 'chats', 'session-current.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-current.json`,
+        ),
       );
       expect(unlinkCalls).not.toContain(
-        path.join('/tmp/test-project', 'chats', 'session-3d.json'),
+        path.join(
+          '/tmp/test-project',
+          'chats',
+          `${SESSION_FILE_PREFIX}-3d.json`,
+        ),
       );
     });
   });

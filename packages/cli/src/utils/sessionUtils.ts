@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ConversationRecord } from '@google/gemini-cli-core';
+import { SESSION_FILE_PREFIX, type ConversationRecord } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -32,7 +32,7 @@ export const getSessionFiles = async (
   try {
     const files = await fs.readdir(chatsDir);
     const sessionFiles = files
-      .filter((f) => f.startsWith('session-') && f.endsWith('.json'))
+      .filter((f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'))
       .sort(); // Sort by filename, which includes timestamp
 
     const sessionPromises = sessionFiles.map(async (file) => {

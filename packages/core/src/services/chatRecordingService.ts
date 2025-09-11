@@ -16,6 +16,8 @@ import type {
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 
+export const SESSION_FILE_PREFIX = 'session-';
+
 /**
  * Token usage summary for a message or conversation.
  */
