@@ -297,6 +297,9 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
+          () => {},
+          80,
+          24,
         );
       },
       {
@@ -459,6 +462,9 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
+        () => {},
+        80,
+        24,
       ),
     );
 
@@ -539,6 +545,9 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
+        () => {},
+        80,
+        24,
       ),
     );
 
@@ -648,6 +657,9 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
+        () => {},
+        80,
+        24,
       ),
     );
 
@@ -758,6 +770,9 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
+        () => {},
+        80,
+        24,
       ),
     );
 
@@ -888,6 +903,9 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           cancelSubmitSpy,
+          () => {},
+          80,
+          24,
         ),
       );
 
@@ -899,6 +917,47 @@ describe('useGeminiStream', () => {
       simulateEscapeKeyPress();
 
       expect(cancelSubmitSpy).toHaveBeenCalled();
+    });
+
+    it('should call setShellInputFocused(false) when escape is pressed', async () => {
+      const setShellInputFocusedSpy = vi.fn();
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        await new Promise(() => {}); // Keep stream open
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          mockConfig.getGeminiClient(),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          vi.fn(),
+          setShellInputFocusedSpy, // Pass the spy here
+          80,
+          24,
+        ),
+      );
+
+      // Start a query
+      await act(async () => {
+        result.current.submitQuery('test query');
+      });
+
+      simulateEscapeKeyPress();
+
+      expect(setShellInputFocusedSpy).toHaveBeenCalledWith(false);
     });
 
     it('should not do anything if escape is pressed when not responding', () => {
@@ -1200,6 +1259,9 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
+          () => {},
+          80,
+          24,
         ),
       );
 
@@ -1254,6 +1316,9 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
+          () => {},
+          80,
+          24,
         ),
       );
 
@@ -1308,6 +1373,9 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
+          () => {},
+          80,
+          24,
         ),
       );
 
@@ -1360,6 +1428,9 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
+          () => {},
+          80,
+          24,
         ),
       );
 
@@ -1413,6 +1484,9 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
+          () => {},
+          80,
+          24,
         ),
       );
 
@@ -1495,6 +1569,7 @@ describe('useGeminiStream', () => {
             [],
             mockAddItem,
             mockConfig,
+            mockLoadedSettings,
             mockOnDebugMessage,
             mockHandleSlashCommand,
             false,
@@ -1505,6 +1580,9 @@ describe('useGeminiStream', () => {
             () => {},
             () => {},
             () => {},
+            vi.fn(),
+            80,
+            24,
           ),
         );
 
@@ -1556,6 +1634,9 @@ describe('useGeminiStream', () => {
         vi.fn(), // setModelSwitched
         vi.fn(), // onEditorClose
         vi.fn(), // onCancelSubmit
+        vi.fn(), // setShellInputFocused
+        80, // terminalWidth
+        24, // terminalHeight
       ),
     );
 
@@ -1624,6 +1705,9 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
+          () => {},
+          80,
+          24,
         ),
       );
 
@@ -1706,6 +1790,9 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
+          () => {},
+          80,
+          24,
         ),
       );
 
@@ -1761,6 +1848,9 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
+          () => {},
+          80,
+          24,
         ),
       );
 

@@ -21,6 +21,9 @@ interface ToolGroupMessageProps {
   availableTerminalHeight?: number;
   terminalWidth: number;
   isFocused?: boolean;
+  activeShellPtyId?: number | null;
+  shellFocused?: boolean;
+  onShellInputSubmit?: (input: string) => void;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -29,14 +32,26 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   availableTerminalHeight,
   terminalWidth,
   isFocused = true,
+  activeShellPtyId,
+  shellFocused,
 }) => {
-  const config = useConfig();
+  const isShellFocused =
+    shellFocused &&
+    toolCalls.some(
+      (t) =>
+        t.ptyId === activeShellPtyId && t.status === ToolCallStatus.Executing,
+    );
+
   const hasPending = !toolCalls.every(
     (t) => t.status === ToolCallStatus.Success,
   );
+
+  const config = useConfig();
   const isShellCommand = toolCalls.some((t) => t.name === SHELL_COMMAND_NAME);
   const borderColor =
-    hasPending || isShellCommand ? theme.status.warning : theme.border.default;
+    hasPending || isShellCommand || isShellFocused
+      ? theme.status.warning
+      : theme.border.default;
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
   // This is a bit of a magic number, but it accounts for the border and
@@ -89,12 +104,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           <Box key={tool.callId} flexDirection="column" minHeight={1}>
             <Box flexDirection="row" alignItems="center">
               <ToolMessage
-                callId={tool.callId}
-                name={tool.name}
-                description={tool.description}
-                resultDisplay={tool.resultDisplay}
-                status={tool.status}
-                confirmationDetails={tool.confirmationDetails}
+                {...tool}
                 availableTerminalHeight={availableTerminalHeightPerToolMessage}
                 terminalWidth={innerWidth}
                 emphasis={
@@ -104,7 +114,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                       ? 'low'
                       : 'medium'
                 }
-                renderOutputAsMarkdown={tool.renderOutputAsMarkdown}
+                activeShellPtyId={activeShellPtyId}
+                shellFocused={shellFocused}
+                config={config}
               />
             </Box>
             {tool.status === ToolCallStatus.Confirming &&
