@@ -64,7 +64,10 @@ export const useSlashCommandProcessor = (
   setIsProcessing: (isProcessing: boolean) => void,
   setGeminiMdFileCount: (count: number) => void,
   actions: SlashCommandProcessorActions,
+<<<<<<< HEAD
   extensionsUpdateState: Map<string, ExtensionUpdateState>,
+=======
+>>>>>>> ad21c109 (Fix MCP prompt slash commands not appearing. (#8290))
   isConfigInitialized: boolean,
 ) => {
   const session = useSessionStats();
