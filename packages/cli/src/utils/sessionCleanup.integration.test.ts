@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { cleanupExpiredSessions } from './sessionCleanup.js';
 import type { Settings } from '../config/settings.js';
 import { SESSION_FILE_PREFIX, type Config } from '@google/gemini-cli-core';
@@ -63,16 +63,52 @@ describe('Session Cleanup Integration', () => {
   });
 
   it('should handle missing sessionRetention configuration', async () => {
+    // Create test session files to verify they are NOT deleted when config is missing
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const os = await import('node:os');
+
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-test-'));
+    const chatsDir = path.join(tempDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    // Create an old session file that would normally be deleted
+    const oldDate = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000); // 60 days ago
+    const sessionFile = path.join(
+      chatsDir,
+      `${SESSION_FILE_PREFIX}2024-01-01T10-00-00-test123.json`,
+    );
+    await fs.writeFile(
+      sessionFile,
+      JSON.stringify({
+        sessionId: 'test123',
+        messages: [],
+        startTime: oldDate.toISOString(),
+        lastUpdated: oldDate.toISOString(),
+      }),
+    );
+
     const config = createTestConfig();
+    config.storage.getProjectTempDir = vi.fn().mockReturnValue(tempDir);
+
     const settings: Settings = {};
 
     const result = await cleanupExpiredSessions(config, settings);
 
     expect(result.disabled).toBe(true);
-    expect(result.scanned).toBe(0);
+    expect(result.scanned).toBe(0); // Should not even scan when config is missing
     expect(result.deleted).toBe(0);
     expect(result.skipped).toBe(0);
     expect(result.errors).toHaveLength(0);
+
+    // Verify the session file still exists (was not deleted)
+    const filesAfter = await fs.readdir(chatsDir);
+    expect(filesAfter).toContain(
+      `${SESSION_FILE_PREFIX}2024-01-01T10-00-00-test123.json`,
+    );
+
+    // Cleanup
+    await fs.rm(tempDir, { recursive: true });
   });
 
   it('should validate configuration and fail gracefully', async () => {
