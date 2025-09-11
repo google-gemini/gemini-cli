@@ -22,6 +22,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { EnvHttpProxyAgent } from 'undici';
+import { ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,6 +79,7 @@ export class IdeClient {
   private diffResponses = new Map<string, (result: DiffUpdateResult) => void>();
   private statusListeners = new Set<(state: IDEConnectionState) => void>();
   private trustChangeListeners = new Set<(isTrusted: boolean) => void>();
+  private availableTools: string[] = [];
   /**
    * A mutex to ensure that only one diff view is open in the IDE at a time.
    * This prevents race conditions and UI issues in IDEs like VSCode that
@@ -332,6 +334,53 @@ export class IdeClient {
 
   getDetectedIdeDisplayName(): string | undefined {
     return this.currentIdeDisplayName;
+  }
+
+  isDiffingEnabled(): boolean {
+    return (
+      !!this.client &&
+      this.state.status === IDEConnectionStatus.Connected &&
+      this.availableTools.includes('openDiff') &&
+      this.availableTools.includes('closeDiff')
+    );
+  }
+
+  private async discoverTools(): Promise<void> {
+    if (!this.client) {
+      return;
+    }
+    try {
+      logger.debug('Discovering tools from IDE...');
+      const response = await this.client.request(
+        { method: 'tools/list', params: {} },
+        ListToolsResultSchema,
+      );
+
+      // Map the array of tool objects to an array of tool names (strings)
+      this.availableTools = response.tools.map((tool) => tool.name);
+
+      if (this.availableTools.length > 0) {
+        logger.debug(
+          `Discovered ${this.availableTools.length} tools from IDE: ${this.availableTools.join(', ')}`,
+        );
+      } else {
+        logger.debug(
+          'IDE supports tool discovery, but no tools are available.',
+        );
+      }
+    } catch (error) {
+      // It's okay if this fails, the IDE might not support it.
+      // Don't log an error if the method is not found, which is a common case.
+      if (
+        error instanceof Error &&
+        !error.message?.includes('Method not found')
+      ) {
+        logger.error(`Error discovering tools from IDE: ${error.message}`);
+      } else {
+        logger.debug('IDE does not support tool discovery.');
+      }
+      this.availableTools = [];
+    }
   }
 
   private setState(
@@ -631,6 +680,7 @@ export class IdeClient {
       );
       await this.client.connect(transport);
       this.registerClientHandlers();
+      await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
     } catch (_error) {
@@ -664,6 +714,7 @@ export class IdeClient {
       });
       await this.client.connect(transport);
       this.registerClientHandlers();
+      await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
     } catch (_error) {

@@ -5,6 +5,7 @@
  */
 
 import type React from 'react';
+import { useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
@@ -41,12 +42,31 @@ export const ToolConfirmationMessage: React.FC<
   const { onConfirm } = confirmationDetails;
   const childWidth = terminalWidth - 2; // 2 for padding
 
+  const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
+  const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (config.getIdeMode()) {
+      const getIdeClient = async () => {
+        const client = await IdeClient.getInstance();
+        if (isMounted) {
+          setIdeClient(client);
+          setIsDiffingEnabled(client?.isDiffingEnabled() ?? false);
+        }
+      };
+      getIdeClient();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [config]);
+
   const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
     if (confirmationDetails.type === 'edit') {
-      if (config.getIdeMode()) {
+      if (config.getIdeMode() && isDiffingEnabled) {
         const cliOutcome =
           outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
-        const ideClient = await IdeClient.getInstance();
         await ideClient?.resolveDiffFromCli(
           confirmationDetails.filePath,
           cliOutcome,
@@ -137,21 +157,17 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedAlways,
       });
     }
-    if (config.getIdeMode()) {
-      options.push({
-        label: 'No (esc)',
-        value: ToolConfirmationOutcome.Cancel,
-      });
-    } else {
+    if (!config.getIdeMode() || !isDiffingEnabled) {
       options.push({
         label: 'Modify with external editor',
         value: ToolConfirmationOutcome.ModifyWithEditor,
       });
-      options.push({
-        label: 'No, suggest changes (esc)',
-        value: ToolConfirmationOutcome.Cancel,
-      });
     }
+
+    options.push({
+      label: 'No, suggest changes (esc)',
+      value: ToolConfirmationOutcome.Cancel,
+    });
 
     bodyContent = (
       <DiffRenderer

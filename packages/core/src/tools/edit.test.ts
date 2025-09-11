@@ -10,15 +10,11 @@ const mockEnsureCorrectEdit = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 
-import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient } from '../ide/ide-client.js';
 
 vi.mock('../ide/ide-client.js', () => ({
   IdeClient: {
     getInstance: vi.fn(),
-  },
-  IDEConnectionStatus: {
-    Connected: 'connected',
-    Disconnected: 'disconnected',
   },
 }));
 
@@ -896,9 +892,7 @@ describe('EditTool', () => {
       filePath = path.join(rootDir, testFile);
       ideClient = {
         openDiff: vi.fn(),
-        getConnectionStatus: vi.fn().mockReturnValue({
-          status: IDEConnectionStatus.Connected,
-        }),
+        isDiffingEnabled: vi.fn().mockReturnValue(true),
       };
       vi.mocked(IdeClient.getInstance).mockResolvedValue(ideClient);
       (mockConfig as any).getIdeMode = () => true;
