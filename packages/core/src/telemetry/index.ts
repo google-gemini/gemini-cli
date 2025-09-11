@@ -31,6 +31,7 @@ export {
   logKittySequenceOverflow,
   logResearchOptIn,
   logChatCompression,
+  logToolOutputTruncated,
 } from './loggers.js';
 export type {
   SlashCommandEvent,
@@ -53,6 +54,7 @@ export {
   makeSlashCommandEvent,
   makeResearchOptInEvent,
   makeChatCompressionEvent,
+  ToolOutputTruncatedEvent,
 } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
