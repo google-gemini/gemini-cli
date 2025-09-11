@@ -108,7 +108,9 @@ export const Composer = () => {
 
       <Box
         marginTop={1}
-        justifyContent="space-between"
+        justifyContent={
+          settings.merged.ui?.hideContextSummary ? 'flex-end' : 'space-between'
+        }
         width="100%"
         flexDirection={isNarrow ? 'column' : 'row'}
         alignItems={isNarrow ? 'flex-start' : 'center'}
