@@ -1645,28 +1645,28 @@ describe('loadCliConfig useRipgrep', () => {
     vi.restoreAllMocks();
   });
 
-  it('should be false by default when useRipgrep is not set in settings', async () => {
+  it('should be true by default when useRipgrep is not set in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getUseRipgrep()).toBe(false);
-  });
-
-  it('should be true when useRipgrep is set to true in settings', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = { tools: { useRipgrep: true } };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getUseRipgrep()).toBe(true);
   });
 
-  it('should be false when useRipgrep is explicitly set to false in settings', async () => {
+  it('should be false when useRipgrep is set to false in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { tools: { useRipgrep: false } };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getUseRipgrep()).toBe(false);
+  });
+
+  it('should be true when useRipgrep is explicitly set to true in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = { tools: { useRipgrep: true } };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getUseRipgrep()).toBe(true);
   });
 });
 
