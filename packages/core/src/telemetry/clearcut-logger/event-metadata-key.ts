@@ -48,6 +48,9 @@ export enum EventMetadataKey {
   // Logs whether the session was configured to respect gitignore files.
   GEMINI_CLI_START_SESSION_RESPECT_GITIGNORE = 12,
 
+  // Logs the output format of the session.
+  GEMINI_CLI_START_SESSION_OUTPUT_FORMAT = 94,
+
   // ==========================================================================
   // User Prompt Event Keys
   // ===========================================================================
