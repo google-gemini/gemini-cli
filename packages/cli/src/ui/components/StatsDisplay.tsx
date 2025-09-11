@@ -187,7 +187,9 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
     if (title) {
       return theme.ui.gradient && theme.ui.gradient.length > 0 ? (
         <Gradient colors={theme.ui.gradient}>
-          <Text bold>{title}</Text>
+          <Text bold color={theme.text.primary}>
+            {title}
+          </Text>
         </Gradient>
       ) : (
         <Text bold color={theme.text.accent}>
