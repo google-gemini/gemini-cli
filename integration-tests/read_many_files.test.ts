@@ -16,7 +16,13 @@ describe('read_many_files', () => {
 
     const prompt = `Use the read_many_files tool to read the contents of file1.txt and file2.txt and then print the contents of each file.`;
 
-    const result = await rig.run(prompt);
+    let result;
+    try {
+      result = await rig.run(prompt);
+    } catch (e) {
+      console.error('Error running test rig:', e);
+      throw e;
+    }
 
     // Check for either read_many_files or multiple read_file calls
     const allTools = rig.readToolLogs();

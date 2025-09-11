@@ -6,7 +6,8 @@
 
 import { execSync, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { EOL } from 'node:os';
+import { join, dirname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
 import fs from 'node:fs';
@@ -101,7 +102,7 @@ export function validateModelOutput(
         'The tool was called successfully, which is the main requirement.',
       );
       return false;
-    } else if (process.env.VERBOSE === 'true') {
+    } else if (process.env['VERBOSE'] === 'true') {
       console.log(`${testName}: Model output validated successfully.`);
     }
     return true;
@@ -117,14 +118,14 @@ export class TestRig {
   _lastRunStdout?: string;
 
   constructor() {
-    this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
+    this.bundlePath = normalize(join(__dirname, '..', 'bundle/gemini.js'));
     this.testDir = null;
   }
 
   // Get timeout based on environment
   getDefaultTimeout() {
-    if (env.CI) return 60000; // 1 minute in CI
-    if (env.GEMINI_SANDBOX) return 30000; // 30s in containers
+    if (env['CI']) return 60000; // 1 minute in CI
+    if (env['GEMINI_SANDBOX']) return 30000; // 30s in containers
     return 15000; // 15s locally
   }
 
@@ -134,7 +135,7 @@ export class TestRig {
   ) {
     this.testName = testName;
     const sanitizedName = sanitizeTestName(testName);
-    this.testDir = join(env.INTEGRATION_TEST_FILE_DIR!, sanitizedName);
+    this.testDir = join(env['INTEGRATION_TEST_FILE_DIR']!, sanitizedName);
     mkdirSync(this.testDir, { recursive: true });
 
     // Create a settings file to point the CLI to the local collector
@@ -151,7 +152,8 @@ export class TestRig {
         otlpEndpoint: '',
         outfile: telemetryPath,
       },
-      sandbox: env.GEMINI_SANDBOX !== 'false' ? env.GEMINI_SANDBOX : false,
+      sandbox:
+        env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
       ...options.settings, // Allow tests to override/add settings
     };
     writeFileSync(
@@ -229,20 +231,21 @@ export class TestRig {
 
     child.stdout!.on('data', (data: Buffer) => {
       stdout += data;
-      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
         process.stdout.write(data);
       }
     });
 
     child.stderr!.on('data', (data: Buffer) => {
       stderr += data;
-      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
         process.stderr.write(data);
       }
     });
 
     const promise = new Promise<string>((resolve, reject) => {
       child.on('close', (code: number) => {
+        console.log(`Child process exited with code ${code}`);
         if (code === 0) {
           // Store the raw stdout for Podman telemetry parsing
           this._lastRunStdout = stdout;
@@ -250,7 +253,7 @@ export class TestRig {
           // Filter out telemetry output when running with Podman
           // Podman seems to output telemetry to stdout even when writing to file
           let result = stdout;
-          if (env.GEMINI_SANDBOX === 'podman') {
+          if (env['GEMINI_SANDBOX'] === 'podman') {
             // Remove telemetry JSON objects from output
             // They are multi-line JSON objects that start with { and contain telemetry fields
             const lines = result.split(EOL);
@@ -303,13 +306,17 @@ export class TestRig {
       });
     });
 
+    child.on('error', (err) => {
+      console.error('Failed to start child process.', err);
+    });
+
     return promise;
   }
 
   readFile(fileName: string) {
     const filePath = join(this.testDir!, fileName);
     const content = readFileSync(filePath, 'utf-8');
-    if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+    if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
       console.log(`--- FILE: ${filePath} ---`);
       console.log(content);
       console.log(`--- END FILE: ${filePath} ---`);
@@ -319,12 +326,12 @@ export class TestRig {
 
   async cleanup() {
     // Clean up test directory
-    if (this.testDir && !env.KEEP_OUTPUT) {
+    if (this.testDir && !env['KEEP_OUTPUT']) {
       try {
         execSync(`rm -rf ${this.testDir}`);
       } catch (error) {
         // Ignore cleanup errors
-        if (env.VERBOSE === 'true') {
+        if (env['VERBOSE'] === 'true') {
           console.warn('Cleanup warning:', (error as Error).message);
         }
       }
@@ -450,7 +457,7 @@ export class TestRig {
     while (Date.now() - startTime < timeout) {
       attempts++;
       const result = predicate();
-      if (env.VERBOSE === 'true' && attempts % 5 === 0) {
+      if (env['VERBOSE'] === 'true' && attempts % 5 === 0) {
         console.log(
           `Poll attempt ${attempts}: ${result ? 'success' : 'waiting...'}`,
         );
@@ -460,7 +467,7 @@ export class TestRig {
       }
       await new Promise((resolve) => setTimeout(resolve, interval));
     }
-    if (env.VERBOSE === 'true') {
+    if (env['VERBOSE'] === 'true') {
       console.log(`Poll timed out after ${attempts} attempts`);
     }
     return false;
@@ -593,7 +600,7 @@ export class TestRig {
   readToolLogs() {
     // For Podman, first check if telemetry file exists and has content
     // If not, fall back to parsing from stdout
-    if (env.GEMINI_SANDBOX === 'podman') {
+    if (env['GEMINI_SANDBOX'] === 'podman') {
       // Try reading from file first
       const logFilePath = join(this.testDir!, 'telemetry.log');
 
@@ -675,7 +682,7 @@ export class TestRig {
         }
       } catch (e) {
         // Skip objects that aren't valid JSON
-        if (env.VERBOSE === 'true') {
+        if (env['VERBOSE'] === 'true') {
           console.error('Failed to parse telemetry object:', e);
         }
       }
