@@ -23,7 +23,6 @@ export {
   IdeConnectionType,
   ExtensionInstallEvent,
 } from './src/telemetry/types.js';
-export { getIdeTrust } from './src/utils/ide-trust.js';
 export { makeFakeConfig } from './src/test-utils/config.js';
 export * from './src/utils/pathReader.js';
 export { ClearcutLogger } from './src/telemetry/clearcut-logger/clearcut-logger.js';
