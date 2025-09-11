@@ -55,7 +55,6 @@ export { RateLimiter } from './rate-limiter.js';
 export { ActivityType } from './activity-types.js';
 export {
   ActivityDetector,
-  initializeActivityDetector,
   getActivityDetector,
   recordUserActivity,
   isUserActive,

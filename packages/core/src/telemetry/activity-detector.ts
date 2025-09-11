@@ -45,25 +45,13 @@ export class ActivityDetector {
   }
 }
 
-// Global activity detector instance
-let globalActivityDetector: ActivityDetector | null = null;
-
-/**
- * Initialize global activity detector
- */
-export function initializeActivityDetector(
-  idleThresholdMs: number = 30000,
-): ActivityDetector {
-  if (!globalActivityDetector) {
-    globalActivityDetector = new ActivityDetector(idleThresholdMs);
-  }
-  return globalActivityDetector;
-}
+// Global activity detector instance (eagerly created with default threshold)
+const globalActivityDetector: ActivityDetector = new ActivityDetector();
 
 /**
  * Get global activity detector instance
  */
-export function getActivityDetector(): ActivityDetector | null {
+export function getActivityDetector(): ActivityDetector {
   return globalActivityDetector;
 }
 
@@ -71,22 +59,12 @@ export function getActivityDetector(): ActivityDetector | null {
  * Record user activity (convenience function for CLI to call)
  */
 export function recordUserActivity(): void {
-  // Do not implicitly initialize here to avoid locking in default timeout
-  // when a custom timeout may be set later via initializeActivityDetector().
-  globalActivityDetector?.recordActivity();
+  globalActivityDetector.recordActivity();
 }
 
 /**
  * Check if user is currently active (convenience function)
  */
 export function isUserActive(): boolean {
-  const detector = globalActivityDetector;
-  return detector ? detector.isUserActive() : false;
-}
-
-/**
- * Reset global activity detector (for testing)
- */
-export function resetGlobalActivityDetector(): void {
-  globalActivityDetector = null;
+  return globalActivityDetector.isUserActive();
 }
