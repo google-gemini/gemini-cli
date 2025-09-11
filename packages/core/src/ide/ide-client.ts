@@ -337,10 +337,8 @@ export class IdeClient {
   }
 
   isDiffingEnabled(): boolean {
-    if (!this.client) {
-      return false;
-    }
     return (
+      !!this.client &&
       this.state.status === IDEConnectionStatus.Connected &&
       this.availableTools.includes('openDiff') &&
       this.availableTools.includes('closeDiff')
@@ -682,7 +680,7 @@ export class IdeClient {
       );
       await this.client.connect(transport);
       this.registerClientHandlers();
-      this.discoverTools();
+      await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
     } catch (_error) {
@@ -716,7 +714,7 @@ export class IdeClient {
       });
       await this.client.connect(transport);
       this.registerClientHandlers();
-      this.discoverTools();
+      await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
     } catch (_error) {
