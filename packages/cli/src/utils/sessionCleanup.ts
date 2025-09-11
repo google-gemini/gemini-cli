@@ -10,6 +10,16 @@ import type { Config } from '@google/gemini-cli-core';
 import type { Settings, SessionRetentionSettings } from '../config/settings.js';
 import { getSessionFiles, type SessionInfo } from './sessionUtils.js';
 
+// Constants
+export const DEFAULT_MIN_RETENTION = '1d';
+const MIN_MAX_COUNT = 1;
+const MULTIPLIERS = {
+  h: 60 * 60 * 1000, // hours to ms
+  d: 24 * 60 * 60 * 1000, // days to ms
+  w: 7 * 24 * 60 * 60 * 1000, // weeks to ms
+  m: 30 * 24 * 60 * 60 * 1000, // months (30 days) to ms
+};
+
 /**
  * Result of session cleanup operation
  */
@@ -44,7 +54,7 @@ export async function cleanupExpiredSessions(
     const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
 
     // Validate retention configuration
-    const validationResult = validateRetentionConfig(retentionConfig);
+    const validationResult = validateRetentionConfig(config, retentionConfig);
     if (!validationResult.valid) {
       if (config.getDebugMode()) {
         console.debug(`Session cleanup disabled: ${validationResult.error}`);
@@ -113,9 +123,13 @@ async function identifyExpiredSessions(
   // Calculate cutoff date for age-based retention
   let cutoffDate: Date | null = null;
   if (retentionConfig.maxAge) {
-    const maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
-    if (maxAgeMs > 0) {
+    try {
+      const maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
       cutoffDate = new Date(now.getTime() - maxAgeMs);
+    } catch {
+      // This should not happen as validation should have caught it,
+      // but handle gracefully just in case
+      cutoffDate = null;
     }
   }
 
@@ -208,66 +222,85 @@ async function safeDeleteSession(
 
 /**
  * Parses retention period strings like "30d", "7d", "24h" into milliseconds
+ * @throws {Error} If the format is invalid
  */
 function parseRetentionPeriod(period: string): number {
   const match = period.match(/^(\d+)([dhwm])$/);
   if (!match) {
-    return 0; // Invalid format
+    throw new Error(
+      `Invalid retention period format: ${period}. Expected format: <number><unit> where unit is h, d, w, or m`,
+    );
   }
 
   const value = parseInt(match[1], 10);
   const unit = match[2];
 
-  const multipliers = {
-    h: 60 * 60 * 1000, // hours to ms
-    d: 24 * 60 * 60 * 1000, // days to ms
-    w: 7 * 24 * 60 * 60 * 1000, // weeks to ms
-    m: 30 * 24 * 60 * 60 * 1000, // months (30 days) to ms
-  };
+  // Reject zero values as they're semantically invalid
+  if (value === 0) {
+    throw new Error(
+      `Invalid retention period: ${period}. Value must be greater than 0`,
+    );
+  }
 
-  return value * multipliers[unit as keyof typeof multipliers] || 0;
+  return value * MULTIPLIERS[unit as keyof typeof MULTIPLIERS];
 }
 
 /**
  * Validates retention configuration
  */
-function validateRetentionConfig(config: SessionRetentionSettings): {
+function validateRetentionConfig(
+  config: Config,
+  retentionConfig: SessionRetentionSettings,
+): {
   valid: boolean;
   error?: string;
 } {
-  if (!config.enabled) {
+  if (!retentionConfig.enabled) {
     return { valid: false, error: 'Retention not enabled' };
   }
 
   // Validate maxAge if provided
-  if (config.maxAge) {
-    const maxAgeMs = parseRetentionPeriod(config.maxAge);
-    if (maxAgeMs === 0) {
-      return { valid: false, error: `Invalid maxAge format: ${config.maxAge}` };
+  if (retentionConfig.maxAge) {
+    let maxAgeMs: number;
+    try {
+      maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
+    } catch (error) {
+      return { valid: false, error: (error as Error | string).toString() };
     }
 
     // Enforce minimum retention period
-    const minRetentionMs = parseRetentionPeriod(config.minRetention || '1d');
-    if (minRetentionMs > 0 && maxAgeMs < minRetentionMs) {
+    const minRetention = retentionConfig.minRetention || DEFAULT_MIN_RETENTION;
+    let minRetentionMs: number;
+    try {
+      minRetentionMs = parseRetentionPeriod(minRetention);
+    } catch (error) {
+      // If minRetention format is invalid, fall back to default
+      if (config.getDebugMode()) {
+        console.error(`Failed to parse minRetention: ${error}`);
+      }
+      minRetentionMs = parseRetentionPeriod(DEFAULT_MIN_RETENTION);
+    }
+
+    if (maxAgeMs < minRetentionMs) {
       return {
         valid: false,
-        error: `maxAge cannot be less than minRetention (${config.minRetention || '1d'})`,
+        error: `maxAge cannot be less than minRetention (${minRetention})`,
       };
     }
   }
 
   // Validate maxCount if provided
-  if (config.maxCount !== undefined) {
-    if (config.maxCount < 1) {
-      return { valid: false, error: 'maxCount must be at least 1' };
-    }
-    if (config.maxCount > 1000) {
-      return { valid: false, error: 'maxCount cannot exceed 1000' };
+  if (retentionConfig.maxCount !== undefined) {
+    if (retentionConfig.maxCount < MIN_MAX_COUNT) {
+      return {
+        valid: false,
+        error: `maxCount must be at least ${MIN_MAX_COUNT}`,
+      };
     }
   }
 
   // At least one retention method must be specified
-  if (!config.maxAge && config.maxCount === undefined) {
+  if (!retentionConfig.maxAge && retentionConfig.maxCount === undefined) {
     return {
       valid: false,
       error: 'Either maxAge or maxCount must be specified',

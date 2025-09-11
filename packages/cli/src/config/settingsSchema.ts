@@ -227,7 +227,7 @@ const SETTINGS_SCHEMA = {
             label: 'Min Retention Period',
             category: 'General',
             requiresRestart: false,
-            default: '1d',
+            default: '1d' as string,
             description:
               'Minimum retention period (safety limit, defaults to "1d")',
             showInDialog: false,
