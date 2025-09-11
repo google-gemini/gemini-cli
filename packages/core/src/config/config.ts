@@ -45,6 +45,7 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_DEEPSEEK_MODEL,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -488,6 +489,24 @@ export class Config {
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.inFallbackMode = false;
+
+    // Adjust displayed/default model based on provider
+    try {
+      const current = this.getModel();
+      if (authMethod === AuthType.USE_DEEPSEEK) {
+        // If currently on a Gemini model (or empty), switch to DeepSeek default
+        if (!current || current.startsWith('gemini-')) {
+          this.setModel(DEFAULT_DEEPSEEK_MODEL);
+        }
+      } else {
+        // For all Google-backed auth types, ensure we don't display a DeepSeek model
+        if (!current || current.startsWith('deepseek-')) {
+          this.setModel(DEFAULT_GEMINI_MODEL);
+        }
+      }
+    } catch {
+      // Non-fatal: model display fallback shouldn't break auth
+    }
   }
 
   getUserTier(): UserTierId | undefined {

@@ -196,7 +196,7 @@ export class DeepseekContentGenerator implements ContentGenerator {
     const messages = this.convertContentsToOpenAIMessages(processedContents, request);
 
     const payload: any = {
-      model: 'deepseek-chat',
+      model: request.model || 'deepseek-chat',
       messages,
       max_tokens: request.config?.maxOutputTokens ?? 2048,
       temperature: request.config?.temperature ?? 0.7,
