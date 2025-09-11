@@ -76,7 +76,11 @@ describe('Session Cleanup Integration', () => {
   });
 
   it('should validate configuration and fail gracefully', async () => {
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
     const config = createTestConfig();
+    // Enable debug mode to verify visibility into failures
+    config.getDebugMode = vi.fn().mockReturnValue(true);
+
     const settings: Settings = {
       general: {
         sessionRetention: {
@@ -93,6 +97,15 @@ describe('Session Cleanup Integration', () => {
     expect(result.deleted).toBe(0);
     expect(result.skipped).toBe(0);
     expect(result.errors).toHaveLength(0);
+
+    // Verify debug logging provides visibility into the validation failure
+    expect(debugSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Session cleanup disabled: Error: Invalid retention period format',
+      ),
+    );
+
+    debugSpy.mockRestore();
   });
 
   it('should clean up expired sessions when they exist', async () => {
