@@ -164,13 +164,48 @@ class CodebaseInvestigatorInvocation extends BaseSubAgentInvocation<
   /**
    * Post-processes the sub-agent's report to include file content if requested.
    */
+
+  protected convertReportToXmlString(
+    report: CodebaseInvestigatorOutput,
+  ): string {
+    // Map each location object to its XML representation
+    const locationsXml = report.relevant_locations
+      .map((location) => {
+        // Map each key symbol to a <Symbol> tag
+        const keySymbolsXml = location.key_symbols
+          .map((symbol) => `      <Symbol>${symbol}</Symbol>`)
+          .join('\n');
+
+        // If content exists, wrap it in a CDATA block to handle special characters
+        const contentXml = location.content
+          ? `    <Content><![CDATA[\n${location.content}\n]]></Content>\n`
+          : '';
+
+        // Assemble the XML for a single location
+        return `  <Location>
+      <FilePath>${location.file_path}</FilePath>
+      <Reasoning>${location.reasoning}</Reasoning>
+      <KeySymbols>
+        ${keySymbolsXml}
+      </KeySymbols>
+        ${contentXml}  
+      </Location>`;
+      })
+      .join('\n');
+
+    // Assemble the final report
+    return `<CodebaseReport>
+    <SummaryOfFindings>${report.summary_of_findings}</SummaryOfFindings>
+    <ExplorationTrace>${report.exploration_trace}</ExplorationTrace>
+    <RelevantLocations>
+  ${locationsXml}
+    </RelevantLocations>
+  </CodebaseReport>`;
+  }
+
   protected override async postProcessResult(
     reportJson: string,
   ): Promise<string> {
-    if (!this.params.include_file_content) {
-      return reportJson;
-    }
-
     const report = JSON.parse(reportJson) as CodebaseInvestigatorOutput;
 
     for (const location of report.relevant_locations) {
@@ -191,8 +226,7 @@ class CodebaseInvestigatorInvocation extends BaseSubAgentInvocation<
         // Ignore errors if file doesn't exist or is not accessible
       }
     }
-
-    return JSON.stringify(report, null, 2);
+    return this.convertReportToXmlString(report);
   }
 }
 

@@ -102,19 +102,22 @@ Here is an example for a task: "Add a new '/api/v2/invoice/discount' endpoint th
 {
   "summary_of_analysis": "To add the new discount endpoint, we must modify the main API router, add a new business logic method to the 'InvoiceService', and create a new handler in the 'InvoiceController'.",
   "solution_strategy": "The approach is to add a new PUT route. The controller will receive the request, call the InvoiceService to fetch the invoice, apply the 10% discount logic within the service, save the updated invoice, and return it.",
-  "key_files_for_context": [
-    {
-      "file_path": "src/routes/api_v2_router.ts",
-      "reasoning": "Defines all API routes; must be modified to add the new endpoint."
-    },
-    {
-      "file_path": "src/services/invoice_service.ts",
-      "reasoning": "Contains all core business logic for invoices. The discount logic must be added here."
-    },
-    {
-      "file_path": "src/controllers/invoice_controller.ts",
-      "reasoning": "Connects routes to services. A new handler method is required here."
-    }
+  "relevant_locations": [
+      {
+          "file_path": "src/services/invoice_service.ts",
+          "reasoning": "Contains the core business logic for processing invoices and interacting with external gateways.",
+          "key_symbols": ["InvoiceService", "invoiceRepository", "aplyDiscount"]
+      },
+      {
+          "file_path": "src/controllers/invoice_controller.ts",
+          "reasoning": "Contains controller logic for processing invoices.",
+          "key_symbols": ["applyDiscountHandler", "InvoiceController"]
+      },
+      {
+          "file_path": "src/routes/api_v2_router.ts",
+          "reasoning": "Important to  find the route group for invoices.",
+          "key_symbols": ["invoiceController"]
+      }
   ],
   "step_by_step_plan": [
     {
@@ -186,6 +189,13 @@ export interface SolutionPlannerOutput {
     /** What should be true after this step is successfully completed. */
     expected_outcome: string;
   }>;
+
+  relevant_locations: Array<{
+    file_path: string;
+    reasoning: string;
+    key_symbols: string[];
+    content?: string;
+  }>;
 }
 
 class SolutionPlannerInvocation extends BaseSubAgentInvocation<
@@ -215,6 +225,74 @@ class SolutionPlannerInvocation extends BaseSubAgentInvocation<
   getDescription(): string {
     return `Planning solution for objective: ${this.params.user_objective}`;
   }
+  private convertSolutionPlanToXmlString(
+    report: SolutionPlannerOutput,
+  ): string {
+    // Convert the list of key files to an XML block
+    const keyFilesXml = report.key_files_for_context
+      .map(
+        (file) => `    <File>
+      <FilePath>${file.file_path}</FilePath>
+      <Reasoning>${file.reasoning}</Reasoning>
+    </File>`,
+      )
+      .join('\n');
+
+    // Convert the newly added relevant locations to an XML block
+    const locationsXml = report.relevant_locations
+      .map((location) => {
+        const keySymbolsXml = location.key_symbols
+          .map((symbol) => `        <Symbol>${symbol}</Symbol>`)
+          .join('\n');
+
+        const contentXml = location.content
+          ? `      <Content><![CDATA[\n${location.content}\n]]></Content>\n`
+          : '';
+
+        return `    <Location>
+      <FilePath>${location.file_path}</FilePath>
+      <Reasoning>${location.reasoning}</Reasoning>
+      <KeySymbols>
+${keySymbolsXml}
+      </KeySymbols>
+${contentXml}    </Location>`;
+      })
+      .join('\n');
+
+    // Convert the detailed step-by-step plan to an XML block
+    const stepsXml = report.step_by_step_plan
+      .map(
+        (step) => `    <Step>
+      <StepNumber>${step.step_number}</StepNumber>
+      <Action>${step.action}</Action>
+      <FilePath>${step.file_path}</FilePath>
+      <Description>${step.description}</Description>
+      <ExpectedOutcome>${step.expected_outcome}</ExpectedOutcome>
+    </Step>`,
+      )
+      .join('\n');
+
+    // Assemble the final, complete XML report
+    return `<SolutionPlan>
+  <SummaryOfAnalysis>${report.summary_of_analysis}</SummaryOfAnalysis>
+  <SolutionStrategy>${report.solution_strategy}</SolutionStrategy>
+  <KeyFiles>
+${keyFilesXml}
+  </KeyFiles>
+  <RelevantCodeLocations>
+${locationsXml}
+  </RelevantCodeLocations>
+  <ImplementationPlan>
+${stepsXml}
+  </ImplementationPlan>
+</SolutionPlan>`;
+  }
+  protected override async postProcessResult(
+    reportJson: string,
+  ): Promise<string> {
+    const report = JSON.parse(reportJson) as SolutionPlannerOutput;
+    return this.convertSolutionPlanToXmlString(report);
+  }
 }
 
 export class SolutionPlannerTool extends BaseDeclarativeTool<
@@ -243,7 +321,6 @@ export class SolutionPlannerTool extends BaseDeclarativeTool<
       false, // isOutputMarkdown = false, as the output is structured JSON for the agent
     );
   }
-
   protected createInvocation(
     params: SolutionPlannerInput,
   ): ToolInvocation<SolutionPlannerInput, ToolResult> {
