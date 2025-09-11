@@ -17,7 +17,7 @@ async function removeMcpServer(
   const { scope } = options;
   const settingsScope =
     scope === 'user' ? SettingScope.User : SettingScope.Workspace;
-  const settings = loadSettings(process.cwd());
+  const settings = loadSettings();
 
   const existingSettings = settings.forScope(settingsScope).settings;
   const mcpServers = existingSettings.mcpServers || {};
@@ -53,8 +53,8 @@ export const removeCommand: CommandModule = {
         choices: ['user', 'project'],
       }),
   handler: async (argv) => {
-    await removeMcpServer(argv.name as string, {
-      scope: argv.scope as string,
+    await removeMcpServer(argv['name'] as string, {
+      scope: argv['scope'] as string,
     });
   },
 };

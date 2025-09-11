@@ -7,12 +7,13 @@
 export enum DetectedIde {
   Devin = 'devin',
   Replit = 'replit',
-  VSCode = 'vscode',
   Cursor = 'cursor',
   CloudShell = 'cloudshell',
   Codespaces = 'codespaces',
   FirebaseStudio = 'firebasestudio',
   Trae = 'trae',
+  VSCode = 'vscode',
+  VSCodeFork = 'vscodefork',
 }
 
 export interface IdeInfo {
@@ -28,10 +29,6 @@ export function getIdeInfo(ide: DetectedIde): IdeInfo {
     case DetectedIde.Replit:
       return {
         displayName: 'Replit',
-      };
-    case DetectedIde.VSCode:
-      return {
-        displayName: 'VS Code',
       };
     case DetectedIde.Cursor:
       return {
@@ -53,6 +50,14 @@ export function getIdeInfo(ide: DetectedIde): IdeInfo {
       return {
         displayName: 'Trae',
       };
+    case DetectedIde.VSCode:
+      return {
+        displayName: 'VS Code',
+      };
+    case DetectedIde.VSCodeFork:
+      return {
+        displayName: 'IDE',
+      };
     default: {
       // This ensures that if a new IDE is added to the enum, we get a compile-time error.
       const exhaustiveCheck: never = ide;
@@ -61,31 +66,56 @@ export function getIdeInfo(ide: DetectedIde): IdeInfo {
   }
 }
 
-export function detectIde(): DetectedIde | undefined {
-  // Only VSCode-based integrations are currently supported.
-  if (process.env.TERM_PROGRAM !== 'vscode') {
-    return undefined;
-  }
-  if (process.env.__COG_BASHRC_SOURCED) {
+export function detectIdeFromEnv(): DetectedIde {
+  if (process.env['__COG_BASHRC_SOURCED']) {
     return DetectedIde.Devin;
   }
-  if (process.env.REPLIT_USER) {
+  if (process.env['REPLIT_USER']) {
     return DetectedIde.Replit;
   }
-  if (process.env.CURSOR_TRACE_ID) {
+  if (process.env['CURSOR_TRACE_ID']) {
     return DetectedIde.Cursor;
   }
-  if (process.env.CODESPACES) {
+  if (process.env['CODESPACES']) {
     return DetectedIde.Codespaces;
   }
-  if (process.env.EDITOR_IN_CLOUD_SHELL || process.env.CLOUD_SHELL) {
+  if (process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']) {
     return DetectedIde.CloudShell;
   }
-  if (process.env.TERM_PRODUCT === 'Trae') {
+  if (process.env['TERM_PRODUCT'] === 'Trae') {
     return DetectedIde.Trae;
   }
-  if (process.env.FIREBASE_DEPLOY_AGENT || process.env.MONOSPACE_ENV) {
+  if (process.env['MONOSPACE_ENV']) {
     return DetectedIde.FirebaseStudio;
   }
   return DetectedIde.VSCode;
+}
+
+function verifyVSCode(
+  ide: DetectedIde,
+  ideProcessInfo: {
+    pid: number;
+    command: string;
+  },
+): DetectedIde {
+  if (ide !== DetectedIde.VSCode) {
+    return ide;
+  }
+  if (ideProcessInfo.command.toLowerCase().includes('code')) {
+    return DetectedIde.VSCode;
+  }
+  return DetectedIde.VSCodeFork;
+}
+
+export function detectIde(ideProcessInfo: {
+  pid: number;
+  command: string;
+}): DetectedIde | undefined {
+  // Only VSCode-based integrations are currently supported.
+  if (process.env['TERM_PROGRAM'] !== 'vscode') {
+    return undefined;
+  }
+
+  const ide = detectIdeFromEnv();
+  return verifyVSCode(ide, ideProcessInfo);
 }

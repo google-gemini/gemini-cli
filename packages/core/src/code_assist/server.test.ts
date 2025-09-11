@@ -215,4 +215,41 @@ describe('CodeAssistServer', () => {
       }),
     ).rejects.toThrow();
   });
+
+  it('should handle VPC-SC errors when calling loadCodeAssist', async () => {
+    const client = new OAuth2Client();
+    const server = new CodeAssistServer(
+      client,
+      'test-project',
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
+    const mockVpcScError = {
+      response: {
+        data: {
+          error: {
+            details: [
+              {
+                reason: 'SECURITY_POLICY_VIOLATED',
+              },
+            ],
+          },
+        },
+      },
+    };
+    vi.spyOn(server, 'requestPost').mockRejectedValue(mockVpcScError);
+
+    const response = await server.loadCodeAssist({
+      metadata: {},
+    });
+
+    expect(server.requestPost).toHaveBeenCalledWith(
+      'loadCodeAssist',
+      expect.any(Object),
+    );
+    expect(response).toEqual({
+      currentTier: { id: UserTierId.STANDARD },
+    });
+  });
 });

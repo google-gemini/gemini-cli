@@ -4,16 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { OAuth2Client } from 'google-auth-library';
-import {
+import type { OAuth2Client } from 'google-auth-library';
+import type {
   CodeAssistGlobalUserSettingResponse,
+  GoogleRpcResponse,
   LoadCodeAssistRequest,
   LoadCodeAssistResponse,
   LongRunningOperationResponse,
   OnboardUserRequest,
   SetCodeAssistGlobalUserSettingRequest,
 } from './types.js';
-import {
+import type {
   CountTokensParameters,
   CountTokensResponse,
   EmbedContentParameters,
@@ -21,12 +22,14 @@ import {
   GenerateContentParameters,
   GenerateContentResponse,
 } from '@google/genai';
-import * as readline from 'readline';
-import { ContentGenerator } from '../core/contentGenerator.js';
+import * as readline from 'node:readline';
+import type { ContentGenerator } from '../core/contentGenerator.js';
 import { UserTierId } from './types.js';
-import {
+import type {
   CaCountTokenResponse,
   CaGenerateContentResponse,
+} from './converter.js';
+import {
   fromCountTokenResponse,
   fromGenerateContentResponse,
   toCountTokenRequest,
@@ -101,10 +104,20 @@ export class CodeAssistServer implements ContentGenerator {
   async loadCodeAssist(
     req: LoadCodeAssistRequest,
   ): Promise<LoadCodeAssistResponse> {
-    return await this.requestPost<LoadCodeAssistResponse>(
-      'loadCodeAssist',
-      req,
-    );
+    try {
+      return await this.requestPost<LoadCodeAssistResponse>(
+        'loadCodeAssist',
+        req,
+      );
+    } catch (e) {
+      if (isVpcScAffectedUser(e)) {
+        return {
+          currentTier: { id: UserTierId.STANDARD },
+        };
+      } else {
+        throw e;
+      }
+    }
   }
 
   async getCodeAssistGlobalUserSetting(): Promise<CodeAssistGlobalUserSettingResponse> {
@@ -214,7 +227,27 @@ export class CodeAssistServer implements ContentGenerator {
   }
 
   getMethodUrl(method: string): string {
-    const endpoint = process.env.CODE_ASSIST_ENDPOINT ?? CODE_ASSIST_ENDPOINT;
+    const endpoint =
+      process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
     return `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
   }
+}
+
+function isVpcScAffectedUser(error: unknown): boolean {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const gaxiosError = error as {
+      response?: {
+        data?: unknown;
+      };
+    };
+    const response = gaxiosError.response?.data as
+      | GoogleRpcResponse
+      | undefined;
+    if (Array.isArray(response?.error?.details)) {
+      return response.error.details.some(
+        (detail) => detail.reason === 'SECURITY_POLICY_VIOLATED',
+      );
+    }
+  }
+  return false;
 }

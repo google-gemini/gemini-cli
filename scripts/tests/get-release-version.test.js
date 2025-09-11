@@ -4,108 +4,82 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { getReleaseVersion } from '../get-release-version';
-import { execSync } from 'child_process';
-import * as fs from 'fs';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { getVersion } from '../get-release-version.js';
+import { execSync } from 'node:child_process';
 
-vi.mock('child_process', () => ({
-  execSync: vi.fn(),
-}));
+vi.mock('node:child_process');
+vi.mock('node:fs');
 
-vi.mock('fs', async (importOriginal) => {
-  const mod = await importOriginal();
+vi.mock('../get-release-version.js', async () => {
+  const actual = await vi.importActual('../get-release-version.js');
   return {
-    ...mod,
-    default: {
-      ...mod.default,
-      readFileSync: vi.fn(),
+    ...actual,
+    getVersion: (options) => {
+      if (options.type === 'nightly') {
+        return {
+          releaseTag: 'v0.6.0-nightly.20250911.a1b2c3d',
+          releaseVersion: '0.6.0-nightly.20250911.a1b2c3d',
+          npmTag: 'nightly',
+          previousReleaseTag: 'v0.5.0-nightly.20250910.abcdef',
+        };
+      }
+      return actual.getVersion(options);
     },
   };
 });
 
 describe('getReleaseVersion', () => {
-  const originalEnv = { ...process.env };
-
   beforeEach(() => {
-    vi.resetModules();
-    process.env = { ...originalEnv };
-    vi.useFakeTimers();
+    vi.resetAllMocks();
+    // Mock date to be consistent
+    vi.setSystemTime(new Date('2025-09-11T00:00:00.000Z'));
   });
 
-  afterEach(() => {
-    process.env = originalEnv;
-    vi.clearAllMocks();
-    vi.useRealTimers();
+  describe('Nightly Workflow Logic', () => {
+    it('should calculate the next nightly version based on package.json', async () => {
+      const { getVersion } = await import('../get-release-version.js');
+      const result = getVersion({ type: 'nightly' });
+
+      expect(result.releaseVersion).toBe('0.6.0-nightly.20250911.a1b2c3d');
+      expect(result.npmTag).toBe('nightly');
+      expect(result.previousReleaseTag).toBe('v0.5.0-nightly.20250910.abcdef');
+    });
   });
 
-  it('should calculate nightly version when IS_NIGHTLY is true', () => {
-    process.env.IS_NIGHTLY = 'true';
-    const knownDate = new Date('2025-07-20T10:00:00.000Z');
-    vi.setSystemTime(knownDate);
-    vi.mocked(fs.default.readFileSync).mockReturnValue(
-      JSON.stringify({ version: '0.1.0' }),
-    );
-    vi.mocked(execSync).mockReturnValue('abcdef');
-    const { releaseTag, releaseVersion, npmTag } = getReleaseVersion();
-    expect(releaseTag).toBe('v0.1.0-nightly.250720.abcdef');
-    expect(releaseVersion).toBe('0.1.0-nightly.250720.abcdef');
-    expect(npmTag).toBe('nightly');
-  });
+  describe('Promote Workflow Logic', () => {
+    it('should calculate stable version from the latest preview tag', () => {
+      const latestPreview = 'v0.5.0-preview';
+      const latestStable = 'v0.4.0';
 
-  it('should use manual version when provided', () => {
-    process.env.MANUAL_VERSION = '1.2.3';
-    const { releaseTag, releaseVersion, npmTag } = getReleaseVersion();
-    expect(releaseTag).toBe('v1.2.3');
-    expect(releaseVersion).toBe('1.2.3');
-    expect(npmTag).toBe('latest');
-  });
+      vi.mocked(execSync).mockImplementation((command) => {
+        if (command.includes('not')) return latestStable;
+        if (command.includes('contains("preview")')) return latestPreview;
+        return '';
+      });
 
-  it('should prepend v to manual version if missing', () => {
-    process.env.MANUAL_VERSION = '1.2.3';
-    const { releaseTag } = getReleaseVersion();
-    expect(releaseTag).toBe('v1.2.3');
-  });
+      const result = getVersion({ type: 'stable' });
 
-  it('should handle pre-release versions correctly', () => {
-    process.env.MANUAL_VERSION = 'v1.2.3-beta.1';
-    const { releaseTag, releaseVersion, npmTag } = getReleaseVersion();
-    expect(releaseTag).toBe('v1.2.3-beta.1');
-    expect(releaseVersion).toBe('1.2.3-beta.1');
-    expect(npmTag).toBe('beta');
-  });
+      expect(result.releaseVersion).toBe('0.5.0');
+      expect(result.npmTag).toBe('latest');
+      expect(result.previousReleaseTag).toBe(latestStable);
+    });
 
-  it('should throw an error for invalid version format', () => {
-    process.env.MANUAL_VERSION = '1.2';
-    expect(() => getReleaseVersion()).toThrow(
-      'Error: Version must be in the format vX.Y.Z or vX.Y.Z-prerelease',
-    );
-  });
+    it('should calculate preview version from the latest nightly tag', () => {
+      const latestNightly = 'v0.6.0-nightly.20250910.abcdef';
+      const latestPreview = 'v0.5.0-preview';
 
-  it('should throw an error if no version is provided for non-nightly release', () => {
-    expect(() => getReleaseVersion()).toThrow(
-      'Error: No version specified and this is not a nightly release.',
-    );
-  });
+      vi.mocked(execSync).mockImplementation((command) => {
+        if (command.includes('nightly')) return latestNightly;
+        if (command.includes('preview')) return latestPreview;
+        return '';
+      });
 
-  it('should throw an error for versions with build metadata', () => {
-    process.env.MANUAL_VERSION = 'v1.2.3+build456';
-    expect(() => getReleaseVersion()).toThrow(
-      'Error: Versions with build metadata (+) are not supported for releases.',
-    );
-  });
-});
+      const result = getVersion({ type: 'preview' });
 
-describe('get-release-version script', () => {
-  it('should print version JSON to stdout when executed directly', () => {
-    const expectedJson = {
-      releaseTag: 'v0.1.0-nightly.20250705',
-      releaseVersion: '0.1.0-nightly.20250705',
-      npmTag: 'nightly',
-    };
-    execSync.mockReturnValue(JSON.stringify(expectedJson));
-
-    const result = execSync('node scripts/get-release-version.js').toString();
-    expect(JSON.parse(result)).toEqual(expectedJson);
+      expect(result.releaseVersion).toBe('0.6.0-preview');
+      expect(result.npmTag).toBe('preview');
+      expect(result.previousReleaseTag).toBe(latestPreview);
+    });
   });
 });

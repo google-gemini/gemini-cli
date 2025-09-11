@@ -6,33 +6,93 @@
 
 import * as vscode from 'vscode';
 import { IDEServer } from './ide-server.js';
+import semver from 'semver';
 import { DiffContentProvider, DiffManager } from './diff-manager.js';
 import { createLogger } from './utils/logger.js';
+import { detectIdeFromEnv, DetectedIde } from '@google/gemini-cli-core';
 
+const CLI_IDE_COMPANION_IDENTIFIER = 'Google.gemini-cli-vscode-ide-companion';
 const INFO_MESSAGE_SHOWN_KEY = 'geminiCliInfoMessageShown';
-const IDE_WORKSPACE_PATH_ENV_VAR = 'GEMINI_CLI_IDE_WORKSPACE_PATH';
 export const DIFF_SCHEME = 'gemini-diff';
+
+/**
+ * IDE environments where the installation greeting is hidden.  In these
+ * environments we either are pre-installed and the installation message is
+ * confusing or we just want to be quiet.
+ */
+const HIDE_INSTALLATION_GREETING_IDES: ReadonlySet<DetectedIde> = new Set([
+  DetectedIde.FirebaseStudio,
+  DetectedIde.CloudShell,
+]);
 
 let ideServer: IDEServer;
 let logger: vscode.OutputChannel;
 
 let log: (message: string) => void = () => {};
 
-function updateWorkspacePath(context: vscode.ExtensionContext) {
-  const workspaceFolders = vscode.workspace.workspaceFolders;
-  if (workspaceFolders && workspaceFolders.length > 0) {
-    const workspacePaths = workspaceFolders
-      .map((folder) => folder.uri.fsPath)
-      .join(':');
-    context.environmentVariableCollection.replace(
-      IDE_WORKSPACE_PATH_ENV_VAR,
-      workspacePaths,
+async function checkForUpdates(
+  context: vscode.ExtensionContext,
+  log: (message: string) => void,
+) {
+  try {
+    const currentVersion = context.extension.packageJSON.version;
+
+    // Fetch extension details from the VSCode Marketplace.
+    const response = await fetch(
+      'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json;api-version=7.1-preview.1',
+        },
+        body: JSON.stringify({
+          filters: [
+            {
+              criteria: [
+                {
+                  filterType: 7, // Corresponds to ExtensionName
+                  value: CLI_IDE_COMPANION_IDENTIFIER,
+                },
+              ],
+            },
+          ],
+          // See: https://learn.microsoft.com/en-us/azure/devops/extend/gallery/apis/hyper-linking?view=azure-devops
+          // 946 = IncludeVersions | IncludeFiles | IncludeCategoryAndTags |
+          //       IncludeShortDescription | IncludePublisher | IncludeStatistics
+          flags: 946,
+        }),
+      },
     );
-  } else {
-    context.environmentVariableCollection.replace(
-      IDE_WORKSPACE_PATH_ENV_VAR,
-      '',
-    );
+
+    if (!response.ok) {
+      log(
+        `Failed to fetch latest version info from marketplace: ${response.statusText}`,
+      );
+      return;
+    }
+
+    const data = await response.json();
+    const extension = data?.results?.[0]?.extensions?.[0];
+    // The versions are sorted by date, so the first one is the latest.
+    const latestVersion = extension?.versions?.[0]?.version;
+
+    if (latestVersion && semver.gt(latestVersion, currentVersion)) {
+      const selection = await vscode.window.showInformationMessage(
+        `A new version (${latestVersion}) of the Gemini CLI Companion extension is available.`,
+        'Update to latest version',
+      );
+      if (selection === 'Update to latest version') {
+        // The install command will update the extension if a newer version is found.
+        await vscode.commands.executeCommand(
+          'workbench.extensions.installExtension',
+          CLI_IDE_COMPANION_IDENTIFIER,
+        );
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log(`Error checking for extension updates: ${message}`);
   }
 }
 
@@ -41,7 +101,7 @@ export async function activate(context: vscode.ExtensionContext) {
   log = createLogger(context, logger);
   log('Extension activated');
 
-  updateWorkspacePath(context);
+  checkForUpdates(context, log);
 
   const diffContentProvider = new DiffContentProvider();
   const diffManager = new DiffManager(log, diffContentProvider);
@@ -84,34 +144,50 @@ export async function activate(context: vscode.ExtensionContext) {
     log(`Failed to start IDE server: ${message}`);
   }
 
-  if (!context.globalState.get(INFO_MESSAGE_SHOWN_KEY)) {
-    void vscode.window
-      .showInformationMessage(
-        'Gemini CLI Companion extension successfully installed. Please restart your terminal to enable full IDE integration.',
-        'Re-launch Gemini CLI',
-      )
-      .then(
-        (selection) => {
-          if (selection === 'Re-launch Gemini CLI') {
-            void vscode.commands.executeCommand('gemini-cli.runGeminiCLI');
-          }
-        },
-        (err) => {
-          log(`Failed to show information message: ${String(err)}`);
-        },
-      );
+  const infoMessageEnabled =
+    !HIDE_INSTALLATION_GREETING_IDES.has(detectIdeFromEnv());
+
+  if (!context.globalState.get(INFO_MESSAGE_SHOWN_KEY) && infoMessageEnabled) {
+    void vscode.window.showInformationMessage(
+      'Gemini CLI Companion extension successfully installed.',
+    );
     context.globalState.update(INFO_MESSAGE_SHOWN_KEY, true);
   }
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
-      updateWorkspacePath(context);
+      ideServer.syncEnvVars();
     }),
-    vscode.commands.registerCommand('gemini-cli.runGeminiCLI', () => {
-      const geminiCmd = 'gemini';
-      const terminal = vscode.window.createTerminal(`Gemini CLI`);
-      terminal.show();
-      terminal.sendText(geminiCmd);
+    vscode.workspace.onDidGrantWorkspaceTrust(() => {
+      ideServer.syncEnvVars();
+    }),
+    vscode.commands.registerCommand('gemini-cli.runGeminiCLI', async () => {
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showInformationMessage(
+          'No folder open. Please open a folder to run Gemini CLI.',
+        );
+        return;
+      }
+
+      let selectedFolder: vscode.WorkspaceFolder | undefined;
+      if (workspaceFolders.length === 1) {
+        selectedFolder = workspaceFolders[0];
+      } else {
+        selectedFolder = await vscode.window.showWorkspaceFolderPick({
+          placeHolder: 'Select a folder to run Gemini CLI in',
+        });
+      }
+
+      if (selectedFolder) {
+        const geminiCmd = 'gemini';
+        const terminal = vscode.window.createTerminal({
+          name: `Gemini CLI (${selectedFolder.name})`,
+          cwd: selectedFolder.uri.fsPath,
+        });
+        terminal.show();
+        terminal.sendText(geminiCmd);
+      }
     }),
     vscode.commands.registerCommand('gemini-cli.showNotices', async () => {
       const noticePath = vscode.Uri.joinPath(

@@ -4,29 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import type React from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import { TextBuffer, logicalPosToOffset } from './shared/text-buffer.js';
-import { cpSlice, cpLen } from '../utils/textUtils.js';
+import type { TextBuffer } from './shared/text-buffer.js';
+import { logicalPosToOffset } from './shared/text-buffer.js';
+import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
-import { useKeypress, Key } from '../hooks/useKeypress.js';
-import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
+import type { Key } from '../hooks/useKeypress.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
-import { CommandContext, SlashCommand } from '../commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
+import { ApprovalMode } from '@google/gemini-cli-core';
+import { parseInputForHighlighting } from '../utils/highlight.js';
 import {
   clipboardHasImage,
   saveClipboardImage,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
-import * as path from 'path';
+import * as path from 'node:path';
+import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -42,8 +47,10 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  approvalMode: ApprovalMode;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
+  isShellFocused?: boolean;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -60,14 +67,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  approvalMode,
   onEscapePromptChange,
   vimHandleInput,
+  isShellFocused,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [escPressCount, setEscPressCount] = useState(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const kittyProtocolStatus = useKittyKeyboardProtocol();
+  const [recentPasteTime, setRecentPasteTime] = useState<number | null>(null);
+  const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -83,7 +93,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [cursorPosition, setCursorPosition] = useState<[number, number]>([
     0, 0,
   ]);
-  const shellHistory = useShellHistory(config.getProjectRoot());
+  const shellHistory = useShellHistory(config.getProjectRoot(), config.storage);
   const historyData = shellHistory.history;
 
   const completion = useCommandCompletion(
@@ -126,6 +136,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     () => () => {
       if (escapeTimerRef.current) {
         clearTimeout(escapeTimerRef.current);
+      }
+      if (pasteTimeoutRef.current) {
+        clearTimeout(pasteTimeoutRef.current);
       }
     },
     [],
@@ -238,6 +251,26 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     (key: Key) => {
       /// We want to handle paste even when not focused to support drag and drop.
       if (!focus && !key.paste) {
+        return;
+      }
+
+      if (key.paste) {
+        // Record paste time to prevent accidental auto-submission
+        setRecentPasteTime(Date.now());
+
+        // Clear any existing paste timeout
+        if (pasteTimeoutRef.current) {
+          clearTimeout(pasteTimeoutRef.current);
+        }
+
+        // Clear the paste protection after a safe delay
+        pasteTimeoutRef.current = setTimeout(() => {
+          setRecentPasteTime(null);
+          pasteTimeoutRef.current = null;
+        }, 500);
+
+        // Ensure we never accidentally interpret paste as regular input.
+        buffer.handleInput(key);
         return;
       }
 
@@ -399,6 +432,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
+      // Handle Tab key for ghost text acceptance
+      if (
+        key.name === 'tab' &&
+        !completion.showSuggestions &&
+        completion.promptCompletion.text
+      ) {
+        completion.promptCompletion.accept();
+        return;
+      }
+
       if (!shellModeActive) {
         if (keyMatchers[Command.HISTORY_UP](key)) {
           inputHistory.navigateUp();
@@ -441,6 +484,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (keyMatchers[Command.SUBMIT](key)) {
         if (buffer.text.trim()) {
+          // Check if a paste operation occurred recently to prevent accidental auto-submission
+          if (recentPasteTime !== null) {
+            // Paste occurred recently, ignore this submit to prevent auto-execution
+            return;
+          }
+
           const [row, col] = buffer.cursor;
           const line = buffer.lines[row];
           const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
@@ -467,7 +516,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
       if (keyMatchers[Command.END](key)) {
         buffer.move('end');
-        buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
       // Ctrl+C (Clear input)
@@ -489,6 +537,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) {
+        buffer.deleteWordLeft();
+        return;
+      }
+
       // External editor
       if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
         buffer.openInExternalEditor();
@@ -503,6 +556,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
+
+      // Clear ghost text when user types regular characters (not navigation/control keys)
+      if (
+        completion.promptCompletion.text &&
+        key.sequence &&
+        key.sequence.length === 1 &&
+        !key.ctrl &&
+        !key.meta
+      ) {
+        completion.promptCompletion.clear();
+      }
     },
     [
       focus,
@@ -524,13 +588,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,
+      recentPasteTime,
     ],
   );
 
   useKeypress(handleInput, {
-    isActive: true,
-    kittyProtocolEnabled: kittyProtocolStatus.enabled,
-    config,
+    isActive: !isShellFocused,
   });
 
   const linesToRender = buffer.viewportVisualLines;
@@ -538,27 +601,166 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     buffer.visualCursor;
   const scrollVisualRow = buffer.visualScrollRow;
 
+  const getGhostTextLines = useCallback(() => {
+    if (
+      !completion.promptCompletion.text ||
+      !buffer.text ||
+      !completion.promptCompletion.text.startsWith(buffer.text)
+    ) {
+      return { inlineGhost: '', additionalLines: [] };
+    }
+
+    const ghostSuffix = completion.promptCompletion.text.slice(
+      buffer.text.length,
+    );
+    if (!ghostSuffix) {
+      return { inlineGhost: '', additionalLines: [] };
+    }
+
+    const currentLogicalLine = buffer.lines[buffer.cursor[0]] || '';
+    const cursorCol = buffer.cursor[1];
+
+    const textBeforeCursor = cpSlice(currentLogicalLine, 0, cursorCol);
+    const usedWidth = stringWidth(textBeforeCursor);
+    const remainingWidth = Math.max(0, inputWidth - usedWidth);
+
+    const ghostTextLinesRaw = ghostSuffix.split('\n');
+    const firstLineRaw = ghostTextLinesRaw.shift() || '';
+
+    let inlineGhost = '';
+    let remainingFirstLine = '';
+
+    if (stringWidth(firstLineRaw) <= remainingWidth) {
+      inlineGhost = firstLineRaw;
+    } else {
+      const words = firstLineRaw.split(' ');
+      let currentLine = '';
+      let wordIdx = 0;
+      for (const word of words) {
+        const prospectiveLine = currentLine ? `${currentLine} ${word}` : word;
+        if (stringWidth(prospectiveLine) > remainingWidth) {
+          break;
+        }
+        currentLine = prospectiveLine;
+        wordIdx++;
+      }
+      inlineGhost = currentLine;
+      if (words.length > wordIdx) {
+        remainingFirstLine = words.slice(wordIdx).join(' ');
+      }
+    }
+
+    const linesToWrap = [];
+    if (remainingFirstLine) {
+      linesToWrap.push(remainingFirstLine);
+    }
+    linesToWrap.push(...ghostTextLinesRaw);
+    const remainingGhostText = linesToWrap.join('\n');
+
+    const additionalLines: string[] = [];
+    if (remainingGhostText) {
+      const textLines = remainingGhostText.split('\n');
+      for (const textLine of textLines) {
+        const words = textLine.split(' ');
+        let currentLine = '';
+
+        for (const word of words) {
+          const prospectiveLine = currentLine ? `${currentLine} ${word}` : word;
+          const prospectiveWidth = stringWidth(prospectiveLine);
+
+          if (prospectiveWidth > inputWidth) {
+            if (currentLine) {
+              additionalLines.push(currentLine);
+            }
+
+            let wordToProcess = word;
+            while (stringWidth(wordToProcess) > inputWidth) {
+              let part = '';
+              const wordCP = toCodePoints(wordToProcess);
+              let partWidth = 0;
+              let splitIndex = 0;
+              for (let i = 0; i < wordCP.length; i++) {
+                const char = wordCP[i];
+                const charWidth = stringWidth(char);
+                if (partWidth + charWidth > inputWidth) {
+                  break;
+                }
+                part += char;
+                partWidth += charWidth;
+                splitIndex = i + 1;
+              }
+              additionalLines.push(part);
+              wordToProcess = cpSlice(wordToProcess, splitIndex);
+            }
+            currentLine = wordToProcess;
+          } else {
+            currentLine = prospectiveLine;
+          }
+        }
+        if (currentLine) {
+          additionalLines.push(currentLine);
+        }
+      }
+    }
+
+    return { inlineGhost, additionalLines };
+  }, [
+    completion.promptCompletion.text,
+    buffer.text,
+    buffer.lines,
+    buffer.cursor,
+    inputWidth,
+  ]);
+
+  const { inlineGhost, additionalLines } = getGhostTextLines();
+
+  const showAutoAcceptStyling =
+    !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
+  const showYoloStyling =
+    !shellModeActive && approvalMode === ApprovalMode.YOLO;
+
+  let statusColor: string | undefined;
+  let statusText = '';
+  if (shellModeActive) {
+    statusColor = theme.ui.symbol;
+    statusText = 'Shell mode';
+  } else if (showYoloStyling) {
+    statusColor = theme.status.error;
+    statusText = 'YOLO mode';
+  } else if (showAutoAcceptStyling) {
+    statusColor = theme.status.warning;
+    statusText = 'Accepting edits';
+  }
+
   return (
     <>
       <Box
         borderStyle="round"
         borderColor={
-          shellModeActive ? theme.status.warning : theme.border.focused
+          statusColor ?? (focus ? theme.border.focused : theme.border.default)
         }
         paddingX={1}
       >
         <Text
-          color={shellModeActive ? theme.status.warning : theme.text.accent}
+          color={statusColor ?? theme.text.accent}
+          aria-label={statusText || undefined}
         >
           {shellModeActive ? (
             reverseSearchActive ? (
-              <Text color={theme.text.link}>(r:) </Text>
+              <Text
+                color={theme.text.link}
+                aria-label={SCREEN_READER_USER_PREFIX}
+              >
+                (r:){' '}
+              </Text>
             ) : (
-              '! '
+              '!'
             )
+          ) : showYoloStyling ? (
+            '*'
           ) : (
-            '> '
-          )}
+            '>'
+          )}{' '}
         </Text>
         <Box flexGrow={1} flexDirection="column">
           {buffer.text.length === 0 && placeholder ? (
@@ -571,42 +773,116 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               <Text color={theme.text.secondary}>{placeholder}</Text>
             )
           ) : (
-            linesToRender.map((lineText, visualIdxInRenderedSet) => {
-              const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
-              let display = cpSlice(lineText, 0, inputWidth);
-              const currentVisualWidth = stringWidth(display);
-              if (currentVisualWidth < inputWidth) {
-                display = display + ' '.repeat(inputWidth - currentVisualWidth);
-              }
+            linesToRender
+              .map((lineText, visualIdxInRenderedSet) => {
+                const tokens = parseInputForHighlighting(
+                  lineText,
+                  visualIdxInRenderedSet,
+                );
+                const cursorVisualRow =
+                  cursorVisualRowAbsolute - scrollVisualRow;
+                const isOnCursorLine =
+                  focus && visualIdxInRenderedSet === cursorVisualRow;
 
-              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
-                const relativeVisualColForHighlight = cursorVisualColAbsolute;
+                const renderedLine: React.ReactNode[] = [];
+                let charCount = 0;
 
-                if (relativeVisualColForHighlight >= 0) {
-                  if (relativeVisualColForHighlight < cpLen(display)) {
-                    const charToHighlight =
-                      cpSlice(
-                        display,
-                        relativeVisualColForHighlight,
-                        relativeVisualColForHighlight + 1,
-                      ) || ' ';
-                    const highlighted = chalk.inverse(charToHighlight);
-                    display =
-                      cpSlice(display, 0, relativeVisualColForHighlight) +
-                      highlighted +
-                      cpSlice(display, relativeVisualColForHighlight + 1);
-                  } else if (
-                    relativeVisualColForHighlight === cpLen(display) &&
-                    cpLen(display) === inputWidth
-                  ) {
-                    display = display + chalk.inverse(' ');
+                tokens.forEach((token, tokenIdx) => {
+                  let display = token.text;
+                  if (isOnCursorLine) {
+                    const relativeVisualColForHighlight =
+                      cursorVisualColAbsolute;
+                    const tokenStart = charCount;
+                    const tokenEnd = tokenStart + cpLen(token.text);
+
+                    if (
+                      relativeVisualColForHighlight >= tokenStart &&
+                      relativeVisualColForHighlight < tokenEnd
+                    ) {
+                      const charToHighlight = cpSlice(
+                        token.text,
+                        relativeVisualColForHighlight - tokenStart,
+                        relativeVisualColForHighlight - tokenStart + 1,
+                      );
+                      const highlighted = chalk.inverse(charToHighlight);
+                      display =
+                        cpSlice(
+                          token.text,
+                          0,
+                          relativeVisualColForHighlight - tokenStart,
+                        ) +
+                        highlighted +
+                        cpSlice(
+                          token.text,
+                          relativeVisualColForHighlight - tokenStart + 1,
+                        );
+                    }
+                    charCount = tokenEnd;
+                  }
+
+                  const color =
+                    token.type === 'command' || token.type === 'file'
+                      ? theme.text.accent
+                      : theme.text.primary;
+
+                  renderedLine.push(
+                    <Text key={`token-${tokenIdx}`} color={color}>
+                      {display}
+                    </Text>,
+                  );
+                });
+                const currentLineGhost = isOnCursorLine ? inlineGhost : '';
+
+                if (
+                  isOnCursorLine &&
+                  cursorVisualColAbsolute === cpLen(lineText)
+                ) {
+                  if (!currentLineGhost) {
+                    renderedLine.push(
+                      <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
+                        {chalk.inverse(' ')}
+                      </Text>,
+                    );
                   }
                 }
-              }
-              return (
-                <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
-              );
-            })
+
+                const showCursorBeforeGhost =
+                  focus &&
+                  isOnCursorLine &&
+                  cursorVisualColAbsolute === cpLen(lineText) &&
+                  currentLineGhost;
+
+                return (
+                  <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
+                    <Text>
+                      {renderedLine}
+                      {showCursorBeforeGhost && chalk.inverse(' ')}
+                      {currentLineGhost && (
+                        <Text color={theme.text.secondary}>
+                          {currentLineGhost}
+                        </Text>
+                      )}
+                    </Text>
+                  </Box>
+                );
+              })
+              .concat(
+                additionalLines.map((ghostLine, index) => {
+                  const padding = Math.max(
+                    0,
+                    inputWidth - stringWidth(ghostLine),
+                  );
+                  return (
+                    <Text
+                      key={`ghost-line-${index}`}
+                      color={theme.text.secondary}
+                    >
+                      {ghostLine}
+                      {' '.repeat(padding)}
+                    </Text>
+                  );
+                }),
+              )
           )}
         </Box>
       </Box>

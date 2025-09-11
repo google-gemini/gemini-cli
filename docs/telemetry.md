@@ -47,7 +47,9 @@ The following code can be added to your workspace (`.gemini/settings.json`) or u
     "enabled": true,
     "target": "gcp"
   },
-  "sandbox": false
+  "tools": {
+    "sandbox": false
+  }
 }
 ```
 
@@ -74,7 +76,11 @@ gemini --telemetry \
 ## Running an OTEL Collector
 
 An OTEL Collector is a service that receives, processes, and exports telemetry data.
-The CLI sends data using the OTLP/gRPC protocol.
+The CLI can send data using either the OTLP/gRPC or OTLP/HTTP protocol.
+You can specify which protocol to use via the `--telemetry-otlp-protocol` flag
+or the `telemetry.otlpProtocol` setting in your `settings.json` file. See the
+[configuration docs](./cli/configuration.md#--telemetry-otlp-protocol) for more
+details.
 
 Learn more about OTEL exporter standard configuration in [documentation][otel-config-docs].
 
@@ -170,12 +176,14 @@ Logs are timestamped records of specific events. The following events are logged
     - `file_filtering_respect_git_ignore` (boolean)
     - `debug_mode` (boolean)
     - `mcp_servers` (string)
+    - `output_format` (string: "text" or "json")
 
 - `gemini_cli.user_prompt`: This event occurs when a user submits a prompt.
   - **Attributes**:
-    - `prompt_length`
-    - `prompt` (this attribute is excluded if `log_prompts_enabled` is configured to be `false`)
-    - `auth_type`
+    - `prompt_length` (int)
+    - `prompt_id` (string)
+    - `prompt` (string, this attribute is excluded if `log_prompts_enabled` is configured to be `false`)
+    - `auth_type` (string)
 
 - `gemini_cli.tool_call`: This event occurs for each function call.
   - **Attributes**:
@@ -186,7 +194,22 @@ Logs are timestamped records of specific events. The following events are logged
     - `decision` (string: "accept", "reject", "auto_accept", or "modify", if applicable)
     - `error` (if applicable)
     - `error_type` (if applicable)
+    - `content_length` (int, if applicable)
     - `metadata` (if applicable, dictionary of string -> any)
+
+- `gemini_cli.file_operation`: This event occurs for each file operation.
+  - **Attributes**:
+    - `tool_name` (string)
+    - `operation` (string: "create", "read", "update")
+    - `lines` (int, if applicable)
+    - `mimetype` (string, if applicable)
+    - `extension` (string, if applicable)
+    - `programming_language` (string, if applicable)
+    - `diff_stat` (json string, if applicable): A JSON string with the following members:
+      - `ai_added_lines` (int)
+      - `ai_removed_lines` (int)
+      - `user_added_lines` (int)
+      - `user_removed_lines` (int)
 
 - `gemini_cli.api_request`: This event occurs when making a request to Gemini API.
   - **Attributes**:
@@ -216,6 +239,19 @@ Logs are timestamped records of specific events. The following events are logged
     - `response_text` (if applicable)
     - `auth_type`
 
+- `gemini_cli.tool_output_truncated`: This event occurs when the output of a tool call is too large and gets truncated.
+  - **Attributes**:
+    - `tool_name` (string)
+    - `original_content_length` (int)
+    - `truncated_content_length` (int)
+    - `threshold` (int)
+    - `lines` (int)
+    - `prompt_id` (string)
+
+- `gemini_cli.malformed_json_response`: This event occurs when a `generateJson` response from Gemini API cannot be parsed as a json.
+  - **Attributes**:
+    - `model`
+
 - `gemini_cli.flash_fallback`: This event occurs when Gemini CLI switches to flash as fallback.
   - **Attributes**:
     - `auth_type`
@@ -236,6 +272,7 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `function_name`
     - `success` (boolean)
     - `decision` (string: "accept", "reject", or "modify", if applicable)
+    - `tool_type` (string: "mcp", or "native", if applicable)
 
 - `gemini_cli.tool.call.latency` (Histogram, ms): Measures tool call latency.
   - **Attributes**:
@@ -263,7 +300,13 @@ Metrics are numerical measurements of behavior over time. The following metrics 
     - `lines` (Int, if applicable): Number of lines in the file.
     - `mimetype` (string, if applicable): Mimetype of the file.
     - `extension` (string, if applicable): File extension of the file.
-    - `ai_added_lines` (Int, if applicable): Number of lines added/changed by AI.
-    - `ai_removed_lines` (Int, if applicable): Number of lines removed/changed by AI.
+    - `model_added_lines` (Int, if applicable): Number of lines added/changed by the model.
+    - `model_removed_lines` (Int, if applicable): Number of lines removed/changed by the model.
     - `user_added_lines` (Int, if applicable): Number of lines added/changed by user in AI proposed changes.
     - `user_removed_lines` (Int, if applicable): Number of lines removed/changed by user in AI proposed changes.
+    - `programming_language` (string, if applicable): The programming language of the file.
+
+- `gemini_cli.chat_compression` (Counter, Int): Counts chat compression operations
+  - **Attributes**:
+    - `tokens_before`: (Int): Number of tokens in context prior to compression
+    - `tokens_after`: (Int): Number of tokens in context after compression

@@ -23,11 +23,11 @@
  * to avoid conflicts with user customizations.
  */
 
-import { promises as fs } from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { promises as fs } from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { isKittyProtocolEnabled } from './kittyProtocolDetector.js';
 import { VSCODE_SHIFT_ENTER_SEQUENCE } from './platformConstants.js';
 
@@ -52,22 +52,24 @@ type SupportedTerminal = 'vscode' | 'cursor' | 'windsurf';
 
 // Terminal detection
 async function detectTerminal(): Promise<SupportedTerminal | null> {
-  const termProgram = process.env.TERM_PROGRAM;
+  const termProgram = process.env['TERM_PROGRAM'];
 
   // Check VS Code and its forks - check forks first to avoid false positives
   // Check for Cursor-specific indicators
   if (
-    process.env.CURSOR_TRACE_ID ||
-    process.env.VSCODE_GIT_ASKPASS_MAIN?.toLowerCase().includes('cursor')
+    process.env['CURSOR_TRACE_ID'] ||
+    process.env['VSCODE_GIT_ASKPASS_MAIN']?.toLowerCase().includes('cursor')
   ) {
     return 'cursor';
   }
   // Check for Windsurf-specific indicators
-  if (process.env.VSCODE_GIT_ASKPASS_MAIN?.toLowerCase().includes('windsurf')) {
+  if (
+    process.env['VSCODE_GIT_ASKPASS_MAIN']?.toLowerCase().includes('windsurf')
+  ) {
     return 'windsurf';
   }
   // Check VS Code last since forks may also set VSCODE env vars
-  if (termProgram === 'vscode' || process.env.VSCODE_GIT_IPC_HANDLE) {
+  if (termProgram === 'vscode' || process.env['VSCODE_GIT_IPC_HANDLE']) {
     return 'vscode';
   }
 
@@ -118,10 +120,10 @@ function getVSCodeStyleConfigDir(appName: string): string | null {
       'User',
     );
   } else if (platform === 'win32') {
-    if (!process.env.APPDATA) {
+    if (!process.env['APPDATA']) {
       return null;
     }
-    return path.join(process.env.APPDATA, appName, 'User');
+    return path.join(process.env['APPDATA'], appName, 'User');
   } else {
     return path.join(os.homedir(), '.config', appName, 'User');
   }

@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn } from 'child_process';
+import type { SpawnOptions } from 'node:child_process';
+import { spawn } from 'node:child_process';
 
 /**
  * Checks if a query string potentially represents an '@' command.
@@ -20,20 +21,38 @@ export const isAtCommand = (query: string): boolean =>
 
 /**
  * Checks if a query string potentially represents an '/' command.
- * It triggers if the query starts with '/'
+ * It triggers if the query starts with '/' but excludes code comments like '//' and '/*'.
  *
  * @param query The input query string.
  * @returns True if the query looks like an '/' command, false otherwise.
  */
-export const isSlashCommand = (query: string): boolean => query.startsWith('/');
+export const isSlashCommand = (query: string): boolean => {
+  if (!query.startsWith('/')) {
+    return false;
+  }
+
+  // Exclude line comments that start with '//'
+  if (query.startsWith('//')) {
+    return false;
+  }
+
+  // Exclude block comments that start with '/*'
+  if (query.startsWith('/*')) {
+    return false;
+  }
+
+  return true;
+};
 
 // Copies a string snippet to the clipboard for different platforms
 export const copyToClipboard = async (text: string): Promise<void> => {
-  const run = (cmd: string, args: string[]) =>
+  const run = (cmd: string, args: string[], options?: SpawnOptions) =>
     new Promise<void>((resolve, reject) => {
-      const child = spawn(cmd, args);
+      const child = options ? spawn(cmd, args, options) : spawn(cmd, args);
       let stderr = '';
-      child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
+      if (child.stderr) {
+        child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
+      }
       child.on('error', reject);
       child.on('close', (code) => {
         if (code === 0) return resolve();
@@ -44,10 +63,20 @@ export const copyToClipboard = async (text: string): Promise<void> => {
           ),
         );
       });
-      child.stdin.on('error', reject);
-      child.stdin.write(text);
-      child.stdin.end();
+      if (child.stdin) {
+        child.stdin.on('error', reject);
+        child.stdin.write(text);
+        child.stdin.end();
+      } else {
+        reject(new Error('Child process has no stdin stream to write to.'));
+      }
     });
+
+  // Configure stdio for Linux clipboard commands.
+  // - stdin: 'pipe' to write the text that needs to be copied.
+  // - stdout: 'inherit' since we don't need to capture the command's output on success.
+  // - stderr: 'pipe' to capture error messages (e.g., "command not found") for better error handling.
+  const linuxOptions: SpawnOptions = { stdio: ['pipe', 'inherit', 'pipe'] };
 
   switch (process.platform) {
     case 'win32':
@@ -56,22 +85,41 @@ export const copyToClipboard = async (text: string): Promise<void> => {
       return run('pbcopy', []);
     case 'linux':
       try {
-        await run('xclip', ['-selection', 'clipboard']);
+        await run('xclip', ['-selection', 'clipboard'], linuxOptions);
       } catch (primaryError) {
         try {
           // If xclip fails for any reason, try xsel as a fallback.
-          await run('xsel', ['--clipboard', '--input']);
+          await run('xsel', ['--clipboard', '--input'], linuxOptions);
         } catch (fallbackError) {
-          const primaryMsg =
+          const xclipNotFound =
+            primaryError instanceof Error &&
+            (primaryError as NodeJS.ErrnoException).code === 'ENOENT';
+          const xselNotFound =
+            fallbackError instanceof Error &&
+            (fallbackError as NodeJS.ErrnoException).code === 'ENOENT';
+          if (xclipNotFound && xselNotFound) {
+            throw new Error(
+              'Please ensure xclip or xsel is installed and configured.',
+            );
+          }
+
+          let primaryMsg =
             primaryError instanceof Error
               ? primaryError.message
               : String(primaryError);
-          const fallbackMsg =
+          if (xclipNotFound) {
+            primaryMsg = `xclip not found`;
+          }
+          let fallbackMsg =
             fallbackError instanceof Error
               ? fallbackError.message
               : String(fallbackError);
+          if (xselNotFound) {
+            fallbackMsg = `xsel not found`;
+          }
+
           throw new Error(
-            `All copy commands failed. xclip: "${primaryMsg}", xsel: "${fallbackMsg}". Please ensure xclip or xsel is installed and configured.`,
+            `All copy commands failed. "${primaryMsg}", "${fallbackMsg}". `,
           );
         }
       }
