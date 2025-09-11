@@ -51,6 +51,7 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { useStdin, useStdout } from 'ink';
 import ansiEscapes from 'ansi-escapes';
 import * as fs from 'node:fs';
+import { basename } from 'node:path';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
@@ -156,7 +157,9 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Layout measurements
   const mainControlsRef = useRef<DOMElement>(null);
-  const originalTitleRef = useRef(process.title);
+  const originalTitleRef = useRef(
+    process.env['CLI_TITLE'] || `Gemini - ${basename(config.getTargetDir())}`,
+  );
   const lastTitleRef = useRef<string | null>(null);
   const staticExtraHeight = 3;
 

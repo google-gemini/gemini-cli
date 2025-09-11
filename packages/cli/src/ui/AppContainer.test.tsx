@@ -136,10 +136,17 @@ describe('AppContainer State Management', () => {
     // Initialize mock stdout for terminal title tests
     mockStdout = { write: vi.fn() };
 
-    // Mock process.title for consistent testing
-    Object.defineProperty(process, 'title', {
-      value: 'Gemini CLI',
-      writable: true,
+    // Mock process.env for consistent testing
+    vi.stubEnv('CLI_TITLE', undefined);
+
+    // Mock basename to return consistent folder name
+    vi.mock('node:path', async () => {
+      const actualPath =
+        await vi.importActual<typeof import('node:path')>('node:path');
+      return {
+        ...actualPath,
+        basename: vi.fn().mockReturnValue('workspace'),
+      };
     });
 
     capturedUIState = null!;
@@ -241,6 +248,9 @@ describe('AppContainer State Management', () => {
 
     // Mock Config
     mockConfig = makeFakeConfig();
+
+    // Mock config's getTargetDir to return consistent workspace directory
+    vi.spyOn(mockConfig, 'getTargetDir').mockReturnValue('/test/workspace');
 
     // Mock LoadedSettings
     mockSettings = {
@@ -736,7 +746,7 @@ describe('AppContainer State Management', () => {
       );
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${'Gemini CLI'.padEnd(80, ' ')}\x07`,
+        `\x1b]2;${'Gemini - workspace'.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
@@ -879,6 +889,54 @@ describe('AppContainer State Management', () => {
       expect(titleWrites).toHaveLength(1);
       const expectedEscapeSequence = `\x1b]2;${title.padEnd(80, ' ')}\x07`;
       expect(titleWrites[0][0]).toBe(expectedEscapeSequence);
+      unmount();
+    });
+
+    it('should use CLI_TITLE environment variable when set', () => {
+      // Arrange: Set up mock settings with showStatusInTitle enabled
+      const mockSettingsWithTitleEnabled = {
+        ...mockSettings,
+        merged: {
+          ...mockSettings.merged,
+          ui: {
+            ...mockSettings.merged.ui,
+            showStatusInTitle: true,
+            hideWindowTitle: false,
+          },
+        },
+      } as unknown as LoadedSettings;
+
+      // Mock CLI_TITLE environment variable
+      vi.stubEnv('CLI_TITLE', 'Custom Gemini Title');
+
+      // Mock the streaming state as Idle with no thought
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      // Act: Render the container
+      const { unmount } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettingsWithTitleEnabled}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      // Assert: Check that title was updated with CLI_TITLE value
+      const titleWrites = mockStdout.write.mock.calls.filter((call) =>
+        call[0].includes('\x1b]2;'),
+      );
+      expect(titleWrites).toHaveLength(1);
+      expect(titleWrites[0][0]).toBe(
+        `\x1b]2;${'Custom Gemini Title'.padEnd(80, ' ')}\x07`,
+      );
       unmount();
     });
   });
