@@ -74,8 +74,18 @@ export class LoopDetectionService {
   private llmCheckInterval = DEFAULT_LLM_CHECK_INTERVAL;
   private lastCheckTurn = 0;
 
+  // Session-level disable flag
+  private disabledForSession = false;
+
   constructor(config: Config) {
     this.config = config;
+  }
+
+  /**
+   * Disables loop detection for the current session.
+   */
+  disableForSession(): void {
+    this.disabledForSession = true;
   }
 
   private getToolCallKey(toolCall: { name: string; args: object }): string {
@@ -90,8 +100,8 @@ export class LoopDetectionService {
    * @returns true if a loop is detected, false otherwise
    */
   addAndCheck(event: ServerGeminiStreamEvent): boolean {
-    if (this.loopDetected) {
-      return true;
+    if (this.loopDetected || this.disabledForSession) {
+      return this.loopDetected;
     }
 
     switch (event.type) {
@@ -121,6 +131,9 @@ export class LoopDetectionService {
    * @returns A promise that resolves to `true` if a loop is detected, and `false` otherwise.
    */
   async turnStarted(signal: AbortSignal) {
+    if (this.disabledForSession) {
+      return false;
+    }
     this.turnsInCurrentPrompt++;
 
     if (

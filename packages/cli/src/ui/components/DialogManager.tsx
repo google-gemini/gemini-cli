@@ -6,6 +6,7 @@
 
 import { Box, Text } from 'ink';
 import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
+import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
@@ -81,6 +82,13 @@ export const DialogManager = () => {
   if (uiState.shellConfirmationRequest) {
     return (
       <ShellConfirmationDialog request={uiState.shellConfirmationRequest} />
+    );
+  }
+  if (uiState.loopDetectionConfirmationRequest) {
+    return (
+      <LoopDetectionConfirmation
+        onComplete={uiState.loopDetectionConfirmationRequest.onComplete}
+      />
     );
   }
   if (uiState.confirmationRequest) {
