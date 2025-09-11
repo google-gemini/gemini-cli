@@ -11,6 +11,7 @@ import type {
   ConsoleMessageItem,
   ShellConfirmationRequest,
   ConfirmationRequest,
+  LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
 } from '../types.js';
@@ -53,6 +54,7 @@ export interface UIState {
   commandContext: CommandContext;
   shellConfirmationRequest: ShellConfirmationRequest | null;
   confirmationRequest: ConfirmationRequest | null;
+  loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   geminiMdFileCount: number;
   streamingState: StreamingState;
   initError: string | null;
