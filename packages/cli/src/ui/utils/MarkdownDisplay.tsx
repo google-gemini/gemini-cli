@@ -188,7 +188,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
           break;
         case 3:
           headerNode = (
-            <Text bold>
+            <Text bold color={theme.text.primary}>
               <RenderInline text={headerText} />
             </Text>
           );
