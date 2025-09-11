@@ -329,7 +329,7 @@ Here is an example of a `settings.json` file with the nested structure, new as o
     "hideBanner": true,
     "hideTips": false,
     "customWittyPhrases": [
-      "Getting this Before GTA6",
+      "You forget a thousand things every day. Make sure this is one of ’em",
       "Connecting to AGI"
     ]
   },
