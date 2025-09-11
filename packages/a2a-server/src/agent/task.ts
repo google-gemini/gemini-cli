@@ -132,7 +132,7 @@ export class Task {
       id: this.id,
       contextId: this.contextId,
       taskState: this.taskState,
-      model: this.config.getContentGeneratorConfig().model,
+      model: this.config.getModel(),
       mcpServers: servers,
       availableTools,
     };
