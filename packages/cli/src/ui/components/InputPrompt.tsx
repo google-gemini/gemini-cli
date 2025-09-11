@@ -714,7 +714,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       <Box
         borderStyle="round"
         borderColor={
-          shellModeActive ? theme.status.warning : theme.border.focused
+          shellModeActive
+            ? theme.status.warning
+            : focus
+              ? theme.border.focused
+              : theme.border.default
         }
         paddingX={1}
       >
@@ -797,7 +801,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   const color =
                     token.type === 'command' || token.type === 'file'
                       ? theme.text.accent
-                      : undefined;
+                      : theme.text.primary;
 
                   renderedLine.push(
                     <Text key={`token-${tokenIdx}`} color={color}>

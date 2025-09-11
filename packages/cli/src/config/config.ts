@@ -15,6 +15,7 @@ import type {
   TelemetryTarget,
   FileFilteringOptions,
   MCPServerConfig,
+  OutputFormat,
 } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
 import {
@@ -81,6 +82,7 @@ export interface CliArgs {
   useSmartEdit: boolean | undefined;
   sessionSummary: string | undefined;
   promptWords: string[] | undefined;
+  outputFormat: string | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -233,6 +235,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('session-summary', {
           type: 'string',
           description: 'File to write session summary to.',
+        })
+        .option('output-format', {
+          type: 'string',
+          description: 'The format of the CLI output.',
+          choices: ['text', 'json'],
         })
         .deprecateOption(
           'telemetry',
@@ -627,6 +634,9 @@ export async function loadCliConfig(
     enableToolOutputTruncation: settings.tools?.enableToolOutputTruncation,
     eventEmitter: appEvents,
     useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
+    output: {
+      format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
+    },
   });
 }
 
