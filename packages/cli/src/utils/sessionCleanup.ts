@@ -11,7 +11,7 @@ import type { Settings, SessionRetentionSettings } from '../config/settings.js';
 import { getSessionFiles, type SessionInfo } from './sessionUtils.js';
 
 // Constants
-export const DEFAULT_MIN_RETENTION = '1d';
+export const DEFAULT_MIN_RETENTION = '1d' as string;
 const MIN_MAX_COUNT = 1;
 const MULTIPLIERS = {
   h: 60 * 60 * 1000, // hours to ms
