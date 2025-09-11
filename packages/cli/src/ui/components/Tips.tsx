@@ -30,7 +30,7 @@ export const Tips: React.FC<TipsProps> = ({ config }) => {
           <Text bold color={theme.text.accent}>
             GEMINI.md
           </Text>{' '}
-          files to customize your interactions with Gemini.
+          files to customize your interactions with RAGHU.
         </Text>
       )}
       <Text color={theme.text.primary}>
