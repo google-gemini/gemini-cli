@@ -392,7 +392,7 @@ export class Config {
     this.trustedFolder = params.trustedFolder;
     this.useRipgrep = params.useRipgrep ?? false;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
-    this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
+    this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
       terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
       terminalHeight: params.shellExecutionConfig?.terminalHeight ?? 24,
