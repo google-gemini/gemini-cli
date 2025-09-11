@@ -36,6 +36,7 @@ describe('Session Cleanup Integration', () => {
     const result = await cleanupExpiredSessions(config, settings);
 
     // Should return empty result for non-existent directory
+    expect(result.disabled).toBe(false);
     expect(result.scanned).toBe(0);
     expect(result.deleted).toBe(0);
     expect(result.skipped).toBe(0);
@@ -54,6 +55,7 @@ describe('Session Cleanup Integration', () => {
 
     const result = await cleanupExpiredSessions(config, settings);
 
+    expect(result.disabled).toBe(true);
     expect(result.scanned).toBe(0);
     expect(result.deleted).toBe(0);
     expect(result.skipped).toBe(0);
@@ -66,6 +68,7 @@ describe('Session Cleanup Integration', () => {
 
     const result = await cleanupExpiredSessions(config, settings);
 
+    expect(result.disabled).toBe(true);
     expect(result.scanned).toBe(0);
     expect(result.deleted).toBe(0);
     expect(result.skipped).toBe(0);
@@ -85,6 +88,7 @@ describe('Session Cleanup Integration', () => {
 
     const result = await cleanupExpiredSessions(config, settings);
 
+    expect(result.disabled).toBe(true);
     expect(result.scanned).toBe(0);
     expect(result.deleted).toBe(0);
     expect(result.skipped).toBe(0);
@@ -174,6 +178,7 @@ describe('Session Cleanup Integration', () => {
       const result = await cleanupExpiredSessions(config, settings);
 
       // Verify the result
+      expect(result.disabled).toBe(false);
       expect(result.scanned).toBe(3); // Should scan all 3 sessions
       expect(result.deleted).toBe(1); // Should delete the old session (35 days old)
       expect(result.skipped).toBe(2); // Should keep recent and current sessions

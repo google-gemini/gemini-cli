@@ -24,6 +24,7 @@ const MULTIPLIERS = {
  * Result of session cleanup operation
  */
 export interface CleanupResult {
+  disabled: boolean;
   scanned: number;
   deleted: number;
   skipped: number;
@@ -38,16 +39,17 @@ export async function cleanupExpiredSessions(
   settings: Settings,
 ): Promise<CleanupResult> {
   const result: CleanupResult = {
+    disabled: false,
     scanned: 0,
     deleted: 0,
-    errors: [],
     skipped: 0,
+    errors: [],
   };
 
   try {
     // Early exit if cleanup is disabled
     if (!settings.general?.sessionRetention?.enabled) {
-      return result;
+      return { ...result, disabled: true };
     }
 
     const retentionConfig = settings.general.sessionRetention;
@@ -59,7 +61,7 @@ export async function cleanupExpiredSessions(
       if (config.getDebugMode()) {
         console.debug(`Session cleanup disabled: ${validationResult.error}`);
       }
-      return result;
+      return { ...result, disabled: true };
     }
 
     // Get all session files for this project
