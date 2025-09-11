@@ -62,6 +62,9 @@ export enum EventMetadataKey {
   // Logs the function name.
   GEMINI_CLI_TOOL_CALL_NAME = 14,
 
+  // Logs the MCP server name.
+  GEMINI_CLI_TOOL_CALL_MCP_SERVER_NAME = 95,
+
   // Logs the user's decision about how to handle the tool call.
   GEMINI_CLI_TOOL_CALL_DECISION = 15,
 
@@ -76,9 +79,6 @@ export enum EventMetadataKey {
 
   // Logs the tool call error type, if any.
   GEMINI_CLI_TOOL_CALL_ERROR_TYPE = 19,
-
-  // Logs the MCP server name.
-  GEMINI_CLI_TOOL_MCP_SERVER = 89,
 
   // ==========================================================================
   // GenAI API Request Event Keys

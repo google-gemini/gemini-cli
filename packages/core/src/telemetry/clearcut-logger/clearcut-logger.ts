@@ -465,7 +465,7 @@ export class ClearcutLogger {
         value: JSON.stringify(event.tool_type),
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_MCP_SERVER,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_MCP_SERVER_NAME,
         value: JSON.stringify(event.mcp_server_name),
       },
     ];
