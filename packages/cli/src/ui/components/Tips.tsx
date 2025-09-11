@@ -40,6 +40,10 @@ export const Tips: React.FC<TipsProps> = ({ config }) => {
         </Text>{' '}
         for more information.
       </Text>
+      <Text color={theme.text.primary}>
+        {geminiMdFileCount === 0 ? '5.' : '4.'} Paste images from clipboard with
+        Ctrl+V.
+      </Text>
     </Box>
   );
 };

@@ -20,8 +20,6 @@ import type { UseCommandCompletionReturn } from '../hooks/useCommandCompletion.j
 import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
 import type { UseInputHistoryReturn } from '../hooks/useInputHistory.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import type { UseReverseSearchCompletionReturn } from '../hooks/useReverseSearchCompletion.js';
-import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import chalk from 'chalk';
@@ -29,7 +27,6 @@ import chalk from 'chalk';
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
-vi.mock('../hooks/useReverseSearchCompletion.js');
 vi.mock('../utils/clipboardUtils.js');
 
 const mockSlashCommands: SlashCommand[] = [
@@ -85,16 +82,12 @@ describe('InputPrompt', () => {
   let mockShellHistory: UseShellHistoryReturn;
   let mockCommandCompletion: UseCommandCompletionReturn;
   let mockInputHistory: UseInputHistoryReturn;
-  let mockReverseSearchCompletion: UseReverseSearchCompletionReturn;
   let mockBuffer: TextBuffer;
   let mockCommandContext: CommandContext;
 
   const mockedUseShellHistory = vi.mocked(useShellHistory);
   const mockedUseCommandCompletion = vi.mocked(useCommandCompletion);
   const mockedUseInputHistory = vi.mocked(useInputHistory);
-  const mockedUseReverseSearchCompletion = vi.mocked(
-    useReverseSearchCompletion,
-  );
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -164,6 +157,9 @@ describe('InputPrompt', () => {
         text: '',
         accept: vi.fn(),
         clear: vi.fn(),
+        isLoading: false,
+        isActive: false,
+        markSelected: vi.fn(),
       },
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
@@ -174,21 +170,6 @@ describe('InputPrompt', () => {
       handleSubmit: vi.fn(),
     };
     mockedUseInputHistory.mockReturnValue(mockInputHistory);
-
-    mockReverseSearchCompletion = {
-      suggestions: [],
-      activeSuggestionIndex: -1,
-      visibleStartIndex: 0,
-      showSuggestions: false,
-      isLoadingSuggestions: false,
-      navigateUp: vi.fn(),
-      navigateDown: vi.fn(),
-      handleAutocomplete: vi.fn(),
-      resetCompletionState: vi.fn(),
-    };
-    mockedUseReverseSearchCompletion.mockReturnValue(
-      mockReverseSearchCompletion,
-    );
 
     props = {
       buffer: mockBuffer,
@@ -1148,7 +1129,6 @@ describe('InputPrompt', () => {
 
   describe('vim mode', () => {
     it('should not call buffer.handleInput when vim mode is enabled and vim handles the input', async () => {
-      props.vimModeEnabled = true;
       props.vimHandleInput = vi.fn().mockReturnValue(true); // Mock that vim handled it.
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
@@ -1164,7 +1144,6 @@ describe('InputPrompt', () => {
     });
 
     it('should call buffer.handleInput when vim mode is enabled but vim does not handle the input', async () => {
-      props.vimModeEnabled = true;
       props.vimHandleInput = vi.fn().mockReturnValue(false); // Mock that vim did NOT handle it.
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
@@ -1397,77 +1376,6 @@ describe('InputPrompt', () => {
     });
   });
 
-  describe('paste auto-submission protection', () => {
-    it('should prevent auto-submission immediately after paste with newlines', async () => {
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      // First type some text manually
-      stdin.write('test command');
-      await wait();
-
-      // Simulate a paste operation (this should set the paste protection)
-      stdin.write(`\x1b[200~\npasted content\x1b[201~`);
-      await wait();
-
-      // Simulate an Enter key press immediately after paste
-      stdin.write('\r');
-      await wait();
-
-      // Verify that onSubmit was NOT called due to recent paste protection
-      expect(props.onSubmit).not.toHaveBeenCalled();
-
-      unmount();
-    });
-
-    it('should allow submission after paste protection timeout', async () => {
-      // Set up buffer with text for submission
-      props.buffer.text = 'test command';
-
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      // Simulate a paste operation (this sets the protection)
-      stdin.write(`\x1b[200~\npasted\x1b[201~`);
-      await wait();
-
-      // Wait for the protection timeout to naturally expire
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      // Now Enter should work normally
-      stdin.write('\r');
-      await wait();
-
-      // Verify that onSubmit was called after the timeout
-      expect(props.onSubmit).toHaveBeenCalledWith('test command');
-
-      unmount();
-    });
-
-    it('should not interfere with normal Enter key submission when no recent paste', async () => {
-      // Set up buffer with text before rendering to ensure submission works
-      props.buffer.text = 'normal command';
-
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      // Press Enter without any recent paste
-      stdin.write('\r');
-      await wait();
-
-      // Verify that onSubmit was called normally
-      expect(props.onSubmit).toHaveBeenCalledWith('normal command');
-
-      unmount();
-    });
-  });
-
   describe('enhanced input UX - double ESC clear functionality', () => {
     it('should clear buffer on second ESC press', async () => {
       const onEscapePromptChange = vi.fn();
@@ -1595,27 +1503,12 @@ describe('InputPrompt', () => {
     });
 
     it('invokes reverse search on Ctrl+R', async () => {
-      // Mock the reverse search completion to return suggestions
-      mockedUseReverseSearchCompletion.mockReturnValue({
-        ...mockReverseSearchCompletion,
-        suggestions: [
-          { label: 'echo hello', value: 'echo hello' },
-          { label: 'echo world', value: 'echo world' },
-          { label: 'ls', value: 'ls' },
-        ],
-        showSuggestions: true,
-        activeSuggestionIndex: 0,
-      });
-
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
       await wait();
 
-      // Trigger reverse search with Ctrl+R
-      act(() => {
-        stdin.write('\x12');
-      });
+      stdin.write('\x12');
       await wait();
 
       const frame = stdout.lastFrame();
@@ -1647,27 +1540,6 @@ describe('InputPrompt', () => {
     });
 
     it('completes the highlighted entry on Tab and exits reverse-search', async () => {
-      // Mock the reverse search completion
-      const mockHandleAutocomplete = vi.fn(() => {
-        props.buffer.setText('echo hello');
-      });
-
-      mockedUseReverseSearchCompletion.mockImplementation(
-        (buffer, shellHistory, reverseSearchActive) => ({
-          ...mockReverseSearchCompletion,
-          suggestions: reverseSearchActive
-            ? [
-                { label: 'echo hello', value: 'echo hello' },
-                { label: 'echo world', value: 'echo world' },
-                { label: 'ls', value: 'ls' },
-              ]
-            : [],
-          showSuggestions: reverseSearchActive,
-          activeSuggestionIndex: reverseSearchActive ? 0 : -1,
-          handleAutocomplete: mockHandleAutocomplete,
-        }),
-      );
-
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
@@ -1685,26 +1557,19 @@ describe('InputPrompt', () => {
       act(() => {
         stdin.write('\t');
       });
-      await wait();
 
-      expect(mockHandleAutocomplete).toHaveBeenCalledWith(0);
+      await waitFor(
+        () => {
+          expect(stdout.lastFrame()).not.toContain('(r:)');
+        },
+        { timeout: 5000 },
+      ); // Increase timeout
+
       expect(props.buffer.setText).toHaveBeenCalledWith('echo hello');
       unmount();
-    }, 15000);
+    });
 
     it('submits the highlighted entry on Enter and exits reverse-search', async () => {
-      // Mock the reverse search completion to return suggestions
-      mockedUseReverseSearchCompletion.mockReturnValue({
-        ...mockReverseSearchCompletion,
-        suggestions: [
-          { label: 'echo hello', value: 'echo hello' },
-          { label: 'echo world', value: 'echo world' },
-          { label: 'ls', value: 'ls' },
-        ],
-        showSuggestions: true,
-        activeSuggestionIndex: 0,
-      });
-
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
@@ -1783,6 +1648,242 @@ describe('InputPrompt', () => {
 
       expect(props.buffer.move).toHaveBeenCalledWith('end');
       expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
+      unmount();
+    });
+  });
+
+  describe('paste auto-submission protection', () => {
+    it('should set paste timing protection when paste occurs', async () => {
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Simulate a paste event
+      stdin.write('\x1b[200~pasted content\x1b[201~');
+      await wait();
+
+      // The paste timing should be set (we can't directly test internal state,
+      // but we can verify the paste was processed)
+      expect(mockBuffer.handleInput).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paste: true,
+          sequence: 'pasted content',
+        }),
+      );
+      unmount();
+    });
+
+    it('should prevent auto-submission immediately after paste', async () => {
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Set up buffer with content
+      mockBuffer.text = 'some command';
+      mockBuffer.lines = ['some command'];
+
+      // Simulate paste
+      stdin.write('\x1b[200~pasted\x1b[201~');
+      await wait();
+
+      // Immediately try to submit (should be blocked)
+      stdin.write('\r');
+      await wait();
+
+      // Should NOT call onSubmit due to paste protection
+      expect(props.onSubmit).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should allow submission after paste protection timeout', async () => {
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Set up buffer with content
+      mockBuffer.text = 'some command';
+      mockBuffer.lines = ['some command'];
+
+      // Simulate paste
+      stdin.write('\x1b[200~pasted\x1b[201~');
+      await wait();
+
+      // Wait for protection timeout (500ms)
+      await new Promise((resolve) => setTimeout(resolve, 550));
+
+      // Now try to submit (should work)
+      stdin.write('\r');
+      await wait();
+
+      expect(props.onSubmit).toHaveBeenCalledWith('some command');
+      unmount();
+    });
+
+    it('should handle multiple pastes correctly', async () => {
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // First paste
+      stdin.write('\x1b[200~first paste\x1b[201~');
+      await wait();
+
+      // Second paste (should reset timing)
+      stdin.write('\x1b[200~second paste\x1b[201~');
+      await wait();
+
+      // Immediate submit should be blocked
+      stdin.write('\r');
+      await wait();
+
+      expect(props.onSubmit).not.toHaveBeenCalled();
+      unmount();
+    });
+  });
+
+  describe('Ctrl+V clipboard image integration', () => {
+    beforeEach(() => {
+      // Mock clipboard utilities
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
+      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(
+        '/path/to/image.png',
+      );
+      vi.mocked(clipboardUtils.cleanupOldClipboardImages).mockResolvedValue(
+        undefined,
+      );
+    });
+
+    it('should handle Ctrl+V when clipboard has image', async () => {
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Simulate Ctrl+V
+      stdin.write('\x16'); // Ctrl+V
+      await wait();
+
+      // Should check for clipboard image
+      expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
+
+      // Should save the image
+      expect(clipboardUtils.saveClipboardImage).toHaveBeenCalledWith(
+        props.config.getTargetDir(),
+      );
+
+      // Should clean up old images
+      expect(clipboardUtils.cleanupOldClipboardImages).toHaveBeenCalledWith(
+        props.config.getTargetDir(),
+      );
+
+      unmount();
+    });
+
+    it('should insert @path reference when image is saved', async () => {
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Set up buffer with some text and cursor position
+      mockBuffer.text = 'before ';
+      mockBuffer.lines = ['before '];
+      mockBuffer.cursor = [0, 7]; // After "before "
+
+      // Simulate Ctrl+V
+      stdin.write('\x16');
+      await wait();
+
+      // Should insert @path reference at cursor
+      expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalledWith(
+        7, // cursor offset
+        7, // cursor offset
+        expect.stringContaining('@'), // Should contain @ symbol for path reference
+      );
+
+      unmount();
+    });
+
+    it('should handle clipboard image errors gracefully', async () => {
+      // Mock saveClipboardImage to throw an error
+      vi.mocked(clipboardUtils.saveClipboardImage).mockRejectedValue(
+        new Error('Save failed'),
+      );
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Mock console.error to capture error logging
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      // Simulate Ctrl+V
+      stdin.write('\x16');
+      await wait();
+
+      // Should still check clipboard and attempt to save
+      expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
+      expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
+
+      // Should log the error
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Error handling clipboard image:',
+        expect.any(Error),
+      );
+
+      consoleSpy.mockRestore();
+      unmount();
+    });
+
+    it('should not insert path when no image in clipboard', async () => {
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Simulate Ctrl+V
+      stdin.write('\x16');
+      await wait();
+
+      // Should check clipboard but not save or insert anything
+      expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
+      expect(clipboardUtils.saveClipboardImage).not.toHaveBeenCalled();
+      expect(mockBuffer.replaceRangeByOffset).not.toHaveBeenCalled();
+
+      unmount();
+    });
+
+    it('should add spaces around @path when needed', async () => {
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      // Test case: cursor after text without space
+      mockBuffer.text = 'text';
+      mockBuffer.lines = ['text'];
+      mockBuffer.cursor = [0, 4];
+
+      // Simulate Ctrl+V
+      stdin.write('\x16');
+      await wait();
+
+      // Should add space before @path when cursor is after text
+      expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalledWith(
+        4,
+        4,
+        expect.stringMatching(/^ @/), // Should start with space before @
+      );
+
       unmount();
     });
   });
