@@ -1482,9 +1482,10 @@ describe('truncateAndSaveToFile', () => {
     );
 
     // For small truncateLines (3), should use simple head/tail view
-    // headCount = ceil(3/2) = 2, tailCount = 1
-    const headCount = Math.ceil(smallTruncateLines / 2);
-    const tailCount = smallTruncateLines - headCount;
+    // For truncateLines < 5, we reserve 1 line for marker
+    const contentLinesToShow = Math.max(0, smallTruncateLines - 1);
+    const headCount = Math.ceil(contentLinesToShow / 2);
+    const tailCount = contentLinesToShow - headCount;
     const headLines = lines.slice(0, headCount);
     const tailLines = tailCount > 0 ? lines.slice(-tailCount) : [];
 
