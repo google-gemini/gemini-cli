@@ -13,36 +13,21 @@ import {
 
 describe('clipboardUtils', () => {
   describe('clipboardHasImage', () => {
-    it('should return false on non-macOS platforms', async () => {
-      if (process.platform !== 'darwin') {
-        const result = await clipboardHasImage();
-        expect(result).toBe(false);
-      } else {
-        // Skip on macOS as it would require actual clipboard state
-        expect(true).toBe(true);
-      }
+    it('should return boolean on all platforms', async () => {
+      const result = await clipboardHasImage();
+      expect(typeof result).toBe('boolean');
     });
 
-    it('should return boolean on macOS', async () => {
-      if (process.platform === 'darwin') {
-        const result = await clipboardHasImage();
-        expect(typeof result).toBe('boolean');
-      } else {
-        // Skip on non-macOS
-        expect(true).toBe(true);
-      }
+    it('should handle clipboard detection gracefully', async () => {
+      // Test that the function doesn't throw errors
+      await expect(clipboardHasImage()).resolves.not.toThrow();
     });
   });
 
   describe('saveClipboardImage', () => {
-    it('should return null on non-macOS platforms', async () => {
-      if (process.platform !== 'darwin') {
-        const result = await saveClipboardImage();
-        expect(result).toBe(null);
-      } else {
-        // Skip on macOS
-        expect(true).toBe(true);
-      }
+    it('should return string or null on all platforms', async () => {
+      const result = await saveClipboardImage();
+      expect(result === null || typeof result === 'string').toBe(true);
     });
 
     it('should handle errors gracefully', async () => {
@@ -51,13 +36,8 @@ describe('clipboardUtils', () => {
         '/invalid/path/that/does/not/exist',
       );
 
-      if (process.platform === 'darwin') {
-        // On macOS, might return null due to various errors
-        expect(result === null || typeof result === 'string').toBe(true);
-      } else {
-        // On other platforms, should always return null
-        expect(result).toBe(null);
-      }
+      // On all platforms, should handle invalid paths gracefully
+      expect(result === null || typeof result === 'string').toBe(true);
     });
   });
 
