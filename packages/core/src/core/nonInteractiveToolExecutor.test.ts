@@ -46,6 +46,10 @@ describe('executeToolCall', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
       storage: {
         getProjectTempDir: () => '/tmp',
       },

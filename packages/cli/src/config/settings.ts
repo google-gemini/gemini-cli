@@ -106,6 +106,8 @@ const MIGRATION_MAP: Record<string, string> = {
   sandbox: 'tools.sandbox',
   selectedAuthType: 'security.auth.selectedType',
   shouldUseNodePtyShell: 'tools.usePty',
+  shellPager: 'tools.shell.pager',
+  shellShowColor: 'tools.shell.showColor',
   skipNextSpeakerCheck: 'model.skipNextSpeakerCheck',
   summarizeToolOutput: 'model.summarizeToolOutput',
   telemetry: 'telemetry',

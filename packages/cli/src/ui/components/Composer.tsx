@@ -60,20 +60,22 @@ export const Composer = () => {
 
   return (
     <Box flexDirection="column">
-      <LoadingIndicator
-        thought={
-          uiState.streamingState === StreamingState.WaitingForConfirmation ||
-          config.getAccessibility()?.disableLoadingPhrases
-            ? undefined
-            : uiState.thought
-        }
-        currentLoadingPhrase={
-          config.getAccessibility()?.disableLoadingPhrases
-            ? undefined
-            : uiState.currentLoadingPhrase
-        }
-        elapsedTime={uiState.elapsedTime}
-      />
+      {!uiState.shellFocused && (
+        <LoadingIndicator
+          thought={
+            uiState.streamingState === StreamingState.WaitingForConfirmation ||
+            config.getAccessibility()?.disableLoadingPhrases
+              ? undefined
+              : uiState.thought
+          }
+          currentLoadingPhrase={
+            config.getAccessibility()?.disableLoadingPhrases
+              ? undefined
+              : uiState.currentLoadingPhrase
+          }
+          elapsedTime={uiState.elapsedTime}
+        />
+      )}
 
       {!uiState.isConfigInitialized && <ConfigInitDisplay />}
 
@@ -180,6 +182,7 @@ export const Composer = () => {
           onEscapePromptChange={uiActions.onEscapePromptChange}
           focus={uiState.isFocused}
           vimHandleInput={uiActions.vimHandleInput}
+          isShellFocused={uiState.shellFocused}
           placeholder={
             vimEnabled
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."

@@ -50,6 +50,7 @@ export interface InputPromptProps {
   approvalMode: ApprovalMode;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
+  isShellFocused?: boolean;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -69,6 +70,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   approvalMode,
   onEscapePromptChange,
   vimHandleInput,
+  isShellFocused,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [escPressCount, setEscPressCount] = useState(0);
@@ -591,7 +593,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
 
   useKeypress(handleInput, {
-    isActive: true,
+    isActive: !isShellFocused,
   });
 
   const linesToRender = buffer.viewportVisualLines;
