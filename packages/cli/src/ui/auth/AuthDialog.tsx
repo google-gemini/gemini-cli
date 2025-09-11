@@ -154,7 +154,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       padding={1}
       width="100%"
     >
-      <Text bold>Get started</Text>
+      <Text bold color={theme.text.primary}>
+        Get started
+      </Text>
       <Box marginTop={1}>
         <Text color={theme.text.primary}>
           How would you like to authenticate for this project?
