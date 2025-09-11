@@ -897,37 +897,20 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const nightly = props.version.includes('nightly');
 
-  const dialogsVisible = useMemo(
-    () =>
-      showWorkspaceMigrationDialog ||
-      shouldShowIdePrompt ||
-      isFolderTrustDialogOpen ||
-      !!shellConfirmationRequest ||
-      !!confirmationRequest ||
-      !!loopDetectionConfirmationRequest ||
-      isThemeDialogOpen ||
-      isSettingsDialogOpen ||
-      isAuthenticating ||
-      isAuthDialogOpen ||
-      isEditorDialogOpen ||
-      showPrivacyNotice ||
-      !!proQuotaRequest,
-    [
-      showWorkspaceMigrationDialog,
-      shouldShowIdePrompt,
-      isFolderTrustDialogOpen,
-      shellConfirmationRequest,
-      confirmationRequest,
-      loopDetectionConfirmationRequest,
-      isThemeDialogOpen,
-      isSettingsDialogOpen,
-      isAuthenticating,
-      isAuthDialogOpen,
-      isEditorDialogOpen,
-      showPrivacyNotice,
-      proQuotaRequest,
-    ],
-  );
+  const dialogsVisible =
+    showWorkspaceMigrationDialog ||
+    shouldShowIdePrompt ||
+    isFolderTrustDialogOpen ||
+    !!shellConfirmationRequest ||
+    !!confirmationRequest ||
+    !!loopDetectionConfirmationRequest ||
+    isThemeDialogOpen ||
+    isSettingsDialogOpen ||
+    isAuthenticating ||
+    isAuthDialogOpen ||
+    isEditorDialogOpen ||
+    showPrivacyNotice ||
+    !!proQuotaRequest;
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
