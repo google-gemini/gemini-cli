@@ -24,7 +24,9 @@ import {
   UIActionsContext,
   type UIActions,
 } from './contexts/UIActionsContext.js';
-import { useContext } from 'react';
+import { act, useContext } from 'react';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import process from 'node:process';
 
 // Helper component will read the context values provided by AppContainer
 // so we can assert against them in our tests.
@@ -40,6 +42,8 @@ vi.mock('./App.js', () => ({
   App: TestContextConsumer,
 }));
 
+vi.mock('node:child_process');
+vi.mock('node:process');
 vi.mock('./hooks/useQuotaAndFallback.js');
 vi.mock('./hooks/useHistoryManager.js');
 vi.mock('./hooks/useThemeCommand.js');
@@ -97,6 +101,7 @@ describe('AppContainer State Management', () => {
   let mockConfig: Config;
   let mockSettings: LoadedSettings;
   let mockInitResult: InitializationResult;
+  let mockChildProcessOn: Mock;
 
   // Create typed mocks for all hooks
   const mockedUseQuotaAndFallback = useQuotaAndFallback as Mock;
@@ -125,6 +130,13 @@ describe('AppContainer State Management', () => {
 
     capturedUIState = null!;
     capturedUIActions = null!;
+
+    // Setup mock for spawn to be available in all tests
+    mockChildProcessOn = vi.fn();
+    const mockChildProcess = { on: mockChildProcessOn };
+    vi.mocked(spawn).mockReturnValue(
+      mockChildProcess as unknown as ChildProcessWithoutNullStreams,
+    );
 
     // **Provide a default return value for EVERY mocked hook.**
     mockedUseQuotaAndFallback.mockReturnValue({
@@ -245,6 +257,84 @@ describe('AppContainer State Management', () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  describe('Restart Logic', () => {
+    it('should call spawn when useFolderTrust returns isRestarting as true', () => {
+      mockedUseFolderTrust.mockReturnValue({
+        isFolderTrustDialogOpen: false,
+        handleFolderTrustSelect: vi.fn(),
+        isRestarting: true, // Trigger the restart
+        isTrusted: true,
+      });
+
+      const spawnSpy = vi.mocked(spawn);
+      const stdinPauseSpy = vi
+        .spyOn(process.stdin, 'pause')
+        .mockImplementation(() => process.stdin);
+
+      const { frames } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(spawnSpy).toHaveBeenCalledTimes(1);
+      expect(spawnSpy).toHaveBeenCalledWith(
+        process.execPath,
+        process.argv.slice(1),
+        { stdio: 'inherit' },
+      );
+      expect(stdinPauseSpy).toHaveBeenCalledTimes(1);
+      expect(frames[0]).toBeFalsy();
+    });
+
+    it('should exit parent process when child process exits', () => {
+      const processExitSpy = vi
+        .spyOn(process, 'exit')
+        .mockImplementation(() => undefined as never);
+
+      mockedUseFolderTrust.mockReturnValue({
+        isFolderTrustDialogOpen: false,
+        handleFolderTrustSelect: vi.fn(),
+        isRestarting: true,
+        isTrusted: true,
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      // Find the 'exit' event handler from the mock
+      const exitCallback = mockChildProcessOn.mock.calls.find(
+        (call) => call[0] === 'exit',
+      )?.[1];
+
+      expect(exitCallback).toBeDefined();
+
+      // Simulate the child process exiting with code 0
+      act(() => {
+        exitCallback(0);
+      });
+
+      // Expect parent process to exit as well.
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+
+      // Simulate the child process exiting with code 1
+      act(() => {
+        exitCallback(1);
+      });
+
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+    });
   });
 
   describe('Basic Rendering', () => {

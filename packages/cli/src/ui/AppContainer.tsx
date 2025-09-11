@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { spawn } from 'node:child_process';
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { type DOMElement, measureElement } from 'ink';
 import { App } from './App.js';
@@ -707,6 +708,23 @@ Logging in with Google... Please restart Gemini CLI to continue.
   }, [terminalWidth, refreshStatic]);
 
   useEffect(() => {
+    if (isRestarting) {
+      // Spawn the new process, inheriting the terminal.
+      const child = spawn(process.execPath, process.argv.slice(1), {
+        stdio: 'inherit',
+      });
+
+      // Parent process must not read from stdin anymore as child process needs stdin.
+      process.stdin.pause();
+
+      // The parent now waits for the child to exit.
+      child.on('exit', (code) => {
+        process.exit(code ?? 0);
+      });
+    }
+  }, [isRestarting]);
+
+  useEffect(() => {
     const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
     setIdeContextState(ideContext.getIdeContext());
     return unsubscribe;
@@ -1113,6 +1131,11 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleProQuotaChoice,
     ],
   );
+
+  // Removing parent's UI from termnial for child UI's to be visible.
+  if (isRestarting) {
+    return null;
+  }
 
   return (
     <UIStateContext.Provider value={uiState}>
