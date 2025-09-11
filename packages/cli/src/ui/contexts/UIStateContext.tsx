@@ -108,6 +108,8 @@ export interface UIState {
   updateInfo: UpdateObject | null;
   showIdeRestartPrompt: boolean;
   isRestarting: boolean;
+  activePtyId: number | undefined;
+  shellFocused: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);
