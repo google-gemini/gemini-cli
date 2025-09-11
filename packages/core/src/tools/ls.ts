@@ -86,7 +86,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       return false;
     }
     for (const pattern of patterns) {
-      if (minimatch(filename, pattern)) {
+      if (minimatch(filename, pattern, { dot: true })) {
         return true;
       }
     }
