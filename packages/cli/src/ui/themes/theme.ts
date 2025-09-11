@@ -174,8 +174,8 @@ export class Theme {
         focused: this.colors.AccentBlue,
       },
       ui: {
-        comment: this.colors.Comment,
-        symbol: this.colors.Gray,
+        comment: this.colors.Gray,
+        symbol: this.colors.AccentCyan,
         gradient: this.colors.GradientColors,
       },
       status: {
