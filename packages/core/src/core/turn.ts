@@ -92,6 +92,7 @@ export interface ToolCallResponseInfo {
   error: Error | undefined;
   errorType: ToolErrorType | undefined;
   outputFile?: string | undefined;
+  contentLength?: number;
 }
 
 export interface ServerToolCallConfirmationDetails {

@@ -194,6 +194,7 @@ Logs are timestamped records of specific events. The following events are logged
     - `decision` (string: "accept", "reject", "auto_accept", or "modify", if applicable)
     - `error` (if applicable)
     - `error_type` (if applicable)
+    - `content_length` (int, if applicable)
     - `metadata` (if applicable, dictionary of string -> any)
 
 - `gemini_cli.file_operation`: This event occurs for each file operation.
@@ -237,6 +238,15 @@ Logs are timestamped records of specific events. The following events are logged
     - `tool_token_count`
     - `response_text` (if applicable)
     - `auth_type`
+
+- `gemini_cli.tool_output_truncated`: This event occurs when the output of a tool call is too large and gets truncated.
+  - **Attributes**:
+    - `tool_name` (string)
+    - `original_content_length` (int)
+    - `truncated_content_length` (int)
+    - `threshold` (int)
+    - `lines` (int)
+    - `prompt_id` (string)
 
 - `gemini_cli.malformed_json_response`: This event occurs when a `generateJson` response from Gemini API cannot be parsed as a json.
   - **Attributes**:
