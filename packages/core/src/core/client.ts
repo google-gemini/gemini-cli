@@ -188,6 +188,10 @@ export class GeminiClient {
     return this.chat?.getChatRecordingService();
   }
 
+  getLoopDetectionService(): LoopDetectionService {
+    return this.loopDetector;
+  }
+
   async addDirectoryContext(): Promise<void> {
     if (!this.chat) {
       return;
