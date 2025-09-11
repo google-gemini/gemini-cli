@@ -581,12 +581,16 @@ describe('fileUtils', () => {
       vi.restoreAllMocks(); // Restore spies on actualNodeFs
     });
 
-    it('should detect typescript type by extension (ts, mts, cts, tsx)', async () => {
+    it('should detect typescript type by extension (ts, mts, cts)', async () => {
       expect(await detectFileType('file.ts')).toBe('text');
       expect(await detectFileType('file.test.ts')).toBe('text');
       expect(await detectFileType('file.mts')).toBe('text');
       expect(await detectFileType('vite.config.mts')).toBe('text');
       expect(await detectFileType('file.cts')).toBe('text');
+    });
+
+    it('should detect tsx as text even when mime type is ambiguous', async () => {
+      mockMimeGetType.mockReturnValue('video/mp2t');
       expect(await detectFileType('component.tsx')).toBe('text');
     });
 
