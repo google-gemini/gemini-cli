@@ -589,7 +589,7 @@ describe('fileUtils', () => {
       expect(await detectFileType('file.cts')).toBe('text');
     });
 
-    it('should detect tsx as text even when mime type is ambiguous', async () => {
+    it('should detect tsx as text when mime type is video/mp2t', async () => {
       mockMimeGetType.mockReturnValue('video/mp2t');
       expect(await detectFileType('component.tsx')).toBe('text');
     });
