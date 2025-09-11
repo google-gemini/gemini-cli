@@ -9,7 +9,7 @@ import {
   IDE_MAX_SELECTED_TEXT_LENGTH,
 } from './constants.js';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { createIdeContextStore } from './ideContext.js';
+import { IdeContextStore } from './ideContext.js';
 import {
   type IdeContext,
   FileSchema,
@@ -19,11 +19,11 @@ import {
 
 describe('ideContext', () => {
   describe('createIdeContextStore', () => {
-    let ideContextStore: ReturnType<typeof createIdeContextStore>;
+    let ideContextStore: IdeContextStore;
 
     beforeEach(() => {
       // Create a fresh, isolated instance for each test
-      ideContextStore = createIdeContextStore();
+      ideContextStore = new IdeContextStore();
     });
 
     afterEach(() => {
@@ -31,7 +31,7 @@ describe('ideContext', () => {
     });
 
     it('should return undefined initially for ide context', () => {
-      expect(ideContextStore.getIdeContext()).toBeUndefined();
+      expect(ideContextStore.get()).toBeUndefined();
     });
 
     it('should set and retrieve the ide context', () => {
@@ -48,9 +48,9 @@ describe('ideContext', () => {
         },
       };
 
-      ideContextStore.setIdeContext(testFile);
+      ideContextStore.set(testFile);
 
-      const activeFile = ideContextStore.getIdeContext();
+      const activeFile = ideContextStore.get();
       expect(activeFile).toEqual(testFile);
     });
 
@@ -67,7 +67,7 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContextStore.setIdeContext(firstFile);
+      ideContextStore.set(firstFile);
 
       const secondFile = {
         workspaceState: {
@@ -81,9 +81,9 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContextStore.setIdeContext(secondFile);
+      ideContextStore.set(secondFile);
 
-      const activeFile = ideContextStore.getIdeContext();
+      const activeFile = ideContextStore.get();
       expect(activeFile).toEqual(secondFile);
     });
 
@@ -100,16 +100,16 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContextStore.setIdeContext(testFile);
-      expect(ideContextStore.getIdeContext()).toEqual(testFile);
+      ideContextStore.set(testFile);
+      expect(ideContextStore.get()).toEqual(testFile);
     });
 
     it('should notify subscribers when ide context changes', () => {
       const subscriber1 = vi.fn();
       const subscriber2 = vi.fn();
 
-      ideContextStore.subscribeToIdeContext(subscriber1);
-      ideContextStore.subscribeToIdeContext(subscriber2);
+      ideContextStore.subscribe(subscriber1);
+      ideContextStore.subscribe(subscriber2);
 
       const testFile = {
         workspaceState: {
@@ -123,7 +123,7 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContextStore.setIdeContext(testFile);
+      ideContextStore.set(testFile);
 
       expect(subscriber1).toHaveBeenCalledTimes(1);
       expect(subscriber1).toHaveBeenCalledWith(testFile);
@@ -143,7 +143,7 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContextStore.setIdeContext(newFile);
+      ideContextStore.set(newFile);
 
       expect(subscriber1).toHaveBeenCalledTimes(2);
       expect(subscriber1).toHaveBeenCalledWith(newFile);
@@ -155,10 +155,10 @@ describe('ideContext', () => {
       const subscriber1 = vi.fn();
       const subscriber2 = vi.fn();
 
-      const unsubscribe1 = ideContextStore.subscribeToIdeContext(subscriber1);
-      ideContextStore.subscribeToIdeContext(subscriber2);
+      const unsubscribe1 = ideContextStore.subscribe(subscriber1);
+      ideContextStore.subscribe(subscriber2);
 
-      ideContextStore.setIdeContext({
+      ideContextStore.set({
         workspaceState: {
           openFiles: [
             {
@@ -175,7 +175,7 @@ describe('ideContext', () => {
 
       unsubscribe1();
 
-      ideContextStore.setIdeContext({
+      ideContextStore.set({
         workspaceState: {
           openFiles: [
             {
@@ -205,21 +205,21 @@ describe('ideContext', () => {
         },
       };
 
-      ideContextStore.setIdeContext(testFile);
+      ideContextStore.set(testFile);
 
-      expect(ideContextStore.getIdeContext()).toEqual(testFile);
+      expect(ideContextStore.get()).toEqual(testFile);
 
-      ideContextStore.clearIdeContext();
+      ideContextStore.clear();
 
-      expect(ideContextStore.getIdeContext()).toBeUndefined();
+      expect(ideContextStore.get()).toBeUndefined();
     });
 
     it('should set the context and notify subscribers when no workspaceState is present', () => {
       const subscriber = vi.fn();
-      ideContextStore.subscribeToIdeContext(subscriber);
+      ideContextStore.subscribe(subscriber);
       const context: IdeContext = {};
-      ideContextStore.setIdeContext(context);
-      expect(ideContextStore.getIdeContext()).toBe(context);
+      ideContextStore.set(context);
+      expect(ideContextStore.get()).toBe(context);
       expect(subscriber).toHaveBeenCalledWith(context);
     });
 
@@ -229,10 +229,8 @@ describe('ideContext', () => {
           openFiles: [],
         },
       };
-      ideContextStore.setIdeContext(context);
-      expect(
-        ideContextStore.getIdeContext()?.workspaceState?.openFiles,
-      ).toEqual([]);
+      ideContextStore.set(context);
+      expect(ideContextStore.get()?.workspaceState?.openFiles).toEqual([]);
     });
 
     it('should sort openFiles by timestamp in descending order', () => {
@@ -245,9 +243,8 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContextStore.setIdeContext(context);
-      const openFiles =
-        ideContextStore.getIdeContext()?.workspaceState?.openFiles;
+      ideContextStore.set(context);
+      const openFiles = ideContextStore.get()?.workspaceState?.openFiles;
       expect(openFiles?.[0]?.path).toBe('file2.ts');
       expect(openFiles?.[1]?.path).toBe('file3.ts');
       expect(openFiles?.[2]?.path).toBe('file1.ts');
@@ -279,9 +276,8 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContextStore.setIdeContext(context);
-      const openFiles =
-        ideContextStore.getIdeContext()?.workspaceState?.openFiles;
+      ideContextStore.set(context);
+      const openFiles = ideContextStore.get()?.workspaceState?.openFiles;
       expect(openFiles?.[0]?.isActive).toBe(true);
       expect(openFiles?.[0]?.cursor).toBeDefined();
       expect(openFiles?.[0]?.selectedText).toBeDefined();
@@ -309,10 +305,9 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContextStore.setIdeContext(context);
+      ideContextStore.set(context);
       const selectedText =
-        ideContextStore.getIdeContext()?.workspaceState?.openFiles?.[0]
-          ?.selectedText;
+        ideContextStore.get()?.workspaceState?.openFiles?.[0]?.selectedText;
       expect(selectedText).toHaveLength(
         IDE_MAX_SELECTED_TEXT_LENGTH + '... [TRUNCATED]'.length,
       );
@@ -333,10 +328,9 @@ describe('ideContext', () => {
           ],
         },
       };
-      ideContextStore.setIdeContext(context);
+      ideContextStore.set(context);
       const selectedText =
-        ideContextStore.getIdeContext()?.workspaceState?.openFiles?.[0]
-          ?.selectedText;
+        ideContextStore.get()?.workspaceState?.openFiles?.[0]?.selectedText;
       expect(selectedText).toBe(shortText);
     });
 
@@ -354,9 +348,8 @@ describe('ideContext', () => {
           openFiles: files,
         },
       };
-      ideContextStore.setIdeContext(context);
-      const openFiles =
-        ideContextStore.getIdeContext()?.workspaceState?.openFiles;
+      ideContextStore.set(context);
+      const openFiles = ideContextStore.get()?.workspaceState?.openFiles;
       expect(openFiles).toHaveLength(IDE_MAX_OPEN_FILES);
     });
   });
