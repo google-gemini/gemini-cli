@@ -46,14 +46,20 @@ export const ToolConfirmationMessage: React.FC<
   const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     if (config.getIdeMode()) {
       const getIdeClient = async () => {
         const client = await IdeClient.getInstance();
-        setIdeClient(client);
-        setIsDiffingEnabled(client?.isDiffingEnabled ?? false);
+        if (isMounted) {
+          setIdeClient(client);
+          setIsDiffingEnabled(client?.isDiffingEnabled() ?? false);
+        }
       };
       getIdeClient();
     }
+    return () => {
+      isMounted = false;
+    };
   }, [config]);
 
   const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
