@@ -50,6 +50,7 @@ import type {
   ContentRetryEvent,
   ContentRetryFailureEvent,
   RipgrepFallbackEvent,
+  ToolOutputTruncatedEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -106,6 +107,7 @@ export function logCliConfiguration(
     mcp_servers_count: event.mcp_servers_count,
     mcp_tools: event.mcp_tools,
     mcp_tools_count: event.mcp_tools_count,
+    output_format: event.output_format,
   };
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -182,6 +184,28 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     event.decision,
     event.tool_type,
   );
+}
+
+export function logToolOutputTruncated(
+  config: Config,
+  event: ToolOutputTruncatedEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logToolOutputTruncatedEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': 'tool_output_truncated',
+    'event.timestamp': new Date().toISOString(),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Tool output truncated for ${event.tool_name}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
 }
 
 export function logFileOperation(
