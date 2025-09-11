@@ -109,13 +109,13 @@ export const Composer = () => {
       <Box
         marginTop={1}
         justifyContent={
-          settings.merged.ui?.hideContextSummary ? 'flex-end' : 'space-between'
+          settings.merged.ui?.hideContextSummary ? 'flex-start' : 'space-between'
         }
         width="100%"
         flexDirection={isNarrow ? 'column' : 'row'}
         alignItems={isNarrow ? 'flex-start' : 'center'}
       >
-        <Box>
+        <Box marginRight={1}>
           {process.env['GEMINI_SYSTEM_MD'] && (
             <Text color={theme.status.error}>|⌐■_■| </Text>
           )}
