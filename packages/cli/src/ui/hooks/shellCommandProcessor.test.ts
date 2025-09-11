@@ -179,7 +179,7 @@ describe('useShellCommandProcessor', () => {
 
     act(() => {
       result.current.handleShellCommand(
-        'echo "test\rme\nand\ryou"',
+        'echo -e "test\rme\nand\ryou"',
         new AbortController().signal,
       );
     });
