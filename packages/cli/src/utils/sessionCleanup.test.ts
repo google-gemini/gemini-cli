@@ -271,34 +271,6 @@ describe('Session Cleanup', () => {
       expect(result.errors[0].error).toContain('Permission denied');
     });
 
-    it('should validate session file structure before deletion', async () => {
-      const config = createMockConfig();
-      const settings: Settings = {
-        general: {
-          sessionRetention: {
-            enabled: true,
-            maxAge: '1d',
-          },
-        },
-      };
-
-      // Mock file operations
-      mockFs.access.mockResolvedValue(undefined);
-      mockFs.readFile.mockResolvedValue(
-        JSON.stringify({
-          // Missing required fields
-          wrongField: 'value',
-        }),
-      );
-
-      const result = await cleanupExpiredSessions(config, settings);
-
-      expect(result.disabled).toBe(false);
-      expect(result.errors.length).toBeGreaterThan(0);
-      expect(result.errors[0].error).toContain(
-        'Invalid session file structure',
-      );
-    });
 
     it('should handle empty sessions directory', async () => {
       const config = createMockConfig();

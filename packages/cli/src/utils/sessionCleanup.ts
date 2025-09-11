@@ -81,13 +81,29 @@ export async function cleanupExpiredSessions(
     // Perform cleanup
     for (const session of sessionsToDelete) {
       try {
-        await safeDeleteSession(session, chatsDir, config.getDebugMode());
+        const sessionPath = path.join(chatsDir, session.fileName);
+        await fs.unlink(sessionPath);
+
+        if (config.getDebugMode()) {
+          console.debug(
+            `Deleted expired session: ${session.id} (${session.lastUpdated})`,
+          );
+        }
         result.deleted++;
       } catch (error) {
-        result.errors.push({
-          sessionId: session.id,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
+        // Ignore ENOENT errors (file already deleted)
+        if (
+          error instanceof Error &&
+          'code' in error &&
+          error.code === 'ENOENT'
+        ) {
+          result.deleted++;
+        } else {
+          result.errors.push({
+            sessionId: session.id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
       }
     }
 
@@ -174,52 +190,6 @@ async function identifyExpiredSessions(
   }
 
   return expiredSessions;
-}
-
-/**
- * Safely deletes a session file with proper error handling
- */
-async function safeDeleteSession(
-  session: SessionInfo,
-  chatsDir: string,
-  debugMode: boolean,
-): Promise<void> {
-  const sessionPath = path.join(chatsDir, session.fileName);
-
-  try {
-    // Verify file exists before attempting deletion
-    await fs.access(sessionPath, fs.constants.F_OK);
-
-    // Attempt to read and validate the session file structure
-    // This ensures we're not deleting corrupted or non-session files
-    const content = await fs.readFile(sessionPath, 'utf8');
-    const sessionData = JSON.parse(content);
-
-    // Basic validation that this is actually a session file
-    if (
-      !sessionData.sessionId ||
-      !sessionData.messages ||
-      !Array.isArray(sessionData.messages)
-    ) {
-      throw new Error('Invalid session file structure');
-    }
-
-    // Perform the deletion
-    await fs.unlink(sessionPath);
-
-    if (debugMode) {
-      console.debug(
-        `Deleted expired session: ${session.id} (${session.lastUpdated})`,
-      );
-    }
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(
-        `Failed to delete session ${session.id}: ${error.message}`,
-      );
-    }
-    throw error;
-  }
 }
 
 /**
