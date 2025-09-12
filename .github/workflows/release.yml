@@ -72,7 +72,7 @@ jobs:
         run: |-
           RELEASE_TAG="${{ inputs.version }}"
           # The version for npm should not have the 'v' prefix.
-          RELEASE_VERSION=$(echo "${RELEASE_TAG}" | sed 's/^v//')
+          RELEASE_VERSION="${RELEASE_TAG#v}"
           NPM_TAG="latest"
           PREVIOUS_TAG=$(git describe --tags --abbrev=0)
           echo "RELEASE_TAG=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
