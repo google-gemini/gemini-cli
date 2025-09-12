@@ -128,8 +128,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   useKeypress(
     (key) => {
       if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
-        // Prevent exit if there is an error message.
-        // This means they user is not authenticated yet.
+        // Exit if there is an error message, as the user can't proceed.
         if (authError) {
           process.exit(0);
         }
