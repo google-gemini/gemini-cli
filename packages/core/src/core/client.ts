@@ -453,7 +453,7 @@ export class GeminiClient {
       return new Turn(this.getChat(), prompt_id);
     }
 
-    const compressed = await this.tryCompressChat(prompt_id, request);
+    const compressed = await this.tryCompressChat(prompt_id, false, request);
 
     if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
@@ -789,10 +789,14 @@ export class GeminiClient {
 
   async tryCompressChat(
     prompt_id: string,
-    request: PartListUnion,
     force: boolean = false,
+    request?: PartListUnion,
   ): Promise<ChatCompressionInfo> {
     const curatedHistory = this.getChat().getHistory(true);
+
+    if (request) {
+      curatedHistory.push(createUserContent(request));
+    }
 
     // Regardless of `force`, don't do anything if the history is empty.
     if (
@@ -807,8 +811,6 @@ export class GeminiClient {
     }
 
     const model = this.config.getModel();
-
-    curatedHistory.push(createUserContent(request));
 
     const { totalTokens: originalTokenCount } =
       await this.getContentGeneratorOrFail().countTokens({

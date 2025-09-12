@@ -583,12 +583,12 @@ describe('Gemini Client (client.ts)', () => {
         vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
           totalTokens: 1000,
         });
-        await client.tryCompressChat('prompt-id-4', [{ text: 'request' }]); // Fails
-        const result = await client.tryCompressChat(
-          'prompt-id-4',
-          [{ text: 'request' }],
-          true,
-        );
+        await client.tryCompressChat('prompt-id-4', false, [
+          { text: 'request' },
+        ]); // Fails
+        const result = await client.tryCompressChat('prompt-id-4', true, [
+          { text: 'request' },
+        ]);
 
         expect(result).toEqual({
           compressionStatus: CompressionStatus.COMPRESSED,
@@ -602,11 +602,9 @@ describe('Gemini Client (client.ts)', () => {
         vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
           totalTokens: 1000,
         });
-        const result = await client.tryCompressChat(
-          'prompt-id-4',
-          [{ text: 'request' }],
-          true,
-        );
+        const result = await client.tryCompressChat('prompt-id-4', false, [
+          { text: 'request' },
+        ]);
 
         expect(result).toEqual({
           compressionStatus:
@@ -618,11 +616,9 @@ describe('Gemini Client (client.ts)', () => {
 
       it('does not manipulate the source chat', async () => {
         const { client, mockChat } = setup();
-        await client.tryCompressChat(
-          'prompt-id-4',
-          [{ text: 'request' }],
-          true,
-        );
+        await client.tryCompressChat('prompt-id-4', false, [
+          { text: 'request' },
+        ]);
 
         expect(client['chat']).toBe(mockChat); // a new chat session was not created
       });
@@ -644,6 +640,7 @@ describe('Gemini Client (client.ts)', () => {
         });
         const { compressionStatus } = await client.tryCompressChat(
           'prompt-id-4',
+          false,
           [{ text: 'what is your wisdom?' }],
         );
 
@@ -657,9 +654,11 @@ describe('Gemini Client (client.ts)', () => {
 
       it('will not attempt to compress context after a failure', async () => {
         const { client } = setup();
-        await client.tryCompressChat('prompt-id-4', [{ text: 'request' }]);
+        await client.tryCompressChat('prompt-id-4', false, [
+          { text: 'request' },
+        ]);
 
-        const result = await client.tryCompressChat('prompt-id-5', [
+        const result = await client.tryCompressChat('prompt-id-5', false, [
           { text: 'request' },
         ]);
 
@@ -684,7 +683,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-2', [
+      const result = await client.tryCompressChat('prompt-id-2', false, [
         { text: '...history...' },
       ]);
       const newChat = client.getChat();
@@ -731,7 +730,9 @@ describe('Gemini Client (client.ts)', () => {
         ],
       } as unknown as GenerateContentResponse);
 
-      await client.tryCompressChat('prompt-id-3', [{ text: '...history...' }]);
+      await client.tryCompressChat('prompt-id-3', false, [
+        { text: '...history...' },
+      ]);
 
       expect(
         ClearcutLogger.prototype.logChatCompressionEvent,
@@ -775,7 +776,7 @@ describe('Gemini Client (client.ts)', () => {
       } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-3', [
+      const result = await client.tryCompressChat('prompt-id-3', false, [
         { text: '...history...' },
       ]);
       const newChat = client.getChat();
@@ -836,7 +837,7 @@ describe('Gemini Client (client.ts)', () => {
       } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-3', [
+      const result = await client.tryCompressChat('prompt-id-3', false, [
         { text: '...history...' },
       ]);
       const newChat = client.getChat();
@@ -886,11 +887,9 @@ describe('Gemini Client (client.ts)', () => {
       } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat(
-        'prompt-id-1',
-        [{ text: '...history...' }],
-        true,
-      ); // force = true
+      const result = await client.tryCompressChat('prompt-id-1', false, [
+        { text: '...history...' },
+      ]); // force = true
       const newChat = client.getChat();
 
       expect(mockGenerateContentFn).toHaveBeenCalled();
@@ -936,7 +935,11 @@ describe('Gemini Client (client.ts)', () => {
       client['startChat'] = vi.fn().mockResolvedValue(mockChat);
 
       const request = [{ text: 'Long conversation' }];
-      const result = await client.tryCompressChat('prompt-id-4', request, true);
+      const result = await client.tryCompressChat(
+        'prompt-id-4',
+        false,
+        request,
+      );
 
       expect(mockContentGenerator.countTokens).toHaveBeenCalledTimes(2);
       expect(mockContentGenerator.countTokens).toHaveBeenNthCalledWith(1, {
@@ -1063,6 +1066,12 @@ describe('Gemini Client (client.ts)', () => {
 
       vi.mocked(mockConfig.getIdeMode).mockReturnValue(true);
 
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: 0,
+        newTokenCount: 0,
+        compressionStatus: CompressionStatus.COMPRESSED,
+      });
+
       mockTurnRunFn.mockReturnValue(
         (async function* () {
           yield { type: 'content', value: 'Hello' };
@@ -1180,6 +1189,12 @@ ${JSON.stringify(
 
       vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
 
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: 0,
+        newTokenCount: 0,
+        compressionStatus: CompressionStatus.COMPRESSED,
+      });
+
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Hello' };
       })();
@@ -1249,6 +1264,12 @@ ${JSON.stringify(
       });
 
       vi.spyOn(client['config'], 'getIdeMode').mockReturnValue(true);
+
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: 0,
+        newTokenCount: 0,
+        compressionStatus: CompressionStatus.COMPRESSED,
+      });
 
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Hello' };
