@@ -18,19 +18,21 @@ export const useFolderTrust = (
   settings: LoadedSettings,
   onTrustChange: (isTrusted: boolean | undefined) => void,
   refreshStatic: () => void,
+  isConfigInitialized: boolean,
 ) => {
   const [isTrusted, setIsTrusted] = useState<boolean | undefined>(undefined);
   const [isFolderTrustDialogOpen, setIsFolderTrustDialogOpen] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
 
-  const folderTrust = settings.merged.security?.folderTrust?.enabled;
-
   useEffect(() => {
+    if (!isConfigInitialized) {
+      return;
+    }
     const trusted = isWorkspaceTrusted(settings.merged);
     setIsTrusted(trusted);
     setIsFolderTrustDialogOpen(trusted === undefined);
     onTrustChange(trusted);
-  }, [folderTrust, onTrustChange, settings.merged]);
+  }, [onTrustChange, settings.merged, isConfigInitialized]);
 
   useEffect(() => {
     // When the folder trust dialog is about to open/close, we need to force a refresh
