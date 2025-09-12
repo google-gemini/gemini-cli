@@ -29,9 +29,14 @@ vi.mock('./settings.js', async (importActual) => {
 });
 
 // Mock trustedFolders
-vi.mock('./trustedFolders.js', () => ({
-  isWorkspaceTrusted: vi.fn(),
-}));
+vi.mock('./trustedFolders.js', async (importActual) => {
+  const actual = await importActual<typeof import('./trustedFolders.js')>();
+  return {
+    ...actual,
+    isWorkspaceTrusted: vi.fn(),
+    LoadedTrustedFolders: vi.mockObject(actual.LoadedTrustedFolders),
+  };
+});
 
 // NOW import everything else, including the (now effectively re-exported) settings.js
 import path, * as pathActual from 'node:path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
@@ -48,7 +53,10 @@ import {
 } from 'vitest';
 import * as fs from 'node:fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
-import { isWorkspaceTrusted } from './trustedFolders.js';
+import {
+  isWorkspaceTrusted,
+  USER_TRUSTED_FOLDERS_PATH,
+} from './trustedFolders.js';
 
 // These imports will get the versions from the vi.mock('./settings.js', ...) factory.
 import {
@@ -61,6 +69,7 @@ import {
   needsMigration,
   type Settings,
   loadEnvironment,
+  SettingScope,
 } from './settings.js';
 import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
 
@@ -2192,6 +2201,84 @@ describe('Settings Loading and Merging', () => {
         },
         allowMCPServers: ['serverA'],
       });
+    });
+  });
+
+  describe('setValue', () => {
+    function setup() {
+      const geminiEnvPath = path.resolve(path.join(GEMINI_DIR, '.env'));
+
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) =>
+        [USER_SETTINGS_PATH, geminiEnvPath].includes(p.toString()),
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH) return JSON.stringify({});
+          if (p === geminiEnvPath) return 'TESTTEST=1234';
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      return { settings };
+    }
+
+    describe('non persisted values', () => {
+      it('has a special case for security.workspaceTrustLevel', () => {
+        const { settings } = setup();
+
+        vi.spyOn(process, 'cwd').mockReturnValueOnce(MOCK_WORKSPACE_DIR);
+        settings.setValue(
+          SettingScope.User,
+          'security.workspaceTrustLevel',
+          'IM_TOTALLY_GOOD_FOR_IT',
+        );
+
+        expect(vi.mocked(fs.writeFileSync)).toHaveBeenCalledWith(
+          USER_TRUSTED_FOLDERS_PATH,
+          JSON.stringify(
+            {
+              [MOCK_WORKSPACE_DIR]: 'IM_TOTALLY_GOOD_FOR_IT',
+            },
+            null,
+            2,
+          ),
+          { encoding: 'utf-8', mode: 0o600 },
+        );
+      });
+
+      it('also writes other settings', () => {
+        const { settings } = setup();
+
+        vi.spyOn(process, 'cwd').mockReturnValueOnce(MOCK_WORKSPACE_DIR);
+        settings.setValue(
+          SettingScope.User,
+          'security.workspaceTrustLevel',
+          'IM_TOTALLY_GOOD_FOR_IT',
+        );
+
+        expect(vi.mocked(fs.writeFileSync)).toHaveBeenCalledWith(
+          USER_SETTINGS_PATH,
+          '{}',
+          'utf-8',
+        );
+      });
+    });
+
+    it('saves settings to a file', () => {
+      const { settings } = setup();
+
+      const expectedSettings: Record<string, unknown> = {
+        vimMode: 'true',
+      };
+
+      settings.setValue(SettingScope.User, 'general.vimMode', 'true');
+
+      expect(vi.mocked(fs.writeFileSync)).toHaveBeenCalledWith(
+        USER_SETTINGS_PATH,
+        JSON.stringify(expectedSettings, null, 2),
+        'utf-8',
+      );
     });
   });
 

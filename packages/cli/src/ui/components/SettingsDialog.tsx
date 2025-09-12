@@ -133,9 +133,6 @@ export function SettingsDialog({
           let newValue: SettingsValue;
           if (definition?.type === 'boolean') {
             newValue = !(currentValue as boolean);
-            setPendingSettings((prev) =>
-              setPendingSettingValue(key, newValue as boolean, prev),
-            );
           } else if (definition?.type === 'enum' && definition.options) {
             const options = definition.options;
             const currentIndex = options?.findIndex(
@@ -146,13 +143,9 @@ export function SettingsDialog({
             } else {
               newValue = options[0].value; // loop back to start.
             }
-            setPendingSettings((prev) =>
-              setPendingSettingValueAny(key, newValue, prev),
-            );
           }
-
           setPendingSettings((prev) =>
-            setPendingSettingValue(key, newValue as boolean, prev),
+            setPendingSettingValueAny(key, newValue, prev),
           );
 
           if (!requiresRestart(key)) {

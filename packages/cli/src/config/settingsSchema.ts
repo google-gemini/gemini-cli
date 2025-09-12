@@ -16,6 +16,7 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
+import { TrustLevel } from './trustedFolders.js';
 
 export type SettingsType =
   | 'boolean'
@@ -59,6 +60,11 @@ export enum MergeStrategy {
   SHALLOW_MERGE = 'shallow_merge',
 }
 
+export enum PersistenceBehavior {
+  /** Setting will not be written or persisted to any settings.json file */
+  NO_PERSISTENCE = 1,
+}
+
 export interface SettingDefinition {
   type: SettingsType;
   label: string;
@@ -72,6 +78,7 @@ export interface SettingDefinition {
   properties?: SettingsSchema;
   showInDialog?: boolean;
   mergeStrategy?: MergeStrategy;
+  persistenceBehavior?: PersistenceBehavior;
   /** Enum type options  */
   options?: readonly SettingEnumOption[];
 }
@@ -833,6 +840,24 @@ const SETTINGS_SCHEMA = {
     description: 'Security-related settings.',
     showInDialog: false,
     properties: {
+      workspaceTrustLevel: {
+        type: 'enum',
+        label: 'Workspace Trust Level',
+        category: 'General',
+        requiresRestart: false,
+        default: TrustLevel.TRUST_FOLDER,
+        description: 'Defines workspace trust level',
+        showInDialog: true, // Temporary
+        persistenceBehavior: PersistenceBehavior.NO_PERSISTENCE,
+        options: [
+          { value: TrustLevel.TRUST_FOLDER, label: 'Trust Folder' },
+          { value: TrustLevel.TRUST_PARENT, label: 'Trust Parent' },
+          {
+            value: TrustLevel.DO_NOT_TRUST,
+            label: 'Do not trust this folder',
+          },
+        ],
+      },
       folderTrust: {
         type: 'object',
         label: 'Folder Trust',

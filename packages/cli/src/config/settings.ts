@@ -14,11 +14,16 @@ import {
   GEMINI_CONFIG_DIR as GEMINI_DIR,
   getErrorMessage,
   Storage,
+  type ValueType,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
-import { isWorkspaceTrusted } from './trustedFolders.js';
+import {
+  isWorkspaceTrusted,
+  loadTrustedFolders,
+  type TrustLevel,
+} from './trustedFolders.js';
 import {
   type Settings,
   type MemoryImportFormat,
@@ -26,9 +31,11 @@ import {
   type SettingsSchema,
   type SettingDefinition,
   getSettingsSchema,
+  PersistenceBehavior,
 } from './settingsSchema.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge } from '../utils/deepMerge.js';
+import { getSettingDefinition } from '../utils/settingsUtils.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
@@ -688,7 +695,8 @@ export function saveSettings(settingsFile: SettingsFile): void {
       fs.mkdirSync(dirPath, { recursive: true });
     }
 
-    let settingsToSave = settingsFile.settings;
+    let settingsToSave = handleUnpersistedValues(settingsFile.settings);
+
     if (!MIGRATE_V2_OVERWRITE) {
       settingsToSave = migrateSettingsToV1(
         settingsToSave as Record<string, unknown>,
@@ -702,5 +710,59 @@ export function saveSettings(settingsFile: SettingsFile): void {
     );
   } catch (error) {
     console.error('Error saving user settings file:', error);
+  }
+}
+
+function handleUnpersistedValues(obj: Record<string, unknown>): Settings {
+  /**
+   * Recursively traverses the object.
+   * @param {object} currentObject The object or sub-object to traverse.
+   * @param {string[]} parentPath An array of keys representing the path to the current object.
+   */
+  function traverse(
+    currentObject: Record<string, unknown>,
+    parentPath: string[] = [],
+  ) {
+    // Get an array of keys and iterate using an Array.prototype method.
+    Object.keys(currentObject).forEach((key) => {
+      // Create the full path for the current key.
+      const currentPath = [...parentPath, key];
+      const keyPathString = currentPath.join('.');
+
+      // Check if the current key/value pair should be deleted.
+      const def = getSettingDefinition(keyPathString);
+
+      if (def?.persistenceBehavior === PersistenceBehavior.NO_PERSISTENCE) {
+        processUnpersistedValue(keyPathString, currentObject[key] as ValueType);
+        delete currentObject[key];
+      } else if (
+        typeof currentObject[key] === 'object' &&
+        currentObject[key] !== null
+      ) {
+        // If the value is a nested object, recurse into it.
+        traverse(currentObject[key] as Record<string, unknown>, currentPath);
+      }
+    });
+  }
+
+  // Start the traversal from the root of the object.
+  traverse(obj, []);
+
+  return obj;
+}
+
+/**
+ * Handles "save" operations on values that are not persisted to the normal
+ * settings.json.  These values use {@link PersistenceBehavior.NO_PERSISTENCE}
+ * in their settings definition.
+ *
+ * @param keyPath
+ * @param value
+ */
+function processUnpersistedValue(keyPath: string, value: ValueType): void {
+  if (keyPath === 'security.workspaceTrustLevel') {
+    const folders = loadTrustedFolders();
+    const trustLevel = value as unknown as TrustLevel;
+    folders.setValue(process.cwd(), trustLevel);
   }
 }

@@ -169,6 +169,24 @@ describe('Trusted Folders Loading', () => {
       { encoding: 'utf-8', mode: 0o600 },
     );
   });
+
+  describe('getTrustLevelForPath', () => {
+    it('provides a method to fetch the trust level for a given path', () => {
+      const loadedFolders = loadTrustedFolders();
+      loadedFolders.setValue('/new/path', TrustLevel.TRUST_FOLDER);
+
+      expect(loadedFolders.getTrustLevelForPath('/new/path')).toBe(
+        TrustLevel.TRUST_FOLDER,
+      );
+    });
+
+    it('returns undefined for an unknown path', () => {
+      const loadedFolders = loadTrustedFolders();
+      expect(
+        loadedFolders.getTrustLevelForPath('/unknown/path'),
+      ).toBeUndefined();
+    });
+  });
 });
 
 describe('isWorkspaceTrusted', () => {

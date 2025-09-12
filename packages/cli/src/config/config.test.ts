@@ -20,9 +20,13 @@ import type { Extension } from './extension.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
-vi.mock('./trustedFolders.js', () => ({
-  isWorkspaceTrusted: vi.fn().mockReturnValue(true), // Default to trusted
-}));
+vi.mock('./trustedFolders.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./trustedFolders.js')>();
+  return {
+    ...original,
+    isWorkspaceTrusted: vi.fn().mockReturnValue(true), // Default to trusted
+  };
+});
 
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof import('fs')>();

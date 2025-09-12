@@ -57,6 +57,10 @@ export class LoadedTrustedFolders {
     }));
   }
 
+  getTrustLevelForPath(path: string): TrustLevel | undefined {
+    return this.rules.find((rule) => rule.path === path)?.trustLevel;
+  }
+
   /**
    * Returns true or false if the path should be "trusted". This function
    * should only be invoked when the folder trust setting is active.

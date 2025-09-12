@@ -15,7 +15,11 @@ import type {
   SettingsType,
   SettingsValue,
 } from '../config/settingsSchema.js';
-import { getSettingsSchema } from '../config/settingsSchema.js';
+import {
+  getSettingsSchema,
+  PersistenceBehavior,
+} from '../config/settingsSchema.js';
+import { loadTrustedFolders } from '../config/trustedFolders.js';
 
 // The schema is now nested, but many parts of the UI and logic work better
 // with a flattened structure and dot-notation keys. This section flattens the
@@ -154,8 +158,14 @@ export function getEffectiveValue(
     return value as SettingsValue;
   }
 
+  if (definition?.persistenceBehavior === PersistenceBehavior.NO_PERSISTENCE) {
+    return computeUnpersistedValue({
+      key,
+    });
+  }
+
   // Return default value if no value is set anywhere
-  return definition.default;
+  return getDefaultValue(key);
 }
 
 /**
@@ -394,6 +404,11 @@ export function saveModifiedSettings(
   scope: SettingScope,
 ): void {
   modifiedSettings.forEach((settingKey) => {
+    const definition = getSettingDefinition(settingKey);
+    if (!definition) {
+      return;
+    }
+
     const path = settingKey.split('.');
     const value = getNestedValue(
       pendingSettings as Record<string, unknown>,
@@ -411,10 +426,29 @@ export function saveModifiedSettings(
 
     const isDefaultValue = value === getDefaultValue(settingKey);
 
-    if (existsInOriginalFile || !isDefaultValue) {
+    if (
+      existsInOriginalFile ||
+      !isDefaultValue ||
+      definition.persistenceBehavior === PersistenceBehavior.NO_PERSISTENCE
+    ) {
       loadedSettings.setValue(scope, settingKey, value);
     }
   });
+}
+
+/**
+ * Computes an unpersisted value.  This is a settings value that is computed
+ * from a variety of other settings, files or special cases.
+ *
+ * @param key full key path (e..g "general.someSetting")
+ * @returns the computed setting value or the default for that key.
+ */
+function computeUnpersistedValue({ key }: { key: string }): SettingsValue {
+  if (key === 'security.workspaceTrustLevel') {
+    const folders = loadTrustedFolders();
+    return folders.getTrustLevelForPath(process.cwd());
+  }
+  return getDefaultValue(key);
 }
 
 /**
@@ -434,7 +468,10 @@ export function getDisplayValue(
   if (pendingSettings && settingExistsInScope(key, pendingSettings)) {
     // Show the value from the pending (unsaved) edits when it exists
     value = getEffectiveValue(key, pendingSettings, {});
-  } else if (settingExistsInScope(key, settings)) {
+  } else if (
+    settingExistsInScope(key, settings) ||
+    definition?.persistenceBehavior === PersistenceBehavior.NO_PERSISTENCE
+  ) {
     // Show the value defined at the current scope if present
     value = getEffectiveValue(key, settings, {});
   } else {
