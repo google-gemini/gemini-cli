@@ -94,6 +94,15 @@ vi.mock('child_process', async (importOriginal) => {
   };
 });
 
+const mockQuestion = vi.hoisted(() => vi.fn());
+const mockClose = vi.hoisted(() => vi.fn());
+vi.mock('node:readline', () => ({
+  createInterface: vi.fn(() => ({
+    question: mockQuestion,
+    close: mockClose,
+  })),
+}));
+
 const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
 describe('loadExtensions', () => {
@@ -244,6 +253,7 @@ describe('loadExtensions', () => {
       source: sourceExtDir,
       type: 'link',
     });
+
     expect(extensionName).toEqual('my-linked-extension');
     const extensions = loadExtensions();
     expect(extensions).toHaveLength(1);
@@ -434,6 +444,7 @@ describe('installExtension', () => {
   let userExtensionsDir: string;
 
   beforeEach(() => {
+    mockQuestion.mockImplementation((_query, callback) => callback('y'));
     tempHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
@@ -448,6 +459,8 @@ describe('installExtension', () => {
   });
 
   afterEach(() => {
+    mockQuestion.mockClear();
+    mockClose.mockClear();
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
   });
@@ -564,6 +577,56 @@ describe('installExtension', () => {
 
     const logger = ClearcutLogger.getInstance({} as Config);
     expect(logger?.logExtensionInstallEvent).toHaveBeenCalled();
+  });
+
+  it('should continue installation if user accepts prompt for local extension with mcp servers', async () => {
+    const sourceExtDir = createExtension({
+      extensionsDir: tempHomeDir,
+      name: 'my-local-extension',
+      version: '1.0.0',
+      mcpServers: {
+        'test-server': {
+          command: 'node',
+          args: ['server.js'],
+        },
+      },
+    });
+
+    mockQuestion.mockImplementation((_query, callback) => callback('y'));
+
+    await expect(
+      installExtension({ source: sourceExtDir, type: 'local' }),
+    ).resolves.toBe('my-local-extension');
+
+    expect(mockQuestion).toHaveBeenCalledWith(
+      expect.stringContaining('Do you want to continue? (y/n)'),
+      expect.any(Function),
+    );
+  });
+
+  it('should cancel installation if user declines prompt for local extension with mcp servers', async () => {
+    const sourceExtDir = createExtension({
+      extensionsDir: tempHomeDir,
+      name: 'my-local-extension',
+      version: '1.0.0',
+      mcpServers: {
+        'test-server': {
+          command: 'node',
+          args: ['server.js'],
+        },
+      },
+    });
+
+    mockQuestion.mockImplementation((_query, callback) => callback('n'));
+
+    await expect(
+      installExtension({ source: sourceExtDir, type: 'local' }),
+    ).rejects.toThrow('Installation cancelled by user.');
+
+    expect(mockQuestion).toHaveBeenCalledWith(
+      expect.stringContaining('Do you want to continue? (y/n)'),
+      expect.any(Function),
+    );
   });
 });
 
@@ -807,6 +870,7 @@ describe('updateExtension', () => {
 
   afterEach(() => {
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    mockClose.mockClear();
   });
 
   it('should update a git-installed extension', async () => {
