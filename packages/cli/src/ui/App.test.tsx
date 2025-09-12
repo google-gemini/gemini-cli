@@ -40,8 +40,8 @@ vi.mock('./layouts/ScreenReaderAppLayout.js', () => ({
   ScreenReaderAppLayout: () => <Text>ScreenReaderAppLayout</Text>,
 }));
 
-vi.mock('./layouts/useScreenReaderLayout.js', () => ({
-  useScreenReaderLayout: () => ({
+vi.mock('./hooks/useLayoutConfig.js', () => ({
+  useLayoutConfig: () => ({
     mode: 'default',
     shouldUseStatic: true,
     shouldShowFooterInComposer: true,

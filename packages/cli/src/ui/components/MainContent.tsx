@@ -5,18 +5,19 @@
  */
 
 import { Box, Static } from 'ink';
-import { HistoryItemDisplay } from './HistoryItemDisplay.js';
+import { HistoryList } from './HistoryList.js';
+import { PendingHistoryList } from './PendingHistoryList.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
-import { useScreenReaderLayout } from '../layouts/useScreenReaderLayout.js';
+import { useLayoutConfig } from '../hooks/useLayoutConfig.js';
 
 export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
-  const layout = useScreenReaderLayout();
+  const layout = useLayoutConfig();
   const {
     pendingHistoryItems,
     mainAreaWidth,
@@ -30,28 +31,19 @@ export const MainContent = () => {
       <OverflowProvider>
         <Box flexDirection="column">
           <AppHeader version={version} />
-          {uiState.history.map((h) => (
-            <HistoryItemDisplay
-              terminalWidth={mainAreaWidth}
-              availableTerminalHeight={staticAreaMaxItemHeight}
-              key={h.id}
-              item={h}
-              isPending={false}
-              commands={uiState.slashCommands}
-            />
-          ))}
-          {pendingHistoryItems.map((item, i) => (
-            <HistoryItemDisplay
-              key={i}
-              availableTerminalHeight={
-                uiState.constrainHeight ? availableTerminalHeight : undefined
-              }
-              terminalWidth={mainAreaWidth}
-              item={{ ...item, id: 0 }}
-              isPending={true}
-              isFocused={!uiState.isEditorDialogOpen}
-            />
-          ))}
+          <HistoryList
+            history={uiState.history}
+            terminalWidth={mainAreaWidth}
+            staticAreaMaxItemHeight={staticAreaMaxItemHeight}
+            slashCommands={uiState.slashCommands}
+          />
+          <PendingHistoryList
+            pendingHistoryItems={pendingHistoryItems}
+            terminalWidth={mainAreaWidth}
+            availableTerminalHeight={availableTerminalHeight}
+            constrainHeight={uiState.constrainHeight}
+            isEditorDialogOpen={uiState.isEditorDialogOpen}
+          />
           <ShowMoreLines constrainHeight={uiState.constrainHeight} />
         </Box>
       </OverflowProvider>
@@ -65,36 +57,28 @@ export const MainContent = () => {
         key={uiState.historyRemountKey}
         items={[
           <AppHeader key="app-header" version={version} />,
-          ...uiState.history.map((h) => (
-            <HistoryItemDisplay
-              terminalWidth={mainAreaWidth}
-              availableTerminalHeight={staticAreaMaxItemHeight}
-              key={h.id}
-              item={h}
-              isPending={false}
-              commands={uiState.slashCommands}
-            />
-          )),
+          <HistoryList
+            key="history-list"
+            history={uiState.history}
+            terminalWidth={mainAreaWidth}
+            staticAreaMaxItemHeight={staticAreaMaxItemHeight}
+            slashCommands={uiState.slashCommands}
+          />,
         ]}
       >
         {(item) => item}
       </Static>
       <OverflowProvider>
         <Box flexDirection="column">
-          {pendingHistoryItems.map((item, i) => (
-            <HistoryItemDisplay
-              key={i}
-              availableTerminalHeight={
-                uiState.constrainHeight ? availableTerminalHeight : undefined
-              }
-              terminalWidth={mainAreaWidth}
-              item={{ ...item, id: 0 }}
-              isPending={true}
-              isFocused={!uiState.isEditorDialogOpen}
-              activeShellPtyId={uiState.activePtyId}
-              shellFocused={uiState.shellFocused}
-            />
-          ))}
+          <PendingHistoryList
+            pendingHistoryItems={pendingHistoryItems}
+            terminalWidth={mainAreaWidth}
+            availableTerminalHeight={availableTerminalHeight}
+            constrainHeight={uiState.constrainHeight}
+            isEditorDialogOpen={uiState.isEditorDialogOpen}
+            activePtyId={uiState.activePtyId?.toString()}
+            shellFocused={uiState.shellFocused}
+          />
           <ShowMoreLines constrainHeight={uiState.constrainHeight} />
         </Box>
       </OverflowProvider>
