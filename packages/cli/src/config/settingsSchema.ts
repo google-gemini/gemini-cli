@@ -17,6 +17,7 @@ import {
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
+import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
 
 export type SettingsType =
   | 'boolean'
@@ -227,9 +228,8 @@ const SETTINGS_SCHEMA = {
             label: 'Min Retention Period',
             category: 'General',
             requiresRestart: false,
-            default: '1d' as string,
-            description:
-              'Minimum retention period (safety limit, defaults to "1d")',
+            default: DEFAULT_MIN_RETENTION,
+            description: `Minimum retention period (safety limit, defaults to "${DEFAULT_MIN_RETENTION}")`,
             showInDialog: false,
           },
         },
