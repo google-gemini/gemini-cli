@@ -136,18 +136,14 @@ describe('AppContainer State Management', () => {
     // Initialize mock stdout for terminal title tests
     mockStdout = { write: vi.fn() };
 
-    // Mock process.env for consistent testing
-    vi.stubEnv('CLI_TITLE', undefined);
-
-    // Mock basename to return consistent folder name
-    vi.mock('node:path', async () => {
-      const actualPath =
-        await vi.importActual<typeof import('node:path')>('node:path');
-      return {
-        ...actualPath,
-        basename: vi.fn().mockReturnValue('workspace'),
-      };
-    });
+    // Mock computeWindowTitle function to centralize title logic testing
+    vi.mock('../utils/windowTitle.js', async () => ({
+      computeWindowTitle: vi.fn(
+        (folderName: string) =>
+          // Default behavior: return "Gemini - {folderName}" unless CLI_TITLE is set
+          process.env['CLI_TITLE'] || `Gemini - ${folderName}`,
+      ),
+    }));
 
     capturedUIState = null!;
     capturedUIActions = null!;
