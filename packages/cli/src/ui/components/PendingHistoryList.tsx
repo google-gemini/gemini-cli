@@ -37,7 +37,7 @@ export const PendingHistoryList = ({
         item={{ ...item, id: 0 }}
         isPending={true}
         isFocused={!isEditorDialogOpen}
-        activeShellPtyId={activePtyId ? parseInt(activePtyId) : null}
+        activeShellPtyId={activePtyId ? parseInt(activePtyId, 10) : null}
         shellFocused={shellFocused}
       />
     ))}
