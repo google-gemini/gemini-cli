@@ -22,21 +22,6 @@ on:
         required: false
         type: 'boolean'
         default: false
-      ref:
-        description: 'The branch or ref (full git sha) to release from.'
-        required: true
-        type: 'string'
-        default: 'main'
-      dry_run:
-        description: 'Run a dry-run of the release process; no branches, npm packages or GitHub releases will be created.'
-        required: true
-        type: 'boolean'
-        default: true
-      force_skip_tests:
-        description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
-        required: false
-        type: 'boolean'
-        default: false
 
 jobs:
   release:
