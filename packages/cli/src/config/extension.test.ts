@@ -579,6 +579,34 @@ describe('installExtension', () => {
     expect(logger?.logExtensionInstallEvent).toHaveBeenCalled();
   });
 
+  it('should show users information on their mcp server when installing', async () => {
+    const consoleInfoSpy = vi.spyOn(console, 'info');
+    const sourceExtDir = createExtension({
+      extensionsDir: tempHomeDir,
+      name: 'my-local-extension',
+      version: '1.0.0',
+      mcpServers: {
+        'test-server': {
+          command: 'node',
+          args: ['server.js'],
+        },
+        'test-server-2': {
+          command: 'node',
+          args: ['server.js'],
+          httpUrl: 'https//google.com',
+        },
+      },
+    });
+
+    mockQuestion.mockImplementation((_query, callback) => callback('y'));
+
+    await expect(
+      installExtension({ source: sourceExtDir, type: 'local' }),
+    ).resolves.toBe('my-local-extension');
+
+    expect(consoleInfoSpy).toHaveBeenCalledWith("");
+  });
+
   it('should continue installation if user accepts prompt for local extension with mcp servers', async () => {
     const sourceExtDir = createExtension({
       extensionsDir: tempHomeDir,
