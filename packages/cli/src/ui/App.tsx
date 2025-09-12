@@ -7,13 +7,13 @@
 import { useUIState } from './contexts/UIStateContext.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
 import { QuittingDisplay } from './components/QuittingDisplay.js';
-import { useScreenReaderLayout } from './layouts/useScreenReaderLayout.js';
+import { useLayoutConfig } from './hooks/useLayoutConfig.js';
 import { ScreenReaderAppLayout } from './layouts/ScreenReaderAppLayout.js';
 import { DefaultAppLayout } from './layouts/DefaultAppLayout.js';
 
 export const App = () => {
   const uiState = useUIState();
-  const layout = useScreenReaderLayout();
+  const layout = useLayoutConfig();
 
   if (uiState.quittingMessages) {
     return <QuittingDisplay />;
