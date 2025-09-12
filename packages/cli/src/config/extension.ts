@@ -372,6 +372,26 @@ async function cloneFromGit(
   }
 }
 
+/**
+ * Asks users a prompt and awaits for a y/n response
+ * @param prompt A yes/no prompt to ask the user
+ * @returns Whether or not the user answers 'y' (yes)
+ */
+async function promptForContinuation(prompt: string): Promise<boolean> {
+  const readline = await import('node:readline');
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    rl.question(prompt, (answer) => {
+      rl.close();
+      resolve(answer.toLowerCase() === 'y');
+    });
+  });
+}
+
 export async function installExtension(
   installMetadata: ExtensionInstallMetadata,
   cwd: string = process.cwd(),
@@ -441,6 +461,26 @@ export async function installExtension(
         throw new Error(
           `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
         );
+      }
+
+      const mcpServerEntries = Object.entries(
+        newExtensionConfig.mcpServers || {},
+      );
+      if (mcpServerEntries.length) {
+        console.info('This extension will run the following MCP servers: ');
+        for (const [key, value] of mcpServerEntries) {
+          console.info(`  * ${key}: ${value.description}`);
+        }
+        console.info(
+          'The extension will append info to your gemini.md context',
+        );
+
+        const shouldContinue = await promptForContinuation(
+          'Do you want to continue? (y/n): ',
+        );
+        if (!shouldContinue) {
+          throw new Error('Installation cancelled by user.');
+        }
       }
 
       await fs.promises.mkdir(destinationPath, { recursive: true });
@@ -599,7 +639,6 @@ export async function updateExtension(
     await copyExtension(extension.path, tempDir);
     await uninstallExtension(extension.config.name, cwd);
     await installExtension(extension.installMetadata, cwd);
-
     const updatedExtensionStorage = new ExtensionStorage(extension.config.name);
     const updatedExtension = loadExtension(
       updatedExtensionStorage.getExtensionDir(),

@@ -85,7 +85,7 @@ export function SuggestionsDisplay({
               <Box>
                 {labelElement}
                 {suggestion.commandKind === CommandKind.MCP_PROMPT && (
-                  <Text color={theme.text.secondary}> [MCP]</Text>
+                  <Text color={textColor}> [MCP]</Text>
                 )}
               </Box>
             </Box>
