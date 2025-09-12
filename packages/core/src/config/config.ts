@@ -48,20 +48,14 @@ import {
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
-import { IdeClient } from '../ide/ide-client.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import {
   logCliConfiguration,
-  logIdeConnection,
   logRipgrepFallback,
 } from '../telemetry/loggers.js';
-import {
-  IdeConnectionEvent,
-  IdeConnectionType,
-  RipgrepFallbackEvent,
-} from '../telemetry/types.js';
+import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import type { FallbackModelHandler } from '../fallback/types.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
@@ -71,6 +65,7 @@ export type { MCPOAuthConfig, AnyToolInvocation };
 import type { AnyToolInvocation } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
+import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
 import type { EventEmitter } from 'node:events';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -231,6 +226,7 @@ export interface ConfigParameters {
   useRipgrep?: boolean;
   shouldUseNodePtyShell?: boolean;
   skipNextSpeakerCheck?: boolean;
+  shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
   enablePromptCompletion?: boolean;
   truncateToolOutputThreshold?: number;
@@ -313,6 +309,7 @@ export class Config {
   private readonly useRipgrep: boolean;
   private readonly shouldUseNodePtyShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
+  private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
@@ -393,9 +390,15 @@ export class Config {
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
-    this.useRipgrep = params.useRipgrep ?? false;
+    this.useRipgrep = params.useRipgrep ?? true;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
-    this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
+    this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
+    this.shellExecutionConfig = {
+      terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
+      terminalHeight: params.shellExecutionConfig?.terminalHeight ?? 24,
+      showColor: params.shellExecutionConfig?.showColor ?? false,
+      pager: params.shellExecutionConfig?.pager ?? 'cat',
+    };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
@@ -438,11 +441,6 @@ export class Config {
       throw Error('Config was already initialized');
     }
     this.initialized = true;
-
-    if (this.getIdeMode()) {
-      await (await IdeClient.getInstance()).connect();
-      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
-    }
 
     // Initialize centralized FileDiscoveryService
     this.getFileService();
@@ -885,6 +883,20 @@ export class Config {
     return this.skipNextSpeakerCheck;
   }
 
+  getShellExecutionConfig(): ShellExecutionConfig {
+    return this.shellExecutionConfig;
+  }
+
+  setShellExecutionConfig(config: ShellExecutionConfig): void {
+    this.shellExecutionConfig = {
+      terminalWidth:
+        config.terminalWidth ?? this.shellExecutionConfig.terminalWidth,
+      terminalHeight:
+        config.terminalHeight ?? this.shellExecutionConfig.terminalHeight,
+      showColor: config.showColor ?? this.shellExecutionConfig.showColor,
+      pager: config.pager ?? this.shellExecutionConfig.pager,
+    };
+  }
   getScreenReader(): boolean {
     return this.accessibility.screenReader ?? false;
   }

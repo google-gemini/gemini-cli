@@ -20,6 +20,7 @@ import {
   SHORTHAND_ARGS_PLACEHOLDER,
 } from './types.js';
 import { extractInjections, type Injection } from './injectionParser.js';
+import { themeManager } from '../../ui/themes/theme-manager.js';
 
 export class ConfirmationRequiredError extends Error {
   constructor(
@@ -159,12 +160,19 @@ export class ShellProcessor implements IPromptProcessor {
 
       // Execute the resolved command (which already has ESCAPED input).
       if (injection.resolvedCommand) {
+        const activeTheme = themeManager.getActiveTheme();
+        const shellExecutionConfig = {
+          ...config.getShellExecutionConfig(),
+          defaultFg: activeTheme.colors.Foreground,
+          defaultBg: activeTheme.colors.Background,
+        };
         const { result } = await ShellExecutionService.execute(
           injection.resolvedCommand,
           config.getTargetDir(),
           () => {},
           new AbortController().signal,
           config.getShouldUseNodePtyShell(),
+          shellExecutionConfig,
         );
 
         const executionResult = await result;
