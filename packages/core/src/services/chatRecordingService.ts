@@ -151,7 +151,7 @@ export class ChatRecordingService {
           .toISOString()
           .slice(0, 16)
           .replace(/:/g, '-');
-        const filename = `session-${timestamp}-${this.sessionId.slice(
+        const filename = `${SESSION_FILE_PREFIX}${timestamp}-${this.sessionId.slice(
           0,
           8,
         )}.json`;
