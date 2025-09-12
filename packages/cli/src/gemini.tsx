@@ -230,9 +230,9 @@ export async function main() {
   if (process.env['GOOGLE_CLOUD_PROJECT']) {
     try {
       const { validateCurrentProjectAccess } = await import('./utils/projectAccessValidator.js');
-              if (settings.merged.selectedAuthType) {
+              if (settings.merged.security?.auth?.selectedType) {
           const hasAccess = await validateCurrentProjectAccess(
-            settings.merged.selectedAuthType,
+            settings.merged.security.auth.selectedType,
             config
           );
 
