@@ -5,6 +5,8 @@
  */
 
 import { exec, execSync, spawn, type ChildProcess } from 'node:child_process';
+import http from 'node:http';
+import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -21,6 +23,121 @@ import { FatalSandboxError } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 
 const execAsync = promisify(exec);
+
+type WaitForProxyOptions = {
+  intervalMs?: number;
+  signal?: AbortSignal;
+  timeoutMs?: number; // overall deadline for the wait
+};
+
+function abortError(): Error {
+  const err = new Error('Aborted');
+  // Mark the name for easier identification by callers/logs
+  err.name = 'AbortError';
+  return err;
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      if (signal) signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      if (signal) signal.removeEventListener('abort', onAbort);
+      reject(abortError());
+    };
+    if (signal) {
+      if (signal.aborted) return onAbort();
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
+}
+
+async function waitForProxyReady(
+  urlString: string,
+  intervalOrOptions: number | WaitForProxyOptions = 250,
+): Promise<void> {
+  const url = new URL(urlString);
+  const opts: WaitForProxyOptions =
+    typeof intervalOrOptions === 'number'
+      ? { intervalMs: intervalOrOptions }
+      : intervalOrOptions ?? {};
+  const intervalMs = opts.intervalMs ?? 250;
+  const signal = opts.signal;
+  const start = Date.now();
+
+  // Loop until a successful HTTP response is received
+  // This mirrors the previous shell loop but is portable across platforms.
+  // Intentionally no hard deadline to retain previous behavior.
+  // Callers may decide if they want to enforce a timeout or abort via signal.
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    if (opts.timeoutMs && Date.now() - start >= opts.timeoutMs) {
+      const e = new Error('waitForProxyReady timeout');
+      e.name = 'TimeoutError';
+      throw e;
+    }
+    if (signal?.aborted) throw abortError();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const isHttps = url.protocol === 'https:';
+        const transport = isHttps ? https : http;
+        const req = transport.request(
+          {
+            hostname: url.hostname,
+            port: url.port ? Number(url.port) : isHttps ? 443 : 80,
+            path: `${url.pathname}${url.search}`,
+            method: 'GET',
+            timeout: intervalMs,
+            signal,
+          },
+          (res) => {
+            // Any HTTP response means the proxy is serving
+            res.resume(); // drain
+            resolve();
+          },
+        );
+        req.on('timeout', () => {
+          req.destroy(new Error('timeout'));
+        });
+        req.on('error', (err) => {
+          // Pass through for classification below
+          reject(err);
+        });
+        req.end();
+      });
+      return; // success
+    } catch (error) {
+      // Abort immediately if aborted
+      if (
+        (signal?.aborted) ||
+        (error && typeof error === 'object' && (error as any).name === 'AbortError')
+      ) {
+        throw abortError();
+      }
+
+      // Only ignore connection errors, which are expected if the proxy isn't ready.
+      // Log other errors to aid debugging.
+      const errorCode = (error as NodeJS.ErrnoException)?.code;
+      const isExpected =
+        error instanceof Error &&
+        (error.message === 'timeout' ||
+          ['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT'].includes(
+            errorCode ?? '',
+          ));
+      if (!isExpected) {
+        console.warn(
+          '[waitForProxyReady] Unexpected error while waiting for proxy, retrying:',
+          error,
+        );
+      }
+      // retry after a short delay (abort-aware)
+      await sleep(intervalMs, signal);
+    }
+  }
+}
 
 function getContainerPath(hostPath: string): string {
   if (os.platform() !== 'win32') {
@@ -325,6 +442,11 @@ export async function start_sandbox(
         proxyProcess.stderr?.on('data', (data) => {
           console.error(data.toString());
         });
+        const proxyWaitAbortController = new AbortController();
+        const abortOnProxyClose = () => proxyWaitAbortController.abort();
+        const abortOnSigint = () => proxyWaitAbortController.abort();
+        const abortOnSigterm = () => proxyWaitAbortController.abort();
+
         proxyProcess.on('close', (code, signal) => {
           if (sandboxProcess?.pid) {
             process.kill(-sandboxProcess.pid, 'SIGTERM');
@@ -333,10 +455,20 @@ export async function start_sandbox(
             `Proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
           );
         });
+        // Abort the wait if the proxy process closes or on interrupt/terminate
+        proxyProcess.on('close', abortOnProxyClose);
+        process.once('SIGINT', abortOnSigint);
+        process.once('SIGTERM', abortOnSigterm);
         console.log('waiting for proxy to start ...');
-        await execAsync(
-          `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
-        );
+        try {
+          await waitForProxyReady('http://localhost:8877', {
+            signal: proxyWaitAbortController.signal,
+          });
+        } finally {
+          proxyProcess.off('close', abortOnProxyClose);
+          process.off('SIGINT', abortOnSigint);
+          process.off('SIGTERM', abortOnSigterm);
+        }
       }
       // spawn child and let it inherit stdio
       sandboxProcess = spawn(config.command, args, {
@@ -773,6 +905,11 @@ export async function start_sandbox(
       proxyProcess.stderr?.on('data', (data) => {
         console.error(data.toString().trim());
       });
+      const proxyWaitAbortController = new AbortController();
+      const abortOnProxyClose = () => proxyWaitAbortController.abort();
+      const abortOnSigint = () => proxyWaitAbortController.abort();
+      const abortOnSigterm = () => proxyWaitAbortController.abort();
+
       proxyProcess.on('close', (code, signal) => {
         if (sandboxProcess?.pid) {
           process.kill(-sandboxProcess.pid, 'SIGTERM');
@@ -781,10 +918,20 @@ export async function start_sandbox(
           `Proxy container command '${proxyContainerCommand}' exited with code ${code}, signal ${signal}`,
         );
       });
+      // Abort the wait if the proxy process closes or on interrupt/terminate
+      proxyProcess.on('close', abortOnProxyClose);
+      process.once('SIGINT', abortOnSigint);
+      process.once('SIGTERM', abortOnSigterm);
       console.log('waiting for proxy to start ...');
-      await execAsync(
-        `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
-      );
+      try {
+        await waitForProxyReady('http://localhost:8877', {
+          signal: proxyWaitAbortController.signal,
+        });
+      } finally {
+        proxyProcess.off('close', abortOnProxyClose);
+        process.off('SIGINT', abortOnSigint);
+        process.off('SIGTERM', abortOnSigterm);
+      }
       // connect proxy container to sandbox network
       // (workaround for older versions of docker that don't support multiple --network args)
       await execAsync(
