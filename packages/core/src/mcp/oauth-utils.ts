@@ -177,7 +177,7 @@ export class OAuthUtils {
       // 3. OAuth 2.0 Authorization Server Metadata with path appending
       endpointsToTry.push(
         new URL(
-          `${authServerUrlObj.pathname}/.well-known/oauth-authorization-server`,
+          `${authServerUrlObj.pathname.replace(/\/$/, '')}/.well-known/oauth-authorization-server`,
           base,
         ).toString(),
       );
