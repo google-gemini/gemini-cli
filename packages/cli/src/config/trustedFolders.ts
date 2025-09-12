@@ -10,7 +10,7 @@ import { homedir } from 'node:os';
 import {
   getErrorMessage,
   isWithinRoot,
-  getIdeTrust,
+  ideContextStore,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
@@ -182,7 +182,7 @@ export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
     return true;
   }
 
-  const ideTrust = getIdeTrust();
+  const ideTrust = ideContextStore.get()?.workspaceState?.isTrusted;
   if (ideTrust !== undefined) {
     return ideTrust;
   }

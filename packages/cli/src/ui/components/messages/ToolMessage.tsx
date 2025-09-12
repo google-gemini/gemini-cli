@@ -10,10 +10,13 @@ import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { DiffRenderer } from './DiffRenderer.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
+import { AnsiOutputText } from '../AnsiOutput.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
-import { TOOL_STATUS } from '../../constants.js';
+import { ShellInputPrompt } from '../ShellInputPrompt.js';
+import { SHELL_COMMAND_NAME, TOOL_STATUS } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
+import type { AnsiOutput, Config } from '@google/gemini-cli-core';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -30,6 +33,9 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   terminalWidth: number;
   emphasis?: TextEmphasis;
   renderOutputAsMarkdown?: boolean;
+  activeShellPtyId?: number | null;
+  shellFocused?: boolean;
+  config?: Config;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -41,7 +47,17 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   terminalWidth,
   emphasis = 'medium',
   renderOutputAsMarkdown = true,
+  activeShellPtyId,
+  shellFocused,
+  ptyId,
+  config,
 }) => {
+  const isThisShellFocused =
+    (name === SHELL_COMMAND_NAME || name === 'Shell') &&
+    status === ToolCallStatus.Executing &&
+    ptyId === activeShellPtyId &&
+    shellFocused;
+
   const availableHeight = availableTerminalHeight
     ? Math.max(
         availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
@@ -74,12 +90,17 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           description={description}
           emphasis={emphasis}
         />
+        {isThisShellFocused && (
+          <Box marginLeft={1}>
+            <Text color={theme.text.accent}>[Focused]</Text>
+          </Box>
+        )}
         {emphasis === 'high' && <TrailingIndicator />}
       </Box>
       {resultDisplay && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
           <Box flexDirection="column">
-            {typeof resultDisplay === 'string' && renderOutputAsMarkdown && (
+            {typeof resultDisplay === 'string' && renderOutputAsMarkdown ? (
               <Box flexDirection="column">
                 <MarkdownDisplay
                   text={resultDisplay}
@@ -88,23 +109,37 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                   terminalWidth={childWidth}
                 />
               </Box>
-            )}
-            {typeof resultDisplay === 'string' && !renderOutputAsMarkdown && (
+            ) : typeof resultDisplay === 'string' && !renderOutputAsMarkdown ? (
               <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
                 <Box>
-                  <Text wrap="wrap">{resultDisplay}</Text>
+                  <Text wrap="wrap" color={theme.text.primary}>
+                    {resultDisplay}
+                  </Text>
                 </Box>
               </MaxSizedBox>
-            )}
-            {typeof resultDisplay !== 'string' && (
+            ) : typeof resultDisplay === 'object' &&
+              !Array.isArray(resultDisplay) ? (
               <DiffRenderer
                 diffContent={resultDisplay.fileDiff}
                 filename={resultDisplay.fileName}
                 availableTerminalHeight={availableHeight}
                 terminalWidth={childWidth}
               />
+            ) : (
+              <AnsiOutputText
+                data={resultDisplay as AnsiOutput}
+                availableTerminalHeight={availableHeight}
+              />
             )}
           </Box>
+        </Box>
+      )}
+      {isThisShellFocused && config && (
+        <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
+          <ShellInputPrompt
+            activeShellPtyId={activeShellPtyId ?? null}
+            focus={shellFocused}
+          />
         </Box>
       )}
     </Box>
