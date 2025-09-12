@@ -919,7 +919,7 @@ export class Config {
 
   getTruncateToolOutputThreshold(): number {
     return Math.min(
-      // an estimate of remaining context-window size
+      // Estimate remaining context window in characters (1 token ~= 4 chars).
       4 *
         (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
