@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { homedir, platform } from 'node:os';
-import * as dotenv from 'dotenv';
+import * as dotenvx from '@dotenvx/dotenvx';
 import process from 'node:process';
 import {
   FatalConfigError,
@@ -448,7 +448,7 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   // one of the .env files, we set the Cloud Shell-specific default here.
   if (envFilePath && fs.existsSync(envFilePath)) {
     const envFileContent = fs.readFileSync(envFilePath);
-    const parsedEnv = dotenv.parse(envFileContent);
+    const parsedEnv = dotenvx.parse(envFileContent);
     if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
       // .env file takes precedence in Cloud Shell
       process.env['GOOGLE_CLOUD_PROJECT'] = parsedEnv['GOOGLE_CLOUD_PROJECT'];
@@ -478,15 +478,17 @@ export function loadEnvironment(settings: Settings): void {
     // Manually parse and load environment variables to handle exclusions correctly.
     // This avoids modifying environment variables that were already set from the shell.
     try {
-      const envFileContent = fs.readFileSync(envFilePath, 'utf-8');
-      const parsedEnv = dotenv.parse(envFileContent);
+      // dotenvx.config will parse the file, expand variables (including command
+      // substitution), and return the resolved values without modifying process.env.
+      const result = dotenvx.config({ path: envFilePath });
+      const fullyResolved = result.parsed || {};
 
       const excludedVars =
         settings?.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
       const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
 
-      for (const key in parsedEnv) {
-        if (Object.hasOwn(parsedEnv, key)) {
+      for (const key in fullyResolved) {
+        if (Object.hasOwn(fullyResolved, key)) {
           // If it's a project .env file, skip loading excluded variables.
           if (isProjectEnvFile && excludedVars.includes(key)) {
             continue;
@@ -494,7 +496,7 @@ export function loadEnvironment(settings: Settings): void {
 
           // Load variable only if it's not already set in the environment.
           if (!Object.hasOwn(process.env, key)) {
-            process.env[key] = parsedEnv[key];
+            process.env[key] = fullyResolved[key];
           }
         }
       }

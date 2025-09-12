@@ -49,6 +49,8 @@ import {
 import * as fs from 'node:fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
 import { isWorkspaceTrusted } from './trustedFolders.js';
+import * as dotenvxActual from '@dotenvx/dotenvx';
+vi.mock('@dotenvx/dotenvx');
 
 // These imports will get the versions from the vi.mock('./settings.js', ...) factory.
 import {
@@ -61,6 +63,7 @@ import {
   needsMigration,
   type Settings,
   loadEnvironment,
+  setUpCloudShellEnvironment,
 } from './settings.js';
 import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
 
@@ -98,6 +101,7 @@ describe('Settings Loading and Merging', () => {
   let mockFsExistsSync: Mocked<typeof fs.existsSync>;
   let mockStripJsonComments: Mocked<typeof stripJsonComments>;
   let mockFsMkdirSync: Mocked<typeof fs.mkdirSync>;
+  const MOCK_HOME_DIR = '/mock/home/user';
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -106,7 +110,7 @@ describe('Settings Loading and Merging', () => {
     mockFsMkdirSync = vi.mocked(fs.mkdirSync);
     mockStripJsonComments = vi.mocked(stripJsonComments);
 
-    vi.mocked(osActual.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(osActual.homedir).mockReturnValue(MOCK_HOME_DIR);
     (mockStripJsonComments as unknown as Mock).mockImplementation(
       (jsonString: string) => jsonString,
     );
@@ -2196,6 +2200,254 @@ describe('Settings Loading and Merging', () => {
   });
 
   describe('loadEnvironment', () => {
+    const MOCK_CWD = '/mock/home/user/codespace/workspace';
+    const MOCK_PARENT_DIR = '/mock/home/user/codespace';
+    const MOCK_HOME_DIR = '/mock/home/user';
+    const MOCK_ENV_PATH = `${MOCK_CWD}/.env`;
+    const MOCK_GEMINI_ENV_PATH = `${MOCK_CWD}/.gemini/.env`;
+    const MOCK_PARENT_ENV_PATH = `${MOCK_PARENT_DIR}/.env`;
+    const MOCK_HOME_ENV_PATH = `${MOCK_HOME_DIR}/.env`;
+    const MOCK_DEFAULT_SETTINGS = {
+      isFolderTrustEnabled: true,
+      isWorkspaceTrustedValue: true,
+    };
+
+    beforeEach(() => {
+      vi.spyOn(process, 'cwd').mockReturnValue(MOCK_CWD);
+      // vi.mocked(path.resolve).mockImplementation((p) => p as string);
+      // vi.mocked(path.join).mockImplementation((...args) => args.join('/'));
+      // vi.mocked(path.dirname).mockImplementation((p) => {
+      //   if (p === MOCK_CWD) return MOCK_PARENT_DIR;
+      //   if (p === MOCK_PARENT_DIR) return MOCK_PARENT_DIR; // Stop traversal
+      //   return p.substring(0, p.lastIndexOf('/'));
+      // });
+      vi.mocked(osActual.homedir).mockReturnValue(MOCK_HOME_DIR);
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(dotenvxActual.config).mockReturnValue({ parsed: {} });
+      vi.mocked(dotenvxActual.parse).mockReturnValue({});
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllEnvs();
+    });
+
+    it('should load a variable from a project .env file if it is not already set', () => {
+      vi.stubEnv('MY_TEST_VAR', undefined);
+      vi.mocked(fs.existsSync).mockImplementation((p) => p === MOCK_ENV_PATH);
+      const mockParsedEnv = { MY_TEST_VAR: 'value_from_dotenvx' };
+      vi.mocked(dotenvxActual.config).mockReturnValue({
+        parsed: mockParsedEnv,
+      });
+
+      loadEnvironment(MOCK_DEFAULT_SETTINGS);
+
+      expect(dotenvxActual.config).toHaveBeenCalledWith({
+        path: MOCK_ENV_PATH,
+      });
+      expect(process.env.MY_TEST_VAR).toBe('value_from_dotenvx');
+    });
+
+    it('should NOT overwrite an existing environment variable', () => {
+      vi.stubEnv('MY_EXISTING_VAR', 'value_from_shell');
+      vi.mocked(fs.existsSync).mockImplementation((p) => p === MOCK_ENV_PATH);
+      const mockParsedEnv = { MY_EXISTING_VAR: 'value_from_dotenvx' };
+      vi.mocked(dotenvxActual.config).mockReturnValue({
+        parsed: mockParsedEnv,
+      });
+
+      loadEnvironment(MOCK_DEFAULT_SETTINGS);
+
+      expect(dotenvxActual.config).toHaveBeenCalledWith({
+        path: MOCK_ENV_PATH,
+      });
+      expect(process.env.MY_EXISTING_VAR).toBe('value_from_shell');
+    });
+
+    it('should NOT load excluded variables defined in settings', () => {
+      vi.stubEnv('EXCLUDED_VAR', undefined);
+      vi.mocked(fs.existsSync).mockImplementation((p) => p === MOCK_ENV_PATH);
+      const mockParsedEnv = { EXCLUDED_VAR: 'should_be_excluded' };
+      vi.mocked(dotenvxActual.config).mockReturnValue({
+        parsed: mockParsedEnv,
+      });
+
+      const mockSettings: Settings = {
+        advanced: {
+          excludedEnvVars: ['EXCLUDED_VAR'],
+        },
+      };
+
+      loadEnvironment(mockSettings);
+
+      expect(process.env['EXCLUDED_VAR']).toBeUndefined();
+    });
+
+    it('should not crash if dotenvxActual.config throws an error', () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) => p === MOCK_ENV_PATH);
+      vi.mocked(dotenvxActual.config).mockImplementation(() => {
+        throw new Error('Parsing error');
+      });
+
+      expect(() => loadEnvironment({})).not.toThrow();
+    });
+
+    it('should use provided settings for exclusions', () => {
+      vi.stubEnv('EXCLUDED_VAR', undefined);
+      vi.stubEnv('INCLUDED_VAR', undefined);
+      vi.mocked(fs.existsSync).mockImplementation((p) => p === MOCK_ENV_PATH);
+      const mockParsedEnv = {
+        EXCLUDED_VAR: 'should_be_excluded',
+        INCLUDED_VAR: 'should_be_included',
+      };
+      vi.mocked(dotenvxActual.config).mockReturnValue({
+        parsed: mockParsedEnv,
+      });
+
+      const mockSettings: Settings = {
+        advanced: {
+          excludedEnvVars: ['EXCLUDED_VAR'],
+        },
+      };
+
+      loadEnvironment(mockSettings);
+
+      expect(process.env['EXCLUDED_VAR']).toBeUndefined();
+      expect(process.env['INCLUDED_VAR']).toBe('should_be_included');
+    });
+
+    it('should prefer .gemini/.env over .env in the same directory', () => {
+      vi.mocked(fs.existsSync).mockImplementation(
+        (p) => p === MOCK_ENV_PATH || p === MOCK_GEMINI_ENV_PATH,
+      );
+
+      loadEnvironment(MOCK_DEFAULT_SETTINGS);
+
+      expect(dotenvxActual.config).toHaveBeenCalledWith({
+        path: MOCK_GEMINI_ENV_PATH,
+      });
+      expect(dotenvxActual.config).not.toHaveBeenCalledWith({
+        path: MOCK_ENV_PATH,
+      });
+    });
+
+    it('should find .env file in parent directory', () => {
+      vi.mocked(fs.existsSync).mockImplementation(
+        (p) => p === MOCK_PARENT_ENV_PATH,
+      );
+
+      loadEnvironment(MOCK_DEFAULT_SETTINGS);
+
+      expect(dotenvxActual.config).toHaveBeenCalledWith({
+        path: MOCK_PARENT_ENV_PATH,
+      });
+    });
+
+    it('should fall back to .env file in home directory', () => {
+      vi.mocked(fs.existsSync).mockImplementation(
+        (p) => p === MOCK_HOME_ENV_PATH,
+      );
+
+      loadEnvironment(MOCK_DEFAULT_SETTINGS);
+
+      expect(dotenvxActual.config).toHaveBeenCalledWith({
+        path: MOCK_HOME_ENV_PATH,
+      });
+    });
+
+    it('should not call dotenvxActual.config if no .env file is found', () => {
+      // fs.existsSync is already mocked to return false by default
+      loadEnvironment(MOCK_DEFAULT_SETTINGS);
+      expect(dotenvxActual.config).not.toHaveBeenCalled();
+    });
+
+    it('should not load DEBUG and DEBUG_MODE by default from project .env files', () => {
+      vi.stubEnv('DEBUG', undefined);
+      vi.stubEnv('DEBUG_MODE', undefined);
+      vi.stubEnv('GEMINI_API_KEY', undefined);
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => p === MOCK_ENV_PATH);
+      const mockParsedEnv = {
+        DEBUG: 'true',
+        DEBUG_MODE: '1',
+        GEMINI_API_KEY: 'test-key',
+      };
+      vi.mocked(dotenvxActual.config).mockReturnValue({
+        parsed: mockParsedEnv,
+      });
+
+      // Default settings for exclusion are ['DEBUG', 'DEBUG_MODE']
+      const mockSettings = {
+        excludedProjectEnvVars: ['DEBUG', 'DEBUG_MODE'],
+      };
+
+      loadEnvironment(mockSettings);
+
+      expect(process.env.DEBUG).toBeUndefined();
+      expect(process.env.DEBUG_MODE).toBeUndefined();
+      expect(process.env.GEMINI_API_KEY).toBe('test-key');
+    });
+  });
+
+  describe('setUpCloudShellEnvironment', () => {
+    const MOCK_ENV_PATH = '/mock/workspace/.env';
+
+    beforeEach(() => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.readFileSync).mockReturnValue('');
+      vi.mocked(dotenvxActual.parse).mockReturnValue({});
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllEnvs();
+    });
+
+    it('should set GOOGLE_CLOUD_PROJECT from .env file if it exists', () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'pre-existing_value');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(dotenvxActual.parse).mockReturnValue({
+        GOOGLE_CLOUD_PROJECT: 'value_from_env_file',
+      });
+
+      setUpCloudShellEnvironment(MOCK_ENV_PATH);
+
+      expect(fs.readFileSync).toHaveBeenCalledWith(MOCK_ENV_PATH);
+      expect(process.env.GOOGLE_CLOUD_PROJECT).toBe('value_from_env_file');
+    });
+
+    it('should set default GOOGLE_CLOUD_PROJECT if not in .env file', () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'pre-existing_value');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      // dotenvxActual.parse is mocked to return an empty object by default
+      vi.mocked(dotenvxActual.parse).mockReturnValue({
+        SOME_OTHER_VAR: 'some_value',
+      });
+
+      setUpCloudShellEnvironment(MOCK_ENV_PATH);
+
+      expect(process.env.GOOGLE_CLOUD_PROJECT).toBe('cloudshell-gca');
+    });
+
+    it('should set default GOOGLE_CLOUD_PROJECT if .env file does not exist', () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'pre-existing_value');
+      // fs.existsSync is mocked to return false by default
+
+      setUpCloudShellEnvironment(MOCK_ENV_PATH);
+
+      expect(process.env.GOOGLE_CLOUD_PROJECT).toBe('cloudshell-gca');
+    });
+
+    it('should set default GOOGLE_CLOUD_PROJECT if env file path is null', () => {
+      vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'pre-existing_value');
+
+      setUpCloudShellEnvironment(null);
+
+      expect(process.env.GOOGLE_CLOUD_PROJECT).toBe('cloudshell-gca');
+    });
+  });
+
+  describe('loadEnvironment: trusted folder', () => {
     function setup({
       isFolderTrustEnabled = true,
       isWorkspaceTrustedValue = true,
@@ -2228,6 +2480,9 @@ describe('Settings Loading and Merging', () => {
           return '{}';
         },
       );
+      vi.mocked(dotenvxActual.config).mockReturnValue({
+        parsed: { TESTTEST: '1234' },
+      });
     }
 
     it('sets environment variables from .env files', () => {
