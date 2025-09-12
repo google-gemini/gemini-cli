@@ -816,10 +816,36 @@ A good instruction should concisely answer:
           const currentContent = await this.config
             .getFileSystemService()
             .readTextFile(params.file_path);
+
+          // Attempt to restore any escape sequences (e.g. \\n, \\t, \\r, \\\\) that
+          // may have been unintentionally collapsed by the model when producing
+          // the proposed new_string relative to the old_string.
+          let correctedNewString = params.new_string;
+          try {
+            const { restoreCollapsedEscapes } = await import(
+              '../utils/escapePreserver.js'
+            );
+            const restoration = restoreCollapsedEscapes(
+              params.old_string,
+              correctedNewString,
+            );
+            if (restoration.changed) {
+              if (this.config.getDebugMode()) {
+                console.debug(
+                  'Restored collapsed escape sequences in smart-edit proposal:',
+                  restoration.restoredCounts,
+                );
+              }
+              correctedNewString = restoration.output;
+            }
+          } catch {
+            // Swallow any dynamic import / restoration issues silently; fallback to original new_string.
+          }
+
           return applyReplacement(
             currentContent,
             params.old_string,
-            params.new_string,
+            correctedNewString,
             params.old_string === '' && currentContent === '',
           );
         } catch (err) {
