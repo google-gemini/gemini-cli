@@ -49,6 +49,7 @@ import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { writeFileSync } from 'node:fs';
+import { getInstallationInfo } from './utils/installationInfo.js';
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
@@ -180,7 +181,12 @@ export async function startInteractiveUI(
     isScreenReaderEnabled: config.getScreenReader(),
   });
 
-  checkForUpdates()
+  const installationInfo = getInstallationInfo(
+    config.getProjectRoot(),
+    settings.merged.general?.disableAutoUpdate ?? false,
+  );
+
+  checkForUpdates(installationInfo)
     .then((info) => {
       handleAutoUpdate(info, settings, config.getProjectRoot());
     })
