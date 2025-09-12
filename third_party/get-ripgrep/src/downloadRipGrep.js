@@ -115,11 +115,9 @@ export const downloadRipGrep = async () => {
       console.info('ripgrep is already installed, skipping download')
       return
     } catch (error) {
-      console.error(
-        'On FreeBSD, ripgrep must be installed manually. Please run `pkg install ripgrep` and try again.'
-      )
       throw new VError(
-        `On FreeBSD, ripgrep must be installed manually. Please run \`pkg install ripgrep\` and try again.`
+        error,
+        'On FreeBSD, ripgrep must be installed manually. Please run `pkg install ripgrep` and try again.'
       )
     }
   }
