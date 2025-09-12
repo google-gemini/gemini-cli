@@ -6,6 +6,7 @@
 
 import { exec, execSync, spawn, type ChildProcess } from 'node:child_process';
 import http from 'node:http';
+import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -26,6 +27,7 @@ const execAsync = promisify(exec);
 type WaitForProxyOptions = {
   intervalMs?: number;
   signal?: AbortSignal;
+  timeoutMs?: number; // overall deadline for the wait
 };
 
 function abortError(): Error {
@@ -64,6 +66,7 @@ async function waitForProxyReady(
       : intervalOrOptions ?? {};
   const intervalMs = opts.intervalMs ?? 250;
   const signal = opts.signal;
+  const start = Date.now();
 
   // Loop until a successful HTTP response is received
   // This mirrors the previous shell loop but is portable across platforms.
@@ -71,14 +74,21 @@ async function waitForProxyReady(
   // Callers may decide if they want to enforce a timeout or abort via signal.
   // eslint-disable-next-line no-constant-condition
   while (true) {
+    if (opts.timeoutMs && Date.now() - start >= opts.timeoutMs) {
+      const e = new Error('waitForProxyReady timeout');
+      e.name = 'TimeoutError';
+      throw e;
+    }
     if (signal?.aborted) throw abortError();
     try {
       await new Promise<void>((resolve, reject) => {
-        const req = http.request(
+        const isHttps = url.protocol === 'https:';
+        const transport = isHttps ? https : http;
+        const req = transport.request(
           {
-            host: url.hostname,
-            port: url.port ? Number(url.port) : 80,
-            path: url.pathname,
+            hostname: url.hostname,
+            port: url.port ? Number(url.port) : isHttps ? 443 : 80,
+            path: `${url.pathname}${url.search}`,
             method: 'GET',
             timeout: intervalMs,
             signal,

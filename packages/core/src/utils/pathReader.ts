@@ -128,9 +128,10 @@ export async function readPathFromWorkspace(
     }
 
     for (const filePath of finalFiles) {
+      // Compute display path relative to the expanded directory for readability
       const relativePathForDisplay = path.relative(absolutePath, filePath);
       allParts.push({ text: `--- ${relativePathForDisplay} ---\n` });
-      // Display relative paths against the correct workspace root
+      // Resolve workspace root for correct ignore rules and processing
       const root = findRootFor(filePath) ?? config.getTargetDir();
       const result = await processSingleFileContent(
         filePath,

@@ -85,8 +85,8 @@ export class FileCommandLoader implements ICommandLoader {
    */
   async loadCommands(signal: AbortSignal): Promise<SlashCommand[]> {
     const allCommands: SlashCommand[] = [];
-    // Short‑circuit early if folder trust is enabled but the current folder is not trusted.
-    // This avoids unnecessary filesystem scans when trust is denied.
+    // If folder trust is enabled but the current folder is not trusted,
+    // short-circuit and do not load any commands from any directory.
     if (this.folderTrustEnabled && !this.folderTrust) {
       return [];
     }
