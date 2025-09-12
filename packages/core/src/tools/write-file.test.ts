@@ -33,8 +33,8 @@ import {
 } from '../utils/editCorrector.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
-import type { DiffUpdateResult } from '../ide/ideContext.js';
+import type { DiffUpdateResult } from '../ide/ide-client.js';
+import { IdeClient } from '../ide/ide-client.js';
 
 const rootDir = path.resolve(os.tmpdir(), 'gemini-cli-test-root');
 
@@ -45,18 +45,13 @@ vi.mock('../ide/ide-client.js', () => ({
   IdeClient: {
     getInstance: vi.fn(),
   },
-  IDEConnectionStatus: {
-    Connected: 'connected',
-    Disconnected: 'disconnected',
-    Connecting: 'connecting',
-  },
 }));
 let mockGeminiClientInstance: Mocked<GeminiClient>;
 const mockEnsureCorrectEdit = vi.fn<typeof ensureCorrectEdit>();
 const mockEnsureCorrectFileContent = vi.fn<typeof ensureCorrectFileContent>();
 const mockIdeClient = {
-  getConnectionStatus: vi.fn(),
   openDiff: vi.fn(),
+  isDiffingEnabled: vi.fn(),
 };
 
 // Wire up the mocked functions to be used by the actual module imports
@@ -456,9 +451,7 @@ describe('WriteFileTool', () => {
       beforeEach(() => {
         // Enable IDE mode and set connection status for these tests
         mockConfigInternal.getIdeMode.mockReturnValue(true);
-        mockIdeClient.getConnectionStatus.mockReturnValue({
-          status: IDEConnectionStatus.Connected,
-        });
+        mockIdeClient.isDiffingEnabled.mockReturnValue(true);
         mockIdeClient.openDiff.mockResolvedValue({
           status: 'accepted',
           content: 'ide-modified-content',
@@ -495,9 +488,7 @@ describe('WriteFileTool', () => {
       });
 
       it('should not call openDiff if IDE is not connected', async () => {
-        mockIdeClient.getConnectionStatus.mockReturnValue({
-          status: IDEConnectionStatus.Disconnected,
-        });
+        mockIdeClient.isDiffingEnabled.mockReturnValue(false);
         const filePath = path.join(rootDir, 'ide_disconnected_file.txt');
         const params = { file_path: filePath, content: 'test' };
         const invocation = tool.build(params);
