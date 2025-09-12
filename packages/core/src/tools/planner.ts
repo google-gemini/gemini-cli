@@ -219,12 +219,6 @@ export interface SolutionPlannerOutput {
   summary_of_analysis: string;
   /** The overall technical approach or strategy for the solution. */
   solution_strategy: string;
-  /** All unique file paths that require modification or are critical context. */
-  key_files_for_context: Array<{
-    file_path: string;
-    /** Why this file is important (e.g., "Defines the core data model"). */
-    reasoning: string;
-  }>;
   /** The detailed, step-by-step implementation plan for an execution agent to follow. */
   step_by_step_plan: Array<{
     step_number: number;
@@ -281,7 +275,7 @@ class SolutionPlannerInvocation extends BaseSubAgentInvocation<
     report: SolutionPlannerOutput,
   ): string {
     // Convert the list of key files to an XML block
-    const keyFilesXml = report.key_files_for_context
+    const keyFilesXml = report.relevant_locations
       .map(
         (file) => `    <File>
       <FilePath>${file.file_path}</FilePath>
