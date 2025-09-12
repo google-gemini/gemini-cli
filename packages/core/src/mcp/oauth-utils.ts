@@ -174,7 +174,15 @@ export class OAuthUtils {
         ).toString(),
       );
 
-      // 3. OpenID Connect Discovery 1.0 with path appending
+      // 3. OAuth 2.0 Authorization Server Metadata with path appending
+      endpointsToTry.push(
+        new URL(
+          `${authServerUrlObj.pathname}/.well-known/oauth-authorization-server`,
+          base,
+        ).toString(),
+      );
+
+      // 4. OpenID Connect Discovery 1.0 with path appending
       endpointsToTry.push(
         new URL(
           `${authServerUrlObj.pathname}/.well-known/openid-configuration`,
