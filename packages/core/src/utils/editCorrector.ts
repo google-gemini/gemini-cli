@@ -685,44 +685,74 @@ function trimPairIfPossible(
 
 /**
  * Unescapes a string that might have been overly escaped by an LLM.
+ *
+ * This function fixes over-escaping issues where LLMs generate sequences like "\\n"
+ * when they mean "\n", but it should NOT corrupt legitimate backslash sequences
+ * in file paths or code.
  */
 export function unescapeStringForGeminiBug(inputString: string): string {
-  // Regex explanation:
-  // \\ : Matches exactly one literal backslash character.
-  // (n|t|r|'|"|`|\\|\n) : This is a capturing group. It matches one of the following:
-  //   n, t, r, ', ", ` : These match the literal characters 'n', 't', 'r', single quote, double quote, or backtick.
-  //                       This handles cases like "\\n", "\\`", etc.
-  //   \\ : This matches a literal backslash. This handles cases like "\\\\" (escaped backslash).
-  //   \n : This matches an actual newline character. This handles cases where the input
-  //        string might have something like "\\\n" (a literal backslash followed by a newline).
-  // g : Global flag, to replace all occurrences.
+  // The original regex /\\+(n|t|r|'|"|`|\\|\n)/g was too aggressive and would
+  // match legitimate sequences like \\name in file paths, converting \\n to newline
+  // and corrupting the text. This caused issues like:
+  // - "C:\\Users\\name" becoming "C:\Users[newline]ame"
+  // - "path\\to\\file" becoming "path[tab]o\file"
+  //
+  // The fix adds context detection to distinguish between:
+  // 1. Legitimate escape sequences that should be unescaped
+  // 2. Legitimate file paths that should be preserved
 
   return inputString.replace(
     /\\+(n|t|r|'|"|`|\\|\n)/g,
-    (match, capturedChar) => {
-      // 'match' is the entire erroneous sequence, e.g., if the input (in memory) was "\\\\`", match is "\\\\`".
-      // 'capturedChar' is the character that determines the true meaning, e.g., '`'.
+    (match, capturedChar, offset, string) => {
+      // Get context around the match to make better decisions
+      const contextBefore = string.substring(Math.max(0, offset - 15), offset);
+      const contextAfter = string.substring(offset + match.length, Math.min(string.length, offset + match.length + 15));
+      const fullContext = contextBefore + match + contextAfter;
 
+      // Only preserve backslashes if this is clearly a file path:
+      // 1. Windows absolute paths: C:\Users\name, D:\path\to\file
+      // 2. UNC paths: \\server\share\path
+      // 3. Multi-segment relative paths with clear path structure
+
+      // Windows absolute paths (C:\, D:\, etc.)
+      if (/[A-Z]:\\/.test(contextBefore)) {
+        return match;
+      }
+
+      // UNC paths (\\server\share)
+      if (/\\\\[^\\]+\\/.test(contextBefore)) {
+        return match;
+      }
+
+      // Multi-segment paths - look for patterns like: word\word\word or word\word.ext
+      if (/[a-zA-Z0-9_-]+\\[a-zA-Z0-9_-]+\\[a-zA-Z0-9_.-]/.test(fullContext)) {
+        return match; // Preserve - clear multi-segment path
+      }
+
+      // File with extension in a path: word\file.ext
+      if (/[a-zA-Z0-9_-]+\\[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+/.test(fullContext)) {
+        return match; // Preserve - file with extension
+      }
+
+      // Otherwise, treat as escape sequence and unescape
       switch (capturedChar) {
         case 'n':
-          return '\n'; // Correctly escaped: \n (newline character)
+          return '\n';
         case 't':
-          return '\t'; // Correctly escaped: \t (tab character)
+          return '\t';
         case 'r':
-          return '\r'; // Correctly escaped: \r (carriage return character)
+          return '\r';
         case "'":
-          return "'"; // Correctly escaped: ' (apostrophe character)
+          return "'";
         case '"':
-          return '"'; // Correctly escaped: " (quotation mark character)
+          return '"';
         case '`':
-          return '`'; // Correctly escaped: ` (backtick character)
-        case '\\': // This handles when 'capturedChar' is a literal backslash
-          return '\\'; // Replace escaped backslash (e.g., "\\\\") with single backslash
-        case '\n': // This handles when 'capturedChar' is an actual newline
-          return '\n'; // Replace the whole erroneous sequence (e.g., "\\\n" in memory) with a clean newline
+          return '`';
+        case '\\':
+          return '\\';
+        case '\n':
+          return '\n';
         default:
-          // This fallback should ideally not be reached if the regex captures correctly.
-          // It would return the original matched sequence if an unexpected character was captured.
           return match;
       }
     },
