@@ -17,7 +17,11 @@ export async function handleUninstall(args: UninstallArgs) {
     await uninstallExtension(args.name);
     console.log(`Extension "${args.name}" successfully uninstalled.`);
   } catch (error) {
-    console.error(getErrorMessage(error));
+    if (error instanceof Error && error.message.includes('not found')) {
+      console.error(error.message);
+    } else {
+      console.error(getErrorMessage(error));
+    }
     process.exit(1);
   }
 }
