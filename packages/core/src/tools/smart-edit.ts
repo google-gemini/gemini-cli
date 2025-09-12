@@ -28,7 +28,7 @@ import {
   type ModifiableDeclarativeTool,
   type ModifyContext,
 } from './modifiable-tool.js';
-import { IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
 
 export function applyReplacement(
@@ -310,7 +310,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       params.new_string,
       initialError.raw,
       currentContent,
-      this.config.getGeminiClient(),
+      this.config.getBaseLlmClient(),
       abortSignal,
     );
 
@@ -526,10 +526,9 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       'Proposed',
       DEFAULT_DIFF_OPTIONS,
     );
-    const ideClient = this.config.getIdeClient();
+    const ideClient = await IdeClient.getInstance();
     const ideConfirmation =
-      this.config.getIdeMode() &&
-      ideClient?.getConnectionStatus().status === IDEConnectionStatus.Connected
+      this.config.getIdeMode() && ideClient.isDiffingEnabled()
         ? ideClient.openDiff(this.params.file_path, editData.newContent)
         : undefined;
 
@@ -705,7 +704,7 @@ export class SmartEditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
   implements ModifiableDeclarativeTool<EditToolParams>
 {
-  static readonly Name = 'smart_edit';
+  static readonly Name = 'replace';
 
   constructor(private readonly config: Config) {
     super(

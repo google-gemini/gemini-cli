@@ -155,8 +155,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         mockAbortSignal,
         false,
-        undefined,
-        undefined,
+        {},
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(tmpFile);
@@ -183,8 +182,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         mockAbortSignal,
         false,
-        undefined,
-        undefined,
+        {},
       );
     });
 
@@ -296,43 +294,6 @@ describe('ShellTool', () => {
         vi.useRealTimers();
       });
 
-      it('should throttle text output updates', async () => {
-        const invocation = shellTool.build({ command: 'stream' });
-        const promise = invocation.execute(mockAbortSignal, updateOutputMock);
-
-        // First chunk, should be throttled.
-        mockShellOutputCallback({
-          type: 'data',
-          chunk: 'hello ',
-        });
-        expect(updateOutputMock).not.toHaveBeenCalled();
-
-        // Advance time past the throttle interval.
-        await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
-
-        // Send a second chunk. THIS event triggers the update with the CUMULATIVE content.
-        mockShellOutputCallback({
-          type: 'data',
-          chunk: 'hello world',
-        });
-
-        // It should have been called once now with the combined output.
-        expect(updateOutputMock).toHaveBeenCalledOnce();
-        expect(updateOutputMock).toHaveBeenCalledWith('hello world');
-
-        resolveExecutionPromise({
-          rawOutput: Buffer.from(''),
-          output: '',
-          exitCode: 0,
-          signal: null,
-          error: null,
-          aborted: false,
-          pid: 12345,
-          executionMethod: 'child_process',
-        });
-        await promise;
-      });
-
       it('should immediately show binary detection message and throttle progress', async () => {
         const invocation = shellTool.build({ command: 'cat img' });
         const promise = invocation.execute(mockAbortSignal, updateOutputMock);
@@ -380,7 +341,7 @@ describe('ShellTool', () => {
   });
 
   describe('shouldConfirmExecute', () => {
-    it('should request confirmation for a new command and whitelist it on "Always"', async () => {
+    it('should request confirmation for a new command and allowlist it on "Always"', async () => {
       const params = { command: 'npm install' };
       const invocation = shellTool.build(params);
       const confirmation = await invocation.shouldConfirmExecute(
@@ -395,7 +356,7 @@ describe('ShellTool', () => {
         ToolConfirmationOutcome.ProceedAlways,
       );
 
-      // Should now be whitelisted
+      // Should now be allowlisted
       const secondInvocation = shellTool.build({ command: 'npm test' });
       const secondConfirmation = await secondInvocation.shouldConfirmExecute(
         new AbortController().signal,

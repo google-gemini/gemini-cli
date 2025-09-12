@@ -4,17 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Mock 'os' first.
 import * as osActual from 'node:os';
-vi.mock('os', async (importOriginal) => {
-  const actualOs = await importOriginal<typeof osActual>();
-  return {
-    ...actualOs,
-    homedir: vi.fn(() => '/mock/home/user'),
-    platform: vi.fn(() => 'linux'),
-  };
-});
-
+import { ideContextStore } from '@google/gemini-cli-core';
 import {
   describe,
   it,
@@ -28,7 +19,6 @@ import {
 import * as fs from 'node:fs';
 import stripJsonComments from 'strip-json-comments';
 import * as path from 'node:path';
-
 import {
   loadTrustedFolders,
   USER_TRUSTED_FOLDERS_PATH,
@@ -37,6 +27,14 @@ import {
 } from './trustedFolders.js';
 import type { Settings } from './settings.js';
 
+vi.mock('os', async (importOriginal) => {
+  const actualOs = await importOriginal<typeof osActual>();
+  return {
+    ...actualOs,
+    homedir: vi.fn(() => '/mock/home/user'),
+    platform: vi.fn(() => 'linux'),
+  };
+});
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof fs>();
   return {
@@ -47,7 +45,6 @@ vi.mock('fs', async (importOriginal) => {
     mkdirSync: vi.fn(),
   };
 });
-
 vi.mock('strip-json-comments', () => ({
   default: vi.fn((content) => content),
 }));
@@ -169,7 +166,7 @@ describe('Trusted Folders Loading', () => {
     expect(mockFsWriteFileSync).toHaveBeenCalledWith(
       USER_TRUSTED_FOLDERS_PATH,
       JSON.stringify({ '/new/path': TrustLevel.TRUST_FOLDER }, null, 2),
-      'utf-8',
+      { encoding: 'utf-8', mode: 0o600 },
     );
   });
 });
@@ -180,7 +177,6 @@ describe('isWorkspaceTrusted', () => {
   const mockSettings: Settings = {
     security: {
       folderTrust: {
-        featureEnabled: true,
         enabled: true,
       },
     },
@@ -254,5 +250,57 @@ describe('isWorkspaceTrusted', () => {
     mockRules[`/home/user/../user/${path.basename('/home/user/projectA')}`] =
       TrustLevel.TRUST_FOLDER;
     expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+  });
+});
+
+describe('isWorkspaceTrusted with IDE override', () => {
+  afterEach(() => {
+    ideContextStore.clear();
+  });
+
+  const mockSettings: Settings = {
+    security: {
+      folderTrust: {
+        enabled: true,
+      },
+    },
+  };
+
+  it('should return true when ideTrust is true, ignoring config', () => {
+    ideContextStore.set({ workspaceState: { isTrusted: true } });
+    // Even if config says don't trust, ideTrust should win.
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({ [process.cwd()]: TrustLevel.DO_NOT_TRUST }),
+    );
+    expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+  });
+
+  it('should return false when ideTrust is false, ignoring config', () => {
+    ideContextStore.set({ workspaceState: { isTrusted: false } });
+    // Even if config says trust, ideTrust should win.
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({ [process.cwd()]: TrustLevel.TRUST_FOLDER }),
+    );
+    expect(isWorkspaceTrusted(mockSettings)).toBe(false);
+  });
+
+  it('should fall back to config when ideTrust is undefined', () => {
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({ [process.cwd()]: TrustLevel.TRUST_FOLDER }),
+    );
+    expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+  });
+
+  it('should always return true if folderTrust setting is disabled', () => {
+    const settings: Settings = {
+      security: {
+        folderTrust: {
+          enabled: false,
+        },
+      },
+    };
+    ideContextStore.set({ workspaceState: { isTrusted: false } });
+    expect(isWorkspaceTrusted(settings)).toBe(true);
   });
 });

@@ -12,6 +12,8 @@ import {
   splitContentIntoEqualWidthLines,
   MAX_LINES_IN_A_ROW,
 } from './tableRendererUtils.js';
+import { theme } from '../semantic-colors.js';
+import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
 
 interface TableRendererProps {
   headers: string[];
@@ -50,7 +52,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     (cellPart: string, isHeader: boolean) => (
       <Text>
         {isHeader ? (
-          <Text bold color={Colors.AccentCyan}>
+          <Text bold color={theme.text.link}>
             <RenderInline text={cellPart} />
           </Text>
         ) : (
@@ -73,14 +75,14 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const borderParts = adjustedWidths.map((w) => char.horizontal.repeat(w));
     const border = char.left + borderParts.join(char.middle) + char.right;
 
-    return <Text>{border}</Text>;
+    return <Text color={theme.border.default}>{border}</Text>;
   };
 
   const renderLineInsideRow = useCallback(
     (line: string[], isHeader: boolean) => {
       const lineParts = line.map((txt) => renderCell(txt, isHeader));
       return (
-        <Text>
+        <Text color={theme.text.primary}>
           │{' '}
           {lineParts.map((cell, index) => (
             <React.Fragment key={index}>

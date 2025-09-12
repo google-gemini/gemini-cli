@@ -27,6 +27,7 @@ import { UserPromptEvent, makeChatCompressionEvent } from '../types.js';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { InstallationManager } from '../../utils/installationManager.js';
+import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 
 interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
@@ -208,6 +209,7 @@ describe('ClearcutLogger', () => {
       const cli_version = CLI_VERSION;
       const git_commit_hash = GIT_COMMIT_INFO;
       const prompt_id = 'my-prompt-123';
+      const user_settings = safeJsonStringify([{ smart_edit_enabled: true }]);
 
       // Setup logger with expected values
       const { logger, loggerConfig } = setup({
@@ -258,6 +260,10 @@ describe('ClearcutLogger', () => {
             gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
             value: process.platform,
           },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
+            value: user_settings,
+          },
         ]),
       );
     });
@@ -284,6 +290,24 @@ describe('ClearcutLogger', () => {
       expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
         value: 'ide-1234',
+      });
+    });
+
+    it('logs the value of config.useSmartEdit', () => {
+      const user_settings = safeJsonStringify([{ smart_edit_enabled: true }]);
+
+      const { logger } = setup({
+        config: { useSmartEdit: true },
+      });
+
+      vi.stubEnv('TERM_PROGRAM', 'vscode');
+      vi.stubEnv('SURFACE', 'ide-1234');
+
+      const event = logger?.createLogEvent(EventNames.TOOL_CALL, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
+        value: user_settings,
       });
     });
 
@@ -365,6 +389,24 @@ describe('ClearcutLogger', () => {
         EventMetadataKey.GEMINI_CLI_COMPRESSION_TOKENS_AFTER,
         '8000',
       ]);
+    });
+  });
+
+  describe('logRipgrepFallbackEvent', () => {
+    it('logs an event with the proper name', () => {
+      const { logger } = setup();
+      // Spy on flushToClearcut to prevent it from clearing the queue
+      const flushSpy = vi
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .spyOn(logger!, 'flushToClearcut' as any)
+        .mockResolvedValue({ nextRequestWaitMs: 0 });
+
+      logger?.logRipgrepFallbackEvent();
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.RIPGREP_FALLBACK);
+      expect(flushSpy).toHaveBeenCalledOnce();
     });
   });
 
