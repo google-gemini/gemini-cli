@@ -171,7 +171,7 @@ export class McpPromptLoader implements ICommandLoader {
                     return true;
                   }
 
-                  // The parseArgs method automatically assigns the value
+                  // The parseArgs method assigns the value
                   // at the end of the prompt as a final value
                   // The argument should still be suggested
                   // Example /add --numberOne="34" --num
