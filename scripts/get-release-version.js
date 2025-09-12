@@ -47,8 +47,10 @@ export function getVersion(options = {}) {
     const packageJson = JSON.parse(
       readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8'),
     );
-    const [major, minor] = packageJson.version.split('.');
-    const nextMinor = parseInt(minor) + 1;
+    const versionParts = packageJson.version.split('.');
+    const major = versionParts[0];
+    const minor = versionParts[1] ? parseInt(versionParts[1]) : 0;
+    const nextMinor = minor + 1;
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const gitShortHash = execSync('git rev-parse --short HEAD')
       .toString()
@@ -71,6 +73,37 @@ export function getVersion(options = {}) {
       latestNightlyTag.replace(/-nightly.*/, '').replace(/^v/, '') + '-preview';
     npmTag = 'preview';
     previousReleaseTag = getLatestTag('contains("preview")');
+  } else if (type === 'patch') {
+    const patchFrom = options.patchFrom || args.patchFrom;
+    if (!patchFrom || (patchFrom !== 'stable' && patchFrom !== 'preview')) {
+      throw new Error(
+        'Patch type must be specified with --patch-from=stable or --patch-from=preview',
+      );
+    }
+
+    if (patchFrom === 'stable') {
+      previousReleaseTag = getLatestTag(
+        '(contains("nightly") or contains("preview")) | not',
+      );
+      const versionParts = previousReleaseTag.replace(/^v/, '').split('.');
+      const major = versionParts[0];
+      const minor = versionParts[1];
+      const patch = versionParts[2] ? parseInt(versionParts[2]) : 0;
+      releaseVersion = `${major}.${minor}.${patch + 1}`;
+      npmTag = 'latest';
+    } else {
+      // patchFrom === 'preview'
+      previousReleaseTag = getLatestTag('contains("preview")');
+      const [version, prerelease] = previousReleaseTag
+        .replace(/^v/, '')
+        .split('-');
+      const versionParts = version.split('.');
+      const major = versionParts[0];
+      const minor = versionParts[1];
+      const patch = versionParts[2] ? parseInt(versionParts[2]) : 0;
+      releaseVersion = `${major}.${minor}.${patch + 1}-${prerelease}`;
+      npmTag = 'preview';
+    }
   }
 
   const releaseTag = `v${releaseVersion}`;
