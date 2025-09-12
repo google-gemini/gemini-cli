@@ -571,87 +571,36 @@ export class GeminiChat {
     this.recordHistory(userInput, modelOutput);
   }
 
-  private recordHistory(userInput: Content, modelOutput: Content[]) {
-    // Part 1: Handle the user's turn.
-
-    const lastTurn = this.history[this.history.length - 1];
-    // The only time we don't push is if it's the *exact same* object,
-    // which happens in streaming where we add it preemptively.
-    if (lastTurn !== userInput) {
-      if (lastTurn?.role === 'user') {
-        // This is an invalid sequence.
-        throw new Error('Cannot add a user turn after another user turn.');
-      }
+  private recordHistory(
+    userInput: Content,
+    modelOutput: Content[],
+    automaticFunctionCallingHistory?: Content[],
+  ) {
+    let outputContents: Content[] = [];
+    if (
+      modelOutput.length > 0 &&
+      modelOutput.every((content) => content.role !== undefined)
+    ) {
+      outputContents = modelOutput;
+    } else {
+      // Appends an empty content when model returns empty response, so that the
+      // history is always alternating between user and model.
+      outputContents.push({
+        role: 'model',
+        parts: [],
+      } as Content);
+    }
+    if (
+      automaticFunctionCallingHistory &&
+      automaticFunctionCallingHistory.length > 0
+    ) {
+      this.history.push(
+        ...extractCuratedHistory(automaticFunctionCallingHistory!),
+      );
+    } else {
       this.history.push(userInput);
     }
-
-    // Part 2: Process the model output into a final, consolidated list of turns.
-    const finalModelTurns: Content[] = [];
-    for (const content of modelOutput) {
-      // A. Preserve malformed content that has no 'parts' array.
-      if (!content.parts) {
-        finalModelTurns.push(content);
-        continue;
-      }
-
-      // B. Filter out 'thought' parts.
-      const visibleParts = content.parts.filter((part) => !part.thought);
-
-      const newTurn = { ...content, parts: visibleParts };
-      const lastTurnInFinal = finalModelTurns[finalModelTurns.length - 1];
-
-      // Consolidate this new turn with the PREVIOUS turn if they are adjacent model turns.
-      if (
-        lastTurnInFinal &&
-        lastTurnInFinal.role === 'model' &&
-        newTurn.role === 'model' &&
-        lastTurnInFinal.parts && // SAFETY CHECK: Ensure the destination has a parts array.
-        newTurn.parts
-      ) {
-        lastTurnInFinal.parts.push(...newTurn.parts);
-      } else {
-        finalModelTurns.push(newTurn);
-      }
-    }
-
-    // Part 3: Add the processed model turns to the history, with one final consolidation pass.
-    if (finalModelTurns.length > 0) {
-      // Re-consolidate parts within any turns that were merged in the previous step.
-      for (const turn of finalModelTurns) {
-        if (turn.parts && turn.parts.length > 1) {
-          const consolidatedParts: Part[] = [];
-          for (const part of turn.parts) {
-            const lastPart = consolidatedParts[consolidatedParts.length - 1];
-            if (
-              lastPart &&
-              // Ensure lastPart is a pure text part
-              typeof lastPart.text === 'string' &&
-              !lastPart.functionCall &&
-              !lastPart.functionResponse &&
-              !lastPart.inlineData &&
-              !lastPart.fileData &&
-              !lastPart.thought &&
-              // Ensure current part is a pure text part
-              typeof part.text === 'string' &&
-              !part.functionCall &&
-              !part.functionResponse &&
-              !part.inlineData &&
-              !part.fileData &&
-              !part.thought
-            ) {
-              lastPart.text += part.text;
-            } else {
-              consolidatedParts.push({ ...part });
-            }
-          }
-          turn.parts = consolidatedParts;
-        }
-      }
-      this.history.push(...finalModelTurns);
-    } else {
-      // If, after all processing, there's NO model output, add the placeholder.
-      this.history.push({ role: 'model', parts: [] });
-    }
+    this.history.push(...outputContents);
   }
 
   /**
