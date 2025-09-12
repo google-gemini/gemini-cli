@@ -637,9 +637,13 @@ export class SubAgentScope {
     try {
       const generationConfig: GenerateContentConfig & {
         systemInstruction?: string | Content;
+        responseMimeType?: string;
+
       } = {
         temperature: this.modelConfig.temp,
         topP: this.modelConfig.top_p,
+        responseMimeType: 'application/json',
+
       };
 
       if (systemInstruction) {

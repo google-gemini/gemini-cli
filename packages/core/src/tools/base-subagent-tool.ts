@@ -171,10 +171,10 @@ export abstract class BaseSubAgentInvocation<
       try {
         JSON.parse(reportJson) as TOutput;
         const finalReportJson = await this.postProcessResult(reportJson);
-
+        console.log(finalReportJson);
         return {
           llmContent: `${this.getAgentName()} finished. Report:\n\`\`\`json\n${finalReportJson}\n\`\`\``,
-          returnDisplay: `${this.getAgentName()} finished successfully.`,
+          returnDisplay: `${this.getAgentName()} finished successfully. This is the report: \n ${finalReportJson}.`,
         };
       } catch (_) {
         const message = `Error: ${this.getAgentName()} returned invalid JSON in its final report.`;
