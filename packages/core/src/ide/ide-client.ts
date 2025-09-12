@@ -588,7 +588,7 @@ export class IdeClient {
       // exist.
     }
 
-    const portFileDir = path.join(os.tmpdir(), '.gemini', 'ide');
+    const portFileDir = path.join(os.tmpdir(), 'gemini', 'ide');
     let portFiles;
     try {
       portFiles = await fs.promises.readdir(portFileDir);
@@ -650,7 +650,7 @@ export class IdeClient {
     const portFromEnv = this.getPortFromEnv();
     if (portFromEnv) {
       const matchingPort = validWorkspaces.find(
-        (content) => content.port === portFromEnv,
+        (content) => String(content.port) === portFromEnv,
       );
       if (matchingPort) {
         return matchingPort;
