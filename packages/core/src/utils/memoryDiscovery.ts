@@ -109,7 +109,7 @@ async function getGeminiMdFilePathsInternal(
         userHomePath,
         debugMode,
         fileService,
-        currentDirectoryOnly ? [] : extensionContextFilePaths,
+        extensionContextFilePaths,
         folderTrust,
         fileFilteringOptions,
         maxDirs,
@@ -243,9 +243,11 @@ async function getGeminiMdFilePathsInternalForEachDir(
     }
   }
 
-  // Add extension context file paths.
-  for (const extensionPath of extensionContextFilePaths) {
-    allPaths.add(extensionPath);
+  // Add extension context file paths only if not in currentDirectoryOnly mode.
+  if (!currentDirectoryOnly) {
+    for (const extensionPath of extensionContextFilePaths) {
+      allPaths.add(extensionPath);
+    }
   }
 
   const finalPaths = Array.from(allPaths);
