@@ -207,7 +207,7 @@ export function ThemeDialog({
               onSelect={handleThemeSelect}
               onHighlight={handleThemeHighlight}
               isFocused={mode === 'theme'}
-              defaultColor="#444"
+              defaultColor={theme.text.accent}
               maxItemsToShow={12}
               showScrollArrows={true}
               showNumbers={mode === 'theme'}
