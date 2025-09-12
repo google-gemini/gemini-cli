@@ -190,10 +190,7 @@ describe('McpPromptLoader', () => {
       });
     });
 
-    it('should return an error message if prompt invocation fails', async () => {
-      vi.spyOn(mockPrompt, 'invoke').mockRejectedValue(
-        new Error('Invocation failed!'),
-      );
+    it('should return an error for missing required arguments', async () => {
       const loader = new McpPromptLoader(mockConfigWithPrompts);
       const commands = await loader.loadCommands(new AbortController().signal);
       const action = commands[0].action!;
@@ -203,6 +200,22 @@ describe('McpPromptLoader', () => {
         type: 'message',
         messageType: 'error',
         content: 'Missing required argument(s): --age, --species',
+      });
+    });
+
+    it('should return an error message if prompt invocation fails', async () => {
+      vi.spyOn(mockPrompt, 'invoke').mockRejectedValue(
+        new Error('Invocation failed!'),
+      );
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+      const action = commands[0].action!;
+      const context = {} as CommandContext;
+      const result = await action(context, 'test-name 123 tiger');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Error: Invocation failed!',
       });
     });
 
