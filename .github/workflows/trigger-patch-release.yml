@@ -1,0 +1,30 @@
+name: 'Trigger Patch Release'
+
+on:
+  pull_request:
+    types:
+      - 'closed'
+
+jobs:
+  trigger-patch-release:
+    if: "github.event.pull_request.merged == true && startsWith(github.head_ref, 'hotfix/')"
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Trigger Patch Release'
+        uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
+        with:
+          script: |
+            const body = context.payload.pull_request.body;
+            const isDryRun = body.includes('[DRY RUN]');
+            const ref = context.payload.pull_request.base.ref;
+            const channel = ref.includes('preview') ? 'preview' : 'stable';
+            github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'patch-release.yml',
+              ref: ref,
+              inputs: {
+                type: channel,
+                dry_run: isDryRun.toString()
+              }
+            })
