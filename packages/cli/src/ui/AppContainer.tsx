@@ -614,18 +614,27 @@ Logging in with Google... Please restart Gemini CLI to continue.
       streamingState === StreamingState.Responding) &&
     !proQuotaRequest;
 
-  // Compute available terminal height based on controls measurement
-  const availableTerminalHeight = useMemo(() => {
+  const [footerHeight, setFooterHeight] = useState(staticExtraHeight);
+
+  useEffect(() => {
     if (mainControlsRef.current) {
       const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      return terminalHeight - fullFooterMeasurement.height - staticExtraHeight;
+      if (fullFooterMeasurement.height > 0) {
+        setFooterHeight(fullFooterMeasurement.height);
+      }
     }
-    return terminalHeight - staticExtraHeight;
-  }, [terminalHeight]);
+  }, [buffer]);
+
+  // Compute available terminal height based on controls measurement
+  const availableTerminalHeight =
+    terminalHeight - footerHeight - staticExtraHeight;
 
   config.setShellExecutionConfig({
     terminalWidth: Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
-    terminalHeight: Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
+    terminalHeight: Math.max(
+      Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
+      1,
+    ),
     pager: settings.merged.tools?.shell?.pager,
     showColor: settings.merged.tools?.shell?.showColor,
   });
@@ -652,16 +661,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
       ShellExecutionService.resizePty(
         activePtyId,
         Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
-        Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
+        Math.max(Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING), 1),
       );
     }
-  }, [
-    terminalHeight,
-    terminalWidth,
-    availableTerminalHeight,
-    activePtyId,
-    geminiClient,
-  ]);
+  }, [terminalWidth, availableTerminalHeight, activePtyId]);
 
   useEffect(() => {
     if (
