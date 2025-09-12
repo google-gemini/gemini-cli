@@ -28,7 +28,7 @@ export interface CleanupResult {
   scanned: number;
   deleted: number;
   skipped: number;
-  errors: Array<{ sessionId: string; error: string }>;
+  failed: number;
 }
 
 /**
@@ -43,7 +43,7 @@ export async function cleanupExpiredSessions(
     scanned: 0,
     deleted: 0,
     skipped: 0,
-    errors: [],
+    failed: 0,
   };
 
   try {
@@ -56,11 +56,13 @@ export async function cleanupExpiredSessions(
     const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
 
     // Validate retention configuration
-    const validationResult = validateRetentionConfig(config, retentionConfig);
-    if (!validationResult.valid) {
-      if (config.getDebugMode()) {
-        console.debug(`Session cleanup disabled: ${validationResult.error}`);
-      }
+    const validationErrorMessage = validateRetentionConfig(
+      config,
+      retentionConfig,
+    );
+    if (validationErrorMessage) {
+      // Log validation errors to console for visibility
+      console.error(`Session cleanup disabled: ${validationErrorMessage}`);
       return { ...result, disabled: true };
     }
 
@@ -105,34 +107,34 @@ export async function cleanupExpiredSessions(
         ) {
           result.deleted++;
         } else {
+          // Log error directly to console
           const sessionId =
             sessionToDelete.sessionInfo === null
-              ? `corrupted-${sessionToDelete.fileName}`
+              ? sessionToDelete.fileName
               : sessionToDelete.sessionInfo.id;
-          result.errors.push({
-            sessionId,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
+          const errorMessage =
+            error instanceof Error ? error.message : 'Unknown error';
+          console.error(
+            `Failed to delete session ${sessionId}: ${errorMessage}`,
+          );
+          result.failed++;
         }
       }
     }
 
-    result.skipped = result.scanned - result.deleted - result.errors.length;
+    result.skipped = result.scanned - result.deleted - result.failed;
 
     if (config.getDebugMode() && result.deleted > 0) {
       console.debug(
-        `Session cleanup: deleted ${result.deleted}, skipped ${result.skipped}, errors ${result.errors.length}`,
+        `Session cleanup: deleted ${result.deleted}, skipped ${result.skipped}, failed ${result.failed}`,
       );
     }
   } catch (error) {
     // Global error handler - don't let cleanup failures break startup
-    if (config.getDebugMode()) {
-      console.debug('Session cleanup failed:', error);
-    }
-    result.errors.push({
-      sessionId: 'global',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    console.error(`Session cleanup failed: ${errorMessage}`);
+    result.failed++;
   }
 
   return result;
@@ -249,12 +251,9 @@ function parseRetentionPeriod(period: string): number {
 function validateRetentionConfig(
   config: Config,
   retentionConfig: SessionRetentionSettings,
-): {
-  valid: boolean;
-  error?: string;
-} {
+): string | null {
   if (!retentionConfig.enabled) {
-    return { valid: false, error: 'Retention not enabled' };
+    return 'Retention not enabled';
   }
 
   // Validate maxAge if provided
@@ -263,7 +262,7 @@ function validateRetentionConfig(
     try {
       maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
     } catch (error) {
-      return { valid: false, error: (error as Error | string).toString() };
+      return (error as Error | string).toString();
     }
 
     // Enforce minimum retention period
@@ -280,30 +279,21 @@ function validateRetentionConfig(
     }
 
     if (maxAgeMs < minRetentionMs) {
-      return {
-        valid: false,
-        error: `maxAge cannot be less than minRetention (${minRetention})`,
-      };
+      return `maxAge cannot be less than minRetention (${minRetention})`;
     }
   }
 
   // Validate maxCount if provided
   if (retentionConfig.maxCount !== undefined) {
     if (retentionConfig.maxCount < MIN_MAX_COUNT) {
-      return {
-        valid: false,
-        error: `maxCount must be at least ${MIN_MAX_COUNT}`,
-      };
+      return `maxCount must be at least ${MIN_MAX_COUNT}`;
     }
   }
 
   // At least one retention method must be specified
   if (!retentionConfig.maxAge && retentionConfig.maxCount === undefined) {
-    return {
-      valid: false,
-      error: 'Either maxAge or maxCount must be specified',
-    };
+    return 'Either maxAge or maxCount must be specified';
   }
 
-  return { valid: true };
+  return null;
 }

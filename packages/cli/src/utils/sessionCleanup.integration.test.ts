@@ -40,7 +40,7 @@ describe('Session Cleanup Integration', () => {
     expect(result.scanned).toBe(0);
     expect(result.deleted).toBe(0);
     expect(result.skipped).toBe(0);
-    expect(result.errors).toHaveLength(0);
+    expect(result.failed).toBe(0);
   });
 
   it('should not impact startup when disabled', async () => {
@@ -59,7 +59,7 @@ describe('Session Cleanup Integration', () => {
     expect(result.scanned).toBe(0);
     expect(result.deleted).toBe(0);
     expect(result.skipped).toBe(0);
-    expect(result.errors).toHaveLength(0);
+    expect(result.failed).toBe(0);
   });
 
   it('should handle missing sessionRetention configuration', async () => {
@@ -99,7 +99,7 @@ describe('Session Cleanup Integration', () => {
     expect(result.scanned).toBe(0); // Should not even scan when config is missing
     expect(result.deleted).toBe(0);
     expect(result.skipped).toBe(0);
-    expect(result.errors).toHaveLength(0);
+    expect(result.failed).toBe(0);
 
     // Verify the session file still exists (was not deleted)
     const filesAfter = await fs.readdir(chatsDir);
@@ -112,10 +112,8 @@ describe('Session Cleanup Integration', () => {
   });
 
   it('should validate configuration and fail gracefully', async () => {
-    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const config = createTestConfig();
-    // Enable debug mode to verify visibility into failures
-    config.getDebugMode = vi.fn().mockReturnValue(true);
 
     const settings: Settings = {
       general: {
@@ -132,16 +130,16 @@ describe('Session Cleanup Integration', () => {
     expect(result.scanned).toBe(0);
     expect(result.deleted).toBe(0);
     expect(result.skipped).toBe(0);
-    expect(result.errors).toHaveLength(0);
+    expect(result.failed).toBe(0);
 
-    // Verify debug logging provides visibility into the validation failure
-    expect(debugSpy).toHaveBeenCalledWith(
+    // Verify error logging provides visibility into the validation failure
+    expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining(
         'Session cleanup disabled: Error: Invalid retention period format',
       ),
     );
 
-    debugSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   it('should clean up expired sessions when they exist', async () => {
@@ -231,7 +229,7 @@ describe('Session Cleanup Integration', () => {
       expect(result.scanned).toBe(3); // Should scan all 3 sessions
       expect(result.deleted).toBe(1); // Should delete the old session (35 days old)
       expect(result.skipped).toBe(2); // Should keep recent and current sessions
-      expect(result.errors).toHaveLength(0);
+      expect(result.failed).toBe(0);
 
       // Verify files on disk
       const remainingFiles = await fs.readdir(chatsDir);
