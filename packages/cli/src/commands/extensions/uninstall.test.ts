@@ -8,6 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { uninstallCommand, handleUninstall } from './uninstall.js';
 import yargs from 'yargs';
 import { uninstallExtension } from '../../config/extension.js';
+import { ExtensionNotFoundError } from '../../utils/errors.js';
 
 vi.mock('../../config/extension.js', () => ({
   uninstallExtension: vi.fn(),
@@ -30,7 +31,7 @@ describe('extensions uninstall command', () => {
       .mockImplementation((() => {}) as any);
     const extensionName = 'non-existent-extension';
     (uninstallExtension as any).mockRejectedValue(
-      new Error(`Extension "${extensionName}" not found.`),
+      new ExtensionNotFoundError(extensionName),
     );
 
     await handleUninstall({ name: extensionName });

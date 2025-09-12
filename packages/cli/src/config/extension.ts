@@ -20,7 +20,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { simpleGit } from 'simple-git';
 import { SettingScope, loadSettings } from '../config/settings.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { ExtensionNotFoundError, getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -522,7 +522,7 @@ export async function uninstallExtension(
       (installed) => installed.config.name === extensionName,
     )
   ) {
-    throw new Error(`Extension "${extensionName}" not found.`);
+    throw new ExtensionNotFoundError(extensionName);
   }
   removeFromDisabledExtensions(
     extensionName,
