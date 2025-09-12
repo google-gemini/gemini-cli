@@ -920,7 +920,8 @@ export class Config {
   getTruncateToolOutputThreshold(): number {
     return Math.min(
       // an estimate of remaining context-window size
-      4 * (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
+      4 *
+        (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
     );
   }
