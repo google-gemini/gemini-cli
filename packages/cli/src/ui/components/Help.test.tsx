@@ -45,19 +45,70 @@ const mockCommands: readonly SlashCommand[] = [
 ];
 
 describe('Help Component', () => {
-  it('should not render hidden commands', () => {
+  it('renders help component with mock commands', () => {
     const { lastFrame } = render(<Help commands={mockCommands} />);
-    const output = lastFrame();
-
-    expect(output).toContain('/test');
-    expect(output).not.toContain('/hidden');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('should not render hidden subcommands', () => {
-    const { lastFrame } = render(<Help commands={mockCommands} />);
-    const output = lastFrame();
+  describe('Platform-specific behavior', () => {
+    it('renders correct shortcuts for linux', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'linux',
+        writable: true,
+        configurable: true,
+      });
 
-    expect(output).toContain('visible-child');
-    expect(output).not.toContain('hidden-child');
+      try {
+        const { lastFrame } = render(<Help commands={mockCommands} />);
+        expect(lastFrame()).toMatchSnapshot('linux-shortcuts');
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          value: originalPlatform,
+          writable: true,
+          configurable: true,
+        });
+      }
+    });
+
+    it('renders correct shortcuts for darwin', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'darwin',
+        writable: true,
+        configurable: true,
+      });
+
+      try {
+        const { lastFrame } = render(<Help commands={mockCommands} />);
+        expect(lastFrame()).toMatchSnapshot('darwin-shortcuts');
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          value: originalPlatform,
+          writable: true,
+          configurable: true,
+        });
+      }
+    });
+
+    it('renders correct shortcuts for win32', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        writable: true,
+        configurable: true,
+      });
+
+      try {
+        const { lastFrame } = render(<Help commands={mockCommands} />);
+        expect(lastFrame()).toMatchSnapshot('win32-shortcuts');
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          value: originalPlatform,
+          writable: true,
+          configurable: true,
+        });
+      }
+    });
   });
 });

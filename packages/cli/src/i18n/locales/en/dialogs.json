@@ -1,0 +1,24 @@
+{
+  "auth": {
+    "title": "Get started",
+    "description": "How would you like to authenticate for this project?",
+    "instructions": "(Use Enter to select)",
+    "terms": "Terms of Services and Privacy Notice for Gemini CLI",
+    "termsUrl": "https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md",
+    "options": {
+      "google": "Login with Google",
+      "cloudShell": "Use Cloud Shell user credentials",
+      "geminiKey": "Use Gemini API Key",
+      "vertexAI": "Vertex AI"
+    },
+    "errors": {
+      "authRequired": "You must select an auth method to proceed. Press Ctrl+C twice to exit."
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "applyTo": "Apply To",
+    "instructions": "(Use Enter to select, Tab to change focus)",
+    "restartPrompt": "To see changes, Gemini CLI must be restarted. Press r to exit and apply changes now."
+  }
+}
