@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { render } from 'ink';
 import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
@@ -175,10 +176,19 @@ export async function startInteractiveUI(
     );
   };
 
-  const instance = render(<AppWrapper />, {
-    exitOnCtrlC: false,
-    isScreenReaderEnabled: config.getScreenReader(),
-  });
+  const instance = render(
+    process.env['NODE_ENV'] === 'production' ? (
+      <AppWrapper />
+    ) : (
+      <React.StrictMode>
+        <AppWrapper />
+      </React.StrictMode>
+    ),
+    {
+      exitOnCtrlC: false,
+      isScreenReaderEnabled: config.getScreenReader(),
+    },
+  );
 
   checkForUpdates()
     .then((info) => {
