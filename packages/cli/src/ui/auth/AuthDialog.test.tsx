@@ -233,6 +233,7 @@ describe('AuthDialog', () => {
       renderWithProviders(<AuthDialog {...props} />);
       const keypressHandler = mockedUseKeypress.mock.calls[0][0];
       keypressHandler({ name: 'escape' });
+      expect(mockedRunExitCleanup).toHaveBeenCalled();
       expect(exitSpy).toHaveBeenCalledWith(0);
       exitSpy.mockRestore();
     });
@@ -245,6 +246,7 @@ describe('AuthDialog', () => {
       renderWithProviders(<AuthDialog {...props} />);
       const keypressHandler = mockedUseKeypress.mock.calls[0][0];
       keypressHandler({ name: 'c', ctrl: true });
+      expect(mockedRunExitCleanup).toHaveBeenCalled();
       expect(exitSpy).toHaveBeenCalledWith(0);
       exitSpy.mockRestore();
     });
