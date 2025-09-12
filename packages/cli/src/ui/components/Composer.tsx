@@ -54,24 +54,29 @@ export const Composer = () => {
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
     nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,
+    hideCWD: settings.merged.ui?.footer?.hideCWD || false,
+    hideSandboxStatus: settings.merged.ui?.footer?.hideSandboxStatus || false,
+    hideModelInfo: settings.merged.ui?.footer?.hideModelInfo || false,
   };
 
   return (
     <Box flexDirection="column">
-      <LoadingIndicator
-        thought={
-          uiState.streamingState === StreamingState.WaitingForConfirmation ||
-          config.getAccessibility()?.disableLoadingPhrases
-            ? undefined
-            : uiState.thought
-        }
-        currentLoadingPhrase={
-          config.getAccessibility()?.disableLoadingPhrases
-            ? undefined
-            : uiState.currentLoadingPhrase
-        }
-        elapsedTime={uiState.elapsedTime}
-      />
+      {!uiState.shellFocused && (
+        <LoadingIndicator
+          thought={
+            uiState.streamingState === StreamingState.WaitingForConfirmation ||
+            config.getAccessibility()?.disableLoadingPhrases
+              ? undefined
+              : uiState.thought
+          }
+          currentLoadingPhrase={
+            config.getAccessibility()?.disableLoadingPhrases
+              ? undefined
+              : uiState.currentLoadingPhrase
+          }
+          elapsedTime={uiState.elapsedTime}
+        />
+      )}
 
       {!uiState.isConfigInitialized && <ConfigInitDisplay />}
 
@@ -105,12 +110,16 @@ export const Composer = () => {
 
       <Box
         marginTop={1}
-        justifyContent="space-between"
+        justifyContent={
+          settings.merged.ui?.hideContextSummary
+            ? 'flex-start'
+            : 'space-between'
+        }
         width="100%"
         flexDirection={isNarrow ? 'column' : 'row'}
         alignItems={isNarrow ? 'flex-start' : 'center'}
       >
-        <Box>
+        <Box marginRight={1}>
           {process.env['GEMINI_SYSTEM_MD'] && (
             <Text color={theme.status.error}>|⌐■_■| </Text>
           )}
@@ -174,9 +183,11 @@ export const Composer = () => {
           commandContext={uiState.commandContext}
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
+          approvalMode={showAutoAcceptIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
           focus={uiState.isFocused}
           vimHandleInput={uiActions.vimHandleInput}
+          isShellFocused={uiState.shellFocused}
           placeholder={
             vimEnabled
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
