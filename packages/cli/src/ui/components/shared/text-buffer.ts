@@ -920,7 +920,6 @@ export type TextBufferAction =
   | { type: 'move_to_offset'; payload: { offset: number } }
   | { type: 'create_undo_snapshot' }
   | { type: 'set_viewport'; payload: { width: number; height: number } }
-  | { type: 'insert_large_paste_placeholder'; payload: { content: string } }
   | { type: 'clear_pending_pastes' }
   | { type: 'prune_pending_pastes' }
   | { type: 'delete_placeholder_at_cursor' }
@@ -971,40 +970,6 @@ function textBufferReducerLogic(
   const currentLineLen = (r: number): number => cpLen(currentLine(r));
 
   switch (action.type) {
-    case 'insert_large_paste_placeholder': {
-      const { content } = action.payload;
-      const contentLen = toCodePoints(content).length;
-      const placeholder = `[Pasted Content ${contentLen} chars]`;
-
-      const nextState = pushUndoLocal(state);
-      const lineContent = currentLine(nextState.cursorRow);
-      const col = nextState.cursorCol;
-      const lineLen = cpLen(lineContent);
-      const charBefore = col > 0 ? cpSlice(lineContent, col - 1, col) : '';
-      const charAfter = col < lineLen ? cpSlice(lineContent, col, col + 1) : '';
-
-      let textToInsert = placeholder;
-      if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
-        textToInsert = ' ' + textToInsert;
-      }
-      if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
-        textToInsert = textToInsert + ' ';
-      }
-
-      const replaced = replaceRangeInternal(
-        nextState,
-        nextState.cursorRow,
-        nextState.cursorCol,
-        nextState.cursorRow,
-        nextState.cursorCol,
-        textToInsert,
-      );
-      return {
-        ...replaced,
-        pendingPastes: [...replaced.pendingPastes, { placeholder, content }],
-      };
-    }
-
     case 'clear_pending_pastes': {
       if (state.pendingPastes.length === 0) return state;
       return { ...state, pendingPastes: [] };
@@ -1077,6 +1042,35 @@ function textBufferReducerLogic(
     }
 
     case 'insert': {
+      const incomingLen = toCodePoints(action.payload).length;
+      if (incomingLen > LARGE_PASTE_CHAR_THRESHOLD) {
+        const nextState = pushUndoLocal(state);
+        const lineContent = (nextState.lines[nextState.cursorRow] ?? '') as string;
+        const col = nextState.cursorCol;
+        const lineLenNow = cpLen(lineContent);
+        const charBefore = col > 0 ? cpSlice(lineContent, col - 1, col) : '';
+        const charAfter = col < lineLenNow ? cpSlice(lineContent, col, col + 1) : '';
+        const placeholder = `[Pasted Content ${incomingLen} chars]`;
+        let textToInsert = placeholder;
+        if (charBefore && charBefore !== ' ' && charBefore !== '\n') textToInsert = ' ' + textToInsert;
+        if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) textToInsert = textToInsert + ' ';
+        const replaced = replaceRangeInternal(
+          nextState,
+          nextState.cursorRow,
+          nextState.cursorCol,
+          nextState.cursorRow,
+          nextState.cursorCol,
+          textToInsert,
+        );
+        return {
+          ...replaced,
+          pendingPastes: [
+            ...replaced.pendingPastes,
+            { placeholder, content: action.payload },
+          ],
+        };
+      }
+
       const nextState = pushUndoLocal(state);
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
@@ -1119,6 +1113,33 @@ function textBufferReducerLogic(
     }
 
     case 'backspace': {
+      // 先尝试删除紧邻光标前的占位符(照搬原 tryDeletePlaceholderAtCursor 思路)
+      if (state.pendingPastes.length > 0) {
+        const textAll = state.lines.join('\n');
+        const offset = logicalPosToOffset(state.lines, state.cursorRow, state.cursorCol);
+        for (let i = 0; i < state.pendingPastes.length; i++) {
+          const ph = state.pendingPastes[i].placeholder;
+          const phLen = cpLen(ph);
+          if (offset >= phLen && cpSlice(textAll, offset - phLen, offset) === ph) {
+            const [startRow, startCol] = offsetToLogicalPos(textAll, offset - phLen);
+            const [endRow, endCol] = offsetToLogicalPos(textAll, offset);
+            const nextState = pushUndoLocal(state);
+            const replaced = replaceRangeInternal(
+              nextState,
+              startRow,
+              startCol,
+              endRow,
+              endCol,
+              '',
+            );
+            const newPending = [...replaced.pendingPastes];
+            const idxToRemove = newPending.findIndex((p) => p.placeholder === ph);
+            if (idxToRemove !== -1) newPending.splice(idxToRemove, 1);
+            return { ...replaced, pendingPastes: newPending, preferredCol: null };
+          }
+        }
+      }
+
       const nextState = pushUndoLocal(state);
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
@@ -1985,16 +2006,9 @@ export function useTextBuffer({
       const { sequence: input } = key;
 
       if (key.paste) {
-        const content = input || '';
-        const contentLen = toCodePoints(content).length;
-        if (contentLen > LARGE_PASTE_CHAR_THRESHOLD) {
-          dispatch({
-            type: 'insert_large_paste_placeholder',
-            payload: { content },
-          });
-        } else {
-          insert(content, { paste: true });
-        }
+        // Do not do any other processing on pastes so ensure we handle them
+        // before all other cases.
+        insert(input, { paste: key.paste });
         return;
       }
 
@@ -2033,7 +2047,6 @@ export function useTextBuffer({
         input === '\x7f' ||
         (key.ctrl && key.name === 'h')
       ) {
-        dispatch({ type: 'delete_placeholder_at_cursor' });
         backspace();
       } else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
       else if (input && !key.ctrl && !key.meta) {
@@ -2075,11 +2088,6 @@ export function useTextBuffer({
 
   const moveToOffset = useCallback((offset: number): void => {
     dispatch({ type: 'move_to_offset', payload: { offset } });
-  }, []);
-
-  // Insert large paste placeholder when paste content is larger than threshold
-  const insertLargePastePlaceholder = useCallback((content: string): void => {
-    dispatch({ type: 'insert_large_paste_placeholder', payload: { content } });
   }, []);
 
   const expandPlaceholders = useCallback(
@@ -2127,7 +2135,6 @@ export function useTextBuffer({
     backspace,
     del,
     move,
-    insertLargePastePlaceholder,
     expandPlaceholders,
     clearPendingPastes,
     undo,
@@ -2217,10 +2224,6 @@ export interface TextBuffer {
   move: (dir: Direction) => void;
   undo: () => void;
   redo: () => void;
-  /**
-   * Insert a placeholder for large paste content at the cursor.
-   */
-  insertLargePastePlaceholder: (content: string) => void;
   /**
    * Expand placeholder tokens into their original content.
    */
