@@ -44,51 +44,20 @@ describe('extensionsCommand', () => {
       services: {
         config: {
           getExtensions: () => [],
+          getWorkingDir: () => '/test/dir',
         },
       },
     });
   });
 
   describe('list', () => {
-    it('should display "No active extensions." when none are found', async () => {
+    it('should add an EXTENSIONS_LIST item to the UI', async () => {
       if (!extensionsCommand.action) throw new Error('Action not defined');
       await extensionsCommand.action(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
-          type: MessageType.INFO,
-          text: 'No active extensions.',
-        },
-        expect.any(Number),
-      );
-    });
-
-    it('should list active extensions when they are found', async () => {
-      const mockExtensions = [
-        { name: 'ext-one', version: '1.0.0', isActive: true },
-        { name: 'ext-two', version: '2.1.0', isActive: true },
-        { name: 'ext-three', version: '3.0.0', isActive: false },
-      ];
-      mockContext = createMockCommandContext({
-        services: {
-          config: {
-            getExtensions: () => mockExtensions,
-          },
-        },
-      });
-
-      if (!extensionsCommand.action) throw new Error('Action not defined');
-      await extensionsCommand.action(mockContext, '');
-
-      const expectedMessage =
-        'Active extensions:\n\n' +
-        `  - \u001b[36mext-one (v1.0.0)\u001b[0m\n` +
-        `  - \u001b[36mext-two (v2.1.0)\u001b[0m\n`;
-
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: expectedMessage,
+          type: MessageType.EXTENSIONS_LIST,
         },
         expect.any(Number),
       );
@@ -127,7 +96,7 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('should update all extensions with --all', async () => {
+    it('should call setPendingItem and addItem in a finally block on success', async () => {
       mockUpdateAllUpdatableExtensions.mockResolvedValue([
         {
           name: 'ext-one',
@@ -141,23 +110,33 @@ describe('extensionsCommand', () => {
         },
       ]);
       await updateAction(mockContext, '--all');
+      expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
+        type: MessageType.EXTENSIONS_LIST,
+      });
+      expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith(null);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
-          type: MessageType.INFO,
-          text:
-            'Extension "ext-one" successfully updated: 1.0.0 → 1.0.1.\n' +
-            'Extension "ext-two" successfully updated: 2.0.0 → 2.0.1.\n' +
-            'Restart gemini-cli to see the changes.',
+          type: MessageType.EXTENSIONS_LIST,
         },
         expect.any(Number),
       );
     });
 
-    it('should handle errors when updating all extensions', async () => {
+    it('should call setPendingItem and addItem in a finally block on failure', async () => {
       mockUpdateAllUpdatableExtensions.mockRejectedValue(
         new Error('Something went wrong'),
       );
       await updateAction(mockContext, '--all');
+      expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
+        type: MessageType.EXTENSIONS_LIST,
+      });
+      expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith(null);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.EXTENSIONS_LIST,
+        },
+        expect.any(Number),
+      );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.ERROR,
@@ -174,14 +153,11 @@ describe('extensionsCommand', () => {
         updatedVersion: '1.0.1',
       });
       await updateAction(mockContext, 'ext-one');
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text:
-            'Extension "ext-one" successfully updated: 1.0.0 → 1.0.1.\n' +
-            'Restart gemini-cli to see the changes.',
-        },
-        expect.any(Number),
+      expect(mockUpdateExtensionByName).toHaveBeenCalledWith(
+        'ext-one',
+        '/test/dir',
+        [],
+        expect.any(Function),
       );
     });
 
@@ -213,13 +189,13 @@ describe('extensionsCommand', () => {
         });
       await updateAction(mockContext, 'ext-one ext-two');
       expect(mockUpdateExtensionByName).toHaveBeenCalledTimes(2);
+      expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
+        type: MessageType.EXTENSIONS_LIST,
+      });
+      expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith(null);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
-          type: MessageType.INFO,
-          text:
-            'Extension "ext-one" successfully updated: 1.0.0 → 1.0.1.\n' +
-            'Extension "ext-two" successfully updated: 2.0.0 → 2.0.1.\n' +
-            'Restart gemini-cli to see the changes.',
+          type: MessageType.EXTENSIONS_LIST,
         },
         expect.any(Number),
       );

@@ -9,6 +9,9 @@ import {
   updateExtensionByName,
   updateAllUpdatableExtensions,
   type ExtensionUpdateInfo,
+  loadExtensions,
+  annotateActiveExtensions,
+  checkForAllExtensionUpdates,
 } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
@@ -21,9 +24,25 @@ const updateOutput = (info: ExtensionUpdateInfo) =>
   `Extension "${info.name}" successfully updated: ${info.originalVersion} → ${info.updatedVersion}.`;
 
 export async function handleUpdate(args: UpdateArgs) {
+  const workingDir = process.cwd();
+  const allExtensions = loadExtensions();
+  const extensions = annotateActiveExtensions(
+    allExtensions,
+    allExtensions.map((e) => e.config.name),
+    workingDir,
+  );
+
   if (args.all) {
     try {
-      const updateInfos = await updateAllUpdatableExtensions();
+      let updateInfos = await updateAllUpdatableExtensions(
+        workingDir,
+        extensions,
+        await checkForAllExtensionUpdates(extensions, (_) => {}),
+        () => {},
+      );
+      updateInfos = updateInfos.filter(
+        (info) => info.originalVersion !== info.updatedVersion,
+      );
       if (updateInfos.length === 0) {
         console.log('No extensions to update.');
         return;
@@ -36,10 +55,22 @@ export async function handleUpdate(args: UpdateArgs) {
   if (args.name)
     try {
       // TODO(chrstnb): we should list extensions if the requested extension is not installed.
-      const updatedExtensionInfo = await updateExtensionByName(args.name);
-      console.log(
-        `Extension "${args.name}" successfully updated: ${updatedExtensionInfo.originalVersion} → ${updatedExtensionInfo.updatedVersion}.`,
+      const updatedExtensionInfo = await updateExtensionByName(
+        args.name,
+        workingDir,
+        extensions,
+        () => {},
       );
+      if (
+        updatedExtensionInfo.originalVersion !==
+        updatedExtensionInfo.updatedVersion
+      ) {
+        console.log(
+          `Extension "${args.name}" successfully updated: ${updatedExtensionInfo.originalVersion} → ${updatedExtensionInfo.updatedVersion}.`,
+        );
+      } else {
+        console.log(`Extension "${args.name}" already up to date.`);
+      }
     } catch (error) {
       console.error(getErrorMessage(error));
     }

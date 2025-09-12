@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import type { Content, PartListUnion } from '@google/genai';
 import type { HistoryItemWithoutId, HistoryItem } from '../types.js';
 import type { Config, GitService, Logger } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
+import type { ExtensionUpdateState } from '../state/extensions.js';
 
 // Grouped dependencies for clarity and easier mocking
 export interface CommandContext {
@@ -61,6 +62,10 @@ export interface CommandContext {
     toggleVimEnabled: () => Promise<boolean>;
     setGeminiMdFileCount: (count: number) => void;
     reloadCommands: () => void;
+    extensionsUpdateState: Map<string, ExtensionUpdateState>;
+    setExtensionsUpdateState: (
+      updateState: Map<string, ExtensionUpdateState>,
+    ) => void;
   };
   // Session-specific data
   session: {

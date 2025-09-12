@@ -25,6 +25,7 @@ import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { randomUUID } from 'node:crypto';
+import { ExtensionUpdateState } from '../ui/state/extensions.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
@@ -291,6 +292,9 @@ export function annotateActiveExtensions(
       version: extension.config.version,
       isActive: !disabledExtensions.includes(extension.config.name),
       path: extension.path,
+      source: extension.installMetadata?.source,
+      type: extension.installMetadata?.type,
+      ref: extension.installMetadata?.ref,
     }));
   }
 
@@ -307,6 +311,9 @@ export function annotateActiveExtensions(
       version: extension.config.version,
       isActive: false,
       path: extension.path,
+      source: extension.installMetadata?.source,
+      type: extension.installMetadata?.type,
+      ref: extension.installMetadata?.ref,
     }));
   }
 
@@ -609,46 +616,63 @@ export function toOutputString(extension: Extension): string {
 export async function updateExtensionByName(
   extensionName: string,
   cwd: string = process.cwd(),
+  extensions: GeminiCLIExtension[],
+  setExtensionUpdateState: (updateState: ExtensionUpdateState) => void,
 ): Promise<ExtensionUpdateInfo> {
-  const installedExtensions = loadUserExtensions();
-  const extension = installedExtensions.find(
-    (installed) => installed.config.name === extensionName,
+  const extension = extensions.find(
+    (installed) => installed.name === extensionName,
   );
   if (!extension) {
     throw new Error(
       `Extension "${extensionName}" not found. Run gemini extensions list to see available extensions.`,
     );
   }
-  return await updateExtension(extension, cwd);
+  return await updateExtension(extension, cwd, setExtensionUpdateState);
 }
 
 export async function updateExtension(
-  extension: Extension,
+  extension: GeminiCLIExtension,
   cwd: string = process.cwd(),
+  setExtensionUpdateState: (updateState: ExtensionUpdateState) => void,
 ): Promise<ExtensionUpdateInfo> {
-  if (!extension.installMetadata) {
-    throw new Error(`Extension ${extension.config.name} cannot be updated.`);
+  if (!extension.type) {
+    setExtensionUpdateState(ExtensionUpdateState.ERROR);
+    throw new Error(
+      `Extension ${extension.name} cannot be updated, type is unknown.`,
+    );
   }
-  if (extension.installMetadata.type === 'link') {
+  if (extension.type === 'link') {
+    setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
     throw new Error(`Extension is linked so does not need to be updated`);
   }
-  const originalVersion = extension.config.version;
+  setExtensionUpdateState(ExtensionUpdateState.UPDATING);
+  const originalVersion = extension.version;
 
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
     await copyExtension(extension.path, tempDir);
-    await uninstallExtension(extension.config.name, cwd);
-    await installExtension(extension.installMetadata, cwd);
-    const updatedExtensionStorage = new ExtensionStorage(extension.config.name);
+    await uninstallExtension(extension.name, cwd);
+    await installExtension(
+      {
+        source: extension.source!,
+        type: extension.type,
+        ref: extension.ref,
+      },
+      cwd,
+    );
+
+    const updatedExtensionStorage = new ExtensionStorage(extension.name);
     const updatedExtension = loadExtension(
       updatedExtensionStorage.getExtensionDir(),
     );
     if (!updatedExtension) {
+      setExtensionUpdateState(ExtensionUpdateState.ERROR);
       throw new Error('Updated extension not found after installation.');
     }
     const updatedVersion = updatedExtension.config.version;
+    setExtensionUpdateState(ExtensionUpdateState.UPDATED_NEEDS_RESTART);
     return {
-      name: extension.config.name,
+      name: extension.name,
       originalVersion,
       updatedVersion,
     };
@@ -656,6 +680,7 @@ export async function updateExtension(
     console.error(
       `Error updating extension, rolling back. ${getErrorMessage(e)}`,
     );
+    setExtensionUpdateState(ExtensionUpdateState.ERROR);
     await copyExtension(tempDir, extension.path);
     throw e;
   } finally {
@@ -714,98 +739,97 @@ function removeFromDisabledExtensions(
 
 export async function updateAllUpdatableExtensions(
   cwd: string = process.cwd(),
+  extensions: GeminiCLIExtension[],
+  extensionsState: Map<string, ExtensionUpdateState>,
+  setExtensionsUpdateState: (
+    updateState: Map<string, ExtensionUpdateState>,
+  ) => void,
 ): Promise<ExtensionUpdateInfo[]> {
-  const extensions = loadExtensions(cwd).filter(
-    (extension) => !!extension.installMetadata,
-  );
   return await Promise.all(
-    extensions.map((extension) => updateExtension(extension, cwd)),
+    extensions
+      .filter(
+        (extension) =>
+          extensionsState.get(extension.name) ===
+          ExtensionUpdateState.UPDATE_AVAILABLE,
+      )
+      .map((extension) =>
+        updateExtension(extension, cwd, (updateState) => {
+          const newState = new Map(extensionsState);
+          newState.set(extension.name, updateState);
+          setExtensionsUpdateState(newState);
+        }),
+      ),
   );
-}
-
-export enum ExtensionUpdateStatus {
-  UpdateAvailable,
-  UpToDate,
-  Error,
-  NotUpdatable,
 }
 
 export interface ExtensionUpdateCheckResult {
-  status: ExtensionUpdateStatus;
+  state: ExtensionUpdateState;
   error?: string;
 }
 
-export async function checkForExtensionUpdates(
-  extensions: Extension[],
-): Promise<Map<string, ExtensionUpdateCheckResult>> {
-  const results = new Map<string, ExtensionUpdateCheckResult>();
-
+export async function checkForAllExtensionUpdates(
+  extensions: GeminiCLIExtension[],
+  setExtensionsUpdateState: (
+    updateState: Map<string, ExtensionUpdateState>,
+  ) => void,
+): Promise<Map<string, ExtensionUpdateState>> {
+  const finalState = new Map<string, ExtensionUpdateState>();
   for (const extension of extensions) {
-    if (extension.installMetadata?.type !== 'git') {
-      results.set(extension.config.name, {
-        status: ExtensionUpdateStatus.NotUpdatable,
-      });
-      continue;
-    }
+    finalState.set(extension.name, await checkForExtensionUpdate(extension));
+  }
+  setExtensionsUpdateState(finalState);
+  return finalState;
+}
 
-    try {
-      const git = simpleGit(extension.path);
-      const remotes = await git.getRemotes(true);
-      if (remotes.length === 0) {
-        results.set(extension.config.name, {
-          status: ExtensionUpdateStatus.Error,
-          error: 'No git remotes found.',
-        });
-        continue;
-      }
-      const remoteUrl = remotes[0].refs.fetch;
-      if (!remoteUrl) {
-        results.set(extension.config.name, {
-          status: ExtensionUpdateStatus.Error,
-          error: `No fetch URL found for git remote ${remotes[0].name}.`,
-        });
-        continue;
-      }
-
-      // Determine the ref to check on the remote.
-      const refToCheck = extension.installMetadata.ref || 'HEAD';
-
-      const lsRemoteOutput = await git.listRemote([remoteUrl, refToCheck]);
-
-      if (typeof lsRemoteOutput !== 'string' || lsRemoteOutput.trim() === '') {
-        results.set(extension.config.name, {
-          status: ExtensionUpdateStatus.Error,
-          error: `Git ref ${refToCheck} not found.`,
-        });
-        continue;
-      }
-
-      const remoteHash = lsRemoteOutput.split('\t')[0];
-      const localHash = await git.revparse(['HEAD']);
-
-      if (!remoteHash) {
-        results.set(extension.config.name, {
-          status: ExtensionUpdateStatus.Error,
-          error: `Unable to parse hash from git ls-remote output "${lsRemoteOutput}"`,
-        });
-      } else if (remoteHash === localHash) {
-        results.set(extension.config.name, {
-          status: ExtensionUpdateStatus.UpToDate,
-        });
-      } else {
-        results.set(extension.config.name, {
-          status: ExtensionUpdateStatus.UpdateAvailable,
-        });
-      }
-    } catch (error) {
-      results.set(extension.config.name, {
-        status: ExtensionUpdateStatus.Error,
-        error: `Failed to check for updates for extension "${
-          extension.config.name
-        }": ${getErrorMessage(error)}`,
-      });
-    }
+export async function checkForExtensionUpdate(
+  extension: GeminiCLIExtension,
+): Promise<ExtensionUpdateState> {
+  if (extension.type !== 'git') {
+    return ExtensionUpdateState.NOT_UPDATABLE;
   }
 
-  return results;
+  try {
+    const git = simpleGit(extension.path);
+    const remotes = await git.getRemotes(true);
+    if (remotes.length === 0) {
+      console.error('No git remotes found.');
+      return ExtensionUpdateState.ERROR;
+    }
+    const remoteUrl = remotes[0].refs.fetch;
+    if (!remoteUrl) {
+      console.error(`No fetch URL found for git remote ${remotes[0].name}.`);
+      return ExtensionUpdateState.ERROR;
+    }
+
+    // Determine the ref to check on the remote.
+    const refToCheck = extension.ref || 'HEAD';
+
+    const lsRemoteOutput = await git.listRemote([remoteUrl, refToCheck]);
+
+    if (typeof lsRemoteOutput !== 'string' || lsRemoteOutput.trim() === '') {
+      console.error(`Git ref ${refToCheck} not found.`);
+      return ExtensionUpdateState.ERROR;
+    }
+
+    const remoteHash = lsRemoteOutput.split('\t')[0];
+    const localHash = await git.revparse(['HEAD']);
+
+    if (!remoteHash) {
+      console.error(
+        `Unable to parse hash from git ls-remote output "${lsRemoteOutput}"`,
+      );
+      return ExtensionUpdateState.ERROR;
+    } else if (remoteHash === localHash) {
+      return ExtensionUpdateState.UP_TO_DATE;
+    } else {
+      return ExtensionUpdateState.UPDATE_AVAILABLE;
+    }
+  } catch (error) {
+    console.error(
+      `Failed to check for updates for extension "${
+        extension.name
+      }": ${getErrorMessage(error)}`,
+    );
+    return ExtensionUpdateState.ERROR;
+  }
 }
