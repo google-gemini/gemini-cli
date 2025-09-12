@@ -153,16 +153,13 @@ async function getGeminiMdFilePathsInternalForEachDir(
     if (currentDirectoryOnly) {
       // Only consider the file in the current directory.
       const candidate = path.join(path.resolve(dir), geminiMdFilename);
-      try {
-        await fs.access(candidate, fsSync.constants.R_OK);
-        allPaths.add(candidate);
-        if (debugMode)
-          logger.debug(
-            `currentDirectoryOnly: Found ${geminiMdFilename} in CWD: ${candidate}`,
-          );
-      } catch {
-        // not found in CWD, silently ignore
-      }
+      // Avoid TOCTOU: don't check access here; defer to readGeminiMdFiles which
+      // handles errors gracefully. Just add the candidate and log.
+      allPaths.add(candidate);
+      if (debugMode)
+        logger.debug(
+          `currentDirectoryOnly: Added candidate ${geminiMdFilename} in CWD: ${candidate}`,
+        );
       continue; // Skip global/upward/downward/ext when currentDirectoryOnly
     }
 
