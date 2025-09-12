@@ -53,12 +53,13 @@ export function splitContentIntoEqualWidthLines(
     }
     const contentWillOverflow =
       isLastLine && getPlainTextLength(content) > contentWidth;
+    const hasSpaceForDots = contentWidth > 3;
     const { prefix, remainingPart } = extractPrefixByDisplayWidth(
       content,
-      contentWillOverflow ? contentWidth - 3 : contentWidth,
+      contentWillOverflow && hasSpaceForDots ? contentWidth - 3 : contentWidth,
     );
     if (contentWillOverflow) {
-      lines.push(contentWidth <= 3 ? prefix : prefix + '...');
+      lines.push(hasSpaceForDots ? prefix + '...' : prefix);
     } else {
       lines.push(appendEmptySpaces(prefix, contentWidth));
     }
