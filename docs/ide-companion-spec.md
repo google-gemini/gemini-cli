@@ -2,8 +2,6 @@
 
 This document defines the contract for building a companion extension to enable Gemini CLI's IDE mode. For VS Code, these features (native diffing, context awareness) are provided by the official extension ([marketplace](https://marketplace.visualstudio.com/items?itemName=Google.gemini-cli-vscode-ide-companion)). This specification is for contributors who wish to bring similar functionality to other editors like JetBrains IDEs, Sublime Text, etc.
 
----
-
 ## I. The Communication Interface
 
 The foundation of the IDE integration is a local communication channel between Gemini CLI and the IDE extension.
@@ -21,7 +19,7 @@ The extension **MUST** run a local HTTP server that implements the **Model Conte
 For Gemini CLI to connect, it needs to discover which IDE instance it's running in and what port your server is using. The extension **MUST** facilitate this by creating a "discovery file."
 
 - **How the CLI Finds the File:** The CLI determines the Process ID (PID) of the IDE it's running in by traversing the process tree. It then looks for a discovery file that contains this PID in its name.
-- **File Location:** The file must be created in a specific directory: `os.tmpdir()/.gemini/ide/`. Your extension must create this directory if it doesn't exist.
+- **File Location:** The file must be created in a specific directory: `os.tmpdir()/gemini/ide/`. Your extension must create this directory if it doesn't exist.
 - **File Naming Convention:** The filename is critical and **MUST** follow the pattern:
   `gemini-ide-server-${PID}-${PORT}.json`
   - `${PID}`: The process ID of the parent IDE process. Your extension must determine this PID and include it in the filename.
@@ -38,8 +36,6 @@ For Gemini CLI to connect, it needs to discover which IDE instance it's running 
 - **Tie-Breaking with Environment Variables (Recommended):** For the most reliable experience, your extension **SHOULD** both create the discovery file and set the `GEMINI_CLI_IDE_SERVER_PORT` and `GEMINI_CLI_IDE_WORKSPACE_PATH` environment variables in the integrated terminal. The file serves as the primary discovery mechanism, but the environment variables are crucial for tie-breaking. If a user has multiple IDE windows open for the same workspace, the CLI uses the `GEMINI_CLI_IDE_SERVER_PORT` variable to identify and connect to the correct window's server.
   - For prototyping, you may opt to _only_ set the environment variables. However, this is not a robust solution for a production extension, as environment variables may not be reliably set in all terminal sessions (e.g., restored terminals), which can lead to connection failures.
 - **Authentication:** (TBD)
-
----
 
 ## II. The Context Interface
 
@@ -86,8 +82,6 @@ After receiving the `IdeContext` object, the CLI performs several normalization 
 
 While the CLI handles the final truncation, it is highly recommended that your extension also limits the amount of context it sends.
 
----
-
 ## III. Supporting Additional IDEs
 
 To add support for a new IDE, two main components in the Gemini CLI codebase need to be updated: the detection logic and the installer logic.
@@ -111,8 +105,6 @@ The CLI provides a command (`/ide install`) to help users automatically install 
   3.  Return a result object indicating success or failure.
 - **Update `getIdeInstaller`:** Add a case to the `switch` statement in this factory function to return an instance of your new installer class when your `DetectedIde` enum is matched.
 
----
-
 ## IV. The Lifecycle Interface
 
 The extension **MUST** manage its resources and the discovery file correctly based on the IDE's lifecycle.
@@ -123,9 +115,3 @@ The extension **MUST** manage its resources and the discovery file correctly bas
 - **On Deactivation (IDE shutdown/extension disabled):**
   1.  Stop the MCP server.
   2.  Delete the discovery file.
-
----
-
-## V. Authentication
-
-(TBD)
