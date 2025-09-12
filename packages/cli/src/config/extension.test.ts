@@ -592,10 +592,8 @@ describe('installExtension', () => {
           description: 'a local mcp server',
         },
         'test-server-2': {
-          command: 'node',
-          args: ['server.js'],
           description: 'a remote mcp server',
-          httpUrl: 'https//google.com',
+          httpUrl: 'https://google.com',
         },
       },
     });

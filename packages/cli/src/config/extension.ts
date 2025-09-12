@@ -469,9 +469,9 @@ export async function installExtension(
       if (mcpServerEntries.length) {
         console.info('This extension will run the following MCP servers: ');
         for (const [key, mcpServer] of mcpServerEntries) {
-          const isRemote = !!mcpServer.httpUrl;
+          const isLocal = !!mcpServer.command;
           console.info(
-            `  * ${key} (${isRemote ? 'remote' : 'local'}): ${mcpServer.description}`,
+            `  * ${key} (${isLocal ? 'local' : 'remote'}): ${mcpServer.description}`,
           );
         }
         console.info(
