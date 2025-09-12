@@ -24,19 +24,17 @@ import { MessageType, StreamingState } from './types.js';
 import {
   type EditorType,
   type Config,
-  IdeClient,
   type DetectedIde,
-  ideContext,
   type IdeContext,
+  type UserTierId,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  IdeClient,
+  ideContextStore,
   getErrorMessage,
   getAllGeminiMdFilenames,
-  UserTierId,
   AuthType,
-  isProQuotaExceededError,
-  isGenericQuotaExceededError,
-  logFlashFallback,
-  FlashFallbackEvent,
   clearCachedCredentialFile,
+  ShellExecutionService,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -44,6 +42,7 @@ import process from 'node:process';
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
+import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
@@ -99,6 +98,18 @@ interface AppContainerProps {
   initializationResult: InitializationResult;
 }
 
+/**
+ * The fraction of the terminal width to allocate to the shell.
+ * This provides horizontal padding.
+ */
+const SHELL_WIDTH_FRACTION = 0.89;
+
+/**
+ * The number of lines to subtract from the available terminal height
+ * for the shell. This provides vertical padding and space for other UI elements.
+ */
+const SHELL_HEIGHT_PADDING = 10;
+
 export const AppContainer = (props: AppContainerProps) => {
   const { settings, config, initializationResult } = props;
   const historyManager = useHistory();
@@ -112,6 +123,8 @@ export const AppContainer = (props: AppContainerProps) => {
     initializationResult.themeError,
   );
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [shellFocused, setShellFocused] = useState(false);
+
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
     initializationResult.geminiMdFileCount,
   );
@@ -123,12 +136,20 @@ export const AppContainer = (props: AppContainerProps) => {
   const [isTrustedFolder, setIsTrustedFolder] = useState<boolean | undefined>(
     config.isTrustedFolder(),
   );
-  const [currentModel, setCurrentModel] = useState(config.getModel());
+
+  // Helper to determine the effective model, considering the fallback state.
+  const getEffectiveModel = useCallback(() => {
+    if (config.isInFallbackMode()) {
+      return DEFAULT_GEMINI_FLASH_MODEL;
+    }
+    return config.getModel();
+  }, [config]);
+
+  const [currentModel, setCurrentModel] = useState(getEffectiveModel());
+
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
-  const [isProQuotaDialogOpen, setIsProQuotaDialogOpen] = useState(false);
-  const [proQuotaDialogResolver, setProQuotaDialogResolver] = useState<
-    ((value: boolean) => void) | null
-  >(null);
+
+  const [isConfigInitialized, setConfigInitialized] = useState(false);
 
   // Auto-accept indicator
   const showAutoAcceptIndicator = useAutoAcceptIndicator({
@@ -153,32 +174,37 @@ export const AppContainer = (props: AppContainerProps) => {
   const staticExtraHeight = 3;
 
   useEffect(() => {
+    (async () => {
+      // Note: the program will not work if this fails so let errors be
+      // handled by the global catch.
+      await config.initialize();
+      setConfigInitialized(true);
+    })();
     registerCleanup(async () => {
       const ideClient = await IdeClient.getInstance();
       await ideClient.disconnect();
     });
   }, [config]);
 
-  useEffect(() => {
-    const cleanup = setUpdateHandler(historyManager.addItem, setUpdateInfo);
-    return cleanup;
-  }, [historyManager.addItem]);
+  useEffect(
+    () => setUpdateHandler(historyManager.addItem, setUpdateInfo),
+    [historyManager.addItem],
+  );
 
   // Watch for model changes (e.g., from Flash fallback)
   useEffect(() => {
     const checkModelChange = () => {
-      const configModel = config.getModel();
-      if (configModel !== currentModel) {
-        setCurrentModel(configModel);
+      const effectiveModel = getEffectiveModel();
+      if (effectiveModel !== currentModel) {
+        setCurrentModel(effectiveModel);
       }
     };
 
-    // Check immediately and then periodically
     checkModelChange();
     const interval = setInterval(checkModelChange, 1000); // Check every second
 
     return () => clearInterval(interval);
-  }, [config, currentModel]);
+  }, [config, currentModel, getEffectiveModel]);
 
   const {
     consoleMessages,
@@ -200,7 +226,7 @@ export const AppContainer = (props: AppContainerProps) => {
     20,
     Math.floor(terminalWidth * widthFraction) - 3,
   );
-  const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 0.8));
+  const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 1.0));
   const mainAreaWidth = Math.floor(terminalWidth * 0.9);
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
@@ -272,6 +298,14 @@ export const AppContainer = (props: AppContainerProps) => {
     settings,
     config,
   );
+
+  const { proQuotaRequest, handleProQuotaChoice } = useQuotaAndFallback({
+    config,
+    historyManager,
+    userTier,
+    setAuthState,
+    setModelSwitchedFromQuotaError,
+  });
 
   // Derive auth state variables for backward compatibility with UIStateContext
   const isAuthDialogOpen = authState === AuthState.Updating;
@@ -416,6 +450,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     setIsProcessing,
     setGeminiMdFileCount,
     slashCommandActions,
+    isConfigInitialized,
   );
 
   const performMemoryRefresh = useCallback(async () => {
@@ -477,132 +512,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
     }
   }, [config, historyManager, settings.merged]);
 
-  // Set up Flash fallback handler
-  useEffect(() => {
-    const flashFallbackHandler = async (
-      currentModel: string,
-      fallbackModel: string,
-      error?: unknown,
-    ): Promise<boolean> => {
-      // Check if we've already switched to the fallback model
-      if (config.isInFallbackMode()) {
-        // If we're already in fallback mode, don't show the dialog again
-        return false;
-      }
-
-      let message: string;
-
-      if (
-        config.getContentGeneratorConfig().authType ===
-        AuthType.LOGIN_WITH_GOOGLE
-      ) {
-        // Use actual user tier if available; otherwise, default to FREE tier behavior (safe default)
-        const isPaidTier =
-          userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
-
-        // Check if this is a Pro quota exceeded error
-        if (error && isProQuotaExceededError(error)) {
-          if (isPaidTier) {
-            message = `⚡ You have reached your daily ${currentModel} quota limit.
-⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
-⚡ To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
-          } else {
-            message = `⚡ You have reached your daily ${currentModel} quota limit.
-⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
-⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
-⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
-⚡ You can switch authentication methods by typing /auth`;
-          }
-        } else if (error && isGenericQuotaExceededError(error)) {
-          if (isPaidTier) {
-            message = `⚡ You have reached your daily quota limit.
-⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
-⚡ To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
-          } else {
-            message = `⚡ You have reached your daily quota limit.
-⚡ Automatically switching from ${currentModel} to ${fallbackModel} for the remainder of this session.
-⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
-⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
-⚡ You can switch authentication methods by typing /auth`;
-          }
-        } else {
-          if (isPaidTier) {
-            // Default fallback message for other cases (like consecutive 429s)
-            message = `⚡ Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.
-⚡ Possible reasons for this are that you have received multiple consecutive capacity errors or you have reached your daily ${currentModel} quota limit
-⚡ To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
-          } else {
-            // Default fallback message for other cases (like consecutive 429s)
-            message = `⚡ Automatically switching from ${currentModel} to ${fallbackModel} for faster responses for the remainder of this session.
-⚡ Possible reasons for this are that you have received multiple consecutive capacity errors or you have reached your daily ${currentModel} quota limit
-⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
-⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
-⚡ You can switch authentication methods by typing /auth`;
-          }
-        }
-
-        // Add message to UI history
-        historyManager.addItem(
-          {
-            type: MessageType.INFO,
-            text: message,
-          },
-          Date.now(),
-        );
-
-        // For Pro quota errors, show the dialog and wait for user's choice
-        if (error && isProQuotaExceededError(error)) {
-          // Set the flag to prevent tool continuation
-          setModelSwitchedFromQuotaError(true);
-          // Set global quota error flag to prevent Flash model calls
-          config.setQuotaErrorOccurred(true);
-
-          // Show the ProQuotaDialog and wait for user's choice
-          const shouldContinueWithFallback = await new Promise<boolean>(
-            (resolve) => {
-              setIsProQuotaDialogOpen(true);
-              setProQuotaDialogResolver(() => resolve);
-            },
-          );
-
-          // If user chose to continue with fallback, we don't need to stop the current prompt
-          if (shouldContinueWithFallback) {
-            // Switch to fallback model for future use
-            config.setModel(fallbackModel);
-            config.setFallbackMode(true);
-            logFlashFallback(
-              config,
-              new FlashFallbackEvent(
-                config.getContentGeneratorConfig().authType!,
-              ),
-            );
-            return true; // Continue with current prompt using fallback model
-          }
-
-          // If user chose to authenticate, stop current prompt
-          return false;
-        }
-
-        // For other quota errors, automatically switch to fallback model
-        // Set the flag to prevent tool continuation
-        setModelSwitchedFromQuotaError(true);
-        // Set global quota error flag to prevent Flash model calls
-        config.setQuotaErrorOccurred(true);
-      }
-
-      // Switch model for future use but return false to stop current retry
-      config.setModel(fallbackModel);
-      config.setFallbackMode(true);
-      logFlashFallback(
-        config,
-        new FlashFallbackEvent(config.getContentGeneratorConfig().authType!),
-      );
-      return false; // Don't continue with current prompt
-    };
-
-    config.setFlashFallbackHandler(flashFallbackHandler);
-  }, [config, historyManager, userTier]);
-
   const cancelHandlerRef = useRef<() => void>(() => {});
 
   const {
@@ -612,6 +521,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
     cancelOngoingRequest,
+    activePtyId,
+    loopDetectionConfirmationRequest,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -628,10 +539,15 @@ Logging in with Google... Please restart Gemini CLI to continue.
     setModelSwitchedFromQuotaError,
     refreshStatic,
     () => cancelHandlerRef.current(),
+    setShellFocused,
+    terminalWidth,
+    terminalHeight,
+    shellFocused,
   );
 
   const { messageQueue, addMessage, clearQueue, getQueuedMessagesText } =
     useMessageQueue({
+      isConfigInitialized,
       streamingState,
       submitQuery,
     });
@@ -681,22 +597,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
     refreshStatic();
   }, [historyManager, clearConsoleMessagesState, refreshStatic]);
 
-  const handleProQuotaChoice = useCallback(
-    (choice: 'auth' | 'continue') => {
-      setIsProQuotaDialogOpen(false);
-      if (proQuotaDialogResolver) {
-        if (choice === 'auth') {
-          proQuotaDialogResolver(false); // Don't continue with fallback, show auth dialog
-          setAuthState(AuthState.Updating);
-        } else {
-          proQuotaDialogResolver(true); // Continue with fallback model
-        }
-        setProQuotaDialogResolver(null);
-      }
-    },
-    [proQuotaDialogResolver, setAuthState],
-  );
-
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
   /**
@@ -712,7 +612,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     !isProcessing &&
     (streamingState === StreamingState.Idle ||
       streamingState === StreamingState.Responding) &&
-    !isProQuotaDialogOpen;
+    !proQuotaRequest;
 
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = useMemo(() => {
@@ -730,6 +630,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
     }
     return Math.max(0, terminalHeight - staticExtraHeight - RESIZE_ROW_SLACK);
   }, [terminalHeight]);
+
+  config.setShellExecutionConfig({
+    terminalWidth: Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
+    terminalHeight: Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
+    pager: settings.merged.tools?.shell?.pager,
+    showColor: settings.merged.tools?.shell?.showColor,
+  });
 
   const isFocused = useFocus();
   useBracketedPaste();
@@ -749,8 +656,25 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const geminiClient = config.getGeminiClient();
 
   useEffect(() => {
+    if (activePtyId) {
+      ShellExecutionService.resizePty(
+        activePtyId,
+        Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
+        Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
+      );
+    }
+  }, [
+    terminalHeight,
+    terminalWidth,
+    availableTerminalHeight,
+    activePtyId,
+    geminiClient,
+  ]);
+
+  useEffect(() => {
     if (
       initialPrompt &&
+      isConfigInitialized &&
       !initialPromptSubmitted.current &&
       !isAuthenticating &&
       !isAuthDialogOpen &&
@@ -764,6 +688,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     }
   }, [
     initialPrompt,
+    isConfigInitialized,
     handleFinalSubmit,
     isAuthenticating,
     isAuthDialogOpen,
@@ -807,7 +732,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
-    useFolderTrust(settings, config, setIsTrustedFolder);
+    useFolderTrust(settings, setIsTrustedFolder, refreshStatic);
   const { needsRestart: ideNeedsRestart } = useIdeTrustListener();
   const isInitialMount = useRef(true);
 
@@ -834,8 +759,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
   }, [terminalWidth, refreshStatic]);
 
   useEffect(() => {
-    const unsubscribe = ideContext.subscribeToIdeContext(setIdeContextState);
-    setIdeContextState(ideContext.getIdeContext());
+    const unsubscribe = ideContextStore.subscribe(setIdeContextState);
+    setIdeContextState(ideContextStore.get());
     return unsubscribe;
   }, []);
 
@@ -966,6 +891,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
+      } else if (keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS](key)) {
+        if (activePtyId || shellFocused) {
+          setShellFocused((prev) => !prev);
+        }
       }
     },
     [
@@ -992,6 +921,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isSettingsDialogOpen,
       isFolderTrustDialogOpen,
       showPrivacyNotice,
+      activePtyId,
+      shellFocused,
       settings.merged.general?.debugKeystrokeLogging,
     ],
   );
@@ -1024,35 +955,20 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const nightly = props.version.includes('nightly');
 
-  const dialogsVisible = useMemo(
-    () =>
-      showWorkspaceMigrationDialog ||
-      shouldShowIdePrompt ||
-      isFolderTrustDialogOpen ||
-      !!shellConfirmationRequest ||
-      !!confirmationRequest ||
-      isThemeDialogOpen ||
-      isSettingsDialogOpen ||
-      isAuthenticating ||
-      isAuthDialogOpen ||
-      isEditorDialogOpen ||
-      showPrivacyNotice ||
-      isProQuotaDialogOpen,
-    [
-      showWorkspaceMigrationDialog,
-      shouldShowIdePrompt,
-      isFolderTrustDialogOpen,
-      shellConfirmationRequest,
-      confirmationRequest,
-      isThemeDialogOpen,
-      isSettingsDialogOpen,
-      isAuthenticating,
-      isAuthDialogOpen,
-      isEditorDialogOpen,
-      showPrivacyNotice,
-      isProQuotaDialogOpen,
-    ],
-  );
+  const dialogsVisible =
+    showWorkspaceMigrationDialog ||
+    shouldShowIdePrompt ||
+    isFolderTrustDialogOpen ||
+    !!shellConfirmationRequest ||
+    !!confirmationRequest ||
+    !!loopDetectionConfirmationRequest ||
+    isThemeDialogOpen ||
+    isSettingsDialogOpen ||
+    isAuthenticating ||
+    isAuthDialogOpen ||
+    isEditorDialogOpen ||
+    showPrivacyNotice ||
+    !!proQuotaRequest;
 
   const pendingHistoryItems = useMemo(
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
@@ -1065,6 +981,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isThemeDialogOpen,
       themeError,
       isAuthenticating,
+      isConfigInitialized,
       authError,
       isAuthDialogOpen,
       editorError,
@@ -1079,6 +996,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       commandContext,
       shellConfirmationRequest,
       confirmationRequest,
+      loopDetectionConfirmationRequest,
       geminiMdFileCount,
       streamingState,
       initError,
@@ -1109,11 +1027,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       showAutoAcceptIndicator,
       showWorkspaceMigrationDialog,
       workspaceExtensions,
-      // Use current state values instead of config.getModel()
       currentModel,
       userTier,
-      isProQuotaDialogOpen,
-      // New fields
+      proQuotaRequest,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -1132,12 +1048,15 @@ Logging in with Google... Please restart Gemini CLI to continue.
       updateInfo,
       showIdeRestartPrompt,
       isRestarting,
+      activePtyId,
+      shellFocused,
     }),
     [
       historyManager.history,
       isThemeDialogOpen,
       themeError,
       isAuthenticating,
+      isConfigInitialized,
       authError,
       isAuthDialogOpen,
       editorError,
@@ -1152,6 +1071,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       commandContext,
       shellConfirmationRequest,
       confirmationRequest,
+      loopDetectionConfirmationRequest,
       geminiMdFileCount,
       streamingState,
       initError,
@@ -1182,10 +1102,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       showAutoAcceptIndicator,
       showWorkspaceMigrationDialog,
       workspaceExtensions,
-      // Quota-related state dependencies
       userTier,
-      isProQuotaDialogOpen,
-      // New fields dependencies
+      proQuotaRequest,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -1204,8 +1122,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       updateInfo,
       showIdeRestartPrompt,
       isRestarting,
-      // Quota-related dependencies
       currentModel,
+      activePtyId,
+      shellFocused,
     ],
   );
 

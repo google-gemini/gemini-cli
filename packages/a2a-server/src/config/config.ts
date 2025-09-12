@@ -69,6 +69,7 @@ export async function loadConfig(
         settings.fileFiltering?.enableRecursiveFileSearch,
     },
     ideMode: false,
+    folderTrust: settings.folderTrust === true,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
@@ -79,7 +80,7 @@ export async function loadConfig(
     false,
     fileService,
     extensionContextFilePaths,
-    true, /// TODO: Wire up folder trust logic here.
+    settings.folderTrust === true,
   );
   configParams.userMemory = memoryContent;
   configParams.geminiMdFileCount = fileCount;
@@ -108,9 +109,10 @@ export async function loadConfig(
     logger.info('[Config] Using Gemini API Key');
     await config.refreshAuth(AuthType.USE_GEMINI);
   } else {
-    logger.error(
-      `[Config] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.`,
-    );
+    const errorMessage =
+      '[Config] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.';
+    logger.error(errorMessage);
+    throw new Error(errorMessage);
   }
 
   return config;
