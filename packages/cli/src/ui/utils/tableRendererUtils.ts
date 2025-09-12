@@ -14,7 +14,7 @@ export function extractPrefixByDisplayWidth(
 ) {
   let left = 0;
   let right = content.length;
-  let bestTruncated: string = content;
+  let bestTruncated = '';
 
   while (left <= right) {
     const mid = Math.floor((left + right) / 2);
