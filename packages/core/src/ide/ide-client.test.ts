@@ -331,7 +331,7 @@ describe('IdeClient', () => {
 
       expect(result).toEqual(config);
       expect(fs.promises.readFile).toHaveBeenCalledWith(
-        path.join('/tmp/.gemini/ide', 'gemini-ide-server-12345-123.json'),
+        path.join('/tmp/gemini/ide', 'gemini-ide-server-12345-123.json'),
         'utf8',
       );
     });
@@ -526,13 +526,45 @@ describe('IdeClient', () => {
 
       expect(result).toEqual(validConfig);
       expect(fs.promises.readFile).toHaveBeenCalledWith(
-        path.join('/tmp/.gemini/ide', 'gemini-ide-server-12345-111.json'),
+        path.join('/tmp/gemini/ide', 'gemini-ide-server-12345-111.json'),
         'utf8',
       );
       expect(fs.promises.readFile).not.toHaveBeenCalledWith(
-        path.join('/tmp/.gemini/ide', 'not-a-config-file.txt'),
+        path.join('/tmp/gemini/ide', 'not-a-config-file.txt'),
         'utf8',
       );
+    });
+
+    it('should match env port string to a number port in the config', async () => {
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '3333';
+      const config1 = { port: 1111, workspacePath: '/test/workspace' };
+      const config2 = { port: 3333, workspacePath: '/test/workspace2' };
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue([
+        'gemini-ide-server-12345-111.json',
+        'gemini-ide-server-12345-222.json',
+      ]);
+      vi.mocked(fs.promises.readFile)
+        .mockResolvedValueOnce(JSON.stringify(config1))
+        .mockResolvedValueOnce(JSON.stringify(config2));
+      vi.spyOn(IdeClient, 'validateWorkspacePath').mockReturnValue({
+        isValid: true,
+      });
+
+      const ideClient = await IdeClient.getInstance();
+      const result = await (
+        ideClient as unknown as {
+          getConnectionConfigFromFile: () => Promise<unknown>;
+        }
+      ).getConnectionConfigFromFile();
+
+      expect(result).toEqual(config2);
     });
   });
 
