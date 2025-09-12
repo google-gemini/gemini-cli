@@ -7,18 +7,18 @@
 import * as fs from 'node:fs';
 import { isSubpath } from '../utils/paths.js';
 import { detectIde, type DetectedIde, getIdeInfo } from '../ide/detect-ide.js';
+import { ideContextStore } from './ideContext.js';
 import {
-  ideContextStore,
+  IdeContextNotificationSchema,
   IdeDiffAcceptedNotificationSchema,
   IdeDiffClosedNotificationSchema,
-  CloseDiffResponseSchema,
-  type DiffUpdateResult,
-} from './ideContext.js';
-import { IdeContextNotificationSchema } from './types.js';
+  IdeDiffRejectedNotificationSchema,
+} from './types.js';
 import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { EnvHttpProxyAgent } from 'undici';
@@ -30,6 +30,16 @@ const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) => console.error('[ERROR] [IDEClient]', ...args),
 };
+
+export type DiffUpdateResult =
+  | {
+      status: 'accepted';
+      content?: string;
+    }
+  | {
+      status: 'rejected';
+      content: undefined;
+    };
 
 export type IDEConnectionState = {
   status: IDEConnectionStatus;
@@ -193,22 +203,26 @@ export class IdeClient {
   }
 
   /**
-   * A diff is accepted with any modifications if the user performs one of the
-   * following actions:
-   * - Clicks the checkbox icon in the IDE to accept
-   * - Runs `command+shift+p` > "Gemini CLI: Accept Diff in IDE" to accept
-   * - Selects "accept" in the CLI UI
-   * - Saves the file via `ctrl/command+s`
+   * Opens a diff view in the IDE, allowing the user to review and accept or
+   * reject changes.
    *
-   * A diff is rejected if the user performs one of the following actions:
-   * - Clicks the "x" icon in the IDE
-   * - Runs "Gemini CLI: Close Diff in IDE"
-   * - Selects "no" in the CLI UI
-   * - Closes the file
+   * This method sends a request to the IDE to display a diff between the
+   * current content of a file and the new content provided. It then waits for
+   * a notification from the IDE indicating that the user has either accepted
+   * (potentially with manual edits) or rejected the diff.
+   *
+   * A mutex ensures that only one diff view can be open at a time to prevent
+   * race conditions.
+   *
+   * @param filePath The absolute path to the file to be diffed.
+   * @param newContent The proposed new content for the file.
+   * @returns A promise that resolves with a `DiffUpdateResult`, indicating
+   *   whether the diff was 'accepted' or 'rejected' and including the final
+   *   content if accepted.
    */
   async openDiff(
     filePath: string,
-    newContent?: string,
+    newContent: string,
   ): Promise<DiffUpdateResult> {
     const release = await this.acquireMutex();
 
@@ -225,6 +239,30 @@ export class IdeClient {
             filePath,
             newContent,
           },
+        })
+        .then((result) => {
+          const parsedResult = CallToolResultSchema.safeParse(result);
+          if (!parsedResult.success) {
+            const err = new Error('Failed to parse tool result from IDE');
+            logger.debug(err, parsedResult.error);
+            this.diffResponses.delete(filePath);
+            reject(err);
+            return;
+          }
+
+          if (parsedResult.data.isError) {
+            const textPart = parsedResult.data.content.find(
+              (part) => part.type === 'text',
+            );
+            const errorMessage =
+              textPart?.text ?? `Tool 'openDiff' reported an error.`;
+            logger.debug(
+              `callTool for ${filePath} failed with isError:`,
+              errorMessage,
+            );
+            this.diffResponses.delete(filePath);
+            reject(new Error(errorMessage));
+          }
         })
         .catch((err) => {
           logger.debug(`callTool for ${filePath} failed:`, err);
@@ -279,14 +317,56 @@ export class IdeClient {
         },
       });
 
-      if (result) {
-        const parsed = CloseDiffResponseSchema.parse(result);
-        return parsed.content;
+      if (!result) {
+        return undefined;
+      }
+
+      const parsedResult = CallToolResultSchema.safeParse(result);
+      if (!parsedResult.success) {
+        logger.debug(
+          `Failed to parse tool result from IDE for closeDiff:`,
+          parsedResult.error,
+        );
+        return undefined;
+      }
+
+      if (parsedResult.data.isError) {
+        const textPart = parsedResult.data.content.find(
+          (part) => part.type === 'text',
+        );
+        const errorMessage =
+          textPart?.text ?? `Tool 'closeDiff' reported an error.`;
+        logger.debug(
+          `callTool for closeDiff ${filePath} failed with isError:`,
+          errorMessage,
+        );
+        return undefined;
+      }
+
+      const textPart = parsedResult.data.content.find(
+        (part) => part.type === 'text',
+      );
+
+      if (textPart?.text) {
+        try {
+          const parsedJson = JSON.parse(textPart.text);
+          if (parsedJson && typeof parsedJson.content === 'string') {
+            return parsedJson.content;
+          }
+          if (parsedJson && parsedJson.content === null) {
+            return undefined;
+          }
+        } catch (_e) {
+          logger.debug(
+            `Invalid JSON in closeDiff response for ${filePath}:`,
+            textPart.text,
+          );
+        }
       }
     } catch (err) {
-      logger.debug(`callTool for ${filePath} failed:`, err);
+      logger.debug(`callTool for closeDiff ${filePath} failed:`, err);
     }
-    return;
+    return undefined;
   }
 
   // Closes the diff. Instead of waiting for a notification,
@@ -648,6 +728,22 @@ export class IdeClient {
       },
     );
 
+    this.client.setNotificationHandler(
+      IdeDiffRejectedNotificationSchema,
+      (notification) => {
+        const { filePath } = notification.params;
+        const resolver = this.diffResponses.get(filePath);
+        if (resolver) {
+          resolver({ status: 'rejected', content: undefined });
+          this.diffResponses.delete(filePath);
+        } else {
+          logger.debug(`No resolver found for ${filePath}`);
+        }
+      },
+    );
+
+    // For backwards compatability. Newer extension versions will only send
+    // IdeDiffRejectedNotificationSchema.
     this.client.setNotificationHandler(
       IdeDiffClosedNotificationSchema,
       (notification) => {
