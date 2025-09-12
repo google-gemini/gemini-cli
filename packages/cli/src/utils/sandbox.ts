@@ -5,6 +5,7 @@
  */
 
 import { exec, execSync, spawn, type ChildProcess } from 'node:child_process';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -21,6 +22,44 @@ import { FatalSandboxError } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 
 const execAsync = promisify(exec);
+
+async function waitForProxyReady(urlString: string, intervalMs = 250): Promise<void> {
+  const url = new URL(urlString);
+  // Loop until a successful HTTP response is received
+  // This mirrors the previous shell loop but is portable across platforms.
+  // Intentionally no hard deadline to retain previous behavior.
+  // Callers may decide if they want to enforce a timeout.
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const req = http.request(
+          {
+            host: url.hostname,
+            port: url.port ? Number(url.port) : 80,
+            path: url.pathname,
+            method: 'GET',
+            timeout: intervalMs,
+          },
+          (res) => {
+            // Any HTTP response means the proxy is serving
+            res.resume(); // drain
+            resolve();
+          },
+        );
+        req.on('timeout', () => {
+          req.destroy(new Error('timeout'));
+        });
+        req.on('error', reject);
+        req.end();
+      });
+      return; // success
+    } catch {
+      // ignore and retry after a short delay
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+  }
+}
 
 function getContainerPath(hostPath: string): string {
   if (os.platform() !== 'win32') {
@@ -334,9 +373,7 @@ export async function start_sandbox(
           );
         });
         console.log('waiting for proxy to start ...');
-        await execAsync(
-          `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
-        );
+        await waitForProxyReady('http://localhost:8877');
       }
       // spawn child and let it inherit stdio
       sandboxProcess = spawn(config.command, args, {
@@ -782,9 +819,7 @@ export async function start_sandbox(
         );
       });
       console.log('waiting for proxy to start ...');
-      await execAsync(
-        `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
-      );
+      await waitForProxyReady('http://localhost:8877');
       // connect proxy container to sandbox network
       // (workaround for older versions of docker that don't support multiple --network args)
       await execAsync(
