@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.3.4",
+  "version": "0.6.0-nightly",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.3.4"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.6.0-nightly"
   },
   "scripts": {
     "start": "node scripts/start.js",
@@ -42,6 +42,7 @@
     "lint": "eslint . --ext .ts,.tsx && eslint integration-tests",
     "lint:fix": "eslint . --fix && eslint integration-tests --fix",
     "lint:ci": "eslint . --ext .ts,.tsx --max-warnings 0 && eslint integration-tests --max-warnings 0",
+    "lint:all": "node scripts/lint.js",
     "format": "prettier --experimental-cli --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "preflight": "npm run clean && npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci",
@@ -58,7 +59,8 @@
   "files": [
     "bundle/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "npm-shrinkwrap.json"
   ],
   "devDependencies": {
     "@types/marked": "^5.0.2",
@@ -91,7 +93,6 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "@lvce-editor/ripgrep": "^1.6.0",
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {

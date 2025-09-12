@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import type { LoadedSettings, Settings } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
 import {
@@ -16,7 +16,6 @@ import {
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import {
   getDialogSettingKeys,
-  getSettingValue,
   setPendingSettingValue,
   getDisplayValue,
   hasRestartRequiredSettings,
@@ -28,11 +27,16 @@ import {
   getDefaultValue,
   setPendingSettingValueAny,
   getNestedValue,
+  getEffectiveValue,
 } from '../../utils/settingsUtils.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import chalk from 'chalk';
 import { cpSlice, cpLen, stripUnsafeCharacters } from '../utils/textUtils.js';
+import {
+  type SettingsValue,
+  TOGGLE_TYPES,
+} from '../../config/settingsSchema.js';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -122,15 +126,33 @@ export function SettingsDialog({
         value: key,
         type: definition?.type,
         toggle: () => {
-          if (definition?.type !== 'boolean') {
-            // For non-boolean items, toggle will be handled via edit mode.
+          if (!TOGGLE_TYPES.has(definition?.type)) {
             return;
           }
-          const currentValue = getSettingValue(key, pendingSettings, {});
-          const newValue = !currentValue;
+          const currentValue = getEffectiveValue(key, pendingSettings, {});
+          let newValue: SettingsValue;
+          if (definition?.type === 'boolean') {
+            newValue = !(currentValue as boolean);
+            setPendingSettings((prev) =>
+              setPendingSettingValue(key, newValue as boolean, prev),
+            );
+          } else if (definition?.type === 'enum' && definition.options) {
+            const options = definition.options;
+            const currentIndex = options?.findIndex(
+              (opt) => opt.value === currentValue,
+            );
+            if (currentIndex !== -1 && currentIndex < options.length - 1) {
+              newValue = options[currentIndex + 1].value;
+            } else {
+              newValue = options[0].value; // loop back to start.
+            }
+            setPendingSettings((prev) =>
+              setPendingSettingValueAny(key, newValue, prev),
+            );
+          }
 
           setPendingSettings((prev) =>
-            setPendingSettingValue(key, newValue, prev),
+            setPendingSettingValue(key, newValue as boolean, prev),
           );
 
           if (!requiresRestart(key)) {
@@ -634,18 +656,18 @@ export function SettingsDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={Colors.Gray}
+      borderColor={theme.border.default}
       flexDirection="row"
       padding={1}
       width="100%"
       height="100%"
     >
       <Box flexDirection="column" flexGrow={1}>
-        <Text bold color={Colors.AccentBlue}>
+        <Text bold color={theme.text.link}>
           Settings
         </Text>
         <Box height={1} />
-        {showScrollUp && <Text color={Colors.Gray}>▲</Text>}
+        {showScrollUp && <Text color={theme.text.secondary}>▲</Text>}
         {visibleItems.map((item, idx) => {
           const isActive =
             focusSection === 'settings' &&
@@ -726,17 +748,21 @@ export function SettingsDialog({
             <React.Fragment key={item.value}>
               <Box flexDirection="row" alignItems="center">
                 <Box minWidth={2} flexShrink={0}>
-                  <Text color={isActive ? Colors.AccentGreen : Colors.Gray}>
+                  <Text
+                    color={
+                      isActive ? theme.status.success : theme.text.secondary
+                    }
+                  >
                     {isActive ? '●' : ''}
                   </Text>
                 </Box>
                 <Box minWidth={50}>
                   <Text
-                    color={isActive ? Colors.AccentGreen : Colors.Foreground}
+                    color={isActive ? theme.status.success : theme.text.primary}
                   >
                     {item.label}
                     {scopeMessage && (
-                      <Text color={Colors.Gray}> {scopeMessage}</Text>
+                      <Text color={theme.text.secondary}> {scopeMessage}</Text>
                     )}
                   </Text>
                 </Box>
@@ -744,10 +770,10 @@ export function SettingsDialog({
                 <Text
                   color={
                     isActive
-                      ? Colors.AccentGreen
+                      ? theme.status.success
                       : shouldBeGreyedOut
-                        ? Colors.Gray
-                        : Colors.Foreground
+                        ? theme.text.secondary
+                        : theme.text.primary
                   }
                 >
                   {displayValue}
@@ -757,7 +783,7 @@ export function SettingsDialog({
             </React.Fragment>
           );
         })}
-        {showScrollDown && <Text color={Colors.Gray}>▼</Text>}
+        {showScrollDown && <Text color={theme.text.secondary}>▼</Text>}
 
         <Box height={1} />
 
@@ -776,11 +802,11 @@ export function SettingsDialog({
         </Box>
 
         <Box height={1} />
-        <Text color={Colors.Gray}>
+        <Text color={theme.text.secondary}>
           (Use Enter to select, Tab to change focus)
         </Text>
         {showRestartPrompt && (
-          <Text color={Colors.AccentYellow}>
+          <Text color={theme.status.warning}>
             To see changes, Gemini CLI must be restarted. Press r to exit and
             apply changes now.
           </Text>
