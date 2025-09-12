@@ -87,6 +87,7 @@ While the CLI handles the final truncation, it is highly recommended that your e
 To add support for a new IDE, two main components in the Gemini CLI codebase need to be updated: the detection logic and the installer logic.
 
 ### 1. IDE Detection (`@packages/core/src/ide/detect-ide.ts`)
+// TODO(skeshive): Determine whether we should discover the IDE via the port file
 
 The CLI must be able to identify when it is running inside a specific IDE's integrated terminal. This is primarily done by checking for unique environment variables. As a fallback, it can also inspect process information (like the command name) to help distinguish between IDEs if a unique environment variable is not available.
 
