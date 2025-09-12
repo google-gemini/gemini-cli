@@ -863,8 +863,8 @@ export const useGeminiStream = (
 
         // For AUTO_EDIT mode, only approve edit tools (replace, write_file)
         if (newApprovalMode === ApprovalMode.AUTO_EDIT) {
-          awaitingApprovalCalls = awaitingApprovalCalls.filter(
-            (call) => EDIT_TOOL_NAMES.has(call.request.name),
+          awaitingApprovalCalls = awaitingApprovalCalls.filter((call) =>
+            EDIT_TOOL_NAMES.has(call.request.name),
           );
         }
 
