@@ -127,7 +127,11 @@ describe('ChatRecordingService', () => {
       const writeFileSyncSpy = vi
         .spyOn(fs, 'writeFileSync')
         .mockImplementation(() => undefined);
-      chatRecordingService.recordMessage({ type: 'user', content: 'Hello' });
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Hello',
+        model: 'gemini-pro',
+      });
       expect(mkdirSyncSpy).toHaveBeenCalled();
       expect(writeFileSyncSpy).toHaveBeenCalled();
       const conversation = JSON.parse(
@@ -161,6 +165,7 @@ describe('ChatRecordingService', () => {
       chatRecordingService.recordMessage({
         type: 'user',
         content: 'World',
+        model: 'gemini-pro',
       });
 
       expect(mkdirSyncSpy).toHaveBeenCalled();
@@ -311,7 +316,7 @@ describe('ChatRecordingService', () => {
         status: 'awaiting_approval',
         timestamp: new Date().toISOString(),
       };
-      chatRecordingService.recordToolCalls([toolCall]);
+      chatRecordingService.recordToolCalls('gemini-pro', [toolCall]);
 
       expect(mkdirSyncSpy).toHaveBeenCalled();
       expect(writeFileSyncSpy).toHaveBeenCalled();
@@ -358,7 +363,7 @@ describe('ChatRecordingService', () => {
         status: 'awaiting_approval',
         timestamp: new Date().toISOString(),
       };
-      chatRecordingService.recordToolCalls([toolCall]);
+      chatRecordingService.recordToolCalls('gemini-pro', [toolCall]);
 
       expect(mkdirSyncSpy).toHaveBeenCalled();
       expect(writeFileSyncSpy).toHaveBeenCalled();
