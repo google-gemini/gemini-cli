@@ -33,6 +33,7 @@ import {
   parseAndFormatApiError,
   getCodeAssistServer,
   UserTierId,
+  promptIdContext,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -101,6 +102,10 @@ export const useGeminiStream = (
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
   onEditorClose: () => void,
   onCancelSubmit: () => void,
+  setShellInputFocused: (value: boolean) => void,
+  terminalWidth: number,
+  terminalHeight: number,
+  isShellFocused?: boolean,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -140,7 +145,6 @@ export const useGeminiStream = (
         }
       },
       config,
-      setPendingHistoryItem,
       getPreferredEditor,
       onEditorClose,
     );
@@ -151,21 +155,49 @@ export const useGeminiStream = (
     [toolCalls],
   );
 
+  const activeToolPtyId = useMemo(() => {
+    const executingShellTool = toolCalls?.find(
+      (tc) =>
+        tc.status === 'executing' && tc.request.name === 'run_shell_command',
+    );
+    if (executingShellTool) {
+      return (executingShellTool as { pid?: number }).pid;
+    }
+    return undefined;
+  }, [toolCalls]);
+
   const loopDetectedRef = useRef(false);
+  const [
+    loopDetectionConfirmationRequest,
+    setLoopDetectionConfirmationRequest,
+  ] = useState<{
+    onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
+  } | null>(null);
 
   const onExec = useCallback(async (done: Promise<void>) => {
     setIsResponding(true);
     await done;
     setIsResponding(false);
   }, []);
-  const { handleShellCommand } = useShellCommandProcessor(
+  const { handleShellCommand, activeShellPtyId } = useShellCommandProcessor(
     addItem,
     setPendingHistoryItem,
     onExec,
     onDebugMessage,
     config,
     geminiClient,
+    setShellInputFocused,
+    terminalWidth,
+    terminalHeight,
   );
+
+  const activePtyId = activeShellPtyId || activeToolPtyId;
+
+  useEffect(() => {
+    if (!activePtyId) {
+      setShellInputFocused(false);
+    }
+  }, [activePtyId, setShellInputFocused]);
 
   const streamingState = useMemo(() => {
     if (toolCalls.some((tc) => tc.status === 'awaiting_approval')) {
@@ -233,17 +265,19 @@ export const useGeminiStream = (
     setPendingHistoryItem(null);
     onCancelSubmit();
     setIsResponding(false);
+    setShellInputFocused(false);
   }, [
     streamingState,
     addItem,
     setPendingHistoryItem,
     onCancelSubmit,
     pendingHistoryItemRef,
+    setShellInputFocused,
   ]);
 
   useKeypress(
     (key) => {
-      if (key.name === 'escape') {
+      if (key.name === 'escape' && !isShellFocused) {
         cancelOngoingRequest();
       }
     },
@@ -587,15 +621,38 @@ export const useGeminiStream = (
     [addItem, config],
   );
 
+  const handleLoopDetectionConfirmation = useCallback(
+    (result: { userSelection: 'disable' | 'keep' }) => {
+      setLoopDetectionConfirmationRequest(null);
+
+      if (result.userSelection === 'disable') {
+        config.getGeminiClient().getLoopDetectionService().disableForSession();
+        addItem(
+          {
+            type: 'info',
+            text: `Loop detection has been disabled for this session. Please try your request again.`,
+          },
+          Date.now(),
+        );
+      } else {
+        addItem(
+          {
+            type: 'info',
+            text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
+          },
+          Date.now(),
+        );
+      }
+    },
+    [config, addItem],
+  );
+
   const handleLoopDetectedEvent = useCallback(() => {
-    addItem(
-      {
-        type: 'info',
-        text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
-      },
-      Date.now(),
-    );
-  }, [addItem]);
+    // Show the confirmation dialog to choose whether to disable loop detection
+    setLoopDetectionConfirmationRequest({
+      onComplete: handleLoopDetectionConfirmation,
+    });
+  }, [handleLoopDetectionConfirmation]);
 
   const processGeminiStreamEvents = useCallback(
     async (
@@ -705,71 +762,72 @@ export const useGeminiStream = (
       if (!prompt_id) {
         prompt_id = config.getSessionId() + '########' + getPromptCount();
       }
-
-      const { queryToSend, shouldProceed } = await prepareQueryForGemini(
-        query,
-        userMessageTimestamp,
-        abortSignal,
-        prompt_id!,
-      );
-
-      if (!shouldProceed || queryToSend === null) {
-        return;
-      }
-
-      if (!options?.isContinuation) {
-        startNewPrompt();
-        setThought(null); // Reset thought when starting a new prompt
-      }
-
-      setIsResponding(true);
-      setInitError(null);
-
-      try {
-        const stream = geminiClient.sendMessageStream(
-          queryToSend,
-          abortSignal,
-          prompt_id!,
-        );
-        const processingStatus = await processGeminiStreamEvents(
-          stream,
+      return promptIdContext.run(prompt_id, async () => {
+        const { queryToSend, shouldProceed } = await prepareQueryForGemini(
+          query,
           userMessageTimestamp,
           abortSignal,
+          prompt_id,
         );
 
-        if (processingStatus === StreamProcessingStatus.UserCancelled) {
+        if (!shouldProceed || queryToSend === null) {
           return;
         }
 
-        if (pendingHistoryItemRef.current) {
-          addItem(pendingHistoryItemRef.current, userMessageTimestamp);
-          setPendingHistoryItem(null);
+        if (!options?.isContinuation) {
+          startNewPrompt();
+          setThought(null); // Reset thought when starting a new prompt
         }
-        if (loopDetectedRef.current) {
-          loopDetectedRef.current = false;
-          handleLoopDetectedEvent();
-        }
-      } catch (error: unknown) {
-        if (error instanceof UnauthorizedError) {
-          onAuthError('Session expired or is unauthorized.');
-        } else if (!isNodeError(error) || error.name !== 'AbortError') {
-          addItem(
-            {
-              type: MessageType.ERROR,
-              text: parseAndFormatApiError(
-                getErrorMessage(error) || 'Unknown error',
-                config.getContentGeneratorConfig()?.authType,
-                undefined,
-                config.getModel(),
-                DEFAULT_GEMINI_FLASH_MODEL,
-              ),
-            },
-            userMessageTimestamp,
+
+        setIsResponding(true);
+        setInitError(null);
+
+        try {
+          const stream = geminiClient.sendMessageStream(
+            queryToSend,
+            abortSignal,
+            prompt_id,
           );
+          const processingStatus = await processGeminiStreamEvents(
+            stream,
+            userMessageTimestamp,
+            abortSignal,
+          );
+
+          if (processingStatus === StreamProcessingStatus.UserCancelled) {
+            return;
+          }
+
+          if (pendingHistoryItemRef.current) {
+            addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+            setPendingHistoryItem(null);
+          }
+          if (loopDetectedRef.current) {
+            loopDetectedRef.current = false;
+            handleLoopDetectedEvent();
+          }
+        } catch (error: unknown) {
+          if (error instanceof UnauthorizedError) {
+            onAuthError('Session expired or is unauthorized.');
+          } else if (!isNodeError(error) || error.name !== 'AbortError') {
+            addItem(
+              {
+                type: MessageType.ERROR,
+                text: parseAndFormatApiError(
+                  getErrorMessage(error) || 'Unknown error',
+                  config.getContentGeneratorConfig()?.authType,
+                  undefined,
+                  config.getModel(),
+                  DEFAULT_GEMINI_FLASH_MODEL,
+                ),
+              },
+              userMessageTimestamp,
+            );
+          }
+        } finally {
+          setIsResponding(false);
         }
-      } finally {
-        setIsResponding(false);
-      }
+      });
     },
     [
       streamingState,
@@ -1043,5 +1101,7 @@ export const useGeminiStream = (
     pendingHistoryItems,
     thought,
     cancelOngoingRequest,
+    activePtyId,
+    loopDetectionConfirmationRequest,
   };
 };
