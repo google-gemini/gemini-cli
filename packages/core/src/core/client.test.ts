@@ -14,7 +14,12 @@ import {
   type Mock,
 } from 'vitest';
 
-import type { Content, GenerateContentResponse, Part } from '@google/genai';
+import {
+  createUserContent,
+  type Content,
+  type GenerateContentResponse,
+  type Part,
+} from '@google/genai';
 import {
   findIndexAfterFraction,
   isThinkingDefault,
@@ -578,8 +583,12 @@ describe('Gemini Client (client.ts)', () => {
         vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
           totalTokens: 1000,
         });
-        await client.tryCompressChat('prompt-id-4'); // Fails
-        const result = await client.tryCompressChat('prompt-id-4', true);
+        await client.tryCompressChat('prompt-id-4', [{ text: 'request' }]); // Fails
+        const result = await client.tryCompressChat(
+          'prompt-id-4',
+          [{ text: 'request' }],
+          true,
+        );
 
         expect(result).toEqual({
           compressionStatus: CompressionStatus.COMPRESSED,
@@ -593,7 +602,11 @@ describe('Gemini Client (client.ts)', () => {
         vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
           totalTokens: 1000,
         });
-        const result = await client.tryCompressChat('prompt-id-4', true);
+        const result = await client.tryCompressChat(
+          'prompt-id-4',
+          [{ text: 'request' }],
+          true,
+        );
 
         expect(result).toEqual({
           compressionStatus:
@@ -605,7 +618,11 @@ describe('Gemini Client (client.ts)', () => {
 
       it('does not manipulate the source chat', async () => {
         const { client, mockChat } = setup();
-        await client.tryCompressChat('prompt-id-4', true);
+        await client.tryCompressChat(
+          'prompt-id-4',
+          [{ text: 'request' }],
+          true,
+        );
 
         expect(client['chat']).toBe(mockChat); // a new chat session was not created
       });
@@ -625,8 +642,10 @@ describe('Gemini Client (client.ts)', () => {
         const { client } = setup({
           chatHistory: originalHistory,
         });
-        const { compressionStatus } =
-          await client.tryCompressChat('prompt-id-4');
+        const { compressionStatus } = await client.tryCompressChat(
+          'prompt-id-4',
+          [{ text: 'what is your wisdom?' }],
+        );
 
         expect(compressionStatus).toBe(
           CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT,
@@ -638,9 +657,11 @@ describe('Gemini Client (client.ts)', () => {
 
       it('will not attempt to compress context after a failure', async () => {
         const { client } = setup();
-        await client.tryCompressChat('prompt-id-4');
+        await client.tryCompressChat('prompt-id-4', [{ text: 'request' }]);
 
-        const result = await client.tryCompressChat('prompt-id-5');
+        const result = await client.tryCompressChat('prompt-id-5', [
+          { text: 'request' },
+        ]);
 
         // it counts tokens for {original, compressed} and then never again
         expect(mockContentGenerator.countTokens).toHaveBeenCalledTimes(2);
@@ -663,7 +684,9 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-2');
+      const result = await client.tryCompressChat('prompt-id-2', [
+        { text: '...history...' },
+      ]);
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -708,7 +731,7 @@ describe('Gemini Client (client.ts)', () => {
         ],
       } as unknown as GenerateContentResponse);
 
-      await client.tryCompressChat('prompt-id-3');
+      await client.tryCompressChat('prompt-id-3', [{ text: '...history...' }]);
 
       expect(
         ClearcutLogger.prototype.logChatCompressionEvent,
@@ -752,7 +775,9 @@ describe('Gemini Client (client.ts)', () => {
       } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-3');
+      const result = await client.tryCompressChat('prompt-id-3', [
+        { text: '...history...' },
+      ]);
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -811,7 +836,9 @@ describe('Gemini Client (client.ts)', () => {
       } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-3');
+      const result = await client.tryCompressChat('prompt-id-3', [
+        { text: '...history...' },
+      ]);
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -831,7 +858,7 @@ describe('Gemini Client (client.ts)', () => {
       // 3. compressed summary message
       // 4. standard canned user summary message
       // 5. The last user message (not the last 3 because that would start with a function response)
-      expect(newChat.getHistory().length).toEqual(5);
+      expect(newChat.getHistory().length).toEqual(6);
     });
 
     it('should always trigger summarization when force is true, regardless of token count', async () => {
@@ -859,7 +886,11 @@ describe('Gemini Client (client.ts)', () => {
       } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-1', true); // force = true
+      const result = await client.tryCompressChat(
+        'prompt-id-1',
+        [{ text: '...history...' }],
+        true,
+      ); // force = true
       const newChat = client.getChat();
 
       expect(mockGenerateContentFn).toHaveBeenCalled();
@@ -896,7 +927,7 @@ describe('Gemini Client (client.ts)', () => {
       ];
 
       const mockChat = {
-        getHistory: vi.fn().mockReturnValue(mockChatHistory),
+        getHistory: vi.fn().mockImplementation(() => [...mockChatHistory]),
         setHistory: vi.fn(),
         sendMessage: mockSendMessage,
       } as unknown as GeminiChat;
@@ -904,12 +935,13 @@ describe('Gemini Client (client.ts)', () => {
       client['chat'] = mockChat;
       client['startChat'] = vi.fn().mockResolvedValue(mockChat);
 
-      const result = await client.tryCompressChat('prompt-id-4', true);
+      const request = [{ text: 'Long conversation' }];
+      const result = await client.tryCompressChat('prompt-id-4', request, true);
 
       expect(mockContentGenerator.countTokens).toHaveBeenCalledTimes(2);
       expect(mockContentGenerator.countTokens).toHaveBeenNthCalledWith(1, {
         model: firstCurrentModel,
-        contents: mockChatHistory,
+        contents: [...mockChatHistory, createUserContent(request)],
       });
       expect(mockContentGenerator.countTokens).toHaveBeenNthCalledWith(2, {
         model: secondCurrentModel,

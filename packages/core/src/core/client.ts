@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  EmbedContentParameters,
-  GenerateContentConfig,
-  PartListUnion,
-  Content,
-  Tool,
-  GenerateContentResponse,
+import {
+  type EmbedContentParameters,
+  type GenerateContentConfig,
+  type PartListUnion,
+  type Content,
+  type Tool,
+  type GenerateContentResponse,
+  createUserContent,
 } from '@google/genai';
 import {
   getDirectoryContextString,
@@ -452,7 +453,7 @@ export class GeminiClient {
       return new Turn(this.getChat(), prompt_id);
     }
 
-    const compressed = await this.tryCompressChat(prompt_id);
+    const compressed = await this.tryCompressChat(prompt_id, request);
 
     if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
@@ -788,6 +789,7 @@ export class GeminiClient {
 
   async tryCompressChat(
     prompt_id: string,
+    request: PartListUnion,
     force: boolean = false,
   ): Promise<ChatCompressionInfo> {
     const curatedHistory = this.getChat().getHistory(true);
@@ -805,6 +807,8 @@ export class GeminiClient {
     }
 
     const model = this.config.getModel();
+
+    curatedHistory.push(createUserContent(request));
 
     const { totalTokens: originalTokenCount } =
       await this.getContentGeneratorOrFail().countTokens({
