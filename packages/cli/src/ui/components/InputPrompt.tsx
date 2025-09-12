@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
@@ -31,13 +31,6 @@ import {
 } from '../utils/clipboardUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
-
-const LARGE_PASTE_CHAR_THRESHOLD = 1000; // When the pasted content is larger than this threshold, it will be inserted as a placeholder
-
-interface PendingPasteItem {
-  placeholder: string;
-  content: string;
-}
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -77,11 +70,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [escPressCount, setEscPressCount] = useState(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
-  const [pendingPastes, setPendingPastes] = useState<PendingPasteItem[]>([]);
-  const pastePlaceholders = useMemo(
-    () => pendingPastes.map((p) => p.placeholder),
-    [pendingPastes],
-  );
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [recentPasteTime, setRecentPasteTime] = useState<number | null>(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -221,22 +209,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     [buffer],
   );
 
-  // Remove pending pastes that are not in the buffer text
-  const prunePendingPastes = useCallback(() => {
-    const t = buffer.text;
-    setPendingPastes((prev) => {
-      if (prev.length === 0) {
-        return prev;
-      }
-      const next = prev.filter((p) => t.includes(p.placeholder));
-      return next.length === prev.length ? prev : next;
-    });
-  }, [buffer.text]);
-
-  useEffect(() => {
-    prunePendingPastes();
-  }, [prunePendingPastes]);
-
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
     try {
@@ -267,63 +239,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
   }, [buffer, config, insertAtOffsetWithAutoSpaces]);
 
-  const expandPlaceholders = useCallback(
-    (input: string): string => {
-      let out = input;
-      for (const item of pendingPastes) {
-        const idx = out.indexOf(item.placeholder);
-        if (idx !== -1) {
-          out =
-            out.slice(0, idx) +
-            item.content +
-            out.slice(idx + item.placeholder.length);
-        }
-      }
-      return out;
-    },
-    [pendingPastes],
-  );
-
-  const insertLargePastePlaceholder = useCallback(
-    (content: string): void => {
-      const contentLen = toCodePoints(content).length;
-      const placeholder = `[Pasted Content ${contentLen} chars]`;
-      const offset = logicalPosToOffset(
-        buffer.lines,
-        buffer.cursor[0],
-        buffer.cursor[1],
-      );
-      insertAtOffsetWithAutoSpaces(offset, placeholder);
-      setPendingPastes((prev) => prev.concat({ placeholder, content }));
-    },
-    [buffer, insertAtOffsetWithAutoSpaces],
-  );
-
-  const tryDeletePlaceholderAtCursor = useCallback((): boolean => {
-    const offset = logicalPosToOffset(
-      buffer.lines,
-      buffer.cursor[0],
-      buffer.cursor[1],
-    );
-    const text = buffer.text;
-    for (let i = 0; i < pendingPastes.length; i++) {
-      const ph = pendingPastes[i].placeholder;
-      const phLen = cpLen(ph);
-      if (offset >= phLen && cpSlice(text, offset - phLen, offset) === ph) {
-        buffer.replaceRangeByOffset(offset - phLen, offset, '');
-        setPendingPastes((prev) => {
-          const idx = prev.findIndex((p) => p.placeholder === ph);
-          if (idx === -1) return prev;
-          const next = prev.slice();
-          next.splice(idx, 1);
-          return next;
-        });
-        return true;
-      }
-    }
-    return false;
-  }, [buffer, pendingPastes]);
-
   const handleInput = useCallback(
     (key: Key) => {
       /// We want to handle paste even when not focused to support drag and drop.
@@ -345,14 +260,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           setRecentPasteTime(null);
           pasteTimeoutRef.current = null;
         }, 500);
-
-        const content = key.sequence || '';
-        const contentLen = toCodePoints(content).length;
-        if (contentLen > LARGE_PASTE_CHAR_THRESHOLD) {
-          insertLargePastePlaceholder(content);
-        } else {
-          buffer.handleInput(key);
-        }
+        buffer.handleInput(key);
         return;
       }
 
@@ -579,8 +487,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.backspace();
             buffer.newline();
           } else {
-            const expanded = expandPlaceholders(buffer.text);
-            setPendingPastes([]);
+            const expanded = buffer.expandPlaceholders(buffer.text);
+            buffer.clearPendingPastes();
             handleSubmitAndClear(expanded);
           }
         }
@@ -608,7 +516,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           buffer.setText('');
           resetCompletionState();
         }
-        setPendingPastes([]);
+        buffer.clearPendingPastes();
         return;
       }
 
@@ -639,11 +547,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      if (key.name === 'backspace') {
-        if (tryDeletePlaceholderAtCursor()) {
-          return;
-        }
-      }
       buffer.handleInput(key);
 
       // Clear ghost text when user types regular characters (not navigation/control keys)
@@ -678,9 +581,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       textBeforeReverseSearch,
       cursorPosition,
       recentPasteTime,
-      tryDeletePlaceholderAtCursor,
-      expandPlaceholders,
-      insertLargePastePlaceholder,
     ],
   );
 
@@ -849,7 +749,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 const tokens = parseInputForHighlighting(
                   lineText,
                   visualIdxInRenderedSet,
-                  pastePlaceholders,
+                  buffer.pastePlaceholders,
                 );
                 const cursorVisualRow =
                   cursorVisualRowAbsolute - scrollVisualRow;
