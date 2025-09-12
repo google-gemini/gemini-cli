@@ -153,13 +153,23 @@ async function getGeminiMdFilePathsInternalForEachDir(
     if (currentDirectoryOnly) {
       // Only consider the file in the current directory.
       const candidate = path.join(path.resolve(dir), geminiMdFilename);
-      // Avoid TOCTOU: don't check access here; defer to readGeminiMdFiles which
-      // handles errors gracefully. Just add the candidate and log.
-      allPaths.add(candidate);
-      if (debugMode)
-        logger.debug(
-          `currentDirectoryOnly: Added candidate ${geminiMdFilename} in CWD: ${candidate}`,
-        );
+      // Apply file filtering options (e.g., respectGitIgnore) before adding
+      if (fileService.shouldIgnoreFile(candidate, fileFilteringOptions)) {
+        if (debugMode) {
+          logger.debug(
+            `currentDirectoryOnly: Ignoring candidate ${candidate} due to filter rules.`,
+          );
+        }
+      } else {
+        // Avoid TOCTOU: don't check access here; defer to readGeminiMdFiles which
+        // handles errors gracefully. Just add the candidate and log.
+        allPaths.add(candidate);
+        if (debugMode) {
+          logger.debug(
+            `currentDirectoryOnly: Added candidate ${geminiMdFilename} in CWD: ${candidate}`,
+          );
+        }
+      }
       continue; // Skip global/upward/downward/ext when currentDirectoryOnly
     }
 
