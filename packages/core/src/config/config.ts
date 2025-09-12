@@ -18,9 +18,6 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
 import { RipGrepTool } from '../tools/ripGrep.js';
 import { GlobTool } from '../tools/glob.js';
-import { ContextHarvesterTool } from '../tools/context-harvester.js';
-import { CodebaseInvestigatorTool } from '../tools/codebase-investigator.js';
-import { SolutionPlannerTool } from '../tools/planner.js';
 import { EditTool } from '../tools/edit.js';
 import { SmartEditTool } from '../tools/smart-edit.js';
 import { ShellTool } from '../tools/shell.js';
@@ -886,9 +883,6 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
-    registerCoreTool(ContextHarvesterTool, this);
-    registerCoreTool(CodebaseInvestigatorTool, this);
-    registerCoreTool(SolutionPlannerTool, this);
     await registry.discoverAllTools();
     return registry;
   }
