@@ -7,7 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import Gradient from 'ink-gradient';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { shortAsciiLogo, longAsciiLogo, tinyAsciiLogo } from './AsciiArt.js';
 import { getAsciiArtWidth } from '../utils/textUtils.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -28,14 +28,11 @@ export const Header: React.FC<HeaderProps> = ({
   const widthOfLongLogo = getAsciiArtWidth(longAsciiLogo);
   const widthOfShortLogo = getAsciiArtWidth(shortAsciiLogo);
 
-  // Small hysteresis to reduce toggling between logo sizes around width thresholds.
-  const HYSTERESIS = 2;
-
   if (customAsciiArt) {
     displayTitle = customAsciiArt;
-  } else if (terminalWidth >= widthOfLongLogo + HYSTERESIS) {
+  } else if (terminalWidth >= widthOfLongLogo) {
     displayTitle = longAsciiLogo;
-  } else if (terminalWidth >= widthOfShortLogo + HYSTERESIS) {
+  } else if (terminalWidth >= widthOfShortLogo) {
     displayTitle = shortAsciiLogo;
   } else {
     displayTitle = tinyAsciiLogo;
@@ -50,8 +47,8 @@ export const Header: React.FC<HeaderProps> = ({
       flexShrink={0}
       flexDirection="column"
     >
-      {Colors.GradientColors ? (
-        <Gradient colors={Colors.GradientColors}>
+      {theme.ui.gradient ? (
+        <Gradient colors={theme.ui.gradient}>
           <Text>{displayTitle}</Text>
         </Gradient>
       ) : (
@@ -59,8 +56,8 @@ export const Header: React.FC<HeaderProps> = ({
       )}
       {nightly && (
         <Box width="100%" flexDirection="row" justifyContent="flex-end">
-          {Colors.GradientColors ? (
-            <Gradient colors={Colors.GradientColors}>
+          {theme.ui.gradient ? (
+            <Gradient colors={theme.ui.gradient}>
               <Text>v{version}</Text>
             </Gradient>
           ) : (
