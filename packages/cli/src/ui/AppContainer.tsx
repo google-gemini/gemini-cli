@@ -614,20 +614,20 @@ Logging in with Google... Please restart Gemini CLI to continue.
       streamingState === StreamingState.Responding) &&
     !proQuotaRequest;
 
-  const [footerHeight, setFooterHeight] = useState(staticExtraHeight);
+  const [controlsHeight, setControlsHeight] = useState(0);
 
   useEffect(() => {
     if (mainControlsRef.current) {
       const fullFooterMeasurement = measureElement(mainControlsRef.current);
       if (fullFooterMeasurement.height > 0) {
-        setFooterHeight(fullFooterMeasurement.height);
+        setControlsHeight(fullFooterMeasurement.height);
       }
     }
-  }, [buffer]);
+  }, [buffer, terminalWidth, terminalHeight]);
 
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight =
-    terminalHeight - footerHeight - staticExtraHeight;
+    terminalHeight - controlsHeight - staticExtraHeight;
 
   config.setShellExecutionConfig({
     terminalWidth: Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
