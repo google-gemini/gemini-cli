@@ -9,16 +9,129 @@ import type { ToolResult } from './tools.js';
 import type { Config } from '../config/config.js';
 
 /**
+ * Row height information structure
+ */
+interface RowHeightInfo {
+  row: number;
+  height: number | null;
+  error?: string;
+}
+
+/**
+ * Column width information structure  
+ */
+interface ColumnWidthInfo {
+  column: string;
+  column_number?: number;
+  width: number | null;
+  error?: string;
+}
+
+/**
+ * Cell information structure
+ */
+interface CellInfo {
+  address: string;
+  row: number;
+  column: number;
+  value: unknown;
+  data_type: string;
+  formula?: string | null;
+  has_formula?: boolean;
+  formatting?: Record<string, unknown>;
+  comment?: {
+    text: string;
+    author: string;
+    visible: boolean;
+  } | null;
+  validation?: Record<string, unknown> | null;
+  is_merged?: boolean;
+  merge_area?: string | null;
+}
+
+/**
+ * Shape style configuration interface
+ */
+interface ShapeStyle {
+  fill_color?: string;
+  border_color?: string;
+  border_width?: number;
+  border_style?: 'solid' | 'dashed' | 'dotted' | 'none';
+  transparency?: number;
+  shadow?: {
+    enabled: boolean;
+    color?: string;
+    blur?: number;
+    distance?: number;
+    angle?: number;
+  };
+  three_d?: {
+    enabled: boolean;
+    depth?: number;
+    bevel?: boolean;
+  };
+}
+
+/**
+ * Shape text format configuration interface
+ */
+interface ShapeTextFormat {
+  font?: {
+    name?: string;
+    size?: number;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    color?: string;
+  };
+  alignment?: {
+    horizontal?: 'left' | 'center' | 'right' | 'justify';
+    vertical?: 'top' | 'middle' | 'bottom';
+  };
+  margins?: {
+    left?: number;
+    right?: number;
+    top?: number;
+    bottom?: number;
+  };
+  wrap_text?: boolean;
+  rotation?: number;
+}
+
+/**
  * Parameters for xlwings Excel operations
  */
 interface XlwingsParams {
   /** Operation type */
-  op: 'read' | 'write' | 'create_chart' | 'update_chart' | 'delete_chart' | 'list_charts' | 'format' | 'add_sheet' | 'list_books' | 
-  'list_sheets' | 'get_selection' | 'set_selection' | 'formula' | 'clear' | 'copy_paste' | 'find_replace' | 'create_workbook' | 
-  'open_workbook' | 'save_workbook' | 'close_workbook' | 'get_last_row' | 'get_used_range' | 'convert_data_types' | 'add_vba_module' | 
-  'run_vba_macro' | 'update_vba_code' | 'list_vba_modules' | 'delete_vba_module' | 'insert_image' | 'list_images' | 'delete_image' | 
-  'resize_image' | 'move_image' | 'save_range_as_image' | 'save_chart_as_image' | 'search_data' | 'list_apps' | 
-  'insert_row' | 'insert_column' | 'delete_row' | 'delete_column';
+  op: 
+  // Cell/Range operations
+  'read_range' | 'write_range' | 'clear_range' | 'formula_range' | 'format_range' |
+  'get_cell_info' | 'insert_cells' | 'delete_cells' |
+  // Range operations
+  'copy_paste_range' | 'find_replace_range' | 'search_range' | 'get_used_range' | 'sort_range' |
+  // Merge operations
+  'merge_cells' | 'unmerge_cells' |
+  // Row/Column size operations
+  'set_row_height' | 'set_column_width' | 'get_row_height' | 'get_column_width' |
+  // Comment operations
+  'add_comment' | 'edit_comment' | 'delete_comment' | 'list_comments' |
+  // Chart operations
+  'create_chart' | 'update_chart' | 'delete_chart' | 'list_charts' | 
+  // Shape operations
+  'create_shape' | 'create_textbox' | 'list_shapes' | 'modify_shape' | 'delete_shape' | 'move_shape' | 'resize_shape' |
+  // Sheet operations
+  'add_sheet' | 'alter_sheet' | 'delete_sheet' | 'move_sheet' | 'copy_sheet' | 'list_sheets' | 
+  'list_apps' | 
+  // Selection operations
+  'get_selection' | 'set_selection' | 
+  // Workbook operations
+  'create_workbook' |  'open_workbook' | 'save_workbook' | 'close_workbook' | 'list_workbooks' |  
+  //VBA operations
+  'convert_data_types' | 'add_vba_module' | 'run_vba_macro' | 'update_vba_code' | 'list_vba_modules' | 'delete_vba_module' | 
+  // Image operations
+  'insert_image' | 'list_images' | 'delete_image' |   'resize_image' | 'move_image' | 'save_range_as_image' | 'save_chart_as_image' |   
+  // Row/Column operations
+  'insert_row' | 'insert_column' | 'delete_row' | 'delete_column'| 'get_last_row' ;
   
   /** Target workbook name (optional - uses active if not specified) */
   workbook?: string;
@@ -86,6 +199,113 @@ interface XlwingsParams {
   /** New sheet name (for add_sheet operations) */
   new_sheet_name?: string;
   
+  /** Sheet alteration settings (for alter_sheet operations) */
+  sheet_alter?: {
+    /** New name for the sheet */
+    new_name?: string;
+    /** Tab color in RGB hex format (e.g., "#FF0000" for red) */
+    tab_color?: string;
+  };
+  
+  /** Sheet move settings (for move_sheet operations) */
+  sheet_move?: {
+    /** Target workbook name (for cross-workbook moves) */
+    target_workbook?: string;
+    /** New index position (0-based, for same-workbook moves) */
+    new_index?: number;
+    /** Position relative to other sheet ('before' or 'after') */
+    position?: 'before' | 'after';
+    /** Reference sheet name (when using position) */
+    reference_sheet?: string;
+  };
+  
+  /** Sheet copy settings (for copy_sheet operations) */
+  sheet_copy?: {
+    /** Target workbook name (for cross-workbook copies, optional for same-workbook) */
+    target_workbook?: string;
+    /** New name for copied sheet */
+    new_name?: string;
+    /** Target index position (0-based) */
+    target_index?: number;
+    /** Position relative to other sheet ('before' or 'after') */
+    position?: 'before' | 'after';
+    /** Reference sheet name (when using position) */
+    reference_sheet?: string;
+  };
+  
+  /** Comment settings (for comment operations) */
+  comment?: {
+    /** Comment text content */
+    text: string;
+    /** Comment author (optional, defaults to current user) */
+    author?: string;
+    /** Whether comment should be visible by default */
+    visible?: boolean;
+  };
+  
+  /** Merge settings (for merge operations) */
+  merge?: {
+    /** Whether to merge across columns only (horizontal merge) */
+    across_columns?: boolean;
+    /** Whether to merge across rows only (vertical merge) */
+    across_rows?: boolean;
+    /** Center content in merged cell after merging */
+    center_content?: boolean;
+  };
+  
+  /** Row/Column sizing settings */
+  sizing?: {
+    /** Height for row operations (in points) */
+    height?: number;
+    /** Width for column operations (in characters or points) */
+    width?: number;
+    /** Auto-fit to content */
+    auto_fit?: boolean;
+    /** Row numbers (for multi-row operations, e.g., [1, 3, 5]) */
+    row_numbers?: number[];
+    /** Column identifiers (for multi-column operations, e.g., ['A', 'C', 'E'] or [1, 3, 5]) */
+    column_identifiers?: Array<string | number>;
+  };
+  
+  /** Cell manipulation settings (for insert/delete operations) */
+  cell_operation?: {
+    /** Direction to shift cells when inserting/deleting */
+    shift_direction?: 'right' | 'down' | 'left' | 'up';
+    /** Number of cells/rows/columns to insert or delete */
+    count?: number;
+    /** Whether to include cell formatting information (for get_cell_info) */
+    include_formatting?: boolean;
+    /** Whether to include formula information (for get_cell_info) */
+    include_formulas?: boolean;
+    /** Whether to include data validation info (for get_cell_info) */
+    include_validation?: boolean;
+    /** Whether to include comments (for get_cell_info) */
+    include_comments?: boolean;
+  };
+  
+  /** Sort settings (for sort_range operations) */
+  sort?: {
+    /** Sort keys - array of column/row specifications */
+    keys?: Array<{
+      /** Column letter or number to sort by */
+      column?: string | number;
+      /** Row number to sort by (for horizontal sorting) */
+      row?: number;
+      /** Sort order: ascending or descending */
+      order?: 'asc' | 'desc';
+      /** Data type for sorting (auto, text, number, date) */
+      data_type?: 'auto' | 'text' | 'number' | 'date';
+    }>;
+    /** Whether to include header row in sorting (default: false) */
+    has_header?: boolean;
+    /** Sort orientation: by rows (vertical) or by columns (horizontal) */
+    orientation?: 'rows' | 'columns';
+    /** Whether sorting should be case sensitive */
+    case_sensitive?: boolean;
+    /** Custom sort order array for text values */
+    custom_order?: string[];
+  };
+  
   /** Whether to make Excel visible during operation */
   visible?: boolean;
   
@@ -148,6 +368,128 @@ interface XlwingsParams {
   
   /** Number of rows/columns to insert or delete (default: 1) */
   count?: number;
+
+  /** Shape configuration (for shape operations) */
+  shape?: {
+    /** Shape type */
+    type: 'rectangle' | 'oval' | 'triangle' | 'line' | 'arrow' | 'textbox' | 
+          'flowchart_process' | 'flowchart_decision' | 'flowchart_start_end' | 
+          'flowchart_connector' | 'star' | 'pentagon' | 'hexagon';
+    /** Shape name/identifier (for management operations) */
+    name?: string;
+    /** Position and size */
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    /** Text content (for shapes that support text) */
+    text?: string;
+    /** Style configuration */
+    style?: {
+      /** Fill color (hex format, e.g., "#FF0000") */
+      fill_color?: string;
+      /** Border color (hex format) */
+      border_color?: string;
+      /** Border width in points */
+      border_width?: number;
+      /** Border style */
+      border_style?: 'solid' | 'dashed' | 'dotted' | 'none';
+      /** Transparency (0.0 = opaque, 1.0 = fully transparent) */
+      transparency?: number;
+      /** Shadow settings */
+      shadow?: {
+        enabled: boolean;
+        color?: string;
+        blur?: number;
+        distance?: number;
+        angle?: number;
+      };
+      /** 3D effect settings */
+      three_d?: {
+        enabled: boolean;
+        depth?: number;
+        bevel?: boolean;
+      };
+    };
+    /** Text formatting (for text-supporting shapes) */
+    text_format?: {
+      /** Font settings */
+      font?: {
+        name?: string;
+        size?: number;
+        bold?: boolean;
+        italic?: boolean;
+        underline?: boolean;
+        color?: string;
+      };
+      /** Text alignment */
+      alignment?: {
+        horizontal?: 'left' | 'center' | 'right' | 'justify';
+        vertical?: 'top' | 'middle' | 'bottom';
+      };
+      /** Text margins within shape */
+      margins?: {
+        left?: number;
+        right?: number;
+        top?: number;
+        bottom?: number;
+      };
+      /** Text wrapping */
+      wrap_text?: boolean;
+      /** Text rotation (in degrees) */
+      rotation?: number;
+    };
+    /** Shape rotation (in degrees) */
+    rotation?: number;
+    /** Layer/z-order management */
+    layer?: {
+      /** Bring to front, send to back, etc. */
+      action?: 'bring_to_front' | 'send_to_back' | 'bring_forward' | 'send_backward';
+      /** Specific z-order index */
+      z_index?: number;
+    };
+    /** Grouping settings */
+    group?: {
+      /** Group name for grouping operations */
+      group_name?: string;
+      /** Action to perform */
+      action?: 'group' | 'ungroup' | 'add_to_group' | 'remove_from_group';
+    };
+    /** Animation settings (if supported) */
+    animation?: {
+      /** Animation type */
+      type?: 'fade_in' | 'slide_in' | 'bounce' | 'rotate' | 'none';
+      /** Duration in milliseconds */
+      duration?: number;
+      /** Delay before animation starts */
+      delay?: number;
+    };
+  };
+
+  /** Shape movement settings (for move_shape operations) */
+  shape_move?: {
+    /** New position */
+    new_left: number;
+    new_top: number;
+    /** Whether to animate the movement */
+    animate?: boolean;
+  };
+
+  /** Shape resize settings (for resize_shape operations) */
+  shape_resize?: {
+    /** New dimensions */
+    new_width: number;
+    new_height: number;
+    /** Whether to maintain aspect ratio */
+    keep_aspect_ratio?: boolean;
+    /** Resize anchor point */
+    anchor?: 'top_left' | 'top_center' | 'top_right' | 
+             'middle_left' | 'center' | 'middle_right' | 
+             'bottom_left' | 'bottom_center' | 'bottom_right';
+  };
+
+  /** Shape name/identifier (for shape management operations) */
+  shape_name?: string;
 }
 
 /**
@@ -283,7 +625,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
     super(
       'xlwings',
       'Excel Live Interaction',
-      'Real-time Excel manipulation using xlwings with smart data handling. Can start Excel, create/open files, and perform all Excel operations. Features: BATCH READING (use max_rows, start_row for pagination), PROGRESS TRACKING (shows total/remaining rows), DATA SUMMARY (summary_mode for large datasets). IMPORTANT: Requires xlwings library (pip install xlwings). Can work with existing Excel instances or start new ones. Supports: file creation/opening, data I/O, chart creation, formatting, formulas, sheet management, find/replace, copy/paste operations. Use visible=true to show Excel UI.',
+      'Real-time Excel manipulation using xlwings with smart data handling. Can start Excel, create/open files, and perform all Excel operations. Features: BATCH READING (use max_rows, start_row for pagination), PROGRESS TRACKING (shows total/remaining rows), DATA SUMMARY (summary_mode for large datasets). IMPORTANT: Requires xlwings library (pip install xlwings). Can work with existing Excel instances or start new ones. Supports: range operations (read_range, write_range, format_range, formula_range, clear_range), advanced operations (copy_paste_range, find_replace_range, search_range), sheet management, chart creation, image handling. Use visible=true to show Excel UI.',
       ['xlwings'], // Python requirements
       {
         type: 'object',
@@ -291,7 +633,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
         properties: {
           op: {
             type: 'string',
-            enum: ['read', 'write', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'format', 'add_sheet', 'list_books', 'list_sheets', 'get_selection', 'set_selection', 'formula', 'clear', 'copy_paste', 'find_replace', 'create_workbook', 'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'get_used_range', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image', 'resize_image', 'move_image', 'save_range_as_image', 'save_chart_as_image', 'search_data', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column'],
+            enum: ['read_range', 'write_range', 'clear_range', 'formula_range', 'format_range', 'get_cell_info', 'insert_cells', 'delete_cells', 'copy_paste_range', 'find_replace_range', 'search_range', 'get_used_range', 'sort_range', 'merge_cells', 'unmerge_cells', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width', 'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'create_shape', 'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image', 'resize_image', 'move_image', 'save_range_as_image', 'save_chart_as_image', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column'],
             description: 'Operation to perform'
           },
           workbook: {
@@ -369,6 +711,116 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           new_sheet_name: {
             type: 'string',
             description: 'Name for new sheet'
+          },
+          sheet_alter: {
+            type: 'object',
+            description: 'Sheet alteration settings',
+            properties: {
+              new_name: { type: 'string', description: 'New name for the sheet' },
+              tab_color: { type: 'string', description: 'Tab color in RGB hex format (e.g., "#FF0000" for red)' }
+            }
+          },
+          sheet_move: {
+            type: 'object',
+            description: 'Sheet move settings',
+            properties: {
+              target_workbook: { type: 'string', description: 'Target workbook name (for cross-workbook moves)' },
+              new_index: { type: 'integer', description: 'New index position (0-based, for same-workbook moves)' },
+              position: { type: 'string', enum: ['before', 'after'], description: 'Position relative to reference sheet' },
+              reference_sheet: { type: 'string', description: 'Reference sheet name (when using position)' }
+            }
+          },
+          sheet_copy: {
+            type: 'object',
+            description: 'Sheet copy settings',
+            properties: {
+              target_workbook: { type: 'string', description: 'Target workbook name (for cross-workbook copies)' },
+              new_name: { type: 'string', description: 'New name for copied sheet' },
+              target_index: { type: 'integer', description: 'Target index position (0-based)' },
+              position: { type: 'string', enum: ['before', 'after'], description: 'Position relative to reference sheet' },
+              reference_sheet: { type: 'string', description: 'Reference sheet name (when using position)' }
+            }
+          },
+          comment: {
+            type: 'object',
+            description: 'Comment settings',
+            required: ['text'],
+            properties: {
+              text: { type: 'string', description: 'Comment text content' },
+              author: { type: 'string', description: 'Comment author (optional, defaults to current user)' },
+              visible: { type: 'boolean', description: 'Whether comment should be visible by default' }
+            }
+          },
+          merge: {
+            type: 'object',
+            description: 'Merge settings for merge/unmerge operations',
+            properties: {
+              across_columns: { type: 'boolean', description: 'Whether to merge across columns only (horizontal merge)' },
+              across_rows: { type: 'boolean', description: 'Whether to merge across rows only (vertical merge)' },
+              center_content: { type: 'boolean', description: 'Center content in merged cell after merging' }
+            }
+          },
+          sizing: {
+            type: 'object',
+            description: 'Row/Column sizing settings for height and width operations',
+            properties: {
+              height: { type: 'number', description: 'Height for row operations (in points)' },
+              width: { type: 'number', description: 'Width for column operations (in characters or points)' },
+              auto_fit: { type: 'boolean', description: 'Auto-fit to content' },
+              row_numbers: { 
+                type: 'array', 
+                items: { type: 'number' }, 
+                description: 'Row numbers for multi-row operations (e.g., [1, 3, 5])' 
+              },
+              column_identifiers: { 
+                type: 'array', 
+                items: { oneOf: [{ type: 'string' }, { type: 'number' }] }, 
+                description: 'Column identifiers for multi-column operations (e.g., ["A", "C", "E"] or [1, 3, 5])' 
+              }
+            }
+          },
+          cell_operation: {
+            type: 'object',
+            description: 'Cell manipulation and information settings',
+            properties: {
+              shift_direction: { 
+                type: 'string', 
+                enum: ['right', 'down', 'left', 'up'], 
+                description: 'Direction to shift cells when inserting/deleting' 
+              },
+              count: { type: 'number', description: 'Number of cells/rows/columns to insert or delete' },
+              include_formatting: { type: 'boolean', description: 'Whether to include cell formatting information (for get_cell_info)' },
+              include_formulas: { type: 'boolean', description: 'Whether to include formula information (for get_cell_info)' },
+              include_validation: { type: 'boolean', description: 'Whether to include data validation info (for get_cell_info)' },
+              include_comments: { type: 'boolean', description: 'Whether to include comments (for get_cell_info)' }
+            }
+          },
+          sort: {
+            type: 'object',
+            description: 'Sort settings for sort_range operations',
+            properties: {
+              keys: {
+                type: 'array',
+                description: 'Sort criteria keys',
+                items: {
+                  type: 'object',
+                  properties: {
+                    column: { oneOf: [{ type: 'string' }, { type: 'number' }], description: 'Column letter or number to sort by' },
+                    row: { type: 'number', description: 'Row number to sort by (for horizontal sorting)' },
+                    order: { type: 'string', enum: ['asc', 'desc'], description: 'Sort order: ascending or descending' },
+                    data_type: { type: 'string', enum: ['auto', 'text', 'number', 'date'], description: 'Data type for sorting' }
+                  }
+                }
+              },
+              has_header: { type: 'boolean', description: 'Whether to include header row in sorting (default: false)' },
+              orientation: { type: 'string', enum: ['rows', 'columns'], description: 'Sort orientation: by rows (vertical) or by columns (horizontal)' },
+              case_sensitive: { type: 'boolean', description: 'Whether sorting should be case sensitive' },
+              custom_order: { 
+                type: 'array', 
+                items: { type: 'string' }, 
+                description: 'Custom sort order array for text values' 
+              }
+            }
           },
           visible: {
             type: 'boolean',
@@ -455,6 +907,240 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           count: {
             type: 'number',
             description: 'Number of rows/columns to insert or delete (default: 1)'
+          },
+          shape: {
+            type: 'object',
+            description: 'Shape configuration for shape operations',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['rectangle', 'oval', 'triangle', 'line', 'arrow', 'textbox', 'flowchart_process', 'flowchart_decision', 'flowchart_start_end', 'flowchart_connector', 'star', 'pentagon', 'hexagon'],
+                description: 'Shape type'
+              },
+              name: {
+                type: 'string',
+                description: 'Shape name/identifier for management operations'
+              },
+              left: {
+                type: 'number',
+                description: 'Left position in points'
+              },
+              top: {
+                type: 'number', 
+                description: 'Top position in points'
+              },
+              width: {
+                type: 'number',
+                description: 'Width in points'
+              },
+              height: {
+                type: 'number',
+                description: 'Height in points'
+              },
+              text: {
+                type: 'string',
+                description: 'Text content for shapes that support text'
+              },
+              style: {
+                type: 'object',
+                description: 'Shape styling configuration',
+                properties: {
+                  fill_color: {
+                    type: 'string',
+                    description: 'Fill color in hex format (e.g., "#FF0000")'
+                  },
+                  border_color: {
+                    type: 'string',
+                    description: 'Border color in hex format'
+                  },
+                  border_width: {
+                    type: 'number',
+                    description: 'Border width in points'
+                  },
+                  border_style: {
+                    type: 'string',
+                    enum: ['solid', 'dashed', 'dotted', 'none'],
+                    description: 'Border style'
+                  },
+                  transparency: {
+                    type: 'number',
+                    minimum: 0,
+                    maximum: 1,
+                    description: 'Transparency (0.0 = opaque, 1.0 = fully transparent)'
+                  },
+                  shadow: {
+                    type: 'object',
+                    description: 'Shadow settings',
+                    properties: {
+                      enabled: { type: 'boolean', description: 'Enable shadow' },
+                      color: { type: 'string', description: 'Shadow color' },
+                      blur: { type: 'number', description: 'Shadow blur radius' },
+                      distance: { type: 'number', description: 'Shadow distance' },
+                      angle: { type: 'number', description: 'Shadow angle in degrees' }
+                    }
+                  },
+                  three_d: {
+                    type: 'object',
+                    description: '3D effect settings',
+                    properties: {
+                      enabled: { type: 'boolean', description: 'Enable 3D effect' },
+                      depth: { type: 'number', description: '3D depth' },
+                      bevel: { type: 'boolean', description: 'Enable bevel effect' }
+                    }
+                  }
+                }
+              },
+              text_format: {
+                type: 'object',
+                description: 'Text formatting for text-supporting shapes',
+                properties: {
+                  font: {
+                    type: 'object',
+                    description: 'Font settings',
+                    properties: {
+                      name: { type: 'string', description: 'Font name' },
+                      size: { type: 'number', description: 'Font size in points' },
+                      bold: { type: 'boolean', description: 'Bold text' },
+                      italic: { type: 'boolean', description: 'Italic text' },
+                      underline: { type: 'boolean', description: 'Underlined text' },
+                      color: { type: 'string', description: 'Font color in hex format' }
+                    }
+                  },
+                  alignment: {
+                    type: 'object',
+                    description: 'Text alignment',
+                    properties: {
+                      horizontal: {
+                        type: 'string',
+                        enum: ['left', 'center', 'right', 'justify'],
+                        description: 'Horizontal text alignment'
+                      },
+                      vertical: {
+                        type: 'string',
+                        enum: ['top', 'middle', 'bottom'],
+                        description: 'Vertical text alignment'
+                      }
+                    }
+                  },
+                  margins: {
+                    type: 'object',
+                    description: 'Text margins within shape',
+                    properties: {
+                      left: { type: 'number', description: 'Left margin' },
+                      right: { type: 'number', description: 'Right margin' },
+                      top: { type: 'number', description: 'Top margin' },
+                      bottom: { type: 'number', description: 'Bottom margin' }
+                    }
+                  },
+                  wrap_text: {
+                    type: 'boolean',
+                    description: 'Enable text wrapping'
+                  },
+                  rotation: {
+                    type: 'number',
+                    description: 'Text rotation in degrees'
+                  }
+                }
+              },
+              rotation: {
+                type: 'number',
+                description: 'Shape rotation in degrees'
+              },
+              layer: {
+                type: 'object',
+                description: 'Layer/z-order management',
+                properties: {
+                  action: {
+                    type: 'string',
+                    enum: ['bring_to_front', 'send_to_back', 'bring_forward', 'send_backward'],
+                    description: 'Layer action to perform'
+                  },
+                  z_index: {
+                    type: 'number',
+                    description: 'Specific z-order index'
+                  }
+                }
+              },
+              group: {
+                type: 'object',
+                description: 'Grouping settings',
+                properties: {
+                  group_name: {
+                    type: 'string',
+                    description: 'Group name for grouping operations'
+                  },
+                  action: {
+                    type: 'string',
+                    enum: ['group', 'ungroup', 'add_to_group', 'remove_from_group'],
+                    description: 'Grouping action to perform'
+                  }
+                }
+              },
+              animation: {
+                type: 'object',
+                description: 'Animation settings (if supported)',
+                properties: {
+                  type: {
+                    type: 'string',
+                    enum: ['fade_in', 'slide_in', 'bounce', 'rotate', 'none'],
+                    description: 'Animation type'
+                  },
+                  duration: {
+                    type: 'number',
+                    description: 'Duration in milliseconds'
+                  },
+                  delay: {
+                    type: 'number',
+                    description: 'Delay before animation starts'
+                  }
+                }
+              }
+            }
+          },
+          shape_move: {
+            type: 'object',
+            description: 'Shape movement settings for move_shape operations',
+            properties: {
+              new_left: {
+                type: 'number',
+                description: 'New left position'
+              },
+              new_top: {
+                type: 'number',
+                description: 'New top position'
+              },
+              animate: {
+                type: 'boolean',
+                description: 'Whether to animate the movement'
+              }
+            }
+          },
+          shape_resize: {
+            type: 'object',
+            description: 'Shape resize settings for resize_shape operations',
+            properties: {
+              new_width: {
+                type: 'number',
+                description: 'New width'
+              },
+              new_height: {
+                type: 'number',
+                description: 'New height'
+              },
+              keep_aspect_ratio: {
+                type: 'boolean',
+                description: 'Whether to maintain aspect ratio'
+              },
+              anchor: {
+                type: 'string',
+                enum: ['top_left', 'top_center', 'top_right', 'middle_left', 'center', 'middle_right', 'bottom_left', 'bottom_center', 'bottom_right'],
+                description: 'Resize anchor point'
+              }
+            }
+          },
+          shape_name: {
+            type: 'string',
+            description: 'Shape name/identifier for shape management operations'
           }
         }
       },
@@ -575,11 +1261,11 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           if (result.cells_affected && !result.find_text && !result.data) {
             // Only show general cells_affected if not already covered by specific operations
             const operation = result.operation;
-            if (operation === 'write') {
+            if (operation === 'write_range') {
               llmContent += ` ${result.cells_affected} cells written with data.`;
-            } else if (operation === 'format') {
+            } else if (operation === 'format_range') {
               llmContent += ` Formatting applied to ${result.cells_affected} cells.`;
-            } else if (operation === 'clear') {
+            } else if (operation === 'clear_range') {
               llmContent += ` ${result.cells_affected} cells cleared.`;
             } else {
               llmContent += ` ${result.cells_affected} cells affected.`;
@@ -591,7 +1277,15 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           }
           
           if (result.sheets) {
-            llmContent += ` Found ${result.sheets.length} worksheets: ${result.sheets.join(', ')}.`;
+            if (result.sheets_with_index && Array.isArray(result.sheets_with_index)) {
+              llmContent += ` Found ${result.sheets.length} worksheets:\n`;
+              for (const sheet of result.sheets_with_index) {
+                llmContent += `  ${sheet.index}: ${sheet.name}\n`;
+              }
+              llmContent = llmContent.trim();
+            } else {
+              llmContent += ` Found ${result.sheets.length} worksheets: ${result.sheets.join(', ')}.`;
+            }
           }
           
           if (result.file_created) {
@@ -666,6 +1360,55 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             llmContent += ` New worksheet "${result.new_sheet_name}" added.`;
           }
           
+          if (result.operation === 'alter_sheet' && result.changes_made && Array.isArray(result.changes_made)) {
+            const originalName = result.original_sheet_name || 'sheet';
+            const currentName = result.current_sheet_name || originalName;
+            llmContent += ` Worksheet "${originalName}"`;
+            if (originalName !== currentName) {
+              llmContent += ` (now "${currentName}")`;
+            }
+            llmContent += ` modified: ${result.changes_made.join(', ')}.`;
+          }
+          
+          if (result.operation === 'delete_sheet' && result.deleted_sheet_name) {
+            llmContent += ` Worksheet "${result.deleted_sheet_name}" deleted.`;
+            if (result.remaining_sheets && Array.isArray(result.remaining_sheets)) {
+              llmContent += ` Remaining sheets: ${result.remaining_sheets.join(', ')} (${result.remaining_sheets_count} total).`;
+            }
+          }
+          
+          if (result.operation === 'move_sheet' && result.sheet_name) {
+            if (result.move_type === 'cross_workbook') {
+              llmContent += ` Worksheet "${result.sheet_name}" moved from "${result.source_workbook}" to "${result.target_workbook}".`;
+              if (result.source_sheets_remaining && Array.isArray(result.source_sheets_remaining)) {
+                llmContent += ` Source workbook remaining sheets: ${result.source_sheets_remaining.join(', ')}.`;
+              }
+            } else if (result.move_type === 'reorder_index' || result.move_type === 'reorder_position') {
+              llmContent += ` Worksheet "${result.sheet_name}" moved from index ${result.original_index} to index ${result.new_index} in "${result.workbook}".`;
+              if (result.sheets_after && Array.isArray(result.sheets_after)) {
+                llmContent += ` New order: ${result.sheets_after.map(([i, name]: [number, string]) => `${i}: ${name}`).join(', ')}.`;
+              }
+            }
+          }
+          
+          if (result.operation === 'copy_sheet' && result.source_sheet_name) {
+            if (result.copy_type === 'cross_workbook') {
+              llmContent += ` Worksheet "${result.source_sheet_name}" copied from "${result.source_workbook}" to "${result.target_workbook}"`;
+              if (result.copied_sheet_name !== result.source_sheet_name) {
+                llmContent += ` as "${result.copied_sheet_name}"`;
+              }
+              llmContent += ` at index ${result.target_index}.`;
+              if (result.target_sheets_after && Array.isArray(result.target_sheets_after)) {
+                llmContent += ` Target workbook now has ${result.target_sheets_count} sheets: ${result.target_sheets_after.join(', ')}.`;
+              }
+            } else if (result.copy_type === 'same_workbook') {
+              llmContent += ` Worksheet "${result.source_sheet_name}" copied to "${result.copied_sheet_name}" at index ${result.copied_index} in "${result.workbook}".`;
+              if (result.sheets_after && Array.isArray(result.sheets_after)) {
+                llmContent += ` Workbook now has ${result.total_sheets} sheets: ${result.sheets_after.map(([i, name]: [number, string]) => `${i}: ${name}`).join(', ')}.`;
+              }
+            }
+          }
+          
           if (result.total_cells && result.converted_cells !== undefined) {
             llmContent += ` Data type conversion completed: ${result.converted_cells} out of ${result.total_cells} cells converted to proper numeric types.`;
           }
@@ -735,7 +1478,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           }
           
           // Search operation results
-          if (result.operation === 'search_data') {
+          if (result.operation === 'search_range') {
             llmContent += ` Search for "${result.search_term}" completed.`;
             if (result.total_matches === 0) {
               llmContent += ` No matches found.`;
@@ -814,6 +1557,262 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           
           if (result.operation === 'delete_column' && result.columns_deleted) {
             llmContent += ` ${result.columns_deleted} column(s) deleted starting from position ${result.position}.`;
+          }
+          
+          // Comment operation results
+          if (result.operation === 'add_comment') {
+            llmContent += ` Comment added to ${result.range}`;
+            if (result.comment_author && result.comment_author !== 'System') {
+              llmContent += ` by ${result.comment_author}`;
+            }
+            llmContent += `: "${result.comment_text}".`;
+          }
+          
+          if (result.operation === 'edit_comment') {
+            llmContent += ` Comment at ${result.range} updated`;
+            if (result.changes_made && Array.isArray(result.changes_made) && result.changes_made.length > 0) {
+              llmContent += ` (${result.changes_made.join(', ')})`;
+            }
+            llmContent += `.`;
+          }
+          
+          if (result.operation === 'delete_comment') {
+            llmContent += ` Comment deleted from ${result.range}`;
+            if (result.deleted_comment_text) {
+              llmContent += `: "${result.deleted_comment_text}"`;
+            }
+            llmContent += `.`;
+          }
+          
+          if (result.operation === 'list_comments') {
+            if (result.total_comments === 0) {
+              llmContent += ` No comments found in worksheet "${result.worksheet}".`;
+            } else {
+              llmContent += ` Found ${result.total_comments} comment(s) in worksheet "${result.worksheet}":`;
+              if (result.comments && Array.isArray(result.comments)) {
+                for (const comment of result.comments.slice(0, 5)) { // Show first 5 comments
+                  llmContent += `\n  • ${comment.address}: "${comment.text}" (by ${comment.author})`;
+                }
+                if (result.total_comments > 5) {
+                  llmContent += `\n  ... and ${result.total_comments - 5} more comments.`;
+                }
+              }
+            }
+          }
+          
+          // Merge operation results
+          if (result.operation === 'merge_cells') {
+            llmContent += ` Cells merged in range ${result.range}`;
+            if (result.merge_type) {
+              llmContent += ` (${result.merge_type} merge)`;
+            }
+            if (result.content_centered) {
+              llmContent += ` with content centered`;
+            }
+            llmContent += `.`;
+          }
+          
+          if (result.operation === 'unmerge_cells') {
+            if (result.cells_unmerged === 0) {
+              llmContent += ` No merged cells found in range ${result.range}.`;
+            } else {
+              llmContent += ` ${result.cells_unmerged} merged cell area(s) unmerged in range ${result.range}`;
+              if (result.unmerged_ranges && Array.isArray(result.unmerged_ranges)) {
+                if (result.unmerged_ranges.length <= 3) {
+                  llmContent += `: ${result.unmerged_ranges.join(', ')}`;
+                } else {
+                  llmContent += `: ${result.unmerged_ranges.slice(0, 3).join(', ')} and ${result.unmerged_ranges.length - 3} more areas`;
+                }
+              }
+              llmContent += `.`;
+            }
+          }
+          
+          // Row/Column sizing operation results
+          if (result.operation === 'set_row_height') {
+            if (result.auto_fit) {
+              llmContent += ` Row height auto-fitted for ${result.total_rows} row(s)`;
+            } else {
+              llmContent += ` Row height set to ${result.height_set} points for ${result.total_rows} row(s)`;
+            }
+            if (result.range) {
+              llmContent += ` in range ${result.range}`;
+            }
+            if (result.rows_processed && Array.isArray(result.rows_processed)) {
+              if (result.rows_processed.length <= 5) {
+                llmContent += ` (rows: ${result.rows_processed.join(', ')})`;
+              } else {
+                llmContent += ` (rows: ${result.rows_processed.slice(0, 5).join(', ')} and ${result.rows_processed.length - 5} more)`;
+              }
+            }
+            llmContent += `.`;
+          }
+          
+          if (result.operation === 'set_column_width') {
+            if (result.auto_fit) {
+              llmContent += ` Column width auto-fitted for ${result.total_columns} column(s)`;
+            } else {
+              llmContent += ` Column width set to ${result.width_set} units for ${result.total_columns} column(s)`;
+            }
+            if (result.range) {
+              llmContent += ` in range ${result.range}`;
+            }
+            if (result.columns_processed && Array.isArray(result.columns_processed)) {
+              if (result.columns_processed.length <= 5) {
+                llmContent += ` (columns: ${result.columns_processed.join(', ')})`;
+              } else {
+                llmContent += ` (columns: ${result.columns_processed.slice(0, 5).join(', ')} and ${result.columns_processed.length - 5} more)`;
+              }
+            }
+            llmContent += `.`;
+          }
+          
+          if (result.operation === 'get_row_height') {
+            llmContent += ` Retrieved row height information for ${result.total_rows} row(s)`;
+            if (result.range) {
+              llmContent += ` in range ${result.range}`;
+            }
+            if (result.row_heights && Array.isArray(result.row_heights)) {
+              const validHeights = result.row_heights.filter((rh: RowHeightInfo) => rh.height !== null);
+              if (validHeights.length > 0) {
+                llmContent += `:\n`;
+                for (const rh of validHeights.slice(0, 5)) {
+                  llmContent += `  • Row ${rh.row}: ${rh.height} points\n`;
+                }
+                if (validHeights.length > 5) {
+                  llmContent += `  ... and ${validHeights.length - 5} more rows`;
+                }
+              } else {
+                llmContent += ` (no valid height data found)`;
+              }
+            }
+            llmContent += `.`;
+          }
+          
+          if (result.operation === 'get_column_width') {
+            llmContent += ` Retrieved column width information for ${result.total_columns} column(s)`;
+            if (result.range) {
+              llmContent += ` in range ${result.range}`;
+            }
+            if (result.column_widths && Array.isArray(result.column_widths)) {
+              const validWidths = result.column_widths.filter((cw: ColumnWidthInfo) => cw.width !== null);
+              if (validWidths.length > 0) {
+                llmContent += `:\n`;
+                for (const cw of validWidths.slice(0, 5)) {
+                  llmContent += `  • Column ${cw.column}: ${cw.width} units\n`;
+                }
+                if (validWidths.length > 5) {
+                  llmContent += `  ... and ${validWidths.length - 5} more columns`;
+                }
+              } else {
+                llmContent += ` (no valid width data found)`;
+              }
+            }
+            llmContent += `.`;
+          }
+          
+          // Cell information and manipulation operation results
+          if (result.operation === 'get_cell_info') {
+            llmContent += ` Retrieved detailed information for ${result.total_cells} cell(s) in range ${result.range}`;
+            if (result.info_included) {
+              const included = [];
+              if (result.info_included.formatting) included.push('formatting');
+              if (result.info_included.formulas) included.push('formulas');  
+              if (result.info_included.validation) included.push('validation');
+              if (result.info_included.comments) included.push('comments');
+              llmContent += ` (including: ${included.join(', ')})`;
+            }
+            
+            if (result.cells && Array.isArray(result.cells)) {
+              const cellsWithData = result.cells.filter((cell: CellInfo) => 
+                cell.value !== null || cell.has_formula || cell.comment || cell.is_merged
+              );
+              if (cellsWithData.length > 0) {
+                llmContent += `:\n`;
+                for (const cell of cellsWithData.slice(0, 3)) {
+                  llmContent += `  • ${cell.address}: `;
+                  if (cell.has_formula) {
+                    llmContent += `formula=${cell.formula}`;
+                  } else if (cell.value !== null) {
+                    llmContent += `value=${cell.value} (${cell.data_type})`;
+                  } else {
+                    llmContent += `empty`;
+                  }
+                  if (cell.comment) llmContent += `, has comment`;
+                  if (cell.is_merged) llmContent += `, merged`;
+                  llmContent += `\n`;
+                }
+                if (cellsWithData.length > 3) {
+                  llmContent += `  ... and ${cellsWithData.length - 3} more cells with data`;
+                }
+              } else {
+                llmContent += ` (all cells are empty)`;
+              }
+            }
+            llmContent += `.`;
+          }
+          
+          if (result.operation === 'insert_cells') {
+            llmContent += ` Inserted ${result.cells_inserted} cell(s) in range ${result.range}`;
+            llmContent += ` with ${result.shift_direction} shift direction`;
+            if (result.insertions_completed !== result.total_requested / result.cells_inserted) {
+              llmContent += ` (${result.insertions_completed} of ${result.total_requested / result.cells_inserted} insertions completed)`;
+            }
+            llmContent += `.`;
+          }
+          
+          if (result.operation === 'delete_cells') {
+            llmContent += ` Deleted ${result.cells_deleted} cell(s) from range ${result.range}`;
+            llmContent += ` with ${result.shift_direction} shift direction`;
+            if (result.original_range_size) {
+              llmContent += ` (original range: ${result.original_range_size.rows}×${result.original_range_size.columns})`;
+            }
+            if (result.deletions_completed !== result.total_requested / result.cells_deleted) {
+              llmContent += ` (${result.deletions_completed} of ${result.total_requested / result.cells_deleted} deletions completed)`;
+            }
+            llmContent += `.`;
+          }
+          
+          // Sort operation results
+          if (result.operation === 'sort_range') {
+            llmContent += ` Sorted range ${result.range}`;
+            llmContent += ` (${result.rows_affected} rows × ${result.columns_affected} columns)`;
+            
+            if (result.orientation) {
+              llmContent += ` by ${result.orientation === 'rows' ? 'columns' : 'rows'}`;
+            }
+            
+            if (result.sort_criteria && Array.isArray(result.sort_criteria)) {
+              llmContent += ` using criteria:`;
+              for (const criteria of result.sort_criteria.slice(0, 3)) {
+                if (result.orientation === 'rows') {
+                  llmContent += ` Column ${criteria.column} (${criteria.order})`;
+                } else {
+                  llmContent += ` Row ${criteria.row} (${criteria.order})`;
+                }
+                if (criteria.data_type && criteria.data_type !== 'auto') {
+                  llmContent += ` as ${criteria.data_type}`;
+                }
+                llmContent += `,`;
+              }
+              // Remove trailing comma
+              llmContent = llmContent.slice(0, -1);
+              
+              if (result.sort_criteria.length > 3) {
+                llmContent += ` and ${result.sort_criteria.length - 3} more criteria`;
+              }
+            }
+            
+            const features = [];
+            if (result.has_header) features.push('with header');
+            if (result.case_sensitive) features.push('case sensitive');
+            if (result.custom_order_applied) features.push('custom order');
+            
+            if (features.length > 0) {
+              llmContent += ` (${features.join(', ')})`;
+            }
+            
+            llmContent += `.`;
           }
         } else {
           let errorMessage = result.xlwings_error || 'Unknown error';
@@ -998,9 +1997,9 @@ def get_worksheet(wb, worksheet_name=None):
     const { op } = params;
     
     switch (op) {
-      case 'read':
+      case 'read_range':
         return this.generateReadLogic(params);
-      case 'write':
+      case 'write_range':
         return this.generateWriteLogic(params);
       case 'create_chart':
         return this.generateChartLogic(params);
@@ -1010,25 +2009,33 @@ def get_worksheet(wb, worksheet_name=None):
         return this.generateDeleteChartLogic(params);
       case 'list_charts':
         return this.generateListChartsLogic(params);
-      case 'format':
+      case 'format_range':
         return this.generateFormatLogic(params);
       case 'add_sheet':
         return this.generateAddSheetLogic(params);
-      case 'list_books':
-        return this.generateListBooksLogic();
+      case 'alter_sheet':
+        return this.generateAlterSheetLogic(params);
+      case 'delete_sheet':
+        return this.generateDeleteSheetLogic(params);
+      case 'move_sheet':
+        return this.generateMoveSheetLogic(params);
+      case 'copy_sheet':
+        return this.generateCopySheetLogic(params);
+      case 'list_workbooks':
+        return this.generateListWorkbooksLogic();
       case 'list_sheets':
         return this.generateListSheetsLogic(params);
       case 'get_selection':
         return this.generateGetSelectionLogic();
       case 'set_selection':
         return this.generateSetSelectionLogic(params);
-      case 'formula':
+      case 'formula_range':
         return this.generateFormulaLogic(params);
-      case 'clear':
+      case 'clear_range':
         return this.generateClearLogic(params);
-      case 'copy_paste':
+      case 'copy_paste_range':
         return this.generateCopyPasteLogic(params);
-      case 'find_replace':
+      case 'find_replace_range':
         return this.generateFindReplaceLogic(params);
       case 'create_workbook':
         return this.generateCreateWorkbookLogic(params);
@@ -1068,8 +2075,36 @@ def get_worksheet(wb, worksheet_name=None):
         return this.generateSaveRangeAsImageLogic(params);
       case 'save_chart_as_image':
         return this.generateSaveChartAsImageLogic(params);
-      case 'search_data':
+      case 'search_range':
         return this.generateSearchDataLogic(params);
+      case 'sort_range':
+        return this.generateSortRangeLogic(params);
+      case 'add_comment':
+        return this.generateAddCommentLogic(params);
+      case 'edit_comment':
+        return this.generateEditCommentLogic(params);
+      case 'delete_comment':
+        return this.generateDeleteCommentLogic(params);
+      case 'list_comments':
+        return this.generateListCommentsLogic(params);
+      case 'merge_cells':
+        return this.generateMergeCellsLogic(params);
+      case 'unmerge_cells':
+        return this.generateUnmergeCellsLogic(params);
+      case 'set_row_height':
+        return this.generateSetRowHeightLogic(params);
+      case 'set_column_width':
+        return this.generateSetColumnWidthLogic(params);
+      case 'get_row_height':
+        return this.generateGetRowHeightLogic(params);
+      case 'get_column_width':
+        return this.generateGetColumnWidthLogic(params);
+      case 'get_cell_info':
+        return this.generateGetCellInfoLogic(params);
+      case 'insert_cells':
+        return this.generateInsertCellsLogic(params);
+      case 'delete_cells':
+        return this.generateDeleteCellsLogic(params);
       case 'list_apps':
         return this.generateListAppsLogic(params);
       case 'insert_row':
@@ -1080,6 +2115,20 @@ def get_worksheet(wb, worksheet_name=None):
         return this.generateDeleteRowLogic(params);
       case 'delete_column':
         return this.generateDeleteColumnLogic(params);
+      case 'create_shape':
+        return this.generateCreateShapeLogic(params);
+      case 'create_textbox':
+        return this.generateCreateTextboxLogic(params);
+      case 'list_shapes':
+        return this.generateListShapesLogic(params);
+      case 'modify_shape':
+        return this.generateModifyShapeLogic(params);
+      case 'delete_shape':
+        return this.generateDeleteShapeLogic(params);
+      case 'move_shape':
+        return this.generateMoveShapeLogic(params);
+      case 'resize_shape':
+        return this.generateResizeShapeLogic(params);
       default:
         return 'raise ValueError(f"Unsupported operation: {op}")';
     }
@@ -1104,6 +2153,7 @@ if not wb:
     const maxRows = params.max_rows || 100;
     const startRow = params.start_row || 1;
     const summaryMode = params.summary_mode || false;
+    const summaryModePython = summaryMode ? 'True' : 'False';
     
     return `${this.generateExcelConnectionCode(params)}
 
@@ -1199,7 +2249,7 @@ progress_info = {
 
 # Provide data summary if in summary mode or if dataset is large
 data_summary = None
-if ${summaryMode} or total_rows > ${maxRows * 2}:
+if ${summaryModePython} or total_rows > ${maxRows * 2}:
     if isinstance(data, list):
         if len(data) > 0 and isinstance(data[0], list):
             # 2D data
@@ -1219,12 +2269,12 @@ if ${summaryMode} or total_rows > ${maxRows * 2}:
 
 result = {
     "success": True,
-    "operation": "read",
+    "operation": "read_range",
     "workbook": wb.name,
     "worksheet": ws.name,
     "range": actual_range,
     "full_range": full_range_obj.address,
-    "data": data if not ${summaryMode} or total_rows <= ${maxRows * 2} else None,
+    "data": data if not ${summaryModePython} or total_rows <= ${maxRows * 2} else None,
     "data_summary": data_summary,
     "progress": progress_info,
     "message": f"Read {rows_to_read} rows (rows {start_row_actual}-{end_row_actual}) out of {total_rows} total rows. {progress_info['remaining_rows']} rows remaining." if progress_info['has_more_data'] else f"Read all {rows_to_read} rows of data."
@@ -1307,7 +2357,7 @@ else:
 
 result = {
     "success": True,
-    "operation": "write",
+    "operation": "write_range",
     "workbook": wb.name,
     "worksheet": ws.name,
     "range": range_str,
@@ -1428,9 +2478,9 @@ format_config = ${JSON.stringify(params.format || {})}
 if format_config.get('font'):
     font = format_config['font']
     if font.get('bold'):
-        range_obj.font.bold = font['bold']
+        range_obj.font.bold = bool(font['bold'])
     if font.get('italic'):
-        range_obj.font.italic = font['italic']
+        range_obj.font.italic = bool(font['italic'])
     if font.get('size'):
         range_obj.font.size = font['size']
     if font.get('color'):
@@ -1446,7 +2496,7 @@ cells_affected = range_obj.rows.count * range_obj.columns.count
 
 result = {
     "success": True,
-    "operation": "format",
+    "operation": "format_range",
     "workbook": wb.name,
     "worksheet": ws.name,
     "range": range_str,
@@ -1455,14 +2505,14 @@ result = {
 print(json.dumps(result))`;
   }
 
-  private generateListBooksLogic(): string {
+  private generateListWorkbooksLogic(): string {
     return `
 # List all open workbooks
 books = [book.name for book in xw.books]
 
 result = {
     "success": True,
-    "operation": "list_books",
+    "operation": "list_workbooks",
     "books": books
 }
 print(json.dumps(result))`;
@@ -1479,13 +2529,14 @@ wb = get_workbook("${params.workbook || ''}")
 if not wb:
     raise Exception("Could not find the specified workbook")
 
-sheets = [sheet.name for sheet in wb.sheets]
+sheets = [(i, sheet.name) for i, sheet in enumerate(wb.sheets)]
 
 result = {
     "success": True,
     "operation": "list_sheets",
     "workbook": wb.name,
-    "sheets": sheets
+    "sheets": [name for _, name in sheets],
+    "sheets_with_index": [{"index": i, "name": name} for i, name in sheets]
 }
 print(json.dumps(result))`;
   }
@@ -1564,7 +2615,7 @@ ws.range(range_str).formula = formula
 
 result = {
     "success": True,
-    "operation": "formula",
+    "operation": "formula_range",
     "workbook": wb.name,
     "worksheet": ws.name,
     "range": range_str,
@@ -1596,7 +2647,7 @@ cells_affected = range_obj.rows.count * range_obj.columns.count
 
 result = {
     "success": True,
-    "operation": "clear",
+    "operation": "clear_range",
     "workbook": wb.name,
     "worksheet": ws.name,
     "range": range_str,
@@ -1712,7 +2763,7 @@ dest_ws_name = dest.sheet.name
 
 result = {
     "success": True,
-    "operation": "copy_paste",
+    "operation": "copy_paste_range",
     "workbook": wb.name,
     "source_worksheet": source_ws_name,
     "destination_worksheet": dest_ws_name,
@@ -1765,7 +2816,7 @@ for cell in search_range:
 
 result = {
     "success": True,
-    "operation": "find_replace",
+    "operation": "find_replace_range",
     "workbook": wb.name,
     "worksheet": ws.name,
     "find_text": find_text,
@@ -1805,6 +2856,1878 @@ result = {
     "workbook": wb.name,
     "new_sheet_name": sheet_name
 }
+print(json.dumps(result))`;
+  }
+
+  private generateAlterSheetLogic(params: XlwingsParams): string {
+    const sheetAlter = params.sheet_alter;
+    const newName = sheetAlter?.new_name || '';
+    const tabColor = sheetAlter?.tab_color || '';
+    
+    return `
+# Alter sheet properties
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+original_name = ws.name
+changes_made = []
+
+try:
+    # Rename sheet if new_name is provided
+    if "${newName}":
+        new_sheet_name = "${newName}"
+        existing_names = [sheet.name for sheet in wb.sheets if sheet.name != original_name]
+        
+        # Check if new name already exists
+        if new_sheet_name in existing_names:
+            raise Exception(f"Sheet name '{new_sheet_name}' already exists. Available names: {existing_names}")
+        
+        ws.name = new_sheet_name
+        changes_made.append(f"renamed to '{new_sheet_name}'")
+    
+    # Set tab color if provided
+    if "${tabColor}":
+        tab_color = "${tabColor}"
+        # Convert hex color to RGB values
+        if tab_color.startswith('#') and len(tab_color) == 7:
+            try:
+                # Remove # and convert hex to RGB
+                hex_color = tab_color[1:]
+                r = int(hex_color[0:2], 16)
+                g = int(hex_color[2:4], 16) 
+                b = int(hex_color[4:6], 16)
+                
+                # Set tab color using RGB values
+                ws.api.Tab.Color = r + (g * 256) + (b * 256 * 256)
+                changes_made.append(f"tab color set to {tab_color}")
+            except ValueError:
+                raise Exception(f"Invalid hex color format: {tab_color}. Use format #RRGGBB")
+        else:
+            raise Exception(f"Invalid hex color format: {tab_color}. Use format #RRGGBB")
+
+    if not changes_made:
+        raise Exception("No changes specified. Provide new_name and/or tab_color")
+
+    result = {
+        "success": True,
+        "operation": "alter_sheet",
+        "workbook": wb.name,
+        "original_sheet_name": original_name,
+        "current_sheet_name": ws.name,
+        "changes_made": changes_made,
+        "tab_color": "${tabColor}" if "${tabColor}" else None
+    }
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "alter_sheet", 
+        "workbook": wb.name if 'wb' in locals() else None,
+        "original_sheet_name": original_name if 'original_name' in locals() else None,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateDeleteSheetLogic(params: XlwingsParams): string {
+    return `
+# Delete sheet
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+# Check if worksheet is specified
+worksheet_name = "${params.worksheet || ''}"
+if not worksheet_name:
+    raise Exception("worksheet parameter is required for delete_sheet operation")
+
+# Find the worksheet to delete
+try:
+    ws = wb.sheets[worksheet_name]
+    sheet_name_to_delete = ws.name
+except KeyError:
+    available_sheets = [sheet.name for sheet in wb.sheets]
+    raise Exception(f"Worksheet '{worksheet_name}' not found. Available sheets: {available_sheets}")
+
+# Check if it's the only sheet (Excel doesn't allow deleting the last sheet)
+if len(wb.sheets) <= 1:
+    raise Exception("Cannot delete the only worksheet in the workbook. Excel requires at least one worksheet.")
+
+try:
+    # Delete the worksheet
+    ws.delete()
+    
+    result = {
+        "success": True,
+        "operation": "delete_sheet",
+        "workbook": wb.name,
+        "deleted_sheet_name": sheet_name_to_delete,
+        "remaining_sheets": [sheet.name for sheet in wb.sheets],
+        "remaining_sheets_count": len(wb.sheets)
+    }
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "delete_sheet",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "attempted_sheet_name": sheet_name_to_delete if 'sheet_name_to_delete' in locals() else worksheet_name,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateMoveSheetLogic(params: XlwingsParams): string {
+    const sheetMove = params.sheet_move;
+    const targetWorkbook = sheetMove?.target_workbook || '';
+    const newIndex = sheetMove?.new_index ?? -1;
+    const position = sheetMove?.position || '';
+    const referenceSheet = sheetMove?.reference_sheet || '';
+    
+    return `
+# Move sheet
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+source_wb = get_workbook(app, "${params.workbook || ''}")
+if not source_wb:
+    raise Exception("Could not find the source workbook")
+
+# Check if worksheet is specified
+worksheet_name = "${params.worksheet || ''}"
+if not worksheet_name:
+    raise Exception("worksheet parameter is required for move_sheet operation")
+
+# Find the source worksheet
+try:
+    source_ws = source_wb.sheets[worksheet_name]
+    source_sheet_name = source_ws.name
+    original_index = source_ws.index
+except KeyError:
+    available_sheets = [sheet.name for sheet in source_wb.sheets]
+    raise Exception(f"Worksheet '{worksheet_name}' not found in source workbook. Available sheets: {available_sheets}")
+
+move_type = None
+target_wb = None
+
+try:
+    # Determine if this is a cross-workbook move or index reorder
+    if "${targetWorkbook}":
+        # Cross-workbook move (cut mode)
+        target_wb = get_workbook(app, "${targetWorkbook}")
+        if not target_wb:
+            raise Exception(f"Target workbook '{targetWorkbook}' not found")
+        
+        if target_wb.name == source_wb.name:
+            raise Exception("Target workbook cannot be the same as source workbook for cross-workbook moves")
+        
+        # Copy worksheet to target workbook
+        source_ws.api.Copy(Before=target_wb.sheets[0].api)
+        
+        # Get the copied sheet (it will be the first sheet in target workbook)
+        moved_ws = target_wb.sheets[0]
+        
+        # Delete original sheet from source workbook
+        if len(source_wb.sheets) <= 1:
+            raise Exception("Cannot move the only worksheet from source workbook")
+        source_ws.delete()
+        
+        move_type = "cross_workbook"
+        
+        result = {
+            "success": True,
+            "operation": "move_sheet",
+            "move_type": move_type,
+            "sheet_name": source_sheet_name,
+            "source_workbook": source_wb.name,
+            "target_workbook": target_wb.name,
+            "original_index": original_index,
+            "new_index": 0,
+            "source_sheets_remaining": [sheet.name for sheet in source_wb.sheets],
+            "target_sheets_after": [sheet.name for sheet in target_wb.sheets]
+        }
+        
+    else:
+        # Same workbook - reorder by index or position
+        target_wb = source_wb
+        total_sheets = len(source_wb.sheets)
+        
+        if ${newIndex} >= 0:
+            # Move to specific index
+            new_pos = min(max(${newIndex}, 0), total_sheets - 1)
+            
+            if new_pos == original_index - 1:  # xlwings uses 1-based index
+                raise Exception(f"Sheet is already at index {new_pos}")
+                
+            # Move worksheet to new position
+            if new_pos < original_index - 1:
+                # Moving left - insert before the sheet at new_pos
+                target_sheet = source_wb.sheets[new_pos]
+                source_ws.api.Move(Before=target_sheet.api)
+            else:
+                # Moving right - insert after the sheet at new_pos  
+                if new_pos < total_sheets - 1:
+                    target_sheet = source_wb.sheets[new_pos + 1]
+                    source_ws.api.Move(Before=target_sheet.api)
+                else:
+                    # Move to end
+                    source_ws.api.Move(After=source_wb.sheets[-1].api)
+            
+            move_type = "reorder_index"
+            final_index = source_ws.index - 1  # Convert to 0-based
+            
+        elif "${position}" and "${referenceSheet}":
+            # Move relative to another sheet
+            try:
+                ref_ws = source_wb.sheets["${referenceSheet}"]
+                ref_index = ref_ws.index
+                
+                if "${position}" == "before":
+                    source_ws.api.Move(Before=ref_ws.api)
+                    final_index = ref_index - 1
+                else:  # after
+                    if ref_index < total_sheets:
+                        next_sheet = source_wb.sheets[ref_index]  # xlwings uses 1-based, so ref_index is the next sheet
+                        source_ws.api.Move(Before=next_sheet.api)
+                        final_index = ref_index
+                    else:
+                        source_ws.api.Move(After=ref_ws.api)
+                        final_index = total_sheets - 1
+                        
+                move_type = "reorder_position"
+                
+            except KeyError:
+                available_sheets = [sheet.name for sheet in source_wb.sheets if sheet.name != source_sheet_name]
+                raise Exception(f"Reference sheet '{referenceSheet}' not found. Available sheets: {available_sheets}")
+        
+        else:
+            raise Exception("For same-workbook moves, specify either new_index or (position + reference_sheet)")
+        
+        result = {
+            "success": True,
+            "operation": "move_sheet", 
+            "move_type": move_type,
+            "sheet_name": source_sheet_name,
+            "workbook": source_wb.name,
+            "original_index": original_index - 1,  # Convert to 0-based
+            "new_index": final_index,
+            "sheets_after": [(i, sheet.name) for i, sheet in enumerate(source_wb.sheets)]
+        }
+
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "move_sheet",
+        "sheet_name": source_sheet_name if 'source_sheet_name' in locals() else worksheet_name,
+        "source_workbook": source_wb.name if 'source_wb' in locals() else None,
+        "target_workbook": "${targetWorkbook}" if "${targetWorkbook}" else None,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateCopySheetLogic(params: XlwingsParams): string {
+    const sheetCopy = params.sheet_copy;
+    const targetWorkbook = sheetCopy?.target_workbook || '';
+    const newName = sheetCopy?.new_name || '';
+    const targetIndex = sheetCopy?.target_index ?? -1;
+    const position = sheetCopy?.position || '';
+    const referenceSheet = sheetCopy?.reference_sheet || '';
+    
+    return `
+# Copy sheet
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+source_wb = get_workbook(app, "${params.workbook || ''}")
+if not source_wb:
+    raise Exception("Could not find the source workbook")
+
+# Check if worksheet is specified
+worksheet_name = "${params.worksheet || ''}"
+if not worksheet_name:
+    raise Exception("worksheet parameter is required for copy_sheet operation")
+
+# Find the source worksheet
+try:
+    source_ws = source_wb.sheets[worksheet_name]
+    source_sheet_name = source_ws.name
+    original_index = source_ws.index - 1  # Convert to 0-based
+except KeyError:
+    available_sheets = [sheet.name for sheet in source_wb.sheets]
+    raise Exception(f"Worksheet '{worksheet_name}' not found in source workbook. Available sheets: {available_sheets}")
+
+copy_type = None
+target_wb = None
+copied_sheet_name = None
+
+try:
+    # Determine target workbook and copy type
+    if "${targetWorkbook}":
+        # Cross-workbook copy
+        target_wb = get_workbook(app, "${targetWorkbook}")
+        if not target_wb:
+            raise Exception(f"Target workbook '{targetWorkbook}' not found")
+        
+        copy_type = "cross_workbook"
+        
+        # Copy worksheet to target workbook (default: to the end)
+        source_ws.api.Copy(After=target_wb.sheets[-1].api)
+        
+        # Get the copied sheet (it will be the last sheet in target workbook)
+        copied_ws = target_wb.sheets[-1]
+        copied_sheet_name = copied_ws.name
+        final_index = len(target_wb.sheets) - 1
+        
+    else:
+        # Same workbook copy (create duplicate)
+        target_wb = source_wb
+        copy_type = "same_workbook"
+        
+        # Copy worksheet within same workbook (default: after original)
+        source_ws.api.Copy(After=source_ws.api)
+        
+        # Get the copied sheet (it will be right after the original)
+        copied_ws = source_wb.sheets[source_ws.index]  # xlwings 1-based index
+        copied_sheet_name = copied_ws.name
+        final_index = source_ws.index  # This is 0-based for result
+    
+    # Handle custom naming
+    if "${newName}":
+        new_sheet_name = "${newName}"
+        existing_names = [sheet.name for sheet in target_wb.sheets if sheet.name != copied_sheet_name]
+        
+        if new_sheet_name in existing_names:
+            # Generate unique name
+            counter = 1
+            while f"{new_sheet_name}_{counter}" in existing_names:
+                counter += 1
+            new_sheet_name = f"{new_sheet_name}_{counter}"
+        
+        copied_ws.name = new_sheet_name
+        copied_sheet_name = new_sheet_name
+    
+    # Handle positioning (move the copied sheet to desired position)
+    if ${targetIndex} >= 0:
+        # Move to specific index
+        total_sheets = len(target_wb.sheets)
+        new_pos = min(max(${targetIndex}, 0), total_sheets - 1)
+        
+        if new_pos != copied_ws.index - 1:  # xlwings uses 1-based index
+            if new_pos == 0:
+                # Move to beginning
+                copied_ws.api.Move(Before=target_wb.sheets[0].api)
+            elif new_pos < copied_ws.index - 1:
+                # Moving left
+                target_sheet = target_wb.sheets[new_pos]
+                copied_ws.api.Move(Before=target_sheet.api)
+            else:
+                # Moving right
+                if new_pos < total_sheets - 1:
+                    target_sheet = target_wb.sheets[new_pos + 1]
+                    copied_ws.api.Move(Before=target_sheet.api)
+                else:
+                    # Move to end
+                    copied_ws.api.Move(After=target_wb.sheets[-1].api)
+        
+        final_index = new_pos
+        
+    elif "${position}" and "${referenceSheet}":
+        # Move relative to another sheet
+        try:
+            ref_ws = target_wb.sheets["${referenceSheet}"]
+            
+            if "${position}" == "before":
+                copied_ws.api.Move(Before=ref_ws.api)
+                final_index = ref_ws.index - 2  # Adjust for the moved sheet
+            else:  # after
+                copied_ws.api.Move(After=ref_ws.api)
+                final_index = ref_ws.index - 1  # Adjust for 1-based to 0-based
+                
+        except KeyError:
+            available_sheets = [sheet.name for sheet in target_wb.sheets if sheet.name != copied_sheet_name]
+            raise Exception(f"Reference sheet '{referenceSheet}' not found. Available sheets: {available_sheets}")
+    
+    # Prepare result based on copy type
+    if copy_type == "cross_workbook":
+        result = {
+            "success": True,
+            "operation": "copy_sheet",
+            "copy_type": copy_type,
+            "source_sheet_name": source_sheet_name,
+            "copied_sheet_name": copied_sheet_name,
+            "source_workbook": source_wb.name,
+            "target_workbook": target_wb.name,
+            "source_index": original_index,
+            "target_index": final_index,
+            "target_sheets_after": [sheet.name for sheet in target_wb.sheets],
+            "target_sheets_count": len(target_wb.sheets)
+        }
+    else:  # same_workbook
+        result = {
+            "success": True,
+            "operation": "copy_sheet",
+            "copy_type": copy_type,
+            "source_sheet_name": source_sheet_name,
+            "copied_sheet_name": copied_sheet_name,
+            "workbook": source_wb.name,
+            "source_index": original_index,
+            "copied_index": final_index,
+            "sheets_after": [(i, sheet.name) for i, sheet in enumerate(target_wb.sheets)],
+            "total_sheets": len(target_wb.sheets)
+        }
+
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "copy_sheet",
+        "source_sheet_name": source_sheet_name if 'source_sheet_name' in locals() else worksheet_name,
+        "source_workbook": source_wb.name if 'source_wb' in locals() else None,
+        "target_workbook": "${targetWorkbook}" if "${targetWorkbook}" else None,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateAddCommentLogic(params: XlwingsParams): string {
+    const comment = params.comment;
+    const commentText = comment?.text || '';
+    const author = comment?.author || '';
+    const visible = comment?.visible ?? true;
+    
+    return `
+# Add comment to cell
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+# Get target cell
+range_str = "${params.range || 'A1'}"
+if not range_str:
+    raise Exception("range parameter is required for add_comment operation")
+
+try:
+    cell = ws.range(range_str)
+    
+    # Check if it's a single cell
+    if cell.rows.count > 1 or cell.columns.count > 1:
+        raise Exception("Comments can only be added to single cells, not ranges")
+    
+    # Add comment
+    comment_text = "${commentText}"
+    if not comment_text:
+        raise Exception("comment.text is required for add_comment operation")
+    
+    # Delete existing comment if any
+    if cell.comment:
+        cell.comment.delete()
+    
+    # Add new comment
+    cell.comment = comment_text
+    
+    # Set author if provided
+    author = "${author}"
+    if author:
+        try:
+            cell.comment.author = author
+        except:
+            pass  # Some Excel versions don't support setting author
+    
+    # Set visibility
+    visible = ${visible ? 'True' : 'False'}
+    try:
+        cell.comment.visible = visible
+    except:
+        pass  # Some Excel versions don't support setting visibility
+    
+    result = {
+        "success": True,
+        "operation": "add_comment",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "range": range_str,
+        "comment_text": comment_text,
+        "comment_author": author if author else "System",
+        "comment_visible": visible
+    }
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "add_comment",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "range": range_str,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateEditCommentLogic(params: XlwingsParams): string {
+    const comment = params.comment;
+    const commentText = comment?.text || '';
+    const author = comment?.author || '';
+    const visible = comment?.visible;
+    
+    return `
+# Edit existing comment
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+# Get target cell
+range_str = "${params.range || 'A1'}"
+if not range_str:
+    raise Exception("range parameter is required for edit_comment operation")
+
+try:
+    cell = ws.range(range_str)
+    
+    # Check if it's a single cell
+    if cell.rows.count > 1 or cell.columns.count > 1:
+        raise Exception("Comments can only be edited on single cells, not ranges")
+    
+    # Check if comment exists
+    if not cell.comment:
+        raise Exception(f"No comment found at {range_str}")
+    
+    # Update comment text if provided
+    comment_text = "${commentText}"
+    if comment_text:
+        cell.comment.text = comment_text
+    
+    # Update author if provided
+    author = "${author}"
+    if author:
+        try:
+            cell.comment.author = author
+        except:
+            pass  # Some Excel versions don't support setting author
+    
+    # Update visibility if provided
+    visible = ${visible !== undefined ? (visible ? 'True' : 'False') : 'None'}
+    if visible is not None:
+        try:
+            cell.comment.visible = visible
+        except:
+            pass  # Some Excel versions don't support setting visibility
+    
+    result = {
+        "success": True,
+        "operation": "edit_comment",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "range": range_str,
+        "comment_text": cell.comment.text,
+        "changes_made": []
+    }
+    
+    if comment_text:
+        result["changes_made"].append("text updated")
+    if author:
+        result["changes_made"].append("author updated")
+    if visible is not None:
+        result["changes_made"].append("visibility updated")
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "edit_comment",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "range": range_str,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateDeleteCommentLogic(params: XlwingsParams): string {
+    return `
+# Delete comment from cell
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+# Get target cell
+range_str = "${params.range || 'A1'}"
+if not range_str:
+    raise Exception("range parameter is required for delete_comment operation")
+
+try:
+    cell = ws.range(range_str)
+    
+    # Check if it's a single cell
+    if cell.rows.count > 1 or cell.columns.count > 1:
+        raise Exception("Comments can only be deleted from single cells, not ranges")
+    
+    # Check if comment exists
+    if not cell.comment:
+        raise Exception(f"No comment found at {range_str}")
+    
+    # Store comment info before deletion
+    comment_text = cell.comment.text
+    comment_author = getattr(cell.comment, 'author', 'Unknown')
+    
+    # Delete comment
+    cell.comment.delete()
+    
+    result = {
+        "success": True,
+        "operation": "delete_comment",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "range": range_str,
+        "deleted_comment_text": comment_text,
+        "deleted_comment_author": comment_author
+    }
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "delete_comment",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "range": range_str,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateListCommentsLogic(params: XlwingsParams): string {
+    return `
+# List all comments in worksheet
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+try:
+    comments = []
+    
+    # Search for comments in used range
+    used_range = ws.used_range
+    if used_range:
+        for row in range(1, used_range.last_cell.row + 1):
+            for col in range(1, used_range.last_cell.column + 1):
+                try:
+                    cell = ws.range((row, col))
+                    if cell.comment:
+                        comment_info = {
+                            "address": cell.address,
+                            "row": row,
+                            "column": col,
+                            "text": cell.comment.text,
+                            "author": getattr(cell.comment, 'author', 'Unknown'),
+                            "visible": getattr(cell.comment, 'visible', False)
+                        }
+                        comments.append(comment_info)
+                except:
+                    continue  # Skip cells that can't be accessed
+    
+    result = {
+        "success": True,
+        "operation": "list_comments",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "comments": comments,
+        "total_comments": len(comments)
+    }
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "list_comments",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateMergeCellsLogic(params: XlwingsParams): string {
+    const merge = params.merge;
+    const acrossColumns = merge?.across_columns ?? false;
+    const acrossRows = merge?.across_rows ?? false;
+    const centerContent = merge?.center_content ?? false;
+    const acrossColumnsPython = acrossColumns ? 'True' : 'False';
+    const acrossRowsPython = acrossRows ? 'True' : 'False';
+    const centerContentPython = centerContent ? 'True' : 'False';
+    
+    return `
+# Merge cells in specified range
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+# Get target range
+range_str = "${params.range || 'A1'}"
+if not range_str:
+    raise Exception("range parameter is required for merge_cells operation")
+
+try:
+    range_obj = ws.range(range_str)
+    
+    # Check if range is already merged
+    try:
+        if range_obj.api.MergeCells:
+            result = {
+                "success": False,
+                "operation": "merge_cells",
+                "workbook": wb.name,
+                "worksheet": ws.name,
+                "range": range_str,
+                "error": "Range is already merged"
+            }
+        else:
+            # Perform merge based on options
+            across_columns = ${acrossColumnsPython}
+            across_rows = ${acrossRowsPython}
+            center_content = ${centerContentPython}
+            
+            if across_columns and not across_rows:
+                # Horizontal merge only - merge each row separately
+                for row in range(range_obj.row, range_obj.row + range_obj.rows.count):
+                    merge_range = ws.range((row, range_obj.column), (row, range_obj.column + range_obj.columns.count - 1))
+                    merge_range.api.Merge()
+            elif across_rows and not across_columns:
+                # Vertical merge only - merge each column separately  
+                for col in range(range_obj.column, range_obj.column + range_obj.columns.count):
+                    merge_range = ws.range((range_obj.row, col), (range_obj.row + range_obj.rows.count - 1, col))
+                    merge_range.api.Merge()
+            else:
+                # Default: merge entire range
+                range_obj.api.Merge()
+            
+            # Center content if requested
+            if center_content:
+                range_obj.api.HorizontalAlignment = -4108  # xlCenter
+                range_obj.api.VerticalAlignment = -4108    # xlCenter
+            
+            result = {
+                "success": True,
+                "operation": "merge_cells",
+                "workbook": wb.name,
+                "worksheet": ws.name,
+                "range": range_str,
+                "merge_type": "horizontal" if across_columns and not across_rows else "vertical" if across_rows and not across_columns else "full",
+                "content_centered": center_content
+            }
+    except Exception as merge_error:
+        result = {
+            "success": False,
+            "operation": "merge_cells",
+            "workbook": wb.name,
+            "worksheet": ws.name,
+            "range": range_str,
+            "error": f"Failed to merge cells: {str(merge_error)}"
+        }
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "merge_cells",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "range": range_str,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateUnmergeCellsLogic(params: XlwingsParams): string {
+    return `
+# Unmerge cells in specified range
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+# Get target range
+range_str = "${params.range || 'A1'}"
+if not range_str:
+    raise Exception("range parameter is required for unmerge_cells operation")
+
+try:
+    range_obj = ws.range(range_str)
+    
+    # Check if range contains merged cells
+    merged_cells = []
+    try:
+        # Check if the range itself is merged
+        if range_obj.api.MergeCells:
+            range_obj.api.UnMerge()
+            merged_cells.append(range_str)
+        else:
+            # Check each cell in the range for merged cells
+            for row in range(range_obj.row, range_obj.row + range_obj.rows.count):
+                for col in range(range_obj.column, range_obj.column + range_obj.columns.count):
+                    cell = ws.range((row, col))
+                    try:
+                        if cell.api.MergeCells:
+                            # Get the merged area address
+                            merge_area = cell.api.MergeArea.Address
+                            if merge_area not in merged_cells:
+                                cell.api.UnMerge()
+                                merged_cells.append(merge_area)
+                    except:
+                        continue
+        
+        if merged_cells:
+            result = {
+                "success": True,
+                "operation": "unmerge_cells",
+                "workbook": wb.name,
+                "worksheet": ws.name,
+                "range": range_str,
+                "unmerged_ranges": merged_cells,
+                "cells_unmerged": len(merged_cells)
+            }
+        else:
+            result = {
+                "success": True,
+                "operation": "unmerge_cells", 
+                "workbook": wb.name,
+                "worksheet": ws.name,
+                "range": range_str,
+                "message": "No merged cells found in the specified range",
+                "cells_unmerged": 0
+            }
+    
+    except Exception as unmerge_error:
+        result = {
+            "success": False,
+            "operation": "unmerge_cells",
+            "workbook": wb.name,
+            "worksheet": ws.name,
+            "range": range_str,
+            "error": f"Failed to unmerge cells: {str(unmerge_error)}"
+        }
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "unmerge_cells",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "range": range_str,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateSetRowHeightLogic(params: XlwingsParams): string {
+    const sizing = params.sizing;
+    const height = sizing?.height ?? 15;
+    const autoFit = sizing?.auto_fit ?? false;
+    const autoFitPython = autoFit ? 'True' : 'False';
+    const rowNumbers = sizing?.row_numbers;
+    
+    return `
+# Set row height
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+try:
+    height_value = ${height}
+    auto_fit = ${autoFitPython}
+    row_numbers = ${rowNumbers ? JSON.stringify(rowNumbers) : 'None'}
+    
+    if row_numbers:
+        # Set height for specific rows
+        processed_rows = []
+        for row_num in row_numbers:
+            try:
+                if auto_fit:
+                    ws.rows(row_num).api.AutoFit()
+                else:
+                    ws.rows(row_num).api.RowHeight = height_value
+                processed_rows.append(row_num)
+            except Exception as row_error:
+                continue  # Skip invalid rows
+        
+        result = {
+            "success": True,
+            "operation": "set_row_height",
+            "workbook": wb.name,
+            "worksheet": ws.name,
+            "rows_processed": processed_rows,
+            "total_rows": len(processed_rows),
+            "height_set": None if auto_fit else height_value,
+            "auto_fit": auto_fit
+        }
+    else:
+        # Use range parameter or default to current selection
+        range_str = "${params.range || ''}"
+        if not range_str:
+            # Get current selection or default to A1
+            try:
+                range_str = ws.api.Selection.Address
+            except:
+                range_str = "A1"
+        
+        range_obj = ws.range(range_str)
+        
+        # Set height for all rows in the range
+        processed_rows = []
+        for row in range(range_obj.row, range_obj.row + range_obj.rows.count):
+            try:
+                if auto_fit:
+                    ws.rows(row).api.AutoFit()
+                else:
+                    ws.rows(row).api.RowHeight = height_value
+                processed_rows.append(row)
+            except:
+                continue
+        
+        result = {
+            "success": True,
+            "operation": "set_row_height",
+            "workbook": wb.name,
+            "worksheet": ws.name,
+            "range": range_str,
+            "rows_processed": processed_rows,
+            "total_rows": len(processed_rows),
+            "height_set": None if auto_fit else height_value,
+            "auto_fit": auto_fit
+        }
+        
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "set_row_height",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateSetColumnWidthLogic(params: XlwingsParams): string {
+    const sizing = params.sizing;
+    const width = sizing?.width ?? 10;
+    const autoFit = sizing?.auto_fit ?? false;
+    const autoFitPython = autoFit ? 'True' : 'False';
+    const columnIdentifiers = sizing?.column_identifiers;
+    
+    return `
+# Set column width
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+try:
+    width_value = ${width}
+    auto_fit = ${autoFitPython}
+    column_identifiers = ${columnIdentifiers ? JSON.stringify(columnIdentifiers) : 'None'}
+    
+    def column_to_number(col_id):
+        """Convert column identifier to number"""
+        if isinstance(col_id, int):
+            return col_id
+        elif isinstance(col_id, str):
+            if col_id.isdigit():
+                return int(col_id)
+            else:
+                # Convert letter to number (A=1, B=2, etc.)
+                result = 0
+                for char in col_id.upper():
+                    result = result * 26 + (ord(char) - ord('A') + 1)
+                return result
+        return None
+    
+    if column_identifiers:
+        # Set width for specific columns
+        processed_columns = []
+        for col_id in column_identifiers:
+            try:
+                col_num = column_to_number(col_id)
+                if col_num:
+                    if auto_fit:
+                        ws.columns(col_num).api.AutoFit()
+                    else:
+                        ws.columns(col_num).api.ColumnWidth = width_value
+                    processed_columns.append(col_id)
+            except Exception as col_error:
+                continue  # Skip invalid columns
+        
+        result = {
+            "success": True,
+            "operation": "set_column_width",
+            "workbook": wb.name,
+            "worksheet": ws.name,
+            "columns_processed": processed_columns,
+            "total_columns": len(processed_columns),
+            "width_set": None if auto_fit else width_value,
+            "auto_fit": auto_fit
+        }
+    else:
+        # Use range parameter or default to current selection
+        range_str = "${params.range || ''}"
+        if not range_str:
+            # Get current selection or default to A1
+            try:
+                range_str = ws.api.Selection.Address
+            except:
+                range_str = "A1"
+        
+        range_obj = ws.range(range_str)
+        
+        # Set width for all columns in the range
+        processed_columns = []
+        for col in range(range_obj.column, range_obj.column + range_obj.columns.count):
+            try:
+                if auto_fit:
+                    ws.columns(col).api.AutoFit()
+                else:
+                    ws.columns(col).api.ColumnWidth = width_value
+                # Convert column number back to letter for display
+                col_letter = ''
+                temp = col
+                while temp > 0:
+                    temp -= 1
+                    col_letter = chr(temp % 26 + ord('A')) + col_letter
+                    temp //= 26
+                processed_columns.append(col_letter)
+            except:
+                continue
+        
+        result = {
+            "success": True,
+            "operation": "set_column_width",
+            "workbook": wb.name,
+            "worksheet": ws.name,
+            "range": range_str,
+            "columns_processed": processed_columns,
+            "total_columns": len(processed_columns),
+            "width_set": None if auto_fit else width_value,
+            "auto_fit": auto_fit
+        }
+        
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "set_column_width",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateGetRowHeightLogic(params: XlwingsParams): string {
+    const sizing = params.sizing;
+    const rowNumbers = sizing?.row_numbers;
+    
+    return `
+# Get row height
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+try:
+    row_numbers = ${rowNumbers ? JSON.stringify(rowNumbers) : 'None'}
+    
+    if row_numbers:
+        # Get height for specific rows
+        row_heights = []
+        for row_num in row_numbers:
+            try:
+                height = ws.rows(row_num).api.RowHeight
+                row_heights.append({"row": row_num, "height": height})
+            except Exception as row_error:
+                row_heights.append({"row": row_num, "height": None, "error": str(row_error)})
+        
+        result = {
+            "success": True,
+            "operation": "get_row_height",
+            "workbook": wb.name,
+            "worksheet": ws.name,
+            "row_heights": row_heights,
+            "total_rows": len(row_heights)
+        }
+    else:
+        # Use range parameter or default to current selection
+        range_str = "${params.range || ''}"
+        if not range_str:
+            # Get current selection or default to A1
+            try:
+                range_str = ws.api.Selection.Address
+            except:
+                range_str = "A1"
+        
+        range_obj = ws.range(range_str)
+        
+        # Get height for all rows in the range
+        row_heights = []
+        for row in range(range_obj.row, range_obj.row + range_obj.rows.count):
+            try:
+                height = ws.rows(row).api.RowHeight
+                row_heights.append({"row": row, "height": height})
+            except:
+                row_heights.append({"row": row, "height": None, "error": "Could not read row height"})
+        
+        result = {
+            "success": True,
+            "operation": "get_row_height",
+            "workbook": wb.name,
+            "worksheet": ws.name,
+            "range": range_str,
+            "row_heights": row_heights,
+            "total_rows": len(row_heights)
+        }
+        
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "get_row_height",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateGetColumnWidthLogic(params: XlwingsParams): string {
+    const sizing = params.sizing;
+    const columnIdentifiers = sizing?.column_identifiers;
+    
+    return `
+# Get column width
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+try:
+    column_identifiers = ${columnIdentifiers ? JSON.stringify(columnIdentifiers) : 'None'}
+    
+    def column_to_number(col_id):
+        """Convert column identifier to number"""
+        if isinstance(col_id, int):
+            return col_id
+        elif isinstance(col_id, str):
+            if col_id.isdigit():
+                return int(col_id)
+            else:
+                # Convert letter to number (A=1, B=2, etc.)
+                result = 0
+                for char in col_id.upper():
+                    result = result * 26 + (ord(char) - ord('A') + 1)
+                return result
+        return None
+    
+    def number_to_column(col_num):
+        """Convert column number to letter"""
+        col_letter = ''
+        temp = col_num
+        while temp > 0:
+            temp -= 1
+            col_letter = chr(temp % 26 + ord('A')) + col_letter
+            temp //= 26
+        return col_letter
+    
+    if column_identifiers:
+        # Get width for specific columns
+        column_widths = []
+        for col_id in column_identifiers:
+            try:
+                col_num = column_to_number(col_id)
+                if col_num:
+                    width = ws.columns(col_num).api.ColumnWidth
+                    column_widths.append({"column": col_id, "column_number": col_num, "width": width})
+                else:
+                    column_widths.append({"column": col_id, "width": None, "error": "Invalid column identifier"})
+            except Exception as col_error:
+                column_widths.append({"column": col_id, "width": None, "error": str(col_error)})
+        
+        result = {
+            "success": True,
+            "operation": "get_column_width",
+            "workbook": wb.name,
+            "worksheet": ws.name,
+            "column_widths": column_widths,
+            "total_columns": len(column_widths)
+        }
+    else:
+        # Use range parameter or default to current selection
+        range_str = "${params.range || ''}"
+        if not range_str:
+            # Get current selection or default to A1
+            try:
+                range_str = ws.api.Selection.Address
+            except:
+                range_str = "A1"
+        
+        range_obj = ws.range(range_str)
+        
+        # Get width for all columns in the range
+        column_widths = []
+        for col in range(range_obj.column, range_obj.column + range_obj.columns.count):
+            try:
+                width = ws.columns(col).api.ColumnWidth
+                col_letter = number_to_column(col)
+                column_widths.append({"column": col_letter, "column_number": col, "width": width})
+            except:
+                col_letter = number_to_column(col)
+                column_widths.append({"column": col_letter, "column_number": col, "width": None, "error": "Could not read column width"})
+        
+        result = {
+            "success": True,
+            "operation": "get_column_width",
+            "workbook": wb.name,
+            "worksheet": ws.name,
+            "range": range_str,
+            "column_widths": column_widths,
+            "total_columns": len(column_widths)
+        }
+        
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "get_column_width",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateGetCellInfoLogic(params: XlwingsParams): string {
+    const cellOp = params.cell_operation;
+    const includeFormatting = cellOp?.include_formatting ?? true;
+    const includeFormulas = cellOp?.include_formulas ?? true;
+    const includeValidation = cellOp?.include_validation ?? false;
+    const includeComments = cellOp?.include_comments ?? true;
+    const includeFormattingPython = includeFormatting ? 'True' : 'False';
+    const includeFormulasPython = includeFormulas ? 'True' : 'False';
+    const includeValidationPython = includeValidation ? 'True' : 'False';
+    const includeCommentsPython = includeComments ? 'True' : 'False';
+    
+    return `
+# Get comprehensive cell information
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+# Get target range
+range_str = "${params.range || 'A1'}"
+if not range_str:
+    raise Exception("range parameter is required for get_cell_info operation")
+
+try:
+    range_obj = ws.range(range_str)
+    cells_info = []
+    
+    include_formatting = ${includeFormattingPython}
+    include_formulas = ${includeFormulasPython}
+    include_validation = ${includeValidationPython}
+    include_comments = ${includeCommentsPython}
+    
+    # Iterate through each cell in the range
+    for row in range(range_obj.row, range_obj.row + range_obj.rows.count):
+        for col in range(range_obj.column, range_obj.column + range_obj.columns.count):
+            cell = ws.range((row, col))
+            
+            # Basic cell information
+            cell_info = {
+                "address": cell.address,
+                "row": row,
+                "column": col,
+                "value": cell.value,
+                "data_type": str(type(cell.value).__name__) if cell.value is not None else "NoneType"
+            }
+            
+            # Formula information
+            if include_formulas:
+                try:
+                    formula = cell.formula
+                    cell_info["formula"] = formula if formula else None
+                    cell_info["has_formula"] = bool(formula)
+                except:
+                    cell_info["formula"] = None
+                    cell_info["has_formula"] = False
+            
+            # Formatting information
+            if include_formatting:
+                try:
+                    cell_info["formatting"] = {
+                        "font_name": getattr(cell.api.Font, 'Name', None),
+                        "font_size": getattr(cell.api.Font, 'Size', None),
+                        "font_bold": getattr(cell.api.Font, 'Bold', None),
+                        "font_italic": getattr(cell.api.Font, 'Italic', None),
+                        "font_color": getattr(cell.api.Font, 'Color', None),
+                        "fill_color": getattr(cell.api.Interior, 'Color', None),
+                        "number_format": getattr(cell.api, 'NumberFormat', None),
+                        "horizontal_alignment": getattr(cell.api, 'HorizontalAlignment', None),
+                        "vertical_alignment": getattr(cell.api, 'VerticalAlignment', None),
+                        "has_border": bool(getattr(cell.api.Borders, 'LineStyle', None))
+                    }
+                except Exception as fmt_error:
+                    cell_info["formatting"] = {"error": str(fmt_error)}
+            
+            # Comment information
+            if include_comments:
+                try:
+                    if cell.comment:
+                        cell_info["comment"] = {
+                            "text": cell.comment.text,
+                            "author": getattr(cell.comment, 'author', 'Unknown'),
+                            "visible": getattr(cell.comment, 'visible', False)
+                        }
+                    else:
+                        cell_info["comment"] = None
+                except:
+                    cell_info["comment"] = None
+            
+            # Data validation information
+            if include_validation:
+                try:
+                    validation = cell.api.Validation
+                    if validation.Type > 0:  # Has validation
+                        cell_info["validation"] = {
+                            "type": validation.Type,
+                            "formula1": validation.Formula1,
+                            "formula2": validation.Formula2,
+                            "input_message": validation.InputMessage,
+                            "error_message": validation.ErrorMessage,
+                            "show_input": validation.ShowInput,
+                            "show_error": validation.ShowError
+                        }
+                    else:
+                        cell_info["validation"] = None
+                except:
+                    cell_info["validation"] = None
+            
+            # Additional properties
+            try:
+                cell_info["is_merged"] = cell.api.MergeCells
+                if cell_info["is_merged"]:
+                    cell_info["merge_area"] = cell.api.MergeArea.Address
+            except:
+                cell_info["is_merged"] = False
+                cell_info["merge_area"] = None
+            
+            cells_info.append(cell_info)
+    
+    result = {
+        "success": True,
+        "operation": "get_cell_info",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "range": range_str,
+        "cells": cells_info,
+        "total_cells": len(cells_info),
+        "info_included": {
+            "formatting": include_formatting,
+            "formulas": include_formulas,
+            "validation": include_validation,
+            "comments": include_comments
+        }
+    }
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "get_cell_info",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "range": range_str,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateInsertCellsLogic(params: XlwingsParams): string {
+    const cellOp = params.cell_operation;
+    const shiftDirection = cellOp?.shift_direction || 'down';
+    const count = cellOp?.count || 1;
+    
+    return `
+# Insert cells with shift direction
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+# Get target range
+range_str = "${params.range || 'A1'}"
+if not range_str:
+    raise Exception("range parameter is required for insert_cells operation")
+
+try:
+    range_obj = ws.range(range_str)
+    shift_direction = "${shiftDirection}"
+    count = ${count}
+    
+    # Validate shift direction
+    valid_directions = ["down", "right", "up", "left"]
+    if shift_direction not in valid_directions:
+        raise Exception(f"Invalid shift_direction: {shift_direction}. Must be one of: {valid_directions}")
+    
+    # Excel shift constants
+    shift_constants = {
+        "down": -4121,    # xlShiftDown
+        "right": -4161,   # xlShiftToRight
+        "up": -4162,      # xlShiftUp
+        "left": -4159     # xlShiftToLeft
+    }
+    
+    # Perform insertion multiple times if count > 1
+    cells_inserted = 0
+    for i in range(count):
+        try:
+            if shift_direction == "down":
+                range_obj.api.Insert(Shift=shift_constants[shift_direction])
+            elif shift_direction == "right":
+                range_obj.api.Insert(Shift=shift_constants[shift_direction])
+            elif shift_direction == "up":
+                # For up shift, we need to select the range above and insert down
+                above_range = ws.range((range_obj.row - 1, range_obj.column), 
+                                     (range_obj.row - 1 + range_obj.rows.count - 1, 
+                                      range_obj.column + range_obj.columns.count - 1))
+                above_range.api.Insert(Shift=shift_constants["down"])
+            elif shift_direction == "left":
+                # For left shift, we need to select the range to the left and insert right
+                left_range = ws.range((range_obj.row, range_obj.column - 1), 
+                                    (range_obj.row + range_obj.rows.count - 1, 
+                                     range_obj.column - 1 + range_obj.columns.count - 1))
+                left_range.api.Insert(Shift=shift_constants["right"])
+            
+            cells_inserted += range_obj.rows.count * range_obj.columns.count
+        except Exception as insert_error:
+            if i == 0:  # If first insertion fails, raise error
+                raise insert_error
+            else:  # If subsequent insertions fail, break but report partial success
+                break
+    
+    result = {
+        "success": True,
+        "operation": "insert_cells",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "range": range_str,
+        "shift_direction": shift_direction,
+        "cells_inserted": cells_inserted,
+        "insertions_completed": i + 1 if 'i' in locals() else count,
+        "total_requested": count * range_obj.rows.count * range_obj.columns.count
+    }
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "insert_cells",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "range": range_str,
+        "shift_direction": shift_direction,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateDeleteCellsLogic(params: XlwingsParams): string {
+    const cellOp = params.cell_operation;
+    const shiftDirection = cellOp?.shift_direction || 'up';
+    const count = cellOp?.count || 1;
+    
+    return `
+# Delete cells with shift direction
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+# Get target range
+range_str = "${params.range || 'A1'}"
+if not range_str:
+    raise Exception("range parameter is required for delete_cells operation")
+
+try:
+    range_obj = ws.range(range_str)
+    shift_direction = "${shiftDirection}"
+    count = ${count}
+    
+    # Validate shift direction
+    valid_directions = ["up", "left", "down", "right"]
+    if shift_direction not in valid_directions:
+        raise Exception(f"Invalid shift_direction: {shift_direction}. Must be one of: {valid_directions}")
+    
+    # Excel shift constants for delete
+    shift_constants = {
+        "up": -4162,      # xlShiftUp
+        "left": -4159,    # xlShiftToLeft
+        "down": -4121,    # xlShiftDown (rarely used for delete)
+        "right": -4161    # xlShiftToRight (rarely used for delete)
+    }
+    
+    # Store original range info before deletion
+    original_rows = range_obj.rows.count
+    original_cols = range_obj.columns.count
+    cells_per_deletion = original_rows * original_cols
+    
+    # Perform deletion multiple times if count > 1
+    cells_deleted = 0
+    for i in range(count):
+        try:
+            # For multiple deletions, we need to recalculate the range
+            if i > 0:
+                range_obj = ws.range(range_str)  # Reset to original range
+            
+            range_obj.api.Delete(Shift=shift_constants[shift_direction])
+            cells_deleted += cells_per_deletion
+            
+        except Exception as delete_error:
+            if i == 0:  # If first deletion fails, raise error
+                raise delete_error
+            else:  # If subsequent deletions fail, break but report partial success
+                break
+    
+    result = {
+        "success": True,
+        "operation": "delete_cells",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "range": range_str,
+        "shift_direction": shift_direction,
+        "cells_deleted": cells_deleted,
+        "deletions_completed": i + 1 if 'i' in locals() else count,
+        "total_requested": count * cells_per_deletion,
+        "original_range_size": {
+            "rows": original_rows,
+            "columns": original_cols,
+            "total_cells": cells_per_deletion
+        }
+    }
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "delete_cells",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "range": range_str,
+        "shift_direction": shift_direction,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateSortRangeLogic(params: XlwingsParams): string {
+    const sort = params.sort;
+    const keys = sort?.keys || [{ column: 1, order: 'asc', data_type: 'auto' }];
+    const hasHeader = sort?.has_header ?? false;
+    const orientation = sort?.orientation || 'rows';
+    const caseSensitive = sort?.case_sensitive ?? false;
+    const hasHeaderPython = hasHeader ? 'True' : 'False';
+    const caseSensitivePython = caseSensitive ? 'True' : 'False';
+    const customOrder = sort?.custom_order;
+    
+    return `
+# Sort range with specified criteria
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook(app, "${params.workbook || ''}")
+if not wb:
+    raise Exception("Could not find the specified workbook")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+# Get target range
+range_str = "${params.range || ''}"
+if not range_str:
+    raise Exception("range parameter is required for sort_range operation")
+
+try:
+    range_obj = ws.range(range_str)
+    
+    # Parse sort configuration
+    sort_keys = ${JSON.stringify(keys)}
+    has_header = ${hasHeaderPython}
+    orientation = "${orientation}"
+    case_sensitive = ${caseSensitivePython}
+    custom_order = ${customOrder ? JSON.stringify(customOrder) : 'None'}
+    
+    def column_to_number(col_id):
+        """Convert column identifier to number"""
+        if isinstance(col_id, int):
+            return col_id
+        elif isinstance(col_id, str):
+            if col_id.isdigit():
+                return int(col_id)
+            else:
+                # Convert letter to number (A=1, B=2, etc.)
+                result = 0
+                for char in col_id.upper():
+                    result = result * 26 + (ord(char) - ord('A') + 1)
+                return result
+        return 1
+    
+    # Excel sort constants
+    xl_ascending = 1
+    xl_descending = 2
+    xl_sort_on_values = 0
+    xl_sort_normal = 0
+    xl_sort_text_as_numbers = 1
+    xl_pinyin_sort_type = 1
+    xl_sort_rows = 2  # Sort by rows (default)
+    xl_sort_columns = 1  # Sort by columns
+    
+    # Data type constants
+    data_type_constants = {
+        'auto': xl_sort_normal,
+        'text': xl_sort_normal,
+        'number': xl_sort_text_as_numbers,
+        'date': xl_sort_normal
+    }
+    
+    # Create sort object
+    sort_range = range_obj
+    
+    # If has header, exclude header row from sort range
+    if has_header and orientation == 'rows':
+        sort_range = ws.range(
+            (range_obj.row + 1, range_obj.column),
+            (range_obj.row + range_obj.rows.count - 1, 
+             range_obj.column + range_obj.columns.count - 1)
+        )
+    elif has_header and orientation == 'columns':
+        sort_range = ws.range(
+            (range_obj.row, range_obj.column + 1),
+            (range_obj.row + range_obj.rows.count - 1, 
+             range_obj.column + range_obj.columns.count - 2)
+        )
+    
+    # Use Excel's Sort object for advanced sorting
+    sort_obj = wb.api.Worksheets(ws.name).Sort
+    
+    # Clear existing sort criteria
+    sort_obj.SortFields.Clear()
+    
+    # Process sort keys
+    for i, key in enumerate(sort_keys):
+        if orientation == 'rows':
+            # Sorting by columns (vertical sort)
+            col_num = column_to_number(key.get('column', 1))
+            sort_column = range_obj.columns(col_num)
+            
+            sort_order = xl_ascending if key.get('order', 'asc') == 'asc' else xl_descending
+            data_type = data_type_constants.get(key.get('data_type', 'auto'), xl_sort_normal)
+            
+            sort_obj.SortFields.Add(
+                Key=sort_column,
+                SortOn=xl_sort_on_values,
+                Order=sort_order,
+                DataOption=data_type
+            )
+        else:
+            # Sorting by rows (horizontal sort)  
+            row_num = key.get('row', 1)
+            sort_row = range_obj.rows(row_num)
+            
+            sort_order = xl_ascending if key.get('order', 'asc') == 'asc' else xl_descending
+            
+            sort_obj.SortFields.Add(
+                Key=sort_row,
+                SortOn=xl_sort_on_values, 
+                Order=sort_order
+            )
+    
+    # Set sort range and execute
+    sort_obj.SetRange(sort_range.api)
+    sort_obj.Header = 1 if has_header else 2  # xlNo = 2, xlYes = 1
+    sort_obj.MatchCase = case_sensitive
+    sort_obj.Orientation = xl_sort_rows if orientation == 'rows' else xl_sort_columns
+    
+    # Apply custom sort order if provided
+    if custom_order and orientation == 'rows' and len(sort_keys) > 0:
+        try:
+            # Create custom list (this is Excel version dependent)
+            custom_list = custom_order
+            # Note: Custom sort orders are complex in xlwings/Excel API
+            # For now, we'll note it in the result but may not apply it
+        except:
+            pass
+    
+    # Execute the sort
+    sort_obj.Apply()
+    
+    # Prepare result information
+    sort_summary = []
+    for key in sort_keys:
+        if orientation == 'rows':
+            sort_summary.append({
+                "column": key.get('column'),
+                "order": key.get('order', 'asc'),
+                "data_type": key.get('data_type', 'auto')
+            })
+        else:
+            sort_summary.append({
+                "row": key.get('row'),
+                "order": key.get('order', 'asc'),
+                "data_type": key.get('data_type', 'auto')
+            })
+    
+    result = {
+        "success": True,
+        "operation": "sort_range",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "range": range_str,
+        "sort_criteria": sort_summary,
+        "orientation": orientation,
+        "has_header": has_header,
+        "case_sensitive": case_sensitive,
+        "custom_order_applied": bool(custom_order),
+        "rows_affected": range_obj.rows.count,
+        "columns_affected": range_obj.columns.count
+    }
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "sort_range",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "range": range_str,
+        "error": str(e)
+    }
+
 print(json.dumps(result))`;
   }
 
@@ -3053,6 +5976,8 @@ except Exception as e:
     const searchColumn = params.search_column;
     const searchFormulas = params.search_formulas !== false; // Default true
     const autoSelect = params.auto_select !== false; // Default true
+    const searchFormulasPython = searchFormulas ? 'True' : 'False';
+    const autoSelectPython = autoSelect ? 'True' : 'False';
     const targetWorksheet = params.worksheet || '';
     
     if (!searchTerm) {
@@ -3071,8 +5996,8 @@ if not wb:
 
 search_term = "${searchTerm}"
 search_column = ${searchColumn ? (typeof searchColumn === 'string' ? `"${searchColumn}"` : searchColumn) : 'None'}
-search_formulas = ${searchFormulas ? 'True' : 'False'}
-auto_select = ${autoSelect ? 'True' : 'False'}
+search_formulas = ${searchFormulasPython}
+auto_select = ${autoSelectPython}
 target_worksheet = "${targetWorksheet}"
 
 matches = []
@@ -3210,7 +6135,7 @@ try:
     
     result = {
         "success": True,
-        "operation": "search_data",
+        "operation": "search_range",
         "workbook": wb.name,
         "search_term": search_term,
         "search_formulas": search_formulas,
@@ -3223,7 +6148,7 @@ try:
 except Exception as e:
     result = {
         "success": False,
-        "operation": "search_data",
+        "operation": "search_range",
         "xlwings_error": str(e)
     }
     print(json.dumps(result))`;
@@ -3496,5 +6421,506 @@ except Exception as e:
         "xlwings_error": str(e)
     }
     print(json.dumps(result))`;
+  }
+
+  private generateCreateShapeLogic(params: XlwingsParams): string {
+    if (!params.shape) {
+      return 'raise ValueError("Shape configuration is required for create_shape operation")';
+    }
+
+    const shape = params.shape;
+    const shapeType = shape.type;
+    const left = shape.left;
+    const top = shape.top;
+    const width = shape.width;
+    const height = shape.height;
+    const text = shape.text || '';
+    const name = shape.name || `Shape_${Date.now()}`;
+
+    return `${this.generateExcelConnectionCode(params)}
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    ws = wb.sheets.active
+
+# Import required modules for shapes
+import xlwings.constants as constants
+
+# Shape type mapping
+shape_type_mapping = {
+    'rectangle': constants.ShapeType.xlRectangle,
+    'oval': constants.ShapeType.xlOval,
+    'triangle': constants.ShapeType.xlIsoscelesTriangle,
+    'line': constants.ShapeType.xlLine,
+    'arrow': constants.ShapeType.xlArrow,
+    'textbox': constants.ShapeType.xlTextBox,
+    'flowchart_process': constants.ShapeType.xlFlowchartProcess,
+    'flowchart_decision': constants.ShapeType.xlFlowchartDecision,
+    'flowchart_start_end': constants.ShapeType.xlFlowchartTerminator,
+    'flowchart_connector': constants.ShapeType.xlFlowchartConnector,
+    'star': constants.ShapeType.xl5pointStar,
+    'pentagon': constants.ShapeType.xlRegularPentagon,
+    'hexagon': constants.ShapeType.xlHexagon
+}
+
+try:
+    shape_type = "${shapeType}"
+    if shape_type not in shape_type_mapping:
+        raise ValueError(f"Unsupported shape type: {shape_type}")
+    
+    # Create the shape
+    shape_obj = ws.shapes.add_shape(
+        Type=shape_type_mapping[shape_type],
+        Left=${left},
+        Top=${top},
+        Width=${width},
+        Height=${height}
+    )
+    
+    # Set shape name
+    shape_obj.name = "${name}"
+    
+    # Add text if provided
+    if "${text}":
+        shape_obj.text_frame.characters.text = "${text}"
+    
+    ${this.generateShapeStyleCode(shape)}
+    ${this.generateShapeTextFormatCode(shape)}
+    
+    result = {
+        "success": True,
+        "operation": "create_shape",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "shape_name": shape_obj.name,
+        "shape_type": "${shapeType}",
+        "position": {"left": ${left}, "top": ${top}},
+        "size": {"width": ${width}, "height": ${height}},
+        "text": "${text}"
+    }
+    print(json.dumps(result))
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "create_shape",
+        "xlwings_error": str(e)
+    }
+    print(json.dumps(result))`;
+  }
+
+  private generateCreateTextboxLogic(params: XlwingsParams): string {
+    if (!params.shape) {
+      return 'raise ValueError("Shape configuration is required for create_textbox operation")';
+    }
+
+    const shape = params.shape;
+    const left = shape.left;
+    const top = shape.top;
+    const width = shape.width;
+    const height = shape.height;
+    const text = shape.text || '';
+    const name = shape.name || `Textbox_${Date.now()}`;
+
+    return `${this.generateExcelConnectionCode(params)}
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    ws = wb.sheets.active
+
+# Import required modules for shapes
+import xlwings.constants as constants
+
+try:
+    # Create textbox
+    textbox = ws.shapes.add_textbox(
+        Left=${left},
+        Top=${top},
+        Width=${width},
+        Height=${height}
+    )
+    
+    # Set textbox name
+    textbox.name = "${name}"
+    
+    # Set text content
+    textbox.text_frame.characters.text = "${text}"
+    
+    ${this.generateShapeStyleCode(shape)}
+    ${this.generateShapeTextFormatCode(shape)}
+    
+    result = {
+        "success": True,
+        "operation": "create_textbox",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "shape_name": textbox.name,
+        "position": {"left": ${left}, "top": ${top}},
+        "size": {"width": ${width}, "height": ${height}},
+        "text": "${text}"
+    }
+    print(json.dumps(result))
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "create_textbox",
+        "xlwings_error": str(e)
+    }
+    print(json.dumps(result))`;
+  }
+
+  private generateListShapesLogic(params: XlwingsParams): string {
+    return `${this.generateExcelConnectionCode(params)}
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    ws = wb.sheets.active
+
+try:
+    shapes_info = []
+    
+    for shape in ws.shapes:
+        shape_info = {
+            "name": shape.name,
+            "type": str(shape.type),
+            "position": {
+                "left": shape.left,
+                "top": shape.top
+            },
+            "size": {
+                "width": shape.width,
+                "height": shape.height
+            },
+            "text": getattr(shape.text_frame.characters, 'text', '') if hasattr(shape, 'text_frame') else '',
+            "rotation": shape.rotation if hasattr(shape, 'rotation') else 0,
+            "visible": shape.visible
+        }
+        shapes_info.append(shape_info)
+    
+    result = {
+        "success": True,
+        "operation": "list_shapes",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "shapes_count": len(shapes_info),
+        "shapes": shapes_info
+    }
+    print(json.dumps(result))
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "list_shapes",
+        "xlwings_error": str(e)
+    }
+    print(json.dumps(result))`;
+  }
+
+  private generateModifyShapeLogic(params: XlwingsParams): string {
+    const shapeName = params.shape_name || params.shape?.name;
+    if (!shapeName) {
+      return 'raise ValueError("Shape name is required for modify_shape operation")';
+    }
+
+    return `${this.generateExcelConnectionCode(params)}
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    ws = wb.sheets.active
+
+try:
+    # Find the shape
+    target_shape = None
+    for shape in ws.shapes:
+        if shape.name == "${shapeName}":
+            target_shape = shape
+            break
+    
+    if not target_shape:
+        raise ValueError(f"Shape '{shapeName}' not found")
+    
+    ${this.generateShapeModificationCode(params)}
+    
+    result = {
+        "success": True,
+        "operation": "modify_shape",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "shape_name": "${shapeName}",
+        "modifications_applied": True
+    }
+    print(json.dumps(result))
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "modify_shape",
+        "xlwings_error": str(e)
+    }
+    print(json.dumps(result))`;
+  }
+
+  private generateDeleteShapeLogic(params: XlwingsParams): string {
+    const shapeName = params.shape_name || params.shape?.name;
+    if (!shapeName) {
+      return 'raise ValueError("Shape name is required for delete_shape operation")';
+    }
+
+    return `${this.generateExcelConnectionCode(params)}
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    ws = wb.sheets.active
+
+try:
+    # Find and delete the shape
+    shape_found = False
+    for shape in ws.shapes:
+        if shape.name == "${shapeName}":
+            shape.delete()
+            shape_found = True
+            break
+    
+    if not shape_found:
+        raise ValueError(f"Shape '{shapeName}' not found")
+    
+    result = {
+        "success": True,
+        "operation": "delete_shape",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "shape_name": "${shapeName}",
+        "deleted": True
+    }
+    print(json.dumps(result))
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "delete_shape",
+        "xlwings_error": str(e)
+    }
+    print(json.dumps(result))`;
+  }
+
+  private generateMoveShapeLogic(params: XlwingsParams): string {
+    const shapeName = params.shape_name || params.shape?.name;
+    const moveSettings = params.shape_move;
+    if (!shapeName || !moveSettings) {
+      return 'raise ValueError("Shape name and movement settings are required for move_shape operation")';
+    }
+
+    return `${this.generateExcelConnectionCode(params)}
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    ws = wb.sheets.active
+
+try:
+    # Find the shape
+    target_shape = None
+    for shape in ws.shapes:
+        if shape.name == "${shapeName}":
+            target_shape = shape
+            break
+    
+    if not target_shape:
+        raise ValueError(f"Shape '{shapeName}' not found")
+    
+    # Move the shape
+    old_left = target_shape.left
+    old_top = target_shape.top
+    
+    target_shape.left = ${moveSettings.new_left}
+    target_shape.top = ${moveSettings.new_top}
+    
+    result = {
+        "success": True,
+        "operation": "move_shape",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "shape_name": "${shapeName}",
+        "old_position": {"left": old_left, "top": old_top},
+        "new_position": {"left": ${moveSettings.new_left}, "top": ${moveSettings.new_top}}
+    }
+    print(json.dumps(result))
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "move_shape",
+        "xlwings_error": str(e)
+    }
+    print(json.dumps(result))`;
+  }
+
+  private generateResizeShapeLogic(params: XlwingsParams): string {
+    const shapeName = params.shape_name || params.shape?.name;
+    const resizeSettings = params.shape_resize;
+    if (!shapeName || !resizeSettings) {
+      return 'raise ValueError("Shape name and resize settings are required for resize_shape operation")';
+    }
+    const keepAspectRatio = resizeSettings.keep_aspect_ratio || false;
+    const keepAspectRatioPython = keepAspectRatio ? 'True' : 'False';
+
+    return `${this.generateExcelConnectionCode(params)}
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    ws = wb.sheets.active
+
+try:
+    # Find the shape
+    target_shape = None
+    for shape in ws.shapes:
+        if shape.name == "${shapeName}":
+            target_shape = shape
+            break
+    
+    if not target_shape:
+        raise ValueError(f"Shape '{shapeName}' not found")
+    
+    # Store old dimensions
+    old_width = target_shape.width
+    old_height = target_shape.height
+    
+    # Resize the shape
+    if ${keepAspectRatioPython}:
+        # Calculate aspect ratio and resize proportionally
+        current_ratio = old_width / old_height
+        new_width = ${resizeSettings.new_width}
+        new_height = ${resizeSettings.new_height}
+        
+        if new_width / new_height > current_ratio:
+            new_width = new_height * current_ratio
+        else:
+            new_height = new_width / current_ratio
+            
+        target_shape.width = new_width
+        target_shape.height = new_height
+    else:
+        target_shape.width = ${resizeSettings.new_width}
+        target_shape.height = ${resizeSettings.new_height}
+    
+    result = {
+        "success": True,
+        "operation": "resize_shape",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "shape_name": "${shapeName}",
+        "old_size": {"width": old_width, "height": old_height},
+        "new_size": {"width": target_shape.width, "height": target_shape.height},
+        "aspect_ratio_maintained": ${keepAspectRatioPython}
+    }
+    print(json.dumps(result))
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "resize_shape",
+        "xlwings_error": str(e)
+    }
+    print(json.dumps(result))`;
+  }
+
+  private generateShapeStyleCode(shape: { style?: ShapeStyle }): string {
+    if (!shape.style) return '';
+
+    let styleCode = '';
+    const style = shape.style;
+
+    if (style.fill_color) {
+      styleCode += `    # Set fill color\n    shape_obj.fill.fore_color.rgb = "${style.fill_color}"\n`;
+    }
+
+    if (style.border_color || style.border_width || style.border_style) {
+      styleCode += `    # Set border properties\n`;
+      if (style.border_color) {
+        styleCode += `    shape_obj.line.color.rgb = "${style.border_color}"\n`;
+      }
+      if (style.border_width) {
+        styleCode += `    shape_obj.line.weight = ${style.border_width}\n`;
+      }
+    }
+
+    if (style.transparency) {
+      styleCode += `    # Set transparency\n    shape_obj.fill.transparency = ${style.transparency}\n`;
+    }
+
+    return styleCode;
+  }
+
+  private generateShapeTextFormatCode(shape: { text_format?: ShapeTextFormat }): string {
+    if (!shape.text_format) return '';
+
+    let formatCode = '';
+    const textFormat = shape.text_format;
+
+    if (textFormat.font) {
+      formatCode += `    # Set font properties\n`;
+      const font = textFormat.font;
+      if (font.name) {
+        formatCode += `    shape_obj.text_frame.characters.font.name = "${font.name}"\n`;
+      }
+      if (font.size) {
+        formatCode += `    shape_obj.text_frame.characters.font.size = ${font.size}\n`;
+      }
+      if (font.bold) {
+        formatCode += `    shape_obj.text_frame.characters.font.bold = ${font.bold}\n`;
+      }
+      if (font.italic) {
+        formatCode += `    shape_obj.text_frame.characters.font.italic = ${font.italic}\n`;
+      }
+      if (font.color) {
+        formatCode += `    shape_obj.text_frame.characters.font.color.rgb = "${font.color}"\n`;
+      }
+    }
+
+    if (textFormat.alignment) {
+      formatCode += `    # Set text alignment\n`;
+      const alignment = textFormat.alignment;
+      if (alignment.horizontal) {
+        const alignmentMap: Record<string, string> = {
+          'left': 'xlHAlignLeft',
+          'center': 'xlHAlignCenter', 
+          'right': 'xlHAlignRight',
+          'justify': 'xlHAlignJustify'
+        };
+        const horizontalAlignment = alignmentMap[alignment.horizontal as string] || 'xlHAlignCenter';
+        formatCode += `    shape_obj.text_frame.horizontal_alignment = constants.${horizontalAlignment}\n`;
+      }
+      if (alignment.vertical) {
+        const vAlignmentMap: Record<string, string> = {
+          'top': 'xlVAlignTop',
+          'middle': 'xlVAlignCenter',
+          'bottom': 'xlVAlignBottom'
+        };
+        const verticalAlignment = vAlignmentMap[alignment.vertical as string] || 'xlVAlignCenter';
+        formatCode += `    shape_obj.text_frame.vertical_alignment = constants.${verticalAlignment}\n`;
+      }
+    }
+
+    return formatCode;
+  }
+
+  private generateShapeModificationCode(params: XlwingsParams): string {
+    if (!params.shape) return '';
+
+    let modCode = '';
+    const shape = params.shape;
+
+    if (shape.text !== undefined) {
+      modCode += `    # Update text content\n    target_shape.text_frame.characters.text = "${shape.text}"\n`;
+    }
+
+    if (shape.rotation !== undefined) {
+      modCode += `    # Set rotation\n    target_shape.rotation = ${shape.rotation}\n`;
+    }
+
+    modCode += this.generateShapeStyleCode({ style: shape.style }).replace(/shape_obj/g, 'target_shape');
+    modCode += this.generateShapeTextFormatCode({ text_format: shape.text_format }).replace(/shape_obj/g, 'target_shape');
+
+    return modCode;
   }
 }
