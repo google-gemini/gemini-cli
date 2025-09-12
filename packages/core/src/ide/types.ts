@@ -120,39 +120,6 @@ export const IdeDiffClosedNotificationSchema = z.object({
 });
 
 /**
- * The response from a request to close a diff.
- */
-export const CloseDiffResponseSchema = z
-  .object({
-    content: z
-      .array(
-        z.object({
-          text: z.string(),
-          type: z.literal('text'),
-        }),
-      )
-      .min(1),
-  })
-  .transform((val, ctx) => {
-    try {
-      const parsed = JSON.parse(val.content[0].text);
-      const innerSchema = z.object({ content: z.string().optional() });
-      const validationResult = innerSchema.safeParse(parsed);
-      if (!validationResult.success) {
-        validationResult.error.issues.forEach((issue) => ctx.addIssue(issue));
-        return z.NEVER;
-      }
-      return validationResult.data;
-    } catch (_) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Invalid JSON in text content',
-      });
-      return z.NEVER;
-    }
-  });
-
-/**
  * The request to open a diff view in the IDE.
  */
 export const OpenDiffRequestSchema = z.object({
@@ -164,4 +131,19 @@ export const OpenDiffRequestSchema = z.object({
    * The proposed new content for the file.
    */
   newContent: z.string(),
+});
+
+/**
+ * The request to close a diff view in the IDE.
+ *
+ */
+export const CloseDiffRequestSchema = z.object({
+  /**
+   * The absolute path to the file to be diffed.
+   */
+  filePath: z.string(),
+  /**
+   * @deprecated
+   */
+  suppressNotification: z.boolean().optional(),
 });

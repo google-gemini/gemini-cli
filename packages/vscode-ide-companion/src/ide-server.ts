@@ -6,6 +6,7 @@
 
 import * as vscode from 'vscode';
 import {
+  CloseDiffRequestSchema,
   IdeContextNotificationSchema,
   OpenDiffRequestSchema,
 } from '@google/gemini-cli-core';
@@ -18,7 +19,7 @@ import { type Server as HTTPServer } from 'node:http';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
 
@@ -353,18 +354,12 @@ const createMcpServer = (diffManager: DiffManager) => {
     'closeDiff',
     {
       description: '(IDE Tool) Close an open diff view for a specific file.',
-      inputSchema: z.object({
-        filePath: z.string(),
-        suppressNotification: z.boolean().optional(),
-      }).shape,
+      inputSchema: CloseDiffRequestSchema.shape,
     },
     async ({
       filePath,
       suppressNotification,
-    }: {
-      filePath: string;
-      suppressNotification?: boolean;
-    }) => {
+    }: z.infer<typeof CloseDiffRequestSchema>) => {
       const content = await diffManager.closeDiff(
         filePath,
         suppressNotification,

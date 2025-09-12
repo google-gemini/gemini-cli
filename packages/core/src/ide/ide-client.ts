@@ -13,7 +13,6 @@ import {
   IdeDiffAcceptedNotificationSchema,
   IdeDiffClosedNotificationSchema,
   IdeDiffRejectedNotificationSchema,
-  CloseDiffResponseSchema,
 } from './types.js';
 import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -316,14 +315,56 @@ export class IdeClient {
         },
       });
 
-      if (result) {
-        const parsed = CloseDiffResponseSchema.parse(result);
-        return parsed.content;
+      if (!result) {
+        return undefined;
+      }
+
+      const parsedResult = CallToolResultSchema.safeParse(result);
+      if (!parsedResult.success) {
+        logger.debug(
+          `Failed to parse tool result from IDE for closeDiff:`,
+          parsedResult.error,
+        );
+        return undefined;
+      }
+
+      if (parsedResult.data.isError) {
+        const textPart = parsedResult.data.content.find(
+          (part) => part.type === 'text',
+        );
+        const errorMessage =
+          textPart?.text ?? `Tool 'closeDiff' reported an error.`;
+        logger.debug(
+          `callTool for closeDiff ${filePath} failed with isError:`,
+          errorMessage,
+        );
+        return undefined;
+      }
+
+      const textPart = parsedResult.data.content.find(
+        (part) => part.type === 'text',
+      );
+
+      if (textPart?.text) {
+        try {
+          const parsedJson = JSON.parse(textPart.text);
+          if (parsedJson && typeof parsedJson.content === 'string') {
+            return parsedJson.content;
+          }
+          if (parsedJson && parsedJson.content === null) {
+            return undefined;
+          }
+        } catch (_e) {
+          logger.debug(
+            `Invalid JSON in closeDiff response for ${filePath}:`,
+            textPart.text,
+          );
+        }
       }
     } catch (err) {
-      logger.debug(`callTool for ${filePath} failed:`, err);
+      logger.debug(`callTool for closeDiff ${filePath} failed:`, err);
     }
-    return;
+    return undefined;
   }
 
   // Closes the diff. Instead of waiting for a notification,
