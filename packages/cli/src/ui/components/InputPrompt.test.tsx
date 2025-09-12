@@ -10,6 +10,7 @@ import type { InputPromptProps } from './InputPrompt.js';
 import { InputPrompt } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 import type { Config } from '@google/gemini-cli-core';
+import { ApprovalMode } from '@google/gemini-cli-core';
 import * as path from 'node:path';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
@@ -207,6 +208,7 @@ describe('InputPrompt', () => {
       commandContext: mockCommandContext,
       shellModeActive: false,
       setShellModeActive: vi.fn(),
+      approvalMode: ApprovalMode.DEFAULT,
       inputWidth: 80,
       suggestionsWidth: 80,
       focus: true,
@@ -1783,6 +1785,38 @@ describe('InputPrompt', () => {
 
       expect(props.buffer.move).toHaveBeenCalledWith('end');
       expect(props.buffer.moveToOffset).not.toHaveBeenCalled();
+      unmount();
+    });
+  });
+
+  describe('snapshots', () => {
+    it('should render correctly in shell mode', async () => {
+      props.shellModeActive = true;
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+      expect(stdout.lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('should render correctly when accepting edits', async () => {
+      props.approvalMode = ApprovalMode.AUTO_EDIT;
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+      expect(stdout.lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('should render correctly in yolo mode', async () => {
+      props.approvalMode = ApprovalMode.YOLO;
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+      expect(stdout.lastFrame()).toMatchSnapshot();
       unmount();
     });
   });
