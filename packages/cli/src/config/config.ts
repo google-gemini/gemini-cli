@@ -361,13 +361,11 @@ export async function loadHierarchicalGeminiMemory(
   const realHome = fs.realpathSync(path.resolve(homedir()));
   const isHomeDirectory = realCwd === realHome;
 
-  // If currentDirectoryOnly and we are in home, explicitly use home as cwd.
+  // If not currentDirectoryOnly and in home, pass empty string to skip workspace scan; otherwise, pass cwd.
   const currentDirectoryOnly =
     settings.context?.fileFiltering?.currentDirectoryOnly === true;
   const effectiveCwd =
-    currentDirectoryOnly && isHomeDirectory
-      ? realHome
-      : currentWorkingDirectory;
+    !currentDirectoryOnly && isHomeDirectory ? '' : currentWorkingDirectory;
 
   if (debugMode) {
     logger.debug(
