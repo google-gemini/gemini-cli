@@ -604,7 +604,8 @@ describe('installExtension', () => {
       installExtension({ source: sourceExtDir, type: 'local' }),
     ).resolves.toBe('my-local-extension');
 
-    expect(consoleInfoSpy).toHaveBeenCalledWith("");
+    expect(consoleInfoSpy).toHaveBeenCalledWith('This extension will run the following MCP servers: ');
+    expect(consoleInfoSpy).toHaveBeenCalledWith('The extension will append info to your gemini.md context');
   });
 
   it('should continue installation if user accepts prompt for local extension with mcp servers', async () => {
