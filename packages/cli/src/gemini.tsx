@@ -215,6 +215,9 @@ export async function main() {
     argv,
   );
 
+  // Cleanup sessions after config initialization
+  await cleanupExpiredSessions(config, settings.merged);
+
   const wasRaw = process.stdin.isRaw;
   let kittyProtocolDetectionComplete: Promise<boolean> | undefined;
   if (config.isInteractive() && !wasRaw) {
@@ -396,9 +399,6 @@ export async function main() {
   }
 
   await config.initialize();
-
-  // Cleanup sessions after config initialization
-  await cleanupExpiredSessions(config, settings.merged);
 
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
