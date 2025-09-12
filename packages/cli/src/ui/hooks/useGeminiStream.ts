@@ -71,6 +71,8 @@ enum StreamProcessingStatus {
   Error,
 }
 
+const EDIT_TOOL_NAMES = new Set(['replace', 'write_file']);
+
 function showCitations(settings: LoadedSettings, config: Config): boolean {
   const enabled = settings?.merged?.ui?.showCitations;
   if (enabled !== undefined) {
@@ -862,9 +864,7 @@ export const useGeminiStream = (
         // For AUTO_EDIT mode, only approve edit tools (replace, write_file)
         if (newApprovalMode === ApprovalMode.AUTO_EDIT) {
           awaitingApprovalCalls = awaitingApprovalCalls.filter(
-            (call) =>
-              call.request.name === 'replace' ||
-              call.request.name === 'write_file',
+            (call) => EDIT_TOOL_NAMES.has(call.request.name),
           );
         }
 
@@ -1022,8 +1022,7 @@ export const useGeminiStream = (
       }
       const restorableToolCalls = toolCalls.filter(
         (toolCall) =>
-          (toolCall.request.name === 'replace' ||
-            toolCall.request.name === 'write_file') &&
+          EDIT_TOOL_NAMES.has(toolCall.request.name) &&
           toolCall.status === 'awaiting_approval',
       );
 
