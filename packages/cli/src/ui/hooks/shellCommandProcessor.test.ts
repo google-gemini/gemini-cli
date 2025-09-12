@@ -186,7 +186,9 @@ describe('useShellCommandProcessor', () => {
     const execPromise = onExecMock.mock.calls[0][0];
 
     act(() => {
-      resolveExecutionPromise(createMockServiceResult({ output: 'test\rme\nand\ryou' }));
+      resolveExecutionPromise(
+        createMockServiceResult({ output: 'test\rme\nand\ryou' }),
+      );
     });
     await act(async () => await execPromise);
 

@@ -141,13 +141,13 @@ export const useShellCommandProcessor = (
             result = part + result.substring(part.length);
           }
           return result;
-        }
+        };
 
         const processCarriageReturns = (input: string) => {
           const lines = input.split('\n');
-          const processedLines = lines.map(processLine);       
+          const processedLines = lines.map(processLine);
           return processedLines.join('\n');
-        }
+        };
 
         try {
           const { pid, result } = await ShellExecutionService.execute(
@@ -189,7 +189,8 @@ export const useShellCommandProcessor = (
 
               // Throttle pending UI updates to avoid excessive re-renders.
               if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                const displayOutput = processCarriageReturns(currentDisplayOutput);
+                const displayOutput =
+                  processCarriageReturns(currentDisplayOutput);
                 setPendingHistoryItem({
                   type: 'tool_group',
                   tools: [
