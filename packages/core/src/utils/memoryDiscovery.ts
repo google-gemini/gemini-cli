@@ -92,7 +92,7 @@ async function getGeminiMdFilePathsInternal(
 ): Promise<string[]> {
   const dirs = new Set<string>(
     currentDirectoryOnly
-      ? [currentWorkingDirectory]
+      ? [currentWorkingDirectory || userHomePath]
       : [...includeDirectoriesToReadGemini, currentWorkingDirectory],
   );
 
