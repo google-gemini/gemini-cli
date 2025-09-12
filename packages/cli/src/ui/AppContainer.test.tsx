@@ -48,8 +48,6 @@ vi.mock('ink', async (importOriginal) => {
   };
 });
 
-
-
 vi.mock('./hooks/useQuotaAndFallback.js');
 vi.mock('./hooks/useHistoryManager.js');
 vi.mock('./hooks/useThemeCommand.js');
@@ -577,8 +575,8 @@ describe('AppContainer State Management', () => {
     it('should prevent terminal height from being less than 1', () => {
       const resizePtySpy = vi.spyOn(ShellExecutionService, 'resizePty');
       // Arrange: Simulate a small terminal and a large footer
-      mockedUseTerminalSize.mockReturnValue({columns: 80, rows: 5});
-      mockedMeasureElement.mockReturnValue({width: 80, height: 10}); // Footer is taller than the screen
+      mockedUseTerminalSize.mockReturnValue({ columns: 80, rows: 5 });
+      mockedMeasureElement.mockReturnValue({ width: 80, height: 10 }); // Footer is taller than the screen
       mockedUseGeminiStream.mockReturnValue({
         streamingState: 'idle',
         submitQuery: vi.fn(),
