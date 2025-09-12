@@ -5,63 +5,37 @@
  */
 
 import type React from 'react';
-import { useState } from 'react';
+import { useCallback } from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import { theme } from '../semantic-colors.js';
+import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
-import { AuthType } from '@google/gemini-cli-core';
-import { validateAuthMethod } from '../../config/auth.js';
+import {
+  AuthType,
+  clearCachedCredentialFile,
+  type Config,
+} from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { AuthState } from '../types.js';
+import { runExitCleanup } from '../../utils/cleanup.js';
+import { validateAuthMethodWithSettings } from './useAuth.js';
 
 interface AuthDialogProps {
-  onSelect: (authMethod: AuthType | undefined, scope: SettingScope) => void;
+  config: Config;
   settings: LoadedSettings;
-  initialErrorMessage?: string | null;
-}
-
-function parseDefaultAuthType(
-  defaultAuthType: string | undefined,
-): AuthType | null {
-  if (
-    defaultAuthType &&
-    Object.values(AuthType).includes(defaultAuthType as AuthType)
-  ) {
-    return defaultAuthType as AuthType;
-  }
-  return null;
+  setAuthState: (state: AuthState) => void;
+  authError: string | null;
+  onAuthError: (error: string) => void;
 }
 
 export function AuthDialog({
-  onSelect,
+  config,
   settings,
-  initialErrorMessage,
+  setAuthState,
+  authError,
+  onAuthError,
 }: AuthDialogProps): React.JSX.Element {
-  const [errorMessage, setErrorMessage] = useState<string | null>(() => {
-    if (initialErrorMessage) {
-      return initialErrorMessage;
-    }
-
-    const defaultAuthType = parseDefaultAuthType(
-      process.env['GEMINI_DEFAULT_AUTH_TYPE'],
-    );
-
-    if (process.env['GEMINI_DEFAULT_AUTH_TYPE'] && defaultAuthType === null) {
-      return (
-        `Invalid value for GEMINI_DEFAULT_AUTH_TYPE: "${process.env['GEMINI_DEFAULT_AUTH_TYPE']}". ` +
-        `Valid values are: ${Object.values(AuthType).join(', ')}.`
-      );
-    }
-
-    if (
-      process.env['GEMINI_API_KEY'] &&
-      (!defaultAuthType || defaultAuthType === AuthType.USE_GEMINI)
-    ) {
-      return 'Existing API key detected (GEMINI_API_KEY). Select "Gemini API Key" option to use it.';
-    }
-    return null;
-  });
   let items = [
     {
       label: 'Login with Google',
@@ -88,14 +62,20 @@ export function AuthDialog({
     );
   }
 
+  let defaultAuthType = null;
+  const defaultAuthTypeEnv = process.env['GEMINI_DEFAULT_AUTH_TYPE'];
+  if (
+    defaultAuthTypeEnv &&
+    Object.values(AuthType).includes(defaultAuthTypeEnv as AuthType)
+  ) {
+    defaultAuthType = defaultAuthTypeEnv as AuthType;
+  }
+
   let initialAuthIndex = items.findIndex((item) => {
     if (settings.merged.security?.auth?.selectedType) {
       return item.value === settings.merged.security.auth.selectedType;
     }
 
-    const defaultAuthType = parseDefaultAuthType(
-      process.env['GEMINI_DEFAULT_AUTH_TYPE'],
-    );
     if (defaultAuthType) {
       return item.value === defaultAuthType;
     }
@@ -110,12 +90,37 @@ export function AuthDialog({
     initialAuthIndex = 0;
   }
 
+  const onSelect = useCallback(
+    async (authType: AuthType | undefined, scope: SettingScope) => {
+      if (authType) {
+        await clearCachedCredentialFile();
+
+        settings.setValue(scope, 'security.auth.selectedType', authType);
+        if (
+          authType === AuthType.LOGIN_WITH_GOOGLE &&
+          config.isBrowserLaunchSuppressed()
+        ) {
+          runExitCleanup();
+          console.log(
+            `
+----------------------------------------------------------------
+Logging in with Google... Please restart Gemini CLI to continue.
+----------------------------------------------------------------
+            `,
+          );
+          process.exit(0);
+        }
+      }
+      setAuthState(AuthState.Unauthenticated);
+    },
+    [settings, config, setAuthState],
+  );
+
   const handleAuthSelect = (authMethod: AuthType) => {
-    const error = validateAuthMethod(authMethod);
+    const error = validateAuthMethodWithSettings(authMethod, settings);
     if (error) {
-      setErrorMessage(error);
+      onAuthError(error);
     } else {
-      setErrorMessage(null);
       onSelect(authMethod, SettingScope.User);
     }
   };
@@ -125,12 +130,12 @@ export function AuthDialog({
       if (key.name === 'escape') {
         // Prevent exit if there is an error message.
         // This means they user is not authenticated yet.
-        if (errorMessage) {
+        if (authError) {
           return;
         }
         if (settings.merged.security?.auth?.selectedType === undefined) {
           // Prevent exiting if no auth method is set
-          setErrorMessage(
+          onAuthError(
             'You must select an auth method to proceed. Press Ctrl+C twice to exit.',
           );
           return;
@@ -144,14 +149,18 @@ export function AuthDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={Colors.Gray}
+      borderColor={theme.border.default}
       flexDirection="column"
       padding={1}
       width="100%"
     >
-      <Text bold>Get started</Text>
+      <Text bold color={theme.text.primary}>
+        Get started
+      </Text>
       <Box marginTop={1}>
-        <Text>How would you like to authenticate for this project?</Text>
+        <Text color={theme.text.primary}>
+          How would you like to authenticate for this project?
+        </Text>
       </Box>
       <Box marginTop={1}>
         <RadioButtonSelect
@@ -160,19 +169,21 @@ export function AuthDialog({
           onSelect={handleAuthSelect}
         />
       </Box>
-      {errorMessage && (
+      {authError && (
         <Box marginTop={1}>
-          <Text color={Colors.AccentRed}>{errorMessage}</Text>
+          <Text color={theme.status.error}>{authError}</Text>
         </Box>
       )}
       <Box marginTop={1}>
-        <Text color={Colors.Gray}>(Use Enter to select)</Text>
+        <Text color={theme.text.secondary}>(Use Enter to select)</Text>
       </Box>
       <Box marginTop={1}>
-        <Text>Terms of Services and Privacy Notice for Gemini CLI</Text>
+        <Text color={theme.text.primary}>
+          Terms of Services and Privacy Notice for Gemini CLI
+        </Text>
       </Box>
       <Box marginTop={1}>
-        <Text color={Colors.AccentBlue}>
+        <Text color={theme.text.link}>
           {
             'https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md'
           }

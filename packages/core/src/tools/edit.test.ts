@@ -10,15 +10,11 @@ const mockEnsureCorrectEdit = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 
-import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient } from '../ide/ide-client.js';
 
 vi.mock('../ide/ide-client.js', () => ({
   IdeClient: {
     getInstance: vi.fn(),
-  },
-  IDEConnectionStatus: {
-    Connected: 'connected',
-    Disconnected: 'disconnected',
   },
 }));
 
@@ -197,22 +193,6 @@ describe('EditTool', () => {
       expect(applyReplacement('hello world', '', 'new', false)).toBe(
         'hello world',
       );
-    });
-
-    it('should treat $ literally and not as replacement pattern', () => {
-      const current = "price is $100 and pattern end is ' '";
-      const oldStr = 'price is $100';
-      const newStr = 'price is $200';
-      const result = applyReplacement(current, oldStr, newStr, false);
-      expect(result).toBe("price is $200 and pattern end is ' '");
-    });
-
-    it("should treat $' literally and not as a replacement pattern", () => {
-      const current = 'foo';
-      const oldStr = 'foo';
-      const newStr = "bar$'baz";
-      const result = applyReplacement(current, oldStr, newStr, false);
-      expect(result).toBe("bar$'baz");
     });
   });
 
@@ -912,9 +892,7 @@ describe('EditTool', () => {
       filePath = path.join(rootDir, testFile);
       ideClient = {
         openDiff: vi.fn(),
-        getConnectionStatus: vi.fn().mockReturnValue({
-          status: IDEConnectionStatus.Connected,
-        }),
+        isDiffingEnabled: vi.fn().mockReturnValue(true),
       };
       vi.mocked(IdeClient.getInstance).mockResolvedValue(ideClient);
       (mockConfig as any).getIdeMode = () => true;

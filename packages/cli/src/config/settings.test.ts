@@ -428,8 +428,11 @@ describe('Settings Loading and Merging', () => {
         '/workspace/dir',
       ]);
 
-      // Verify excludeTools are overwritten by workspace
-      expect(settings.merged.tools?.exclude).toEqual(['workspace-tool']);
+      // Verify excludeTools are concatenated and de-duped
+      expect(settings.merged.tools?.exclude).toEqual([
+        'user-tool',
+        'workspace-tool',
+      ]);
 
       // Verify excludedProjectEnvVars are concatenated and de-duped
       expect(settings.merged.advanced?.excludedEnvVars).toEqual(
@@ -1073,6 +1076,30 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.model?.chatCompression).toEqual({
         contextPercentageThreshold: 0.8,
       });
+    });
+
+    it('should merge output format settings, with workspace taking precedence', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        output: { format: 'text' },
+      };
+      const workspaceSettingsContent = {
+        output: { format: 'json' },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.output?.format).toBe('json');
     });
 
     it('should handle chatCompression when only in user settings', () => {

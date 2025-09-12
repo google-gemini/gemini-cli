@@ -44,11 +44,18 @@ async function getProcessInfo(pid: number): Promise<{
         ParentProcessId = 0,
         CommandLine = '',
       } = JSON.parse(output);
-      return { parentPid: ParentProcessId, name: Name, command: CommandLine };
+      return {
+        parentPid: ParentProcessId,
+        name: Name,
+        command: CommandLine ?? '',
+      };
     } else {
       const command = `ps -o ppid=,command= -p ${pid}`;
       const { stdout } = await execAsync(command);
       const trimmedStdout = stdout.trim();
+      if (!trimmedStdout) {
+        return { parentPid: 0, name: '', command: '' };
+      }
       const ppidString = trimmedStdout.split(/\s+/)[0];
       const parentPid = parseInt(ppidString, 10);
       const fullCommand = trimmedStdout.substring(ppidString.length).trim();

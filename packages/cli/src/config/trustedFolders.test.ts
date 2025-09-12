@@ -4,17 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Mock 'os' first.
 import * as osActual from 'node:os';
-vi.mock('os', async (importOriginal) => {
-  const actualOs = await importOriginal<typeof osActual>();
-  return {
-    ...actualOs,
-    homedir: vi.fn(() => '/mock/home/user'),
-    platform: vi.fn(() => 'linux'),
-  };
-});
-
+import { ideContextStore } from '@google/gemini-cli-core';
 import {
   describe,
   it,
@@ -28,7 +19,6 @@ import {
 import * as fs from 'node:fs';
 import stripJsonComments from 'strip-json-comments';
 import * as path from 'node:path';
-
 import {
   loadTrustedFolders,
   USER_TRUSTED_FOLDERS_PATH,
@@ -37,6 +27,14 @@ import {
 } from './trustedFolders.js';
 import type { Settings } from './settings.js';
 
+vi.mock('os', async (importOriginal) => {
+  const actualOs = await importOriginal<typeof osActual>();
+  return {
+    ...actualOs,
+    homedir: vi.fn(() => '/mock/home/user'),
+    platform: vi.fn(() => 'linux'),
+  };
+});
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof fs>();
   return {
@@ -47,7 +45,6 @@ vi.mock('fs', async (importOriginal) => {
     mkdirSync: vi.fn(),
   };
 });
-
 vi.mock('strip-json-comments', () => ({
   default: vi.fn((content) => content),
 }));
@@ -381,17 +378,11 @@ describe('isWorkspaceTrusted', () => {
   });
 });
 
-import { getIdeTrust } from '@google/gemini-cli-core';
-
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    getIdeTrust: vi.fn(),
-  };
-});
-
 describe('isWorkspaceTrusted with IDE override', () => {
+  afterEach(() => {
+    ideContextStore.clear();
+  });
+
   const mockSettings: Settings = {
     security: {
       folderTrust: {
@@ -401,7 +392,7 @@ describe('isWorkspaceTrusted with IDE override', () => {
   };
 
   it('should return true when ideTrust is true, ignoring config', () => {
-    vi.mocked(getIdeTrust).mockReturnValue(true);
+    ideContextStore.set({ workspaceState: { isTrusted: true } });
     // Even if config says don't trust, ideTrust should win.
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({ [process.cwd()]: TrustLevel.DO_NOT_TRUST }),
@@ -410,7 +401,7 @@ describe('isWorkspaceTrusted with IDE override', () => {
   });
 
   it('should return false when ideTrust is false, ignoring config', () => {
-    vi.mocked(getIdeTrust).mockReturnValue(false);
+    ideContextStore.set({ workspaceState: { isTrusted: false } });
     // Even if config says trust, ideTrust should win.
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({ [process.cwd()]: TrustLevel.TRUST_FOLDER }),
@@ -419,7 +410,6 @@ describe('isWorkspaceTrusted with IDE override', () => {
   });
 
   it('should fall back to config when ideTrust is undefined', () => {
-    vi.mocked(getIdeTrust).mockReturnValue(undefined);
     vi.spyOn(fs, 'existsSync').mockReturnValue(true);
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({ [process.cwd()]: TrustLevel.TRUST_FOLDER }),
@@ -435,7 +425,7 @@ describe('isWorkspaceTrusted with IDE override', () => {
         },
       },
     };
-    vi.mocked(getIdeTrust).mockReturnValue(false);
+    ideContextStore.set({ workspaceState: { isTrusted: false } });
     expect(isWorkspaceTrusted(settings)).toBe(true);
   });
 });

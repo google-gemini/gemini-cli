@@ -11,7 +11,42 @@ import type {
   AuthType,
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
+import {
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+} from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
+
+export type SettingsType =
+  | 'boolean'
+  | 'string'
+  | 'number'
+  | 'array'
+  | 'object'
+  | 'enum';
+
+export type SettingsValue =
+  | boolean
+  | string
+  | number
+  | string[]
+  | object
+  | undefined;
+
+/**
+ * Setting datatypes that "toggle" through a fixed list of options
+ * (e.g. an enum or true/false) rather than allowing for free form input
+ * (like a number or string).
+ */
+export const TOGGLE_TYPES: ReadonlySet<SettingsType | undefined> = new Set([
+  'boolean',
+  'enum',
+]);
+
+export interface SettingEnumOption {
+  value: string | number;
+  label: string;
+}
 
 export enum MergeStrategy {
   // Replace the old value with the new value. This is the default.
@@ -25,11 +60,11 @@ export enum MergeStrategy {
 }
 
 export interface SettingDefinition {
-  type: 'boolean' | 'string' | 'number' | 'array' | 'object';
+  type: SettingsType;
   label: string;
   category: string;
   requiresRestart: boolean;
-  default: boolean | string | number | string[] | object | undefined;
+  default: SettingsValue;
   description?: string;
   parentKey?: string;
   childKey?: string;
@@ -37,6 +72,8 @@ export interface SettingDefinition {
   properties?: SettingsSchema;
   showInDialog?: boolean;
   mergeStrategy?: MergeStrategy;
+  /** Enum type options  */
+  options?: readonly SettingEnumOption[];
 }
 
 export interface SettingsSchema {
@@ -51,7 +88,7 @@ export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
  * The structure of this object defines the structure of the `Settings` type.
  * `as const` is crucial for TypeScript to infer the most specific types possible.
  */
-export const SETTINGS_SCHEMA = {
+const SETTINGS_SCHEMA = {
   // Maintained for compatibility/criticality
   mcpServers: {
     type: 'object',
@@ -147,6 +184,30 @@ export const SETTINGS_SCHEMA = {
         default: false,
         description: 'Enable debug logging of keystrokes to the console.',
         showInDialog: true,
+      },
+    },
+  },
+  output: {
+    type: 'object',
+    label: 'Output',
+    category: 'General',
+    requiresRestart: false,
+    default: {},
+    description: 'Settings for the CLI output.',
+    showInDialog: false,
+    properties: {
+      format: {
+        type: 'enum',
+        label: 'Output Format',
+        category: 'General',
+        requiresRestart: false,
+        default: 'text',
+        description: 'The format of the CLI output.',
+        showInDialog: true,
+        options: [
+          { value: 'text', label: 'Text' },
+          { value: 'json', label: 'JSON' },
+        ],
       },
     },
   },
@@ -588,6 +649,36 @@ export const SETTINGS_SCHEMA = {
           'Use node-pty for shell command execution. Fallback to child_process still applies.',
         showInDialog: true,
       },
+      shell: {
+        type: 'object',
+        label: 'Shell',
+        category: 'Tools',
+        requiresRestart: false,
+        default: {},
+        description: 'Settings for shell execution.',
+        showInDialog: false,
+        properties: {
+          pager: {
+            type: 'string',
+            label: 'Pager',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 'cat' as string | undefined,
+            description:
+              'The pager command to use for shell output. Defaults to `cat`.',
+            showInDialog: false,
+          },
+          showColor: {
+            type: 'boolean',
+            label: 'Show Color',
+            category: 'Tools',
+            requiresRestart: false,
+            default: false,
+            description: 'Show color in shell output.',
+            showInDialog: true,
+          },
+        },
+      },
       autoAccept: {
         type: 'boolean',
         label: 'Auto Accept',
@@ -625,6 +716,7 @@ export const SETTINGS_SCHEMA = {
         default: undefined as string[] | undefined,
         description: 'Tool names to exclude from discovery.',
         showInDialog: false,
+        mergeStrategy: MergeStrategy.UNION,
       },
       discoveryCommand: {
         type: 'string',
@@ -649,9 +741,37 @@ export const SETTINGS_SCHEMA = {
         label: 'Use Ripgrep',
         category: 'Tools',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
+        showInDialog: true,
+      },
+      enableToolOutputTruncation: {
+        type: 'boolean',
+        label: 'Enable Tool Output Truncation',
+        category: 'General',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable truncation of large tool outputs.',
+        showInDialog: true,
+      },
+      truncateToolOutputThreshold: {
+        type: 'number',
+        label: 'Tool Output Truncation Threshold',
+        category: 'General',
+        requiresRestart: true,
+        default: DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+        description:
+          'Truncate tool output if it is larger than this many characters. Set to -1 to disable.',
+        showInDialog: true,
+      },
+      truncateToolOutputLines: {
+        type: 'number',
+        label: 'Tool Output Truncation Lines',
+        category: 'General',
+        requiresRestart: true,
+        default: DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+        description: 'The number of lines to keep when truncating tool output.',
         showInDialog: true,
       },
     },
@@ -877,7 +997,13 @@ export const SETTINGS_SCHEMA = {
       },
     },
   },
-} as const;
+} as const satisfies SettingsSchema;
+
+export type SettingsSchemaType = typeof SETTINGS_SCHEMA;
+
+export function getSettingsSchema(): SettingsSchemaType {
+  return SETTINGS_SCHEMA;
+}
 
 type InferSettings<T extends SettingsSchema> = {
   -readonly [K in keyof T]?: T[K] extends { properties: SettingsSchema }
@@ -887,7 +1013,7 @@ type InferSettings<T extends SettingsSchema> = {
       : T[K]['default'];
 };
 
-export type Settings = InferSettings<typeof SETTINGS_SCHEMA>;
+export type Settings = InferSettings<SettingsSchemaType>;
 
 export interface FooterSettings {
   hideCWD?: boolean;

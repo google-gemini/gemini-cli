@@ -1645,28 +1645,28 @@ describe('loadCliConfig useRipgrep', () => {
     vi.restoreAllMocks();
   });
 
-  it('should be false by default when useRipgrep is not set in settings', async () => {
+  it('should be true by default when useRipgrep is not set in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getUseRipgrep()).toBe(false);
-  });
-
-  it('should be true when useRipgrep is set to true in settings', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = { tools: { useRipgrep: true } };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getUseRipgrep()).toBe(true);
   });
 
-  it('should be false when useRipgrep is explicitly set to false in settings', async () => {
+  it('should be false when useRipgrep is set to false in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { tools: { useRipgrep: false } };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getUseRipgrep()).toBe(false);
+  });
+
+  it('should be true when useRipgrep is explicitly set to true in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = { tools: { useRipgrep: true } };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getUseRipgrep()).toBe(true);
   });
 });
 
@@ -1970,6 +1970,55 @@ describe('loadCliConfig fileFiltering', () => {
       expect(getter(config)).toBe(value);
     },
   );
+});
+
+describe('Output Format Configuration', () => {
+  const originalArgv = process.argv;
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.restoreAllMocks();
+  });
+
+  it('should default to text format when no setting or flag is provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {} as Settings,
+      [],
+      'test-session',
+      argv,
+    );
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.TEXT);
+  });
+
+  it('should use the format from settings when no flag is provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { output: { format: 'json' } };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.JSON);
+  });
+
+  it('should use the format from the flag when provided', async () => {
+    process.argv = ['node', 'script.js', '--output-format', 'json'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {} as Settings,
+      [],
+      'test-session',
+      argv,
+    );
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.JSON);
+  });
+
+  it('should prioritize the flag over the setting', async () => {
+    process.argv = ['node', 'script.js', '--output-format', 'text'];
+    const settings: Settings = { output: { format: 'json' } };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.TEXT);
+  });
 });
 
 describe('parseArguments with positional prompt', () => {
