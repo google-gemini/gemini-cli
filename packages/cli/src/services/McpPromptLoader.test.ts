@@ -296,6 +296,91 @@ describe('McpPromptLoader', () => {
         const suggestions = await completion(context, '');
         expect(suggestions).toEqual([]);
       });
+
+      it('should suggest arguments matching a partial argument', async () => {
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
+        const completion = commands[0].completion!;
+        const context = {
+          invocation: {
+            raw: '/find --s',
+            name: 'find',
+            args: '--s',
+          },
+        } as CommandContext;
+        const suggestions = await completion(context, '--s');
+        expect(suggestions).toEqual(['--species="']);
+      });
+
+      it('should suggest arguments even when a partial argument is parsed as a value', async () => {
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
+        const completion = commands[0].completion!;
+        const context = {
+          invocation: {
+            raw: '/find --name="test" --a',
+            name: 'find',
+            args: '--name="test" --a',
+          },
+        } as CommandContext;
+        const suggestions = await completion(context, '--a');
+        expect(suggestions).toEqual(['--age="']);
+      });
+
+      it('should auto-close the quote for a named argument value', async () => {
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
+        const completion = commands[0].completion!;
+        const context = {
+          invocation: {
+            raw: '/find --name="test',
+            name: 'find',
+            args: '--name="test',
+          },
+        } as CommandContext;
+        const suggestions = await completion(context, '--name="test');
+        expect(suggestions).toEqual(['--name="test"']);
+      });
+
+      it('should auto-close the quote for an empty named argument value', async () => {
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
+        const completion = commands[0].completion!;
+        const context = {
+          invocation: {
+            raw: '/find --name="',
+            name: 'find',
+            args: '--name="',
+          },
+        } as CommandContext;
+        const suggestions = await completion(context, '--name="');
+        expect(suggestions).toEqual(['--name=""']);
+      });
+
+      it('should not add a quote if already present', async () => {
+        const loader = new McpPromptLoader(mockConfigWithPrompts);
+        const commands = await loader.loadCommands(
+          new AbortController().signal,
+        );
+        const completion = commands[0].completion!;
+        const context = {
+          invocation: {
+            raw: '/find --name="test"',
+            name: 'find',
+            args: '--name="test"',
+          },
+        } as CommandContext;
+        const suggestions = await completion(context, '--name="test"');
+        expect(suggestions).toEqual([]);
+      });
     });
   });
 });
