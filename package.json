@@ -60,6 +60,7 @@
     "LICENSE"
   ],
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
     "@types/marked": "^5.0.2",
     "@types/mime-types": "^3.0.1",
     "@types/minimatch": "^5.1.2",

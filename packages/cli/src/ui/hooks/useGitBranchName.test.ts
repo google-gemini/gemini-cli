@@ -11,7 +11,7 @@ import { renderHook } from '@testing-library/react';
 import { useGitBranchName } from './useGitBranchName.js';
 import { EventEmitter } from 'node:events';
 import { exec as mockExec, type ChildProcess } from 'node:child_process';
-import { FSWatcher } from 'node:fs';
+import type { FSWatcher } from 'node:fs';
 import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 

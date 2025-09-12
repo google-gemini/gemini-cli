@@ -22,7 +22,7 @@
  */
 
 import { render } from 'ink-testing-library';
-import { waitFor } from '@testing-library/react';
+import { waitFor } from '@testing-library/dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
 import { LoadedSettings } from '../../config/settings.js';
