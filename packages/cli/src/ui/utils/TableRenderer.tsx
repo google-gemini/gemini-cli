@@ -6,8 +6,6 @@
 
 import React, { useCallback } from 'react';
 import { Text, Box } from 'ink';
-import { Colors } from '../colors.js';
-import { getPlainTextLength, RenderInline } from './InlineMarkdownRenderer.js';
 import {
   splitContentIntoEqualWidthLines,
   MAX_LINES_IN_A_ROW,
