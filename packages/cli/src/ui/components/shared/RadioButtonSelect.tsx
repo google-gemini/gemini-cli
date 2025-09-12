@@ -43,6 +43,8 @@ export interface RadioButtonSelectProps<T> {
   maxItemsToShow?: number;
   /** Whether to show numbers next to items. */
   showNumbers?: boolean;
+  /** The color of non-selected items. */
+  defaultColor?: string;
 }
 
 /**
@@ -60,6 +62,7 @@ export function RadioButtonSelect<T>({
   showScrollArrows = false,
   maxItemsToShow = 10,
   showNumbers = true,
+  defaultColor,
 }: RadioButtonSelectProps<T>): React.JSX.Element {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -174,8 +177,8 @@ export function RadioButtonSelect<T>({
         const itemIndex = scrollOffset + index;
         const isSelected = activeIndex === itemIndex;
 
-        let textColor = theme.text.primary;
-        let numberColor = theme.text.primary;
+        let textColor = defaultColor || theme.text.primary;
+        let numberColor = defaultColor || theme.text.primary;
         if (isSelected) {
           textColor = theme.status.success;
           numberColor = theme.status.success;
