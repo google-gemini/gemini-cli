@@ -1,10 +1,10 @@
 {
-  "name": "@google/gemini-cli-core",
-  "version": "0.6.0-nightly",
-  "description": "Gemini CLI Core",
+  "name": "@rradhak1/cli-core",
+  "version": "1.0.0",
+  "description": "RAGHU CLI Core with multi-provider support",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+    "url": "git+https://github.com/raghu-rad/raghu-cli.git"
   },
   "type": "module",
   "main": "dist/index.js",
@@ -32,6 +32,8 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.203.0",
     "@opentelemetry/instrumentation-http": "^0.203.0",
     "@opentelemetry/sdk-node": "^0.203.0",
+    "@rradhak1/cli": "^1.0.0",
+    "@rradhak1/cli-core": "^1.0.0",
     "@types/glob": "^8.1.0",
     "@types/html-to-text": "^9.0.4",
     "@xterm/headless": "5.5.0",
