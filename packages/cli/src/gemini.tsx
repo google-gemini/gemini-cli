@@ -4,9 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
-import { render, Box, Text } from 'ink';
-import Spinner from 'ink-spinner';
+import { render } from 'ink';
 import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
@@ -117,38 +115,6 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   process.exit(0);
 }
 
-const InitializingComponent = ({ initialTotal }: { initialTotal: number }) => {
-  const [total, setTotal] = useState(initialTotal);
-  const [connected, setConnected] = useState(0);
-
-  useEffect(() => {
-    const onStart = ({ count }: { count: number }) => setTotal(count);
-    const onChange = () => {
-      setConnected((val) => val + 1);
-    };
-
-    appEvents.on('mcp-servers-discovery-start', onStart);
-    appEvents.on('mcp-server-connected', onChange);
-    appEvents.on('mcp-server-error', onChange);
-
-    return () => {
-      appEvents.off('mcp-servers-discovery-start', onStart);
-      appEvents.off('mcp-server-connected', onChange);
-      appEvents.off('mcp-server-error', onChange);
-    };
-  }, []);
-
-  const message = `Connecting to MCP servers... (${connected}/${total})`;
-
-  return (
-    <Box>
-      <Text>
-        <Spinner /> {message}
-      </Text>
-    </Box>
-  );
-};
-
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
 
 export function setupUnhandledRejectionHandler() {
@@ -209,15 +175,10 @@ export async function startInteractiveUI(
     );
   };
 
-  const instance = render(
-    <React.StrictMode>
-      <AppWrapper />
-    </React.StrictMode>,
-    {
-      exitOnCtrlC: false,
-      isScreenReaderEnabled: config.getScreenReader(),
-    },
-  );
+  const instance = render(<AppWrapper />, {
+    exitOnCtrlC: false,
+    isScreenReaderEnabled: config.getScreenReader(),
+  });
 
   checkForUpdates()
     .then((info) => {
@@ -314,25 +275,6 @@ export async function main() {
   }
 
   setMaxSizedBoxDebugging(config.getDebugMode());
-
-  const mcpServers = config.getMcpServers();
-  const mcpServersCount = mcpServers ? Object.keys(mcpServers).length : 0;
-
-  let spinnerInstance;
-  if (config.isInteractive() && mcpServersCount > 0) {
-    spinnerInstance = render(
-      <InitializingComponent initialTotal={mcpServersCount} />,
-    );
-  }
-
-  await config.initialize();
-
-  if (spinnerInstance) {
-    // Small UX detail to show the completion message for a bit before unmounting.
-    await new Promise((f) => setTimeout(f, 100));
-    spinnerInstance.clear();
-    spinnerInstance.unmount();
-  }
 
   // Load custom themes from settings
   themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
@@ -446,6 +388,9 @@ export async function main() {
     );
     return;
   }
+
+  await config.initialize();
+
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
   if (!process.stdin.isTTY) {

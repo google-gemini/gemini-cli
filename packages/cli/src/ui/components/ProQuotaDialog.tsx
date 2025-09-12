@@ -7,16 +7,16 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 
 interface ProQuotaDialogProps {
-  currentModel: string;
+  failedModel: string;
   fallbackModel: string;
   onChoice: (choice: 'auth' | 'continue') => void;
 }
 
 export function ProQuotaDialog({
-  currentModel,
+  failedModel,
   fallbackModel,
   onChoice,
 }: ProQuotaDialogProps): React.JSX.Element {
@@ -37,8 +37,8 @@ export function ProQuotaDialog({
 
   return (
     <Box borderStyle="round" flexDirection="column" paddingX={1}>
-      <Text bold color={Colors.AccentYellow}>
-        Pro quota limit reached for {currentModel}.
+      <Text bold color={theme.status.warning}>
+        Pro quota limit reached for {failedModel}.
       </Text>
       <Box marginTop={1}>
         <RadioButtonSelect

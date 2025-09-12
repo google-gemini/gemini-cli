@@ -284,8 +284,15 @@ export class TestRig {
 
             result = filteredLines.join('\n');
           }
-          // If we have stderr output, include that also
-          if (stderr) {
+
+          // Check if this is a JSON output test - if so, don't include stderr
+          // as it would corrupt the JSON
+          const isJsonOutput =
+            commandArgs.includes('--output-format') &&
+            commandArgs.includes('json');
+
+          // If we have stderr output and it's not a JSON test, include that also
+          if (stderr && !isJsonOutput) {
             result += `\n\nStdErr:\n${stderr}`;
           }
 

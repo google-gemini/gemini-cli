@@ -9,10 +9,21 @@ import { IDEServer } from './ide-server.js';
 import semver from 'semver';
 import { DiffContentProvider, DiffManager } from './diff-manager.js';
 import { createLogger } from './utils/logger.js';
+import { detectIdeFromEnv, DetectedIde } from '@google/gemini-cli-core';
 
 const CLI_IDE_COMPANION_IDENTIFIER = 'Google.gemini-cli-vscode-ide-companion';
 const INFO_MESSAGE_SHOWN_KEY = 'geminiCliInfoMessageShown';
 export const DIFF_SCHEME = 'gemini-diff';
+
+/**
+ * IDE environments where the installation greeting is hidden.  In these
+ * environments we either are pre-installed and the installation message is
+ * confusing or we just want to be quiet.
+ */
+const HIDE_INSTALLATION_GREETING_IDES: ReadonlySet<DetectedIde> = new Set([
+  DetectedIde.FirebaseStudio,
+  DetectedIde.CloudShell,
+]);
 
 let ideServer: IDEServer;
 let logger: vscode.OutputChannel;
@@ -133,7 +144,10 @@ export async function activate(context: vscode.ExtensionContext) {
     log(`Failed to start IDE server: ${message}`);
   }
 
-  if (!context.globalState.get(INFO_MESSAGE_SHOWN_KEY)) {
+  const infoMessageEnabled =
+    !HIDE_INSTALLATION_GREETING_IDES.has(detectIdeFromEnv());
+
+  if (!context.globalState.get(INFO_MESSAGE_SHOWN_KEY) && infoMessageEnabled) {
     void vscode.window.showInformationMessage(
       'Gemini CLI Companion extension successfully installed.',
     );
