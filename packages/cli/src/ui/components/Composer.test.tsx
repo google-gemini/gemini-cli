@@ -65,6 +65,22 @@ vi.mock('./ShowMoreLines.js', () => ({
   ShowMoreLines: () => <Text>ShowMoreLines</Text>,
 }));
 
+vi.mock('./QueuedMessageDisplay.js', () => ({
+  QueuedMessageDisplay: ({ messageQueue }: { messageQueue: string[] }) => {
+    if (messageQueue.length === 0) return null;
+    return (
+      <>
+        {messageQueue.slice(0, 3).map((message, index) => (
+          <Text key={index}>{message}</Text>
+        ))}
+        {messageQueue.length > 3 && (
+          <Text>... (+{messageQueue.length - 3} more)</Text>
+        )}
+      </>
+    );
+  },
+}));
+
 // Mock contexts
 vi.mock('../contexts/OverflowContext.js', () => ({
   OverflowProvider: ({ children }: { children: React.ReactNode }) => children,
