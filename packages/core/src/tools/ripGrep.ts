@@ -14,7 +14,10 @@ import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
-import type { Config } from '../config/config.js';
+import {
+  DEFAULT_FILE_FILTERING_OPTIONS,
+  type Config,
+} from '../config/config.js';
 import { fileExists } from '../utils/fileUtils.js';
 import { Storage } from '../config/storage.js';
 
@@ -64,6 +67,16 @@ export interface RipGrepToolParams {
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
    */
   include?: string;
+
+  /**
+   * Whether to respect .gitignore patterns (optional, defaults to true)
+   */
+  respect_git_ignore?: boolean;
+
+  /**
+   * Whether to respect .geminiignore patterns (optional, defaults to true)
+   */
+  respect_gemini_ignore?: boolean;
 }
 
 /**
@@ -73,6 +86,10 @@ interface GrepMatch {
   filePath: string;
   lineNumber: number;
   line: string;
+}
+
+interface GrepResult {
+  matches: GrepMatch[];
 }
 
 class GrepToolInvocation extends BaseToolInvocation<
@@ -151,7 +168,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       }
 
       for (const searchDir of searchDirectories) {
-        const searchResult = await this.performRipgrepSearch({
+        const { matches } = await this.performRipgrepSearch({
           pattern: this.params.pattern,
           path: searchDir,
           include: this.params.include,
@@ -160,12 +177,12 @@ class GrepToolInvocation extends BaseToolInvocation<
 
         if (searchDirectories.length > 1) {
           const dirName = path.basename(searchDir);
-          searchResult.forEach((match) => {
+          matches.forEach((match) => {
             match.filePath = path.join(dirName, match.filePath);
           });
         }
 
-        allMatches = allMatches.concat(searchResult);
+        allMatches = allMatches.concat(matches);
 
         if (allMatches.length >= totalMaxMatches) {
           allMatches = allMatches.slice(0, totalMaxMatches);
@@ -211,6 +228,29 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       if (wasTruncated) {
         llmContent += ` (results limited to ${totalMaxMatches} matches for performance)`;
+      }
+
+      const respectGitIgnore =
+        this.params.respect_git_ignore ??
+        this.config.getFileFilteringOptions().respectGitIgnore ??
+        DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore;
+
+      const respectGeminiIgnore =
+        this.params.respect_gemini_ignore ??
+        this.config.getFileFilteringOptions().respectGeminiIgnore ??
+        DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore;
+
+      const ignoredMessages = [];
+      if (respectGitIgnore) {
+        ignoredMessages.push(`git-ignored`);
+      }
+      if (respectGeminiIgnore) {
+        ignoredMessages.push(`gemini-ignored`);
+      }
+      if (ignoredMessages.length > 0) {
+        llmContent += ` (${ignoredMessages.join(
+          ' and ',
+        )} files were excluded based on your settings)`;
       }
 
       llmContent += `:\n---\n`;
@@ -286,20 +326,48 @@ class GrepToolInvocation extends BaseToolInvocation<
     path: string;
     include?: string;
     signal: AbortSignal;
-  }): Promise<GrepMatch[]> {
+  }): Promise<GrepResult> {
     const { pattern, path: absolutePath, include } = options;
+
+    const respectGitIgnore =
+      this.params.respect_git_ignore ??
+      this.config.getFileFilteringOptions().respectGitIgnore ??
+      DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore;
+
+    const respectGeminiIgnore =
+      this.params.respect_gemini_ignore ??
+      this.config.getFileFilteringOptions().respectGeminiIgnore ??
+      DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore;
 
     const rgArgs = [
       '--line-number',
       '--no-heading',
       '--with-filename',
       '--ignore-case',
-      '--regexp',
+    '--regexp',
       pattern,
     ];
 
+    if (!respectGitIgnore) {
+      rgArgs.push('--no-ignore');
+    }
+
     if (include) {
       rgArgs.push('--glob', include);
+    }
+
+    if (!respectGitIgnore) {
+      rgArgs.push('--no-ignore-vcs');
+    }
+
+    if (respectGeminiIgnore) {
+      const geminiIgnorePath = this.config
+        .getFileService()
+        .getGeminiIgnorePath();
+      // Only add --ignore-file if the .geminiignore file exists
+      if (fs.existsSync(geminiIgnorePath)) {
+        rgArgs.push('--ignore-file', geminiIgnorePath);
+      }
     }
 
     const excludes = [
@@ -366,7 +434,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         });
       });
 
-      return this.parseRipgrepOutput(output, absolutePath);
+      return { matches: this.parseRipgrepOutput(output, absolutePath) };
     } catch (error: unknown) {
       console.error(`GrepLogic: ripgrep failed: ${getErrorMessage(error)}`);
       throw error;
@@ -443,6 +511,16 @@ export class RipGrepTool extends BaseDeclarativeTool<
             description:
               "Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).",
             type: 'string',
+          },
+          respect_git_ignore: {
+            description:
+              'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
+            type: 'boolean',
+          },
+          respect_gemini_ignore: {
+            description:
+              'Optional: Whether to respect .geminiignore patterns when finding files. Defaults to true.',
+            type: 'boolean',
           },
         },
         required: ['pattern'],

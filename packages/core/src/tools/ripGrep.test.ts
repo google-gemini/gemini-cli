@@ -42,10 +42,23 @@ vi.mock('../config/storage.js', () => ({
   },
 }));
 
+// Mock fs.existsSync for .geminiignore file existence checks
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+  };
+});
+
 // Mock child_process for ripgrep calls
-vi.mock('child_process', () => ({
-  spawn: vi.fn(),
-}));
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as object),
+    spawn: vi.fn(),
+  };
+});
 
 const mockSpawn = vi.mocked(spawn);
 
@@ -197,6 +210,14 @@ describe('RipGrepTool', () => {
     getTargetDir: () => tempRootDir,
     getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
     getDebugMode: () => false,
+    getFileService: () => ({
+      getGeminiIgnorePath: vi.fn().mockReturnValue('/path/to/.geminiignore'),
+    }),
+    getFileFilteringOptions: () => ({
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    }),
+    getFileFilteringRespectGitIgnore: vi.fn().mockReturnValue(true),
   } as unknown as Config;
 
   beforeEach(async () => {
@@ -342,7 +363,7 @@ describe('RipGrepTool', () => {
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
-        'Found 1 match for pattern "hello" in the workspace directory (filter: "*.js"):',
+        'Found 1 match for pattern "hello" in the workspace directory (filter: "*.js") (git-ignored and gemini-ignored files were excluded based on your settings):',
       );
       expect(result.llmContent).toContain('File: fileB.js');
       expect(result.llmContent).toContain(
@@ -482,7 +503,7 @@ describe('RipGrepTool', () => {
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
-        'Found 1 match for pattern "foo.*bar" in the workspace directory:',
+        'Found 1 match for pattern "foo.*bar" in the workspace directory (git-ignored and gemini-ignored files were excluded based on your settings):',
       );
       expect(result.llmContent).toContain('File: fileB.js');
       expect(result.llmContent).toContain('L1: const foo = "bar";');
@@ -533,7 +554,7 @@ describe('RipGrepTool', () => {
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
-        'Found 2 matches for pattern "HELLO" in the workspace directory:',
+        'Found 2 matches for pattern "HELLO" in the workspace directory (git-ignored and gemini-ignored files were excluded based on your settings):',
       );
       expect(result.llmContent).toContain('File: fileA.txt');
       expect(result.llmContent).toContain('L1: hello world');
@@ -586,6 +607,14 @@ describe('RipGrepTool', () => {
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
+        getFileService: () => ({
+          getGeminiIgnorePath: vi.fn().mockReturnValue('/path/to/.geminiignore'),
+        }),
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: false,
+        }),
+        getFileFilteringRespectGitIgnore: vi.fn().mockReturnValue(true),
       } as unknown as Config;
 
       // Setup specific mock for this test - multi-directory search for 'world'
@@ -691,6 +720,14 @@ describe('RipGrepTool', () => {
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
+        getFileService: () => ({
+          getGeminiIgnorePath: vi.fn().mockReturnValue('/path/to/.geminiignore'),
+        }),
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: false,
+        }),
+        getFileFilteringRespectGitIgnore: vi.fn().mockReturnValue(true),
       } as unknown as Config;
 
       // Setup specific mock for this test - searching in 'sub' should only return matches from that directory
@@ -1282,6 +1319,131 @@ describe('RipGrepTool', () => {
 
       expect(result.llmContent).toContain('main.ts');
       expect(result.llmContent).not.toContain('other.ts');
+    });
+  });
+
+  describe('with file filtering', () => {
+    let mockConfigWithFiltering: Config;
+    const geminiIgnorePath = path.join(os.homedir(), '.geminiignore');
+
+    beforeEach(async () => {
+      // Mock fs.existsSync to return true for .geminiignore file
+      const { existsSync } = await import('node:fs');
+      (existsSync as Mock).mockClear();
+      (existsSync as Mock).mockImplementation((path: string) => {
+        // Return true for .geminiignore files
+        return path.includes('.geminiignore');
+      });
+      mockConfigWithFiltering = {
+        ...mockConfig,
+        getFileService: () => ({
+          getGeminiIgnorePath: vi.fn().mockReturnValue(geminiIgnorePath),
+        }),
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true, // Default config value
+          respectGeminiIgnore: true, // Default config value
+        }),
+      } as unknown as Config;
+
+      grepTool = new RipGrepTool(mockConfigWithFiltering);
+
+      mockSpawn.mockImplementation(
+        createMockSpawn({ outputData: 'file.txt:1:hello' })
+      );
+    });
+
+    it('should add --no-ignore-vcs when respect_git_ignore is false', async () => {
+      const params: RipGrepToolParams = {
+        pattern: 'hello',
+        respect_git_ignore: false,
+      };
+      const invocation = grepTool.build(params);
+      await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenCalled();
+      const rgArgs = mockSpawn.mock.calls[0][1];
+      expect(rgArgs).toContain('--no-ignore-vcs');
+    });
+
+    it('should NOT add --no-ignore-vcs when respect_git_ignore is true', async () => {
+      const params: RipGrepToolParams = {
+        pattern: 'hello',
+        respect_git_ignore: true,
+      };
+      const invocation = grepTool.build(params);
+      await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenCalled();
+      const rgArgs = mockSpawn.mock.calls[0][1];
+      expect(rgArgs).not.toContain('--no-ignore-vcs');
+    });
+
+    it('should add --ignore-file when respect_gemini_ignore is true', async () => {
+      const params: RipGrepToolParams = {
+        pattern: 'hello',
+        respect_gemini_ignore: true,
+      };
+      const invocation = grepTool.build(params);
+      await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenCalled();
+      const rgArgs = mockSpawn.mock.calls[0][1];
+      
+      // Check if fs.existsSync was called
+      const { existsSync } = await import('node:fs');
+      expect(existsSync).toHaveBeenCalled();
+      
+      expect(rgArgs).toContain('--ignore-file');
+      expect(rgArgs).toContain(geminiIgnorePath);
+    });
+
+    it('should NOT add --ignore-file when respect_gemini_ignore is false', async () => {
+      const params: RipGrepToolParams = {
+        pattern: 'hello',
+        respect_gemini_ignore: false,
+      };
+      const invocation = grepTool.build(params);
+      await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenCalled();
+      const rgArgs = mockSpawn.mock.calls[0][1];
+      expect(rgArgs).not.toContain('--ignore-file');
+    });
+
+    it('should use default config options when params are not provided', async () => {
+      const params: RipGrepToolParams = { pattern: 'hello' }; // No ignore params
+      const invocation = grepTool.build(params);
+      await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenCalled();
+      const rgArgs = mockSpawn.mock.calls[0][1];
+
+      // Based on the mocked default config (respectGitIgnore: true, respectGeminiIgnore: true)
+      expect(rgArgs).not.toContain('--no-ignore-vcs');
+      expect(rgArgs).toContain('--ignore-file');
+      expect(rgArgs).toContain(geminiIgnorePath);
+    });
+
+    it('should include correct message in llmContent when ignoring', async () => {
+      const params: RipGrepToolParams = { pattern: 'hello' };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain(
+        '(git-ignored and gemini-ignored files were excluded based on your settings)',
+      );
+    });
+
+    it('should not include message in llmContent when not ignoring', async () => {
+      const params: RipGrepToolParams = {
+        pattern: 'hello',
+        respect_git_ignore: false,
+        respect_gemini_ignore: false,
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).not.toContain('files were excluded');
     });
   });
 

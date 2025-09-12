@@ -16,7 +16,7 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import type { Config } from '../config/config.js';
-import type { FileExclusions } from '../utils/ignorePatterns.js';
+import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
 import { ToolErrorType } from './tool-error.js';
 
 // --- Interfaces ---
@@ -39,6 +39,16 @@ export interface GrepToolParams {
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
    */
   include?: string;
+
+  /**
+   * Whether to respect .gitignore patterns (optional, defaults to true)
+   */
+  respect_git_ignore?: boolean;
+
+  /**
+   * Whether to respect .geminiignore patterns (optional, defaults to true)
+   */
+  respect_gemini_ignore?: boolean;
 }
 
 /**
@@ -50,18 +60,21 @@ interface GrepMatch {
   line: string;
 }
 
+interface GrepResult {
+  matches: GrepMatch[];
+  gitIgnoredCount: number;
+  geminiIgnoredCount: number;
+}
+
 class GrepToolInvocation extends BaseToolInvocation<
   GrepToolParams,
   ToolResult
 > {
-  private readonly fileExclusions: FileExclusions;
-
   constructor(
     private readonly config: Config,
     params: GrepToolParams,
   ) {
     super(params);
-    this.fileExclusions = config.getFileExclusions();
   }
 
   /**
@@ -123,13 +136,20 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // Collect matches from all search directories
       let allMatches: GrepMatch[] = [];
+      let totalGitIgnored = 0;
+      let totalGeminiIgnored = 0;
+
       for (const searchDir of searchDirectories) {
-        const matches = await this.performGrepSearch({
-          pattern: this.params.pattern,
-          path: searchDir,
-          include: this.params.include,
-          signal,
-        });
+        const { matches, gitIgnoredCount, geminiIgnoredCount } = 
+          await this.performGrepSearch({
+            pattern: this.params.pattern,
+            path: searchDir,
+            include: this.params.include,
+            signal,
+          });
+
+        totalGitIgnored += gitIgnoredCount;
+        totalGeminiIgnored += geminiIgnoredCount;
 
         // Add directory prefix if searching multiple directories
         if (searchDirectories.length > 1) {
@@ -175,9 +195,21 @@ class GrepToolInvocation extends BaseToolInvocation<
       const matchCount = allMatches.length;
       const matchTerm = matchCount === 1 ? 'match' : 'matches';
 
-      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}:
----
-`;
+      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}`;
+
+      const ignoredMessages = [];
+      if (totalGitIgnored > 0) {
+        ignoredMessages.push(`${totalGitIgnored} git-ignored`);
+      }
+      if (totalGeminiIgnored > 0) {
+        ignoredMessages.push(`${totalGeminiIgnored} gemini-ignored`);
+      }
+      if (ignoredMessages.length > 0) {
+        llmContent += ` (${ignoredMessages.join(
+          ' and ',
+        )} files were excluded)`
+      }
+      llmContent += ':\n---\n';
 
       for (const filePath in matchesByFile) {
         llmContent += `File: ${filePath}\n`;
@@ -325,25 +357,32 @@ class GrepToolInvocation extends BaseToolInvocation<
     path: string; // Expects absolute path
     include?: string;
     signal: AbortSignal;
-  }): Promise<GrepMatch[]> {
+  }): Promise<GrepResult> {
     const { pattern, path: absolutePath, include } = options;
     let strategyUsed = 'none';
+
+    const respectGitIgnore =
+      this.params.respect_git_ignore ??
+      this.config.getFileFilteringOptions().respectGitIgnore ??
+      DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore;
+
+    const respectGeminiIgnore =
+      this.params.respect_gemini_ignore ??
+      this.config.getFileFilteringOptions().respectGeminiIgnore ??
+      DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore;
 
     try {
       // --- Strategy 1: git grep ---
       const isGit = isGitRepository(absolutePath);
       const gitAvailable = isGit && (await this.isCommandAvailable('git'));
 
-      if (gitAvailable) {
+      if (gitAvailable && !respectGeminiIgnore) {
         strategyUsed = 'git grep';
-        const gitArgs = [
-          'grep',
-          '--untracked',
-          '-n',
-          '-E',
-          '--ignore-case',
-          pattern,
-        ];
+        const gitArgs = ['grep'];
+        if (respectGitIgnore === false) {
+          gitArgs.push('--untracked');
+        }
+        gitArgs.push('-n', '-E', '--ignore-case', pattern);
         if (include) {
           gitArgs.push('--', include);
         }
@@ -374,7 +413,11 @@ class GrepToolInvocation extends BaseToolInvocation<
                 );
             });
           });
-          return this.parseGrepOutput(output, absolutePath);
+          return {
+            matches: this.parseGrepOutput(output, absolutePath),
+            gitIgnoredCount: 0,
+            geminiIgnoredCount: 0,
+          };
         } catch (gitError: unknown) {
           console.debug(
             `GrepLogic: git grep failed: ${getErrorMessage(
@@ -386,11 +429,15 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // --- Strategy 2: System grep ---
       const grepAvailable = await this.isCommandAvailable('grep');
-      if (grepAvailable) {
+      if (
+        grepAvailable &&
+        (!respectGitIgnore || !isGit) &&
+        !respectGeminiIgnore
+      ) {
         strategyUsed = 'system grep';
         const grepArgs = ['-r', '-n', '-H', '-E'];
         // Extract directory names from exclusion patterns for grep --exclude-dir
-        const globExcludes = this.fileExclusions.getGlobExcludes();
+        const globExcludes = this.config.getFileExclusions().getGlobExcludes();
         const commonExcludes = globExcludes
           .map((pattern) => {
             let dir = pattern;
@@ -476,7 +523,11 @@ class GrepToolInvocation extends BaseToolInvocation<
             child.on('error', onError);
             child.on('close', onClose);
           });
-          return this.parseGrepOutput(output, absolutePath);
+          return {
+            matches: this.parseGrepOutput(output, absolutePath),
+            gitIgnoredCount: 0,
+            geminiIgnoredCount: 0,
+          };
         } catch (grepError: unknown) {
           console.debug(
             `GrepLogic: System grep failed: ${getErrorMessage(
@@ -492,7 +543,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       );
       strategyUsed = 'javascript fallback';
       const globPattern = include ? include : '**/*';
-      const ignorePatterns = this.fileExclusions.getGlobExcludes();
+      const ignorePatterns = this.config.getFileExclusions().getGlobExcludes();
 
       const filesStream = globStream(globPattern, {
         cwd: absolutePath,
@@ -503,11 +554,22 @@ class GrepToolInvocation extends BaseToolInvocation<
         signal: options.signal,
       });
 
+      const fileDiscovery = this.config.getFileService();
+      const allFilePaths: string[] = [];
+      for await (const filePath of filesStream) {
+        allFilePaths.push(filePath as string);
+      }
+
+      const { filteredPaths, gitIgnoredCount, geminiIgnoredCount } =
+        fileDiscovery.filterFilesWithReport(allFilePaths, {
+          respectGitIgnore,
+          respectGeminiIgnore,
+        });
+
       const regex = new RegExp(pattern, 'i');
       const allMatches: GrepMatch[] = [];
 
-      for await (const filePath of filesStream) {
-        const fileAbsolutePath = filePath as string;
+      for (const fileAbsolutePath of filteredPaths) {
         try {
           const content = await fsPromises.readFile(fileAbsolutePath, 'utf8');
           const lines = content.split(/\r?\n/);
@@ -534,7 +596,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         }
       }
 
-      return allMatches;
+      return { matches: allMatches, gitIgnoredCount, geminiIgnoredCount };
     } catch (error: unknown) {
       console.error(
         `GrepLogic: Error in performGrepSearch (Strategy: ${strategyUsed}): ${getErrorMessage(
@@ -564,7 +626,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
         properties: {
           pattern: {
             description:
-              "The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').",
+              "The regular expression (regex) pattern to search for within file contents (e.g., 'function\s+myFunction', 'import\s+\{.*\}\s+from\s+.*').",
             type: 'string',
           },
           path: {
@@ -576,6 +638,16 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
             description:
               "Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).",
             type: 'string',
+          },
+          respect_git_ignore: {
+            description:
+              'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
+            type: 'boolean',
+          },
+          respect_gemini_ignore: {
+            description:
+              'Optional: Whether to respect .geminiignore patterns when finding files. Defaults to true.',
+            type: 'boolean',
           },
         },
         required: ['pattern'],

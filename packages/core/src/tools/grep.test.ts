@@ -18,19 +18,23 @@ import * as glob from 'glob';
 vi.mock('glob', { spy: true });
 
 // Mock the child_process module to control grep/git grep behavior
-vi.mock('child_process', () => ({
-  spawn: vi.fn(() => ({
-    on: (event: string, cb: (...args: unknown[]) => void) => {
-      if (event === 'error' || event === 'close') {
-        // Simulate command not found or error for git grep and system grep
-        // to force it to fall back to JS implementation.
-        setTimeout(() => cb(1), 0); // cb(1) for error/close
-      }
-    },
-    stdout: { on: vi.fn() },
-    stderr: { on: vi.fn() },
-  })),
-}));
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as object),
+    spawn: vi.fn(() => ({
+      on: (event: string, cb: (...args: unknown[]) => void) => {
+        if (event === 'error' || event === 'close') {
+          // Simulate command not found or error for git grep and system grep
+          // to force it to fall back to JS implementation.
+          setTimeout(() => cb(1), 0); // cb(1) for error/close
+        }
+      },
+      stdout: { on: vi.fn() },
+      stderr: { on: vi.fn() },
+    })),
+  };
+});
 
 describe('GrepTool', () => {
   let tempRootDir: string;
@@ -43,6 +47,18 @@ describe('GrepTool', () => {
     getFileExclusions: () => ({
       getGlobExcludes: () => [],
     }),
+    getFileService: () => ({
+      filterFilesWithReport: vi.fn((filePaths: string[]) => ({
+        filteredPaths: filePaths,
+        gitIgnoredCount: 0,
+        geminiIgnoredCount: 0,
+      })),
+    }),
+    getFileFilteringOptions: () => ({
+      respectGitIgnore: true,
+      respectGeminiIgnore: false,
+    }),
+    getFileFilteringRespectGitIgnore: vi.fn().mockReturnValue(true),
   } as unknown as Config;
 
   beforeEach(async () => {
@@ -265,6 +281,18 @@ describe('GrepTool', () => {
         getFileExclusions: () => ({
           getGlobExcludes: () => [],
         }),
+        getFileService: () => ({
+          filterFilesWithReport: vi.fn((filePaths: string[]) => ({
+            filteredPaths: filePaths,
+            gitIgnoredCount: 0,
+            geminiIgnoredCount: 0,
+          })),
+        }),
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: false,
+        }),
+        getFileFilteringRespectGitIgnore: vi.fn().mockReturnValue(true),
       } as unknown as Config;
 
       const multiDirGrepTool = new GrepTool(multiDirConfig);
@@ -318,6 +346,18 @@ describe('GrepTool', () => {
         getFileExclusions: () => ({
           getGlobExcludes: () => [],
         }),
+        getFileService: () => ({
+          filterFilesWithReport: vi.fn((filePaths: string[]) => ({
+            filteredPaths: filePaths,
+            gitIgnoredCount: 0,
+            geminiIgnoredCount: 0,
+          })),
+        }),
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: false,
+        }),
+        getFileFilteringRespectGitIgnore: vi.fn().mockReturnValue(true),
       } as unknown as Config;
 
       const multiDirGrepTool = new GrepTool(multiDirConfig);
@@ -409,6 +449,142 @@ describe('GrepTool', () => {
       const params: GrepToolParams = { pattern: 'testPattern', path: '.' };
       const invocation = grepTool.build(params);
       expect(invocation.getDescription()).toBe("'testPattern' within ./");
+    });
+  });
+
+  describe('with file filtering', () => {
+    let fileDiscoveryServiceMock: {
+      filterFilesWithReport: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(async () => {
+      await fs.writeFile(
+        path.join(tempRootDir, 'gemini-ignored.txt'),
+        'hello from a gemini-ignored file',
+      );
+      await fs.writeFile(
+        path.join(tempRootDir, 'git-ignored.txt'),
+        'hello from a git-ignored file',
+      );
+
+      fileDiscoveryServiceMock = {
+        filterFilesWithReport: vi.fn(
+          (
+            filePaths: string[],
+            options: {
+              respectGitIgnore?: boolean;
+              respectGeminiIgnore?: boolean;
+            },
+          ) => {
+            let gitIgnoredCount = 0;
+            let geminiIgnoredCount = 0;
+
+            const filteredPaths = filePaths.filter((p) => {
+              if (options.respectGitIgnore && p.endsWith('git-ignored.txt')) {
+                gitIgnoredCount++;
+                return false;
+              }
+              if (
+                options.respectGeminiIgnore &&
+                p.endsWith('gemini-ignored.txt')
+              ) {
+                geminiIgnoredCount++;
+                return false;
+              }
+              return true;
+            });
+
+            return {
+              filteredPaths,
+              gitIgnoredCount,
+              geminiIgnoredCount,
+            };
+          },
+        ),
+      };
+
+      const mockConfigWithFiltering = {
+        ...mockConfig,
+        getFileService: () => fileDiscoveryServiceMock,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
+      } as unknown as Config;
+
+      grepTool = new GrepTool(mockConfigWithFiltering);
+    });
+
+    it('should ignore files based on .geminiignore', async () => {
+      const params: GrepToolParams = {
+        pattern: 'hello',
+        respect_gemini_ignore: true,
+        respect_git_ignore: false, // disable git ignore for this test
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain(
+        'Found 3 matches for pattern "hello"',
+      );
+      expect(result.llmContent).toContain(
+        '(1 gemini-ignored files were excluded)',
+      );
+      expect(result.llmContent).not.toContain('gemini-ignored.txt');
+      expect(result.llmContent).toContain('git-ignored.txt'); // Should not be ignored
+    });
+
+    it('should ignore files based on .gitignore', async () => {
+      const params: GrepToolParams = {
+        pattern: 'hello',
+        respect_gemini_ignore: false, // disable gemini ignore
+        respect_git_ignore: true,
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain(
+        'Found 3 matches for pattern "hello"',
+      );
+      expect(result.llmContent).toContain('(1 git-ignored files were excluded)');
+      expect(result.llmContent).not.toContain('git-ignored.txt');
+      expect(result.llmContent).toContain('gemini-ignored.txt'); // Should not be ignored
+    });
+
+    it('should ignore files based on both .gitignore and .geminiignore', async () => {
+      const params: GrepToolParams = {
+        pattern: 'hello',
+        respect_gemini_ignore: true,
+        respect_git_ignore: true,
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain(
+        'Found 2 matches for pattern "hello"',
+      );
+      expect(result.llmContent).toContain(
+        '(1 git-ignored and 1 gemini-ignored files were excluded)',
+      );
+      expect(result.llmContent).not.toContain('git-ignored.txt');
+      expect(result.llmContent).not.toContain('gemini-ignored.txt');
+    });
+
+    it('should not ignore any files when filtering is disabled', async () => {
+      const params: GrepToolParams = {
+        pattern: 'hello',
+        respect_gemini_ignore: false,
+        respect_git_ignore: false,
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain(
+        'Found 4 matches for pattern "hello"',
+      );
+      expect(result.llmContent).not.toContain('files were excluded');
+      expect(result.llmContent).toContain('git-ignored.txt');
+      expect(result.llmContent).toContain('gemini-ignored.txt');
     });
   });
 });
