@@ -58,6 +58,26 @@ export async function readPathFromWorkspace(
     throw new Error(`Path not found in workspace: ${pathStr}`);
   }
 
+  // Determine all workspace roots once and share helper across branches
+  const workspaceRoots = workspace.getDirectories();
+  const findRootFor = (absPath: string): string | undefined => {
+    for (const root of workspaceRoots) {
+      const rel = path.relative(root, absPath);
+      if (
+        rel !== '' &&
+        !rel.startsWith(`..${path.sep}`) &&
+        !path.isAbsolute(rel)
+      ) {
+        return root;
+      }
+      if (rel === '') {
+        // absPath equals the root path
+        return root;
+      }
+    }
+    return undefined;
+  };
+
   const stats = await fs.stat(absolutePath);
   if (stats.isDirectory()) {
     const allParts: PartUnion[] = [];
@@ -73,8 +93,6 @@ export async function readPathFromWorkspace(
       absolute: true,
     });
 
-    // Find workspace roots once for reuse
-    const workspaceRoots = workspace.getDirectories();
     // Cache a FileDiscoveryService per root
     const fileServices = new Map<string, FileDiscoveryService>();
     const getServiceForRoot = (rootDir: string) => {
@@ -93,25 +111,6 @@ export async function readPathFromWorkspace(
         fileServices.set(rootDir, svc);
       }
       return svc;
-    };
-
-    // Helper: find which workspace root contains a given absolute file path
-    const findRootFor = (absPath: string): string | undefined => {
-      for (const root of workspaceRoots) {
-        const rel = path.relative(root, absPath);
-        if (
-          rel !== '' &&
-          !rel.startsWith(`..${path.sep}`) &&
-          !path.isAbsolute(rel)
-        ) {
-          return root;
-        }
-        if (rel === '') {
-          // File equals the root path (unlikely for a file, but safe)
-          return root;
-        }
-      }
-      return undefined;
     };
 
     const finalFiles: string[] = [];
@@ -146,24 +145,6 @@ export async function readPathFromWorkspace(
     return allParts;
   } else {
     // It's a single file, check if it's ignored.
-    // Determine the correct workspace root for single-file checks
-    const workspaceRoots = workspace.getDirectories();
-    const findRootFor = (absPath: string): string | undefined => {
-      for (const root of workspaceRoots) {
-        const rel = path.relative(root, absPath);
-        if (
-          rel !== '' &&
-          !rel.startsWith(`..${path.sep}`) &&
-          !path.isAbsolute(rel)
-        ) {
-          return root;
-        }
-        if (rel === '') {
-          return root;
-        }
-      }
-      return undefined;
-    };
     const root = findRootFor(absolutePath) ?? config.getTargetDir();
     const singleFileService =
       root === config.getTargetDir()
