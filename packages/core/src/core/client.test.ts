@@ -14,12 +14,8 @@ import {
   type Mock,
 } from 'vitest';
 
-import {
-  createUserContent,
-  type Content,
-  type GenerateContentResponse,
-  type Part,
-} from '@google/genai';
+import type { Content, GenerateContentResponse, Part } from '@google/genai';
+import { createUserContent } from '@google/genai';
 import {
   findIndexAfterFraction,
   isThinkingDefault,
