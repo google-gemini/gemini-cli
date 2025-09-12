@@ -74,6 +74,9 @@ jobs:
           # The version for npm should not have the 'v' prefix.
           RELEASE_VERSION="${RELEASE_TAG#v}"
           NPM_TAG="latest"
+          if [[ "${RELEASE_TAG}" == *"preview"* ]]; then
+            NPM_TAG="preview"
+          fi
           PREVIOUS_TAG=$(git describe --tags --abbrev=0)
           echo "RELEASE_TAG=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
           echo "RELEASE_VERSION=${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"

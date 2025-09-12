@@ -523,6 +523,31 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('UseModelRouter Configuration', () => {
+    it('should default useModelRouter to false when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getUseModelRouter()).toBe(false);
+    });
+
+    it('should set useModelRouter to true when provided as true', () => {
+      const paramsWithModelRouter: ConfigParameters = {
+        ...baseParams,
+        useModelRouter: true,
+      };
+      const config = new Config(paramsWithModelRouter);
+      expect(config.getUseModelRouter()).toBe(true);
+    });
+
+    it('should set useModelRouter to false when explicitly provided as false', () => {
+      const paramsWithModelRouter: ConfigParameters = {
+        ...baseParams,
+        useModelRouter: false,
+      };
+      const config = new Config(paramsWithModelRouter);
+      expect(config.getUseModelRouter()).toBe(false);
+    });
+  });
+
   describe('createToolRegistry', () => {
     it('should register a tool if coreTools contains an argument-specific pattern', async () => {
       const params: ConfigParameters = {
