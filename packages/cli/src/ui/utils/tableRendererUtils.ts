@@ -47,7 +47,7 @@ export function splitContentIntoEqualWidthLines(
   const lines = [];
   for (let i = 0; i < totalLines; i++) {
     const isLastLine = i === totalLines - 1;
-    if (!content.length) {
+    if (!content.length || contentWidth < 1) {
       lines.push(appendEmptySpaces('', contentWidth));
       continue;
     }
