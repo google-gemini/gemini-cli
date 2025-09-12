@@ -6,9 +6,9 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { Config } from '@google/gemini-cli-core';
+import { type Config } from '@google/gemini-cli-core';
 import type { Settings, SessionRetentionSettings } from '../config/settings.js';
-import { getSessionFiles, type SessionInfo } from './sessionUtils.js';
+import { getAllSessionFiles, type SessionFileEntry } from './sessionUtils.js';
 
 // Constants
 export const DEFAULT_MIN_RETENTION = '1d' as string;
@@ -64,30 +64,36 @@ export async function cleanupExpiredSessions(
       return { ...result, disabled: true };
     }
 
-    // Get all session files for this project
-    const sessionFiles = await getSessionFiles(chatsDir, config.getSessionId());
-    result.scanned = sessionFiles.length;
+    // Get all session files (including corrupted ones) for this project
+    const allFiles = await getAllSessionFiles(chatsDir, config.getSessionId());
+    result.scanned = allFiles.length;
 
-    if (sessionFiles.length === 0) {
+    if (allFiles.length === 0) {
       return result;
     }
 
-    // Determine which sessions to delete
-    const sessionsToDelete = await identifyExpiredSessions(
-      sessionFiles,
+    // Determine which sessions to delete (corrupted and expired)
+    const sessionsToDelete = await identifySessionsToDelete(
+      allFiles,
       retentionConfig,
     );
 
-    // Perform cleanup
-    for (const session of sessionsToDelete) {
+    // Delete all sessions that need to be deleted
+    for (const sessionToDelete of sessionsToDelete) {
       try {
-        const sessionPath = path.join(chatsDir, session.fileName);
+        const sessionPath = path.join(chatsDir, sessionToDelete.fileName);
         await fs.unlink(sessionPath);
 
         if (config.getDebugMode()) {
-          console.debug(
-            `Deleted expired session: ${session.id} (${session.lastUpdated})`,
-          );
+          if (sessionToDelete.sessionInfo === null) {
+            console.debug(
+              `Deleted corrupted session file: ${sessionToDelete.fileName}`,
+            );
+          } else {
+            console.debug(
+              `Deleted expired session: ${sessionToDelete.sessionInfo.id} (${sessionToDelete.sessionInfo.lastUpdated})`,
+            );
+          }
         }
         result.deleted++;
       } catch (error) {
@@ -99,8 +105,12 @@ export async function cleanupExpiredSessions(
         ) {
           result.deleted++;
         } else {
+          const sessionId =
+            sessionToDelete.sessionInfo === null
+              ? `corrupted-${sessionToDelete.fileName}`
+              : sessionToDelete.sessionInfo.id;
           result.errors.push({
-            sessionId: session.id,
+            sessionId,
             error: error instanceof Error ? error.message : 'Unknown error',
           });
         }
@@ -129,14 +139,26 @@ export async function cleanupExpiredSessions(
 }
 
 /**
- * Identifies sessions that should be deleted based on retention policy
+ * Identifies sessions that should be deleted (corrupted or expired based on retention policy)
  */
-async function identifyExpiredSessions(
-  sessions: SessionInfo[],
+async function identifySessionsToDelete(
+  allFiles: SessionFileEntry[],
   retentionConfig: SessionRetentionSettings,
-): Promise<SessionInfo[]> {
+): Promise<SessionFileEntry[]> {
+  const sessionsToDelete: SessionFileEntry[] = [];
+
+  // All corrupted files should be deleted
+  sessionsToDelete.push(
+    ...allFiles.filter((entry) => entry.sessionInfo === null),
+  );
+
+  // Now handle valid sessions based on retention policy
+  const validSessions = allFiles.filter((entry) => entry.sessionInfo !== null);
+  if (validSessions.length === 0) {
+    return sessionsToDelete;
+  }
+
   const now = new Date();
-  const expiredSessions: SessionInfo[] = [];
 
   // Calculate cutoff date for age-based retention
   let cutoffDate: Date | null = null;
@@ -151,26 +173,30 @@ async function identifyExpiredSessions(
     }
   }
 
-  // Sort sessions by lastUpdated (newest first) for count-based retention
-  const sortedSessions = [...sessions].sort(
+  // Sort valid sessions by lastUpdated (newest first) for count-based retention
+  const sortedValidSessions = [...validSessions].sort(
     (a, b) =>
-      new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime(),
+      new Date(b.sessionInfo!.lastUpdated).getTime() -
+      new Date(a.sessionInfo!.lastUpdated).getTime(),
   );
 
   // Separate deletable sessions from the active session
-  const deletableSessions = sortedSessions.filter(
-    (session) => !session.isCurrentSession,
+  const deletableSessions = sortedValidSessions.filter(
+    (entry) => !entry.sessionInfo!.isCurrentSession,
   );
 
   // Calculate how many deletable sessions to keep (accounting for the active session)
-  const hasActiveSession = sortedSessions.some((s) => s.isCurrentSession);
+  const hasActiveSession = sortedValidSessions.some(
+    (e) => e.sessionInfo!.isCurrentSession,
+  );
   const maxDeletableSessions =
     retentionConfig.maxCount && hasActiveSession
       ? Math.max(0, retentionConfig.maxCount - 1)
       : retentionConfig.maxCount;
 
   for (let i = 0; i < deletableSessions.length; i++) {
-    const session = deletableSessions[i];
+    const entry = deletableSessions[i];
+    const session = entry.sessionInfo!;
 
     let shouldDelete = false;
 
@@ -185,11 +211,11 @@ async function identifyExpiredSessions(
     }
 
     if (shouldDelete) {
-      expiredSessions.push(session);
+      sessionsToDelete.push(entry);
     }
   }
 
-  return expiredSessions;
+  return sessionsToDelete;
 }
 
 /**
