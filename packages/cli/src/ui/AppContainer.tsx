@@ -76,6 +76,8 @@ import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
+import type { ExtensionUpdateState } from './state/extensions.js';
+import { checkForAllExtensionUpdates } from '../config/extension.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -135,6 +137,9 @@ export const AppContainer = (props: AppContainerProps) => {
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
   const [isTrustedFolder, setIsTrustedFolder] = useState<boolean | undefined>(
     config.isTrustedFolder(),
+  );
+  const [extensionsUpdateState, setExtensionsUpdateState] = useState(
+    new Map<string, ExtensionUpdateState>(),
   );
 
   // Helper to determine the effective model, considering the fallback state.
@@ -419,6 +424,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       },
       setDebugMessage,
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
+      setExtensionsUpdateState,
     }),
     [
       setAuthState,
@@ -429,6 +435,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setDebugMessage,
       setShowPrivacyNotice,
       setCorgiMode,
+      setExtensionsUpdateState,
     ],
   );
 
@@ -450,6 +457,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     setIsProcessing,
     setGeminiMdFileCount,
     slashCommandActions,
+    extensionsUpdateState,
     isConfigInitialized,
   );
 
@@ -1040,6 +1048,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       updateInfo,
       showIdeRestartPrompt,
       isRestarting,
+      extensionsUpdateState,
       activePtyId,
       shellFocused,
     }),
@@ -1115,6 +1124,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       showIdeRestartPrompt,
       isRestarting,
       currentModel,
+      extensionsUpdateState,
       activePtyId,
       shellFocused,
     ],
@@ -1167,6 +1177,11 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleProQuotaChoice,
     ],
   );
+
+  const extensions = config.getExtensions();
+  useEffect(() => {
+    checkForAllExtensionUpdates(extensions, setExtensionsUpdateState);
+  }, [extensions, setExtensionsUpdateState]);
 
   return (
     <UIStateContext.Provider value={uiState}>
