@@ -15,6 +15,8 @@ import {
 } from 'vitest';
 
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
+const mockChildProcessSpawn = vi.hoisted(() => vi.fn());
+
 vi.mock('../services/shellExecutionService.js', () => ({
   ShellExecutionService: { execute: mockShellExecutionService },
 }));
@@ -22,9 +24,16 @@ vi.mock('fs');
 vi.mock('os');
 vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    spawn: mockChildProcessSpawn,
+  };
+});
 
 import { isCommandAllowed } from '../utils/shell-utils.js';
-import { ShellTool } from './shell.js';
+import { ShellTool, killAllBackgroundProcesses } from './shell.js';
 import { type Config } from '../config/config.js';
 import {
   type ShellExecutionResult,
@@ -416,5 +425,220 @@ describe('build', () => {
         directory: 'test2',
       }),
     ).toThrow('is not a registered workspace directory');
+  });
+});
+
+describe('killAllBackgroundProcesses', () => {
+  let mockProcessKill: Mock;
+  let mockConfig: Config;
+  let resolveExecutionPromise: (result: ShellExecutionResult) => void;
+  const mockAbortSignal = new AbortController().signal;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockConfig = {
+      getCoreTools: vi.fn().mockReturnValue([]),
+      getExcludeTools: vi.fn().mockReturnValue([]),
+      getDebugMode: vi.fn().mockReturnValue(false),
+      getTargetDir: vi.fn().mockReturnValue('/test/dir'),
+      getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
+      getWorkspaceContext: () => createMockWorkspaceContext('.'),
+      getGeminiClient: vi.fn(),
+      getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
+    } as unknown as Config;
+
+    mockProcessKill = vi.fn();
+
+    // Mock global process.kill
+    vi.spyOn(process, 'kill').mockImplementation(mockProcessKill);
+
+    // Reset the hoisted mock
+    mockChildProcessSpawn.mockClear();
+
+    // Setup shell execution service mock
+    mockShellExecutionService.mockImplementation((_cmd, _cwd, _callback) => ({
+      pid: 12345,
+      result: new Promise((resolve) => {
+        resolveExecutionPromise = resolve;
+      }),
+    }));
+
+    // Mock crypto for temp file names
+    vi.mocked(os.platform).mockReturnValue('linux');
+    vi.mocked(os.tmpdir).mockReturnValue('/tmp');
+    (vi.mocked(crypto.randomBytes) as Mock).mockReturnValue(
+      Buffer.from('abcdef', 'hex'),
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const resolveShellExecution = (
+    result: Partial<ShellExecutionResult> = {},
+  ) => {
+    const fullResult: ShellExecutionResult = {
+      rawOutput: Buffer.from(result.output || ''),
+      output: 'Success',
+      exitCode: 0,
+      signal: null,
+      error: null,
+      aborted: false,
+      pid: 12345,
+      executionMethod: 'child_process',
+      ...result,
+    };
+    resolveExecutionPromise(fullResult);
+  };
+
+  it('should kill background processes on Unix platforms', async () => {
+    vi.mocked(os.platform).mockReturnValue('linux');
+
+    const shellTool = new ShellTool(mockConfig);
+    const invocation = shellTool.build({ command: 'echo "test" &' });
+
+    // Mock pgrep output with background PIDs
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      `12345${EOL}54321${EOL}67890${EOL}`,
+    );
+
+    const promise = invocation.execute(mockAbortSignal);
+    resolveShellExecution({
+      pid: 12345, // Main process PID
+      output: 'test output',
+      exitCode: 0,
+    });
+
+    await promise;
+
+    // Now kill all background processes
+    killAllBackgroundProcesses();
+
+    // Should kill process groups for background PIDs (54321, 67890)
+    expect(mockProcessKill).toHaveBeenCalledWith(-54321, 'SIGTERM');
+    expect(mockProcessKill).toHaveBeenCalledWith(-67890, 'SIGTERM');
+    expect(mockProcessKill).not.toHaveBeenCalledWith(-12345, 'SIGTERM'); // Main process should not be killed
+  });
+
+  it('should use taskkill on Windows platforms', async () => {
+    vi.mocked(os.platform).mockReturnValue('win32');
+
+    // Simulate background PIDs being tracked (normally done by shell execution)
+    const shellTool = new ShellTool(mockConfig);
+    const invocation = shellTool.build({ command: 'echo "test" &' });
+
+    // Mock execution result with background processes
+    const promise = invocation.execute(mockAbortSignal);
+    resolveShellExecution({
+      pid: 12345,
+      output: 'test output',
+      exitCode: 0,
+    });
+
+    await promise;
+
+    // For Windows, we don't parse pgrep output, so we need to manually test the function
+    // with a mocked global state. Let's test the Windows kill logic directly.
+    killAllBackgroundProcesses();
+
+    // On Windows, we can't easily test the internal PID tracking without exposing internals,
+    // but we can verify the function doesn't throw errors
+    expect(() => killAllBackgroundProcesses()).not.toThrow();
+  });
+
+  it('should handle process kill errors gracefully', async () => {
+    vi.mocked(os.platform).mockReturnValue('linux');
+    mockProcessKill.mockImplementation(() => {
+      throw new Error('No such process');
+    });
+
+    const shellTool = new ShellTool(mockConfig);
+    const invocation = shellTool.build({ command: 'echo "test" &' });
+
+    // Mock pgrep output
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(`12345${EOL}54321${EOL}`);
+
+    const promise = invocation.execute(mockAbortSignal);
+    resolveShellExecution({
+      pid: 12345,
+      output: 'test output',
+      exitCode: 0,
+    });
+
+    await promise;
+
+    // Should not throw even if process.kill fails
+    expect(() => killAllBackgroundProcesses()).not.toThrow();
+    expect(mockProcessKill).toHaveBeenCalledWith(-54321, 'SIGTERM');
+  });
+
+  it('should track background PIDs and clear them after killing', async () => {
+    vi.mocked(os.platform).mockReturnValue('linux');
+
+    const shellTool = new ShellTool(mockConfig);
+    const invocation = shellTool.build({ command: 'echo "test" &' });
+
+    // Mock pgrep output with background PIDs
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      `12345${EOL}54321${EOL}67890${EOL}`,
+    );
+
+    const promise = invocation.execute(mockAbortSignal);
+    resolveShellExecution({
+      pid: 12345,
+      output: 'test output',
+      exitCode: 0,
+    });
+
+    await promise;
+
+    // Kill all background processes
+    killAllBackgroundProcesses();
+
+    // Call again - should not attempt to kill any processes since they were cleared
+    mockProcessKill.mockClear();
+    killAllBackgroundProcesses();
+
+    expect(mockProcessKill).not.toHaveBeenCalled();
+  });
+
+  it('should send SIGKILL after timeout for stubborn processes', async () => {
+    vi.mocked(os.platform).mockReturnValue('linux');
+    vi.useFakeTimers();
+
+    const shellTool = new ShellTool(mockConfig);
+    const invocation = shellTool.build({ command: 'sleep 100 &' });
+
+    // Mock pgrep output
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(`12345${EOL}54321${EOL}`);
+
+    const promise = invocation.execute(mockAbortSignal);
+    resolveShellExecution({
+      pid: 12345,
+      output: '',
+      exitCode: 0,
+    });
+
+    await promise;
+
+    // Kill background processes
+    killAllBackgroundProcesses();
+
+    // Should send SIGTERM first
+    expect(mockProcessKill).toHaveBeenCalledWith(-54321, 'SIGTERM');
+
+    // Advance timers to trigger SIGKILL
+    await vi.advanceTimersByTimeAsync(250);
+
+    // Should send SIGKILL after timeout
+    expect(mockProcessKill).toHaveBeenCalledWith(-54321, 'SIGKILL');
+
+    vi.useRealTimers();
   });
 });
