@@ -80,14 +80,12 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     (line: string[], isHeader: boolean) => {
       const lineParts = line.map((txt) => renderCell(txt, isHeader));
       return (
-        <Text color={theme.text.primary}>
+        <Text color={theme.border.default}>
           │{' '}
           {lineParts.map((cell, index) => (
             <React.Fragment key={index}>
-              {cell}
-              <Text color={theme.border.default}>
-                {index < lineParts.length - 1 ? ' │ ' : ''}
-              </Text>
+              <Text color={theme.text.primary}>{cell}</Text>
+              {index < lineParts.length - 1 ? ' │ ' : ''}
             </React.Fragment>
           ))}{' '}
           │
