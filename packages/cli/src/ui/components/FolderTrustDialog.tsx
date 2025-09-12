@@ -37,15 +37,6 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     { isActive: !isRestarting },
   );
 
-  useKeypress(
-    (key) => {
-      if (key.name === 'r') {
-        process.exit(0);
-      }
-    },
-    { isActive: !!isRestarting },
-  );
-
   const dirName = path.basename(process.cwd());
   const parentFolder = path.basename(path.dirname(process.cwd()));
 
@@ -94,8 +85,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
       {isRestarting && (
         <Box marginLeft={1} marginTop={1}>
           <Text color={theme.status.warning}>
-            To see changes, Gemini CLI must be restarted. Press r to exit and
-            apply changes now.
+            Gemini CLI is restarting to apply the trust changes.
           </Text>
         </Box>
       )}

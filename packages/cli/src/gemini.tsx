@@ -15,6 +15,7 @@ import dns from 'node:dns';
 import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
+import { RELAUNCH_EXIT_CODE } from './utils/processUtils.js';
 import {
   loadSettings,
   migrateDeprecatedSettings,
@@ -105,10 +106,12 @@ function getNodeMemoryArgs(config: Config): string[] {
   return [];
 }
 
-async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
+async function relaunchAppInChildProcess(additionalArgs: string[]) {
   try {
+    let relaunch = true;
+  while (relaunch) {
     const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
-    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+      const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
 
     // The parent process should not be reading from stdin while the child is running.
     process.stdin.pause();
@@ -118,20 +121,16 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
       env: newEnv,
     });
 
-    await new Promise<void>((resolve, reject) => {
-      child.on('error', reject);
-      child.on('close', () => {
-        // Resume stdin before the parent process exits.
-        process.stdin.resume();
-        resolve();
-      });
+    const exitCode = await new Promise<number>((resolve) => {
+      child.on('close', resolve);
     });
 
-    process.exit(0);
-  } catch (error) {
-    process.stdin.resume();
-    console.error('Failed to relaunch CLI:', error);
-    process.exit(1);
+    if (exitCode === RELAUNCH_EXIT_CODE) {
+      relaunch = true;
+    } else {
+      relaunch = false;
+      process.exit(exitCode);
+    }
   }
 }
 
@@ -362,7 +361,7 @@ export async function main() {
       // Not in a sandbox and not entering one, so relaunch with additional
       // arguments to control memory usage if needed.
       if (memoryArgs.length > 0) {
-        await relaunchWithAdditionalArgs(memoryArgs);
+        await relaunchAppInChildProcess(memoryArgs);
         process.exit(0);
       }
     }
