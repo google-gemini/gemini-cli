@@ -12,9 +12,6 @@
     ".": "./dist/index.js",
     "./ui": "./dist/src/ui.js"
   },
-  "bin": {
-    "gemini": "dist/index.js"
-  },
   "scripts": {
     "build": "node ../../scripts/build_package.js",
     "start": "node dist/index.js",
