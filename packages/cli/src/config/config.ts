@@ -25,6 +25,7 @@ import {
   getCurrentGeminiMdFilename,
   ApprovalMode,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
@@ -98,7 +99,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           alias: 'm',
           type: 'string',
           description: `Model`,
-          default: process.env['GEMINI_MODEL'],
         })
         .option('prompt', {
           alias: 'p',
@@ -557,6 +557,7 @@ export async function loadCliConfig(
     mcpServers = {};
   }
 
+
   const sandboxConfig = await loadSandboxConfig(settings, argv);
   const screenReader =
     argv.screenReader !== undefined
@@ -618,7 +619,7 @@ export async function loadCliConfig(
     cwd,
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,
-    model: argv.model || settings.model?.name || DEFAULT_GEMINI_MODEL,
+    model: resolvedModel,
     extensionContextFilePaths,
     maxSessionTurns: settings.model?.maxSessionTurns ?? -1,
     experimentalZedIntegration: argv.experimentalAcp || false,
@@ -644,6 +645,7 @@ export async function loadCliConfig(
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
+    useModelRouter,
   });
 }
 
