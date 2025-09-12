@@ -81,7 +81,6 @@ export interface CliArgs {
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
-  useModelRouter: boolean | undefined;
   sessionSummary: string | undefined;
   promptWords: string[] | undefined;
   outputFormat: string | undefined;
