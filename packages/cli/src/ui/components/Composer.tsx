@@ -163,7 +163,7 @@ export const Composer = () => {
               maxHeight={
                 uiState.constrainHeight ? debugConsoleMaxHeight : undefined
               }
-              width={uiState.debugWidth}
+              width={uiState.detailedMessagesDisplayWidth}
             />
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
           </Box>

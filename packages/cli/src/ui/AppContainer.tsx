@@ -49,6 +49,7 @@ import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
+import { calculatePromptWidths } from './components/InputPrompt.js';
 import { useStdin, useStdout } from 'ink';
 import ansiEscapes from 'ansi-escapes';
 import * as fs from 'node:fs';
@@ -226,26 +227,11 @@ export const AppContainer = (props: AppContainerProps) => {
     registerCleanup(consolePatcher.cleanup);
   }, [handleNewMessage, config]);
 
-  const widthFraction = 0.9;
-  // ──────────────────────────────────────────────────────────────
-  // Width calculation for the input prompt
-  // Border (2 chars) + horizontal padding (2 chars) = 4
-  const FRAME_PADDING_AND_BORDER = 4;
-  // The prompt prefix is either "> " or "! " (2 chars)
-  const PROMPT_PREFIX_WIDTH = 2;
-  // We need at least this many columns for meaningful content
-  const MIN_CONTENT_WIDTH = 2;
-
-  const innerContentWidth =
-    Math.floor(terminalWidth * widthFraction) -
-    FRAME_PADDING_AND_BORDER -
-    PROMPT_PREFIX_WIDTH;
-
-  const inputWidth = Math.max(MIN_CONTENT_WIDTH, innerContentWidth);
-  // Framed width (border + padding + prefix) to align other boxes
-  const FRAME_OVERHEAD = FRAME_PADDING_AND_BORDER + PROMPT_PREFIX_WIDTH; // 6
-  const debugWidth = inputWidth + FRAME_OVERHEAD;
-  const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 1.0));
+  // Derive widths for InputPrompt using shared helper
+  const { inputWidth, promptContainerWidth, suggestionsWidth } = useMemo(
+    () => calculatePromptWidths(terminalWidth),
+    [terminalWidth],
+  );
   const mainAreaWidth = Math.floor(terminalWidth * 0.9);
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
@@ -1021,7 +1007,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       buffer,
       inputWidth,
       suggestionsWidth,
-      debugWidth,
+      detailedMessagesDisplayWidth: promptContainerWidth,
       isInputActive,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
@@ -1098,7 +1084,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       buffer,
       inputWidth,
       suggestionsWidth,
-      debugWidth,
+      promptContainerWidth,
       isInputActive,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen,
