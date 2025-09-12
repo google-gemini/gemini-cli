@@ -130,7 +130,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
         // Exit if there is an error message, as the user can't proceed.
         if (authError) {
-          process.exit(0);
+          runExitCleanup().then(() => process.exit(0));
+          return;
         }
         if (settings.merged.security?.auth?.selectedType === undefined) {
           // Prevent exiting if no auth method is set
