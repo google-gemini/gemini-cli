@@ -13,17 +13,17 @@ import {
   afterEach,
   afterAll,
 } from 'vitest';
+import type { LogEntry } from './logger.js';
 import {
   Logger,
   MessageSenderType,
-  LogEntry,
   encodeTagName,
   decodeTagName,
 } from './logger.js';
 import { Storage } from '../config/storage.js';
 import { promises as fs, existsSync } from 'node:fs';
 import path from 'node:path';
-import { Content } from '@google/genai';
+import type { Content } from '@google/genai';
 
 import crypto from 'node:crypto';
 import os from 'node:os';

@@ -4,14 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
-import { UserTierId } from '@google/gemini-cli-core';
-import { getLicenseDisplay } from '../../utils/license.js';
-
-// Define GIT_COMMIT_INFO as a fallback since the generated file may not exist
-const GIT_COMMIT_INFO = 'N/A';
+import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 
 interface AboutBoxProps {
   cliVersion: string;
@@ -21,7 +17,6 @@ interface AboutBoxProps {
   selectedAuthType: string;
   gcpProject: string;
   ideClient: string;
-  userTier?: UserTierId;
 }
 
 export const AboutBox: React.FC<AboutBoxProps> = ({
@@ -32,7 +27,6 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
   selectedAuthType,
   gcpProject,
   ideClient,
-  userTier,
 }) => (
   <Box
     borderStyle="round"
@@ -109,16 +103,6 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
         <Text>
           {selectedAuthType.startsWith('oauth') ? 'OAuth' : selectedAuthType}
         </Text>
-      </Box>
-    </Box>
-    <Box flexDirection="row">
-      <Box width="35%">
-        <Text bold color={Colors.LightBlue}>
-          License
-        </Text>
-      </Box>
-      <Box>
-        <Text>{getLicenseDisplay(selectedAuthType, userTier)}</Text>
       </Box>
     </Box>
     {gcpProject && (

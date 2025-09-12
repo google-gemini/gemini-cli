@@ -5,13 +5,8 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import {
-  DeclarativeTool,
-  hasCycleInSchema,
-  Kind,
-  ToolInvocation,
-  ToolResult,
-} from './tools.js';
+import type { ToolInvocation, ToolResult } from './tools.js';
+import { DeclarativeTool, hasCycleInSchema, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
 class TestToolInvocation implements ToolInvocation<object, ToolResult> {
