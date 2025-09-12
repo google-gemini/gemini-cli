@@ -417,6 +417,47 @@ export class WriteFileTool
     );
   }
 
+  // Be tolerant of common param aliases coming from different providers
+  // (e.g., DeepSeek/Anthropic/OpenAI often use camelCase or shorter keys).
+  // Also allow relative paths by resolving them against the workspace root.
+  override build(params: WriteFileToolParams): ToolInvocation<WriteFileToolParams, ToolResult> {
+    const normalized = this.normalizeParams(params as unknown);
+    const validationError = this.validateToolParams(normalized);
+    if (validationError) {
+      throw new Error(validationError);
+    }
+    return this.createInvocation(normalized);
+  }
+
+  private normalizeParams(input: unknown): WriteFileToolParams {
+    const obj = input as Record<string, unknown>;
+    // Map common aliases to required keys
+    let filePath = (obj['file_path']
+      ?? (obj as any).filePath
+      ?? (obj as any).filepath
+      ?? (obj as any).path
+      ?? (obj as any).file
+      ?? (obj as any).filename) as string | undefined;
+    let content = (obj['content'] ?? (obj as any).text ?? (obj as any).body) as string | undefined;
+
+    // Default to empty strings if still undefined; schema validation will catch empties
+    filePath = filePath ?? '';
+    content = content ?? '';
+
+    // Resolve relative paths against the workspace root
+    if (filePath && !path.isAbsolute(filePath)) {
+      const root = this.config.getTargetDir();
+      filePath = path.resolve(root, filePath);
+    }
+
+    return {
+      file_path: filePath,
+      content,
+      modified_by_user: (obj as any).modified_by_user as boolean | undefined,
+      ai_proposed_content: (obj as any).ai_proposed_content as string | undefined,
+    };
+  }
+
   protected override validateToolParamValues(
     params: WriteFileToolParams,
   ): string | null {

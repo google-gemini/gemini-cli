@@ -213,7 +213,7 @@ export function mapToDisplay(
 ): HistoryItemToolGroup {
   const toolCalls = Array.isArray(toolOrTools) ? toolOrTools : [toolOrTools];
 
-  const toolDisplays = toolCalls.map(
+  const toolDisplaysRaw = toolCalls.map(
     (trackedCall): IndividualToolCallDisplay => {
       let displayName: string;
       let description: string;
@@ -302,6 +302,14 @@ export function mapToDisplay(
       }
     },
   );
+
+  // Deduplicate by callId to avoid React key collisions when the scheduler
+  // briefly surfaces duplicate entries for the same call during rapid updates.
+  const dedupedByCallId = new Map<string, IndividualToolCallDisplay>();
+  for (const td of toolDisplaysRaw) {
+    dedupedByCallId.set(td.callId, td);
+  }
+  const toolDisplays = Array.from(dedupedByCallId.values());
 
   return {
     type: 'tool_group',

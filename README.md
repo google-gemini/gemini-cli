@@ -1,5 +1,28 @@
 # Gemini CLI
 
+## Recent Updates: DeepSeek Integration
+
+This fork of Gemini CLI includes enhanced support for DeepSeek models in interactive mode. The following changes have been implemented:
+
+### Added Features:
+- **DeepSeek Model Support**: Added comprehensive support for DeepSeek models (DeepSeek-V3, DeepSeek-Coder, etc.) in interactive mode
+- **Multi-Model Flexibility**: Users can now seamlessly switch between Gemini and DeepSeek models during interactive sessions
+- **Enhanced Configuration**: Added DeepSeek-specific configuration options and API key management
+- **Model Switching**: Interactive commands to switch between different AI providers on-the-fly
+
+### Usage:
+- Set your DeepSeek API key: `export DEEPSEEK_API_KEY="your_api_key_here"`
+- Use the `/model` command in interactive mode to switch between providers
+- DeepSeek models are now available alongside Gemini models in the model selection interface
+
+### Benefits:
+- Expanded model choice for different use cases
+- Cost optimization by leveraging different pricing models
+- Performance comparison between different AI providers
+- Enhanced coding capabilities with DeepSeek-Coder specialization
+
+---
+
 [![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
 [![Gemini CLI E2E](https://github.com/google-gemini/gemini-cli/actions/workflows/e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/e2e.yml)
 [![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli)
