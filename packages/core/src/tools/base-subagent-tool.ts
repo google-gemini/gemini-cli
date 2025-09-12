@@ -16,6 +16,7 @@ import { GrepTool } from './grep.js';
 import { GlobTool } from './glob.js';
 import { LSTool } from './ls.js';
 import { ReadFileTool } from './read-file.js';
+import { ReadManyFilesTool } from './read-many-files.js';
 import { RipGrepTool } from './ripGrep.js';
 import type { AnyDeclarativeTool } from '../tools/tools.js';
 import type { FunctionDeclaration } from '@google/genai';
@@ -92,6 +93,7 @@ export abstract class BaseSubAgentInvocation<
         ? new RipGrepTool(this.config)
         : new GrepTool(this.config),
       new ReadFileTool(this.config),
+      new ReadManyFilesTool(this.config),
     ];
   }
 
