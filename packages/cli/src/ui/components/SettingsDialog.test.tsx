@@ -181,9 +181,9 @@ describe('SettingsDialog', () => {
 
       const { lastFrame } = render(
         <KeypressProvider kittyProtocolEnabled={false}>
-          <SettingsDialog 
-            settings={settings} 
-            onSelect={onSelect} 
+          <SettingsDialog
+            settings={settings}
+            onSelect={onSelect}
             availableTerminalHeight={20}
           />
         </KeypressProvider>,
@@ -543,7 +543,7 @@ describe('SettingsDialog', () => {
         <KeypressProvider kittyProtocolEnabled={false}>
           <SettingsDialog
             settings={settings}
-            onSelect={() => { }}
+            onSelect={() => {}}
             onRestartRequest={onRestartRequest}
           />
         </KeypressProvider>,
@@ -564,7 +564,7 @@ describe('SettingsDialog', () => {
         <KeypressProvider kittyProtocolEnabled={false}>
           <SettingsDialog
             settings={settings}
-            onSelect={() => { }}
+            onSelect={() => {}}
             onRestartRequest={onRestartRequest}
           />
         </KeypressProvider>,
@@ -1087,7 +1087,7 @@ describe('SettingsDialog', () => {
         <KeypressProvider kittyProtocolEnabled={false}>
           <SettingsDialog
             settings={settings}
-            onSelect={() => { }}
+            onSelect={() => {}}
             onRestartRequest={onRestartRequest}
           />
         </KeypressProvider>,
@@ -1162,17 +1162,17 @@ describe('SettingsDialog', () => {
     /**
      * Snapshot tests for SettingsDialog component using ink-testing-library.
      * These tests capture the visual output of the component in various states:
-     * 
+     *
      * - Default rendering with no custom settings
      * - Various combinations of boolean settings (enabled/disabled)
-     * - Mixed boolean and number settings configurations  
+     * - Mixed boolean and number settings configurations
      * - Different focus states (settings vs scope selector)
      * - Different scope selections (User, System, Workspace)
      * - Accessibility settings enabled
      * - File filtering configurations
      * - Tools and security settings
      * - All settings disabled state
-     * 
+     *
      * The snapshots help ensure UI consistency and catch unintended visual changes.
      */
 
