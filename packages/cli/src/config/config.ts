@@ -382,6 +382,7 @@ export async function loadHierarchicalGeminiMemory(
     memoryImportFormat,
     fileFilteringOptions,
     settings.context?.discoveryMaxDirs,
+    settings.context?.fileFiltering?.currentDirectoryOnly === true,
   );
 }
 

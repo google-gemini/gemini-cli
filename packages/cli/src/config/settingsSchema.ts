@@ -579,6 +579,16 @@ const SETTINGS_SCHEMA = {
         description: 'Settings for git-aware file filtering.',
         showInDialog: false,
         properties: {
+          currentDirectoryOnly: {
+            type: 'boolean',
+            label: 'Context From Current Directory Only',
+            category: 'Context',
+            requiresRestart: true,
+            default: false,
+            description:
+              'If enabled, load context only from the current directory (no upward/downward/global scans).',
+            showInDialog: true,
+          },
           respectGitIgnore: {
             type: 'boolean',
             label: 'Respect .gitignore',

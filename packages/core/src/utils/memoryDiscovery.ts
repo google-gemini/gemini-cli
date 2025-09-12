@@ -88,11 +88,13 @@ async function getGeminiMdFilePathsInternal(
   folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
+  currentDirectoryOnly: boolean = false,
 ): Promise<string[]> {
-  const dirs = new Set<string>([
-    ...includeDirectoriesToReadGemini,
-    currentWorkingDirectory,
-  ]);
+  const dirs = new Set<string>(
+    currentDirectoryOnly
+      ? [currentWorkingDirectory]
+      : [...includeDirectoriesToReadGemini, currentWorkingDirectory],
+  );
 
   // Process directories in parallel with concurrency limit to prevent EMFILE errors
   const CONCURRENT_LIMIT = 10;
@@ -107,10 +109,11 @@ async function getGeminiMdFilePathsInternal(
         userHomePath,
         debugMode,
         fileService,
-        extensionContextFilePaths,
+        currentDirectoryOnly ? [] : extensionContextFilePaths,
         folderTrust,
         fileFilteringOptions,
         maxDirs,
+        currentDirectoryOnly,
       ),
     );
 
@@ -141,11 +144,28 @@ async function getGeminiMdFilePathsInternalForEachDir(
   folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
+  currentDirectoryOnly: boolean = false,
 ): Promise<string[]> {
   const allPaths = new Set<string>();
   const geminiMdFilenames = getAllGeminiMdFilenames();
 
   for (const geminiMdFilename of geminiMdFilenames) {
+    if (currentDirectoryOnly) {
+      // Only consider the file in the current directory.
+      const candidate = path.join(path.resolve(dir), geminiMdFilename);
+      try {
+        await fs.access(candidate, fsSync.constants.R_OK);
+        allPaths.add(candidate);
+        if (debugMode)
+          logger.debug(
+            `currentDirectoryOnly: Found ${geminiMdFilename} in CWD: ${candidate}`,
+          );
+      } catch {
+        // not found in CWD, silently ignore
+      }
+      continue; // Skip global/upward/downward/ext when currentDirectoryOnly
+    }
+
     const resolvedHome = path.resolve(userHomePath);
     const globalMemoryPath = path.join(
       resolvedHome,
@@ -347,6 +367,7 @@ export async function loadServerHierarchicalMemory(
   importFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
   maxDirs: number = 200,
+  currentDirectoryOnly: boolean = false,
 ): Promise<LoadServerHierarchicalMemoryResponse> {
   if (debugMode)
     logger.debug(
@@ -366,6 +387,7 @@ export async function loadServerHierarchicalMemory(
     folderTrust,
     fileFilteringOptions || DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
     maxDirs,
+    currentDirectoryOnly,
   );
   if (filePaths.length === 0) {
     if (debugMode)
