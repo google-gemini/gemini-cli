@@ -98,13 +98,12 @@ function useCommandParser(
         matchesCommand(cmd, part),
       );
 
-      if (found && found.kind === CommandKind.MCP_PROMPT) {
+      if (found) {
         leafCommand = found;
         currentLevel = found.subCommands as readonly SlashCommand[] | undefined;
-        break;
-      } else if (found) {
-        leafCommand = found;
-        currentLevel = found.subCommands as readonly SlashCommand[] | undefined;
+        if(found.kind === CommandKind.MCP_PROMPT) {
+          break;
+        }
       } else {
         leafCommand = null;
         currentLevel = [];
