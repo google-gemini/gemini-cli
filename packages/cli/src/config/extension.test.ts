@@ -253,6 +253,7 @@ describe('loadExtensions', () => {
       source: sourceExtDir,
       type: 'link',
     });
+
     expect(extensionName).toEqual('my-linked-extension');
     const extensions = loadExtensions();
     expect(extensions).toHaveLength(1);
@@ -767,7 +768,6 @@ describe('performWorkspaceExtensionMigration', () => {
   });
 
   it('should install the extensions in the user directory', async () => {
-    mockQuestion.mockImplementation((_query, callback) => callback('y'));
     const ext1Path = createExtension({
       extensionsDir: workspaceExtensionsDir,
       name: 'ext1',
@@ -791,7 +791,6 @@ describe('performWorkspaceExtensionMigration', () => {
     const userExt1Path = path.join(userExtensionsDir, 'ext1');
     const extensions = loadExtensions();
 
-    mockQuestion.mockClear();
     expect(extensions).toHaveLength(2);
     const metadataPath = path.join(userExt1Path, INSTALL_METADATA_FILENAME);
     expect(fs.existsSync(metadataPath)).toBe(true);
@@ -803,7 +802,6 @@ describe('performWorkspaceExtensionMigration', () => {
   });
 
   it('should return the names of failed installations', async () => {
-    mockQuestion.mockImplementation((_query, callback) => callback('y'));
     const ext1Path = createExtension({
       extensionsDir: workspaceExtensionsDir,
       name: 'ext1',
@@ -821,7 +819,6 @@ describe('performWorkspaceExtensionMigration', () => {
 
     const failed = await performWorkspaceExtensionMigration(extensions);
     expect(failed).toEqual(['ext2']);
-    mockQuestion.mockClear();
   });
 });
 

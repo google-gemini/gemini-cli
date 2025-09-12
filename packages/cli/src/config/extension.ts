@@ -463,11 +463,12 @@ export async function installExtension(
         );
       }
 
-      if (installMetadata.type === 'local' && newExtensionConfig.mcpServers) {
+      const mcpServerEntries = Object.entries(
+        newExtensionConfig.mcpServers || {},
+      );
+      if (mcpServerEntries.length) {
         console.info('This extension will run the following MCP servers: ');
-        for (const [key, value] of Object.entries(
-          newExtensionConfig.mcpServers,
-        )) {
+        for (const [key, value] of mcpServerEntries) {
           console.info(`  * ${key}: ${value.description}`);
         }
         console.info(
