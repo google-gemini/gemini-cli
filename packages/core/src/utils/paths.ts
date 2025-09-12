@@ -7,6 +7,7 @@
 import path from 'node:path';
 import os from 'node:os';
 import * as crypto from 'node:crypto';
+import bcrypt from 'bcrypt';
 
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
@@ -169,7 +170,9 @@ export function unescapePath(filePath: string): string {
  * @returns A SHA256 hash of the project root path.
  */
 export function getProjectHash(projectRoot: string): string {
-  return crypto.createHash('sha256').update(projectRoot).digest('hex');
+  // Use bcrypt to generate a computationally expensive hash
+  const saltRounds = 10;
+  return bcrypt.hashSync(projectRoot, saltRounds);
 }
 
 /**

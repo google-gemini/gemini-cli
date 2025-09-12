@@ -58,7 +58,8 @@
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0",
     "undici": "^7.10.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "bcrypt": "^6.0.0"
   },
   "optionalDependencies": {
     "@lydell/node-pty": "1.1.0",

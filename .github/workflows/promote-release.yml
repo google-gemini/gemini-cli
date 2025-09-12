@@ -13,6 +13,8 @@ jobs:
   calculate-versions:
     name: 'Calculate Versions and Plan'
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: read
     outputs:
       STABLE_VERSION: '${{ steps.versions.outputs.STABLE_VERSION }}'
       STABLE_SHA: '${{ steps.versions.outputs.STABLE_SHA }}'

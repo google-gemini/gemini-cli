@@ -183,7 +183,7 @@ export async function openDiff(
         return new Promise((resolve, reject) => {
           const childProcess = spawn(diffCommand.command, diffCommand.args, {
             stdio: 'inherit',
-            shell: true,
+            shell: false,
           });
 
           childProcess.on('close', (code) => {
@@ -203,15 +203,14 @@ export async function openDiff(
       case 'emacs':
       case 'neovim': {
         // Use execSync for terminal-based editors
-        const command =
-          process.platform === 'win32'
-            ? `${diffCommand.command} ${diffCommand.args.join(' ')}`
-            : `${diffCommand.command} ${diffCommand.args.map((arg) => `"${arg}"`).join(' ')}`;
         try {
-          execSync(command, {
+          const result = spawnSync(diffCommand.command, diffCommand.args, {
             stdio: 'inherit',
             encoding: 'utf8',
           });
+          if (result.error) {
+            throw result.error;
+          }
         } catch (e) {
           console.error('Error in onEditorClose callback:', e);
         } finally {

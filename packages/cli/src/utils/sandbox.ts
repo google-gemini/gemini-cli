@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec, execSync, spawn, type ChildProcess } from 'node:child_process';
+import { exec, execSync, execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -383,9 +383,23 @@ export async function start_sandbox(
           console.error(`using ${projectSandboxDockerfile} for sandbox`);
           buildArgs += `-f ${path.resolve(projectSandboxDockerfile)} -i ${image}`;
         }
-        execSync(
-          `cd ${gcRoot} && node scripts/build_sandbox.js -s ${buildArgs}`,
+        // Ensure buildArgs is an array of arguments for the CLI
+        // Construct base args for node scripts/build_sandbox.js
+        const scriptPath = path.join('scripts', 'build_sandbox.js');
+        let args = [scriptPath, '-s'];
+        // If there are additional buildArgs and it's non-empty, split and add them, being careful with spaces
+        if (buildArgs && buildArgs.length > 0) {
+          // Split buildArgs safely (if using shell-quote, can parse; else treat as pre-split array)
+          // Prefer to directly push real arguments instead of a shell string.
+          // If using projectSandboxDockerfile: "-f <...> -i <image>"
+          // buildArgs is e.g.: "-f path/to/file -i image"
+          args = args.concat(buildArgs.trim().split(/\s+/));
+        }
+        execFileSync(
+          'node',
+          args,
           {
+            cwd: gcRoot,
             stdio: 'inherit',
             env: {
               ...process.env,
