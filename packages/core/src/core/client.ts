@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  type EmbedContentParameters,
-  type GenerateContentConfig,
-  type PartListUnion,
-  type Content,
-  type Tool,
-  type GenerateContentResponse,
-  createUserContent,
+import type {
+  EmbedContentParameters,
+  GenerateContentConfig,
+  PartListUnion,
+  Content,
+  Tool,
+  GenerateContentResponse,
 } from '@google/genai';
+import { createUserContent } from '@google/genai';
 import {
   getDirectoryContextString,
   getEnvironmentContext,
