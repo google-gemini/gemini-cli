@@ -85,7 +85,9 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
           {lineParts.map((cell, index) => (
             <React.Fragment key={index}>
               {cell}
-              {index < lineParts.length - 1 ? ' │ ' : ''}
+              <Text color={theme.border.default}>
+                {index < lineParts.length - 1 ? ' │ ' : ''}
+              </Text>
             </React.Fragment>
           ))}{' '}
           │
@@ -117,9 +119,10 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   // Helper function to render a table row
   const renderRow = (cells: string[], isHeader = false): React.ReactNode => {
     const textLines = cells.map((c, i) =>
-      Math.ceil(getPlainTextLength(c) / adjustedWidths[i]),
+      Math.ceil(getPlainTextLength(c) / Math.max(1, adjustedWidths[i] - 2)),
     );
-    const linesInRow = Math.min(Math.max(...textLines), MAX_LINES_IN_A_ROW);
+    let linesInRow = Math.min(Math.max(0, ...textLines), MAX_LINES_IN_A_ROW);
+    linesInRow = Math.max(1, linesInRow);
     const lines = splitRowCellsIntoMultipleLines(cells, linesInRow);
 
     return lines.map((line, idx) => (
