@@ -54,6 +54,9 @@ export const Composer = () => {
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
     nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,
+    hideCWD: settings.merged.ui?.footer?.hideCWD || false,
+    hideSandboxStatus: settings.merged.ui?.footer?.hideSandboxStatus || false,
+    hideModelInfo: settings.merged.ui?.footer?.hideModelInfo || false,
   };
 
   return (
@@ -107,12 +110,16 @@ export const Composer = () => {
 
       <Box
         marginTop={1}
-        justifyContent="space-between"
+        justifyContent={
+          settings.merged.ui?.hideContextSummary
+            ? 'flex-start'
+            : 'space-between'
+        }
         width="100%"
         flexDirection={isNarrow ? 'column' : 'row'}
         alignItems={isNarrow ? 'flex-start' : 'center'}
       >
-        <Box>
+        <Box marginRight={1}>
           {process.env['GEMINI_SYSTEM_MD'] && (
             <Text color={theme.status.error}>|⌐■_■| </Text>
           )}
