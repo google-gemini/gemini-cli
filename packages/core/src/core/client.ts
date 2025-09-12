@@ -489,6 +489,9 @@ export class GeminiClient {
 
     const turn = new Turn(this.getChat(), prompt_id);
 
+    const controller = new AbortController();
+    const linkedSignal = AbortSignal.any([signal, controller.signal]);
+
     const loopDetected = await this.loopDetector.turnStarted(signal);
     if (loopDetected) {
       yield { type: GeminiEventType.LoopDetected };
@@ -514,10 +517,11 @@ export class GeminiClient {
       this.currentSequenceModel = modelToUse;
     }
 
-    const resultStream = turn.run(modelToUse, request, signal);
+    const resultStream = turn.run(modelToUse, request, linkedSignal);
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
         yield { type: GeminiEventType.LoopDetected };
+        controller.abort();
         return turn;
       }
       yield event;
