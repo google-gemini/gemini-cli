@@ -962,6 +962,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable extension management features.',
         showInDialog: false,
       },
+      useModelRouter: {
+        type: 'boolean',
+        label: 'Use Model Router',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable model routing to route requests to the best model based on complexity.',
+        showInDialog: false,
+      },
     },
   },
 
