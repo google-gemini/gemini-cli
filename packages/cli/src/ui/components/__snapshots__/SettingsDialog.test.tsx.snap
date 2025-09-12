@@ -5,33 +5,25 @@ exports[`SettingsDialog > Snapshot Tests > should render default state correctly
 │                                                                                                  │
 │ > Settings                                                                                       │
 │                                                                                                  │
-│ ● Vim Mode                                            false                                      │
+│ ▲                                                                                                │
+│ ● Vim Mode                                             false                                     │
 │                                                                                                  │
-│   Disable Auto Update                                 false                                      │
+│   Disable Auto Update                                  false                                     │
 │                                                                                                  │
-│   Enable Prompt Completion                            false                                      │
+│   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                             false                                      │
+│   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Hide Window Title                                   false                                      │
+│   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Tips                                           false                                      │
+│   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Banner                                         false                                      │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
-│   Hide Context Summary                                false                                      │
-│                                                                                                  │
-│   Hide CWD                                            false                                      │
-│                                                                                                  │
-│   Hide Sandbox Status                                 false                                      │
-│                                                                                                  │
-│   Hide Model Info                                     false                                      │
-│                                                                                                  │
-│   Hide Footer                                         false                                      │
-│                                                                                                  │
-│   Show Memory Usage                                   false                                      │
+│   Hide Banner                                          false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
+│                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
 │ ● 1. User Settings                                                                               │
@@ -48,33 +40,25 @@ exports[`SettingsDialog > Snapshot Tests > should render focused on scope select
 │                                                                                                  │
 │ > Settings                                                                                       │
 │                                                                                                  │
-│ ● Vim Mode                                            false                                      │
+│ ▲                                                                                                │
+│ ● Vim Mode                                             false                                     │
 │                                                                                                  │
-│   Disable Auto Update                                 false                                      │
+│   Disable Auto Update                                  false                                     │
 │                                                                                                  │
-│   Enable Prompt Completion                            false                                      │
+│   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                             false                                      │
+│   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Hide Window Title                                   false                                      │
+│   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Tips                                           false                                      │
+│   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Banner                                         false                                      │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
-│   Hide Context Summary                                false                                      │
-│                                                                                                  │
-│   Hide CWD                                            false                                      │
-│                                                                                                  │
-│   Hide Sandbox Status                                 false                                      │
-│                                                                                                  │
-│   Hide Model Info                                     false                                      │
-│                                                                                                  │
-│   Hide Footer                                         false                                      │
-│                                                                                                  │
-│   Show Memory Usage                                   false                                      │
+│   Hide Banner                                          false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
+│                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
 │ ● 1. User Settings                                                                               │
@@ -91,33 +75,25 @@ exports[`SettingsDialog > Snapshot Tests > should render with accessibility sett
 │                                                                                                  │
 │ > Settings                                                                                       │
 │                                                                                                  │
-│ ● Vim Mode                                            true*                                      │
+│ ▲                                                                                                │
+│ ● Vim Mode                                             true*                                     │
 │                                                                                                  │
-│   Disable Auto Update                                 false                                      │
+│   Disable Auto Update                                  false                                     │
 │                                                                                                  │
-│   Enable Prompt Completion                            false                                      │
+│   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                             false                                      │
+│   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Hide Window Title                                   false                                      │
+│   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Tips                                           false                                      │
+│   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Banner                                         false                                      │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
-│   Hide Context Summary                                false                                      │
-│                                                                                                  │
-│   Hide CWD                                            false                                      │
-│                                                                                                  │
-│   Hide Sandbox Status                                 false                                      │
-│                                                                                                  │
-│   Hide Model Info                                     false                                      │
-│                                                                                                  │
-│   Hide Footer                                         false                                      │
-│                                                                                                  │
-│   Show Memory Usage                                   true*                                      │
+│   Hide Banner                                          false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
+│                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
 │ ● 1. User Settings                                                                               │
@@ -134,33 +110,25 @@ exports[`SettingsDialog > Snapshot Tests > should render with all boolean settin
 │                                                                                                  │
 │ > Settings                                                                                       │
 │                                                                                                  │
-│ ● Vim Mode                                            false*                                     │
+│ ▲                                                                                                │
+│ ● Vim Mode                                             false*                                    │
 │                                                                                                  │
-│   Disable Auto Update                                 false*                                     │
+│   Disable Auto Update                                  false*                                    │
 │                                                                                                  │
-│   Enable Prompt Completion                            false*                                     │
+│   Enable Prompt Completion                             false*                                    │
 │                                                                                                  │
-│   Debug Keystroke Logging                             false*                                     │
+│   Debug Keystroke Logging                              false*                                    │
 │                                                                                                  │
-│   Hide Window Title                                   false*                                     │
+│   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Tips                                           false*                                     │
+│   Hide Window Title                                    false*                                    │
 │                                                                                                  │
-│   Hide Banner                                         false                                      │
+│   Hide Tips                                            false*                                    │
 │                                                                                                  │
-│   Hide Context Summary                                false                                      │
-│                                                                                                  │
-│   Hide CWD                                            false                                      │
-│                                                                                                  │
-│   Hide Sandbox Status                                 false                                      │
-│                                                                                                  │
-│   Hide Model Info                                     false                                      │
-│                                                                                                  │
-│   Hide Footer                                         false                                      │
-│                                                                                                  │
-│   Show Memory Usage                                   false*                                     │
+│   Hide Banner                                          false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
+│                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
 │ ● 1. User Settings                                                                               │
@@ -177,33 +145,25 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │                                                                                                  │
 │ > Settings                                                                                       │
 │                                                                                                  │
-│ ● Vim Mode (Modified in System)                       false                                      │
+│ ▲                                                                                                │
+│ ● Vim Mode (Modified in System)                        false                                     │
 │                                                                                                  │
-│   Disable Auto Update (Modified in System)            false                                      │
+│   Disable Auto Update (Modified in System)             false                                     │
 │                                                                                                  │
-│   Enable Prompt Completion                            false                                      │
+│   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                             false                                      │
+│   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Hide Window Title                                   false                                      │
+│   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Tips                                           false                                      │
+│   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Banner                                         false                                      │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
-│   Hide Context Summary                                false                                      │
-│                                                                                                  │
-│   Hide CWD                                            false                                      │
-│                                                                                                  │
-│   Hide Sandbox Status                                 false                                      │
-│                                                                                                  │
-│   Hide Model Info                                     false                                      │
-│                                                                                                  │
-│   Hide Footer                                         false                                      │
-│                                                                                                  │
-│   Show Memory Usage (Modified in System)              false                                      │
+│   Hide Banner                                          false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
+│                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
 │ ● 1. User Settings                                                                               │
@@ -220,33 +180,25 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │                                                                                                  │
 │ > Settings                                                                                       │
 │                                                                                                  │
-│ ● Vim Mode (Modified in Workspace)                    false                                      │
+│ ▲                                                                                                │
+│ ● Vim Mode (Modified in Workspace)                     false                                     │
 │                                                                                                  │
-│   Disable Auto Update                                 false                                      │
+│   Disable Auto Update                                  false                                     │
 │                                                                                                  │
-│   Enable Prompt Completion                            false                                      │
+│   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging (Modified in Workspace)     false                                      │
+│   Debug Keystroke Logging (Modified in Workspace)      false                                     │
 │                                                                                                  │
-│   Hide Window Title                                   false                                      │
+│   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Tips                                           false                                      │
+│   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Banner                                         false                                      │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
-│   Hide Context Summary                                false                                      │
-│                                                                                                  │
-│   Hide CWD                                            false                                      │
-│                                                                                                  │
-│   Hide Sandbox Status                                 false                                      │
-│                                                                                                  │
-│   Hide Model Info                                     false                                      │
-│                                                                                                  │
-│   Hide Footer                                         false                                      │
-│                                                                                                  │
-│   Show Memory Usage                                   false                                      │
+│   Hide Banner                                          false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
+│                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
 │ ● 1. User Settings                                                                               │
@@ -263,33 +215,25 @@ exports[`SettingsDialog > Snapshot Tests > should render with file filtering set
 │                                                                                                  │
 │ > Settings                                                                                       │
 │                                                                                                  │
-│ ● Vim Mode                                            false                                      │
+│ ▲                                                                                                │
+│ ● Vim Mode                                             false                                     │
 │                                                                                                  │
-│   Disable Auto Update                                 false                                      │
+│   Disable Auto Update                                  false                                     │
 │                                                                                                  │
-│   Enable Prompt Completion                            false                                      │
+│   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                             false                                      │
+│   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Hide Window Title                                   false                                      │
+│   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Tips                                           false                                      │
+│   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Banner                                         false                                      │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
-│   Hide Context Summary                                false                                      │
-│                                                                                                  │
-│   Hide CWD                                            false                                      │
-│                                                                                                  │
-│   Hide Sandbox Status                                 false                                      │
-│                                                                                                  │
-│   Hide Model Info                                     false                                      │
-│                                                                                                  │
-│   Hide Footer                                         false                                      │
-│                                                                                                  │
-│   Show Memory Usage                                   false                                      │
+│   Hide Banner                                          false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
+│                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
 │ ● 1. User Settings                                                                               │
@@ -306,33 +250,25 @@ exports[`SettingsDialog > Snapshot Tests > should render with mixed boolean and 
 │                                                                                                  │
 │ > Settings                                                                                       │
 │                                                                                                  │
-│ ● Vim Mode                                            false*                                     │
+│ ▲                                                                                                │
+│ ● Vim Mode                                             false*                                    │
 │                                                                                                  │
-│   Disable Auto Update                                 true*                                      │
+│   Disable Auto Update                                  true*                                     │
 │                                                                                                  │
-│   Enable Prompt Completion                            false                                      │
+│   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                             false                                      │
+│   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Hide Window Title                                   false*                                     │
+│   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Tips                                           false                                      │
+│   Hide Window Title                                    false*                                    │
 │                                                                                                  │
-│   Hide Banner                                         false                                      │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
-│   Hide Context Summary                                false                                      │
-│                                                                                                  │
-│   Hide CWD                                            false                                      │
-│                                                                                                  │
-│   Hide Sandbox Status                                 false                                      │
-│                                                                                                  │
-│   Hide Model Info                                     false                                      │
-│                                                                                                  │
-│   Hide Footer                                         false                                      │
-│                                                                                                  │
-│   Show Memory Usage                                   true*                                      │
+│   Hide Banner                                          false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
+│                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
 │ ● 1. User Settings                                                                               │
@@ -349,33 +285,25 @@ exports[`SettingsDialog > Snapshot Tests > should render with tools and security
 │                                                                                                  │
 │ > Settings                                                                                       │
 │                                                                                                  │
-│ ● Vim Mode                                            false                                      │
+│ ▲                                                                                                │
+│ ● Vim Mode                                             false                                     │
 │                                                                                                  │
-│   Disable Auto Update                                 false                                      │
+│   Disable Auto Update                                  false                                     │
 │                                                                                                  │
-│   Enable Prompt Completion                            false                                      │
+│   Enable Prompt Completion                             false                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                             false                                      │
+│   Debug Keystroke Logging                              false                                     │
 │                                                                                                  │
-│   Hide Window Title                                   false                                      │
+│   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Tips                                           false                                      │
+│   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Banner                                         false                                      │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
-│   Hide Context Summary                                false                                      │
-│                                                                                                  │
-│   Hide CWD                                            false                                      │
-│                                                                                                  │
-│   Hide Sandbox Status                                 false                                      │
-│                                                                                                  │
-│   Hide Model Info                                     false                                      │
-│                                                                                                  │
-│   Hide Footer                                         false                                      │
-│                                                                                                  │
-│   Show Memory Usage                                   false                                      │
+│   Hide Banner                                          false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
+│                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
 │ ● 1. User Settings                                                                               │
@@ -392,33 +320,25 @@ exports[`SettingsDialog > Snapshot Tests > should render with various boolean se
 │                                                                                                  │
 │ > Settings                                                                                       │
 │                                                                                                  │
-│ ● Vim Mode                                            true*                                      │
+│ ▲                                                                                                │
+│ ● Vim Mode                                             true*                                     │
 │                                                                                                  │
-│   Disable Auto Update                                 true*                                      │
+│   Disable Auto Update                                  true*                                     │
 │                                                                                                  │
-│   Enable Prompt Completion                            true*                                      │
+│   Enable Prompt Completion                             true*                                     │
 │                                                                                                  │
-│   Debug Keystroke Logging                             true*                                      │
+│   Debug Keystroke Logging                              true*                                     │
 │                                                                                                  │
-│   Hide Window Title                                   true*                                      │
+│   Output Format                                        Text                                      │
 │                                                                                                  │
-│   Hide Tips                                           true*                                      │
+│   Hide Window Title                                    true*                                     │
 │                                                                                                  │
-│   Hide Banner                                         false                                      │
+│   Hide Tips                                            true*                                     │
 │                                                                                                  │
-│   Hide Context Summary                                false                                      │
-│                                                                                                  │
-│   Hide CWD                                            false                                      │
-│                                                                                                  │
-│   Hide Sandbox Status                                 false                                      │
-│                                                                                                  │
-│   Hide Model Info                                     false                                      │
-│                                                                                                  │
-│   Hide Footer                                         false                                      │
-│                                                                                                  │
-│   Show Memory Usage                                   true*                                      │
+│   Hide Banner                                          false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
+│                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
 │ ● 1. User Settings                                                                               │

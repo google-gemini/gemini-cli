@@ -175,6 +175,26 @@ describe('SettingsDialog', () => {
       expect(output).toContain('Use Enter to select, Tab to change focus');
     });
 
+    it('should accept availableTerminalHeight prop without errors', () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame } = render(
+        <KeypressProvider kittyProtocolEnabled={false}>
+          <SettingsDialog 
+            settings={settings} 
+            onSelect={onSelect} 
+            availableTerminalHeight={20}
+          />
+        </KeypressProvider>,
+      );
+
+      const output = lastFrame();
+      // Should still render properly with the height prop
+      expect(output).toContain('Settings');
+      expect(output).toContain('Use Enter to select');
+    });
+
     it('should show settings list with default values', () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
