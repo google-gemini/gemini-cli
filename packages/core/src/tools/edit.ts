@@ -551,10 +551,32 @@ Expectation for required parameters:
           const currentContent = await this.config
             .getFileSystemService()
             .readTextFile(params.file_path);
+
+          let correctedNewString = params.new_string;
+          try {
+            const { restoreCollapsedEscapes } = await import(
+              '../utils/escapePreserver.js'
+            );
+            const restoration = restoreCollapsedEscapes(
+              params.old_string,
+              correctedNewString,
+            );
+            if (restoration.changed) {
+              if (this.config.getDebugMode()) {
+                console.debug(
+                  'Restored collapsed escape sequences in edit proposal:',
+                  restoration.restoredCounts,
+                );
+              }
+              correctedNewString = restoration.output;
+            }
+          } catch {
+            // If the helper fails for any reason, fall back silently.
+          }
           return applyReplacement(
             currentContent,
             params.old_string,
-            params.new_string,
+            correctedNewString,
             params.old_string === '' && currentContent === '',
           );
         } catch (err) {
