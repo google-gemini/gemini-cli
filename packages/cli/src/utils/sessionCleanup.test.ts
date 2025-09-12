@@ -819,6 +819,8 @@ describe('Session Cleanup', () => {
           sessionRetention: {
             enabled: true,
             maxAge: input,
+            // Set minRetention to 1h to allow testing of hour-based maxAge values
+            minRetention: '1h',
           },
         },
       };
@@ -853,8 +855,6 @@ describe('Session Cleanup', () => {
           sessionRetention: {
             enabled: true,
             maxAge: input,
-            // Set minRetention to 1h to allow testing of hour-based maxAge values
-            minRetention: '1h',
           },
         },
       };
