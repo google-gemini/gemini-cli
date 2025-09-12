@@ -164,24 +164,22 @@ export class McpPromptLoader implements ICommandLoader {
             const providedArgNames = Object.keys(promptInputs);
             const unusedArguments =
               prompt.arguments
-                .filter(
-                  (arg) => {
-                    // If this arguments is not in the prompt inputs
-                    // add it to unusedArguments
-                    if (!providedArgNames.includes(arg.name)) {
-                      return true;
-                    }
-
-                    // The parseArgs method automatically assigns the value
-                    // at the end of the prompt as a final value
-                    // The argument should still be suggested
-                    // Example /add --numberOne="34" --num
-                    // numberTwo would be assigned a value of --num
-                    // numberTwo should still be considered unused
-                    const argValue = promptInputs[arg.name];
-                    return argValue === partialArg;
+                .filter((arg) => {
+                  // If this arguments is not in the prompt inputs
+                  // add it to unusedArguments
+                  if (!providedArgNames.includes(arg.name)) {
+                    return true;
                   }
-                )
+
+                  // The parseArgs method automatically assigns the value
+                  // at the end of the prompt as a final value
+                  // The argument should still be suggested
+                  // Example /add --numberOne="34" --num
+                  // numberTwo would be assigned a value of --num
+                  // numberTwo should still be considered unused
+                  const argValue = promptInputs[arg.name];
+                  return argValue === partialArg;
+                })
                 .map((argument) => `--${argument.name}="`) || [];
 
             const exactlyMatchingArgumentAtTheEnd = prompt.arguments
