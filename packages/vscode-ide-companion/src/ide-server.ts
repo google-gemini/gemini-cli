@@ -5,7 +5,11 @@
  */
 
 import * as vscode from 'vscode';
-import { IdeContextNotificationSchema } from '@google/gemini-cli-core';
+import {
+  CloseDiffRequestSchema,
+  IdeContextNotificationSchema,
+  OpenDiffRequestSchema,
+} from '@google/gemini-cli-core';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -15,7 +19,7 @@ import { type Server as HTTPServer } from 'node:http';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
-import { z } from 'zod';
+import type { z } from 'zod';
 import type { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
 
@@ -245,6 +249,7 @@ export class IDEServer {
             `gemini-ide-server-${process.ppid}.json`,
           );
           this.log(`IDE server listening on port ${this.port}`);
+
           await writePortAndWorkspace(
             context,
             this.port,
@@ -338,46 +343,23 @@ const createMcpServer = (diffManager: DiffManager) => {
     {
       description:
         '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejcted.',
-      inputSchema: z.object({
-        filePath: z.string(),
-        // TODO(chrstn): determine if this should be required or not.
-        newContent: z.string().optional(),
-      }).shape,
+      inputSchema: OpenDiffRequestSchema.shape,
     },
-    async ({
-      filePath,
-      newContent,
-    }: {
-      filePath: string;
-      newContent?: string;
-    }) => {
-      await diffManager.showDiff(filePath, newContent ?? '');
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Showing diff for ${filePath}`,
-          },
-        ],
-      };
+    async ({ filePath, newContent }: z.infer<typeof OpenDiffRequestSchema>) => {
+      await diffManager.showDiff(filePath, newContent);
+      return { content: [] };
     },
   );
   server.registerTool(
     'closeDiff',
     {
       description: '(IDE Tool) Close an open diff view for a specific file.',
-      inputSchema: z.object({
-        filePath: z.string(),
-        suppressNotification: z.boolean().optional(),
-      }).shape,
+      inputSchema: CloseDiffRequestSchema.shape,
     },
     async ({
       filePath,
       suppressNotification,
-    }: {
-      filePath: string;
-      suppressNotification?: boolean;
-    }) => {
+    }: z.infer<typeof CloseDiffRequestSchema>) => {
       const content = await diffManager.closeDiff(
         filePath,
         suppressNotification,
