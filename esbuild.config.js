@@ -25,33 +25,49 @@ const external = [
   '@lydell/node-pty-win32-x64',
 ];
 
-esbuild
-  .build({
-    entryPoints: ['packages/cli/index.ts'],
-    bundle: true,
-    outfile: 'bundle/gemini.js',
-    platform: 'node',
-    format: 'esm',
-    external,
-    alias: {
-      'is-in-ci': path.resolve(
-        __dirname,
-        'packages/cli/src/patches/is-in-ci.ts',
-      ),
-    },
-    define: {
-      'process.env.CLI_VERSION': JSON.stringify(pkg.version),
-    },
-    banner: {
-      js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
-    },
-    loader: { '.node': 'file' },
-    metafile: true,
-    write: true,
-  })
-  .then(({ metafile }) => {
+const cliConfig = {
+  entryPoints: ['packages/cli/index.ts'],
+  bundle: true,
+  outfile: 'bundle/gemini.js',
+  platform: 'node',
+  format: 'esm',
+  external,
+  alias: {
+    'is-in-ci': path.resolve(__dirname, 'packages/cli/src/patches/is-in-ci.ts'),
+  },
+  define: {
+    'process.env.CLI_VERSION': JSON.stringify(pkg.version),
+  },
+  banner: {
+    js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+  },
+  loader: { '.node': 'file' },
+  metafile: true,
+  write: true,
+};
+
+const a2aServerConfig = {
+  entryPoints: ['packages/a2a-server/src/http/server.ts'],
+  bundle: true,
+  outfile: 'bundle/a2a-server.js',
+  platform: 'node',
+  format: 'esm',
+  external,
+  define: {
+    'process.env.CLI_VERSION': JSON.stringify(pkg.version),
+  },
+  banner: {
+    js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+  },
+  loader: { '.node': 'file' },
+  write: true,
+};
+
+Promise.all([
+  esbuild.build(cliConfig).then(({ metafile }) => {
     if (process.env.DEV === 'true') {
       writeFileSync('./bundle/esbuild.json', JSON.stringify(metafile, null, 2));
     }
-  })
-  .catch(() => process.exit(1));
+  }),
+  esbuild.build(a2aServerConfig),
+]).catch(() => process.exit(1));
