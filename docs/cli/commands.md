@@ -380,6 +380,16 @@ That's it! You can now run your command in the CLI. First, you might add a file 
 
 Gemini CLI will then execute the multi-line prompt defined in your TOML file.
 
+## Input Prompt Shortcuts
+
+These shortcuts apply directly to the input prompt for text manipulation.
+
+- **Undo:**
+  - **Keyboard shortcut:** Press **Ctrl+z** to undo the last action in the input prompt.
+
+- **Redo:**
+  - **Keyboard shortcut:** Press **Ctrl+Shift+Z** to redo the last undone action in the input prompt.
+
 ## At commands (`@`)
 
 At commands are used to include the content of files or directories as part of your prompt to Gemini. These commands include git-aware filtering.
