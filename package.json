@@ -46,12 +46,13 @@
     "format": "prettier --experimental-cli --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "preflight": "npm run clean && npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci",
-    "prepare": "npm run bundle",
+    "prepare": "husky && npm run bundle",
     "prepare:package": "node scripts/prepare-package.js",
     "release:version": "node scripts/version.js",
     "telemetry": "node scripts/telemetry.js",
     "check:lockfile": "node scripts/check-lockfile.js",
-    "clean": "node scripts/clean.js"
+    "clean": "node scripts/clean.js",
+    "pre-commit": "lint-staged"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
@@ -80,7 +81,9 @@
     "glob": "^10.4.5",
     "globals": "^16.0.0",
     "google-artifactregistry-auth": "^3.4.0",
+    "husky": "^9.1.7",
     "json": "^11.0.0",
+    "lint-staged": "^16.1.6",
     "memfs": "^4.17.2",
     "mnemonist": "^0.40.3",
     "mock-fs": "^5.5.0",
@@ -107,5 +110,14 @@
   },
   "overrides": {
     "wrap-ansi": "9.0.2"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix --max-warnings 0"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   }
 }
