@@ -115,10 +115,15 @@ export const downloadRipGrep = async () => {
       console.info('ripgrep is already installed, skipping download')
       return
     } catch (error) {
-      throw new VError(
-        error,
-        'On FreeBSD, ripgrep must be installed manually. Please run `pkg install ripgrep` and try again.'
-      )
+      // 'ENOENT' indicates that the command was not found.
+      if (error.code === 'ENOENT') {
+        throw new VError(
+          error,
+          'On FreeBSD, ripgrep must be installed manually. Please run `pkg install ripgrep` and try again.'
+        )
+      }
+      // For other errors, throw a more generic message to avoid incorrect assumptions.
+      throw new VError(error, 'Failed to check for ripgrep on FreeBSD')
     }
   }
   const url = `https://github.com/${REPOSITORY}/releases/download/${VERSION}/ripgrep-${VERSION}-${target}`
