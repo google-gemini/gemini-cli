@@ -65,6 +65,7 @@ export interface UIState {
   buffer: TextBuffer;
   inputWidth: number;
   suggestionsWidth: number;
+  debugWidth: number;
   isInputActive: boolean;
   shouldShowIdePrompt: boolean;
   isFolderTrustDialogOpen: boolean;

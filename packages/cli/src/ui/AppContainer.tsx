@@ -237,6 +237,9 @@ export const AppContainer = (props: AppContainerProps) => {
     PROMPT_PREFIX_WIDTH;
 
   const inputWidth = Math.max(MIN_CONTENT_WIDTH, innerContentWidth);
+  // Framed width (border + padding + prefix) to align other boxes
+  const FRAME_OVERHEAD = FRAME_PADDING_AND_BORDER + PROMPT_PREFIX_WIDTH; // 6
+  const debugWidth = inputWidth + FRAME_OVERHEAD;
   const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 1.0));
   const mainAreaWidth = Math.floor(terminalWidth * 0.9);
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
@@ -1010,6 +1013,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       buffer,
       inputWidth,
       suggestionsWidth,
+      debugWidth,
       isInputActive,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
@@ -1085,6 +1089,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       buffer,
       inputWidth,
       suggestionsWidth,
+      debugWidth,
       isInputActive,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen,
