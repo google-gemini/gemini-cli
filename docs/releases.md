@@ -73,7 +73,7 @@ Follow the manual release process using the "Patch Release" GitHub Actions workf
 
 - **Type**: Select whether you are patching a `stable` or `preview` release. The workflow will automatically calculate the next patch version.
 - **Ref**: Use your source branch as the reference (ex. `release/v0.2.0-preview.0`)
-Navigate to the **Actions** tab and run the **Create Patch PR** workflow.
+  Navigate to the **Actions** tab and run the **Create Patch PR** workflow.
 
 - **Commit**: The full SHA of the commit on `main` that you want to cherry-pick.
 - **Channel**: The channel you want to patch (`stable` or `preview`).
