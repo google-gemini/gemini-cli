@@ -481,7 +481,28 @@ export class WriteFileTool
           params.content,
           abortSignal,
         );
-        return correctedContentResult.correctedContent;
+        let proposed = correctedContentResult.correctedContent;
+        try {
+          const { restoreCollapsedEscapes } = await import(
+            '../utils/escapePreserver.js'
+          );
+          const restoration = restoreCollapsedEscapes(
+            correctedContentResult.originalContent,
+            proposed,
+          );
+          if (restoration.changed) {
+            if (this.config.getDebugMode()) {
+              console.debug(
+                'Restored collapsed escape sequences in write-file proposal:',
+                restoration.restoredCounts,
+              );
+            }
+            proposed = restoration.output;
+          }
+        } catch {
+          // Silent fallback: if restoration logic fails, we keep the proposed content as-is.
+        }
+        return proposed;
       },
       createUpdatedParams: (
         _oldContent: string,
