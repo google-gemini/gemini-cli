@@ -9,7 +9,7 @@ import { type ColorsTheme, Theme } from './theme.js';
 const draculaColors: ColorsTheme = {
   type: 'dark',
   Background: '#282a36',
-  Foreground: '#d3d3a8ff',
+  Foreground: '#d3d3a8',
   LightBlue: '#8be9fd',
   AccentBlue: '#8be9fd',
   AccentPurple: '#ff79c6',
