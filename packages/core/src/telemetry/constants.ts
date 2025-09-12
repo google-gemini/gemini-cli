@@ -17,6 +17,7 @@ export const EVENT_RIPGREP_FALLBACK = 'gemini_cli.ripgrep_fallback';
 export const EVENT_NEXT_SPEAKER_CHECK = 'gemini_cli.next_speaker_check';
 export const EVENT_SLASH_COMMAND = 'gemini_cli.slash_command';
 export const EVENT_IDE_CONNECTION = 'gemini_cli.ide_connection';
+export const EVENT_RESEARCH_OPT_IN = 'gemini_cli.research_opt_in';
 export const EVENT_CONVERSATION_FINISHED = 'gemini_cli.conversation_finished';
 export const EVENT_CHAT_COMPRESSION = 'gemini_cli.chat_compression';
 export const EVENT_MALFORMED_JSON_RESPONSE =
@@ -33,6 +34,7 @@ export const METRIC_API_REQUEST_LATENCY = 'gemini_cli.api.request.latency';
 export const METRIC_TOKEN_USAGE = 'gemini_cli.token.usage';
 export const METRIC_SESSION_COUNT = 'gemini_cli.session.count';
 export const METRIC_FILE_OPERATION_COUNT = 'gemini_cli.file.operation.count';
+
 export const METRIC_INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
 export const METRIC_CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
 export const METRIC_CONTENT_RETRY_FAILURE_COUNT =
