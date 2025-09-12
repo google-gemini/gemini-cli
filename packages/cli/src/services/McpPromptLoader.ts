@@ -199,14 +199,6 @@ export class McpPromptLoader implements ICommandLoader {
               return [`${partialArg}"`];
             }
 
-            if (
-              partialArg === '' ||
-              partialArg === '-' ||
-              partialArg === '--'
-            ) {
-              return unusedArguments;
-            }
-
             const matchingArguments = unusedArguments.filter((flagArgument) =>
               flagArgument.startsWith(partialArg),
             );
