@@ -156,6 +156,31 @@ describe('Trusted Folders Loading', () => {
     expect(errors[0].message).toContain('Unexpected token');
   });
 
+  it('should use GEMINI_CLI_TRUSTED_FOLDERS_PATH env var if set', () => {
+    const customPath = '/custom/path/to/trusted_folders.json';
+    process.env.GEMINI_CLI_TRUSTED_FOLDERS_PATH = customPath;
+
+    (mockFsExistsSync as Mock).mockImplementation((p) => p === customPath);
+    const userContent = {
+      '/user/folder/from/env': TrustLevel.TRUST_FOLDER,
+    };
+    (fs.readFileSync as Mock).mockImplementation((p) => {
+      if (p === customPath) return JSON.stringify(userContent);
+      return '{}';
+    });
+
+    const { rules, errors } = loadTrustedFolders();
+    expect(rules).toEqual([
+      {
+        path: '/user/folder/from/env',
+        trustLevel: TrustLevel.TRUST_FOLDER,
+      },
+    ]);
+    expect(errors).toEqual([]);
+
+    delete process.env.GEMINI_CLI_TRUSTED_FOLDERS_PATH;
+  });
+
   it('setValue should update the user config and save it', () => {
     const loadedFolders = loadTrustedFolders();
     loadedFolders.setValue('/new/path', TrustLevel.TRUST_FOLDER);
