@@ -135,7 +135,6 @@ export const OpenDiffRequestSchema = z.object({
 
 /**
  * The request to close a diff view in the IDE.
- *
  */
 export const CloseDiffRequestSchema = z.object({
   /**
