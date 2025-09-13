@@ -90,6 +90,92 @@ const findEnclosingCodeBlockStart = (
   return -1;
 };
 
+/**
+ * Checks if a position is likely within a markdown list structure
+ * Enhanced to handle edge cases and unusual spacing
+ * LIMITATION: Regex-based detection may have false positives with file paths or timestamps
+ * FUTURE: Consider using an AST-based approach for more accurate list detection
+ */
+const isWithinList = (content: string, index: number): boolean => {
+  // Check a more generous range of lines to handle unusual spacing
+  const nextContent = content.substring(
+    index,
+    Math.min(index + 200, content.length),
+  );
+  const nextLines = nextContent.split('\n').slice(0, 6); // Check more lines
+
+  // Enhanced list patterns including task lists and varied spacing
+  const listPattern = /^[\s]*([*\-+]|\d+\.|[a-zA-Z]\.|[ivxlcdm]+\.)\s+/;
+  const taskListPattern = /^[\s]*[-*+]\s*\[[ xX]\]\s+/; // Task lists: - [ ] or - [x]
+
+  return nextLines.some(
+    (line) => listPattern.test(line) || taskListPattern.test(line),
+  );
+};
+
+/**
+ * Checks if the content before a position ends with a header
+ */
+const endsWithHeader = (content: string, index: number): boolean => {
+  const beforeContent = content
+    .substring(Math.max(0, index - 100), index)
+    .trim();
+  const lines = beforeContent.split('\n');
+  const lastLine = lines[lines.length - 1];
+  return /^#{1,6}\s+/.test(lastLine);
+};
+
+/**
+ * Checks if a position would split within a blockquote structure
+ */
+const isWithinBlockquote = (content: string, index: number): boolean => {
+  // Check if we're in the middle of a blockquote
+  const nextContent = content.substring(
+    index,
+    Math.min(index + 150, content.length),
+  );
+  const nextLines = nextContent.split('\n').slice(0, 4);
+
+  // Check if next lines continue the blockquote pattern
+  const blockquotePattern = /^[\s]*>\s*/;
+  return nextLines.some((line) => blockquotePattern.test(line));
+};
+
+/**
+ * Checks if a position would split within a table structure
+ * LIMITATION: Uses basic heuristics that may miss complex table formats
+ * FUTURE: Consider using a dedicated markdown parser for robust table detection
+ */
+const isWithinTable = (content: string, index: number): boolean => {
+  // Check the lines around the split point for table patterns
+  const beforeContent = content.substring(Math.max(0, index - 100), index);
+  const afterContent = content.substring(
+    index,
+    Math.min(index + 100, content.length),
+  );
+
+  const beforeLines = beforeContent.split('\n').slice(-2);
+  const afterLines = afterContent.split('\n').slice(0, 2);
+
+  const tableRowPattern = /^\s*\|.*\|\s*$/;
+  const tableSeparatorPattern = /^\s*\|?\s*(:?-+:?\s*\|?\s*)+\s*$/;
+
+  // Check if we have table-like content before and after
+  const hasTableBefore = beforeLines.some(
+    (line) => tableRowPattern.test(line) || tableSeparatorPattern.test(line),
+  );
+  const hasTableAfter = afterLines.some(
+    (line) => tableRowPattern.test(line) || tableSeparatorPattern.test(line),
+  );
+
+  return hasTableBefore && hasTableAfter;
+};
+
+/**
+ * Finds the last safe split point in markdown content to preserve structure integrity.
+ * LIMITATION: Heuristic-based detection may have edge cases with complex nested structures or false positives.
+ * FUTURE: Consider migrating to a dedicated markdown parser (e.g., unified/remark) for AST-based structure detection.
+ */
 export const findLastSafeSplitPoint = (content: string) => {
   const enclosingBlockStart = findEnclosingCodeBlockStart(
     content,
@@ -102,6 +188,8 @@ export const findLastSafeSplitPoint = (content: string) => {
 
   // Search for the last double newline (\n\n) not in a code block.
   let searchStartIndex = content.length;
+  let lastValidSplitPoint = content.length;
+
   while (searchStartIndex >= 0) {
     const dnlIndex = content.lastIndexOf('\n\n', searchStartIndex);
     if (dnlIndex === -1) {
@@ -111,15 +199,26 @@ export const findLastSafeSplitPoint = (content: string) => {
 
     const potentialSplitPoint = dnlIndex + 2;
     if (!isIndexInsideCodeBlock(content, potentialSplitPoint)) {
-      return potentialSplitPoint;
+      // Check if this split would break any markdown structure
+      const wouldBreakStructure =
+        isWithinList(content, potentialSplitPoint) ||
+        endsWithHeader(content, dnlIndex) ||
+        isWithinBlockquote(content, potentialSplitPoint) ||
+        isWithinTable(content, potentialSplitPoint);
+
+      if (!wouldBreakStructure) {
+        return potentialSplitPoint;
+      }
+      // Remember this as a fallback option if we don't find a better split
+      lastValidSplitPoint = potentialSplitPoint;
     }
 
-    // If potentialSplitPoint was inside a code block,
+    // If potentialSplitPoint was inside a code block or list,
     // the next search should start *before* the \n\n we just found to ensure progress.
     searchStartIndex = dnlIndex - 1;
   }
 
-  // If no safe double newline is found, return content.length
-  // to keep the entire content as one piece.
-  return content.length;
+  // If we only found splits that would break lists, use the last one as a fallback
+  // This is better than not splitting at all for very long content
+  return lastValidSplitPoint;
 };
