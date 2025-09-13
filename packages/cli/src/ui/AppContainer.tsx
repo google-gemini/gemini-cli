@@ -624,11 +624,19 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = useMemo(() => {
+    // Provide a small vertical slack to reduce layout jitter while resizing.
+    const RESIZE_ROW_SLACK = 2;
     if (mainControlsRef.current) {
       const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      return terminalHeight - fullFooterMeasurement.height - staticExtraHeight;
+      return Math.max(
+        0,
+        terminalHeight -
+          fullFooterMeasurement.height -
+          staticExtraHeight -
+          RESIZE_ROW_SLACK,
+      );
     }
-    return terminalHeight - staticExtraHeight;
+    return Math.max(0, terminalHeight - staticExtraHeight - RESIZE_ROW_SLACK);
   }, [terminalHeight]);
 
   config.setShellExecutionConfig({
