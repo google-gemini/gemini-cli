@@ -7,6 +7,7 @@
 import type { Config, MCPServerConfig } from '../config/config.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { ResourceRegistry } from '../resources/resource-registry.js';
 import {
   McpClient,
   MCPDiscoveryState,
@@ -18,8 +19,8 @@ import type { WorkspaceContext } from '../utils/workspaceContext.js';
 
 /**
  * Manages the lifecycle of multiple MCP clients, including local child processes.
- * This class is responsible for starting, stopping, and discovering tools from
- * a collection of MCP servers defined in the configuration.
+ * This class is responsible for starting, stopping, and discovering tools, prompts,
+ * and resources from a collection of MCP servers defined in the configuration.
  */
 export class McpClientManager {
   private clients: Map<string, McpClient> = new Map();
@@ -27,6 +28,7 @@ export class McpClientManager {
   private readonly mcpServerCommand: string | undefined;
   private readonly toolRegistry: ToolRegistry;
   private readonly promptRegistry: PromptRegistry;
+  private readonly resourceRegistry: ResourceRegistry;
   private readonly debugMode: boolean;
   private readonly workspaceContext: WorkspaceContext;
   private discoveryState: MCPDiscoveryState = MCPDiscoveryState.NOT_STARTED;
@@ -37,6 +39,7 @@ export class McpClientManager {
     mcpServerCommand: string | undefined,
     toolRegistry: ToolRegistry,
     promptRegistry: PromptRegistry,
+    resourceRegistry: ResourceRegistry,
     debugMode: boolean,
     workspaceContext: WorkspaceContext,
     eventEmitter?: EventEmitter,
@@ -45,15 +48,16 @@ export class McpClientManager {
     this.mcpServerCommand = mcpServerCommand;
     this.toolRegistry = toolRegistry;
     this.promptRegistry = promptRegistry;
+    this.resourceRegistry = resourceRegistry;
     this.debugMode = debugMode;
     this.workspaceContext = workspaceContext;
     this.eventEmitter = eventEmitter;
   }
 
   /**
-   * Initiates the tool discovery process for all configured MCP servers.
-   * It connects to each server, discovers its available tools, and registers
-   * them with the `ToolRegistry`.
+   * Initiates the discovery process for all configured MCP servers.
+   * It connects to each server, discovers its available tools, prompts, and
+   * resources, and registers them with their respective registries.
    */
   async discoverAllMcpTools(cliConfig: Config): Promise<void> {
     if (!cliConfig.isTrustedFolder()) {
@@ -76,6 +80,7 @@ export class McpClientManager {
           config,
           this.toolRegistry,
           this.promptRegistry,
+          this.resourceRegistry,
           this.workspaceContext,
           this.debugMode,
         );

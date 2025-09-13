@@ -69,6 +69,7 @@ describe('mcpCommand', () => {
     getMcpServers: ReturnType<typeof vi.fn>;
     getBlockedMcpServers: ReturnType<typeof vi.fn>;
     getPromptRegistry: ReturnType<typeof vi.fn>;
+    getResourceRegistry: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -93,6 +94,9 @@ describe('mcpCommand', () => {
       getPromptRegistry: vi.fn().mockResolvedValue({
         getAllPrompts: vi.fn().mockReturnValue([]),
         getPromptsByServer: vi.fn().mockReturnValue([]),
+      }),
+      getResourceRegistry: vi.fn().mockReturnValue({
+        getResourcesByServer: vi.fn().mockReturnValue([]),
       }),
     };
 
@@ -358,7 +362,7 @@ describe('mcpCommand', () => {
         expect(message).toContain(
           '🔴 \u001b[1mserver2\u001b[0m - Disconnected (0 tools cached)',
         );
-        expect(message).toContain('No tools or prompts available');
+        expect(message).toContain('No tools, prompts, or resources available');
       }
     });
 
@@ -992,6 +996,9 @@ describe('mcpCommand', () => {
             getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
             getPromptRegistry: vi.fn().mockResolvedValue({
               getPromptsByServer: vi.fn().mockReturnValue([]),
+            }),
+            getResourceRegistry: vi.fn().mockReturnValue({
+              getResourcesByServer: vi.fn().mockReturnValue([]),
             }),
           },
         },

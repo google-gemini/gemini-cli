@@ -80,6 +80,9 @@ export * from './tools/tool-registry.js';
 // Export prompt logic
 export * from './prompts/mcp-prompts.js';
 
+// Resources
+export * from './resources/resource-registry.js';
+
 // Export specific tool logic
 export * from './tools/read-file.js';
 export * from './tools/ls.js';
