@@ -24,7 +24,10 @@ import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode } from '@google/gemini-cli-core';
-import { parseInputForHighlighting } from '../utils/highlight.js';
+import {
+  parseInputForHighlighting,
+  buildSegmentsForVisualSlice,
+} from '../utils/highlight.js';
 import {
   clipboardHasImage,
   saveClipboardImage,
@@ -810,88 +813,62 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
                 const renderedLine: React.ReactNode[] = [];
 
-                type Segment = { color: string | undefined; text: string };
-                const segments: Segment[] = [];
-                let emittedCpOnLine = 0; // count of code points emitted on this visual line (for cursor inversion)
-
                 // Use mapping for segment-based highlighting across visual wraps
                 const [logicalLineIdx, logicalStartCol] = mapEntry;
                 const logicalLine = buffer.lines[logicalLineIdx] || '';
-                const indexForHighlighting = logicalLineIdx;
-                const allTokens = parseInputForHighlighting(
+                const tokens = parseInputForHighlighting(
                   logicalLine,
-                  indexForHighlighting,
+                  logicalLineIdx,
                 );
 
                 const visualStart = logicalStartCol;
                 const visualEnd = logicalStartCol + cpLen(lineText);
+                const segments = buildSegmentsForVisualSlice(
+                  tokens,
+                  visualStart,
+                  visualEnd,
+                );
 
-                let tokenCpStart = 0;
-                allTokens.forEach((token) => {
-                  const tokenLen = cpLen(token.text);
-                  const tokenStart = tokenCpStart;
-                  const tokenEnd = tokenStart + tokenLen;
+                // Render segments, applying cursor inversion if needed
+                let emittedCpOnLine = 0;
+                segments.forEach((seg, segIdx) => {
+                  const segLen = cpLen(seg.text);
+                  let display = seg.text;
 
-                  const overlapStart = Math.max(tokenStart, visualStart);
-                  const overlapEnd = Math.min(tokenEnd, visualEnd);
-                  if (overlapStart < overlapEnd) {
-                    const sliceStartInToken = overlapStart - tokenStart;
-                    const sliceEndInToken = overlapEnd - tokenStart;
-                    const rawSlice = cpSlice(
-                      token.text,
-                      sliceStartInToken,
-                      sliceEndInToken,
-                    );
-                    const sliceLenCP = overlapEnd - overlapStart;
-                    let displaySlice = rawSlice;
-
-                    if (isOnCursorLine) {
-                      const col = cursorVisualColAbsolute;
-                      const segStartOnLine = emittedCpOnLine;
-                      const segEndOnLine = segStartOnLine + sliceLenCP;
-                      if (col >= segStartOnLine && col < segEndOnLine) {
-                        const highlightIdxInSlice = col - segStartOnLine;
-                        const charToHighlight = cpSlice(
-                          rawSlice,
-                          highlightIdxInSlice,
-                          highlightIdxInSlice + 1,
-                        );
-                        const highlightedChar = chalk.inverse(charToHighlight);
-                        displaySlice =
-                          cpSlice(rawSlice, 0, highlightIdxInSlice) +
-                          highlightedChar +
-                          cpSlice(rawSlice, highlightIdxInSlice + 1);
-                      }
+                  if (isOnCursorLine) {
+                    const col = cursorVisualColAbsolute;
+                    const segStartOnLine = emittedCpOnLine;
+                    const segEndOnLine = segStartOnLine + segLen;
+                    if (col >= segStartOnLine && col < segEndOnLine) {
+                      const highlightIdx = col - segStartOnLine;
+                      const charToHighlight = cpSlice(
+                        seg.text,
+                        highlightIdx,
+                        highlightIdx + 1,
+                      );
+                      const highlightedChar = chalk.inverse(charToHighlight);
+                      display =
+                        cpSlice(seg.text, 0, highlightIdx) +
+                        highlightedChar +
+                        cpSlice(seg.text, highlightIdx + 1);
                     }
-
-                    const color =
-                      token.type === 'command' || token.type === 'file'
-                        ? theme.text.accent
-                        : undefined;
-
-                    const last = segments[segments.length - 1];
-                    if (last && last.color === color) {
-                      last.text += displaySlice;
-                    } else {
-                      segments.push({ color, text: displaySlice });
-                    }
-
-                    emittedCpOnLine += sliceLenCP;
                   }
 
-                  tokenCpStart += tokenLen;
-                });
+                  const color =
+                    seg.type === 'command' || seg.type === 'file'
+                      ? theme.text.accent
+                      : theme.text.primary;
 
-                // Render merged segments
-                segments.forEach((seg, segIdx) => {
                   renderedLine.push(
                     <Text
                       key={`seg-${visualIdxInRenderedSet}-${segIdx}`}
-                      color={seg.color}
+                      color={color}
                     >
-                      {seg.text}
+                      {display}
                     </Text>,
                   );
+
+                  emittedCpOnLine += segLen;
                 });
 
                 const currentLineGhost = isOnCursorLine ? inlineGhost : '';
