@@ -830,28 +830,40 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 );
 
                 // Render segments, applying cursor inversion if needed
-                let emittedCpOnLine = 0;
+                let charCount = 0;
                 segments.forEach((seg, segIdx) => {
                   const segLen = cpLen(seg.text);
                   let display = seg.text;
 
                   if (isOnCursorLine) {
-                    const col = cursorVisualColAbsolute;
-                    const segStartOnLine = emittedCpOnLine;
-                    const segEndOnLine = segStartOnLine + segLen;
-                    if (col >= segStartOnLine && col < segEndOnLine) {
-                      const highlightIdx = col - segStartOnLine;
+                    const relativeVisualColForHighlight =
+                      cursorVisualColAbsolute;
+                    const segStart = charCount;
+                    const segEnd = segStart + segLen;
+                    if (
+                      relativeVisualColForHighlight >= segStart &&
+                      relativeVisualColForHighlight < segEnd
+                    ) {
                       const charToHighlight = cpSlice(
                         seg.text,
-                        highlightIdx,
-                        highlightIdx + 1,
+                        relativeVisualColForHighlight - segStart,
+                        relativeVisualColForHighlight - segStart + 1,
                       );
-                      const highlightedChar = chalk.inverse(charToHighlight);
+                      const highlighted = chalk.inverse(charToHighlight);
                       display =
-                        cpSlice(seg.text, 0, highlightIdx) +
-                        highlightedChar +
-                        cpSlice(seg.text, highlightIdx + 1);
+                        cpSlice(
+                          seg.text,
+                          0,
+                          relativeVisualColForHighlight - segStart,
+                        ) +
+                        highlighted +
+                        cpSlice(
+                          seg.text,
+                          relativeVisualColForHighlight - segStart + 1,
+                        );
                     }
+                    // Keep charCount logic identical to the original token loop
+                    charCount = segEnd;
                   }
 
                   const color =
@@ -860,15 +872,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                       : theme.text.primary;
 
                   renderedLine.push(
-                    <Text
-                      key={`seg-${visualIdxInRenderedSet}-${segIdx}`}
-                      color={color}
-                    >
+                    <Text key={`token-${segIdx}`} color={color}>
                       {display}
                     </Text>,
                   );
-
-                  emittedCpOnLine += segLen;
                 });
 
                 const currentLineGhost = isOnCursorLine ? inlineGhost : '';

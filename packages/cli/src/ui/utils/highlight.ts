@@ -66,16 +66,6 @@ export function parseInputForHighlighting(
   return tokens;
 }
 
-
-
-/**
- * Build merged segments for a visual slice of a logical line from highlight tokens.
- *
- * tokens are in logical-line coordinates. sliceStart/sliceEnd are code-point
- * indices into the same logical line. The result is a list of contiguous
- * segments (merged by token type) whose concatenation equals the visible text
- * for that slice.
- */
 export function buildSegmentsForVisualSlice(
   tokens: readonly HighlightToken[],
   sliceStart: number,
