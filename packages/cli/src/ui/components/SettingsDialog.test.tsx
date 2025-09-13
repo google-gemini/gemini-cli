@@ -22,7 +22,6 @@
  */
 
 import { render } from 'ink-testing-library';
-import { waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
@@ -152,6 +151,25 @@ vi.mock('../../utils/settingsUtils.js', async () => {
 // const originalConsoleError = console.error;
 
 describe('SettingsDialog', () => {
+  // Helper to wait for UI state changes after React batched updates
+  const waitForUIUpdate = async (
+    lastFrame: () => string | undefined,
+    expectedContent: string,
+    timeoutMs = 1000,
+  ) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const frame = lastFrame();
+      if (frame && frame.includes(expectedContent)) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    // Final assertion for clear error message
+    expect(lastFrame()).toContain(expectedContent);
+  };
+
+  // Simple delay function for remaining tests that need gradual migration
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
 
   beforeEach(() => {
@@ -315,13 +333,29 @@ describe('SettingsDialog', () => {
         </KeypressProvider>
       );
 
-      const { stdin, unmount } = render(component);
+      const { stdin, unmount, lastFrame } = render(component);
 
-      // Press Enter to toggle current setting
-      stdin.write(TerminalKeys.DOWN_ARROW as string);
-      await wait();
-      stdin.write(TerminalKeys.ENTER as string);
-      await wait();
+      // Wait for initial render and verify we're on Vim Mode (first setting)
+      await waitForUIUpdate(lastFrame, '● Vim Mode');
+
+      // Navigate to Disable Auto Update setting and verify we're there
+      act(() => {
+        stdin.write(TerminalKeys.DOWN_ARROW as string);
+      });
+      await waitForUIUpdate(lastFrame, '● Disable Auto Update');
+
+      // Toggle the setting
+      act(() => {
+        stdin.write(TerminalKeys.ENTER as string);
+      });
+      // Wait for the setting change to be processed
+      const start = Date.now();
+      while (Date.now() - start < 1000) {
+        if (vi.mocked(saveModifiedSettings).mock.calls.length > 0) {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
 
       expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
         new Set<string>(['general.disableAutoUpdate']),
@@ -515,9 +549,7 @@ describe('SettingsDialog', () => {
       );
 
       // Wait for initial render
-      await waitFor(() => {
-        expect(lastFrame()).toContain('Vim Mode');
-      });
+      await waitForUIUpdate(lastFrame, 'Vim Mode');
 
       // The UI should show the settings section is active and scope section is inactive
       expect(lastFrame()).toContain('● Vim Mode'); // Settings section active
@@ -587,9 +619,7 @@ describe('SettingsDialog', () => {
       );
 
       // Wait for initial render
-      await waitFor(() => {
-        expect(lastFrame()).toContain('Hide Window Title');
-      });
+      await waitForUIUpdate(lastFrame, 'Hide Window Title');
 
       // Verify the dialog is rendered properly
       expect(lastFrame()).toContain('Settings');
@@ -937,9 +967,7 @@ describe('SettingsDialog', () => {
       );
 
       // Wait for initial render
-      await waitFor(() => {
-        expect(lastFrame()).toContain('Vim Mode');
-      });
+      await waitForUIUpdate(lastFrame, 'Vim Mode');
 
       // Verify initial state: settings section active, scope section inactive
       expect(lastFrame()).toContain('● Vim Mode'); // Settings section active
@@ -999,9 +1027,7 @@ describe('SettingsDialog', () => {
       );
 
       // Wait for initial render
-      await waitFor(() => {
-        expect(lastFrame()).toContain('Vim Mode');
-      });
+      await waitForUIUpdate(lastFrame, 'Vim Mode');
 
       // Verify the complete UI is rendered with all necessary sections
       expect(lastFrame()).toContain('Settings'); // Title
