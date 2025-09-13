@@ -84,9 +84,7 @@ export class ExtensionStorage {
   }
 
   static async createTmpDir(): Promise<string> {
-    return await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'gemini-extension'),
-    );
+    return fs.promises.mkdtemp(path.join(os.tmpdir(), 'gemini-extension'));
   }
 }
 
@@ -584,7 +582,6 @@ export async function uninstallExtension(
     cwd,
   );
   const storage = new ExtensionStorage(extensionName);
-
   await fs.promises.rm(storage.getExtensionDir(), {
     recursive: true,
     force: true,
@@ -638,7 +635,7 @@ export async function updateExtensionByName(
       `Extension "${extensionName}" not found. Run gemini extensions list to see available extensions.`,
     );
   }
-  return await updateExtension(extension, cwd, setExtensionUpdateState);
+  return updateExtension(extension, cwd, setExtensionUpdateState);
 }
 
 export async function updateExtension(
@@ -756,7 +753,7 @@ export async function updateAllUpdatableExtensions(
     updateState: Map<string, ExtensionUpdateState>,
   ) => void,
 ): Promise<ExtensionUpdateInfo[]> {
-  return await Promise.all(
+  return Promise.all(
     extensions
       .filter(
         (extension) =>
