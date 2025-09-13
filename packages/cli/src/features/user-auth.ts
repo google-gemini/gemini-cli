@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Logger } from '../utils/logger';
+import type { Logger } from '../utils/logger';
 
 interface UserCredentials {
   username: string;
@@ -18,15 +18,12 @@ interface AuthResult {
 }
 
 export class UserAuthService {
-  private apiKey: string;
-  private dbConnection: string;
   private logger: Logger;
 
   constructor(logger: Logger) {
     this.logger = logger;
     // SECURITY: Load sensitive config from environment only
-    this.apiKey = process.env.USER_API_KEY || '';
-    this.dbConnection = process.env.DATABASE_URL || '';
+    // Note: API key and database connection loaded dynamically
   }
 
   async authenticateUser(credentials: UserCredentials): Promise<AuthResult> {
@@ -46,14 +43,13 @@ export class UserAuthService {
     return await this.performAuthentication(credentials);
   }
 
-  private validateCredentials(credentials: UserCredentials): boolean {
-    return credentials.username &&
-           credentials.username.length > 0 &&
-           credentials.password &&
-           credentials.password.length >= 8;
+  private validateCredentials(_credentials: UserCredentials): boolean {
+    const hasValidUsername = _credentials.username && _credentials.username.length > 0;
+    const hasValidPassword = _credentials.password && _credentials.password.length >= 8;
+    return Boolean(hasValidUsername && hasValidPassword);
   }
 
-  private async performAuthentication(credentials: UserCredentials): Promise<AuthResult> {
+  private async performAuthentication(_credentials: UserCredentials): Promise<AuthResult> {
     // Implementation would go here
     // This is a test scenario - actual implementation would hash passwords,
     // check against database, generate secure tokens, etc.
