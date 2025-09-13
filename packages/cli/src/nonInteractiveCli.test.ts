@@ -22,6 +22,7 @@ import {
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { vi } from 'vitest';
+import type { LoadedSettings } from './config/settings.js';
 
 // Mock core modules
 vi.mock('./ui/hooks/atCommandProcessor.js');
@@ -48,8 +49,17 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
+const mockGetCommands = vi.hoisted(() => vi.fn());
+const mockCommandServiceCreate = vi.hoisted(() => vi.fn());
+vi.mock('./services/CommandService.js', () => ({
+  CommandService: {
+    create: mockCommandServiceCreate,
+  },
+}));
+
 describe('runNonInteractive', () => {
   let mockConfig: Config;
+  let mockSettings: LoadedSettings;
   let mockToolRegistry: ToolRegistry;
   let mockCoreExecuteToolCall: vi.Mock;
   let mockShutdownTelemetry: vi.Mock;
@@ -63,6 +73,10 @@ describe('runNonInteractive', () => {
   beforeEach(async () => {
     mockCoreExecuteToolCall = vi.mocked(executeToolCall);
     mockShutdownTelemetry = vi.mocked(shutdownTelemetry);
+
+    mockCommandServiceCreate.mockResolvedValue({
+      getCommands: mockGetCommands,
+    });
 
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     processStdoutSpy = vi
@@ -102,7 +116,29 @@ describe('runNonInteractive', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
       getDebugMode: vi.fn().mockReturnValue(false),
       getOutputFormat: vi.fn().mockReturnValue('text'),
+      getFolderTrustFeature: vi.fn().mockReturnValue(false),
+      getFolderTrust: vi.fn().mockReturnValue(false),
     } as unknown as Config;
+
+    mockSettings = {
+      system: { path: '', settings: {} },
+      systemDefaults: { path: '', settings: {} },
+      user: { path: '', settings: {} },
+      workspace: { path: '', settings: {} },
+      errors: [],
+      setValue: vi.fn(),
+      merged: {
+        security: {
+          auth: {
+            enforcedType: undefined,
+          },
+        },
+      },
+      isTrusted: true,
+      migratedInMemorScopes: new Set(),
+      forScope: vi.fn(),
+      computeMergedSettings: vi.fn(),
+    } as unknown as LoadedSettings;
 
     const { handleAtCommand } = await import(
       './ui/hooks/atCommandProcessor.js'
@@ -138,7 +174,12 @@ describe('runNonInteractive', () => {
       createStreamFromEvents(events),
     );
 
-    await runNonInteractive(mockConfig, 'Test input', 'prompt-id-1');
+    await runNonInteractive(
+      mockConfig,
+      mockSettings,
+      'Test input',
+      'prompt-id-1',
+    );
 
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledWith(
       [{ text: 'Test input' }],
@@ -178,7 +219,12 @@ describe('runNonInteractive', () => {
       .mockReturnValueOnce(createStreamFromEvents(firstCallEvents))
       .mockReturnValueOnce(createStreamFromEvents(secondCallEvents));
 
-    await runNonInteractive(mockConfig, 'Use a tool', 'prompt-id-2');
+    await runNonInteractive(
+      mockConfig,
+      mockSettings,
+      'Use a tool',
+      'prompt-id-2',
+    );
 
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(2);
     expect(mockCoreExecuteToolCall).toHaveBeenCalledWith(
@@ -236,7 +282,12 @@ describe('runNonInteractive', () => {
       .mockReturnValueOnce(createStreamFromEvents([toolCallEvent]))
       .mockReturnValueOnce(createStreamFromEvents(finalResponse));
 
-    await runNonInteractive(mockConfig, 'Trigger tool error', 'prompt-id-3');
+    await runNonInteractive(
+      mockConfig,
+      mockSettings,
+      'Trigger tool error',
+      'prompt-id-3',
+    );
 
     expect(mockCoreExecuteToolCall).toHaveBeenCalled();
     expect(consoleErrorSpy).toHaveBeenCalledWith(
@@ -268,7 +319,12 @@ describe('runNonInteractive', () => {
     });
 
     await expect(
-      runNonInteractive(mockConfig, 'Initial fail', 'prompt-id-4'),
+      runNonInteractive(
+        mockConfig,
+        mockSettings,
+        'Initial fail',
+        'prompt-id-4',
+      ),
     ).rejects.toThrow(apiError);
   });
 
@@ -305,6 +361,7 @@ describe('runNonInteractive', () => {
 
     await runNonInteractive(
       mockConfig,
+      mockSettings,
       'Trigger tool not found',
       'prompt-id-5',
     );
@@ -322,7 +379,12 @@ describe('runNonInteractive', () => {
   it('should exit when max session turns are exceeded', async () => {
     vi.mocked(mockConfig.getMaxSessionTurns).mockReturnValue(0);
     await expect(
-      runNonInteractive(mockConfig, 'Trigger loop', 'prompt-id-6'),
+      runNonInteractive(
+        mockConfig,
+        mockSettings,
+        'Trigger loop',
+        'prompt-id-6',
+      ),
     ).rejects.toThrow('process.exit(53) called');
   });
 
@@ -361,7 +423,7 @@ describe('runNonInteractive', () => {
     );
 
     // 4. Run the non-interactive mode with the raw input
-    await runNonInteractive(mockConfig, rawInput, 'prompt-id-7');
+    await runNonInteractive(mockConfig, mockSettings, rawInput, 'prompt-id-7');
 
     // 5. Assert that sendMessageStream was called with the PROCESSED parts, not the raw input
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledWith(
@@ -408,7 +470,12 @@ describe('runNonInteractive', () => {
     };
     vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(mockMetrics);
 
-    await runNonInteractive(mockConfig, 'Test input', 'prompt-id-1');
+    await runNonInteractive(
+      mockConfig,
+      mockSettings,
+      'Test input',
+      'prompt-id-1',
+    );
 
     expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledWith(
       [{ text: 'Test input' }],
@@ -495,6 +562,7 @@ describe('runNonInteractive', () => {
 
     await runNonInteractive(
       mockConfig,
+      mockSettings,
       'Execute tool only',
       'prompt-id-tool-only',
     );
@@ -548,6 +616,7 @@ describe('runNonInteractive', () => {
 
     await runNonInteractive(
       mockConfig,
+      mockSettings,
       'Empty response test',
       'prompt-id-empty',
     );
@@ -579,7 +648,12 @@ describe('runNonInteractive', () => {
 
     let thrownError: Error | null = null;
     try {
-      await runNonInteractive(mockConfig, 'Test input', 'prompt-id-error');
+      await runNonInteractive(
+        mockConfig,
+        mockSettings,
+        'Test input',
+        'prompt-id-error',
+      );
       // Should not reach here
       expect.fail('Expected process.exit to be called');
     } catch (error) {
@@ -619,7 +693,12 @@ describe('runNonInteractive', () => {
 
     let thrownError: Error | null = null;
     try {
-      await runNonInteractive(mockConfig, 'Invalid syntax', 'prompt-id-fatal');
+      await runNonInteractive(
+        mockConfig,
+        mockSettings,
+        'Invalid syntax',
+        'prompt-id-fatal',
+      );
       // Should not reach here
       expect.fail('Expected process.exit to be called');
     } catch (error) {
@@ -642,5 +721,156 @@ describe('runNonInteractive', () => {
         2,
       ),
     );
+  });
+
+  it('should execute a slash command that returns a prompt', async () => {
+    const mockCommand = {
+      name: 'testcommand',
+      description: 'a test command',
+      action: vi.fn().mockResolvedValue({
+        type: 'submit_prompt',
+        content: [{ text: 'Prompt from command' }],
+      }),
+    };
+    mockGetCommands.mockReturnValue([mockCommand]);
+
+    const events: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Response from command' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 5 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive(
+      mockConfig,
+      mockSettings,
+      '/testcommand',
+      'prompt-id-slash',
+    );
+
+    // Ensure the prompt sent to the model is from the command, not the raw input
+    expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledWith(
+      [{ text: 'Prompt from command' }],
+      expect.any(AbortSignal),
+      'prompt-id-slash',
+    );
+
+    expect(processStdoutSpy).toHaveBeenCalledWith('Response from command');
+  });
+
+  it('should throw FatalInputError if a command requires confirmation', async () => {
+    const mockCommand = {
+      name: 'confirm',
+      description: 'a command that needs confirmation',
+      action: vi.fn().mockResolvedValue({
+        type: 'confirm_shell_commands',
+        commands: ['rm -rf /'],
+      }),
+    };
+    mockGetCommands.mockReturnValue([mockCommand]);
+
+    await expect(
+      runNonInteractive(
+        mockConfig,
+        mockSettings,
+        '/confirm',
+        'prompt-id-confirm',
+      ),
+    ).rejects.toThrow(
+      'Exiting due to a confirmation prompt requested by the command.',
+    );
+  });
+
+  it('should treat an unknown slash command as a regular prompt', async () => {
+    // No commands are mocked, so any slash command is "unknown"
+    mockGetCommands.mockReturnValue([]);
+
+    const events: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Response to unknown' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 5 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive(
+      mockConfig,
+      mockSettings,
+      '/unknowncommand',
+      'prompt-id-unknown',
+    );
+
+    // Ensure the raw input is sent to the model
+    expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledWith(
+      [{ text: '/unknowncommand' }],
+      expect.any(AbortSignal),
+      'prompt-id-unknown',
+    );
+
+    expect(processStdoutSpy).toHaveBeenCalledWith('Response to unknown');
+  });
+
+  it('should throw for unhandled command result types', async () => {
+    const mockCommand = {
+      name: 'noaction',
+      description: 'unhandled type',
+      action: vi.fn().mockResolvedValue({
+        type: 'unhandled',
+      }),
+    };
+    mockGetCommands.mockReturnValue([mockCommand]);
+
+    await expect(
+      runNonInteractive(
+        mockConfig,
+        mockSettings,
+        '/noaction',
+        'prompt-id-unhandled',
+      ),
+    ).rejects.toThrow(
+      'Exiting due to command result that is not supported in non-interactive mode.',
+    );
+  });
+
+  it('should pass arguments to the slash command action', async () => {
+    const mockAction = vi.fn().mockResolvedValue({
+      type: 'submit_prompt',
+      content: [{ text: 'Prompt from command' }],
+    });
+    const mockCommand = {
+      name: 'testargs',
+      description: 'a test command',
+      action: mockAction,
+    };
+    mockGetCommands.mockReturnValue([mockCommand]);
+
+    const events: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Acknowledged' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 1 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive(
+      mockConfig,
+      mockSettings,
+      '/testargs arg1 arg2',
+      'prompt-id-args',
+    );
+
+    expect(mockAction).toHaveBeenCalledWith(expect.any(Object), 'arg1 arg2');
+
+    expect(processStdoutSpy).toHaveBeenCalledWith('Acknowledged');
   });
 });
