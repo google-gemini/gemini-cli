@@ -1,4 +1,4 @@
-# Use a common base image like Debian.
+google.genai# Use a common base image like Debian.
 # Using 'bookworm-slim' for a balance of size and compatibility.
 FROM debian:bookworm-slim
 
