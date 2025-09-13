@@ -59,10 +59,16 @@ const createMockSettings = (
   new LoadedSettings(
     {
       settings: { ui: { customThemes: {} }, mcpServers: {}, ...systemSettings },
+      originalSettings: {
+        ui: { customThemes: {} },
+        mcpServers: {},
+        ...systemSettings,
+      },
       path: '/system/settings.json',
     },
     {
       settings: {},
+      originalSettings: {},
       path: '/system/system-defaults.json',
     },
     {
@@ -71,10 +77,20 @@ const createMockSettings = (
         mcpServers: {},
         ...userSettings,
       },
+      originalSettings: {
+        ui: { customThemes: {} },
+        mcpServers: {},
+        ...userSettings,
+      },
       path: '/user/settings.json',
     },
     {
       settings: {
+        ui: { customThemes: {} },
+        mcpServers: {},
+        ...workspaceSettings,
+      },
+      originalSettings: {
         ui: { customThemes: {} },
         mcpServers: {},
         ...workspaceSettings,
