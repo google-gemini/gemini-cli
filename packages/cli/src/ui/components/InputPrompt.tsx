@@ -24,7 +24,7 @@ import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode } from '@google/gemini-cli-core';
-import { parseInputForHighlighting } from '../utils/highlight.js';
+import { parseInputForHighlighting } from '../utils/parse.js';
 import {
   clipboardHasImage,
   saveClipboardImage,

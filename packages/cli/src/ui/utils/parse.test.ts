@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseInputForHighlighting } from './highlight.js';
+import { parseInputForHighlighting } from './parse.js';
 
 describe('parseInputForHighlighting', () => {
   it('should handle an empty string', () => {
