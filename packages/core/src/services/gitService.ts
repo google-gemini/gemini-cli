@@ -43,7 +43,7 @@ export class GitService {
 
   verifyGitAvailability(): Promise<boolean> {
     return new Promise((resolve) => {
-      exec('git --version', (error) => {
+      exec('LANG=C git --version', (error) => {
         if (error) {
           resolve(false);
         } else {
@@ -69,7 +69,9 @@ export class GitService {
       '[user]\n  name = Gemini CLI\n  email = gemini-cli@google.com\n[commit]\n  gpgsign = false\n';
     await fs.writeFile(gitConfigPath, gitConfigContent);
 
-    const repo = simpleGit(repoDir);
+    const repo = simpleGit(repoDir).env({
+      LANG: 'C',
+    });
     const isRepoDefined = await repo.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
 
     if (!isRepoDefined) {
@@ -98,6 +100,7 @@ export class GitService {
   private get shadowGitRepository(): SimpleGit {
     const repoDir = this.getHistoryDir();
     return simpleGit(this.projectRoot).env({
+      LANG: 'C',
       GIT_DIR: path.join(repoDir, '.git'),
       GIT_WORK_TREE: this.projectRoot,
       // Prevent git from using the user's global git config.
