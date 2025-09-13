@@ -24,8 +24,8 @@ import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
+  _DEFAULT_GEMINI_MODEL,
+  _DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
@@ -619,7 +619,7 @@ export async function loadCliConfig(
     cwd,
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,
-    model: resolvedModel,
+    model: argv.model || settings.model?.name || 'gemini-pro',
     extensionContextFilePaths,
     maxSessionTurns: settings.model?.maxSessionTurns ?? -1,
     experimentalZedIntegration: argv.experimentalAcp || false,
@@ -645,7 +645,7 @@ export async function loadCliConfig(
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
-    useModelRouter,
+    useModelRouter: argv.experimentalAcp || false,
   });
 }
 
