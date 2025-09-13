@@ -430,6 +430,149 @@ describe('useTextBuffer', () => {
     });
   });
 
+  describe('Placeholders', () => {
+    it('inserts placeholder for large paste via handleInput', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+
+      const longText = 'x'.repeat(1001); // > threshold
+      act(() =>
+        result.current.handleInput({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: true,
+          sequence: longText,
+        }),
+      );
+
+      const state = getBufferState(result);
+      expect(state.text.includes('Pasted Content 1001 chars')).toBe(true);
+      // trailing space is added when inserting into empty buffer
+      expect(state.text.endsWith(' ')).toBe(true);
+      expect(result.current.pastePlaceholders.length).toBe(1);
+      const expanded = result.current.expandPlaceholders(state.text);
+      expect(expanded.includes(longText)).toBe(true);
+    });
+
+    it('backspace removes only one of identical placeholders', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+
+      const longText = 'y'.repeat(1001);
+      const pasteKey = {
+        name: '',
+        ctrl: false,
+        meta: false,
+        shift: false,
+        paste: true,
+        sequence: longText,
+      };
+
+      act(() => result.current.handleInput(pasteKey));
+      act(() => result.current.handleInput(pasteKey));
+
+      const text1 = getBufferState(result).text;
+      const ph = '[Pasted Content 1001 chars]';
+      const countOcc = (s: string, needle: string) =>
+        (
+          s.match(
+            new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+          ) || []
+        ).length;
+      expect(countOcc(text1, ph)).toBe(2);
+
+      // At end: first backspace removes trailing space
+      act(() => result.current.backspace());
+      // Second backspace should delete exactly one placeholder instance
+      act(() => result.current.backspace());
+
+      const text2 = getBufferState(result).text;
+      expect(countOcc(text2, ph)).toBe(1);
+      expect(result.current.pastePlaceholders.length).toBe(1);
+    });
+
+    it('clearPendingPastes clears mapping without changing text', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+
+      const longText = 'z'.repeat(1001);
+      act(() =>
+        result.current.handleInput({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: true,
+          sequence: longText,
+        }),
+      );
+
+      const before = getBufferState(result);
+      expect(result.current.pastePlaceholders.length).toBe(1);
+      expect(before.text.includes('[Pasted Content 1001 chars]')).toBe(true);
+
+      act(() => result.current.clearPendingPastes());
+      const after = getBufferState(result);
+      expect(result.current.pastePlaceholders.length).toBe(0);
+      // Text should remain unchanged by clearing mapping only
+      expect(after.text).toBe(before.text);
+    });
+
+    it('prunes pending pastes when text no longer contains placeholder', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+
+      const longText = 'q'.repeat(1001);
+      act(() =>
+        result.current.handleInput({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: true,
+          sequence: longText,
+        }),
+      );
+      expect(result.current.pastePlaceholders.length).toBe(1);
+
+      // Replace all text; useEffect should prune mappings on text change
+      act(() => result.current.setText(''));
+      const state = getBufferState(result);
+      expect(state.text).toBe('');
+      expect(result.current.pastePlaceholders.length).toBe(0);
+    });
+
+    it('handles regular paste batch input via handleInput', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+
+      const seq = 'abc\nmore';
+      act(() =>
+        result.current.handleInput({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: true,
+          sequence: seq,
+        }),
+      );
+
+      const resultText = getBufferState(result).text;
+      expect(resultText).toContain('abc');
+      expect(resultText).toContain('more');
+      expect(resultText).not.toContain('[Pasted Content');
+      expect(result.current.pastePlaceholders.length).toBe(0);
+    });
+  });
+
   describe('Basic Editing', () => {
     it('insert: should insert a character and update cursor', () => {
       const { result } = renderHook(() =>

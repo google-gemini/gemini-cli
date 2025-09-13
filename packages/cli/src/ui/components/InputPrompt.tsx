@@ -24,7 +24,7 @@ import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode } from '@google/gemini-cli-core';
-import { parseInputForHighlighting } from '../utils/highlight.js';
+import { parseInputForHighlighting } from '../utils/parse.js';
 import {
   clipboardHasImage,
   saveClipboardImage,
@@ -199,6 +199,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     resetReverseSearchCompletionState,
   ]);
 
+  const insertAtOffsetWithAutoSpaces = useCallback(
+    (offset: number, insertText: string): void => {
+      const cpsAround = toCodePoints(buffer.text);
+      let textToInsert = insertText;
+      const charBefore = offset > 0 ? cpsAround[offset - 1] : '';
+      const charAfter = offset < cpsAround.length ? cpsAround[offset] : '';
+      if (charBefore && charBefore !== ' ' && charBefore !== '\n')
+        textToInsert = ' ' + textToInsert;
+      if (!charAfter || (charAfter !== ' ' && charAfter !== '\n'))
+        textToInsert = textToInsert + ' ';
+      buffer.replaceRangeByOffset(offset, offset, textToInsert);
+    },
+    [buffer],
+  );
+
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
     try {
@@ -215,37 +230,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
           // Insert @path reference at cursor position
           const insertText = `@${relativePath}`;
-          const currentText = buffer.text;
           const [row, col] = buffer.cursor;
 
           // Calculate offset from row/col
-          let offset = 0;
-          for (let i = 0; i < row; i++) {
-            offset += buffer.lines[i].length + 1; // +1 for newline
-          }
-          offset += col;
+          const offset = logicalPosToOffset(buffer.lines, row, col);
 
-          // Add spaces around the path if needed
-          let textToInsert = insertText;
-          const charBefore = offset > 0 ? currentText[offset - 1] : '';
-          const charAfter =
-            offset < currentText.length ? currentText[offset] : '';
-
-          if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
-            textToInsert = ' ' + textToInsert;
-          }
-          if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
-            textToInsert = textToInsert + ' ';
-          }
-
-          // Insert at cursor position
-          buffer.replaceRangeByOffset(offset, offset, textToInsert);
+          // Insert at cursor position with auto spaces
+          insertAtOffsetWithAutoSpaces(offset, insertText);
         }
       }
     } catch (error) {
       console.error('Error handling clipboard image:', error);
     }
-  }, [buffer, config]);
+  }, [buffer, config, insertAtOffsetWithAutoSpaces]);
 
   const handleInput = useCallback(
     (key: Key) => {
@@ -268,8 +265,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           setRecentPasteTime(null);
           pasteTimeoutRef.current = null;
         }, 500);
-
-        // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
         return;
       }
@@ -497,7 +492,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.backspace();
             buffer.newline();
           } else {
-            handleSubmitAndClear(buffer.text);
+            const expanded = buffer.expandPlaceholders(buffer.text);
+            buffer.clearPendingPastes();
+            handleSubmitAndClear(expanded);
           }
         }
         return;
@@ -524,6 +521,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           buffer.setText('');
           resetCompletionState();
         }
+        buffer.clearPendingPastes();
         return;
       }
 
@@ -554,7 +552,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
 
       // Clear ghost text when user types regular characters (not navigation/control keys)
@@ -778,6 +775,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 const tokens = parseInputForHighlighting(
                   lineText,
                   visualIdxInRenderedSet,
+                  buffer.pastePlaceholders,
                 );
                 const cursorVisualRow =
                   cursorVisualRowAbsolute - scrollVisualRow;
@@ -821,9 +819,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   }
 
                   const color =
-                    token.type === 'command' || token.type === 'file'
-                      ? theme.text.accent
-                      : theme.text.primary;
+                    token.type === 'placeholder'
+                      ? theme.status.success
+                      : token.type === 'command' || token.type === 'file'
+                        ? theme.text.accent
+                        : theme.text.primary;
 
                   renderedLine.push(
                     <Text key={`token-${tokenIdx}`} color={color}>
