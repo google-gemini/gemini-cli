@@ -195,8 +195,10 @@ describe('ShellTool', () => {
       resolveShellExecution();
       await promise;
 
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
-        expect.stringContaining('ls'),
+        wrappedCommand,
         '/test/dir/subdir',
         expect.any(Function),
         mockAbortSignal,
