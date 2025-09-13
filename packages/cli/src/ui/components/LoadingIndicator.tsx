@@ -31,6 +31,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
+  const safeLineWidth = Math.max(terminalWidth - 1, 1);
 
   if (streamingState === StreamingState.Idle) {
     return null;
@@ -45,36 +46,30 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
 
   return (
     <Box paddingLeft={0} flexDirection="column">
-      {/* Main loading line */}
-      <Box
-        width="100%"
-        flexDirection={isNarrow ? 'column' : 'row'}
-        alignItems={isNarrow ? 'flex-start' : 'center'}
-      >
-        <Box>
-          <Box marginRight={1}>
-            <GeminiRespondingSpinner
-              nonRespondingDisplay={
-                streamingState === StreamingState.WaitingForConfirmation
-                  ? '⠏'
-                  : ''
-              }
-            />
-          </Box>
-          {primaryText && <Text color={theme.text.accent}>{primaryText}</Text>}
-          {!isNarrow && cancelAndTimerContent && (
-            <Text color={theme.text.secondary}> {cancelAndTimerContent}</Text>
-          )}
+      <Box width={safeLineWidth} flexDirection="row" alignItems="center">
+        <Box marginRight={1}>
+          <GeminiRespondingSpinner
+            nonRespondingDisplay={
+              streamingState === StreamingState.WaitingForConfirmation
+                ? '⠏'
+                : ''
+            }
+          />
         </Box>
-        {!isNarrow && <Box flexGrow={1}>{/* Spacer */}</Box>}
+        {primaryText && (
+          <Text color={theme.text.accent} wrap="truncate-end">
+            {primaryText}
+            {cancelAndTimerContent ? ` ${cancelAndTimerContent}` : ''}
+          </Text>
+        )}
+        {!primaryText && cancelAndTimerContent && (
+          <Text color={theme.text.secondary} wrap="truncate-end">
+            {cancelAndTimerContent}
+          </Text>
+        )}
+        {!isNarrow && <Box flexGrow={1}></Box>}
         {!isNarrow && rightContent && <Box>{rightContent}</Box>}
       </Box>
-      {isNarrow && cancelAndTimerContent && (
-        <Box>
-          <Text color={theme.text.secondary}>{cancelAndTimerContent}</Text>
-        </Box>
-      )}
-      {isNarrow && rightContent && <Box>{rightContent}</Box>}
     </Box>
   );
 };

@@ -251,7 +251,7 @@ describe('<LoadingIndicator />', () => {
       expect(output).toContain('Right');
     });
 
-    it('should render on multiple lines on a narrow terminal', () => {
+    it('should render on a single line on a narrow terminal and hide right content', () => {
       const { lastFrame } = renderWithContext(
         <LoadingIndicator
           {...defaultProps}
@@ -261,18 +261,11 @@ describe('<LoadingIndicator />', () => {
         79,
       );
       const output = lastFrame();
-      const lines = output?.split('\n');
-      // Expecting 3 lines:
-      // 1. Spinner + Primary Text
-      // 2. Cancel + Timer
-      // 3. Right Content
-      expect(lines).toHaveLength(3);
-      if (lines) {
-        expect(lines[0]).toContain('Loading...');
-        expect(lines[0]).not.toContain('(esc to cancel, 5s)');
-        expect(lines[1]).toContain('(esc to cancel, 5s)');
-        expect(lines[2]).toContain('Right');
-      }
+      expect(output?.includes('\n')).toBe(false);
+      expect(output).toContain('Loading...');
+      expect(output).toContain('(esc to cancel, 5s)');
+      // Right content should be hidden on narrow terminals to keep a single-row layout
+      expect(output).not.toContain('Right');
     });
 
     it('should use wide layout at 80 columns', () => {
@@ -284,13 +277,13 @@ describe('<LoadingIndicator />', () => {
       expect(lastFrame()?.includes('\n')).toBe(false);
     });
 
-    it('should use narrow layout at 79 columns', () => {
+    it('should keep single-row layout at 79 columns', () => {
       const { lastFrame } = renderWithContext(
         <LoadingIndicator {...defaultProps} />,
         StreamingState.Responding,
         79,
       );
-      expect(lastFrame()?.includes('\n')).toBe(true);
+      expect(lastFrame()?.includes('\n')).toBe(false);
     });
   });
 });
