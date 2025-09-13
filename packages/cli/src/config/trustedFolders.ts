@@ -159,10 +159,20 @@ export function saveTrustedFolders(
 
 /** Is folder trust feature enabled per the current applied settings */
 export function isFolderTrustEnabled(settings: Settings): boolean {
+  // Check both enabled and featureEnabled for backward compatibility
   const folderTrustSetting = settings.security?.folderTrust?.enabled ?? false;
+  const folderTrustFeature = settings.security?.folderTrust?.featureEnabled;
+
+  // If featureEnabled is explicitly set to false, disable folder trust
+  if (folderTrustFeature === false) {
+    return false;
+  }
+
+  // Otherwise, use the enabled setting
   return folderTrustSetting;
 }
 
+export function getWorkspaceTrustFromLocalConfig(): boolean | undefined {
   const folders = loadTrustedFolders();
 
   if (folders.errors.length > 0) {
@@ -178,12 +188,26 @@ export function isFolderTrustEnabled(settings: Settings): boolean {
 
 export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
   if (!isFolderTrustEnabled(settings)) {
+    // Check GEMINI_SAFE_TRUST_DEFAULT when folder trust is disabled
+    const safeTrustDefault = process.env['GEMINI_SAFE_TRUST_DEFAULT'];
+    if (safeTrustDefault === '1') {
+      return false;
+    }
     return true;
   }
 
   const ideTrust = ideContextStore.get()?.workspaceState?.isTrusted;
   if (ideTrust !== undefined) {
     return ideTrust;
+  }
+
+  // Check GEMINI_SAFE_TRUST_DEFAULT before falling back to local config
+  const safeTrustDefault = process.env['GEMINI_SAFE_TRUST_DEFAULT'];
+  if (safeTrustDefault === '1') {
+    // When GEMINI_SAFE_TRUST_DEFAULT is set to '1', default to untrusted
+    // but still respect explicit trust rules
+    const localTrust = getWorkspaceTrustFromLocalConfig();
+    return localTrust ?? false;
   }
 
   // Fall back to the local user configuration

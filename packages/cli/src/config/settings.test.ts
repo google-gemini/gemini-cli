@@ -2263,6 +2263,7 @@ describe('Settings Loading and Merging', () => {
       });
 
       it('should load env files when workspace is trusted', () => {
+        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: true });
         originalIsWorkspaceTrusted.mockReturnValue(true);
 
         loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
@@ -2271,6 +2272,7 @@ describe('Settings Loading and Merging', () => {
       });
 
       it('should not load env files when workspace is not trusted', () => {
+        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
         originalIsWorkspaceTrusted.mockReturnValue(false);
 
         loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
@@ -2279,6 +2281,7 @@ describe('Settings Loading and Merging', () => {
       });
 
       it('should not load env files when workspace trust is undefined', () => {
+        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: undefined });
         originalIsWorkspaceTrusted.mockReturnValue(undefined);
 
         loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
@@ -2288,6 +2291,7 @@ describe('Settings Loading and Merging', () => {
 
       it('should load env files when workspace trust returns true with GEMINI_SAFE_TRUST_DEFAULT logic', () => {
         // Test that the centralized isWorkspaceTrusted function handles GEMINI_SAFE_TRUST_DEFAULT
+        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: true });
         process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
         originalIsWorkspaceTrusted.mockReturnValue(true); // Explicit trust overrides env var
 
@@ -2298,6 +2302,7 @@ describe('Settings Loading and Merging', () => {
 
       it('should not load env files when GEMINI_SAFE_TRUST_DEFAULT blocks access', () => {
         // Test that the centralized isWorkspaceTrusted function handles GEMINI_SAFE_TRUST_DEFAULT
+        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
         process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
         originalIsWorkspaceTrusted.mockReturnValue(false); // Env var blocks access
 

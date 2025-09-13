@@ -49,6 +49,19 @@ vi.mock('strip-json-comments', () => ({
   default: vi.fn((content) => content),
 }));
 
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@google/gemini-cli-core')>();
+  let store: any = undefined;
+  return {
+    ...actual,
+    ideContextStore: {
+      get: vi.fn(() => store),
+      set: vi.fn((value) => { store = value; }),
+      clear: vi.fn(() => { store = undefined; }),
+    },
+  };
+});
+
 describe('Trusted Folders Loading', () => {
   let mockFsExistsSync: Mocked<typeof fs.existsSync>;
   let mockStripJsonComments: Mocked<typeof stripJsonComments>;
