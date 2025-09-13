@@ -9,6 +9,11 @@ import type { ToolResult } from './tools.js';
 import type { Config } from '../config/config.js';
 
 /**
+ * JSON-serializable value type for Python conversion
+ */
+type JsonValue = string | number | boolean | null | undefined | JsonValue[] | { [key: string]: JsonValue };
+
+/**
  * Row height information structure
  */
 interface RowHeightInfo {
@@ -104,13 +109,11 @@ interface ShapeTextFormat {
 interface XlwingsParams {
   /** Operation type */
   op: 
-  // Cell/Range operations
-  'read_range' | 'write_range' | 'clear_range' | 'formula_range' | 'format_range' |
-  'get_cell_info' | 'insert_cells' | 'delete_cells' |
   // Range operations
-  'copy_paste_range' | 'find_replace_range' | 'search_range' | 'get_used_range' | 'sort_range' |
-  // Merge operations
-  'merge_cells' | 'unmerge_cells' |
+  'read_range' | 'write_range' | 'clear_range' | 'formula_range' | 'format_range' |
+  'get_range_info' | 'insert_range' | 'delete_range' |
+  'copy_paste_range' | 'replace_range' | 'find_range' | 'get_used_range' | 'sort_range' |
+  'merge_range' | 'unmerge_range' | 'get_sheet_info' |
   // Row/Column size operations
   'set_row_height' | 'set_column_width' | 'get_row_height' | 'get_column_width' |
   // Comment operations
@@ -121,6 +124,7 @@ interface XlwingsParams {
   'create_shape' | 'create_textbox' | 'list_shapes' | 'modify_shape' | 'delete_shape' | 'move_shape' | 'resize_shape' |
   // Sheet operations
   'add_sheet' | 'alter_sheet' | 'delete_sheet' | 'move_sheet' | 'copy_sheet' | 'list_sheets' | 
+  // Workbook operations
   'list_apps' | 
   // Selection operations
   'get_selection' | 'set_selection' | 
@@ -129,9 +133,9 @@ interface XlwingsParams {
   //VBA operations
   'convert_data_types' | 'add_vba_module' | 'run_vba_macro' | 'update_vba_code' | 'list_vba_modules' | 'delete_vba_module' | 
   // Image operations
-  'insert_image' | 'list_images' | 'delete_image' |   'resize_image' | 'move_image' | 'save_range_as_image' | 'save_chart_as_image' |   
+  'insert_image' | 'list_images' | 'delete_image' |   'resize_image' | 'move_image' | /* 'save_range_as_image' | */ 'save_chart_as_image' |   
   // Row/Column operations
-  'insert_row' | 'insert_column' | 'delete_row' | 'delete_column'| 'get_last_row' ;
+  'insert_row' | 'insert_column' | 'delete_row' | 'delete_column'| 'get_last_row' | 'get_last_column' ;
   
   /** Target workbook name (optional - uses active if not specified) */
   workbook?: string;
@@ -194,10 +198,21 @@ interface XlwingsParams {
     values_only?: boolean;
     /** If true, delete the source data after copying (cut operation) */
     cut_mode?: boolean;
+    /** Source workbook (for cross-workbook operations) */
+    source_workbook?: string;
+    /** Target workbook (for cross-workbook operations) */
+    target_workbook?: string;
+    /** Source app ID (for cross-instance operations) */
+    source_app_id?: number;
+    /** Target app ID (for cross-instance operations) */
+    target_app_id?: number;
   };
   
   /** New sheet name (for add_sheet operations) */
   new_sheet_name?: string;
+
+  /** Disable Excel alerts and warnings (prevents dialog boxes) */
+  disable_alerts?: boolean;
   
   /** Sheet alteration settings (for alter_sheet operations) */
   sheet_alter?: {
@@ -273,13 +288,13 @@ interface XlwingsParams {
     shift_direction?: 'right' | 'down' | 'left' | 'up';
     /** Number of cells/rows/columns to insert or delete */
     count?: number;
-    /** Whether to include cell formatting information (for get_cell_info) */
+    /** Whether to include cell formatting information (for get_range_info) */
     include_formatting?: boolean;
-    /** Whether to include formula information (for get_cell_info) */
+    /** Whether to include formula information (for get_range_info) */
     include_formulas?: boolean;
-    /** Whether to include data validation info (for get_cell_info) */
+    /** Whether to include data validation info (for get_range_info) */
     include_validation?: boolean;
-    /** Whether to include comments (for get_cell_info) */
+    /** Whether to include comments (for get_range_info) */
     include_comments?: boolean;
   };
   
@@ -317,6 +332,20 @@ interface XlwingsParams {
   
   /** Provide data summary instead of full data when dataset is large */
   summary_mode?: boolean;
+
+  /** Sheet analysis settings (for get_sheet_info operations) */
+  sheet_analysis?: {
+    /** Number of top rows to return (default: 3, 0 for none) */
+    top_rows?: number;
+    /** Number of bottom rows to return (default: 1, 0 for none) */
+    bottom_rows?: number;
+    /** Include formatting information */
+    include_formatting?: boolean;
+    /** Include formula information */
+    include_formulas?: boolean;
+    /** Include merged cell information */
+    include_merged_cells?: boolean;
+  };
   
   /** File path for create_workbook, open_workbook, save_workbook operations */
   file_path?: string;
@@ -372,9 +401,11 @@ interface XlwingsParams {
   /** Shape configuration (for shape operations) */
   shape?: {
     /** Shape type */
-    type: 'rectangle' | 'oval' | 'triangle' | 'line' | 'arrow' | 'textbox' | 
-          'flowchart_process' | 'flowchart_decision' | 'flowchart_start_end' | 
-          'flowchart_connector' | 'star' | 'pentagon' | 'hexagon';
+    type: 'rectangle' | 'oval' | 'triangle' | 'line' | 'arrow' | 'textbox' |
+          'flowchart_process' | 'flowchart_decision' | 'flowchart_start_end' |
+          'flowchart_connector' | 'straight_connector' | 'elbow_connector' | 'curved_connector' |
+          'right_arrow' | 'left_arrow' | 'up_arrow' | 'down_arrow' |
+          'star' | 'pentagon' | 'hexagon';
     /** Shape name/identifier (for management operations) */
     name?: string;
     /** Position and size */
@@ -463,6 +494,17 @@ interface XlwingsParams {
       duration?: number;
       /** Delay before animation starts */
       delay?: number;
+    };
+    /** Connection settings for connector shapes */
+    connection?: {
+      /** Name of the starting shape to connect from */
+      start_shape?: string;
+      /** Name of the ending shape to connect to */
+      end_shape?: string;
+      /** Connection site index on start shape (0-based) */
+      start_connection_site?: number;
+      /** Connection site index on end shape (0-based) */
+      end_connection_site?: number;
     };
   };
 
@@ -596,6 +638,80 @@ interface XlwingsResult extends ToolResult {
     row_data: Record<string, unknown>;
   }>;
   auto_selected?: string;
+
+  // Sort operation results
+  sort_criteria?: SortCriteria[];
+  rows_affected?: number;
+
+  // Find operation results
+  found_addresses?: string[];
+
+  // Additional fields found in code
+  changes_made?: string[];
+  original_sheet_name?: string;
+  current_sheet_name?: string;
+  deleted_sheet_name?: string;
+  remaining_sheets?: string[];
+  remaining_sheets_count?: number;
+  sheet_name?: string;
+  move_type?: string;
+  source_workbook?: string;
+  target_workbook?: string;
+  source_sheets_remaining?: string[];
+  original_index?: number;
+  new_index?: number;
+  sheets_after?: Array<[number, string]>;
+  source_sheet_name?: string;
+  copy_type?: string;
+  copied_sheet_name?: string;
+  target_index?: number;
+  target_sheets_after?: string[];
+  target_sheets_count?: number;
+  copied_index?: number;
+  total_sheets?: number;
+  rows_inserted?: number;
+  columns_inserted?: number;
+  rows_deleted?: number;
+  columns_deleted?: number;
+  comments?: Array<{
+    address: string;
+    text: string;
+    author: string;
+    visible?: boolean;
+  }>;
+  total_comments?: number;
+  merge_type?: string;
+  content_centered?: boolean;
+  cells_unmerged?: number;
+  unmerged_ranges?: string[];
+  auto_fit?: boolean;
+  total_rows?: number;
+  height_set?: number;
+  rows_processed?: number[];
+  total_columns?: number;
+  width_set?: number;
+  columns_processed?: string[];
+  row_heights?: RowHeightInfo[];
+  column_widths?: ColumnWidthInfo[];
+  info_included?: {
+    formatting?: boolean;
+    formulas?: boolean;
+    validation?: boolean;
+    comments?: boolean;
+  };
+  cells?: CellInfo[];
+  cells_inserted?: number;
+  shift_direction?: string;
+  insertions_completed?: number;
+  total_requested?: number;
+  cells_deleted?: number;
+  original_range_size?: {
+    rows: number;
+    columns: number;
+  };
+  has_header?: boolean;
+  case_sensitive?: boolean;
+  custom_order_applied?: boolean;
   
   // List apps operation results
   total_apps?: number;
@@ -615,6 +731,78 @@ interface XlwingsResult extends ToolResult {
   }>;
   active_app_index?: number;
   message?: string;
+
+  // Shape operation results
+  shape?: {
+    name: string;
+    type: string;
+    text?: string;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
+  shapes?: Array<{
+    name: string;
+    type: string;
+    left?: number;
+    top?: number;
+    width?: number;
+    height?: number;
+    text?: string;
+  }>;
+  total_shapes?: number;
+  shape_created?: boolean;
+  shape_modified?: boolean;
+  shape_deleted?: boolean;
+}
+
+/**
+ * Sort criteria interface
+ */
+interface SortCriteria {
+  column: string;
+  order: 'asc' | 'desc';
+}
+
+/**
+ * Sheet data structure for get_sheet_info operation
+ */
+interface SheetData {
+  used_range?: {
+    total_rows: number;
+    total_columns: number;
+    address?: string;
+    last_row?: number;
+    last_column_letter?: string;
+  };
+  top_rows?: {
+    data: CellInfo[][];
+    count: number;
+    range: string;
+  };
+  bottom_rows?: {
+    data: CellInfo[][];
+    count: number;
+    range: string;
+  };
+  merged_cells?: {
+    count: number;
+    areas?: string[];
+  };
+}
+
+/**
+ * Error context interface for template generation
+ */
+interface ErrorContext {
+  errorMessage: string;
+  operation: string;
+  workbook?: string;
+  worksheet?: string;
+  range?: string;
+  result: XlwingsResult;
+  params: XlwingsParams;
 }
 
 /**
@@ -624,8 +812,8 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
   constructor(config: Config) {
     super(
       'xlwings',
-      'Excel Live Interaction',
-      'Real-time Excel manipulation using xlwings with smart data handling. Can start Excel, create/open files, and perform all Excel operations. Features: BATCH READING (use max_rows, start_row for pagination), PROGRESS TRACKING (shows total/remaining rows), DATA SUMMARY (summary_mode for large datasets). IMPORTANT: Requires xlwings library (pip install xlwings). Can work with existing Excel instances or start new ones. Supports: range operations (read_range, write_range, format_range, formula_range, clear_range), advanced operations (copy_paste_range, find_replace_range, search_range), sheet management, chart creation, image handling. Use visible=true to show Excel UI.',
+      'Excel Automation',
+      'Automates Excel operations: read/write data, create charts, format cells, manage sheets. Requires Microsoft Excel and xlwings Python library.',
       ['xlwings'], // Python requirements
       {
         type: 'object',
@@ -633,8 +821,8 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
         properties: {
           op: {
             type: 'string',
-            enum: ['read_range', 'write_range', 'clear_range', 'formula_range', 'format_range', 'get_cell_info', 'insert_cells', 'delete_cells', 'copy_paste_range', 'find_replace_range', 'search_range', 'get_used_range', 'sort_range', 'merge_cells', 'unmerge_cells', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width', 'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'create_shape', 'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image', 'resize_image', 'move_image', 'save_range_as_image', 'save_chart_as_image', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column'],
-            description: 'Operation to perform'
+            enum: ['read_range', 'write_range', 'clear_range', 'formula_range', 'format_range', 'get_range_info', 'insert_range', 'delete_range', 'copy_paste_range', 'replace_range', 'find_range', 'get_used_range', 'sort_range', 'merge_range', 'unmerge_range', 'get_sheet_info', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width', 'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'create_shape', 'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'get_last_column', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image', 'resize_image', 'move_image', /* 'save_range_as_image', */ 'save_chart_as_image', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column'],
+            description: 'Operation to perform. Key operations: get_sheet_info (recommended for table analysis), get_used_range (basic range info), get_range_info (detailed cell analysis), sort_range (use get_sheet_info first to identify data boundaries)'
           },
           workbook: {
             type: 'string',
@@ -702,15 +890,23 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             type: 'object',
             description: 'Copy/paste options',
             properties: {
-              source_range: { type: 'string', description: 'Source range' },
-              destination_range: { type: 'string', description: 'Destination range' },
+              source_range: { type: 'string', description: 'Source range (supports Sheet!Range format for cross-sheet)' },
+              destination_range: { type: 'string', description: 'Destination range (supports Sheet!Range format for cross-sheet)' },
               values_only: { type: 'boolean', description: 'Copy values only' },
-              cut_mode: { type: 'boolean', description: 'Delete source data after copying (cut operation)' }
+              cut_mode: { type: 'boolean', description: 'Delete source data after copying (cut operation)' },
+              source_workbook: { type: 'string', description: 'Source workbook name for cross-workbook operations' },
+              target_workbook: { type: 'string', description: 'Target workbook name for cross-workbook operations' },
+              source_app_id: { type: 'number', description: 'Source Excel app PID for cross-instance operations' },
+              target_app_id: { type: 'number', description: 'Target Excel app PID for cross-instance operations' }
             }
           },
           new_sheet_name: {
             type: 'string',
             description: 'Name for new sheet'
+          },
+          disable_alerts: {
+            type: 'boolean',
+            description: 'Disable Excel alerts and warnings to prevent dialog boxes (default: false)'
           },
           sheet_alter: {
             type: 'object',
@@ -789,10 +985,10 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
                 description: 'Direction to shift cells when inserting/deleting' 
               },
               count: { type: 'number', description: 'Number of cells/rows/columns to insert or delete' },
-              include_formatting: { type: 'boolean', description: 'Whether to include cell formatting information (for get_cell_info)' },
-              include_formulas: { type: 'boolean', description: 'Whether to include formula information (for get_cell_info)' },
-              include_validation: { type: 'boolean', description: 'Whether to include data validation info (for get_cell_info)' },
-              include_comments: { type: 'boolean', description: 'Whether to include comments (for get_cell_info)' }
+              include_formatting: { type: 'boolean', description: 'Whether to include cell formatting information (for get_range_info)' },
+              include_formulas: { type: 'boolean', description: 'Whether to include formula information (for get_range_info)' },
+              include_validation: { type: 'boolean', description: 'Whether to include data validation info (for get_range_info)' },
+              include_comments: { type: 'boolean', description: 'Whether to include comments (for get_range_info)' }
             }
           },
           sort: {
@@ -837,6 +1033,17 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           summary_mode: {
             type: 'boolean',
             description: 'Return data summary instead of full data for large datasets (default: false)'
+          },
+          sheet_analysis: {
+            type: 'object',
+            description: 'Sheet analysis settings for get_sheet_info operations',
+            properties: {
+              top_rows: { type: 'number', description: 'Number of top rows to return (default: 3, 0 for none)' },
+              bottom_rows: { type: 'number', description: 'Number of bottom rows to return (default: 1, 0 for none)' },
+              include_formatting: { type: 'boolean', description: 'Include formatting information' },
+              include_formulas: { type: 'boolean', description: 'Include formula information' },
+              include_merged_cells: { type: 'boolean', description: 'Include merged cell information' }
+            }
           },
           file_path: {
             type: 'string',
@@ -914,7 +1121,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             properties: {
               type: {
                 type: 'string',
-                enum: ['rectangle', 'oval', 'triangle', 'line', 'arrow', 'textbox', 'flowchart_process', 'flowchart_decision', 'flowchart_start_end', 'flowchart_connector', 'star', 'pentagon', 'hexagon'],
+                enum: ['rectangle', 'oval', 'triangle', 'line', 'arrow', 'textbox', 'flowchart_process', 'flowchart_decision', 'flowchart_start_end', 'flowchart_connector', 'straight_connector', 'elbow_connector', 'curved_connector', 'right_arrow', 'left_arrow', 'up_arrow', 'down_arrow', 'star', 'pentagon', 'hexagon'],
                 description: 'Shape type'
               },
               name: {
@@ -1094,6 +1301,28 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
                     description: 'Delay before animation starts'
                   }
                 }
+              },
+              connection: {
+                type: 'object',
+                description: 'Connection settings for connector shapes',
+                properties: {
+                  start_shape: {
+                    type: 'string',
+                    description: 'Name of the starting shape to connect from'
+                  },
+                  end_shape: {
+                    type: 'string',
+                    description: 'Name of the ending shape to connect to'
+                  },
+                  start_connection_site: {
+                    type: 'number',
+                    description: 'Connection site index on start shape (0-based)'
+                  },
+                  end_connection_site: {
+                    type: 'number',
+                    description: 'Connection site index on end shape (0-based)'
+                  }
+                }
               }
             }
           },
@@ -1163,12 +1392,19 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
       if (lastLine.startsWith('{') && lastLine.endsWith('}')) {
         const result = JSON.parse(lastLine);
         
-        // Format the result for LLM consumption
-        let llmContent = `Excel ${params.op} operation `;
+        // Format the result for LLM consumption using helpful response patterns
+        let llmContent = '';
         if (result.success) {
-          llmContent += 'completed successfully.';
-          
-          if (result.data && Array.isArray(result.data)) {
+          // Check if this operation has optimized success response
+          const optimizedOps = ['get_sheet_info', 'sort_range', 'read_range', 'find_range', 'get_range_info', 'create_shape', 'list_shapes', 'create_textbox'];
+          if (optimizedOps.includes(result.operation || params.op)) {
+            // Use new helpful success response generator
+            llmContent = this.generateHelpfulSuccessResponse(result, params);
+          } else {
+            // Use existing logic for non-optimized operations
+            llmContent += `Excel ${params.op} operation completed successfully.`;
+            
+            if (result.data && Array.isArray(result.data)) {
             // Check if data is 2D array (multiple rows) or 1D array (single row)
             const is2DArray = Array.isArray(result.data[0]);
             
@@ -1251,10 +1487,10 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           }
           
           if (result.charts && Array.isArray(result.charts)) {
-            llmContent += ` Found ${result.total_charts} charts in ${result.worksheet}:\\n`;
+            llmContent += ` Found ${result.total_charts} charts in ${result.worksheet}:\n`;
             for (const chart of result.charts) {
               const title = chart.title ? ` - "${chart.title}"` : '';
-              llmContent += ` - ${chart.name} (${chart.chart_type})${title}\\n`;
+              llmContent += ` - ${chart.name} (${chart.chart_type})${title}\n`;
             }
           }
           
@@ -1423,9 +1659,9 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           }
           
           if (result.modules && result.total_modules !== undefined) {
-            llmContent += ` Found ${result.total_modules} VBA modules:\\n`;
+            llmContent += ` Found ${result.total_modules} VBA modules:\n`;
             for (const module of result.modules) {
-              llmContent += ` - ${module.name} (${module.code_lines} lines)\\n`;
+              llmContent += ` - ${module.name} (${module.code_lines} lines)\n`;
             }
           }
           
@@ -1467,10 +1703,11 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             llmContent += ` Image "${result.image_name}" moved successfully.${originalPos}${newPos}`;
           }
           
-          if (result.operation === 'save_range_as_image' && result.file_created) {
+          // TODO: Implement when Pillow library is available
+          /* if (result.operation === 'save_range_as_image' && result.file_created) {
             const fileSize = result.file_size ? ` (${(result.file_size / 1024).toFixed(1)} KB)` : '';
             llmContent += ` Range ${result.range} saved as image to ${result.output_path}${fileSize}.`;
-          }
+          } */
           
           if (result.operation === 'save_chart_as_image' && result.file_created) {
             const fileSize = result.file_size ? ` (${(result.file_size / 1024).toFixed(1)} KB)` : '';
@@ -1478,7 +1715,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           }
           
           // Search operation results
-          if (result.operation === 'search_range') {
+          if (result.operation === 'find_range') {
             llmContent += ` Search for "${result.search_term}" completed.`;
             if (result.total_matches === 0) {
               llmContent += ` No matches found.`;
@@ -1601,7 +1838,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           }
           
           // Merge operation results
-          if (result.operation === 'merge_cells') {
+          if (result.operation === 'merge_range') {
             llmContent += ` Cells merged in range ${result.range}`;
             if (result.merge_type) {
               llmContent += ` (${result.merge_type} merge)`;
@@ -1612,7 +1849,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             llmContent += `.`;
           }
           
-          if (result.operation === 'unmerge_cells') {
+          if (result.operation === 'unmerge_range') {
             if (result.cells_unmerged === 0) {
               llmContent += ` No merged cells found in range ${result.range}.`;
             } else {
@@ -1712,7 +1949,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           }
           
           // Cell information and manipulation operation results
-          if (result.operation === 'get_cell_info') {
+          if (result.operation === 'get_range_info') {
             llmContent += ` Retrieved detailed information for ${result.total_cells} cell(s) in range ${result.range}`;
             if (result.info_included) {
               const included = [];
@@ -1752,7 +1989,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             llmContent += `.`;
           }
           
-          if (result.operation === 'insert_cells') {
+          if (result.operation === 'insert_range') {
             llmContent += ` Inserted ${result.cells_inserted} cell(s) in range ${result.range}`;
             llmContent += ` with ${result.shift_direction} shift direction`;
             if (result.insertions_completed !== result.total_requested / result.cells_inserted) {
@@ -1761,11 +1998,11 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             llmContent += `.`;
           }
           
-          if (result.operation === 'delete_cells') {
+          if (result.operation === 'delete_range') {
             llmContent += ` Deleted ${result.cells_deleted} cell(s) from range ${result.range}`;
             llmContent += ` with ${result.shift_direction} shift direction`;
             if (result.original_range_size) {
-              llmContent += ` (original range: ${result.original_range_size.rows}×${result.original_range_size.columns})`;
+              llmContent += ` (original range: ${result.original_range_size.rows}*${result.original_range_size.columns})`;
             }
             if (result.deletions_completed !== result.total_requested / result.cells_deleted) {
               llmContent += ` (${result.deletions_completed} of ${result.total_requested / result.cells_deleted} deletions completed)`;
@@ -1773,6 +2010,98 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             llmContent += `.`;
           }
           
+          // Sheet analysis operation results
+          if (result.operation === 'get_sheet_info') {
+            llmContent += ` Retrieved comprehensive sheet analysis for worksheet "${result.worksheet}".`;
+            
+            if (result.data) {
+              const data = result.data;
+              
+              // Used range information
+              if (data.used_range) {
+                if (data.used_range.address) {
+                  llmContent += ` \n\n**Used Range:** ${data.used_range.address} (${data.used_range.total_rows} rows * ${data.used_range.total_columns} columns)`;
+                } else {
+                  llmContent += ` \n\n**Used Range:** Empty worksheet`;
+                }
+              }
+              
+              // Top rows preview
+              if (data.top_rows && data.top_rows.data) {
+                llmContent += ` \n\n**Top ${data.top_rows.count} rows** (${data.top_rows.range}):`;
+                const topData = data.top_rows.data;
+                
+                // Format as markdown table if reasonable size
+                if (topData.length <= 10 && topData[0] && topData[0].length <= 15) {
+                  llmContent += '\n| ';
+                  for (let col = 0; col < topData[0].length; col++) {
+                    llmContent += `Col${col + 1} | `;
+                  }
+                  llmContent += '\n| ';
+                  for (let col = 0; col < topData[0].length; col++) {
+                    llmContent += '--- | ';
+                  }
+                  llmContent += '\n';
+                  
+                  for (let row = 0; row < Math.min(topData.length, 10); row++) {
+                    llmContent += '| ';
+                    for (let col = 0; col < topData[row].length; col++) {
+                      const cellValue = topData[row][col]?.value ?? '';
+                      llmContent += `${String(cellValue).replace(/\\|/g, '\\\\|')} | `;
+                    }
+                    llmContent += '\n';
+                  }
+                } else {
+                  llmContent += '\n';
+                  for (let i = 0; i < Math.min(topData.length, 5); i++) {
+                    llmContent += `Row ${i + 1}: ${topData[i].map((cell: CellInfo) => cell.value).join(', ')}\n`;
+                  }
+                }
+              }
+              
+              // Bottom rows preview
+              if (data.bottom_rows && data.bottom_rows.data) {
+                llmContent += ` \n\n**Bottom ${data.bottom_rows.count} rows** (${data.bottom_rows.range}):`;
+                const bottomData = data.bottom_rows.data;
+                llmContent += '\n';
+                for (let i = 0; i < Math.min(bottomData.length, 3); i++) {
+                  llmContent += `Row ${i + 1}: ${bottomData[i].map((cell: CellInfo) => cell.value).join(', ')}\n`;
+                }
+              }
+              
+              // Merged cells information
+              if (data.merged_cells && data.merged_cells.count > 0) {
+                llmContent += ` \n\n**Merged Cells:** ${data.merged_cells.count} areas found`;
+                if (data.merged_cells.areas && data.merged_cells.areas.length > 0) {
+                  llmContent += ':';
+                  for (const area of data.merged_cells.areas.slice(0, 5)) {
+                    llmContent += ` \n  • ${area.address} (${area.row_count}*${area.column_count})`;
+                  }
+                  if (data.merged_cells.count > 5) {
+                    llmContent += ` \n  ... and ${data.merged_cells.count - 5} more areas`;
+                  }
+                }
+              }
+              
+              // Sheet metadata
+              if (data.sheet_metadata) {
+                llmContent += ` \n\n**Sheet Info:** Index ${data.sheet_metadata.index}, Visible: ${data.sheet_metadata.visible}`;
+              }
+            }
+            
+            if (result.analysis_settings) {
+              const settings = result.analysis_settings;
+              const settingsParts = [];
+              if (settings.include_formatting) settingsParts.push('formatting');
+              if (settings.include_formulas) settingsParts.push('formulas');
+              if (settings.include_merged_cells) settingsParts.push('merged cells');
+              
+              if (settingsParts.length > 0) {
+                llmContent += ` \n\n*Analysis included: ${settingsParts.join(', ')}*`;
+              }
+            }
+          }
+
           // Sort operation results
           if (result.operation === 'sort_range') {
             llmContent += ` Sorted range ${result.range}`;
@@ -1814,16 +2143,10 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             
             llmContent += `.`;
           }
+        }
         } else {
-          let errorMessage = result.xlwings_error || 'Unknown error';
-          // Enhanced error messages for common file locking issues
-          if (errorMessage.toLowerCase().includes('permission') || 
-              errorMessage.toLowerCase().includes('sharing violation') ||
-              errorMessage.toLowerCase().includes('file is already open') ||
-              errorMessage.toLowerCase().includes('access denied')) {
-            errorMessage += '. This file may be locked by Excel/xlwings or another application. Try using xlwings close_workbook operation to release the lock, or close Excel manually.';
-          }
-          llmContent += `failed: ${errorMessage}`;
+          // Use new helpful error response generator
+          llmContent = this.generateHelpfulErrorResponse(result, params);
         }
 
         return {
@@ -1944,21 +2267,131 @@ def get_excel_app(app_id=None):
     except:
         return xw.apps.active if xw.apps else None
 
-def get_workbook(workbook_name=None, app=None):
-    """Get workbook by name from specific app or return active workbook"""
+def get_workbook_smart(workbook_name=None, preferred_app=None, auto_open=True, create_if_missing=False):
+    """
+    Smart workbook finder with multi-instance support and auto-open capability
+    
+    Args:
+        workbook_name: Workbook name or path to find/open
+        preferred_app: Preferred Excel app instance (optional)
+        auto_open: Whether to attempt opening if not found (default: True)
+        create_if_missing: Whether to create new workbook if file doesn't exist (default: False)
+    
+    Returns:
+        tuple: (workbook_object, app_instance, was_opened_by_us, was_created_by_us)
+    """
+    import os
+    
+    if not workbook_name:
+        # Return active workbook from preferred app or any app
+        app = preferred_app or xw.apps.active if xw.apps else None
+        if app and app.books:
+            return app.books.active, app, False, False
+        return None, None, False, False
+    
+    # Phase 1: Search across all open Excel instances
+    all_apps = list(xw.apps) if xw.apps else []
+    
+    # Search in preferred app first
+    if preferred_app and preferred_app in all_apps:
+        wb = _search_workbook_in_app(workbook_name, preferred_app)
+        if wb:
+            return wb, preferred_app, False, False
+    
+    # Search in all other apps
+    for app in all_apps:
+        if app != preferred_app:
+            wb = _search_workbook_in_app(workbook_name, app)
+            if wb:
+                return wb, app, False, False
+    
+    # Phase 2: Not found in any instance - try to open if auto_open enabled
+    if not auto_open:
+        return None, None, False, False
+    
+    # Resolve file path
+    file_path = _resolve_workbook_path(workbook_name)
+    
+    # Choose Excel instance for opening
+    target_app = preferred_app if preferred_app else (all_apps[0] if all_apps else xw.App(visible=False))
+    
+    # Try to open existing file
+    if file_path and os.path.exists(file_path):
+        try:
+            wb = target_app.books.open(file_path)
+            return wb, target_app, True, False
+        except Exception as e:
+            raise Exception(f"Failed to open workbook '{file_path}': {str(e)}")
+    
+    # Phase 3: File doesn't exist - create if requested
+    if create_if_missing:
+        try:
+            wb = target_app.books.add()
+            if file_path:
+                # Save with the specified name/path
+                wb.save(file_path)
+            return wb, target_app, True, True
+        except Exception as e:
+            raise Exception(f"Failed to create workbook '{workbook_name}': {str(e)}")
+    
+    # File not found and creation not requested
+    raise Exception(f"Workbook '{workbook_name}' not found and auto_open/create_if_missing disabled")
+
+def _search_workbook_in_app(workbook_name, app):
+    """Search for workbook in specific Excel app instance"""
+    import os
     try:
-        if app is None:
-            app = xw.apps.active
-        if workbook_name:
-            # Search in the specific app's books
-            for book in app.books:
-                if book.name == workbook_name:
-                    return book
-            return None
-        else:
-            return app.books.active if app.books else None
+        for book in app.books:
+            # Try exact name match
+            if book.name == workbook_name:
+                return book
+            # Try basename match (without path)
+            if book.name == os.path.basename(workbook_name):
+                return book
+            # Try fullname match (with path)
+            try:
+                if hasattr(book, 'fullname'):
+                    if book.fullname == workbook_name:
+                        return book
+                    # Normalized path comparison
+                    if os.path.normpath(book.fullname) == os.path.normpath(workbook_name):
+                        return book
+            except:
+                pass
+        return None
     except:
         return None
+
+def _resolve_workbook_path(workbook_name):
+    """Resolve workbook name to full file path"""
+    import os
+    
+    if not workbook_name:
+        return None
+    
+    # If already absolute path, return as-is
+    if os.path.isabs(workbook_name):
+        return workbook_name
+    
+    # Try current directory
+    if os.path.exists(workbook_name):
+        return os.path.abspath(workbook_name)
+    
+    # Try common Excel extensions if no extension
+    if '.' not in workbook_name:
+        for ext in ['.xlsx', '.xlsm', '.xls']:
+            test_path = workbook_name + ext
+            if os.path.exists(test_path):
+                return os.path.abspath(test_path)
+    
+    # Return as-is (might be for creation)
+    return os.path.abspath(workbook_name)
+
+# Legacy function for backward compatibility
+def get_workbook(workbook_name=None, app=None):
+    """Legacy get_workbook function - calls smart version"""
+    wb, found_app, _, _ = get_workbook_smart(workbook_name, app, auto_open=False)
+    return wb
 
 def get_worksheet(wb, worksheet_name=None):
     """Get worksheet by name or return active worksheet"""
@@ -2035,7 +2468,7 @@ def get_worksheet(wb, worksheet_name=None):
         return this.generateClearLogic(params);
       case 'copy_paste_range':
         return this.generateCopyPasteLogic(params);
-      case 'find_replace_range':
+      case 'replace_range':
         return this.generateFindReplaceLogic(params);
       case 'create_workbook':
         return this.generateCreateWorkbookLogic(params);
@@ -2047,8 +2480,12 @@ def get_worksheet(wb, worksheet_name=None):
         return this.generateCloseWorkbookLogic(params);
       case 'get_last_row':
         return this.generateGetLastRowLogic(params);
+      case 'get_last_column':
+        return this.generateGetLastColumnLogic(params);
       case 'get_used_range':
         return this.generateGetUsedRangeLogic(params);
+      case 'get_sheet_info':
+        return this.generateGetSheetInfoLogic(params);
       case 'convert_data_types':
         return this.generateConvertDataTypesLogic(params);
       case 'add_vba_module':
@@ -2071,11 +2508,12 @@ def get_worksheet(wb, worksheet_name=None):
         return this.generateResizeImageLogic(params);
       case 'move_image':
         return this.generateMoveImageLogic(params);
-      case 'save_range_as_image':
-        return this.generateSaveRangeAsImageLogic(params);
+      // TODO: Implement when Pillow library is available
+      /* case 'save_range_as_image':
+        return this.generateSaveRangeAsImageLogic(params); */
       case 'save_chart_as_image':
         return this.generateSaveChartAsImageLogic(params);
-      case 'search_range':
+      case 'find_range':
         return this.generateSearchDataLogic(params);
       case 'sort_range':
         return this.generateSortRangeLogic(params);
@@ -2087,9 +2525,9 @@ def get_worksheet(wb, worksheet_name=None):
         return this.generateDeleteCommentLogic(params);
       case 'list_comments':
         return this.generateListCommentsLogic(params);
-      case 'merge_cells':
+      case 'merge_range':
         return this.generateMergeCellsLogic(params);
-      case 'unmerge_cells':
+      case 'unmerge_range':
         return this.generateUnmergeCellsLogic(params);
       case 'set_row_height':
         return this.generateSetRowHeightLogic(params);
@@ -2099,11 +2537,11 @@ def get_worksheet(wb, worksheet_name=None):
         return this.generateGetRowHeightLogic(params);
       case 'get_column_width':
         return this.generateGetColumnWidthLogic(params);
-      case 'get_cell_info':
+      case 'get_range_info':
         return this.generateGetCellInfoLogic(params);
-      case 'insert_cells':
+      case 'insert_range':
         return this.generateInsertCellsLogic(params);
-      case 'delete_cells':
+      case 'delete_range':
         return this.generateDeleteCellsLogic(params);
       case 'list_apps':
         return this.generateListAppsLogic(params);
@@ -2147,6 +2585,27 @@ if not wb:
     wb = app.books.active if app.books else None
     if not wb:
         raise Exception("No active workbook found in the Excel application")`;
+  }
+
+  private generateAlertHandlingCode(params: XlwingsParams): string {
+    const disableAlerts = params.disable_alerts || false;
+    if (disableAlerts) {
+      return `
+# Disable Excel alerts to prevent dialog boxes
+original_alerts_setting = app.api.DisplayAlerts
+app.api.DisplayAlerts = False`;
+    }
+    return '';
+  }
+
+  private generateAlertRestoreCode(params: XlwingsParams): string {
+    const disableAlerts = params.disable_alerts || false;
+    if (disableAlerts) {
+      return `
+# Restore original alerts setting
+app.api.DisplayAlerts = original_alerts_setting`;
+    }
+    return '';
   }
 
   private generateReadLogic(params: XlwingsParams): string {
@@ -2424,19 +2883,26 @@ else:
 
 # Set chart properties using Excel API
 try:
-    if "${chartConfig.title || ''}":
-        # Use the Excel API directly for chart title
-        chart.api.ChartTitle.Text = "${chartConfig.title}"
-        chart.api.HasTitle = True
-    
-    # Set axis titles if provided
-    if "${chartConfig.x_axis_title || ''}":
-        chart.api.Axes(1).HasTitle = True
-        chart.api.Axes(1).AxisTitle.Text = "${chartConfig.x_axis_title}"
-    
-    if "${chartConfig.y_axis_title || ''}":
-        chart.api.Axes(2).HasTitle = True  
-        chart.api.Axes(2).AxisTitle.Text = "${chartConfig.y_axis_title}"
+    ${chartConfig?.title ? `
+    # Use the Excel API directly for chart title
+    chart.api.ChartTitle.Text = "${chartConfig.title}"
+    chart.api.HasTitle = True
+    ` : ''}
+
+    ${chartConfig?.x_axis_title ? `
+    # Set x-axis title
+    chart.api.Axes(1).HasTitle = True
+    chart.api.Axes(1).AxisTitle.Text = "${chartConfig.x_axis_title}"
+    ` : ''}
+
+    ${chartConfig?.y_axis_title ? `
+    # Set y-axis title
+    chart.api.Axes(2).HasTitle = True
+    chart.api.Axes(2).AxisTitle.Text = "${chartConfig.y_axis_title}"
+    ` : ''}
+
+    # Placeholder to ensure try block is never empty
+    pass
 except Exception as title_error:
     # Continue even if title setting fails
     pass
@@ -2454,7 +2920,37 @@ result = {
 print(json.dumps(result))`;
   }
 
+  /**
+   * Convert JavaScript object to Python dictionary string representation
+   */
+  private convertToPythonDict(obj: JsonValue): string {
+    if (obj === null) return 'None';
+    if (obj === undefined) return 'None';
+    if (typeof obj === 'boolean') return obj ? 'True' : 'False';
+    if (typeof obj === 'number') return obj.toString();
+    if (typeof obj === 'string') return JSON.stringify(obj);
+    
+    if (Array.isArray(obj)) {
+      const items = obj.map(item => this.convertToPythonDict(item));
+      return `[${items.join(', ')}]`;
+    }
+    
+    if (typeof obj === 'object') {
+      const pairs = Object.entries(obj).map(([key, value]) => {
+        const keyStr = JSON.stringify(key);
+        const valueStr = this.convertToPythonDict(value);
+        return `${keyStr}: ${valueStr}`;
+      });
+      return `{${pairs.join(', ')}}`;
+    }
+    
+    return 'None';
+  }
+
   private generateFormatLogic(params: XlwingsParams): string {
+    // Convert JavaScript format object to Python dictionary string
+    const formatPython = this.convertToPythonDict(params.format || {});
+    
     return `
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
@@ -2473,7 +2969,7 @@ if not ws:
 range_str = "${params.range || 'A1'}"
 range_obj = ws.range(range_str)
 
-format_config = ${JSON.stringify(params.format || {})}
+format_config = ${formatPython}
 
 if format_config.get('font'):
     font = format_config['font']
@@ -2491,6 +2987,13 @@ if format_config.get('fill', {}).get('color'):
 
 if format_config.get('number_format'):
     range_obj.number_format = format_config['number_format']
+
+# Apply borders if requested
+if format_config.get('borders'):
+    import xlwings.constants as const
+    range_obj.api.Borders.LineStyle = const.LineStyle.xlContinuous
+    range_obj.api.Borders.Weight = const.BorderWeight.xlThin
+    range_obj.api.Borders.Color = 0x000000  # Black color
 
 cells_affected = range_obj.rows.count * range_obj.columns.count
 
@@ -2665,115 +3168,318 @@ print(json.dumps(result))`;
     const cutMode = params.copy_paste.cut_mode || false;
     const valuesOnlyPython = valuesOnly ? 'True' : 'False';
     const cutModePython = cutMode ? 'True' : 'False';
+    const sourceWorkbook = params.copy_paste.source_workbook || params.workbook || '';
+    const targetWorkbook = params.copy_paste.target_workbook || params.workbook || '';
+    const alertHandling = this.generateAlertHandlingCode(params);
+    const alertRestore = this.generateAlertRestoreCode(params);
 
-    return `${this.generateExcelConnectionCode(params)}
+    return `# Smart copy/paste range with multi-instance support
+import time
 
-source_range = "${params.copy_paste.source_range}"
-dest_range = "${params.copy_paste.destination_range}"
+source_range_str = "${params.copy_paste.source_range}"
+dest_range_str = "${params.copy_paste.destination_range}"
 values_only = ${valuesOnlyPython}
 cut_mode = ${cutModePython}
 
-# Parse source range to handle cross-worksheet references
 try:
-    if '!' in source_range:
-        # Cross-worksheet reference like "Sheet1!A1:H1"
-        source_sheet_name, source_cell_range = source_range.split('!', 1)
-        try:
-            source_ws = wb.sheets[source_sheet_name]
-        except KeyError:
-            raise Exception(f"Source worksheet '{source_sheet_name}' not found. Available sheets: {[sheet.name for sheet in wb.sheets]}")
-        source = source_ws.range(source_cell_range)
+    # Phase 1: Find/open source workbook
+    source_wb, source_app, source_opened_by_us, source_created_by_us = get_workbook_smart(
+        "${sourceWorkbook}", 
+        auto_open=True, 
+        create_if_missing=False
+    )
+    if not source_wb:
+        raise Exception(f"Could not find or open source workbook '${sourceWorkbook}'")
+
+    # Phase 2: Find/open target workbook (if cross-workbook operation)
+    target_wb = None
+    target_app = None
+    target_opened_by_us = False
+    target_created_by_us = False
+    
+    if "${targetWorkbook}" and "${targetWorkbook}" != "${sourceWorkbook}":
+        # Cross-workbook operation
+        target_wb, target_app, target_opened_by_us, target_created_by_us = get_workbook_smart(
+            "${targetWorkbook}",
+            preferred_app=source_app,  # Prefer same instance as source
+            auto_open=True,
+            create_if_missing=True  # Create target workbook if it doesn't exist
+        )
+        
+        if not target_wb:
+            raise Exception(f"Could not find, open, or create target workbook '${targetWorkbook}'")
+        
+        copy_type = "cross_workbook"
     else:
-        # Same worksheet reference
-        ws = get_worksheet(wb, "${params.worksheet || ''}")
-        if not ws:
-            ws = wb.sheets.active
-        source = ws.range(source_range)
-except Exception as source_error:
-    raise Exception(f"Error accessing source range '{source_range}': {str(source_error)}")
+        # Same workbook operation
+        target_wb = source_wb
+        target_app = source_app
+        copy_type = "same_workbook"
 
-# Parse destination range to handle cross-worksheet references
-try:
-    if '!' in dest_range:
-        # Cross-worksheet reference like "Sheet2!A1"
-        dest_sheet_name, dest_cell_range = dest_range.split('!', 1)
-        try:
-            dest_ws = wb.sheets[dest_sheet_name]
-        except KeyError:
-            raise Exception(f"Destination worksheet '{dest_sheet_name}' not found. Available sheets: {[sheet.name for sheet in wb.sheets]}")
-        dest = dest_ws.range(dest_cell_range)
-    else:
-        # Same worksheet reference - use target worksheet or active
-        dest_ws = get_worksheet(wb, "${params.worksheet || ''}")
-        if not dest_ws:
-            dest_ws = wb.sheets.active
-        dest = dest_ws.range(dest_range)
-except Exception as dest_error:
-    raise Exception(f"Error accessing destination range '{dest_range}': {str(dest_error)}")
-
-# Perform copy/paste operation - use simple xlwings copy method
-if values_only:
-    dest.value = source.value
-else:
-    source.copy(dest)
-
-# If cut_mode is enabled, clear/delete the source after copying
-if cut_mode:
+    # Phase 3: Parse source range
     try:
-        # Check if we're dealing with entire rows or columns for more efficient deletion
-        if ':' in source_range and source_range.count(':') == 1:
-            range_parts = source_range.split(':')
-            start_part = range_parts[0].strip()
-            end_part = range_parts[1].strip()
-            
-            # Check if it's a full row range (like "2:2" or "2:5")
-            if start_part.isdigit() and end_part.isdigit():
-                # Full row range - use row deletion
-                start_row = int(start_part)
-                end_row = int(end_part)
-                row_count = end_row - start_row + 1
-                source.sheet.api.Rows(f"{start_row}:{end_row}").Delete()
-                cut_method = f"deleted {row_count} row(s)"
-            # Check if it's a full column range (like "A:A" or "A:C")
-            elif start_part.isalpha() and end_part.isalpha() and len(start_part) <= 3 and len(end_part) <= 3:
-                # Full column range - use column deletion
-                source.sheet.api.Columns(f"{start_part.upper()}:{end_part.upper()}").Delete()
-                cut_method = f"deleted column(s) {start_part.upper()}:{end_part.upper()}"
-            else:
-                # Regular cell range - just clear the content
-                source.clear()
-                cut_method = "cleared source range"
+        if '!' in source_range_str:
+            source_sheet_name, source_cell_range = source_range_str.split('!', 1)
+            try:
+                source_ws = source_wb.sheets[source_sheet_name]
+            except KeyError:
+                raise Exception(f"Source worksheet '{source_sheet_name}' not found. Available: {[s.name for s in source_wb.sheets]}")
         else:
-            # Single cell or irregular range - just clear
-            source.clear()
-            cut_method = "cleared source range"
-    except Exception as cut_error:
-        # If deletion fails, at least try to clear the content
-        try:
-            source.clear()
-            cut_method = "cleared source range (deletion failed)"
-        except:
-            cut_method = "cut operation failed"
-else:
+            source_ws = get_worksheet(source_wb, "${params.worksheet || ''}")
+            if not source_ws:
+                source_ws = source_wb.sheets.active
+            source_cell_range = source_range_str
+        
+        source_range = source_ws.range(source_cell_range)
+    except Exception as e:
+        raise Exception(f"Error accessing source range '{source_range_str}': {str(e)}")
+
+    # Phase 4: Parse destination range
+    try:
+        if '!' in dest_range_str:
+            dest_sheet_name, dest_cell_range = dest_range_str.split('!', 1)
+            try:
+                dest_ws = target_wb.sheets[dest_sheet_name]
+            except KeyError:
+                raise Exception(f"Destination worksheet '{dest_sheet_name}' not found. Available: {[s.name for s in target_wb.sheets]}")
+        else:
+            dest_ws = get_worksheet(target_wb, "${params.worksheet || ''}")
+            if not dest_ws:
+                dest_ws = target_wb.sheets.active
+            dest_cell_range = dest_range_str
+        
+        dest_range = dest_ws.range(dest_cell_range)
+    except Exception as e:
+        raise Exception(f"Error accessing destination range '{dest_range_str}': {str(e)}")
+
+    # Phase 5: Detect cross-instance operation
+    cross_instance = source_app != target_app
+    cross_workbook = source_wb.name != target_wb.name
+${alertHandling}
+    # Phase 6: Perform copy/paste operation
+    copy_success = False
+    copy_error = None
+    method_used = "unknown"
+
+    try:
+        if cross_instance:
+            # Cross-instance operation - use data reconstruction method
+            method_used = "cross_instance_reconstruction"
+            print(f"Cross-instance copy detected: Source PID {source_app.pid if hasattr(source_app, 'pid') else 'unknown'}, Target PID {target_app.pid if hasattr(target_app, 'pid') else 'unknown'}")
+            
+            # Extract source data
+            source_data = source_range.value
+            
+            # Extract formatting properties if not values_only
+            source_properties = {}
+            if not values_only:
+                try:
+                    # Get basic formatting properties
+                    source_properties['font_bold'] = source_range.api.Font.Bold
+                    source_properties['font_size'] = source_range.api.Font.Size
+                    source_properties['font_color'] = source_range.api.Font.ColorIndex
+                    source_properties['color'] = source_range.color
+                    source_properties['number_format'] = source_range.number_format
+                except Exception:
+                    pass
+            
+            # Extract formulas if not values_only
+            source_formulas = {}
+            if not values_only:
+                try:
+                    if isinstance(source_data, list) and len(source_data) > 0:
+                        # Multi-cell range
+                        for row_idx in range(source_range.rows.count):
+                            for col_idx in range(source_range.columns.count):
+                                cell = source_range[row_idx, col_idx]
+                                if cell.formula and cell.formula.startswith('='):
+                                    source_formulas[f"{row_idx},{col_idx}"] = cell.formula
+                    else:
+                        # Single cell
+                        if source_range.formula and source_range.formula.startswith('='):
+                            source_formulas["0,0"] = source_range.formula
+                except Exception:
+                    pass
+            
+            # Apply data to destination
+            dest_range.value = source_data
+            
+            # Apply formatting if not values_only
+            if not values_only:
+                for prop, value in source_properties.items():
+                    try:
+                        if prop == 'font_bold':
+                            dest_range.api.Font.Bold = value
+                        elif prop == 'font_size':
+                            dest_range.api.Font.Size = value
+                        elif prop == 'font_color':
+                            dest_range.api.Font.ColorIndex = value
+                        elif prop == 'color':
+                            dest_range.color = value
+                        elif prop == 'number_format':
+                            dest_range.number_format = value
+                    except Exception:
+                        pass
+            
+            # Apply formulas if not values_only 
+            if not values_only:
+                for pos, formula in source_formulas.items():
+                    try:
+                        row_idx, col_idx = map(int, pos.split(','))
+                        if isinstance(source_data, list) and len(source_data) > 0:
+                            dest_cell = dest_range[row_idx, col_idx]
+                        else:
+                            dest_cell = dest_range
+                        dest_cell.formula = formula
+                    except Exception:
+                        pass
+            
+            copy_success = True
+            
+        else:
+            # Same instance operation - use native xlwings methods
+            if values_only:
+                method_used = "native_values_only"
+                dest_range.value = source_range.value
+            else:
+                method_used = "native_copy_paste"
+                try:
+                    # Try standard copy method first
+                    source_range.copy()
+                    time.sleep(0.1)
+                    
+                    # Use paste_special if available, otherwise paste normally
+                    try:
+                        dest_range.paste_special(paste="all")
+                    except AttributeError:
+                        # Fallback to COM API
+                        dest_range.api.PasteSpecial()
+                    except Exception:
+                        # Final fallback to simple paste
+                        dest_range.paste()
+                except Exception as copy_error_inner:
+                    # Fallback to value copy
+                    method_used = "native_fallback_values"
+                    dest_range.value = source_range.value
+            
+            copy_success = True
+
+    except Exception as e:
+        copy_error = str(e)
+        copy_success = False
+
+    # Phase 7: Handle cut mode (delete source after successful copy)
     cut_method = None
+    if cut_mode and copy_success:
+        try:
+            # Only perform cut on source if copy was successful
+            if ':' in source_cell_range and source_cell_range.count(':') == 1:
+                range_parts = source_cell_range.split(':')
+                start_part = range_parts[0].strip()
+                end_part = range_parts[1].strip()
+                
+                # Check for full row/column deletion
+                if start_part.isdigit() and end_part.isdigit():
+                    # Full row range
+                    start_row = int(start_part)
+                    end_row = int(end_part)
+                    row_count = end_row - start_row + 1
+                    source_ws.api.Rows(f"{start_row}:{end_row}").Delete()
+                    cut_method = f"deleted {row_count} row(s)"
+                elif start_part.isalpha() and end_part.isalpha() and len(start_part) <= 3 and len(end_part) <= 3:
+                    # Full column range
+                    source_ws.api.Columns(f"{start_part.upper()}:{end_part.upper()}").Delete()
+                    cut_method = f"deleted column(s) {start_part.upper()}:{end_part.upper()}"
+                else:
+                    # Regular cell range
+                    source_range.clear()
+                    cut_method = "cleared source range"
+            else:
+                # Single cell or irregular range
+                source_range.clear()
+                cut_method = "cleared source range"
+        except Exception as cut_error:
+            try:
+                source_range.clear()
+                cut_method = "cleared source range (deletion failed)"
+            except Exception:
+                cut_method = "cut operation failed"
 
-# Get worksheet names for result
-source_ws_name = source.sheet.name
-dest_ws_name = dest.sheet.name
+    # Phase 8: Prepare result
+    if copy_success:
+        cells_affected = 1
+        try:
+            cells_affected = source_range.rows.count * source_range.columns.count
+        except Exception:
+            pass
+            
+        result = {
+            "success": True,
+            "operation": "copy_paste_range",
+            "source_workbook": source_wb.name,
+            "target_workbook": target_wb.name,
+            "source_worksheet": source_ws.name,
+            "destination_worksheet": dest_ws.name,
+            "source_range": source_range_str,
+            "destination_range": dest_range_str,
+            "cross_instance": cross_instance,
+            "cross_workbook": cross_workbook,
+            "source_app_pid": source_app.pid if hasattr(source_app, 'pid') else None,
+            "target_app_pid": target_app.pid if hasattr(target_app, 'pid') else None,
+            "values_only": values_only,
+            "cut_mode": cut_mode,
+            "cut_method": cut_method,
+            "method_used": method_used,
+            "cells_affected": cells_affected,
+            "workbook_status": {
+                "source_opened_by_operation": source_opened_by_us,
+                "source_created_by_operation": source_created_by_us,
+                "target_opened_by_operation": target_opened_by_us,
+                "target_created_by_operation": target_created_by_us
+            }
+        }
+    else:
+        result = {
+            "success": False,
+            "operation": "copy_paste_range",
+            "error": copy_error,
+            "source_range": source_range_str,
+            "destination_range": dest_range_str,
+            "cross_instance": cross_instance if 'cross_instance' in locals() else False,
+            "cross_workbook": cross_workbook if 'cross_workbook' in locals() else False,
+            "method_attempted": method_used
+        }
 
-result = {
-    "success": True,
-    "operation": "copy_paste_range",
-    "workbook": wb.name,
-    "source_worksheet": source_ws_name,
-    "destination_worksheet": dest_ws_name,
-    "source_range": source_range,
-    "destination_range": dest_range,
-    "values_only": values_only,
-    "cut_mode": cut_mode,
-    "cut_method": cut_method,
-    "cells_affected": source.rows.count * source.columns.count
-}
+except Exception as e:
+    # Clean up any workbooks we opened during this operation
+    cleanup_workbooks = []
+    if 'source_opened_by_us' in locals() and source_opened_by_us:
+        cleanup_workbooks.append((source_wb, "source"))
+    if 'target_opened_by_us' in locals() and target_opened_by_us:
+        cleanup_workbooks.append((target_wb, "target"))
+    if 'source_created_by_us' in locals() and source_created_by_us:
+        cleanup_workbooks.append((source_wb, "source"))
+    if 'target_created_by_us' in locals() and target_created_by_us:
+        cleanup_workbooks.append((target_wb, "target"))
+    
+    cleanup_errors = []
+    for wb, wb_type in cleanup_workbooks:
+        try:
+            if wb:
+                wb.close()
+        except Exception as cleanup_error:
+            cleanup_errors.append(f"{wb_type}: {str(cleanup_error)}")
+    
+    result = {
+        "success": False,
+        "operation": "copy_paste_range",
+        "source_range": source_range_str if 'source_range_str' in locals() else "${params.copy_paste.source_range}",
+        "destination_range": dest_range_str if 'dest_range_str' in locals() else "${params.copy_paste.destination_range}",
+        "error": str(e),
+        "cleanup_performed": len(cleanup_workbooks) > 0,
+        "cleanup_errors": cleanup_errors if cleanup_errors else None
+    }
+${alertRestore}
 print(json.dumps(result))`;
   }
 
@@ -2816,7 +3522,7 @@ for cell in search_range:
 
 result = {
     "success": True,
-    "operation": "find_replace_range",
+    "operation": "replace_range",
     "workbook": wb.name,
     "worksheet": ws.name,
     "find_text": find_text,
@@ -2870,9 +3576,11 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
@@ -2940,16 +3648,21 @@ print(json.dumps(result))`;
   }
 
   private generateDeleteSheetLogic(params: XlwingsParams): string {
+    const alertHandling = this.generateAlertHandlingCode(params);
+    const alertRestore = this.generateAlertRestoreCode(params);
+    
     return `
 # Delete sheet
 app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
-
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+${alertHandling}
 # Check if worksheet is specified
 worksheet_name = "${params.worksheet || ''}"
 if not worksheet_name:
@@ -2988,7 +3701,7 @@ except Exception as e:
         "attempted_sheet_name": sheet_name_to_delete if 'sheet_name_to_delete' in locals() else worksheet_name,
         "error": str(e)
     }
-
+${alertRestore}
 print(json.dumps(result))`;
   }
 
@@ -3000,53 +3713,204 @@ print(json.dumps(result))`;
     const referenceSheet = sheetMove?.reference_sheet || '';
     
     return `
-# Move sheet
-app = xw.apps.active if xw.apps else None
-if not app:
-    app = xw.App(visible=False)
+# Smart move sheet with multi-instance support
+# Phase 1: Find/open source workbook
+source_wb, source_app, source_opened_by_us, source_created_by_us = get_workbook_smart(
+    "${params.workbook || ''}", 
+    auto_open=True, 
+    create_if_missing=False
+)
 
-source_wb = get_workbook(app, "${params.workbook || ''}")
 if not source_wb:
-    raise Exception("Could not find the source workbook")
+    raise Exception(f"Could not find or open source workbook '${params.workbook || ''}'")
 
-# Check if worksheet is specified
+# Phase 2: Find/open target workbook (if cross-workbook move)
+target_wb = None
+target_app = None
+target_opened_by_us = False
+target_created_by_us = False
+
+if "${targetWorkbook}":
+    # Cross-workbook move
+    target_wb, target_app, target_opened_by_us, target_created_by_us = get_workbook_smart(
+        "${targetWorkbook}",
+        preferred_app=source_app,  # Prefer same instance as source
+        auto_open=True,
+        create_if_missing=True  # Create target workbook if it doesn't exist
+    )
+    
+    if not target_wb:
+        raise Exception(f"Could not find, open, or create target workbook '${targetWorkbook}'")
+    
+    if target_wb.name == source_wb.name:
+        raise Exception("Target workbook cannot be the same as source workbook for cross-workbook moves")
+    
+    move_type = "cross_workbook"
+else:
+    # Same workbook move/reorder
+    target_wb = source_wb
+    target_app = source_app
+    move_type = "reorder_index" if ${newIndex} >= 0 else "reorder_position"
+
+# Phase 3: Find and validate the source worksheet
 worksheet_name = "${params.worksheet || ''}"
 if not worksheet_name:
     raise Exception("worksheet parameter is required for move_sheet operation")
 
-# Find the source worksheet
 try:
     source_ws = source_wb.sheets[worksheet_name]
     source_sheet_name = source_ws.name
     original_index = source_ws.index
 except KeyError:
     available_sheets = [sheet.name for sheet in source_wb.sheets]
+    # Clean up opened workbooks before failing
+    cleanup_workbooks = []
+    if source_opened_by_us or source_created_by_us:
+        cleanup_workbooks.append((source_wb, "source"))
+    if target_opened_by_us or target_created_by_us:
+        cleanup_workbooks.append((target_wb, "target"))
+    
+    for wb, wb_type in cleanup_workbooks:
+        try:
+            if wb:
+                wb.close()
+        except:
+            pass  # Ignore cleanup errors
+    
     raise Exception(f"Worksheet '{worksheet_name}' not found in source workbook. Available sheets: {available_sheets}")
 
-move_type = None
-target_wb = None
-
+# Phase 4: Perform the move operation
 try:
-    # Determine if this is a cross-workbook move or index reorder
-    if "${targetWorkbook}":
-        # Cross-workbook move (cut mode)
-        target_wb = get_workbook(app, "${targetWorkbook}")
-        if not target_wb:
-            raise Exception(f"Target workbook '{targetWorkbook}' not found")
+    if move_type == "cross_workbook":
         
-        if target_wb.name == source_wb.name:
-            raise Exception("Target workbook cannot be the same as source workbook for cross-workbook moves")
+        # Check if source and target are in different Excel instances
+        cross_instance = source_app != target_app
         
-        # Copy worksheet to target workbook
-        source_ws.api.Copy(Before=target_wb.sheets[0].api)
-        
-        # Get the copied sheet (it will be the first sheet in target workbook)
-        moved_ws = target_wb.sheets[0]
-        
-        # Delete original sheet from source workbook
-        if len(source_wb.sheets) <= 1:
-            raise Exception("Cannot move the only worksheet from source workbook")
-        source_ws.delete()
+        if cross_instance:
+            # Cross-instance move: Use sheet reconstruction + delete method
+            print(f"Cross-instance move detected: Source PID {source_app.pid if hasattr(source_app, 'pid') else 'unknown'}, Target PID {target_app.pid if hasattr(target_app, 'pid') else 'unknown'}")
+            
+            # Step 1: Extract all data and properties from source sheet
+            if source_ws.used_range:
+                used_range_addr = source_ws.used_range.address
+                sheet_data = source_ws.used_range.value
+            else:
+                # Empty sheet
+                used_range_addr = "$A$1"
+                sheet_data = None
+            
+            # Step 2: Extract sheet properties
+            source_sheet_info = {
+                "name": source_ws.name,
+                "data": sheet_data,
+                "used_range": used_range_addr,
+                "tab_color": None,
+                "visible": True
+            }
+            
+            # Try to extract additional properties
+            try:
+                if hasattr(source_ws.api, 'Tab') and hasattr(source_ws.api.Tab, 'Color'):
+                    source_sheet_info["tab_color"] = source_ws.api.Tab.Color
+            except:
+                pass
+                
+            try:
+                source_sheet_info["visible"] = source_ws.api.Visible != 0
+            except:
+                pass
+            
+            # Step 3: Create new sheet in target workbook at beginning
+            moved_ws = target_wb.sheets.add()
+            moved_ws.api.Move(Before=target_wb.sheets[0].api)  # Move to beginning
+            moved_ws = target_wb.sheets[0]  # Get the moved sheet reference
+            
+            # Step 4: Apply name (generate unique if needed)
+            moved_sheet_name = source_sheet_info["name"]
+            existing_names = [sheet.name for sheet in target_wb.sheets if sheet != moved_ws]
+            if moved_sheet_name in existing_names:
+                counter = 1
+                original_name = moved_sheet_name
+                while moved_sheet_name in existing_names:
+                    moved_sheet_name = f"{original_name}_Moved{counter}"
+                    counter += 1
+            
+            moved_ws.name = moved_sheet_name
+            
+            # Step 5: Transfer data if exists
+            if sheet_data is not None:
+                if isinstance(sheet_data, list):
+                    if len(sheet_data) > 0:
+                        rows = len(sheet_data)
+                        cols = len(sheet_data[0]) if isinstance(sheet_data[0], list) else 1
+                        # Build proper range address
+                        if cols <= 26:
+                            col_addr = chr(64 + cols)
+                        else:
+                            col_addr = chr(64 + cols//26) + chr(64 + cols%26)
+                        target_range = f"A1:{col_addr}{rows}"
+                        moved_ws.range(target_range).value = sheet_data
+                else:
+                    # Single value
+                    moved_ws.range("A1").value = sheet_data
+            
+            # Step 6: Apply properties
+            try:
+                if source_sheet_info["tab_color"] is not None:
+                    moved_ws.api.Tab.Color = source_sheet_info["tab_color"]
+            except:
+                pass
+                
+            try:
+                moved_ws.api.Visible = -1 if source_sheet_info["visible"] else 0
+            except:
+                pass
+            
+            # Step 7: Copy basic formatting (same as copy_sheet)
+            if sheet_data is not None and source_ws.used_range:
+                try:
+                    if isinstance(sheet_data, list) and len(sheet_data) > 0:
+                        first_row = sheet_data[0]
+                        if isinstance(first_row, list) and len(first_row) > 0:
+                            cols = len(first_row)
+                            col_addr = chr(64 + cols) if cols <= 26 else chr(64 + cols//26) + chr(64 + cols%26)
+                            
+                            source_header_range = source_ws.range(f"A1:{col_addr}1")
+                            target_header_range = moved_ws.range(f"A1:{col_addr}1")
+                            
+                            # Copy bold formatting
+                            try:
+                                if source_header_range.api.Font.Bold:
+                                    target_header_range.api.Font.Bold = True
+                            except:
+                                pass
+                                
+                            # Copy background color
+                            try:
+                                source_color = source_header_range.color
+                                if source_color and source_color != (255, 255, 255):
+                                    target_header_range.color = source_color
+                            except:
+                                pass
+                except:
+                    pass
+            
+            # Step 8: Delete original sheet from source workbook
+            if len(source_wb.sheets) <= 1:
+                raise Exception("Cannot move the only worksheet from source workbook")
+            source_ws.delete()
+            
+            print(f"Cross-instance sheet move completed: '{moved_sheet_name}' moved to index 0")
+            
+        else:
+            # Same instance cross-workbook move - use native Excel API
+            source_ws.api.Copy(Before=target_wb.sheets[0].api)
+            moved_ws = target_wb.sheets[0]
+            
+            # Delete original sheet from source workbook
+            if len(source_wb.sheets) <= 1:
+                raise Exception("Cannot move the only worksheet from source workbook")
+            source_ws.delete()
         
         move_type = "cross_workbook"
         
@@ -3060,7 +3924,14 @@ try:
             "original_index": original_index,
             "new_index": 0,
             "source_sheets_remaining": [sheet.name for sheet in source_wb.sheets],
-            "target_sheets_after": [sheet.name for sheet in target_wb.sheets]
+            "target_sheets_after": [sheet.name for sheet in target_wb.sheets],
+            "workbook_status": {
+                "source_opened_by_operation": source_opened_by_us,
+                "source_created_by_operation": source_created_by_us,
+                "target_opened_by_operation": target_opened_by_us,
+                "target_created_by_operation": target_created_by_us,
+                "cross_instance": source_app != target_app
+            }
         }
         
     else:
@@ -3127,17 +3998,42 @@ try:
             "workbook": source_wb.name,
             "original_index": original_index - 1,  # Convert to 0-based
             "new_index": final_index,
-            "sheets_after": [(i, sheet.name) for i, sheet in enumerate(source_wb.sheets)]
+            "sheets_after": [(i, sheet.name) for i, sheet in enumerate(source_wb.sheets)],
+            "workbook_status": {
+                "source_opened_by_operation": source_opened_by_us,
+                "source_created_by_operation": source_created_by_us
+            }
         }
 
 except Exception as e:
+    # Clean up any workbooks we opened during this operation
+    cleanup_workbooks = []
+    if 'source_opened_by_us' in locals() and source_opened_by_us:
+        cleanup_workbooks.append((source_wb, "source"))
+    if 'target_opened_by_us' in locals() and target_opened_by_us:
+        cleanup_workbooks.append((target_wb, "target"))
+    if 'source_created_by_us' in locals() and source_created_by_us:
+        cleanup_workbooks.append((source_wb, "source"))
+    if 'target_created_by_us' in locals() and target_created_by_us:
+        cleanup_workbooks.append((target_wb, "target"))
+    
+    cleanup_errors = []
+    for wb, wb_type in cleanup_workbooks:
+        try:
+            if wb:
+                wb.close()
+        except Exception as cleanup_error:
+            cleanup_errors.append(f"{wb_type}: {str(cleanup_error)}")
+    
     result = {
         "success": False,
         "operation": "move_sheet",
         "sheet_name": source_sheet_name if 'source_sheet_name' in locals() else worksheet_name,
-        "source_workbook": source_wb.name if 'source_wb' in locals() else None,
+        "source_workbook": source_wb.name if 'source_wb' in locals() and source_wb else "${params.workbook || ''}",
         "target_workbook": "${targetWorkbook}" if "${targetWorkbook}" else None,
-        "error": str(e)
+        "error": str(e),
+        "cleanup_performed": len(cleanup_workbooks) > 0,
+        "cleanup_errors": cleanup_errors if cleanup_errors else None
     }
 
 print(json.dumps(result))`;
@@ -3152,63 +4048,198 @@ print(json.dumps(result))`;
     const referenceSheet = sheetCopy?.reference_sheet || '';
     
     return `
-# Copy sheet
-app = xw.apps.active if xw.apps else None
-if not app:
-    app = xw.App(visible=False)
+# Smart copy sheet with multi-instance support
+# Phase 1: Find/open source workbook
+source_wb, source_app, source_opened_by_us, source_created_by_us = get_workbook_smart(
+    "${params.workbook || ''}", 
+    auto_open=True, 
+    create_if_missing=False
+)
 
-source_wb = get_workbook(app, "${params.workbook || ''}")
 if not source_wb:
-    raise Exception("Could not find the source workbook")
+    raise Exception(f"Could not find or open source workbook '${params.workbook || ''}'")
 
-# Check if worksheet is specified
+# Phase 2: Find/open target workbook (if cross-workbook copy)
+target_wb = None
+target_app = None
+target_opened_by_us = False
+target_created_by_us = False
+
+if "${targetWorkbook}":
+    # Cross-workbook copy
+    target_wb, target_app, target_opened_by_us, target_created_by_us = get_workbook_smart(
+        "${targetWorkbook}",
+        preferred_app=source_app,  # Prefer same instance as source
+        auto_open=True,
+        create_if_missing=True  # Create target workbook if it doesn't exist
+    )
+    
+    if not target_wb:
+        raise Exception(f"Could not find, open, or create target workbook '${targetWorkbook}'")
+    
+    copy_type = "cross_workbook"
+else:
+    # Same workbook copy
+    target_wb = source_wb
+    target_app = source_app
+    copy_type = "same_workbook"
+
+# Phase 3: Find and copy the source worksheet
 worksheet_name = "${params.worksheet || ''}"
 if not worksheet_name:
     raise Exception("worksheet parameter is required for copy_sheet operation")
 
-# Find the source worksheet
 try:
     source_ws = source_wb.sheets[worksheet_name]
     source_sheet_name = source_ws.name
     original_index = source_ws.index - 1  # Convert to 0-based
 except KeyError:
     available_sheets = [sheet.name for sheet in source_wb.sheets]
+    # Clean up opened workbooks before failing
+    cleanup_workbooks = []
+    if source_opened_by_us or source_created_by_us:
+        cleanup_workbooks.append((source_wb, "source"))
+    if target_opened_by_us or target_created_by_us:
+        cleanup_workbooks.append((target_wb, "target"))
+    
+    for wb, wb_type in cleanup_workbooks:
+        try:
+            wb.close()
+        except:
+            pass  # Ignore cleanup errors
+    
     raise Exception(f"Worksheet '{worksheet_name}' not found in source workbook. Available sheets: {available_sheets}")
 
-copy_type = None
-target_wb = None
+# Phase 4: Perform the copy operation
 copied_sheet_name = None
+final_index = None
 
 try:
-    # Determine target workbook and copy type
-    if "${targetWorkbook}":
-        # Cross-workbook copy
-        target_wb = get_workbook(app, "${targetWorkbook}")
-        if not target_wb:
-            raise Exception(f"Target workbook '{targetWorkbook}' not found")
+    if copy_type == "cross_workbook":
+        # Check if source and target are in different Excel instances
+        cross_instance = source_app != target_app
         
-        copy_type = "cross_workbook"
+        if cross_instance:
+            # Cross-instance copy: Use complete sheet reconstruction method
+            print(f"Cross-instance copy detected: Source PID {source_app.pid if hasattr(source_app, 'pid') else 'unknown'}, Target PID {target_app.pid if hasattr(target_app, 'pid') else 'unknown'}")
+            
+            # Step 1: Extract all data from source sheet
+            if source_ws.used_range:
+                used_range_addr = source_ws.used_range.address
+                sheet_data = source_ws.used_range.value
+            else:
+                # Empty sheet
+                used_range_addr = "$A$1"
+                sheet_data = None
+            
+            # Step 2: Extract sheet properties
+            source_sheet_info = {
+                "name": source_ws.name,
+                "data": sheet_data,
+                "used_range": used_range_addr,
+                "tab_color": None,  # Will extract if available
+                "visible": True     # Default visible
+            }
+            
+            # Try to extract tab color (might fail in some Excel versions)
+            try:
+                if hasattr(source_ws.api, 'Tab') and hasattr(source_ws.api.Tab, 'Color'):
+                    source_sheet_info["tab_color"] = source_ws.api.Tab.Color
+            except:
+                pass
+                
+            # Try to extract visibility
+            try:
+                source_sheet_info["visible"] = source_ws.api.Visible != 0  # Excel uses 0 for hidden
+            except:
+                pass
+            
+            # Step 3: Create new sheet in target workbook
+            copied_ws = target_wb.sheets.add()
+            copied_sheet_name = source_sheet_info["name"]
+            
+            # Generate unique name if needed
+            existing_names = [sheet.name for sheet in target_wb.sheets if sheet != copied_ws]
+            if copied_sheet_name in existing_names:
+                counter = 1
+                original_name = copied_sheet_name
+                while copied_sheet_name in existing_names:
+                    copied_sheet_name = f"{original_name}_Copy{counter}"
+                    counter += 1
+            
+            copied_ws.name = copied_sheet_name
+            
+            # Step 4: Transfer data if exists
+            if sheet_data is not None:
+                # Determine the range to write to
+                if isinstance(sheet_data, list):
+                    if len(sheet_data) > 0:
+                        rows = len(sheet_data)
+                        cols = len(sheet_data[0]) if isinstance(sheet_data[0], list) else 1
+                        target_range = f"A1:{chr(64 + cols)}{rows}" if cols <= 26 else f"A1:{chr(64 + cols//26)}{chr(64 + cols%26)}{rows}"
+                        copied_ws.range(target_range).value = sheet_data
+                else:
+                    # Single value
+                    copied_ws.range("A1").value = sheet_data
+            
+            # Step 5: Apply sheet properties
+            try:
+                if source_sheet_info["tab_color"] is not None:
+                    copied_ws.api.Tab.Color = source_sheet_info["tab_color"]
+            except:
+                pass
+                
+            try:
+                copied_ws.api.Visible = -1 if source_sheet_info["visible"] else 0
+            except:
+                pass
+            
+            # Step 6: Try to copy formatting (basic formatting only due to complexity)
+            if sheet_data is not None and source_ws.used_range:
+                try:
+                    # Copy basic formatting from header row if it exists
+                    if isinstance(sheet_data, list) and len(sheet_data) > 0:
+                        # Check if first row might be headers
+                        first_row = sheet_data[0]
+                        if isinstance(first_row, list) and len(first_row) > 0:
+                            # Try to copy bold formatting from source header
+                            source_header_range = source_ws.range("A1:" + chr(64 + len(first_row)) + "1")
+                            target_header_range = copied_ws.range("A1:" + chr(64 + len(first_row)) + "1")
+                            
+                            # Copy bold formatting
+                            try:
+                                if source_header_range.api.Font.Bold:
+                                    target_header_range.api.Font.Bold = True
+                            except:
+                                pass
+                                
+                            # Copy background color
+                            try:
+                                source_color = source_header_range.color
+                                if source_color and source_color != (255, 255, 255):  # Not white
+                                    target_header_range.color = source_color
+                            except:
+                                pass
+                except:
+                    # Formatting failed, but data copy was successful
+                    pass
+            
+            final_index = copied_ws.index - 1  # Convert to 0-based
+            print(f"Cross-instance sheet reconstruction completed: '{copied_sheet_name}' at index {final_index}")
+            
+        else:
+            # Same instance cross-workbook copy - use native Excel API
+            source_ws.api.Copy(After=target_wb.sheets[-1].api)
+            copied_ws = target_wb.sheets[-1]
+            copied_sheet_name = copied_ws.name
+            final_index = len(target_wb.sheets) - 1
         
-        # Copy worksheet to target workbook (default: to the end)
-        source_ws.api.Copy(After=target_wb.sheets[-1].api)
-        
-        # Get the copied sheet (it will be the last sheet in target workbook)
-        copied_ws = target_wb.sheets[-1]
-        copied_sheet_name = copied_ws.name
-        final_index = len(target_wb.sheets) - 1
-        
-    else:
-        # Same workbook copy (create duplicate)
-        target_wb = source_wb
-        copy_type = "same_workbook"
-        
-        # Copy worksheet within same workbook (default: after original)
+    else:  # same_workbook
+        # Same workbook copy - copy after original sheet
         source_ws.api.Copy(After=source_ws.api)
-        
-        # Get the copied sheet (it will be right after the original)
         copied_ws = source_wb.sheets[source_ws.index]  # xlwings 1-based index
         copied_sheet_name = copied_ws.name
-        final_index = source_ws.index  # This is 0-based for result
+        final_index = source_ws.index  # This will be 0-based for result
     
     # Handle custom naming
     if "${newName}":
@@ -3266,7 +4297,7 @@ try:
             available_sheets = [sheet.name for sheet in target_wb.sheets if sheet.name != copied_sheet_name]
             raise Exception(f"Reference sheet '{referenceSheet}' not found. Available sheets: {available_sheets}")
     
-    # Prepare result based on copy type
+    # Phase 5: Prepare result with workbook status information
     if copy_type == "cross_workbook":
         result = {
             "success": True,
@@ -3279,7 +4310,14 @@ try:
             "source_index": original_index,
             "target_index": final_index,
             "target_sheets_after": [sheet.name for sheet in target_wb.sheets],
-            "target_sheets_count": len(target_wb.sheets)
+            "target_sheets_count": len(target_wb.sheets),
+            "workbook_status": {
+                "source_opened_by_operation": source_opened_by_us,
+                "source_created_by_operation": source_created_by_us,
+                "target_opened_by_operation": target_opened_by_us,
+                "target_created_by_operation": target_created_by_us,
+                "cross_instance": source_app != target_app
+            }
         }
     else:  # same_workbook
         result = {
@@ -3292,17 +4330,42 @@ try:
             "source_index": original_index,
             "copied_index": final_index,
             "sheets_after": [(i, sheet.name) for i, sheet in enumerate(target_wb.sheets)],
-            "total_sheets": len(target_wb.sheets)
+            "total_sheets": len(target_wb.sheets),
+            "workbook_status": {
+                "source_opened_by_operation": source_opened_by_us,
+                "source_created_by_operation": source_created_by_us
+            }
         }
 
 except Exception as e:
+    # Clean up any workbooks we opened during this operation
+    cleanup_workbooks = []
+    if 'source_opened_by_us' in locals() and source_opened_by_us:
+        cleanup_workbooks.append((source_wb, "source"))
+    if 'target_opened_by_us' in locals() and target_opened_by_us:
+        cleanup_workbooks.append((target_wb, "target"))
+    if 'source_created_by_us' in locals() and source_created_by_us:
+        cleanup_workbooks.append((source_wb, "source"))
+    if 'target_created_by_us' in locals() and target_created_by_us:
+        cleanup_workbooks.append((target_wb, "target"))
+    
+    cleanup_errors = []
+    for wb, wb_type in cleanup_workbooks:
+        try:
+            if wb:
+                wb.close()
+        except Exception as cleanup_error:
+            cleanup_errors.append(f"{wb_type}: {str(cleanup_error)}")
+    
     result = {
         "success": False,
         "operation": "copy_sheet",
         "source_sheet_name": source_sheet_name if 'source_sheet_name' in locals() else worksheet_name,
-        "source_workbook": source_wb.name if 'source_wb' in locals() else None,
+        "source_workbook": source_wb.name if 'source_wb' in locals() and source_wb else "${params.workbook || ''}",
         "target_workbook": "${targetWorkbook}" if "${targetWorkbook}" else None,
-        "error": str(e)
+        "error": str(e),
+        "cleanup_performed": len(cleanup_workbooks) > 0,
+        "cleanup_errors": cleanup_errors if cleanup_errors else None
     }
 
 print(json.dumps(result))`;
@@ -3311,8 +4374,8 @@ print(json.dumps(result))`;
   private generateAddCommentLogic(params: XlwingsParams): string {
     const comment = params.comment;
     const commentText = comment?.text || '';
-    const author = comment?.author || '';
-    const visible = comment?.visible ?? true;
+    // const author = comment?.author || '';
+    // const visible = comment?.visible ?? true;
     
     return `
 # Add comment to cell
@@ -3320,9 +4383,11 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
@@ -3346,26 +4411,17 @@ try:
         raise Exception("comment.text is required for add_comment operation")
     
     # Delete existing comment if any
-    if cell.comment:
-        cell.comment.delete()
-    
-    # Add new comment
-    cell.comment = comment_text
-    
-    # Set author if provided
-    author = "${author}"
-    if author:
-        try:
-            cell.comment.author = author
-        except:
-            pass  # Some Excel versions don't support setting author
-    
-    # Set visibility
-    visible = ${visible ? 'True' : 'False'}
     try:
-        cell.comment.visible = visible
+        if cell.note:
+            cell.note.delete()
     except:
-        pass  # Some Excel versions don't support setting visibility
+        pass  # Note doesn't exist, continue
+
+    # Add new comment using note.text property
+    cell.note.text = comment_text
+    
+    # Note: xlwings Note object only supports text property
+    # Author and visibility are not supported in the current Note API
     
     result = {
         "success": True,
@@ -3394,8 +4450,8 @@ print(json.dumps(result))`;
   private generateEditCommentLogic(params: XlwingsParams): string {
     const comment = params.comment;
     const commentText = comment?.text || '';
-    const author = comment?.author || '';
-    const visible = comment?.visible;
+    // const author = comment?.author || '';
+    // const visible = comment?.visible;
     
     return `
 # Edit existing comment
@@ -3403,9 +4459,11 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
@@ -3423,30 +4481,17 @@ try:
     if cell.rows.count > 1 or cell.columns.count > 1:
         raise Exception("Comments can only be edited on single cells, not ranges")
     
-    # Check if comment exists
-    if not cell.comment:
+    # Check if comment exists using note property
+    if not cell.note:
         raise Exception(f"No comment found at {range_str}")
-    
+
     # Update comment text if provided
     comment_text = "${commentText}"
     if comment_text:
-        cell.comment.text = comment_text
+        cell.note.text = comment_text
     
-    # Update author if provided
-    author = "${author}"
-    if author:
-        try:
-            cell.comment.author = author
-        except:
-            pass  # Some Excel versions don't support setting author
-    
-    # Update visibility if provided
-    visible = ${visible !== undefined ? (visible ? 'True' : 'False') : 'None'}
-    if visible is not None:
-        try:
-            cell.comment.visible = visible
-        except:
-            pass  # Some Excel versions don't support setting visibility
+    # Note: xlwings Note object only supports text property
+    # Author and visibility are not supported in the current Note API
     
     result = {
         "success": True,
@@ -3454,7 +4499,7 @@ try:
         "workbook": wb.name,
         "worksheet": ws.name,
         "range": range_str,
-        "comment_text": cell.comment.text,
+        "comment_text": cell.note.text,
         "changes_made": []
     }
     
@@ -3485,9 +4530,11 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
@@ -3505,16 +4552,16 @@ try:
     if cell.rows.count > 1 or cell.columns.count > 1:
         raise Exception("Comments can only be deleted from single cells, not ranges")
     
-    # Check if comment exists
-    if not cell.comment:
+    # Check if comment exists using note property
+    if not cell.note:
         raise Exception(f"No comment found at {range_str}")
-    
+
     # Store comment info before deletion
-    comment_text = cell.comment.text
-    comment_author = getattr(cell.comment, 'author', 'Unknown')
-    
-    # Delete comment
-    cell.comment.delete()
+    comment_text = cell.note.text if cell.note else "No text"
+    comment_author = "Unknown"  # Author info not easily accessible
+
+    # Delete comment using note.delete() method
+    cell.note.delete()
     
     result = {
         "success": True,
@@ -3546,9 +4593,11 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
@@ -3564,14 +4613,14 @@ try:
             for col in range(1, used_range.last_cell.column + 1):
                 try:
                     cell = ws.range((row, col))
-                    if cell.comment:
+                    if cell.note:
                         comment_info = {
                             "address": cell.address,
                             "row": row,
                             "column": col,
-                            "text": cell.comment.text,
-                            "author": getattr(cell.comment, 'author', 'Unknown'),
-                            "visible": getattr(cell.comment, 'visible', False)
+                            "text": cell.note.text,
+                            "author": "Unknown",  # Note object doesn't have author property
+                            "visible": False  # Note object doesn't have visible property
                         }
                         comments.append(comment_info)
                 except:
@@ -3607,24 +4656,30 @@ print(json.dumps(result))`;
     const acrossRowsPython = acrossRows ? 'True' : 'False';
     const centerContentPython = centerContent ? 'True' : 'False';
     
+    const alertHandling = this.generateAlertHandlingCode(params);
+    const alertRestore = this.generateAlertRestoreCode(params);
+    
     return `
 # Merge cells in specified range
 app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
     raise Exception("Could not find the specified worksheet")
+${alertHandling}
 
 # Get target range
 range_str = "${params.range || 'A1'}"
 if not range_str:
-    raise Exception("range parameter is required for merge_cells operation")
+    raise Exception("range parameter is required for merge_range operation")
 
 try:
     range_obj = ws.range(range_str)
@@ -3634,7 +4689,7 @@ try:
         if range_obj.api.MergeCells:
             result = {
                 "success": False,
-                "operation": "merge_cells",
+                "operation": "merge_range",
                 "workbook": wb.name,
                 "worksheet": ws.name,
                 "range": range_str,
@@ -3667,7 +4722,7 @@ try:
             
             result = {
                 "success": True,
-                "operation": "merge_cells",
+                "operation": "merge_range",
                 "workbook": wb.name,
                 "worksheet": ws.name,
                 "range": range_str,
@@ -3677,7 +4732,7 @@ try:
     except Exception as merge_error:
         result = {
             "success": False,
-            "operation": "merge_cells",
+            "operation": "merge_range",
             "workbook": wb.name,
             "worksheet": ws.name,
             "range": range_str,
@@ -3693,29 +4748,35 @@ except Exception as e:
         "range": range_str,
         "error": str(e)
     }
-
+${alertRestore}
 print(json.dumps(result))`;
   }
 
   private generateUnmergeCellsLogic(params: XlwingsParams): string {
+    const alertHandling = this.generateAlertHandlingCode(params);
+    const alertRestore = this.generateAlertRestoreCode(params);
+    
     return `
 # Unmerge cells in specified range
 app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
     raise Exception("Could not find the specified worksheet")
+${alertHandling}
 
 # Get target range
 range_str = "${params.range || 'A1'}"
 if not range_str:
-    raise Exception("range parameter is required for unmerge_cells operation")
+    raise Exception("range parameter is required for unmerge_range operation")
 
 try:
     range_obj = ws.range(range_str)
@@ -3745,7 +4806,7 @@ try:
         if merged_cells:
             result = {
                 "success": True,
-                "operation": "unmerge_cells",
+                "operation": "unmerge_range",
                 "workbook": wb.name,
                 "worksheet": ws.name,
                 "range": range_str,
@@ -3755,7 +4816,7 @@ try:
         else:
             result = {
                 "success": True,
-                "operation": "unmerge_cells", 
+                "operation": "unmerge_range", 
                 "workbook": wb.name,
                 "worksheet": ws.name,
                 "range": range_str,
@@ -3766,7 +4827,7 @@ try:
     except Exception as unmerge_error:
         result = {
             "success": False,
-            "operation": "unmerge_cells",
+            "operation": "unmerge_range",
             "workbook": wb.name,
             "worksheet": ws.name,
             "range": range_str,
@@ -3776,13 +4837,13 @@ try:
 except Exception as e:
     result = {
         "success": False,
-        "operation": "unmerge_cells",
+        "operation": "unmerge_range",
         "workbook": wb.name if 'wb' in locals() else None,
         "worksheet": ws.name if 'ws' in locals() else None,
         "range": range_str,
         "error": str(e)
     }
-
+${alertRestore}
 print(json.dumps(result))`;
   }
 
@@ -3799,9 +4860,11 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
@@ -3896,9 +4959,11 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
@@ -4014,9 +5079,11 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
@@ -4096,9 +5163,11 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
@@ -4216,9 +5285,11 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
@@ -4227,7 +5298,7 @@ if not ws:
 # Get target range
 range_str = "${params.range || 'A1'}"
 if not range_str:
-    raise Exception("range parameter is required for get_cell_info operation")
+    raise Exception("range parameter is required for get_range_info operation")
 
 try:
     range_obj = ws.range(range_str)
@@ -4283,11 +5354,11 @@ try:
             # Comment information
             if include_comments:
                 try:
-                    if cell.comment:
+                    if cell.note:
                         cell_info["comment"] = {
-                            "text": cell.comment.text,
-                            "author": getattr(cell.comment, 'author', 'Unknown'),
-                            "visible": getattr(cell.comment, 'visible', False)
+                            "text": cell.note.text,
+                            "author": "Unknown",  # Not available in Note API
+                            "visible": False  # Not available in Note API
                         }
                     else:
                         cell_info["comment"] = None
@@ -4326,7 +5397,7 @@ try:
     
     result = {
         "success": True,
-        "operation": "get_cell_info",
+        "operation": "get_range_info",
         "workbook": wb.name,
         "worksheet": ws.name,
         "range": range_str,
@@ -4343,7 +5414,7 @@ try:
 except Exception as e:
     result = {
         "success": False,
-        "operation": "get_cell_info",
+        "operation": "get_range_info",
         "workbook": wb.name if 'wb' in locals() else None,
         "worksheet": ws.name if 'ws' in locals() else None,
         "range": range_str,
@@ -4364,9 +5435,11 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
@@ -4375,7 +5448,7 @@ if not ws:
 # Get target range
 range_str = "${params.range || 'A1'}"
 if not range_str:
-    raise Exception("range parameter is required for insert_cells operation")
+    raise Exception("range parameter is required for insert_range operation")
 
 try:
     range_obj = ws.range(range_str)
@@ -4425,7 +5498,7 @@ try:
     
     result = {
         "success": True,
-        "operation": "insert_cells",
+        "operation": "insert_range",
         "workbook": wb.name,
         "worksheet": ws.name,
         "range": range_str,
@@ -4438,7 +5511,7 @@ try:
 except Exception as e:
     result = {
         "success": False,
-        "operation": "insert_cells",
+        "operation": "insert_range",
         "workbook": wb.name if 'wb' in locals() else None,
         "worksheet": ws.name if 'ws' in locals() else None,
         "range": range_str,
@@ -4453,6 +5526,8 @@ print(json.dumps(result))`;
     const cellOp = params.cell_operation;
     const shiftDirection = cellOp?.shift_direction || 'up';
     const count = cellOp?.count || 1;
+    const alertHandling = this.generateAlertHandlingCode(params);
+    const alertRestore = this.generateAlertRestoreCode(params);
     
     return `
 # Delete cells with shift direction
@@ -4460,18 +5535,21 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
     raise Exception("Could not find the specified worksheet")
+${alertHandling}
 
 # Get target range
 range_str = "${params.range || 'A1'}"
 if not range_str:
-    raise Exception("range parameter is required for delete_cells operation")
+    raise Exception("range parameter is required for delete_range operation")
 
 try:
     range_obj = ws.range(range_str)
@@ -4515,7 +5593,7 @@ try:
     
     result = {
         "success": True,
-        "operation": "delete_cells",
+        "operation": "delete_range",
         "workbook": wb.name,
         "worksheet": ws.name,
         "range": range_str,
@@ -4533,14 +5611,14 @@ try:
 except Exception as e:
     result = {
         "success": False,
-        "operation": "delete_cells",
+        "operation": "delete_range",
         "workbook": wb.name if 'wb' in locals() else None,
         "worksheet": ws.name if 'ws' in locals() else None,
         "range": range_str,
         "shift_direction": shift_direction,
         "error": str(e)
     }
-
+${alertRestore}
 print(json.dumps(result))`;
   }
 
@@ -4560,9 +5638,11 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook(app, "${params.workbook || ''}")
+wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
@@ -4605,8 +5685,8 @@ try:
     xl_sort_normal = 0
     xl_sort_text_as_numbers = 1
     xl_pinyin_sort_type = 1
-    xl_sort_rows = 2  # Sort by rows (default)
-    xl_sort_columns = 1  # Sort by columns
+    xl_sort_rows = 2  # xlSortRows: Sort rows based on column values
+    xl_sort_columns = 1  # xlSortColumns: Sort columns based on row values
     
     # Data type constants
     data_type_constants = {
@@ -4643,30 +5723,55 @@ try:
     for i, key in enumerate(sort_keys):
         if orientation == 'rows':
             # Sorting by columns (vertical sort)
-            col_num = column_to_number(key.get('column', 1))
-            sort_column = range_obj.columns(col_num)
+            col_spec = key.get('column', 1)
             
-            sort_order = xl_ascending if key.get('order', 'asc') == 'asc' else xl_descending
-            data_type = data_type_constants.get(key.get('data_type', 'auto'), xl_sort_normal)
+            # Convert column specification to relative position within the range
+            if isinstance(col_spec, str):
+                # If it's a letter (like "I"), get its absolute column number
+                abs_col_num = column_to_number(col_spec)
+                # Calculate relative position within the range (1-based)
+                relative_col_num = abs_col_num - range_obj.column + 1
+            else:
+                # If it's already a number, treat as relative position
+                relative_col_num = int(col_spec)
             
-            sort_obj.SortFields.Add(
-                Key=sort_column,
-                SortOn=xl_sort_on_values,
-                Order=sort_order,
-                DataOption=data_type
-            )
+            # For Excel Sort, we need to use a single cell from the sort column as the key
+            # This should be relative to the sort range, not absolute coordinates
+            if 1 <= relative_col_num <= range_obj.columns.count:
+                # Use the first row of the specified column within the sort range
+                key_col_index = range_obj.column + relative_col_num - 1
+                sort_key_cell = ws.range((sort_range.row, key_col_index))
+                
+                sort_order = xl_ascending if key.get('order', 'asc') == 'asc' else xl_descending
+                data_type = data_type_constants.get(key.get('data_type', 'auto'), xl_sort_normal)
+                
+                sort_obj.SortFields.Add(
+                    Key=sort_key_cell.api,
+                    SortOn=xl_sort_on_values,
+                    Order=sort_order,
+                    DataOption=data_type
+                )
+            else:
+                raise Exception(f"Sort column {col_spec} (relative position {relative_col_num}) is outside the range which has {range_obj.columns.count} columns")
         else:
             # Sorting by rows (horizontal sort)  
             row_num = key.get('row', 1)
-            sort_row = range_obj.rows(row_num)
             
-            sort_order = xl_ascending if key.get('order', 'asc') == 'asc' else xl_descending
-            
-            sort_obj.SortFields.Add(
-                Key=sort_row,
-                SortOn=xl_sort_on_values, 
-                Order=sort_order
-            )
+            # For Excel Sort, we need to use a single cell from the sort row as the key
+            if row_num <= range_obj.rows.count:
+                # Use the first column of the specified row within the sort range
+                key_row_index = range_obj.row + row_num - 1
+                sort_key_cell = ws.range((key_row_index, sort_range.column))
+                
+                sort_order = xl_ascending if key.get('order', 'asc') == 'asc' else xl_descending
+                
+                sort_obj.SortFields.Add(
+                    Key=sort_key_cell.api,
+                    SortOn=xl_sort_on_values, 
+                    Order=sort_order
+                )
+            else:
+                raise Exception(f"Sort row {row_num} is outside the range which has {range_obj.rows.count} rows")
     
     # Set sort range and execute
     sort_obj.SetRange(sort_range.api)
@@ -4902,6 +6007,53 @@ result = {
     "worksheet": ws.name,
     "column": column,
     "last_row": last_row
+}
+print(json.dumps(result))`;
+  }
+
+  private generateGetLastColumnLogic(params: XlwingsParams): string {
+    return `
+# Connect to Excel
+app = xw.apps.active if xw.apps else None
+if not app:
+    raise Exception("No active Excel application found. Please open Excel first.")
+
+wb = get_workbook("${params.workbook || ''}")
+if not wb:
+    wb = xw.books.active
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    ws = wb.sheets.active
+
+# Get last column with data
+row = "${params.range || '1'}"  # Default to row 1 if no range specified
+if ':' in row:
+    row = row.split(':')[0]  # Take first part if range like 1:1
+
+try:
+    # Find last column with data in specified row
+    last_col = ws.range(f"XFD{row}").end('left').column
+    if last_col < 1:
+        last_col = 1
+    last_col_letter = column_number_to_letter(last_col)
+except:
+    # Fallback: use used range
+    try:
+        last_col = ws.used_range.last_cell.column
+        last_col_letter = column_number_to_letter(last_col)
+    except:
+        last_col = 1
+        last_col_letter = "A"
+
+result = {
+    "success": True,
+    "operation": "get_last_column",
+    "workbook": wb.name,
+    "worksheet": ws.name,
+    "row": row,
+    "last_column": last_col,
+    "last_column_letter": last_col_letter
 }
 print(json.dumps(result))`;
   }
@@ -5352,6 +6504,9 @@ try:
         chart.api.Axes(2).AxisTitle.Text = "${chartConfig.y_axis_title}"
         updated_properties.append("y_axis_title")
         ` : ''}
+
+        # Placeholder to ensure try block is never empty
+        pass
     except Exception as title_error:
         pass
     
@@ -5819,7 +6974,8 @@ except Exception as e:
     print(json.dumps(result))`;
   }
 
-  private generateSaveRangeAsImageLogic(params: XlwingsParams): string {
+  // TODO: Implement when Pillow library is available
+  /* private generateSaveRangeAsImageLogic(params: XlwingsParams): string {
     const range = params.range || 'A1:E10';
     const outputPath = params.output_path || '';
     
@@ -5896,7 +7052,7 @@ except Exception as e:
         "xlwings_error": str(e)
     }
     print(json.dumps(result))`;
-  }
+  } */
 
   private generateSaveChartAsImageLogic(params: XlwingsParams): string {
     const chartName = params.chart_name || '';
@@ -6135,7 +7291,7 @@ try:
     
     result = {
         "success": True,
-        "operation": "search_range",
+        "operation": "find_range",
         "workbook": wb.name,
         "search_term": search_term,
         "search_formulas": search_formulas,
@@ -6148,7 +7304,7 @@ try:
 except Exception as e:
     result = {
         "success": False,
-        "operation": "search_range",
+        "operation": "find_range",
         "xlwings_error": str(e)
     }
     print(json.dumps(result))`;
@@ -6443,47 +7599,86 @@ ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
     ws = wb.sheets.active
 
-# Import required modules for shapes
-import xlwings.constants as constants
-
-# Shape type mapping
-shape_type_mapping = {
-    'rectangle': constants.ShapeType.xlRectangle,
-    'oval': constants.ShapeType.xlOval,
-    'triangle': constants.ShapeType.xlIsoscelesTriangle,
-    'line': constants.ShapeType.xlLine,
-    'arrow': constants.ShapeType.xlArrow,
-    'textbox': constants.ShapeType.xlTextBox,
-    'flowchart_process': constants.ShapeType.xlFlowchartProcess,
-    'flowchart_decision': constants.ShapeType.xlFlowchartDecision,
-    'flowchart_start_end': constants.ShapeType.xlFlowchartTerminator,
-    'flowchart_connector': constants.ShapeType.xlFlowchartConnector,
-    'star': constants.ShapeType.xl5pointStar,
-    'pentagon': constants.ShapeType.xlRegularPentagon,
-    'hexagon': constants.ShapeType.xlHexagon
-}
-
+# Shape creation using COM API - xlwings high-level API doesn't support direct shape creation
+# Use basic COM API for limited shape types
 try:
     shape_type = "${shapeType}"
-    if shape_type not in shape_type_mapping:
-        raise ValueError(f"Unsupported shape type: {shape_type}")
-    
-    # Create the shape
-    shape_obj = ws.shapes.add_shape(
-        Type=shape_type_mapping[shape_type],
-        Left=${left},
-        Top=${top},
-        Width=${width},
-        Height=${height}
-    )
+
+    # Define shape type mapping with comprehensive support
+    shape_type_mapping = {
+        'rectangle': 1,    # msoShapeRectangle
+        'oval': 9,         # msoShapeOval
+        'textbox': 1,      # Use rectangle for textbox (msoShapeRectangle)
+
+        # Arrows
+        'right_arrow': 33,     # msoShapeRightArrow
+        'left_arrow': 34,      # msoShapeLeftArrow
+        'up_arrow': 35,        # msoShapeUpArrow
+        'down_arrow': 36,      # msoShapeDownArrow
+        'left_right_arrow': 37, # msoShapeLeftRightArrow
+        'up_down_arrow': 38,   # msoShapeUpDownArrow
+        'quad_arrow': 39,      # msoShapeQuadArrow
+
+        # Flow Chart Shapes
+        'flowchart_process': 61,      # msoShapeFlowchartProcess
+        'flowchart_decision': 63,     # msoShapeFlowchartDecision
+        'flowchart_document': 67,     # msoShapeFlowchartDocument
+        'flowchart_terminator': 69,   # msoShapeFlowchartTerminator
+        'flowchart_preparation': 70,  # msoShapeFlowchartPreparation
+        'flowchart_manual_input': 71, # msoShapeFlowchartManualInput
+
+        # Callouts
+        'rectangular_callout': 105,   # msoShapeRectangularCallout
+        'oval_callout': 107,          # msoShapeOvalCallout
+        'line_callout': 109,          # msoShapeLineCallout1
+        # Connectors
+        'flowchart_connector': 103,   # msoShapeFlowchartConnector
+        'line': 9,                    # msoShapeLineSegment (for simple lines)
+        # Basic geometric shapes
+        'triangle': 5,                # msoShapeIsoscelesTriangle
+        'star': 12,                   # msoShape32pointStar
+        'pentagon': 7,                # msoShapePentagon
+        'hexagon': 8                  # msoShapeHexagon
+    }
+
+    # Define connector type mapping for AddConnector method
+    connector_type_mapping = {
+        'straight_connector': 1,      # msoConnectorStraight
+        'elbow_connector': 2,         # msoConnectorElbow
+        'curved_connector': 3,        # msoConnectorCurve
+    }
+
+    # Check if this is a connector type
+    if shape_type in connector_type_mapping:
+        # Use AddConnector method for connector shapes
+        shape_obj = ws.api.Shapes.AddConnector(
+            Type=connector_type_mapping[shape_type],
+            BeginX=${left},
+            BeginY=${top},
+            EndX=${left + width},
+            EndY=${top + height}
+        )
+    elif shape_type in shape_type_mapping:
+        # Use AddShape method for regular shapes
+        shape_obj = ws.api.Shapes.AddShape(
+            Type=shape_type_mapping[shape_type],
+            Left=${left},
+            Top=${top},
+            Width=${width},
+            Height=${height}
+        )
+    else:
+        raise ValueError(f"Unsupported shape type: {shape_type}. Supported types: {list(shape_type_mapping.keys()) + list(connector_type_mapping.keys())}")
     
     # Set shape name
-    shape_obj.name = "${name}"
-    
+    shape_obj.Name = "${name}"
+
     # Add text if provided
     if "${text}":
-        shape_obj.text_frame.characters.text = "${text}"
-    
+        shape_obj.TextFrame2.TextRange.Text = "${text}"
+
+    ${this.generateConnectionLogic(shape)}
+
     ${this.generateShapeStyleCode(shape)}
     ${this.generateShapeTextFormatCode(shape)}
     
@@ -6492,7 +7687,7 @@ try:
         "operation": "create_shape",
         "workbook": wb.name,
         "worksheet": ws.name,
-        "shape_name": shape_obj.name,
+        "shape_name": shape_obj.Name,
         "shape_type": "${shapeType}",
         "position": {"left": ${left}, "top": ${top}},
         "size": {"width": ${width}, "height": ${height}},
@@ -6529,11 +7724,12 @@ if not ws:
     ws = wb.sheets.active
 
 # Import required modules for shapes
-import xlwings.constants as constants
+# Note: Using Excel API directly instead of xlwings.constants
 
 try:
-    # Create textbox
-    textbox = ws.shapes.add_textbox(
+    # Create textbox using rectangle shape (more reliable than msoTextBox)
+    textbox = ws.api.Shapes.AddShape(
+        Type=1,  # msoShapeRectangle - better for textbox
         Left=${left},
         Top=${top},
         Width=${width},
@@ -6541,11 +7737,12 @@ try:
     )
     
     # Set textbox name
-    textbox.name = "${name}"
+    textbox.Name = "${name}"
     
     # Set text content
-    textbox.text_frame.characters.text = "${text}"
-    
+    if "${text}":
+        textbox.TextFrame2.TextRange.Text = "${text}"
+
     ${this.generateShapeStyleCode(shape)}
     ${this.generateShapeTextFormatCode(shape)}
     
@@ -6554,7 +7751,7 @@ try:
         "operation": "create_textbox",
         "workbook": wb.name,
         "worksheet": ws.name,
-        "shape_name": textbox.name,
+        "shape_name": textbox.Name,
         "position": {"left": ${left}, "top": ${top}},
         "size": {"width": ${width}, "height": ${height}},
         "text": "${text}"
@@ -6592,9 +7789,9 @@ try:
                 "width": shape.width,
                 "height": shape.height
             },
-            "text": getattr(shape.text_frame.characters, 'text', '') if hasattr(shape, 'text_frame') else '',
-            "rotation": shape.rotation if hasattr(shape, 'rotation') else 0,
-            "visible": shape.visible
+            "text": getattr(shape, 'text', '') if hasattr(shape, 'text') else '',
+            "rotation": getattr(shape, 'rotation', 0),
+            "visible": getattr(shape, 'visible', True)
         }
         shapes_info.append(shape_info)
     
@@ -6638,7 +7835,7 @@ try:
             break
     
     if not target_shape:
-        raise ValueError(f"Shape '{shapeName}' not found")
+        raise ValueError(f"Shape '${shapeName}' not found")
     
     ${this.generateShapeModificationCode(params)}
     
@@ -6681,9 +7878,9 @@ try:
             shape.delete()
             shape_found = True
             break
-    
+
     if not shape_found:
-        raise ValueError(f"Shape '{shapeName}' not found")
+        raise ValueError(f"Shape '${shapeName}' not found")
     
     result = {
         "success": True,
@@ -6726,7 +7923,7 @@ try:
             break
     
     if not target_shape:
-        raise ValueError(f"Shape '{shapeName}' not found")
+        raise ValueError(f"Shape '${shapeName}' not found")
     
     # Move the shape
     old_left = target_shape.left
@@ -6779,7 +7976,7 @@ try:
             break
     
     if not target_shape:
-        raise ValueError(f"Shape '{shapeName}' not found")
+        raise ValueError(f"Shape '${shapeName}' not found")
     
     # Store old dimensions
     old_width = target_shape.width
@@ -6824,6 +8021,41 @@ except Exception as e:
     print(json.dumps(result))`;
   }
 
+  private generateConnectionLogic(shape: { connection?: { start_shape?: string, end_shape?: string, start_connection_site?: number, end_connection_site?: number }, type?: string }): string {
+    if (!shape.connection || !shape.connection.start_shape || !shape.connection.end_shape) {
+      return '';
+    }
+
+    const connection = shape.connection;
+    const isConnector = shape.type && ['straight_connector', 'elbow_connector', 'curved_connector', 'flowchart_connector'].includes(shape.type);
+
+    if (!isConnector) {
+      return '';
+    }
+
+    return `
+    # Connect to shapes using COM API
+    try:
+        # Find start and end shapes
+        start_shape = None
+        end_shape = None
+
+        for existing_shape in ws.api.Shapes:
+            if existing_shape.Name == "${connection.start_shape}":
+                start_shape = existing_shape
+            elif existing_shape.Name == "${connection.end_shape}":
+                end_shape = existing_shape
+
+        if start_shape and end_shape:
+            # Connect the connector to the shapes
+            shape_obj.ConnectorFormat.BeginConnect(start_shape, ${connection.start_connection_site || 0})
+            shape_obj.ConnectorFormat.EndConnect(end_shape, ${connection.end_connection_site || 0})
+        else:
+            print(f"Warning: Could not find shapes to connect - start: ${connection.start_shape}, end: ${connection.end_shape}")
+    except Exception as conn_e:
+        print(f"Connection failed: {str(conn_e)}")`;
+  }
+
   private generateShapeStyleCode(shape: { style?: ShapeStyle }): string {
     if (!shape.style) return '';
 
@@ -6831,21 +8063,21 @@ except Exception as e:
     const style = shape.style;
 
     if (style.fill_color) {
-      styleCode += `    # Set fill color\n    shape_obj.fill.fore_color.rgb = "${style.fill_color}"\n`;
+      styleCode += `    # Set fill color\n    shape_obj.Fill.ForeColor.RGB = 0x${style.fill_color.replace('#', '')}\n`;
     }
 
     if (style.border_color || style.border_width || style.border_style) {
       styleCode += `    # Set border properties\n`;
       if (style.border_color) {
-        styleCode += `    shape_obj.line.color.rgb = "${style.border_color}"\n`;
+        styleCode += `    shape_obj.Line.ForeColor.RGB = 0x${style.border_color.replace('#', '')}\n`;
       }
       if (style.border_width) {
-        styleCode += `    shape_obj.line.weight = ${style.border_width}\n`;
+        styleCode += `    shape_obj.Line.Weight = ${style.border_width}\n`;
       }
     }
 
     if (style.transparency) {
-      styleCode += `    # Set transparency\n    shape_obj.fill.transparency = ${style.transparency}\n`;
+      styleCode += `    # Set transparency\n    shape_obj.Fill.Transparency = ${style.transparency}\n`;
     }
 
     return styleCode;
@@ -6861,19 +8093,19 @@ except Exception as e:
       formatCode += `    # Set font properties\n`;
       const font = textFormat.font;
       if (font.name) {
-        formatCode += `    shape_obj.text_frame.characters.font.name = "${font.name}"\n`;
+        formatCode += `    shape_obj.TextFrame2.TextRange.Font.Name = "${font.name}"\n`;
       }
       if (font.size) {
-        formatCode += `    shape_obj.text_frame.characters.font.size = ${font.size}\n`;
+        formatCode += `    shape_obj.TextFrame2.TextRange.Font.Size = ${font.size}\n`;
       }
       if (font.bold) {
-        formatCode += `    shape_obj.text_frame.characters.font.bold = ${font.bold}\n`;
+        formatCode += `    shape_obj.TextFrame2.TextRange.Font.Bold = ${font.bold ? 'True' : 'False'}\n`;
       }
       if (font.italic) {
-        formatCode += `    shape_obj.text_frame.characters.font.italic = ${font.italic}\n`;
+        formatCode += `    shape_obj.TextFrame2.TextRange.Font.Italic = ${font.italic ? 'True' : 'False'}\n`;
       }
       if (font.color) {
-        formatCode += `    shape_obj.text_frame.characters.font.color.rgb = "${font.color}"\n`;
+        formatCode += `    shape_obj.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = 0x${font.color.replace('#', '')}\n`;
       }
     }
 
@@ -6888,7 +8120,9 @@ except Exception as e:
           'justify': 'xlHAlignJustify'
         };
         const horizontalAlignment = alignmentMap[alignment.horizontal as string] || 'xlHAlignCenter';
-        formatCode += `    shape_obj.text_frame.horizontal_alignment = constants.${horizontalAlignment}\n`;
+        const alignmentValue = horizontalAlignment.replace('xlHAlign', '');
+        const alignmentMap2 = {'Left': 1, 'Center': 2, 'Right': 3, 'Justify': 4};
+        formatCode += `    shape_obj.TextFrame2.TextRange.ParagraphFormat.Alignment = ${alignmentMap2[alignmentValue as keyof typeof alignmentMap2] || 2}\n`;
       }
       if (alignment.vertical) {
         const vAlignmentMap: Record<string, string> = {
@@ -6897,7 +8131,9 @@ except Exception as e:
           'bottom': 'xlVAlignBottom'
         };
         const verticalAlignment = vAlignmentMap[alignment.vertical as string] || 'xlVAlignCenter';
-        formatCode += `    shape_obj.text_frame.vertical_alignment = constants.${verticalAlignment}\n`;
+        const vAlignmentValue = verticalAlignment.replace('xlVAlign', '');
+        const vAlignmentMap2 = {'Top': 1, 'Center': 2, 'Bottom': 3};
+        formatCode += `    shape_obj.TextFrame2.VerticalAnchor = ${vAlignmentMap2[vAlignmentValue as keyof typeof vAlignmentMap2] || 2}\n`;
       }
     }
 
@@ -6922,5 +8158,1096 @@ except Exception as e:
     modCode += this.generateShapeTextFormatCode({ text_format: shape.text_format }).replace(/shape_obj/g, 'target_shape');
 
     return modCode;
+  }
+
+  private generateGetSheetInfoLogic(params: XlwingsParams): string {
+    const analysis = params.sheet_analysis;
+    const topRows = analysis?.top_rows ?? 3;
+    const bottomRows = analysis?.bottom_rows ?? 1;
+    
+    return `
+# Get comprehensive sheet information
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb = get_workbook("${params.workbook || ''}", app)
+if not wb:
+    # Get list of available workbooks for debugging
+    available_workbooks = [book.name for book in app.books] if app.books else []
+    raise Exception(f"Could not find workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    raise Exception("Could not find the specified worksheet")
+
+try:
+    # 1. Get used range information (reusing get_used_range logic)
+    used_range = ws.used_range
+    if used_range:
+        range_address = used_range.address
+        last_row = used_range.last_cell.row
+        last_col = used_range.last_cell.column
+        last_col_letter = column_number_to_letter(last_col)
+    else:
+        range_address = None
+        last_row = 1
+        last_col = 1
+        last_col_letter = "A"
+    
+    result_data = {
+        "used_range": {
+            "address": range_address,
+            "last_row": last_row,
+            "last_column": last_col,
+            "last_column_letter": last_col_letter,
+            "total_rows": last_row if range_address else 0,
+            "total_columns": last_col if range_address else 0
+        }
+    }
+    
+    # 2. Get top rows data
+    if ${topRows} > 0 and range_address:
+        top_rows_range = f"A1:{last_col_letter}{min(${topRows}, last_row)}"
+        top_range_obj = ws.range(top_rows_range)
+        top_data = []
+        
+        for row_idx in range(top_range_obj.rows.count):
+            row_data = []
+            for col_idx in range(top_range_obj.columns.count):
+                cell = top_range_obj[row_idx, col_idx]
+                # Simplified: only store the cell value
+                row_data.append(cell.value)
+            top_data.append(row_data)
+        
+        result_data["top_rows"] = {
+            "range": top_rows_range,
+            "count": len(top_data),
+            "data": top_data
+        }
+    else:
+        result_data["top_rows"] = None
+    
+    # 3. Get bottom rows data
+    if ${bottomRows} > 0 and range_address and last_row > ${topRows}:
+        start_row = max(last_row - ${bottomRows} + 1, ${topRows} + 1)
+        bottom_rows_range = f"A{start_row}:{last_col_letter}{last_row}"
+        bottom_range_obj = ws.range(bottom_rows_range)
+        bottom_data = []
+        
+        for row_idx in range(bottom_range_obj.rows.count):
+            row_data = []
+            for col_idx in range(bottom_range_obj.columns.count):
+                cell = bottom_range_obj[row_idx, col_idx]
+                # Simplified: only store the cell value
+                row_data.append(cell.value)
+            bottom_data.append(row_data)
+        
+        result_data["bottom_rows"] = {
+            "range": bottom_rows_range,
+            "count": len(bottom_data),
+            "data": bottom_data
+        }
+    else:
+        result_data["bottom_rows"] = None
+    
+    # 4. Minimal additional info - just sheet name
+    result_data["sheet_name"] = ws.name
+    
+    result = {
+        "success": True,
+        "operation": "get_sheet_info",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "data": result_data
+    }
+    
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "get_sheet_info",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  // =====================================================
+  // HELPFUL RESPONSE GENERATION METHODS
+  // =====================================================
+
+  /**
+   * Generate helpful success response based on helpful_tool_response.webp best practices
+   */
+  private generateHelpfulSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+    const operation = result.operation || params.op;
+    
+    switch (operation) {
+      case 'get_sheet_info':
+        return this.generateSheetInfoSuccessResponse(result, params);
+      case 'sort_range':
+        return this.generateSortRangeSuccessResponse(result, params);
+      case 'read_range':
+        return this.generateReadRangeSuccessResponse(result, params);
+      case 'find_range':
+        return this.generateFindRangeSuccessResponse(result, params);
+      case 'create_shape':
+        return this.generateCreateShapeSuccessResponse(result, params);
+      case 'list_shapes':
+        return this.generateListShapesSuccessResponse(result, params);
+      case 'create_textbox':
+        return this.generateCreateTextboxSuccessResponse(result, params);
+      default:
+        // Fallback to existing logic for other operations
+        return this.generateGenericSuccessResponse(result, params);
+    }
+  }
+
+  /**
+   * Generate helpful success response for get_sheet_info operation
+   */
+  private generateSheetInfoSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+    const data = result.data as SheetData;
+    if (!data) return 'Sheet analysis completed.';
+
+    let response = '';
+    
+    // 1. Detect data pattern and create summary
+    const pattern = this.detectDataPattern(data);
+    response += `Found **${pattern}** in worksheet "${result.worksheet}".\n\n`;
+
+    // 2. Sheet summary with key statistics
+    if (data.used_range) {
+      const usedRange = data.used_range;
+      response += `**Sheet Summary:**\n`;
+      response += `- Total data: ${usedRange.total_rows} rows × ${usedRange.total_columns} columns (${usedRange.address || 'Empty sheet'})\n`;
+      
+      // Detect headers
+      if (data.top_rows && data.top_rows.data && data.top_rows.data.length > 0) {
+        const firstRow = data.top_rows.data[0];
+        let hasHeaders = false;
+        let headers: unknown[] = [];
+
+        if (Array.isArray(firstRow) && typeof firstRow[0] !== 'object') {
+          // Simple array format - convert to CellInfo format for header detection
+          const cellInfoRow = firstRow.map(cell => ({ value: cell } as CellInfo));
+          hasHeaders = this.detectHeaders(cellInfoRow);
+          headers = firstRow.filter((v: unknown) => v !== null);
+        } else {
+          // Already in CellInfo format
+          hasHeaders = this.detectHeaders(firstRow as CellInfo[]);
+          headers = (firstRow as CellInfo[]).map(cell => cell.value).filter((v: unknown) => v !== null);
+        }
+
+        if (hasHeaders) {
+          response += `- Headers detected: Row 1 (${headers.join(', ')})\n`;
+          response += `- Data rows: ${usedRange.total_rows - 1} records\n`;
+        } else {
+          response += `- Data rows: ${usedRange.total_rows} records (no headers detected)\n`;
+        }
+      }
+    }
+
+    // 3. Data preview
+    if (data.top_rows && data.top_rows.data && data.top_rows.data.length > 0) {
+      response += `\n**Top ${data.top_rows.count} rows preview:**\n`;
+      // Check if data is in simple array format and convert to CellInfo format
+      const previewData = data.top_rows.data;
+      if (Array.isArray(previewData[0]) && typeof previewData[0][0] !== 'object') {
+        // Simple array format - convert to CellInfo format
+        const cellInfoData = previewData.map((row: unknown[]) =>
+          row.map(cell => ({ value: cell } as CellInfo))
+        );
+        response += this.formatDataAsTable(cellInfoData, 10);
+      } else {
+        // Already in CellInfo format
+        response += this.formatDataAsTable(previewData, 10);
+      }
+    }
+
+    // 4. Additional insights
+    if (data.merged_cells && data.merged_cells.count > 0) {
+      response += `\n**Merged cells:** ${data.merged_cells.count} areas found`;
+    }
+
+    // 5. Next action suggestions
+    response += this.generateNextActionSuggestions(result, params);
+
+    return response;
+  }
+
+  /**
+   * Detect data pattern in sheet analysis result
+   */
+  private detectDataPattern(data: SheetData): string {
+    if (!data.used_range || !data.used_range.address) {
+      return 'empty sheet';
+    }
+
+    const hasTopRows = data.top_rows && data.top_rows.data && data.top_rows.data.length > 0;
+    if (!hasTopRows) {
+      return 'data range';
+    }
+
+    const firstRow = data.top_rows?.data[0];
+    let hasHeaders = false;
+
+    if (firstRow) {
+      if (Array.isArray(firstRow) && typeof firstRow[0] !== 'object') {
+        // Simple array format - convert to CellInfo format for header detection
+        const cellInfoRow = firstRow.map(cell => ({ value: cell } as CellInfo));
+        hasHeaders = this.detectHeaders(cellInfoRow);
+      } else {
+        // Already in CellInfo format
+        hasHeaders = this.detectHeaders(firstRow as CellInfo[]);
+      }
+    }
+    
+    if (hasHeaders) {
+      return 'table with headers';
+    }
+
+    const totalRows = data.used_range.total_rows;
+    if (totalRows > 10) {
+      return 'large dataset';
+    } else if (totalRows > 1) {
+      return 'data table';
+    } else {
+      return 'single row data';
+    }
+  }
+
+  /**
+   * Detect if first row contains headers
+   */
+  private detectHeaders(firstRow: CellInfo[] | unknown[]): boolean {
+    if (!firstRow || firstRow.length === 0) return false;
+
+    // Check if all cells in first row are text (typical for headers)
+    const textCells = firstRow.filter(cell => {
+      if (cell && typeof cell === 'object' && 'value' in cell) {
+        // CellInfo format
+        return (cell as CellInfo).value && typeof (cell as CellInfo).value === 'string';
+      } else {
+        // Simple format
+        return cell && typeof cell === 'string';
+      }
+    }).length;
+
+    // If most cells are text, likely headers
+    return textCells >= firstRow.length * 0.7;
+  }
+
+  /**
+   * Format data as markdown table
+   */
+  private formatDataAsTable(data: CellInfo[][] | unknown[][], maxCols: number = 10): string {
+    if (!data || data.length === 0) return '';
+
+    // Handle both CellInfo format and simple array format
+    const visibleData = data.map(row => {
+      const rowData = Array.isArray(row) ? row.slice(0, maxCols) : [];
+      return rowData.map(cell => {
+        // Check if it's CellInfo format (has value property) or simple format
+        if (cell && typeof cell === 'object' && 'value' in cell) {
+          return (cell as CellInfo).value ?? '';
+        } else {
+          return cell ?? '';
+        }
+      });
+    });
+
+    const colCount = Math.min(visibleData[0]?.length || 0, maxCols);
+    if (colCount === 0) return '';
+
+    let table = '| ';
+    // Headers
+    for (let col = 0; col < colCount; col++) {
+      table += `${String(visibleData[0][col]).replace(/\|/g, '\\|')} | `;
+    }
+    table += '\n| ';
+    
+    // Separator
+    for (let col = 0; col < colCount; col++) {
+      table += '--- | ';
+    }
+    table += '\n';
+
+    // Data rows (skip first if it's headers)
+    const startRow = this.detectHeaders(data[0]) ? 1 : 0;
+    for (let row = startRow; row < Math.min(data.length, startRow + 5); row++) {
+      table += '| ';
+      for (let col = 0; col < colCount; col++) {
+        const cellValue = visibleData[row]?.[col] ?? '';
+        table += `${String(cellValue).replace(/\|/g, '\\|')} | `;
+      }
+      table += '\n';
+    }
+
+    return table;
+  }
+
+  /**
+   * Generate next action suggestions based on operation and results
+   */
+  private generateNextActionSuggestions(result: XlwingsResult, params: XlwingsParams): string {
+    const operation = result.operation || params.op;
+    let suggestions = '\n## To work with this data:\n';
+
+    switch (operation) {
+      case 'get_sheet_info':
+        {
+          const data = result.data as SheetData;
+          if (data && data.used_range && data.used_range.address) {
+            const range = data.used_range.address;
+            const hasHeaders = data.top_rows?.data?.[0] ? this.detectHeaders(data.top_rows.data[0]) : false;
+            const dataRange = hasHeaders ? 
+              `A2:${data.used_range.last_column_letter}${data.used_range.last_row}` : 
+              range;
+  
+            suggestions += `- **Sort by column**: \`sort_range(range: "${dataRange}", sort: {"keys": [{"column": "A", "order": "desc"}]})\`\n`;
+            suggestions += `- **Read all data**: \`read_range(range: "${range}")\`\n`;
+            suggestions += `- **Add more data**: \`write_range(range: "A${(data.used_range.last_row || 1) + 1}", data: [["new", "row"]])\`\n`;
+          }
+          break;
+        }
+      
+      default:
+        suggestions += `- **Analyze structure**: \`get_sheet_info(worksheet: "${result.worksheet}")\`\n`;
+        break;
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Generate helpful success response for sort_range operation
+   */
+  private generateSortRangeSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+    let response = `Sorted **${result.rows_affected || 'data'}** by specified criteria.`;
+    
+    if (result.range) {
+      response += `\n\n**Range sorted:** ${result.range}`;
+    }
+    
+    if (result.sort_criteria && result.sort_criteria.length > 0) {
+      response += `\n**Sort criteria:** ${result.sort_criteria.slice(0, 3).map((c: SortCriteria) => `${c.column} (${c.order})`).join(', ')}`;
+    }
+    
+    response += `\n\n## Next actions:\n`;
+    response += `- **View results:** read_range(range: "${result.range || params.range}")\n`;
+    response += `- **Analyze data:** get_sheet_info(worksheet: "${result.worksheet}")`;
+    
+    return response;
+  }
+
+  /**
+   * Generate helpful success response for read_range operation
+   */
+  private generateReadRangeSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+    const data = result.data;
+    let response = '';
+
+    if (Array.isArray(data)) {
+      const rowCount = Array.isArray(data[0]) ? data.length : 1;
+      const colCount = Array.isArray(data[0]) ? data[0].length : data.length;
+
+      response = `Read **${rowCount} rows × ${colCount} columns** from ${result.range || params.range}.`;
+
+      // Show preview if reasonable size
+      if (rowCount <= 10 && colCount <= 10) {
+        response += `\n\n**Data preview:**\n`;
+        // Check if data is in simple array format and convert to CellInfo format if needed
+        try {
+          // formatDataAsTable now handles both simple arrays and CellInfo format
+          response += this.formatDataAsTable(data, 10);
+        } catch (error) {
+          // Fallback: use simple array format
+          response += this.formatDataAsTable(data, 10);
+          console.error('Error formatting data preview:', error);
+        }
+      }
+    } else {
+      response = `Read data from ${result.range || params.range}.`;
+    }
+
+    response += `\n\n## Next actions:\n`;
+    response += `- **Sort data:** sort_range(range: "${result.range || params.range}")\n`;
+    response += `- **Analyze structure:** get_sheet_info(worksheet: "${result.worksheet}")`;
+
+    return response;
+  }
+
+  /**
+   * Generate helpful success response for find_range operation
+   */
+  private generateFindRangeSuccessResponse(result: XlwingsResult, _params: XlwingsParams): string {
+    let response = '';
+    
+    if (result.found_addresses && result.found_addresses.length > 0) {
+      response = `Found **${result.found_addresses.length} matches** for search criteria.`;
+      response += `\n\n**Found at:** ${result.found_addresses.slice(0, 5).join(', ')}`;
+      
+      if (result.found_addresses.length > 5) {
+        response += ` and ${result.found_addresses.length - 5} more locations`;
+      }
+    } else {
+      response = `No matches found for the search criteria.`;
+    }
+    
+    response += `\n\n## Next actions:\n`;
+    response += `- **Read found data:** read_range(range: "${result.found_addresses?.[0] || 'A1'}")\n`;
+    response += `- **Expand search:** Try different search terms or use get_sheet_info() to analyze data structure`;
+    
+    return response;
+  }
+
+  /**
+   * Generate generic success response for operations not yet optimized
+   */
+  private generateGenericSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+    // Return the existing success response logic
+    return `Excel ${params.op} operation completed successfully.`;
+  }
+
+  /**
+   * Generate helpful error response based on helpful_tool_error_response.webp best practices
+   */
+  private generateHelpfulErrorResponse(result: XlwingsResult, params: XlwingsParams): string {
+    const errorMessage = result.xlwings_error || (typeof result.error === 'string' ? result.error : result.error?.message) || 'Unknown error';
+    const errorType = this.identifyErrorType(errorMessage);
+    
+    return this.getErrorTemplate(errorType, {
+      errorMessage,
+      operation: result.operation || params.op,
+      workbook: params.workbook,
+      worksheet: params.worksheet,
+      range: params.range,
+      result,
+      params
+    });
+  }
+
+  /**
+   * Identify error type from error message
+   */
+  private identifyErrorType(errorMessage: string): string {
+    const msg = errorMessage.toLowerCase();
+
+    // Excel COM errors with specific error codes
+    if (msg.includes('-2147352567') || msg.includes('このブックを、ほかの開いているブック') || msg.includes('同じ名前で保存できません')) {
+      return 'duplicate_workbook_name';
+    }
+
+    if (msg.includes('-2147023170') || msg.includes('rpc サーバーを利用できません')) {
+      return 'excel_com_unavailable';
+    }
+
+    // Python/xlwings specific errors
+    if (msg.includes('xlwings library is not installed')) {
+      return 'xlwings_not_installed';
+    }
+
+    if (msg.includes('indentationerror') || msg.includes('expected an indented block')) {
+      return 'python_syntax_error';
+    }
+
+    // VBA access errors
+    if (msg.includes('プログラミングによる visual basic プロジェクトへのアクセスは信頼性に欠けます') ||
+        msg.includes('access to the vba project object model') ||
+        msg.includes('マクロが使用できないか、またはすべてのマクロが無効になっている可能性があります')) {
+      return 'vba_access_denied';
+    }
+
+    // Python attribute/variable errors
+    if (msg.includes('object has no attribute')) {
+      return 'python_attribute_error';
+    }
+
+    if (msg.includes('is not defined') || msg.includes('name \'') && msg.includes('\' is not defined')) {
+      return 'python_variable_error';
+    }
+
+    // Missing parameter errors
+    if (msg.includes('is required for') && msg.includes('operation')) {
+      return 'missing_parameter';
+    }
+
+    if (msg.includes('configuration is required') || msg.includes('parameter is required')) {
+      return 'missing_parameter';
+    }
+
+    // Chart specific errors
+    if (msg.includes('chart') && msg.includes('not found')) {
+      return 'chart_not_found';
+    }
+
+    // Data/range errors
+    if (msg.includes('workbook') && (msg.includes('not found') || msg.includes('could not find'))) {
+      return 'workbook_not_found';
+    }
+
+    if (msg.includes('worksheet') && (msg.includes('not found') || msg.includes('could not find'))) {
+      return 'worksheet_not_found';
+    }
+
+    if (msg.includes('permission') || msg.includes('sharing violation') ||
+        msg.includes('file is already open') || msg.includes('access denied')) {
+      return 'file_permission';
+    }
+
+    if (msg.includes('no active excel') || msg.includes('excel') && msg.includes('not found')) {
+      return 'excel_not_running';
+    }
+
+    if (msg.includes('invalid range') || msg.includes('range') && msg.includes('invalid')) {
+      return 'invalid_range';
+    }
+
+    if (msg.includes('sort column') && msg.includes('outside')) {
+      return 'sort_column_outside_range';
+    }
+
+    // File specific errors
+    if (msg.includes('file not found') || msg.includes('path') && msg.includes('not found')) {
+      return 'file_not_found';
+    }
+
+    return 'generic_error';
+  }
+
+  /**
+   * Get error template based on error type
+   */
+  private getErrorTemplate(errorType: string, context: ErrorContext): string {
+    switch (errorType) {
+      case 'duplicate_workbook_name':
+        return this.getDuplicateWorkbookNameTemplate(context);
+
+      case 'excel_com_unavailable':
+        return this.getExcelComUnavailableTemplate(context);
+
+      case 'xlwings_not_installed':
+        return this.getXlwingsNotInstalledTemplate(context);
+
+      case 'python_syntax_error':
+        return this.getPythonSyntaxErrorTemplate(context);
+
+      case 'vba_access_denied':
+        return this.getVbaAccessErrorTemplate(context);
+
+      case 'python_attribute_error':
+        return this.getPythonAttributeErrorTemplate(context);
+
+      case 'python_variable_error':
+        return this.getPythonVariableErrorTemplate(context);
+
+      case 'missing_parameter':
+        return this.handleMissingParameterError(context);
+
+      case 'chart_not_found':
+        return this.getChartNotFoundTemplate(context);
+
+      case 'file_not_found':
+        return this.getFileNotFoundTemplate(context);
+
+      case 'workbook_not_found':
+        return this.getWorkbookNotFoundTemplate(context);
+
+      case 'worksheet_not_found':
+        return this.getWorksheetNotFoundTemplate(context);
+
+      case 'file_permission':
+        return this.getFilePermissionTemplate(context);
+
+      case 'excel_not_running':
+        return this.getExcelNotRunningTemplate(context);
+
+      case 'invalid_range':
+        return this.getInvalidRangeTemplate(context);
+
+      case 'sort_column_outside_range':
+        return this.getSortColumnOutsideRangeTemplate(context);
+
+      default:
+        return this.getGenericErrorTemplate(context);
+    }
+  }
+
+  /**
+   * Template for workbook not found errors
+   */
+  private getWorkbookNotFoundTemplate(context: ErrorContext): string {
+    let response = `# Workbook Not Found: Invalid workbook name\n\n`;
+    response += `## Error Summary\n`;
+    response += `Your request to ${context.operation} failed because workbook \`${context.workbook || 'unknown'}\` is not currently open in Excel.\n\n`;
+    
+    // Try to extract available workbooks from error message
+    const availableWorkbooks = this.extractAvailableWorkbooks(context.errorMessage);
+    if (availableWorkbooks.length > 0) {
+      response += `## Available Workbooks\n`;
+      response += `Currently open:\n`;
+      availableWorkbooks.forEach((wb: string, index: number) => {
+        response += `- \`${wb}\`${index === 0 ? ' (active)' : ''}\n`;
+      });
+      response += `\n`;
+    }
+    
+    response += `## Resolving This Issue\n`;
+    response += `- Open the workbook: open_workbook(file_path: "C:\\\\path\\\\to\\\\'${context.workbook || 'YourFile.xlsx'}")\n`;
+    if (availableWorkbooks.length > 0) {
+      response += `- Use existing workbook: ${context.operation}(workbook: "${availableWorkbooks[0]}")\n`;
+    }
+    response += `- List all workbooks: list_workbooks()`;
+    
+    return response;
+  }
+
+  /**
+   * Template for worksheet not found errors  
+   */
+  private getWorksheetNotFoundTemplate(context: ErrorContext): string {
+    let response = `# Worksheet Not Found: Invalid worksheet name\n\n`;
+    response += `## Error Summary\n`;
+    response += `Your request to ${context.operation} failed because worksheet ${context.worksheet || 'unknown'} does not exist in the workbook.\n\n`;
+    
+    response += `## Resolving This Issue\n`;
+    response += `- List available worksheets: list_sheets(workbook: "${context.workbook || ''}")\n`;
+    response += `- Use active worksheet: ${context.operation}() (without worksheet parameter)\n`;
+    response += `- Create the worksheet: add_sheet(sheet_name: "${context.worksheet || 'NewSheet'}")`;
+    
+    return response;
+  }
+
+  /**
+   * Template for file permission/locking errors
+   */
+  private getFilePermissionTemplate(context: ErrorContext): string {
+    let response = `# File Access Denied: Permission or locking issue\n\n`;
+    response += `## Error Summary\n`;
+    response += `Your request to ${context.operation} failed because the file is locked or you don't have permission to access it.\n\n`;
+    
+    response += `## Common Causes\n`;
+    response += `- File is open in another Excel instance\n`;
+    response += `- File is being used by another application\n`;
+    response += `- Insufficient file permissions\n\n`;
+    
+    response += `## Resolving This Issue\n`;
+    response += `- Close other Excel instances: list_apps() then close manually\n`;
+    response += `- Release file locks: close_workbook(workbook: "${context.workbook || 'all'}")\n`;
+    response += `- Run Excel as administrator\n`;
+    response += `- Check file is not read-only`;
+    
+    return response;
+  }
+
+  /**
+   * Template for Excel not running errors
+   */
+  private getExcelNotRunningTemplate(context: ErrorContext): string {
+    let response = `# Excel Not Available: Application not running\n\n`;
+    response += `## Error Summary\n`;
+    response += `Your request to ${context.operation} failed because Microsoft Excel is not currently running or accessible.\n\n`;
+    
+    response += `## Resolving This Issue\n`;
+    response += `- Start Excel manually and open a workbook\n`;
+    response += `- Check running applications: list_apps()\n`;
+    response += `- Create new workbook: create_workbook(file_path: "C:\\\\path\\\\to\\\new.xlsx")\n`;
+    response += `- Open existing workbook: open_workbook(file_path: "C:\\\\path\\\\to\\\\existing.xlsx")`;
+    
+    return response;
+  }
+
+  /**
+   * Template for invalid range errors
+   */
+  private getInvalidRangeTemplate(context: ErrorContext): string {
+    let response = `# Invalid Range: Incorrect range format\n\n`;
+    response += `## Error Summary\n`;
+    response += `Your request to ${context.operation} failed because range ${context.range || 'unknown'} is not in a valid format.\n\n`;
+    
+    response += `## Valid Range Examples\n`;
+    response += `- Single cell: A1\n`;
+    response += `- Cell range: A1:C10\n`;
+    response += `- With sheet: Sheet1!A1:B5\n`;
+    response += `- Named range: DataRange\n\n`;
+    
+    response += `## Resolving This Issue\n`;
+    response += `- Check range format: use correct syntax like A1:C10\n`;
+    response += `- Analyze sheet first: get_sheet_info(worksheet: "${context.worksheet || ''}")\n`;
+    response += `- Use get_used_range: get_used_range() to find valid ranges`;
+    
+    return response;
+  }
+
+  /**
+   * Template for sort column outside range errors
+   */
+  private getSortColumnOutsideRangeTemplate(context: ErrorContext): string {
+    let response = `# Sort Column Invalid: Column outside data range\n\n`;
+    response += `## Error Summary\n`;
+    response += `Your sort request failed because the specified column is outside the data range.\n\n`;
+    
+    response += `## Resolving This Issue\n`;
+    response += `- Check available columns: get_sheet_info(worksheet: "${context.worksheet || ''}")\n`;
+    response += `- Use correct column reference (e.g., "A", "B", "C" for absolute, or 1, 2, 3 for relative)\n`;
+    response += `- Verify data range: get_used_range(worksheet: "${context.worksheet || ''}")`;
+    
+    return response;
+  }
+
+  /**
+   * Template for duplicate workbook name error
+   */
+  private getDuplicateWorkbookNameTemplate(context: ErrorContext): string {
+    let response = `# Workbook Name Conflict: ${context.operation || 'create_workbook'}\n\n`;
+    response += `## Error Summary\n`;
+    response += `Excel cannot save this workbook because another workbook with the same name is already open.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- **Choose different name:** create_workbook(file_path: "C:\\\\path\\\\to\\\\unique_name.xlsx")\n`;
+    response += `- **Close conflicting workbook:** close_workbook(workbook: "${context.workbook || 'existing_name'}")\n`;
+    response += `- **List open workbooks:** list_workbooks() to see what's currently open`;
+
+    return response;
+  }
+
+  /**
+   * Template for Excel COM unavailable error
+   */
+  private getExcelComUnavailableTemplate(context: ErrorContext): string {
+    let response = `# Excel COM Server Unavailable: ${context.operation || 'Excel operation'}\n\n`;
+    response += `## Error Summary\n`;
+    response += `Excel's COM interface is not responding. This usually means Excel crashed or is locked up.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- **Restart Excel:** Close all Excel windows and reopen Excel\n`;
+    response += `- **Check processes:** Kill Excel.exe processes in Task Manager if needed\n`;
+    response += `- **Verify installation:** Ensure Office/Excel is properly installed\n`;
+    response += `- **Try again:** list_apps() to confirm Excel is running`;
+
+    return response;
+  }
+
+  /**
+   * Template for xlwings not installed error
+   */
+  private getXlwingsNotInstalledTemplate(context: ErrorContext): string {
+    let response = `# xlwings Library Missing: ${context.operation || 'Excel operation'}\n\n`;
+    response += `## Error Summary\n`;
+    response += `The xlwings Python library is not installed or not accessible.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- **Install xlwings:** pip install xlwings\n`;
+    response += `- **Check Python environment:** Ensure Python is in PATH\n`;
+    response += `- **Verify installation:** python -c "import xlwings; print('OK')"\n`;
+    response += `- **Alternative:** Use conda install xlwings if using Anaconda`;
+
+    return response;
+  }
+
+  /**
+   * Template for Python syntax errors
+   */
+  private getPythonSyntaxErrorTemplate(context: ErrorContext): string {
+    let response = `# Python Code Error: ${context.operation || 'Excel operation'}\n\n`;
+    response += `## Error Summary\n`;
+    response += `There's a Python syntax error in the generated xlwings code.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- **Check parameters:** Ensure all required parameters are provided correctly\n`;
+    response += `- **Avoid special characters:** Some parameter values may contain problematic characters\n`;
+    response += `- **Report issue:** This may be a bug in the tool's code generation\n`;
+    response += `- **Simplify request:** Try breaking down complex operations into smaller steps`;
+
+    return response;
+  }
+
+  /**
+   * Template for chart not found errors
+   */
+  private getChartNotFoundTemplate(context: ErrorContext): string {
+    let response = `# Chart Not Found: ${context.operation || 'chart operation'}\n\n`;
+    response += `## Error Summary\n`;
+    response += `The specified chart doesn't exist in the worksheet.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- **List existing charts:** list_charts(worksheet: "${context.worksheet || ''}")\n`;
+    response += `- **Create chart first:** create_chart() before trying to modify it\n`;
+    response += `- **Check chart name:** Ensure the chart name is spelled correctly\n`;
+    response += `- **Verify worksheet:** Make sure you're looking in the right worksheet`;
+
+    return response;
+  }
+
+  /**
+   * Template for missing parameter errors
+   */
+  private getMissingParameterTemplate(context: ErrorContext, paramName: string, operation: string): string {
+    let response = `# Missing Parameter: ${operation}\n\n`;
+    response += `## Error Summary\n`;
+    response += `The '${paramName}' parameter is required for this operation.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+
+    switch (paramName) {
+      case 'worksheet':
+        response += `- **Specify worksheet:** ${operation}(worksheet: "Sheet1")\n`;
+        response += `- **List worksheets:** list_sheets() to see available sheets\n`;
+        response += `- **Use active sheet:** Remove worksheet parameter to use currently selected sheet`;
+        break;
+      case 'chart_config':
+        response += `- **Add chart config:** ${operation}(chart_config: {type: "column", data_range: "A1:B10"})\n`;
+        response += `- **Check data range:** Ensure data exists in the specified range\n`;
+        response += `- **Choose chart type:** Options: column, line, bar, pie, scatter, area`;
+        break;
+      case 'copy_paste':
+        response += `- **Add copy config:** ${operation}(copy_paste: {source_range: "A1:B2", destination_range: "D1:E2"})\n`;
+        response += `- **Specify ranges:** Both source and destination ranges are required\n`;
+        response += `- **Check range validity:** Ensure ranges exist and are properly formatted`;
+        break;
+      case 'search':
+        response += `- **Add search config:** ${operation}(search: {find: "old_text", replace: "new_text"})\n`;
+        response += `- **Specify search terms:** Both find and replace values are required\n`;
+        response += `- **Consider options:** Set match_case or whole_words if needed`;
+        break;
+      case 'vba_module':
+        response += `- **Specify module name:** ${operation}(vba_module: "Module1")\n`;
+        response += `- **List modules:** list_vba_modules() to see existing modules\n`;
+        response += `- **Check spelling:** Ensure module name is spelled correctly`;
+        break;
+      case 'range':
+        response += `- **Add range:** ${operation}(range: "A1:C10")\n`;
+        response += `- **Check format:** Use Excel range format like A1:B2 or A:A\n`;
+        response += `- **Get used range:** get_used_range() to find data boundaries`;
+        break;
+      case 'search_term':
+        response += `- **Add search term:** ${operation}(search_term: "text_to_find")\n`;
+        response += `- **Check data:** Ensure the text exists in the worksheet\n`;
+        response += `- **Use wildcards:** Try patterns like "*text*" for partial matches`;
+        break;
+      case 'shape_config':
+        response += `- **Add shape config:** ${operation}(shape_config: {type: "rectangle", left: 100, top: 100, width: 200, height: 100})\n`;
+        response += `- **Choose shape type:** Options: rectangle, oval, line, arrow\n`;
+        response += `- **Set position:** Specify left, top, width, height coordinates`;
+        break;
+      default:
+        response += `- **Add ${paramName}:** ${operation}(${paramName}: "appropriate_value")\n`;
+        response += `- **Check documentation:** Review parameter requirements for ${operation}\n`;
+        response += `- **Verify syntax:** Ensure parameter name and value are correctly formatted`;
+    }
+
+    return response;
+  }
+
+  /**
+   * Template for Python attribute errors
+   */
+  private getPythonAttributeErrorTemplate(context: ErrorContext): string {
+    let response = `# Python Object Error: ${context.operation || 'Excel operation'}\n\n`;
+    response += `## Error Summary\n`;
+    response += `The Excel object doesn't have the expected attribute or method.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- **Check Excel version:** Some features require newer Excel versions\n`;
+    response += `- **Verify object type:** The operation may not be supported for this Excel object\n`;
+    response += `- **Try alternative:** Look for similar functionality with different method names\n`;
+    response += `- **Update xlwings:** pip install --upgrade xlwings for latest compatibility`;
+
+    return response;
+  }
+
+  /**
+   * Template for Python variable not defined errors
+   */
+  private getPythonVariableErrorTemplate(context: ErrorContext): string {
+    let response = `# Python Variable Error: ${context.operation || 'Excel operation'}\n\n`;
+    response += `## Error Summary\n`;
+    response += `A variable is referenced before being defined in the Python code.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- **Provide all parameters:** Ensure all required parameters are specified\n`;
+    response += `- **Check parameter names:** Variable names must match expected parameter keys\n`;
+    response += `- **Report bug:** This is likely a code generation issue that needs fixing\n`;
+    response += `- **Retry operation:** Try the operation again with complete parameters`;
+
+    return response;
+  }
+
+  /**
+   * Template for VBA access errors
+   */
+  private getVbaAccessErrorTemplate(context: ErrorContext): string {
+    let response = `# VBA Access Denied: ${context.operation || 'VBA operation'}\n\n`;
+    response += `## Error Summary\n`;
+    response += `Excel security settings prevent programmatic access to VBA projects.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- **Enable VBA access:** File → Options → Trust Center → Trust Center Settings → Macro Settings → Trust access to VBA project object model\n`;
+    response += `- **Check macro security:** Ensure macros are enabled for this workbook\n`;
+    response += `- **Run as administrator:** Try running Excel with administrator privileges\n`;
+    response += `- **Alternative approach:** Use Excel's built-in macro recording instead`;
+
+    return response;
+  }
+
+  /**
+   * Template for file not found errors
+   */
+  private getFileNotFoundTemplate(context: ErrorContext): string {
+    let response = `# File Not Found: ${context.operation || 'file operation'}\n\n`;
+    response += `## Error Summary\n`;
+    response += `The specified file path does not exist or is not accessible.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- **Check file path:** Verify the complete file path is correct\n`;
+    response += `- **Create directory:** Ensure the directory exists before creating the file\n`;
+    response += `- **Check permissions:** Make sure you have read/write access to the location\n`;
+    response += `- **Use absolute path:** Try using full path like C:\\\\path\\\\to\\\\file.xlsx`;
+
+    return response;
+  }
+
+  /**
+   * Handle missing parameter errors with specific guidance
+   */
+  private handleMissingParameterError(context: ErrorContext): string {
+    const errorMsg = context.errorMessage.toLowerCase();
+    const operation = context.operation || 'operation';
+
+    // Extract parameter name from error message
+    let paramName = 'parameter';
+    if (errorMsg.includes('worksheet parameter is required')) {
+      paramName = 'worksheet';
+    } else if (errorMsg.includes('chart configuration is required')) {
+      paramName = 'chart_config';
+    } else if (errorMsg.includes('copy/paste configuration is required')) {
+      paramName = 'copy_paste';
+    } else if (errorMsg.includes('search configuration is required')) {
+      paramName = 'search';
+    } else if (errorMsg.includes('vba_module is required')) {
+      paramName = 'vba_module';
+    } else if (errorMsg.includes('range is required')) {
+      paramName = 'range';
+    } else if (errorMsg.includes('search_term is required')) {
+      paramName = 'search_term';
+    } else if (errorMsg.includes('shape configuration is required')) {
+      paramName = 'shape_config';
+    }
+
+    return this.getMissingParameterTemplate(context, paramName, operation);
+  }
+
+  /**
+   * Generic error template for unhandled cases
+   */
+  private getGenericErrorTemplate(context: ErrorContext): string {
+    let response = `# Operation Failed: ${context.operation || 'Excel operation'}\n\n`;
+    response += `## Error Summary\n`;
+    response += `${context.errorMessage}\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- **Check error details:** Review the specific error message above\n`;
+    response += `- **Verify parameters:** Ensure all required parameters are provided correctly\n`;
+    response += `- **Check Excel state:** list_apps() and list_workbooks() to verify Excel is ready\n`;
+    response += `- **Try simpler operation:** Break down complex requests into smaller steps`;
+
+    return response;
+  }
+
+  /**
+   * Extract available workbooks from error message
+   */
+  private extractAvailableWorkbooks(errorMessage: string): string[] {
+    // Try to extract workbook names from error messages like:
+    // "Available workbooks: ['Book1', 'Book2']"
+    const match = errorMessage.match(/available workbooks[:\s]*\[([^\]]+)\]/i);
+    if (match) {
+      return match[1]
+        .split(',')
+        .map((name: string) => name.trim().replace(/['"]/g, ''))
+        .filter((name: string) => name.length > 0);
+    }
+    
+    return [];
+  }
+
+  /**
+   * Generate success response for create_shape operation
+   */
+  private generateCreateShapeSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+    let response = `✅ **Shape created successfully!**\n\n`;
+
+    response += `**Shape Details:**\n`;
+    response += `- **Name:** ${result.shape?.name || 'Unknown'}\n`;
+    response += `- **Type:** ${result.shape?.type || params.shape?.type || 'Unknown'}\n`;
+    response += `- **Position:** Left ${result.shape?.left || 'N/A'}, Top ${result.shape?.top || 'N/A'}\n`;
+    response += `- **Size:** ${result.shape?.width || 'N/A'} × ${result.shape?.height || 'N/A'} points\n`;
+
+    if (result.shape?.text && result.shape.text.trim()) {
+      response += `- **Text:** "${result.shape.text}"\n`;
+    }
+
+    response += `\n**Next actions:**\n`;
+    response += `- **List all shapes:** list_shapes(worksheet: "${result.worksheet}")\n`;
+    response += `- **Modify shape:** modify_shape(shape_name: "${result.shape?.name}")\n`;
+    response += `- **Move shape:** move_shape(shape_name: "${result.shape?.name}", position: "D5")`;
+
+    return response;
+  }
+
+  /**
+   * Generate success response for list_shapes operation
+   */
+  private generateListShapesSuccessResponse(result: XlwingsResult, _params: XlwingsParams): string {
+    const shapes = result.shapes || [];
+    let response = `✅ **Found ${shapes.length} shape(s)** in worksheet "${result.worksheet}":\n\n`;
+
+    if (shapes.length === 0) {
+      response += `No shapes found in this worksheet.\n\n`;
+      response += `**Create shapes:**\n`;
+      response += `- **Rectangle:** create_shape(shape_type: "rectangle", size: {width: 100, height: 50})\n`;
+      response += `- **Circle:** create_shape(shape_type: "oval", size: {width: 80, height: 80})\n`;
+      response += `- **Text box:** create_textbox(text: "Your text here")`;
+    } else {
+      shapes.forEach((shape: { name: string; type: string; left?: number; top?: number; width?: number; height?: number; text?: string; }, index: number) => {
+        response += `**${index + 1}. ${shape.name || 'Unnamed'}** (${shape.type || 'Unknown type'})\n`;
+        response += `   - Position: ${shape.left || 'N/A'}, ${shape.top || 'N/A'}\n`;
+        response += `   - Size: ${shape.width || 'N/A'} × ${shape.height || 'N/A'}\n`;
+        if (shape.text && shape.text.trim()) {
+          response += `   - Text: "${shape.text}"\n`;
+        }
+        response += `\n`;
+      });
+
+      response += `**Shape operations:**\n`;
+      response += `- **Modify:** modify_shape(shape_name: "ShapeName")\n`;
+      response += `- **Delete:** delete_shape(shape_name: "ShapeName")\n`;
+      response += `- **Move:** move_shape(shape_name: "ShapeName", position: "D5")`;
+    }
+
+    return response;
+  }
+
+  /**
+   * Generate success response for create_textbox operation
+   */
+  private generateCreateTextboxSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+    let response = `✅ **Text box created successfully!**\n\n`;
+
+    response += `**Text Box Details:**\n`;
+    response += `- **Name:** ${result.shape?.name || 'Unknown'}\n`;
+    response += `- **Text:** "${result.shape?.text || params.shape?.text || ''}"\n`;
+    response += `- **Position:** Left ${result.shape?.left || 'N/A'}, Top ${result.shape?.top || 'N/A'}\n`;
+    response += `- **Size:** ${result.shape?.width || 'N/A'} × ${result.shape?.height || 'N/A'} points\n`;
+
+    response += `\n**Next actions:**\n`;
+    response += `- **Edit text:** modify_shape(shape_name: "${result.shape?.name}", text: "New text")\n`;
+    response += `- **Move textbox:** move_shape(shape_name: "${result.shape?.name}", position: "C4")\n`;
+    response += `- **List all shapes:** list_shapes()`;
+
+    return response;
   }
 }
