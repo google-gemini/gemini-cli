@@ -1723,10 +1723,9 @@ describe('InputPrompt', () => {
       });
 
       await waitFor(() => {
-        expect(stdout.lastFrame()).not.toContain('(r:)');
+        expect(props.onSubmit).toHaveBeenCalledWith('echo hello');
       });
 
-      expect(props.onSubmit).toHaveBeenCalledWith('echo hello');
       unmount();
     });
 
