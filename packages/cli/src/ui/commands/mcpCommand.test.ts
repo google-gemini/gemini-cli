@@ -22,17 +22,18 @@ import { Type } from '@google/genai';
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const mockAuthenticate = vi.fn();
   return {
     ...actual,
     getMCPServerStatus: vi.fn(),
     getMCPDiscoveryState: vi.fn(),
-    MCPOAuthProvider: {
-      authenticate: vi.fn(),
-    },
-    MCPOAuthTokenStorage: {
+    MCPOAuthProvider: vi.fn(() => ({
+      authenticate: mockAuthenticate,
+    })),
+    MCPOAuthTokenStorage: vi.fn(() => ({
       getToken: vi.fn(),
       isTokenExpired: vi.fn(),
-    },
+    })),
   };
 });
 
@@ -892,13 +893,14 @@ describe('mcpCommand', () => {
       context.ui.reloadCommands = vi.fn();
 
       const { MCPOAuthProvider } = await import('@google/gemini-cli-core');
+      const mockAuthProvider = new MCPOAuthProvider();
 
       const authCommand = mcpCommand.subCommands?.find(
         (cmd) => cmd.name === 'auth',
       );
       const result = await authCommand!.action!(context, 'test-server');
 
-      expect(MCPOAuthProvider.authenticate).toHaveBeenCalledWith(
+      expect(mockAuthProvider.authenticate).toHaveBeenCalledWith(
         'test-server',
         { enabled: true },
         'http://localhost:3000',
@@ -928,9 +930,10 @@ describe('mcpCommand', () => {
       });
 
       const { MCPOAuthProvider } = await import('@google/gemini-cli-core');
-      (
-        MCPOAuthProvider.authenticate as ReturnType<typeof vi.fn>
-      ).mockRejectedValue(new Error('Auth failed'));
+      const mockAuthProvider = new MCPOAuthProvider();
+      vi.mocked(mockAuthProvider.authenticate).mockRejectedValue(
+        new Error('Auth failed'),
+      );
 
       const authCommand = mcpCommand.subCommands?.find(
         (cmd) => cmd.name === 'auth',

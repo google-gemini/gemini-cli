@@ -4,18 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  type Mock,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ShellTool, EditTool, WriteFileTool } from '@google/gemini-cli-core';
+import {
+  ShellTool,
+  EditTool,
+  WriteFileTool,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+} from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import type { Settings } from './settings.js';
 import type { Extension } from './extension.js';
@@ -1492,37 +1490,94 @@ describe('loadCliConfig model selection', () => {
   });
 });
 
-describe('loadCliConfig folderTrustFeature', () => {
-  const originalArgv = process.argv;
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
-    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
-  });
-
-  afterEach(() => {
-    process.argv = originalArgv;
-    vi.unstubAllEnvs();
-    vi.restoreAllMocks();
-  });
-
-  it('should be false by default', async () => {
-    process.argv = ['node', 'script.js'];
-    const settings: Settings = {};
-    const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFolderTrustFeature()).toBe(false);
-  });
-
-  it('should be true when settings.folderTrustFeature is true', async () => {
+describe('loadCliConfig model selection with model router', () => {
+  it('should use auto model when useModelRouter is true and no model is provided', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const settings: Settings = {
-      security: { folderTrust: { featureEnabled: true } },
-    };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFolderTrustFeature()).toBe(true);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          useModelRouter: true,
+        },
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+  });
+
+  it('should use default model when useModelRouter is false and no model is provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          useModelRouter: false,
+        },
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
+  });
+
+  it('should prioritize argv over useModelRouter', async () => {
+    process.argv = ['node', 'script.js', '--model', 'gemini-from-argv'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          useModelRouter: true,
+        },
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemini-from-argv');
+  });
+
+  it('should prioritize settings over useModelRouter', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          useModelRouter: true,
+        },
+        model: {
+          name: 'gemini-from-settings',
+        },
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemini-from-settings');
+  });
+
+  it('should prioritize environment variable over useModelRouter', async () => {
+    process.argv = ['node', 'script.js'];
+    vi.stubEnv('GEMINI_MODEL', 'gemini-from-env');
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          useModelRouter: true,
+        },
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemini-from-env');
   });
 });
 
@@ -1541,12 +1596,11 @@ describe('loadCliConfig folderTrust', () => {
     vi.restoreAllMocks();
   });
 
-  it('should be false if folderTrustFeature is false and folderTrust is false', async () => {
+  it('should be false when folderTrust is false', async () => {
     process.argv = ['node', 'script.js'];
     const settings: Settings = {
       security: {
         folderTrust: {
-          featureEnabled: false,
           enabled: false,
         },
       },
@@ -1556,49 +1610,26 @@ describe('loadCliConfig folderTrust', () => {
     expect(config.getFolderTrust()).toBe(false);
   });
 
-  it('should be false if folderTrustFeature is true and folderTrust is false', async () => {
+  it('should be true when folderTrust is true', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {
       security: {
         folderTrust: {
-          featureEnabled: true,
-          enabled: false,
-        },
-      },
-    };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFolderTrust()).toBe(false);
-  });
-
-  it('should be false if folderTrustFeature is false and folderTrust is true', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = {
-      security: {
-        folderTrust: {
-          featureEnabled: false,
-          enabled: true,
-        },
-      },
-    };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getFolderTrust()).toBe(false);
-  });
-
-  it('should be true when folderTrustFeature is true and folderTrust is true', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = {
-      security: {
-        folderTrust: {
-          featureEnabled: true,
           enabled: true,
         },
       },
     };
     const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getFolderTrust()).toBe(true);
+  });
+
+  it('should be false by default', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getFolderTrust()).toBe(false);
   });
 });
 
@@ -1711,15 +1742,23 @@ describe('loadCliConfig useRipgrep', () => {
     vi.restoreAllMocks();
   });
 
-  it('should be false by default when useRipgrep is not set in settings', async () => {
+  it('should be true by default when useRipgrep is not set in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getUseRipgrep()).toBe(true);
+  });
+
+  it('should be false when useRipgrep is set to false in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = { tools: { useRipgrep: false } };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getUseRipgrep()).toBe(false);
   });
 
-  it('should be true when useRipgrep is set to true in settings', async () => {
+  it('should be true when useRipgrep is explicitly set to true in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { tools: { useRipgrep: true } };
@@ -1727,12 +1766,30 @@ describe('loadCliConfig useRipgrep', () => {
     expect(config.getUseRipgrep()).toBe(true);
   });
 
-  it('should be false when useRipgrep is explicitly set to false in settings', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = { tools: { useRipgrep: false } };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getUseRipgrep()).toBe(false);
+  describe('loadCliConfig useModelRouter', () => {
+    it('should be false by default when useModelRouter is not set in settings', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = {};
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(config.getUseModelRouter()).toBe(false);
+    });
+
+    it('should be true when useModelRouter is set to true in settings', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = { experimental: { useModelRouter: true } };
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(config.getUseModelRouter()).toBe(true);
+    });
+
+    it('should be false when useModelRouter is explicitly set to false in settings', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = { experimental: { useModelRouter: false } };
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(config.getUseModelRouter()).toBe(false);
+    });
   });
 });
 
@@ -1960,7 +2017,7 @@ describe('loadCliConfig approval mode', () => {
   });
 });
 
-describe('loadCliConfig trustedFolder', () => {
+describe('loadCliConfig fileFiltering', () => {
   const originalArgv = process.argv;
 
   beforeEach(() => {
@@ -1976,126 +2033,165 @@ describe('loadCliConfig trustedFolder', () => {
     vi.restoreAllMocks();
   });
 
-  const testCases = [
-    // Cases where folderTrustFeature is false (feature disabled)
+  const testCases: Array<{
+    property: keyof NonNullable<Settings['fileFiltering']>;
+    getter: (config: ServerConfig.Config) => boolean;
+    value: boolean;
+  }> = [
     {
-      folderTrustFeature: false,
-      folderTrust: true,
-      isWorkspaceTrusted: true,
-      expectedFolderTrust: false,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature disabled, folderTrust true, workspace trusted -> behave as trusted',
+      property: 'disableFuzzySearch',
+      getter: (c) => c.getFileFilteringDisableFuzzySearch(),
+      value: true,
     },
     {
-      folderTrustFeature: false,
-      folderTrust: true,
-      isWorkspaceTrusted: false,
-      expectedFolderTrust: false,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature disabled, folderTrust true, workspace not trusted -> behave as trusted',
+      property: 'disableFuzzySearch',
+      getter: (c) => c.getFileFilteringDisableFuzzySearch(),
+      value: false,
     },
     {
-      folderTrustFeature: false,
-      folderTrust: false,
-      isWorkspaceTrusted: true,
-      expectedFolderTrust: false,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature disabled, folderTrust false, workspace trusted -> behave as trusted',
+      property: 'respectGitIgnore',
+      getter: (c) => c.getFileFilteringRespectGitIgnore(),
+      value: true,
     },
     {
-      folderTrustFeature: false,
-      folderTrust: false,
-      isWorkspaceTrusted: false,
-      expectedFolderTrust: false,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature disabled, folderTrust false, workspace not trusted -> behave as trusted',
-    },
-    // Cases where folderTrustFeature is true (feature enabled)
-    {
-      folderTrustFeature: true,
-      folderTrust: true,
-      isWorkspaceTrusted: true,
-      expectedFolderTrust: true,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature enabled, folderTrust true, workspace trusted -> behave as trusted',
+      property: 'respectGitIgnore',
+      getter: (c) => c.getFileFilteringRespectGitIgnore(),
+      value: false,
     },
     {
-      folderTrustFeature: true,
-      folderTrust: true,
-      isWorkspaceTrusted: false,
-      expectedFolderTrust: true,
-      expectedIsTrustedFolder: false,
-      description:
-        'feature enabled, folderTrust true, workspace not trusted -> behave as not trusted',
+      property: 'respectGeminiIgnore',
+      getter: (c) => c.getFileFilteringRespectGeminiIgnore(),
+      value: true,
     },
     {
-      folderTrustFeature: true,
-      folderTrust: true,
-      isWorkspaceTrusted: undefined,
-      expectedFolderTrust: true,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature enabled, folderTrust false, workspace trust unknown -> behave as trusted',
+      property: 'respectGeminiIgnore',
+      getter: (c) => c.getFileFilteringRespectGeminiIgnore(),
+      value: false,
     },
     {
-      folderTrustFeature: true,
-      folderTrust: false,
-      isWorkspaceTrusted: true,
-      expectedFolderTrust: false,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature enabled, folderTrust false, workspace trusted -> behave as trusted',
+      property: 'enableRecursiveFileSearch',
+      getter: (c) => c.getEnableRecursiveFileSearch(),
+      value: true,
     },
     {
-      folderTrustFeature: true,
-      folderTrust: false,
-      isWorkspaceTrusted: false,
-      expectedFolderTrust: false,
-      expectedIsTrustedFolder: true,
-      description:
-        'feature enabled, folderTrust false, workspace not trusted -> behave as trusted',
+      property: 'enableRecursiveFileSearch',
+      getter: (c) => c.getEnableRecursiveFileSearch(),
+      value: false,
     },
   ];
 
-  for (const {
-    folderTrustFeature,
-    folderTrust,
-    isWorkspaceTrusted: isWorkspaceTrustedValue,
-    expectedFolderTrust,
-    expectedIsTrustedFolder,
-    description,
-  } of testCases) {
-    it(`should correctly set folderTrust and isTrustedFolder when ${description}`, async () => {
-      (isWorkspaceTrusted as Mock).mockImplementation((settings: Settings) => {
-        const folderTrustFeature =
-          settings.security?.folderTrust?.featureEnabled ?? false;
-        const folderTrustSetting =
-          settings.security?.folderTrust?.enabled ?? true;
-        const folderTrustEnabled = folderTrustFeature && folderTrustSetting;
-
-        if (!folderTrustEnabled) {
-          return true;
-        }
-        return isWorkspaceTrustedValue; // This is the part that comes from the test case
-      });
-      const argv = await parseArguments({} as Settings);
+  it.each(testCases)(
+    'should pass $property from settings to config when $value',
+    async ({ property, getter, value }) => {
       const settings: Settings = {
-        security: {
-          folderTrust: {
-            featureEnabled: folderTrustFeature,
-            enabled: folderTrust,
-          },
+        context: {
+          fileFiltering: { [property]: value },
         },
       };
+      const argv = await parseArguments(settings);
       const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(getter(config)).toBe(value);
+    },
+  );
+});
 
-      expect(config.getFolderTrust()).toBe(expectedFolderTrust);
-      expect(config.isTrustedFolder()).toBe(expectedIsTrustedFolder);
+describe('Output Format Configuration', () => {
+  const originalArgv = process.argv;
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.restoreAllMocks();
+  });
+
+  it('should default to text format when no setting or flag is provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {} as Settings,
+      [],
+      'test-session',
+      argv,
+    );
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.TEXT);
+  });
+
+  it('should use the format from settings when no flag is provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { output: { format: 'json' } };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.JSON);
+  });
+
+  it('should use the format from the flag when provided', async () => {
+    process.argv = ['node', 'script.js', '--output-format', 'json'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {} as Settings,
+      [],
+      'test-session',
+      argv,
+    );
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.JSON);
+  });
+
+  it('should prioritize the flag over the setting', async () => {
+    process.argv = ['node', 'script.js', '--output-format', 'text'];
+    const settings: Settings = { output: { format: 'json' } };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.TEXT);
+  });
+});
+
+describe('parseArguments with positional prompt', () => {
+  const originalArgv = process.argv;
+
+  afterEach(() => {
+    process.argv = originalArgv;
+  });
+
+  it('should throw an error when both a positional prompt and the --prompt flag are used', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      'positional',
+      'prompt',
+      '--prompt',
+      'test prompt',
+    ];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
     });
-  }
+
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments({} as Settings)).rejects.toThrow(
+      'process.exit called',
+    );
+
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Cannot use both a positional prompt and the --prompt (-p) flag together',
+      ),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+  });
+
+  it('should correctly parse a positional prompt', async () => {
+    process.argv = ['node', 'script.js', 'positional', 'prompt'];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.promptWords).toEqual(['positional', 'prompt']);
+  });
+
+  it('should correctly parse a prompt from the --prompt flag', async () => {
+    process.argv = ['node', 'script.js', '--prompt', 'test prompt'];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.prompt).toBe('test prompt');
+  });
 });

@@ -24,6 +24,7 @@ import {
   getErrorStatus,
   MCPServerConfig,
   DiscoveredMCPTool,
+  StreamEventType,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -254,6 +255,7 @@ class Session {
 
       try {
         const responseStream = await chat.sendMessageStream(
+          this.config.getModel(),
           {
             message: nextMessage?.parts ?? [],
             config: {
@@ -269,8 +271,12 @@ class Session {
             return { stopReason: 'cancelled' };
           }
 
-          if (resp.candidates && resp.candidates.length > 0) {
-            const candidate = resp.candidates[0];
+          if (
+            resp.type === StreamEventType.CHUNK &&
+            resp.value.candidates &&
+            resp.value.candidates.length > 0
+          ) {
+            const candidate = resp.value.candidates[0];
             for (const part of candidate.content?.parts ?? []) {
               if (!part.text) {
                 continue;
@@ -290,8 +296,8 @@ class Session {
             }
           }
 
-          if (resp.functionCalls) {
-            functionCalls.push(...resp.functionCalls);
+          if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
+            functionCalls.push(...resp.value.functionCalls);
           }
         }
       } catch (error) {
@@ -847,12 +853,15 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
         content: { type: 'text', text: toolResult.returnDisplay },
       };
     } else {
-      return {
-        type: 'diff',
-        path: toolResult.returnDisplay.fileName,
-        oldText: toolResult.returnDisplay.originalContent,
-        newText: toolResult.returnDisplay.newContent,
-      };
+      if ('fileName' in toolResult.returnDisplay) {
+        return {
+          type: 'diff',
+          path: toolResult.returnDisplay.fileName,
+          oldText: toolResult.returnDisplay.originalContent,
+          newText: toolResult.returnDisplay.newContent,
+        };
+      }
+      return null;
     }
   } else {
     return null;

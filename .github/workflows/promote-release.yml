@@ -1,0 +1,190 @@
+name: 'Promote Release'
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run a dry-run of the release process; no branches, npm packages or GitHub releases will be created.'
+        required: true
+        type: 'boolean'
+        default: true
+      force_skip_tests:
+        description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
+        required: false
+        type: 'boolean'
+        default: false
+
+jobs:
+  calculate-versions:
+    name: 'Calculate Versions and Plan'
+    runs-on: 'ubuntu-latest'
+    outputs:
+      STABLE_VERSION: '${{ steps.versions.outputs.STABLE_VERSION }}'
+      STABLE_SHA: '${{ steps.versions.outputs.STABLE_SHA }}'
+      PREVIOUS_STABLE_TAG: '${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}'
+      PREVIEW_VERSION: '${{ steps.versions.outputs.PREVIEW_VERSION }}'
+      PREVIEW_SHA: '${{ steps.versions.outputs.PREVIEW_SHA }}'
+      PREVIOUS_PREVIEW_TAG: '${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}'
+      NEXT_NIGHTLY_VERSION: '${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}'
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          fetch-depth: 0
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install Dependencies'
+        run: 'npm ci'
+
+      - name: 'Calculate Versions and SHAs'
+        id: 'versions'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          set -e
+          STABLE_JSON=$(node scripts/get-release-version.js --type=stable)
+          PREVIEW_JSON=$(node scripts/get-release-version.js --type=preview)
+          NIGHTLY_JSON=$(node scripts/get-release-version.js --type=nightly)
+          echo "STABLE_VERSION=$(echo "${STABLE_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
+          # shellcheck disable=SC1083
+          echo "STABLE_SHA=$(git rev-parse "$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
+          echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
+          echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
+          # shellcheck disable=SC1083
+          echo "PREVIEW_SHA=$(git rev-parse "$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
+          echo "PREVIOUS_PREVIEW_TAG=$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
+          echo "NEXT_NIGHTLY_VERSION=$(echo "${NIGHTLY_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
+
+  promote:
+    name: 'Promote to ${{ matrix.channel }}'
+    needs: 'calculate-versions'
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'write'
+      packages: 'write'
+    strategy:
+      matrix:
+        include:
+          - channel: 'stable'
+            version: '${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
+            sha: '${{ needs.calculate-versions.outputs.STABLE_SHA }}'
+            npm-tag: 'latest'
+            previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}'
+          - channel: 'preview'
+            version: '${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
+            sha: '${{ needs.calculate-versions.outputs.PREVIEW_SHA }}'
+            npm-tag: 'preview'
+            previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}'
+
+    steps:
+      - name: 'Checkout main'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: 'main'
+
+      - name: 'Checkout correct SHA'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: '${{ matrix.sha }}'
+          path: 'release'
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install Dependencies'
+        working-directory: './release'
+        run: 'npm ci'
+
+      - name: 'Run Tests'
+        uses: './.github/actions/run-tests'
+        with:
+          force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+
+      - name: 'Publish Release'
+        uses: './.github/actions/publish-release'
+        with:
+          release-version: '${{ matrix.version }}'
+          release-tag: 'v${{ matrix.version }}'
+          npm-tag: '${{ matrix.npm-tag }}'
+          wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+          wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          dry-run: '${{ github.event.inputs.dry_run }}'
+          previous-tag: '${{ matrix.previous-tag }}'
+          working-directory: './release'
+
+  nightly-pr:
+    name: 'Create Nightly PR'
+    needs: 'calculate-versions'
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'write'
+      pull-requests: 'write'
+    steps:
+      - name: 'Checkout main'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: 'main'
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install Dependencies'
+        run: 'npm ci'
+
+      - name: 'Configure Git User'
+        run: |-
+          git config user.name "gemini-cli-robot"
+          git config user.email "gemini-cli-robot@google.com"
+
+      - name: 'Create and switch to a new branch'
+        id: 'release_branch'
+        run: |
+          BRANCH_NAME="chore/nightly-version-bump-${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          git switch -c "${BRANCH_NAME}"
+          echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
+
+      - name: 'Update package versions'
+        run: 'npm run release:version "${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"'
+
+      - name: 'Commit and Push package versions'
+        env:
+          BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+          DRY_RUN: '${{ github.event.inputs.dry_run }}'
+        run: |-
+          git add package.json npm-shrinkwrap.json packages/*/package.json
+          git commit -m "chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          if [[ "${DRY_RUN}" == "false" ]]; then
+            echo "Pushing release branch to remote..."
+            git push --set-upstream origin "${BRANCH_NAME}"
+          else
+            echo "Dry run enabled. Skipping push."
+          fi
+
+      - name: 'Create and Approve Pull Request'
+        if: |-
+          ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+        run: |
+          gh pr create \
+            --title "chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}" \
+            --body "Automated version bump to prepare for the next nightly release." \
+            --base "main" \
+            --head "${BRANCH_NAME}" \
+            --fill
+          gh pr merge --auto --squash
