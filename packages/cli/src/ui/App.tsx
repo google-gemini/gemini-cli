@@ -12,6 +12,8 @@ import { DialogManager } from './components/DialogManager.js';
 import { Composer } from './components/Composer.js';
 import { useUIState } from './contexts/UIStateContext.js';
 import { QuittingDisplay } from './components/QuittingDisplay.js';
+// Initialize i18n system
+import '../i18n/index.js';
 
 export const App = () => {
   const uiState = useUIState();

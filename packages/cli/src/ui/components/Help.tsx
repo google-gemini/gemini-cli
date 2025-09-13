@@ -31,20 +31,58 @@ export const Help: React.FC<Help> = ({ commands }) => {
         {t('sections.basics')}
       </Text>
       <Text color={theme.text.primary}>
-        {renderStyledText(t('basics.addContext'), {
-          symbol: <Text bold color={theme.text.accent}>@</Text>,
-          example: <Text bold color={theme.text.accent}>@src/myFile.ts</Text>
-        }, theme.text.primary)}
+        {renderStyledText(
+          t('basics.addContext'),
+          {
+            label: (
+              <Text bold color={theme.text.accent}>
+                Add context
+              </Text>
+            ),
+            symbol: (
+              <Text bold color={theme.text.accent}>
+                @
+              </Text>
+            ),
+            example: (
+              <Text bold color={theme.text.accent}>
+                @src/myFile.ts
+              </Text>
+            ),
+          },
+          theme.text.primary,
+        )}
       </Text>
       <Text color={theme.text.primary}>
-        {renderStyledText(t('basics.shellMode'), {
-          symbol: <Text bold color={theme.text.accent}>!</Text>,
-          example: <Text bold color={theme.text.accent}>!npm run start</Text>,
-          natural: <Text bold color={theme.text.accent}>start server</Text>
-        }, theme.text.primary)}
+        {renderStyledText(
+          t('basics.shellMode'),
+          {
+            label: (
+              <Text bold color={theme.text.accent}>
+                Shell mode
+              </Text>
+            ),
+            symbol: (
+              <Text bold color={theme.text.accent}>
+                !
+              </Text>
+            ),
+            example: (
+              <Text bold color={theme.text.accent}>
+                !npm run start
+              </Text>
+            ),
+            natural: (
+              <Text bold color={theme.text.accent}>
+                start server
+              </Text>
+            ),
+          },
+          theme.text.primary,
+        )}
       </Text>
 
-    <Box height={1} />
+      <Box height={1} />
 
       {/* Commands */}
       <Text bold color={theme.text.primary}>
@@ -89,7 +127,7 @@ export const Help: React.FC<Help> = ({ commands }) => {
         <Text color={theme.text.secondary}>[MCP]</Text> - {t('mcpCommand')}
       </Text>
 
-    <Box height={1} />
+      <Box height={1} />
 
       {/* Shortcuts */}
       <Text bold color={theme.text.primary}>
@@ -111,7 +149,8 @@ export const Help: React.FC<Help> = ({ commands }) => {
         <Text bold color={theme.text.accent}>
           {process.platform === 'win32' ? 'Ctrl+Enter' : 'Ctrl+J'}
         </Text>{' '}
-        - {process.platform === 'linux'
+        -{' '}
+        {process.platform === 'linux'
           ? t('shortcuts.ctrlJLinux')
           : t('shortcuts.ctrlJ')}
       </Text>
@@ -159,9 +198,17 @@ export const Help: React.FC<Help> = ({ commands }) => {
       </Text>
       <Box height={1} />
       <Text color={theme.text.primary}>
-        {renderStyledText(t('shortcutsDocs'), {
-          docsPath: <Text bold color={theme.text.accent}>docs/keyboard-shortcuts.md</Text>
-        }, theme.text.primary)}
+        {renderStyledText(
+          t('shortcutsDocs'),
+          {
+            docsPath: (
+              <Text bold color={theme.text.accent}>
+                docs/keyboard-shortcuts.md
+              </Text>
+            ),
+          },
+          theme.text.primary,
+        )}
       </Text>
     </Box>
   );

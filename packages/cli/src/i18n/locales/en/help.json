@@ -5,8 +5,8 @@
     "shortcuts": "Keyboard Shortcuts:"
   },
   "basics": {
-    "addContext": "Add context: Use {symbol} to specify files for context (e.g., {example}) to target specific files or folders.",
-    "shellMode": "Shell mode: Execute shell commands via {symbol} (e.g., {example}) or use natural language (e.g. {natural})."
+    "addContext": "{label}: Use {symbol} to specify files for context (e.g., {example}) to target specific files or folders.",
+    "shellMode": "{label}: Execute shell commands via {symbol} (e.g., {example}) or use natural language (e.g. {natural})."
   },
   "shortcuts": {
     "altLeftRight": "Jump through words in the input",
