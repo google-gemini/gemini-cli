@@ -17,16 +17,14 @@ const KEYCHAIN_SERVICE_NAME = 'gemini-cli-oauth';
 const MAIN_ACCOUNT_KEY = 'main-account';
 
 export class OAuthCredentialStorage {
-  constructor(
-    private readonly storage: HybridTokenStorage = new HybridTokenStorage(
-      KEYCHAIN_SERVICE_NAME,
-    ),
-  ) {}
+  private static storage: HybridTokenStorage = new HybridTokenStorage(
+    KEYCHAIN_SERVICE_NAME,
+  );
 
   /**
    * Load cached OAuth credentials
    */
-  async loadCredentials(): Promise<Credentials | null> {
+  static async loadCredentials(): Promise<Credentials | null> {
     try {
       const credentials = await this.storage.getCredentials(MAIN_ACCOUNT_KEY);
 
@@ -59,7 +57,7 @@ export class OAuthCredentialStorage {
   /**
    * Save OAuth credentials
    */
-  async saveCredentials(credentials: Credentials): Promise<void> {
+  static async saveCredentials(credentials: Credentials): Promise<void> {
     if (!credentials.access_token) {
       throw new Error('Attempted to save credentials without an access token.');
     }
@@ -83,7 +81,7 @@ export class OAuthCredentialStorage {
   /**
    * Clear cached OAuth credentials
    */
-  async clearCredentials(): Promise<void> {
+  static async clearCredentials(): Promise<void> {
     try {
       await this.storage.deleteCredentials(MAIN_ACCOUNT_KEY);
 
@@ -99,7 +97,7 @@ export class OAuthCredentialStorage {
   /**
    * Migrate credentials from old file-based storage to keychain
    */
-  private async migrateFromFileStorage(): Promise<Credentials | null> {
+  private static async migrateFromFileStorage(): Promise<Credentials | null> {
     const oldFilePath = path.join(os.homedir(), GEMINI_DIR, OAUTH_FILE);
 
     let credsJson: string;
