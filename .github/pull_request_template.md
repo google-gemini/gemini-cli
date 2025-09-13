@@ -1,41 +1,39 @@
-## TLDR
+## Summary
+Brief description of the changes and why they are needed.
 
-<!-- Add a brief description of what this pull request changes and why and any important things for reviewers to look at -->
+## Linked Issue
+- Closes #[issue_number]
+- Related: #[issue_number]
 
-## Dive Deeper
+## Risk Assessment
+- **Risk Level**: Low | Medium | High | Critical
+- **Impact**: What systems/users are affected?
+- **Rollback Plan**: How to revert if needed?
 
-<!-- more thoughts and in-depth discussion here -->
+## Testing
+- [ ] Unit tests added/updated
+- [ ] Integration tests pass
+- [ ] Manual testing completed
+- [ ] Performance impact tested
 
-## Reviewer Test Plan
+## Compliance Checklist
+- [ ] **Linked Issue**: References issue with acceptance criteria
+- [ ] **Security Review**: Required if touching authentication, trust, or CLI security
+- [ ] **License Headers**: All new/changed files have proper Apache 2.0 headers
+- [ ] **Secrets Check**: No API keys, tokens, or credentials in diff
+- [ ] **Attribution**: Third-party code properly credited
+- [ ] **Documentation**: README/docs updated if needed
+- [ ] **Breaking Changes**: Documented in changelog if applicable
 
-<!-- when a person reviews your code they should ideally be pulling and running that code. How would they validate your change works and if relevant what are some good classes of example prompts and ways they can exercise your changes -->
+## Security Considerations (if applicable)
+- [ ] Default configurations are secure
+- [ ] No privilege escalation paths introduced
+- [ ] Input validation added for user-controlled data
+- [ ] Logging does not expose sensitive information
+- [ ] Trust boundaries properly enforced
 
-## Testing Matrix
+## Deployment Notes
+Any special deployment considerations or migration steps needed?
 
-<!-- Before submitting please validate your changes on as many of these options as possible -->
-
-|          | 🍏  | 🪟  | 🐧  |
-| -------- | --- | --- | --- |
-| npm run  | ❓  | ❓  | ❓  |
-| npx      | ❓  | ❓  | ❓  |
-| Docker   | ❓  | ❓  | ❓  |
-| Podman   | ❓  | -   | -   |
-| Seatbelt | ❓  | -   | -   |
-
-## Linked issues / bugs
-
-<!--
-Link to any related issues or bugs.
-
-**If this PR fully resolves the issue, use one of the following keywords to automatically close the issue when this PR is merged:**
-
-- Closes #<issue_number>
-- Fixes #<issue_number>
-- Resolves #<issue_number>
-
-*Example: `Resolves #123`*
-
-**If this PR is only related to an issue or is a partial fix, simply reference the issue number without a keyword:**
-
-*Example: `This PR makes progress on #456` or `Related to #789`*
--->
+---
+*This PR will be automatically reviewed for compliance. Please ensure all checklist items are addressed before requesting review.*

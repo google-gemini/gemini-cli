@@ -1,0 +1,291 @@
+name: PR Compliance & Security Enforcement
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+  schedule:
+    - cron: '0 14 * * *' # Daily reminders at 14:00 UTC
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+env:
+  PROJECT_NUMBER: 1 # Update to your GitHub Project number (beta)
+  ORG_OR_USER: google-gemini # Update as needed
+  REPO: gemini-cli
+
+jobs:
+  seed-labels:
+    name: Ensure compliance labels exist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              {name:'zone:security', color:'b60205', description:'Security-focused changes requiring security-lead review'},
+              {name:'zone:performance', color:'1d76db', description:'Performance & runtime optimizations'},
+              {name:'zone:config', color:'0e8a16', description:'Configuration & environment changes'},
+              {name:'zone:logging', color:'5319e7', description:'Logging & telemetry changes'},
+              {name:'zone:docs', color:'fbca04', description:'Documentation updates'},
+              {name:'compliance:failed', color:'b60205', description:'Compliance checks failing - merge blocked'},
+              {name:'compliance:passed', color:'0e8a16', description:'All compliance checks passed - ready to merge'},
+              {name:'security:needs-review', color:'d73a49', description:'Requires security team review'},
+              {name:'license:needs-attribution', color:'e99695', description:'License/attribution verification needed'}
+            ];
+            const {owner, repo} = context.repo;
+            for (const l of labels) {
+              try { await github.rest.issues.getLabel({owner, repo, name: l.name}); }
+              catch {
+                await github.rest.issues.createLabel({owner, repo, ...l});
+              }
+            }
+
+  compliance-gate:
+    name: Compliance gate - merge blocker
+    runs-on: ubuntu-latest
+    needs: seed-labels
+    outputs:
+      compliance-status: ${{ steps.final-check.outputs.status }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Auto-label PRs by keywords and content analysis
+      - name: Auto label by content analysis
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          labels: |
+            ${{ contains(github.event.pull_request.title, 'security') && 'zone:security' || '' }}
+            ${{ contains(github.event.pull_request.title, 'security') && 'security:needs-review' || '' }}
+            ${{ contains(github.event.pull_request.title, 'perf') && 'zone:performance' || '' }}
+            ${{ contains(github.event.pull_request.title, 'config') && 'zone:config' || '' }}
+            ${{ contains(github.event.pull_request.title, 'log') && 'zone:logging' || '' }}
+            ${{ contains(github.event.pull_request.title, 'doc') && 'zone:docs' || '' }}
+            ${{ contains(github.event.pull_request.body, 'GEMINI_SAFE_TRUST_DEFAULT') && 'security:needs-review' || '' }}
+
+      # Enforce linked issue requirement
+      - name: Find linked issues in body and references
+        id: linked-issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || ''
+            const hasIssueRef = /#\d+/.test(body) || /closes #\d+/i.test(body) || /fixes #\d+/i.test(body)
+            const hasReferencedIssue = await github.rest.issues.listEvents({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.number
+            }).then(events =>
+              events.data.some(e => e.event === 'cross-referenced' && e.source?.issue?.number)
+            ).catch(() => false)
+            core.setOutput('has-link', (hasIssueRef || hasReferencedIssue) ? 'true' : 'false')
+
+      # Secrets scan with Gitleaks
+      - name: Run Gitleaks secrets scan
+        id: secrets-scan
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: .gitleaks.toml
+          fail: false
+        continue-on-error: true
+
+      # License & attribution compliance check
+      - name: License & attribution check
+        id: license-check
+        run: |
+          if [ ! -f "scripts/license-check.sh" ]; then
+            echo "License check script not found - creating basic check"
+            # Basic check for copyright headers
+            CHANGED_FILES=$(git diff --name-only HEAD~1..HEAD 2>/dev/null || git diff --name-only origin/main..HEAD 2>/dev/null || echo "")
+            FAIL=0
+            for file in $CHANGED_FILES; do
+              if [[ "$file" =~ \.(ts|tsx|js|go|py)$ ]] && [ -f "$file" ]; then
+                if ! head -n 5 "$file" | grep -qi "copyright\|license\|spdx"; then
+                  echo "❌ Missing license header: $file"
+                  FAIL=1
+                fi
+              fi
+            done
+            if [ $FAIL -eq 1 ]; then exit 1; fi
+          else
+            chmod +x scripts/license-check.sh
+            ./scripts/license-check.sh
+          fi
+        continue-on-error: true
+
+      # Assign zone owners based on labels
+      - name: Assign zone reviewers
+        id: assign-reviewers
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = context.payload.pull_request.labels.map(l => l.name)
+            const reviewers = []
+
+            // Security zone - highest priority
+            if (labels.includes('zone:security') || labels.includes('security:needs-review')) {
+              reviewers.push(...(process.env.SECURITY_REVIEWERS || 'security-lead').split(',').filter(Boolean))
+            }
+
+            // Other zones
+            if (labels.includes('zone:performance')) {
+              reviewers.push(...(process.env.PERF_REVIEWERS || 'perf-lead').split(',').filter(Boolean))
+            }
+            if (labels.includes('zone:config')) {
+              reviewers.push(...(process.env.CONFIG_REVIEWERS || 'config-lead').split(',').filter(Boolean))
+            }
+            if (labels.includes('zone:logging')) {
+              reviewers.push(...(process.env.LOGGING_REVIEWERS || 'logging-lead').split(',').filter(Boolean))
+            }
+            if (labels.includes('zone:docs')) {
+              reviewers.push(...(process.env.DOCS_REVIEWERS || 'docs-lead').split(',').filter(Boolean))
+            }
+
+            if (reviewers.length > 0) {
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.number,
+                reviewers: [...new Set(reviewers)] // deduplicate
+              })
+              core.setOutput('assigned', 'true')
+              core.setOutput('reviewers', reviewers.join(','))
+            } else {
+              core.setOutput('assigned', 'false')
+            }
+
+      # Post live compliance dashboard
+      - name: Post compliance dashboard
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: compliance-dashboard
+          message: |
+            ## 📊 Compliance Dashboard (Updated: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }})
+
+            | Check | Status | Details |
+            |-------|--------|---------|
+            | 🔗 Linked Issue | ${{ steps.linked-issue.outputs.has-link == 'true' && '✅ **PASS**' || '❌ **FAIL** - Add issue link' }} | Must link issue with acceptance criteria |
+            | 🔐 Secrets Scan | ${{ steps.secrets-scan.outcome == 'success' && '✅ **PASS**' || '❌ **FAIL** - Secrets detected' }} | Gitleaks scan for API keys, tokens |
+            | 📜 License & Attribution | ${{ steps.license-check.outcome == 'success' && '✅ **PASS**' || '❌ **FAIL** - License issue' }} | Copyright headers and attribution |
+            | 👥 Zone Reviewers | ${{ steps.assign-reviewers.outputs.assigned == 'true' && '✅ **PASS**' || '❌ **FAIL** - No reviewers' }} | ${{ steps.assign-reviewers.outputs.reviewers || 'None assigned' }} |
+            | 🛡️ Security Review | ${{ contains(github.event.pull_request.labels.*.name, 'security:needs-review') && '🔍 **PENDING**' || '✅ **PASS**' }} | Required for security changes |
+
+            ### 📋 Action Items
+            ${{ steps.linked-issue.outputs.has-link != 'true' && '- [ ] **CRITICAL**: Add linked issue (e.g., `Closes #123`)' || '' }}
+            ${{ steps.secrets-scan.outcome != 'success' && '- [ ] **CRITICAL**: Remove or rotate detected secrets' || '' }}
+            ${{ steps.license-check.outcome != 'success' && '- [ ] Fix license/attribution issues' || '' }}
+            ${{ steps.assign-reviewers.outputs.assigned != 'true' && '- [ ] Assign appropriate zone reviewers' || '' }}
+            ${{ contains(github.event.pull_request.labels.*.name, 'security:needs-review') && '- [ ] Complete security review' || '' }}
+
+            ### 🚫 Merge Status
+            ${{ (steps.linked-issue.outputs.has-link == 'true' && steps.secrets-scan.outcome == 'success' && steps.license-check.outcome == 'success') && '**🟢 READY TO MERGE** - All gates passed' || '**🔴 MERGE BLOCKED** - Resolve failing checks above' }}
+
+      # Update compliance status labels
+      - name: Update compliance status labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const hasSecurityLabel = context.payload.pull_request.labels.some(l => l.name === 'security:needs-review')
+            const allPassed = (
+              '${{ steps.linked-issue.outputs.has-link }}' === 'true' &&
+              '${{ steps.secrets-scan.outcome }}' === 'success' &&
+              '${{ steps.license-check.outcome }}' === 'success' &&
+              '${{ steps.assign-reviewers.outputs.assigned }}' === 'true'
+            )
+
+            const {owner, repo} = context.repo
+            const number = context.payload.number
+
+            // Add/remove compliance labels
+            if (allPassed) {
+              await github.rest.issues.addLabels({owner, repo, issue_number: number, labels:['compliance:passed']})
+              try { await github.rest.issues.removeLabel({owner, repo, issue_number: number, name:'compliance:failed'}) } catch {}
+            } else {
+              await github.rest.issues.addLabels({owner, repo, issue_number: number, labels:['compliance:failed']})
+              try { await github.rest.issues.removeLabel({owner, repo, issue_number: number, name:'compliance:passed'}) } catch {}
+            }
+
+            // Add license attribution label if needed
+            if ('${{ steps.license-check.outcome }}' !== 'success') {
+              await github.rest.issues.addLabels({owner, repo, issue_number: number, labels:['license:needs-attribution']})
+            } else {
+              try { await github.rest.issues.removeLabel({owner, repo, issue_number: number, name:'license:needs-attribution'}) } catch {}
+            }
+
+      # Final merge gate check
+      - name: Final compliance check
+        id: final-check
+        run: |
+          if [[ "${{ steps.linked-issue.outputs.has-link }}" == "true" ]] && \
+             [[ "${{ steps.secrets-scan.outcome }}" == "success" ]] && \
+             [[ "${{ steps.license-check.outcome }}" == "success" ]] && \
+             [[ "${{ steps.assign-reviewers.outputs.assigned }}" == "true" ]]; then
+            echo "status=passed" >> $GITHUB_OUTPUT
+            echo "✅ All compliance checks passed"
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "❌ Compliance checks failed - merge blocked"
+            exit 1
+          fi
+
+  # Daily reminder system for failing PRs
+  daily-nags:
+    name: Daily compliance reminders
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo
+            const prs = await github.paginate(github.rest.pulls.list, {owner, repo, state:'open'})
+            for (const pr of prs) {
+              const labels = pr.labels.map(l => l.name)
+              if (labels.includes('compliance:failed')) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: pr.number,
+                  body: `⏰ **Daily Compliance Reminder**: This PR still has failing compliance checks.\n\nPlease review the Compliance Dashboard above and resolve all ❌ items. @${pr.user.login}\n\nIf unresolved, this PR will be closed automatically after 5 days of non-compliance.`
+                })
+              }
+            }
+
+  # Auto-close stale non-compliant PRs
+  stale-close:
+    name: Auto-close stale failing PRs
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          stale-pr-label: 'compliance:failed'
+          days-before-stale: 3
+          days-before-close: 2
+          stale-pr-message: >
+            This PR has failing compliance checks and hasn't been updated in 3 days.
+
+            **Required Actions:**
+            - Fix all ❌ items in the Compliance Dashboard
+            - Add linked issue if missing
+            - Remove or rotate any detected secrets
+            - Add proper license headers/attribution
+
+            If unresolved, this PR will be closed in 2 days.
+          close-pr-message: >
+            **CLOSED**: Due to unresolved compliance failures after 5 days.
+
+            **What happened:**
+            - Compliance checks remained failing
+            - No updates made to address issues
+            - Automatic cleanup per repository policy
+
+            **How to fix and reopen:**
+            1. Address all failing compliance checks
+            2. Push updates to your branch
+            3. Reopen the PR
+            4. All checks must pass for merge
+
+            Please ensure compliance before resubmitting.
