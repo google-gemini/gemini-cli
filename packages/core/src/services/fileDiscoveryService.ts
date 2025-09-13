@@ -139,4 +139,11 @@ export class FileDiscoveryService {
   getGeminiIgnorePatterns(): string[] {
     return this.geminiIgnoreFilter?.getPatterns() ?? [];
   }
+
+  /**
+   * Returns the path to the .geminiignore file
+   */
+  getGeminiIgnorePath(): string {
+    return path.join(this.projectRoot, '.geminiignore');
+  }
 }
