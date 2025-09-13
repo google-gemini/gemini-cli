@@ -155,10 +155,19 @@ ${textContent}
     // Perform GitHub URL conversion here to differentiate between user-provided
     // URL and the actual URL to be fetched.
     const urls = extractUrls(this.params.prompt).map((url) => {
-      if (url.includes('github.com') && url.includes('/blob/')) {
-        return url
-          .replace('github.com', 'raw.githubusercontent.com')
-          .replace('/blob/', '/');
+      try {
+        const parsed = new URL(url);
+        if (
+          parsed.hostname === 'github.com' &&
+          parsed.pathname.includes('/blob/')
+        ) {
+          // Safe: only rewrite actual GitHub blob URLs.
+          return url
+            .replace('github.com', 'raw.githubusercontent.com')
+            .replace('/blob/', '/');
+        }
+      } catch {
+        // Not a valid URL; leave unchanged.
       }
       return url;
     });

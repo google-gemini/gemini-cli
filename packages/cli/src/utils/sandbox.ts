@@ -374,19 +374,22 @@ export async function start_sandbox(
         console.error('building sandbox ...');
         const gcRoot = gcPath.split('/packages/')[0];
         // if project folder has sandbox.Dockerfile under project settings folder, use that
-        let buildArgs = '';
+        const buildArgs: string[] = ['-s'];
         const projectSandboxDockerfile = path.join(
           SETTINGS_DIRECTORY_NAME,
           'sandbox.Dockerfile',
         );
         if (isCustomProjectSandbox) {
           console.error(`using ${projectSandboxDockerfile} for sandbox`);
-          buildArgs += `-f ${path.resolve(projectSandboxDockerfile)} -i ${image}`;
+          buildArgs.push('-f', path.resolve(projectSandboxDockerfile), '-i', image);
         }
-        execSync(
-          `cd ${gcRoot} && node scripts/build_sandbox.js -s ${buildArgs}`,
+        // Use execFileSync to avoid shell interpretation, set cwd for directory
+        require('child_process').execFileSync(
+          'node',
+          ['scripts/build_sandbox.js', ...buildArgs],
           {
             stdio: 'inherit',
+            cwd: gcRoot,
             env: {
               ...process.env,
               GEMINI_SANDBOX: config.command, // in case sandbox is enabled via flags (see config.ts under cli package)
