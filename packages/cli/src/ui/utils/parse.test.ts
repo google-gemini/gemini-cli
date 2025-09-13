@@ -5,7 +5,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseInputForHighlighting } from './parse.js';
+import {
+  parseInputForHighlighting,
+  findPlaceholderCandidates,
+} from './parse.js';
 
 describe('parseInputForHighlighting', () => {
   it('should handle an empty string', () => {
@@ -131,6 +134,126 @@ describe('parseInputForHighlighting', () => {
     expect(parseInputForHighlighting(text, 0)).toEqual([
       { text: 'cat ', type: 'default' },
       { text: '@/my\\ path/file.txt', type: 'file' },
+    ]);
+  });
+});
+
+describe('findPlaceholderCandidates', () => {
+  it('matches a single known placeholder and returns range', () => {
+    const text = 'abc[ENV]def';
+    const set = new Set(['[ENV]']);
+    const ranges = findPlaceholderCandidates(text, set);
+    expect(ranges).toEqual([{ start: 3, end: 8, text: '[ENV]' }]);
+  });
+
+  it('does not match unknown placeholder', () => {
+    const text = 'abc[ENV]def';
+    const set = new Set(['[OTHER]']);
+    const ranges = findPlaceholderCandidates(text, set);
+    expect(ranges).toEqual([]);
+  });
+
+  it('matches adjacent placeholders', () => {
+    const text = '[A][B]';
+    const set = new Set(['[A]', '[B]']);
+    const ranges = findPlaceholderCandidates(text, set);
+    expect(ranges).toEqual([
+      { start: 0, end: 3, text: '[A]' },
+      { start: 3, end: 6, text: '[B]' },
+    ]);
+  });
+
+  it('matches inner placeholder inside nested brackets', () => {
+    const text = 'x[ENV[REG]]y';
+    const set = new Set(['[ENV]', '[REG]']);
+    const ranges = findPlaceholderCandidates(text, set);
+    expect(ranges).toEqual([{ start: 5, end: 10, text: '[REG]' }]);
+  });
+
+  it('does not match unclosed square bracket', () => {
+    const text = 'foo[ENV';
+    const set = new Set(['[ENV]']);
+    const ranges = findPlaceholderCandidates(text, set);
+    expect(ranges).toEqual([]);
+  });
+});
+
+describe('parseInputForHighlighting with placeholders', () => {
+  it('highlights a single placeholder', () => {
+    const text = 'Deploy to [ENV] today';
+    const tokens = parseInputForHighlighting(text, 0, ['[ENV]']);
+    expect(tokens).toEqual([
+      { text: 'Deploy to ', type: 'default' },
+      { text: '[ENV]', type: 'placeholder' },
+      { text: ' today', type: 'default' },
+    ]);
+  });
+
+  it('highlights multiple placeholders alternating with text', () => {
+    const text = 'A [X] and [Y].';
+    const tokens = parseInputForHighlighting(text, 0, ['[X]', '[Y]']);
+    expect(tokens).toEqual([
+      { text: 'A ', type: 'default' },
+      { text: '[X]', type: 'placeholder' },
+      { text: ' and ', type: 'default' },
+      { text: '[Y]', type: 'placeholder' },
+      { text: '.', type: 'default' },
+    ]);
+  });
+
+  it('highlights adjacent placeholders', () => {
+    const text = '[A][B]';
+    const tokens = parseInputForHighlighting(text, 0, ['[A]', '[B]']);
+    expect(tokens).toEqual([
+      { text: '[A]', type: 'placeholder' },
+      { text: '[B]', type: 'placeholder' },
+    ]);
+  });
+
+  it('does not highlight unknown placeholders', () => {
+    const text = 'Use [ENV]';
+    const tokens = parseInputForHighlighting(text, 0, ['[OTHER]']);
+    expect(tokens).toEqual([{ text: 'Use [ENV]', type: 'default' }]);
+  });
+
+  it('mixes with command and file while preserving types', () => {
+    const text = '/run [ARG] @file.txt';
+    const tokens = parseInputForHighlighting(text, 0, ['[ARG]']);
+    expect(tokens).toEqual([
+      { text: '/run', type: 'command' },
+      { text: ' ', type: 'default' },
+      { text: '[ARG]', type: 'placeholder' },
+      { text: ' ', type: 'default' },
+      { text: '@file.txt', type: 'file' },
+    ]);
+  });
+
+  it('non-zero index: command not highlighted; placeholder and file are', () => {
+    const text = '/cmd [ARG] @f';
+    const tokens = parseInputForHighlighting(text, 2, ['[ARG]']);
+    expect(tokens).toEqual([
+      { text: '/cmd', type: 'default' },
+      { text: ' ', type: 'default' },
+      { text: '[ARG]', type: 'placeholder' },
+      { text: ' ', type: 'default' },
+      { text: '@f', type: 'file' },
+    ]);
+  });
+
+  it('highlights inner placeholder; does not highlight unclosed', () => {
+    expect(
+      parseInputForHighlighting('x[ENV[REG]]y', 0, [
+        '[ENV[REG]]',
+        '[ENV]',
+        '[REG]',
+      ]),
+    ).toEqual([
+      { text: 'x[ENV', type: 'default' },
+      { text: '[REG]', type: 'placeholder' },
+      { text: ']y', type: 'default' },
+    ]);
+    expect(parseInputForHighlighting('foo[ENV', 0, ['[ENV]'])).toEqual([
+      { text: 'foo[ENV', type: 'default' },
     ]);
   });
 });
