@@ -69,6 +69,7 @@ export async function loadConfig(
         settings.fileFiltering?.enableRecursiveFileSearch,
     },
     ideMode: false,
+    folderTrust: settings.folderTrust === true,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir);
@@ -79,7 +80,7 @@ export async function loadConfig(
     false,
     fileService,
     extensionContextFilePaths,
-    true, /// TODO: Wire up folder trust logic here.
+    settings.folderTrust === true,
   );
   configParams.userMemory = memoryContent;
   configParams.geminiMdFileCount = fileCount;
