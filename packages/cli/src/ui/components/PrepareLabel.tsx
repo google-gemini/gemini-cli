@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 
 interface PrepareLabelProps {
   label: string;
@@ -21,7 +21,7 @@ export const PrepareLabel: React.FC<PrepareLabelProps> = ({
   matchedIndex,
   userInput,
   textColor,
-  highlightColor = Colors.AccentYellow,
+  highlightColor = theme.status.warning,
 }) => {
   if (
     matchedIndex === undefined ||

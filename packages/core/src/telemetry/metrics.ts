@@ -4,14 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  metrics,
-  Attributes,
-  ValueType,
-  Meter,
-  Counter,
-  Histogram,
-} from '@opentelemetry/api';
+import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
+import { metrics, ValueType } from '@opentelemetry/api';
 import {
   SERVICE_NAME,
   METRIC_TOOL_CALL_COUNT,
@@ -26,8 +20,7 @@ import {
   METRIC_CONTENT_RETRY_COUNT,
   METRIC_CONTENT_RETRY_FAILURE_COUNT,
 } from './constants.js';
-import { Config } from '../config/config.js';
-import { DiffStat } from '../tools/tools.js';
+import type { Config } from '../config/config.js';
 
 export enum FileOperation {
   CREATE = 'create',
@@ -181,7 +174,6 @@ export function recordApiResponseMetrics(
   model: string,
   durationMs: number,
   statusCode?: number | string,
-  error?: string,
 ): void {
   if (
     !apiRequestCounter ||
@@ -192,7 +184,7 @@ export function recordApiResponseMetrics(
   const metricAttributes: Attributes = {
     ...getCommonAttributes(config),
     model,
-    status_code: statusCode ?? (error ? 'error' : 'ok'),
+    status_code: statusCode ?? 'ok',
   };
   apiRequestCounter.add(1, metricAttributes);
   apiRequestLatencyHistogram.record(durationMs, {
@@ -233,7 +225,6 @@ export function recordFileOperationMetric(
   lines?: number,
   mimetype?: string,
   extension?: string,
-  diffStat?: DiffStat,
   programming_language?: string,
 ): void {
   if (!fileOperationCounter || !isMetricsInitialized) return;
@@ -244,12 +235,6 @@ export function recordFileOperationMetric(
   if (lines !== undefined) attributes['lines'] = lines;
   if (mimetype !== undefined) attributes['mimetype'] = mimetype;
   if (extension !== undefined) attributes['extension'] = extension;
-  if (diffStat !== undefined) {
-    attributes['ai_added_lines'] = diffStat.ai_added_lines;
-    attributes['ai_removed_lines'] = diffStat.ai_removed_lines;
-    attributes['user_added_lines'] = diffStat.user_added_lines;
-    attributes['user_removed_lines'] = diffStat.user_removed_lines;
-  }
   if (programming_language !== undefined) {
     attributes['programming_language'] = programming_language;
   }

@@ -5,14 +5,14 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Config } from '../config/config.js';
-import { GeminiClient } from '../core/client.js';
-import {
-  GeminiEventType,
+import type { Config } from '../config/config.js';
+import type { GeminiClient } from '../core/client.js';
+import type {
   ServerGeminiContentEvent,
   ServerGeminiStreamEvent,
   ServerGeminiToolCallRequestEvent,
 } from '../core/turn.js';
+import { GeminiEventType } from '../core/turn.js';
 import * as loggers from '../telemetry/loggers.js';
 import { LoopType } from '../telemetry/types.js';
 import { LoopDetectionService } from './loopDetectionService.js';
@@ -129,6 +129,15 @@ describe('LoopDetectionService', () => {
       // Send the tool call event again, which should now trigger the loop
       expect(service.addAndCheck(toolCallEvent)).toBe(true);
       expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not detect a loop when disabled for session', () => {
+      service.disableForSession();
+      const event = createToolCallRequestEvent('testTool', { param: 'value' });
+      for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD; i++) {
+        expect(service.addAndCheck(event)).toBe(false);
+      }
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
   });
 
@@ -718,5 +727,13 @@ describe('LoopDetectionService LLM Checks', () => {
     const result = await service.turnStarted(abortController.signal);
     expect(result).toBe(false);
     expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+  });
+
+  it('should not trigger LLM check when disabled for session', async () => {
+    service.disableForSession();
+    await advanceTurns(30);
+    const result = await service.turnStarted(abortController.signal);
+    expect(result).toBe(false);
+    expect(mockGeminiClient.generateJson).not.toHaveBeenCalled();
   });
 });

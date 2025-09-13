@@ -1,0 +1,19 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`InputPrompt > snapshots > should render correctly in shell mode 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ !   Type your message or @path/to/file                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`InputPrompt > snapshots > should render correctly in yolo mode 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ *   Type your message or @path/to/file                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`InputPrompt > snapshots > should render correctly when accepting edits 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ >   Type your message or @path/to/file                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
