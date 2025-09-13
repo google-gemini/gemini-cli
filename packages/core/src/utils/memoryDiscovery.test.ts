@@ -228,6 +228,50 @@ describe('loadServerHierarchicalMemory', () => {
     });
   });
 
+  it('should load only from current directory when currentDirectoryOnly is true', async () => {
+    const customFilename = 'LOCAL_ONLY.md';
+    setGeminiMdFilename(customFilename);
+
+    // Create files in multiple locations
+    const cwdOnly = await createTestFile(
+      path.join(cwd, customFilename),
+      'CWD only memory',
+    );
+    await createTestFile(
+      path.join(projectRoot, customFilename),
+      'Parent memory - should be ignored',
+    );
+    await createTestFile(
+      path.join(cwd, 'sub', customFilename),
+      'Sub memory - should be ignored',
+    );
+    await createTestFile(
+      path.join(homedir, GEMINI_DIR, customFilename),
+      'Global memory - should be ignored',
+    );
+
+    const result = await loadServerHierarchicalMemory(
+      cwd,
+      [],
+      false,
+      new FileDiscoveryService(projectRoot),
+      [],
+      DEFAULT_FOLDER_TRUST,
+      'tree',
+      {
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      },
+      200,
+      true, // currentDirectoryOnly
+    );
+
+    expect(result).toEqual({
+      memoryContent: `--- Context from: ${path.relative(cwd, cwdOnly)} ---\nCWD only memory\n--- End of Context from: ${path.relative(cwd, cwdOnly)} ---`,
+      fileCount: 1,
+    });
+  });
+
   it('should load ORIGINAL_GEMINI_MD_FILENAME files by upward traversal from CWD to project root', async () => {
     const projectRootGeminiFile = await createTestFile(
       path.join(projectRoot, DEFAULT_CONTEXT_FILENAME),
