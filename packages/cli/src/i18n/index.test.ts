@@ -34,8 +34,8 @@ describe('Phase 1: i18n Foundation', () => {
     });
 
     it('should have basic functionality descriptions', () => {
-      expect(t('basics.addContext', { ns: 'help' })).toContain('Add context');
-      expect(t('basics.shellMode', { ns: 'help' })).toContain('Shell mode');
+      expect(t('basics.addContext', { ns: 'help' })).toContain('{label}');
+      expect(t('basics.shellMode', { ns: 'help' })).toContain('{label}');
       expect(t('shortcutsDocs', { ns: 'help' })).toContain(
         'For a full list of shortcuts',
       );
