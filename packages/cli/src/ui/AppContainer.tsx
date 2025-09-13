@@ -228,10 +228,11 @@ export const AppContainer = (props: AppContainerProps) => {
   }, [handleNewMessage, config]);
 
   // Derive widths for InputPrompt using shared helper
-  const { inputWidth, promptContainerWidth, suggestionsWidth } = useMemo(
-    () => calculatePromptWidths(terminalWidth),
-    [terminalWidth],
-  );
+  const { inputWidth, suggestionsWidth } = useMemo(() => {
+    const { inputWidth, suggestionsWidth } =
+      calculatePromptWidths(terminalWidth);
+    return { inputWidth, suggestionsWidth };
+  }, [terminalWidth]);
   const mainAreaWidth = Math.floor(terminalWidth * 0.9);
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
@@ -1007,7 +1008,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       buffer,
       inputWidth,
       suggestionsWidth,
-      detailedMessagesDisplayWidth: promptContainerWidth,
       isInputActive,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen: isFolderTrustDialogOpen ?? false,
@@ -1084,7 +1084,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       buffer,
       inputWidth,
       suggestionsWidth,
-      promptContainerWidth,
       isInputActive,
       shouldShowIdePrompt,
       isFolderTrustDialogOpen,
