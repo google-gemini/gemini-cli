@@ -37,6 +37,7 @@ import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
+import { useTranslation } from '../../i18n/useTranslation.js';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -51,6 +52,8 @@ export function SettingsDialog({
   onSelect,
   onRestartRequest,
 }: SettingsDialogProps): React.JSX.Element {
+  const { t } = useTranslation('dialogs');
+
   // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
 
@@ -664,7 +667,7 @@ export function SettingsDialog({
     >
       <Box flexDirection="column" flexGrow={1}>
         <Text bold color={theme.text.link}>
-          Settings
+          {t('settings.title')}
         </Text>
         <Box height={1} />
         {showScrollUp && <Text color={theme.text.secondary}>▲</Text>}
@@ -789,7 +792,8 @@ export function SettingsDialog({
 
         <Box marginTop={1} flexDirection="column">
           <Text bold={focusSection === 'scope'} wrap="truncate">
-            {focusSection === 'scope' ? '> ' : '  '}Apply To
+            {focusSection === 'scope' ? '> ' : '  '}
+            {t('settings.applyTo')}
           </Text>
           <RadioButtonSelect
             items={scopeItems}
@@ -802,13 +806,10 @@ export function SettingsDialog({
         </Box>
 
         <Box height={1} />
-        <Text color={theme.text.secondary}>
-          (Use Enter to select, Tab to change focus)
-        </Text>
+        <Text color={theme.text.secondary}>{t('settings.instructions')}</Text>
         {showRestartPrompt && (
           <Text color={theme.status.warning}>
-            To see changes, Gemini CLI must be restarted. Press r to exit and
-            apply changes now.
+            {t('settings.restartPrompt')}
           </Text>
         )}
       </Box>

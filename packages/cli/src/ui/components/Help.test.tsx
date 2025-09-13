@@ -7,10 +7,11 @@
 /** @vitest-environment jsdom */
 
 import { render } from 'ink-testing-library';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { Help } from './Help.js';
 import type { SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
+import '../../i18n/index.js';
 
 const mockCommands: readonly SlashCommand[] = [
   {
@@ -45,19 +46,79 @@ const mockCommands: readonly SlashCommand[] = [
 ];
 
 describe('Help Component', () => {
-  it('should not render hidden commands', () => {
-    const { lastFrame } = render(<Help commands={mockCommands} />);
-    const output = lastFrame();
-
-    expect(output).toContain('/test');
-    expect(output).not.toContain('/hidden');
+  beforeAll(async () => {
+    // Ensure i18next is ready and has loaded resources
+    const i18next = (await import('../../i18n/index.js')).default;
+    // Wait for i18next to be fully initialized
+    if (!i18next.isInitialized) {
+      await i18next.init();
+    }
   });
 
-  it('should not render hidden subcommands', () => {
+  it('renders help component with mock commands', () => {
     const { lastFrame } = render(<Help commands={mockCommands} />);
-    const output = lastFrame();
+    expect(lastFrame()).toMatchSnapshot();
+  });
 
-    expect(output).toContain('visible-child');
-    expect(output).not.toContain('hidden-child');
+  describe('Platform-specific behavior', () => {
+    it('renders correct shortcuts for linux', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'linux',
+        writable: true,
+        configurable: true,
+      });
+
+      try {
+        const { lastFrame } = render(<Help commands={mockCommands} />);
+        expect(lastFrame()).toMatchSnapshot('linux-shortcuts');
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          value: originalPlatform,
+          writable: true,
+          configurable: true,
+        });
+      }
+    });
+
+    it('renders correct shortcuts for darwin', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'darwin',
+        writable: true,
+        configurable: true,
+      });
+
+      try {
+        const { lastFrame } = render(<Help commands={mockCommands} />);
+        expect(lastFrame()).toMatchSnapshot('darwin-shortcuts');
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          value: originalPlatform,
+          writable: true,
+          configurable: true,
+        });
+      }
+    });
+
+    it('renders correct shortcuts for win32', () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, 'platform', {
+        value: 'win32',
+        writable: true,
+        configurable: true,
+      });
+
+      try {
+        const { lastFrame } = render(<Help commands={mockCommands} />);
+        expect(lastFrame()).toMatchSnapshot('win32-shortcuts');
+      } finally {
+        Object.defineProperty(process, 'platform', {
+          value: originalPlatform,
+          writable: true,
+          configurable: true,
+        });
+      }
+    });
   });
 });

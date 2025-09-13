@@ -53,6 +53,8 @@ import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './ui/hooks/useKittyKeyboardProtocol.js';
+// Initialize i18n foundation
+import './i18n/index.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,

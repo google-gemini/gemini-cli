@@ -20,6 +20,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { AuthState } from '../types.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { validateAuthMethodWithSettings } from './useAuth.js';
+import { useTranslation } from '../../i18n/useTranslation.js';
 
 interface AuthDialogProps {
   config: Config;
@@ -36,24 +37,26 @@ export function AuthDialog({
   authError,
   onAuthError,
 }: AuthDialogProps): React.JSX.Element {
+  const { t } = useTranslation('dialogs');
+
   let items = [
     {
-      label: 'Login with Google',
+      label: t('auth.options.google'),
       value: AuthType.LOGIN_WITH_GOOGLE,
     },
     ...(process.env['CLOUD_SHELL'] === 'true'
       ? [
           {
-            label: 'Use Cloud Shell user credentials',
+            label: t('auth.options.cloudShell'),
             value: AuthType.CLOUD_SHELL,
           },
         ]
       : []),
     {
-      label: 'Use Gemini API Key',
+      label: t('auth.options.geminiKey'),
       value: AuthType.USE_GEMINI,
     },
-    { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
+    { label: t('auth.options.vertexAI'), value: AuthType.USE_VERTEX_AI },
   ];
 
   if (settings.merged.security?.auth?.enforcedType) {
@@ -135,9 +138,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
         }
         if (settings.merged.security?.auth?.selectedType === undefined) {
           // Prevent exiting if no auth method is set
-          onAuthError(
-            'You must select an auth method to proceed. Press Ctrl+C twice to exit.',
-          );
+          onAuthError(t('auth.errors.authRequired'));
           return;
         }
         onSelect(undefined, SettingScope.User);
@@ -155,12 +156,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
       width="100%"
     >
       <Text bold color={theme.text.primary}>
-        Get started
+        {t('auth.title')}
       </Text>
       <Box marginTop={1}>
-        <Text color={theme.text.primary}>
-          How would you like to authenticate for this project?
-        </Text>
+        <Text color={theme.text.primary}>{t('auth.description')}</Text>
       </Box>
       <Box marginTop={1}>
         <RadioButtonSelect
@@ -175,19 +174,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
         </Box>
       )}
       <Box marginTop={1}>
-        <Text color={theme.text.secondary}>(Use Enter to select)</Text>
+        <Text color={theme.text.secondary}>{t('auth.instructions')}</Text>
       </Box>
       <Box marginTop={1}>
-        <Text color={theme.text.primary}>
-          Terms of Services and Privacy Notice for Gemini CLI
-        </Text>
+        <Text color={theme.text.primary}>{t('auth.terms')}</Text>
       </Box>
       <Box marginTop={1}>
-        <Text color={theme.text.link}>
-          {
-            'https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md'
-          }
-        </Text>
+        <Text color={theme.text.link}>{t('auth.termsUrl')}</Text>
       </Box>
     </Box>
   );
