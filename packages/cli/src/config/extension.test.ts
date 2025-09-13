@@ -31,6 +31,7 @@ import {
   type MCPServerConfig,
   ClearcutLogger,
   type Config,
+  ExtensionEnableEvent,
   ExtensionUninstallEvent,
 } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
@@ -76,12 +77,14 @@ vi.mock('./trustedFolders.js', async (importOriginal) => {
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const mockLogExtensionEnableEvent = vi.fn();
   const mockLogExtensionInstallEvent = vi.fn();
   const mockLogExtensionUninstallEvent = vi.fn();
   return {
     ...actual,
     ClearcutLogger: {
       getInstance: vi.fn(() => ({
+        logExtensionEnableEvent: mockLogExtensionEnableEvent,
         logExtensionInstallEvent: mockLogExtensionInstallEvent,
         logExtensionUninstallEvent: mockLogExtensionUninstallEvent,
       })),
@@ -1360,5 +1363,26 @@ describe('enableExtension', () => {
     activeExtensions = getActiveExtensions();
     expect(activeExtensions).toHaveLength(1);
     expect(activeExtensions[0].name).toBe('ext1');
+  });
+
+  it('should log enable event', () => {
+    createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'ext1',
+      version: '1.0.0',
+    });
+    disableExtension('ext1', SettingScope.Workspace);
+    const activeExtensions = getActiveExtensions();
+    expect(activeExtensions).toHaveLength(0);
+
+    enableExtension('ext1', [SettingScope.Workspace]);
+
+    const logger = ClearcutLogger.getInstance({} as Config);
+    expect(logger?.logExtensionEnableEvent).toHaveBeenCalledWith(
+      new ExtensionEnableEvent(
+        'ext1',
+        JSON.stringify([SettingScope.Workspace]),
+      ),
+    );
   });
 });

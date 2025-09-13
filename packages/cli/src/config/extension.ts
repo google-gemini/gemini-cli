@@ -15,6 +15,7 @@ import {
   Config,
   ExtensionInstallEvent,
   ExtensionUninstallEvent,
+  ExtensionEnableEvent,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -721,7 +722,11 @@ export function disableExtension(
 }
 
 export function enableExtension(name: string, scopes: SettingScope[]) {
+  const logger = getClearcutLogger(process.cwd());
   removeFromDisabledExtensions(name, scopes);
+  logger?.logExtensionEnableEvent(
+    new ExtensionEnableEvent(name, JSON.stringify(scopes)),
+  );
 }
 
 /**

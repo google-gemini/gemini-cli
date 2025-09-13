@@ -605,3 +605,17 @@ export class ExtensionUninstallEvent implements BaseTelemetryEvent {
     this.status = status;
   }
 }
+
+export class ExtensionEnableEvent implements BaseTelemetryEvent {
+  'event.name': 'extension_enable';
+  'event.timestamp': string;
+  extension_name: string;
+  settingScope: string;
+
+  constructor(extension_name: string, settingScope: string) {
+    this['event.name'] = 'extension_enable';
+    this['event.timestamp'] = new Date().toISOString();
+    this.extension_name = extension_name;
+    this.settingScope = settingScope;
+  }
+}
