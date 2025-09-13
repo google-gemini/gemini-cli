@@ -11,6 +11,49 @@ export type HighlightToken = {
 
 const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[a-zA-Z0-9_./-])+)/g;
 
+// Single‑pass scanner for bracketed placeholders: [ ... ] with no nested [ or ] inside
+export function findPlaceholderCandidates(
+  text: string,
+  placeholders: ReadonlySet<string>,
+): Array<{ start: number; end: number; text: string }> {
+  const res: Array<{ start: number; end: number; text: string }> = [];
+  if (!text || placeholders.size === 0) return res;
+  const textLength = text.length;
+  let i = 0;
+  while (i < textLength) {
+    if (text[i] !== '[') {
+      i++;
+      continue;
+    }
+    let j = i + 1;
+    let nestedSquareBrackets = false;
+    for (j; j < textLength; j++) {
+      const char = text[j];
+      if (char === '[') {
+        nestedSquareBrackets = true;
+        break;
+      }
+      if (char === ']') {
+        const candidate = text.slice(i, j + 1);
+        if (placeholders.has(candidate)) {
+          res.push({ start: i, end: j + 1, text: candidate });
+          i = j + 1;
+          break;
+        } else {
+          // not a known placeholder; treat '[' as normal and continue scanning after it
+          i++;
+          break;
+        }
+      }
+    }
+    if (j >= textLength || nestedSquareBrackets) {
+      // no closing ']' or nested '[', advance
+      i++;
+    }
+  }
+  return res;
+}
+
 export function parseInputForHighlighting(
   text: string,
   index: number,
@@ -62,60 +105,34 @@ export function parseInputForHighlighting(
     });
   }
 
-  if (placeholders.length === 0) return tokens;
-
+  const phSet = new Set(placeholders);
   const nextTokens: HighlightToken[] = [];
   for (const token of tokens) {
     if (token.type !== 'default') {
       nextTokens.push(token);
       continue;
     }
-    // Find the segments of the token that match the placeholders
-    const segments: Array<{ start: number; end: number }> = [];
-    for (const placeholder of placeholders) {
-      if (!placeholder) continue;
-      let from = 0;
-      while (from <= token.text.length) {
-        const idx = token.text.indexOf(placeholder, from);
-        if (idx === -1) break;
-        segments.push({ start: idx, end: idx + placeholder.length });
-        from = idx + placeholder.length;
-      }
-    }
-    if (segments.length === 0) {
+    const ranges = findPlaceholderCandidates(token.text, phSet);
+    if (ranges.length === 0) {
       nextTokens.push(token);
       continue;
     }
-    segments.sort((a, b) => a.start - b.start);
-    // Keep only the segments that are not overlapping
-    const keptSegments: Array<{ start: number; end: number }> = [];
-    let lastEnd = -1;
-    for (const seg of segments) {
-      if (seg.start >= lastEnd) {
-        keptSegments.push(seg);
-        lastEnd = seg.end;
-      }
-    }
-
-    let currentCursor = 0;
-    for (const seg of keptSegments) {
-      if (seg.start > currentCursor) {
+    let cur = 0;
+    for (const r of ranges) {
+      if (r.start > cur) {
         nextTokens.push({
-          text: token.text.slice(currentCursor, seg.start),
+          text: token.text.slice(cur, r.start),
           type: 'default',
         });
       }
       nextTokens.push({
-        text: token.text.slice(seg.start, seg.end),
+        text: token.text.slice(r.start, r.end),
         type: 'placeholder',
       });
-      currentCursor = seg.end;
+      cur = r.end;
     }
-    if (currentCursor < token.text.length) {
-      nextTokens.push({
-        text: token.text.slice(currentCursor),
-        type: 'default',
-      });
+    if (cur < token.text.length) {
+      nextTokens.push({ text: token.text.slice(cur), type: 'default' });
     }
   }
   return nextTokens;

@@ -19,6 +19,7 @@ import {
 } from '../../utils/textUtils.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
+import { findPlaceholderCandidates } from '../../utils/parse.js';
 
 const LARGE_PASTE_CHAR_THRESHOLD = 1000; // When the pasted content is larger than this threshold, it will be inserted as a placeholder
 
@@ -1084,38 +1085,53 @@ function textBufferReducerLogic(
           state.cursorRow,
           state.cursorCol,
         );
-        for (let i = 0; i < state.pendingPastes.length; i++) {
-          const ph = state.pendingPastes[i].placeholder;
-          const phLen = cpLen(ph);
-          if (
-            offset >= phLen &&
-            cpSlice(textAll, offset - phLen, offset) === ph
-          ) {
-            const [startRow, startCol] = offsetToLogicalPos(
-              textAll,
-              offset - phLen,
-            );
-            const [endRow, endCol] = offsetToLogicalPos(textAll, offset);
-            const nextState = pushUndoLocal(state);
-            const replaced = replaceRangeInternal(
-              nextState,
-              startRow,
-              startCol,
-              endRow,
-              endCol,
-              '',
-            );
-            const newPending = [...replaced.pendingPastes];
-            const idxToRemove = newPending.findIndex(
-              (p) => p.placeholder === ph,
-            );
-            if (idxToRemove !== -1) newPending.splice(idxToRemove, 1);
-            return {
-              ...replaced,
-              pendingPastes: newPending,
-              preferredCol: null,
-            };
+        const placeholderCandidates = findPlaceholderCandidates(
+          textAll,
+          new Set(state.pendingPastes.map((p) => p.placeholder)),
+        );
+        const hitIndex = placeholderCandidates.findIndex(
+          (ph) => ph.end === offset,
+        );
+        if (hitIndex !== -1) {
+          const hitPlaceholder = placeholderCandidates[hitIndex];
+          const [startRow, startCol] = offsetToLogicalPos(
+            textAll,
+            hitPlaceholder.start,
+          );
+          const [endRow, endCol] = offsetToLogicalPos(
+            textAll,
+            hitPlaceholder.end,
+          );
+          const nextState = pushUndoLocal(state);
+          const replaced = replaceRangeInternal(
+            nextState,
+            startRow,
+            startCol,
+            endRow,
+            endCol,
+            '',
+          );
+          // Delete the corresponding placeholder in pendingPastes
+          const sameTextBefore =
+            placeholderCandidates
+              .slice(0, hitIndex + 1)
+              .filter((ph) => ph.text === hitPlaceholder.text).length - 1;
+          let count = 0;
+          const newPending = [...replaced.pendingPastes];
+          for (let j = 0; j < newPending.length; j++) {
+            if (newPending[j].placeholder === hitPlaceholder.text) {
+              if (count === sameTextBefore) {
+                newPending.splice(j, 1);
+                break;
+              }
+              count++;
+            }
           }
+          return {
+            ...replaced,
+            pendingPastes: newPending,
+            preferredCol: null,
+          };
         }
       }
 
