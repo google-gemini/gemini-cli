@@ -885,6 +885,7 @@ export const pushUndo = (currentState: TextBufferState): TextBufferState => {
 export type TextBufferAction =
   | { type: 'set_text'; payload: string; pushToUndo?: boolean }
   | { type: 'insert'; payload: string }
+  | { type: 'insert_large_paste_placeholder'; payload: { content: string } }
   | { type: 'backspace' }
   | {
       type: 'move';
@@ -922,7 +923,6 @@ export type TextBufferAction =
   | { type: 'set_viewport'; payload: { width: number; height: number } }
   | { type: 'clear_pending_pastes' }
   | { type: 'prune_pending_pastes' }
-  | { type: 'delete_placeholder_at_cursor' }
   | { type: 'vim_delete_word_forward'; payload: { count: number } }
   | { type: 'vim_delete_word_backward'; payload: { count: number } }
   | { type: 'vim_delete_word_end'; payload: { count: number } }
@@ -985,43 +985,6 @@ function textBufferReducerLogic(
       return { ...state, pendingPastes: pruned };
     }
 
-    case 'delete_placeholder_at_cursor': {
-      if (state.pendingPastes.length === 0) return state;
-      const textAll = state.lines.join('\n');
-      const offset = logicalPosToOffset(
-        state.lines,
-        state.cursorRow,
-        state.cursorCol,
-      );
-      for (let i = 0; i < state.pendingPastes.length; i++) {
-        const ph = state.pendingPastes[i].placeholder;
-        const phLen = cpLen(ph);
-        if (
-          offset >= phLen &&
-          cpSlice(textAll, offset - phLen, offset) === ph
-        ) {
-          const [startRow, startCol] = offsetToLogicalPos(
-            textAll,
-            offset - phLen,
-          );
-          const [endRow, endCol] = offsetToLogicalPos(textAll, offset);
-          const nextState = pushUndoLocal(state);
-          const replaced = replaceRangeInternal(
-            nextState,
-            startRow,
-            startCol,
-            endRow,
-            endCol,
-            '',
-          );
-          const newPending = [...replaced.pendingPastes];
-          const idxToRemove = newPending.findIndex((p) => p.placeholder === ph);
-          if (idxToRemove !== -1) newPending.splice(idxToRemove, 1);
-          return { ...replaced, pendingPastes: newPending };
-        }
-      }
-      return state;
-    }
     case 'set_text': {
       let nextState = state;
       if (action.pushToUndo !== false) {
@@ -1042,35 +1005,6 @@ function textBufferReducerLogic(
     }
 
     case 'insert': {
-      const incomingLen = toCodePoints(action.payload).length;
-      if (incomingLen > LARGE_PASTE_CHAR_THRESHOLD) {
-        const nextState = pushUndoLocal(state);
-        const lineContent = (nextState.lines[nextState.cursorRow] ?? '') as string;
-        const col = nextState.cursorCol;
-        const lineLenNow = cpLen(lineContent);
-        const charBefore = col > 0 ? cpSlice(lineContent, col - 1, col) : '';
-        const charAfter = col < lineLenNow ? cpSlice(lineContent, col, col + 1) : '';
-        const placeholder = `[Pasted Content ${incomingLen} chars]`;
-        let textToInsert = placeholder;
-        if (charBefore && charBefore !== ' ' && charBefore !== '\n') textToInsert = ' ' + textToInsert;
-        if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) textToInsert = textToInsert + ' ';
-        const replaced = replaceRangeInternal(
-          nextState,
-          nextState.cursorRow,
-          nextState.cursorCol,
-          nextState.cursorRow,
-          nextState.cursorCol,
-          textToInsert,
-        );
-        return {
-          ...replaced,
-          pendingPastes: [
-            ...replaced.pendingPastes,
-            { placeholder, content: action.payload },
-          ],
-        };
-      }
-
       const nextState = pushUndoLocal(state);
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
@@ -1112,16 +1046,55 @@ function textBufferReducerLogic(
       };
     }
 
+    case 'insert_large_paste_placeholder': {
+      const { content } = action.payload;
+      const contentLen = toCodePoints(content).length;
+      const nextState = pushUndoLocal(state);
+      const lineContent = currentLine(nextState.cursorRow);
+      const col = nextState.cursorCol;
+      const lineLenNow = cpLen(lineContent);
+      const charBefore = col > 0 ? cpSlice(lineContent, col - 1, col) : '';
+      const charAfter =
+        col < lineLenNow ? cpSlice(lineContent, col, col + 1) : '';
+      const placeholder = `[Pasted Content ${contentLen} chars]`;
+      let textToInsert = placeholder;
+      if (charBefore && charBefore !== ' ' && charBefore !== '\n')
+        textToInsert = ' ' + textToInsert;
+      if (!charAfter || (charAfter !== ' ' && charAfter !== '\n'))
+        textToInsert = textToInsert + ' ';
+      const replaced = replaceRangeInternal(
+        nextState,
+        nextState.cursorRow,
+        nextState.cursorCol,
+        nextState.cursorRow,
+        nextState.cursorCol,
+        textToInsert,
+      );
+      return {
+        ...replaced,
+        pendingPastes: [...replaced.pendingPastes, { placeholder, content }],
+      };
+    }
+
     case 'backspace': {
-      // 先尝试删除紧邻光标前的占位符(照搬原 tryDeletePlaceholderAtCursor 思路)
-      if (state.pendingPastes.length > 0) {
+      if (state.pendingPastes && state.pendingPastes.length > 0) {
         const textAll = state.lines.join('\n');
-        const offset = logicalPosToOffset(state.lines, state.cursorRow, state.cursorCol);
+        const offset = logicalPosToOffset(
+          state.lines,
+          state.cursorRow,
+          state.cursorCol,
+        );
         for (let i = 0; i < state.pendingPastes.length; i++) {
           const ph = state.pendingPastes[i].placeholder;
           const phLen = cpLen(ph);
-          if (offset >= phLen && cpSlice(textAll, offset - phLen, offset) === ph) {
-            const [startRow, startCol] = offsetToLogicalPos(textAll, offset - phLen);
+          if (
+            offset >= phLen &&
+            cpSlice(textAll, offset - phLen, offset) === ph
+          ) {
+            const [startRow, startCol] = offsetToLogicalPos(
+              textAll,
+              offset - phLen,
+            );
             const [endRow, endCol] = offsetToLogicalPos(textAll, offset);
             const nextState = pushUndoLocal(state);
             const replaced = replaceRangeInternal(
@@ -1133,9 +1106,15 @@ function textBufferReducerLogic(
               '',
             );
             const newPending = [...replaced.pendingPastes];
-            const idxToRemove = newPending.findIndex((p) => p.placeholder === ph);
+            const idxToRemove = newPending.findIndex(
+              (p) => p.placeholder === ph,
+            );
             if (idxToRemove !== -1) newPending.splice(idxToRemove, 1);
-            return { ...replaced, pendingPastes: newPending, preferredCol: null };
+            return {
+              ...replaced,
+              pendingPastes: newPending,
+              preferredCol: null,
+            };
           }
         }
       }
@@ -2008,6 +1987,14 @@ export function useTextBuffer({
       if (key.paste) {
         // Do not do any other processing on pastes so ensure we handle them
         // before all other cases.
+        const len = toCodePoints(input).length;
+        if (len > LARGE_PASTE_CHAR_THRESHOLD) {
+          dispatch({
+            type: 'insert_large_paste_placeholder',
+            payload: { content: input },
+          });
+          return;
+        }
         insert(input, { paste: key.paste });
         return;
       }
