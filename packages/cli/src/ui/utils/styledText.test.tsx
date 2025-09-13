@@ -301,11 +301,14 @@ describe('I18n Styled Text Solution', () => {
   // New Golden Test Suite as suggested by Jacob
   describe('Golden Test Suite - Complete Component Serialization', () => {
     it('should handle simple single placeholder (golden test)', () => {
-      const component = renderStyledText(
-        'Hello {name}!',
-        { name: <Text bold color="green">World</Text> }
-      );
-      
+      const component = renderStyledText('Hello {name}!', {
+        name: (
+          <Text bold color="green">
+            World
+          </Text>
+        ),
+      });
+
       const componentJSON = JSON.stringify(component, null, 2);
       expect(componentJSON).toMatchSnapshot('simple-placeholder.json');
     });
@@ -314,25 +317,42 @@ describe('I18n Styled Text Solution', () => {
       const component = renderStyledText(
         'Execute {type} commands via {symbol} (e.g., {example})',
         {
-          type: <Text italic color="blue">shell</Text>,
-          symbol: <Text bold color="purple">!</Text>,
-          example: <Text bold color="purple">!npm run start</Text>
-        }
+          type: (
+            <Text italic color="blue">
+              shell
+            </Text>
+          ),
+          symbol: (
+            <Text bold color="purple">
+              !
+            </Text>
+          ),
+          example: (
+            <Text bold color="purple">
+              !npm run start
+            </Text>
+          ),
+        },
       );
-      
+
       const componentJSON = JSON.stringify(component, null, 2);
       expect(componentJSON).toMatchSnapshot('multi-placeholder-complex.json');
     });
 
     it('should handle nested styling and special characters (golden test)', () => {
-      const component = renderStyledText(
-        'Code: {code} with {highlight}',
-        {
-          code: <Text bold underline>function() return true</Text>,
-          highlight: <Text bold color="yellow">important</Text>
-        }
-      );
-      
+      const component = renderStyledText('Code: {code} with {highlight}', {
+        code: (
+          <Text bold underline>
+            function() return true
+          </Text>
+        ),
+        highlight: (
+          <Text bold color="yellow">
+            important
+          </Text>
+        ),
+      });
+
       const componentJSON = JSON.stringify(component, null, 2);
       expect(componentJSON).toMatchSnapshot('nested-styling.json');
     });
@@ -341,19 +361,22 @@ describe('I18n Styled Text Solution', () => {
       const component = renderStyledText(
         'Plain text with no placeholders',
         {},
-        'cyan'
+        'cyan',
       );
-      
+
       const componentJSON = JSON.stringify(component, null, 2);
       expect(componentJSON).toMatchSnapshot('no-placeholders.json');
     });
 
     it('should handle only placeholders with no surrounding text (golden test)', () => {
-      const component = renderStyledText(
-        '{only}',
-        { only: <Text bold color="red">Placeholder</Text> }
-      );
-      
+      const component = renderStyledText('{only}', {
+        only: (
+          <Text bold color="red">
+            Placeholder
+          </Text>
+        ),
+      });
+
       const componentJSON = JSON.stringify(component, null, 2);
       expect(componentJSON).toMatchSnapshot('only-placeholder.json');
     });
@@ -363,40 +386,40 @@ describe('I18n Styled Text Solution', () => {
   describe('Error Handling Golden Tests', () => {
     it('should provide detailed error structure for missing mappings (golden test)', () => {
       let errorObject;
-      
+
       try {
         renderStyledText('Use {symbol} and {missing}', {
-          symbol: <Text bold>@</Text>
+          symbol: <Text bold>@</Text>,
           // 'missing' key not provided
         });
       } catch (error) {
         errorObject = {
           message: (error as Error).message,
           name: (error as Error).name,
-          cause: (error as Error).cause || null
+          cause: (error as Error).cause || null,
         };
       }
-      
+
       const errorJSON = JSON.stringify(errorObject, null, 2);
       expect(errorJSON).toMatchSnapshot('missing-mapping-error.json');
     });
 
     it('should provide detailed error structure for unused mappings (golden test)', () => {
       let errorObject;
-      
+
       try {
         renderStyledText('Use {symbol}', {
           symbol: <Text bold>@</Text>,
-          unused: <Text>Never used</Text>
+          unused: <Text>Never used</Text>,
         });
       } catch (error) {
         errorObject = {
           message: (error as Error).message,
           name: (error as Error).name,
-          cause: (error as Error).cause || null
+          cause: (error as Error).cause || null,
         };
       }
-      
+
       const errorJSON = JSON.stringify(errorObject, null, 2);
       expect(errorJSON).toMatchSnapshot('unused-mapping-error.json');
     });

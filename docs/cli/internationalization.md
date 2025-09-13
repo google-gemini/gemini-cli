@@ -13,12 +13,14 @@ If you're new to the Gemini CLI project, this section will help you understand h
 #### 🏗️ UI Development Basics
 
 **1. Understanding the Tech Stack:**
+
 - **React + Ink**: Terminal-based UI using React components
 - **TypeScript**: Type-safe development environment
 - **i18next + react-i18next**: Internationalization framework
 - **Vitest**: Testing framework with snapshot testing
 
 **2. Key Concepts:**
+
 - **Terminal UI**: Unlike web apps, we render to terminal using Ink components
 - **Theme System**: Consistent colors and styling via semantic themes
 - **Component Architecture**: Reusable, tested React components
@@ -85,17 +87,29 @@ export function WelcomeMessage({ username }: WelcomeMessageProps) {
       <Text bold color={theme.text.primary}>
         {t('welcome.title')}
       </Text>
-      
+
       {/* Text with variable interpolation */}
       <Text color={theme.text.secondary}>
         {t('welcome.greeting', { username })}
       </Text>
-      
+
       {/* Complex styled text using Semantic Interpolation Pattern */}
-      {renderStyledText(t('welcome.instructions'), {
-        command: <Text bold color={theme.text.accent}>gemini --help</Text>,
-        key: <Text bold color={theme.text.accent}>Tab</Text>
-      }, theme.text.primary)}
+      {renderStyledText(
+        t('welcome.instructions'),
+        {
+          command: (
+            <Text bold color={theme.text.accent}>
+              gemini --help
+            </Text>
+          ),
+          key: (
+            <Text bold color={theme.text.accent}>
+              Tab
+            </Text>
+          ),
+        },
+        theme.text.primary,
+      )}
     </Box>
   );
 }
@@ -127,9 +141,7 @@ import '../../i18n/index.js'; // Initialize i18n
 
 describe('WelcomeMessage', () => {
   it('should render welcome message with user interpolation', () => {
-    const { lastFrame } = render(
-      <WelcomeMessage username="Alice" />
-    );
+    const { lastFrame } = render(<WelcomeMessage username="Alice" />);
 
     const output = lastFrame();
     expect(output).toContain('Welcome to Gemini CLI');
@@ -139,7 +151,7 @@ describe('WelcomeMessage', () => {
 
   it('should match golden snapshot for complete component structure', () => {
     const component = <WelcomeMessage username="TestUser" />;
-    
+
     // Golden test: capture complete component as JSON
     const componentJSON = JSON.stringify(component, null, 2);
     expect(componentJSON).toMatchSnapshot('welcome-message-component.json');
@@ -171,7 +183,7 @@ describe('WelcomeMessage i18n', () => {
     // This will be useful when adding more languages
     // For now, test the i18n infrastructure works
     const { lastFrame } = render(<WelcomeMessage username="用户" />);
-    
+
     const output = lastFrame();
     expect(output).toContain('Welcome'); // English default
   });
@@ -193,10 +205,11 @@ npm start
 **Why JSON Snapshots?** Following Jacob's feedback (#6832), we use complete component JSON snapshots instead of partial assertions because they capture the full component structure and make it clear what changes impact the UI.
 
 **Basic Pattern:**
+
 ```tsx
 it('should match component structure snapshot', () => {
   const component = <MyComponent prop="value" />;
-  
+
   // Capture complete component as JSON
   const componentJSON = JSON.stringify(component, null, 2);
   expect(componentJSON).toMatchSnapshot('my-component.json');
@@ -206,6 +219,7 @@ it('should match component structure snapshot', () => {
 #### 🐛 Debugging Common i18n Issues
 
 **1. Missing Translation Keys:**
+
 ```
 // Error: "translation missing"
 // Solution: Check key path and namespace
@@ -214,27 +228,40 @@ console.log(t('sections.missing'));     // ✅ Correct (with 'help' namespace)
 ```
 
 **2. Interpolation Not Working:**
+
 ```tsx
 // Problem: Variables not replacing
-{t('welcome.greeting', { user: 'Alice' })} // ❌ Wrong key name
+{
+  t('welcome.greeting', { user: 'Alice' });
+} // ❌ Wrong key name
 
 // Solution: Match JSON key names exactly
-{t('welcome.greeting', { username: 'Alice' })} // ✅ Correct
+{
+  t('welcome.greeting', { username: 'Alice' });
+} // ✅ Correct
 ```
 
 **3. Styled Text Issues:**
+
 ```tsx
 // Problem: Styling not applied
-{renderStyledText(t('message'), {
-  symbol: '@'  // ❌ Plain string, no styling
-})}
+{
+  renderStyledText(t('message'), {
+    symbol: '@', // ❌ Plain string, no styling
+  });
+}
 
 // Solution: Use Ink components for styling
-{renderStyledText(t('message'), {
-  symbol: <Text bold color="purple">@</Text>  // ✅ Styled component
-})}
+{
+  renderStyledText(t('message'), {
+    symbol: (
+      <Text bold color="purple">
+        @
+      </Text>
+    ), // ✅ Styled component
+  });
+}
 ```
-
 
 ---
 
@@ -529,11 +556,12 @@ const progress = t('progress', { current: 5, total: 10 });
 #### Essential Testing Patterns
 
 **1. Component Structure Snapshots:**
+
 ```tsx
 describe('Component Golden Tests', () => {
   it('should match complete component structure', () => {
     const component = <MyComponent prop="testValue" />;
-    
+
     // Capture complete component as JSON - this is the key method
     const componentJSON = JSON.stringify(component, null, 2);
     expect(componentJSON).toMatchSnapshot('my-component.json');
@@ -542,16 +570,25 @@ describe('Component Golden Tests', () => {
 ```
 
 **2. StyledText Snapshots:**
+
 ```tsx
 describe('StyledText Testing', () => {
   it('should capture styled interpolation structure', () => {
     const component = renderStyledText(
       'Use {symbol} to access {feature}',
       {
-        symbol: <Text bold color="purple">@</Text>,
-        feature: <Text bold color="green">files</Text>
+        symbol: (
+          <Text bold color="purple">
+            @
+          </Text>
+        ),
+        feature: (
+          <Text bold color="green">
+            files
+          </Text>
+        ),
       },
-      'white'
+      'white',
     );
 
     // Golden test captures complete styling structure
@@ -562,6 +599,7 @@ describe('StyledText Testing', () => {
 ```
 
 **3. Error Scenario Snapshots:**
+
 ```tsx
 describe('Error Handling', () => {
   it('should capture error structure for missing keys', () => {
@@ -572,10 +610,10 @@ describe('Error Handling', () => {
       errorObject = {
         message: (error as Error).message,
         name: (error as Error).name,
-        cause: (error as Error).cause || null
+        cause: (error as Error).cause || null,
       };
     }
-    
+
     const errorJSON = JSON.stringify(errorObject, null, 2);
     expect(errorJSON).toMatchSnapshot('error-structure.json');
   });
@@ -589,7 +627,7 @@ describe('Error Handling', () => {
 npm test src/i18n/index.test.ts
 
 # Run component tests with snapshots
-npm test src/ui/components/ 
+npm test src/ui/components/
 
 # Run styled text utility tests
 npm test src/ui/utils/styledText.test.tsx
@@ -671,17 +709,20 @@ const EXPECTED_KEYS = {
 ### Best Practices Summary
 
 **Component Development:**
+
 - Use `useTranslation('namespace')` with appropriate namespace
 - Use `renderStyledText()` for styled interpolations
 - Always use theme constants for colors
 - Create JSON snapshots for comprehensive testing
 
 **Translation Keys:**
+
 - Use hierarchical structure: `dialog.auth.title`
 - Complete sentences, not fragments
 - Group by namespace: `common`, `dialogs`, `help`
 
 **Testing Pattern:**
+
 ```tsx
 describe('ComponentName', () => {
   it('should match component structure', () => {
@@ -733,6 +774,7 @@ A: Following Jacob's feedback on Issue #6832, we use "Golden Tests" (complete co
 
 **Q: How do I create a JSON snapshot test?**
 A: Use this pattern:
+
 ```tsx
 it('should match component structure', () => {
   const component = <MyComponent prop="value" />;
@@ -742,7 +784,8 @@ it('should match component structure', () => {
 ```
 
 **Q: My snapshot tests are failing. What should I do?**
-A: 
+A:
+
 1. Verify your changes are intentional
 2. Run `npm test -- --update-snapshots` to update snapshots
 3. Review the snapshot diff to ensure it matches your intended changes
@@ -750,9 +793,14 @@ A:
 
 **Q: How do I test styledText components with snapshots?**
 A: Capture the complete renderStyledText output:
+
 ```tsx
 const component = renderStyledText('Use {symbol}', {
-  symbol: <Text bold color="purple">@</Text>
+  symbol: (
+    <Text bold color="purple">
+      @
+    </Text>
+  ),
 });
 const componentJSON = JSON.stringify(component, null, 2);
 expect(componentJSON).toMatchSnapshot('styled-text.json');
@@ -760,6 +808,7 @@ expect(componentJSON).toMatchSnapshot('styled-text.json');
 
 **Q: Should I still use functional tests alongside JSON snapshots?**
 A: Yes, use both:
+
 - Functional tests verify behavior: `expect(lastFrame()).toContain('text')`
 - JSON snapshots verify structure: `expect(componentJSON).toMatchSnapshot()`
 
