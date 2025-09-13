@@ -813,7 +813,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
                 const renderedLine: React.ReactNode[] = [];
 
-                // Use mapping for segment-based highlighting across visual wraps
                 const [logicalLineIdx, logicalStartCol] = mapEntry;
                 const logicalLine = buffer.lines[logicalLineIdx] || '';
                 const tokens = parseInputForHighlighting(
@@ -829,7 +828,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   visualEnd,
                 );
 
-                // Render segments, applying cursor inversion if needed
                 let charCount = 0;
                 segments.forEach((seg, segIdx) => {
                   const segLen = cpLen(seg.text);
@@ -862,7 +860,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                           relativeVisualColForHighlight - segStart + 1,
                         );
                     }
-                    // Keep charCount logic identical to the original token loop
                     charCount = segEnd;
                   }
 
