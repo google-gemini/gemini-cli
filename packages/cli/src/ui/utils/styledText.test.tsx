@@ -45,7 +45,7 @@ describe('I18n Styled Text Solution', () => {
     expect(output).toContain('@src/myFile.ts');
   });
 
-  it('should apply correct styling attributes to interpolated components', () => {
+  it('should apply correct styling attributes to interpolated components (golden test)', () => {
     const translatedText = 'Use {symbol} to specify {example}';
 
     const component = renderStyledText(
@@ -65,16 +65,9 @@ describe('I18n Styled Text Solution', () => {
       'white',
     );
 
-    // Verify component structure contains correct styling attributes
-    const componentString = JSON.stringify(component);
-
-    // Should contain Text components with correct props
-    expect(componentString).toContain('"bold":true');
-    expect(componentString).toContain('"color":"purple"');
-
-    // Should contain the correct text content
-    expect(componentString).toContain('"@"');
-    expect(componentString).toContain('"files"');
+    // Golden test: capture complete component structure as JSON
+    const componentJSON = JSON.stringify(component, null, 2);
+    expect(componentJSON).toMatchSnapshot('styled-text-component.json');
   });
 
   it('should provide complete context for translators', () => {
@@ -302,6 +295,110 @@ describe('I18n Styled Text Solution', () => {
       expect(output).toContain('REPLACED');
       expect(output).toContain('here');
       expect(output).not.toContain('{missing}');
+    });
+  });
+
+  // New Golden Test Suite as suggested by Jacob
+  describe('Golden Test Suite - Complete Component Serialization', () => {
+    it('should handle simple single placeholder (golden test)', () => {
+      const component = renderStyledText(
+        'Hello {name}!',
+        { name: <Text bold color="green">World</Text> }
+      );
+      
+      const componentJSON = JSON.stringify(component, null, 2);
+      expect(componentJSON).toMatchSnapshot('simple-placeholder.json');
+    });
+
+    it('should handle complex multi-placeholder with different styles (golden test)', () => {
+      const component = renderStyledText(
+        'Execute {type} commands via {symbol} (e.g., {example})',
+        {
+          type: <Text italic color="blue">shell</Text>,
+          symbol: <Text bold color="purple">!</Text>,
+          example: <Text bold color="purple">!npm run start</Text>
+        }
+      );
+      
+      const componentJSON = JSON.stringify(component, null, 2);
+      expect(componentJSON).toMatchSnapshot('multi-placeholder-complex.json');
+    });
+
+    it('should handle nested styling and special characters (golden test)', () => {
+      const component = renderStyledText(
+        'Code: {code} with {highlight}',
+        {
+          code: <Text bold underline>function() return true</Text>,
+          highlight: <Text bold color="yellow">important</Text>
+        }
+      );
+      
+      const componentJSON = JSON.stringify(component, null, 2);
+      expect(componentJSON).toMatchSnapshot('nested-styling.json');
+    });
+
+    it('should handle text with no placeholders (golden test)', () => {
+      const component = renderStyledText(
+        'Plain text with no placeholders',
+        {},
+        'cyan'
+      );
+      
+      const componentJSON = JSON.stringify(component, null, 2);
+      expect(componentJSON).toMatchSnapshot('no-placeholders.json');
+    });
+
+    it('should handle only placeholders with no surrounding text (golden test)', () => {
+      const component = renderStyledText(
+        '{only}',
+        { only: <Text bold color="red">Placeholder</Text> }
+      );
+      
+      const componentJSON = JSON.stringify(component, null, 2);
+      expect(componentJSON).toMatchSnapshot('only-placeholder.json');
+    });
+  });
+
+  // Error Scenario Golden Tests
+  describe('Error Handling Golden Tests', () => {
+    it('should provide detailed error structure for missing mappings (golden test)', () => {
+      let errorObject;
+      
+      try {
+        renderStyledText('Use {symbol} and {missing}', {
+          symbol: <Text bold>@</Text>
+          // 'missing' key not provided
+        });
+      } catch (error) {
+        errorObject = {
+          message: (error as Error).message,
+          name: (error as Error).name,
+          cause: (error as Error).cause || null
+        };
+      }
+      
+      const errorJSON = JSON.stringify(errorObject, null, 2);
+      expect(errorJSON).toMatchSnapshot('missing-mapping-error.json');
+    });
+
+    it('should provide detailed error structure for unused mappings (golden test)', () => {
+      let errorObject;
+      
+      try {
+        renderStyledText('Use {symbol}', {
+          symbol: <Text bold>@</Text>,
+          unused: <Text>Never used</Text>
+        });
+      } catch (error) {
+        errorObject = {
+          message: (error as Error).message,
+          name: (error as Error).name,
+          cause: (error as Error).cause || null
+        };
+      }
+      
+      const errorJSON = JSON.stringify(errorObject, null, 2);
+      expect(errorJSON).toMatchSnapshot('unused-mapping-error.json');
     });
   });
 });

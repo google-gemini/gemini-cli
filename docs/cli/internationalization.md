@@ -2,7 +2,241 @@
 
 ## Overview
 
-Gemini CLI supports internationalization (i18n) to provide a localized experience for users worldwide. This document provides guidance for developers on adding new translatable strings and managing i18n coverage.
+Gemini CLI supports internationalization (i18n) to provide a localized experience for users worldwide. This document provides comprehensive guidance for developers on UI development, internationalization implementation, and testing strategies.
+
+## 🆕 New Developer Quick Start Guide
+
+### For New Contributors: Getting Started with UI Development and i18n
+
+If you're new to the Gemini CLI project, this section will help you understand how to develop user interfaces with internationalization support.
+
+#### 🏗️ UI Development Basics
+
+**1. Understanding the Tech Stack:**
+- **React + Ink**: Terminal-based UI using React components
+- **TypeScript**: Type-safe development environment
+- **i18next + react-i18next**: Internationalization framework
+- **Vitest**: Testing framework with snapshot testing
+
+**2. Key Concepts:**
+- **Terminal UI**: Unlike web apps, we render to terminal using Ink components
+- **Theme System**: Consistent colors and styling via semantic themes
+- **Component Architecture**: Reusable, tested React components
+- **Golden Tests**: JSON snapshots for comprehensive component testing
+
+#### 🌍 i18n Development Workflow
+
+**Step 1: Set Up Your Development Environment**
+
+```bash
+# Clone and set up the project
+git clone https://github.com/google-gemini/gemini-cli.git
+cd gemini-cli
+npm install
+npm run build
+
+# Run in development mode with language switching
+npm start
+```
+
+**Step 2: Understanding the File Structure**
+
+```
+packages/cli/src/
+├── ui/
+│   ├── components/          # React components
+│   │   ├── Help.tsx        # Example: Internationalized component
+│   │   ├── AuthDialog.tsx  # Example: Dialog with i18n
+│   │   └── SettingsDialog.tsx
+│   └── utils/
+│       └── styledText.tsx  # Utility for styled translations
+├── i18n/
+│   ├── index.ts           # i18n configuration
+│   ├── useTranslation.ts  # React hook for translations
+│   └── locales/
+│       └── en/
+│           ├── common.json     # UI elements, buttons
+│           ├── dialogs.json    # Dialog text
+│           └── help.json       # Help system content
+```
+
+#### 📝 Your First Internationalized Component
+
+Let's create a simple component with i18n support:
+
+```tsx
+// src/ui/components/WelcomeMessage.tsx
+import React from 'react';
+import { Box, Text } from 'ink';
+import { useTranslation } from '../../i18n/useTranslation.js';
+import { renderStyledText } from '../utils/styledText.js';
+import { theme } from '../semantic-colors.js';
+
+interface WelcomeMessageProps {
+  username: string;
+}
+
+export function WelcomeMessage({ username }: WelcomeMessageProps) {
+  const { t } = useTranslation('common');
+
+  return (
+    <Box flexDirection="column" padding={1}>
+      {/* Simple text translation */}
+      <Text bold color={theme.text.primary}>
+        {t('welcome.title')}
+      </Text>
+      
+      {/* Text with variable interpolation */}
+      <Text color={theme.text.secondary}>
+        {t('welcome.greeting', { username })}
+      </Text>
+      
+      {/* Complex styled text using Semantic Interpolation Pattern */}
+      {renderStyledText(t('welcome.instructions'), {
+        command: <Text bold color={theme.text.accent}>gemini --help</Text>,
+        key: <Text bold color={theme.text.accent}>Tab</Text>
+      }, theme.text.primary)}
+    </Box>
+  );
+}
+```
+
+**Add corresponding translations:**
+
+```json
+// src/i18n/locales/en/common.json
+{
+  "welcome": {
+    "title": "Welcome to Gemini CLI",
+    "greeting": "Hello, {{username}}! Ready to get started?",
+    "instructions": "Use {command} for help or press {key} for autocomplete."
+  }
+}
+```
+
+#### 🧪 Testing Your i18n Component
+
+**1. Create Component Tests with Golden Testing:**
+
+```tsx
+// src/ui/components/WelcomeMessage.test.tsx
+import { render } from 'ink-testing-library';
+import { describe, it, expect } from 'vitest';
+import { WelcomeMessage } from './WelcomeMessage.js';
+import '../../i18n/index.js'; // Initialize i18n
+
+describe('WelcomeMessage', () => {
+  it('should render welcome message with user interpolation', () => {
+    const { lastFrame } = render(
+      <WelcomeMessage username="Alice" />
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('Welcome to Gemini CLI');
+    expect(output).toContain('Hello, Alice!');
+    expect(output).toContain('gemini --help');
+  });
+
+  it('should match golden snapshot for complete component structure', () => {
+    const component = <WelcomeMessage username="TestUser" />;
+    
+    // Golden test: capture complete component as JSON
+    const componentJSON = JSON.stringify(component, null, 2);
+    expect(componentJSON).toMatchSnapshot('welcome-message-component.json');
+  });
+});
+```
+
+**2. Run Tests and Generate Snapshots:**
+
+```bash
+# Run your component tests
+npm test src/ui/components/WelcomeMessage.test.tsx
+
+# Run all i18n tests
+npm test src/i18n/
+
+# Run tests with coverage
+npm test -- --coverage
+```
+
+#### 🔄 Language Switching and Testing
+
+**1. Test Different Languages (Future):**
+
+```tsx
+// Test component with different languages
+describe('WelcomeMessage i18n', () => {
+  it('should support language switching', async () => {
+    // This will be useful when adding more languages
+    // For now, test the i18n infrastructure works
+    const { lastFrame } = render(<WelcomeMessage username="用户" />);
+    
+    const output = lastFrame();
+    expect(output).toContain('Welcome'); // English default
+  });
+});
+```
+
+**2. Manual Testing in Development:**
+
+```bash
+# Start CLI and test language settings
+npm start
+
+# In the CLI, use settings to change language (when available):
+# /settings → Language → Select language
+```
+
+#### 🎯 JSON Snapshot Testing - Core Method
+
+**Why JSON Snapshots?** Following Jacob's feedback (#6832), we use complete component JSON snapshots instead of partial assertions because they capture the full component structure and make it clear what changes impact the UI.
+
+**Basic Pattern:**
+```tsx
+it('should match component structure snapshot', () => {
+  const component = <MyComponent prop="value" />;
+  
+  // Capture complete component as JSON
+  const componentJSON = JSON.stringify(component, null, 2);
+  expect(componentJSON).toMatchSnapshot('my-component.json');
+});
+```
+
+#### 🐛 Debugging Common i18n Issues
+
+**1. Missing Translation Keys:**
+```
+// Error: "translation missing"
+// Solution: Check key path and namespace
+console.log(t('help:sections.missing')); // ❌ Wrong
+console.log(t('sections.missing'));     // ✅ Correct (with 'help' namespace)
+```
+
+**2. Interpolation Not Working:**
+```tsx
+// Problem: Variables not replacing
+{t('welcome.greeting', { user: 'Alice' })} // ❌ Wrong key name
+
+// Solution: Match JSON key names exactly
+{t('welcome.greeting', { username: 'Alice' })} // ✅ Correct
+```
+
+**3. Styled Text Issues:**
+```tsx
+// Problem: Styling not applied
+{renderStyledText(t('message'), {
+  symbol: '@'  // ❌ Plain string, no styling
+})}
+
+// Solution: Use Ink components for styling
+{renderStyledText(t('message'), {
+  symbol: <Text bold color="purple">@</Text>  // ✅ Styled component
+})}
+```
+
+
+---
 
 ## Architecture
 
@@ -288,11 +522,80 @@ const progress = t('progress', { current: 5, total: 10 });
 
 ## Testing and Coverage
 
+### 🧪 JSON Snapshot Testing Strategy
+
+**Core Principle**: Following Jacob's feedback on Issue #6832, we use **Golden Tests** (complete component JSON snapshots) instead of partial assertions to capture the full component structure and clearly detect what changes impact the UI.
+
+#### Essential Testing Patterns
+
+**1. Component Structure Snapshots:**
+```tsx
+describe('Component Golden Tests', () => {
+  it('should match complete component structure', () => {
+    const component = <MyComponent prop="testValue" />;
+    
+    // Capture complete component as JSON - this is the key method
+    const componentJSON = JSON.stringify(component, null, 2);
+    expect(componentJSON).toMatchSnapshot('my-component.json');
+  });
+});
+```
+
+**2. StyledText Snapshots:**
+```tsx
+describe('StyledText Testing', () => {
+  it('should capture styled interpolation structure', () => {
+    const component = renderStyledText(
+      'Use {symbol} to access {feature}',
+      {
+        symbol: <Text bold color="purple">@</Text>,
+        feature: <Text bold color="green">files</Text>
+      },
+      'white'
+    );
+
+    // Golden test captures complete styling structure
+    const componentJSON = JSON.stringify(component, null, 2);
+    expect(componentJSON).toMatchSnapshot('styled-interpolation.json');
+  });
+});
+```
+
+**3. Error Scenario Snapshots:**
+```tsx
+describe('Error Handling', () => {
+  it('should capture error structure for missing keys', () => {
+    let errorObject;
+    try {
+      renderStyledText('Use {missing}', { provided: <Text>Wrong</Text> });
+    } catch (error) {
+      errorObject = {
+        message: (error as Error).message,
+        name: (error as Error).name,
+        cause: (error as Error).cause || null
+      };
+    }
+    
+    const errorJSON = JSON.stringify(errorObject, null, 2);
+    expect(errorJSON).toMatchSnapshot('error-structure.json');
+  });
+});
+```
+
 ### Running i18n Tests
 
 ```bash
 # Run all i18n tests
 npm test src/i18n/index.test.ts
+
+# Run component tests with snapshots
+npm test src/ui/components/ 
+
+# Run styled text utility tests
+npm test src/ui/utils/styledText.test.tsx
+
+# Generate/update golden test snapshots
+npm test -- --update-snapshots
 
 # Run with coverage
 npm test -- --coverage src/i18n/
@@ -308,6 +611,9 @@ npm test src/i18n/index.test.ts -- --reporter=verbose
 
 # Check translation key coverage
 npm test src/i18n/index.test.ts -- --grep "translation keys"
+
+# Validate golden test snapshots
+npm test src/ui/utils/styledText.test.tsx -- --reporter=verbose
 ```
 
 #### What the Coverage Report Includes:
@@ -362,32 +668,29 @@ const EXPECTED_KEYS = {
 
 ## Best Practices
 
-### 1. String Extraction Guidelines
+### Best Practices Summary
 
-- Extract user-facing strings immediately when writing components
-- Don't extract debug messages or internal logs
-- Use descriptive, hierarchical keys: `dialog.auth.title` not `authTitle`
-- Group related strings in appropriate namespaces
+**Component Development:**
+- Use `useTranslation('namespace')` with appropriate namespace
+- Use `renderStyledText()` for styled interpolations
+- Always use theme constants for colors
+- Create JSON snapshots for comprehensive testing
 
-### 2. Translation-Friendly Strings
+**Translation Keys:**
+- Use hierarchical structure: `dialog.auth.title`
+- Complete sentences, not fragments
+- Group by namespace: `common`, `dialogs`, `help`
 
-- Write complete sentences instead of concatenating fragments
-- Avoid hardcoded formatting - use interpolation instead
-- Consider different languages may need different sentence structures
-- Provide context in key names when the same word could have different meanings
-
-### 3. Code Organization
-
-- Import translations at the component level, not globally
-- Use the correct namespace for your content type
-- Handle missing translations gracefully with fallbacks
-- Test your components with longer translated text
-
-### 4. Performance Considerations
-
-- Namespaces are loaded on-demand - organize by usage patterns
-- Avoid loading all translations upfront
-- Use translation keys that are likely to be stable over time
+**Testing Pattern:**
+```tsx
+describe('ComponentName', () => {
+  it('should match component structure', () => {
+    const component = <ComponentName prop="value" />;
+    const componentJSON = JSON.stringify(component, null, 2);
+    expect(componentJSON).toMatchSnapshot('component-name.json');
+  });
+});
+```
 
 ## Troubleshooting
 
@@ -422,6 +725,43 @@ const EXPECTED_KEYS = {
 - Check console for i18next warnings and errors
 - Verify translation files are properly formatted JSON
 - Test with `lng` parameter to simulate different languages
+
+## FAQ: JSON Snapshot Testing
+
+**Q: Why do we use JSON snapshots instead of testing individual elements?**
+A: Following Jacob's feedback on Issue #6832, we use "Golden Tests" (complete component JSON snapshots) because they capture the full component structure, making it clear exactly what changes impact the UI. This is more comprehensive than partial assertions.
+
+**Q: How do I create a JSON snapshot test?**
+A: Use this pattern:
+```tsx
+it('should match component structure', () => {
+  const component = <MyComponent prop="value" />;
+  const componentJSON = JSON.stringify(component, null, 2);
+  expect(componentJSON).toMatchSnapshot('my-component.json');
+});
+```
+
+**Q: My snapshot tests are failing. What should I do?**
+A: 
+1. Verify your changes are intentional
+2. Run `npm test -- --update-snapshots` to update snapshots
+3. Review the snapshot diff to ensure it matches your intended changes
+4. Commit the updated snapshot files
+
+**Q: How do I test styledText components with snapshots?**
+A: Capture the complete renderStyledText output:
+```tsx
+const component = renderStyledText('Use {symbol}', {
+  symbol: <Text bold color="purple">@</Text>
+});
+const componentJSON = JSON.stringify(component, null, 2);
+expect(componentJSON).toMatchSnapshot('styled-text.json');
+```
+
+**Q: Should I still use functional tests alongside JSON snapshots?**
+A: Yes, use both:
+- Functional tests verify behavior: `expect(lastFrame()).toContain('text')`
+- JSON snapshots verify structure: `expect(componentJSON).toMatchSnapshot()`
 
 ## Related Documentation
 
