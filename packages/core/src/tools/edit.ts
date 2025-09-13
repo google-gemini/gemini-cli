@@ -472,6 +472,7 @@ Expectation for required parameters:
 3. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic.
 4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
 **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
+**CRITICAL for \`new_string\`**: You MUST provide the **complete** block of text that will replace \`old_string\`. Do NOT use comments like \`// ...\` or any other placeholders to omit parts of the code that are unchanged.
 **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
       Kind.Edit,
       {
@@ -488,7 +489,7 @@ Expectation for required parameters:
           },
           new_string: {
             description:
-              'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
+              'The exact literal text to replace `old_string` with, preferably unescaped. This MUST be the COMPLETE and EXACT text, including any unchanged lines from `old_string`. Do NOT use placeholder comments like `// ...` to abbreviate. Ensure the resulting code is correct and idiomatic.',
             type: 'string',
           },
           expected_replacements: {
