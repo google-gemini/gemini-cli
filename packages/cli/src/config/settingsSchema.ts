@@ -851,6 +851,15 @@ const SETTINGS_SCHEMA = {
             description: 'Setting to track whether Folder trust is enabled.',
             showInDialog: true,
           },
+          featureEnabled: {
+            type: 'boolean',
+            label: 'Folder Trust Feature',
+            category: 'Security',
+            requiresRestart: true,
+            default: true,
+            description: 'Setting to track whether Folder trust feature is enabled.',
+            showInDialog: false,
+          },
         },
       },
       auth: {
