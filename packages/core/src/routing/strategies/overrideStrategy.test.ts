@@ -9,15 +9,16 @@ import { OverrideStrategy } from './overrideStrategy.js';
 import type { RoutingContext } from '../routingStrategy.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { Config } from '../../config/config.js';
+import { DEFAULT_GEMINI_MODEL_AUTO } from '../../config/models.js';
 
 describe('OverrideStrategy', () => {
   const strategy = new OverrideStrategy();
   const mockContext = {} as RoutingContext;
   const mockClient = {} as BaseLlmClient;
 
-  it('should return null when no override model is specified', async () => {
+  it('should return null when the override model is auto', async () => {
     const mockConfig = {
-      getModel: () => '', // Simulate no model override
+      getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
     } as Config;
 
     const decision = await strategy.route(mockContext, mockConfig, mockClient);
