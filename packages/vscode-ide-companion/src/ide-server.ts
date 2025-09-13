@@ -5,7 +5,11 @@
  */
 
 import * as vscode from 'vscode';
-import { IdeContextNotificationSchema } from '@google/gemini-cli-core';
+import {
+  CloseDiffRequestSchema,
+  IdeContextNotificationSchema,
+  OpenDiffRequestSchema,
+} from '@google/gemini-cli-core';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -15,18 +19,19 @@ import { type Server as HTTPServer } from 'node:http';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
-import { z } from 'zod';
-import { DiffManager } from './diff-manager.js';
+import type { z } from 'zod';
+import type { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 const IDE_WORKSPACE_PATH_ENV_VAR = 'GEMINI_CLI_IDE_WORKSPACE_PATH';
 
-function writePortAndWorkspace(
+async function writePortAndWorkspace(
   context: vscode.ExtensionContext,
   port: number,
   portFile: string,
+  ppidPortFile: string,
   log: (message: string) => void,
 ): Promise<void> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -44,13 +49,20 @@ function writePortAndWorkspace(
     workspacePath,
   );
 
+  const content = JSON.stringify({ port, workspacePath, ppid: process.ppid });
+
   log(`Writing port file to: ${portFile}`);
-  return fs
-    .writeFile(portFile, JSON.stringify({ port, workspacePath }))
-    .catch((err) => {
-      const message = err instanceof Error ? err.message : String(err);
-      log(`Failed to write port to file: ${message}`);
-    });
+  log(`Writing ppid port file to: ${ppidPortFile}`);
+
+  try {
+    await Promise.all([
+      fs.writeFile(portFile, content),
+      fs.writeFile(ppidPortFile, content),
+    ]);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log(`Failed to write port to file: ${message}`);
+  }
 }
 
 function sendIdeContextUpdateNotification(
@@ -80,44 +92,36 @@ export class IDEServer {
   private server: HTTPServer | undefined;
   private context: vscode.ExtensionContext | undefined;
   private log: (message: string) => void;
-  private portFile: string;
+  private portFile: string | undefined;
+  private ppidPortFile: string | undefined;
   private port: number | undefined;
+  private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
+    {};
+  private openFilesManager: OpenFilesManager | undefined;
   diffManager: DiffManager;
 
   constructor(log: (message: string) => void, diffManager: DiffManager) {
     this.log = log;
     this.diffManager = diffManager;
-    this.portFile = path.join(
-      os.tmpdir(),
-      `gemini-ide-server-${process.ppid}.json`,
-    );
   }
 
   start(context: vscode.ExtensionContext): Promise<void> {
     return new Promise((resolve) => {
       this.context = context;
       const sessionsWithInitialNotification = new Set<string>();
-      const transports: { [sessionId: string]: StreamableHTTPServerTransport } =
-        {};
 
       const app = express();
-      app.use(express.json());
+      app.use(express.json({ limit: '10mb' }));
       const mcpServer = createMcpServer(this.diffManager);
 
-      const openFilesManager = new OpenFilesManager(context);
-      const onDidChangeSubscription = openFilesManager.onDidChange(() => {
-        for (const transport of Object.values(transports)) {
-          sendIdeContextUpdateNotification(
-            transport,
-            this.log.bind(this),
-            openFilesManager,
-          );
-        }
+      this.openFilesManager = new OpenFilesManager(context);
+      const onDidChangeSubscription = this.openFilesManager.onDidChange(() => {
+        this.broadcastIdeContextUpdate();
       });
       context.subscriptions.push(onDidChangeSubscription);
       const onDidChangeDiffSubscription = this.diffManager.onDidChange(
         (notification) => {
-          for (const transport of Object.values(transports)) {
+          for (const transport of Object.values(this.transports)) {
             transport.send(notification);
           }
         },
@@ -130,14 +134,14 @@ export class IDEServer {
           | undefined;
         let transport: StreamableHTTPServerTransport;
 
-        if (sessionId && transports[sessionId]) {
-          transport = transports[sessionId];
+        if (sessionId && this.transports[sessionId]) {
+          transport = this.transports[sessionId];
         } else if (!sessionId && isInitializeRequest(req.body)) {
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (newSessionId) => {
               this.log(`New session initialized: ${newSessionId}`);
-              transports[newSessionId] = transport;
+              this.transports[newSessionId] = transport;
             },
           });
           const keepAlive = setInterval(() => {
@@ -156,7 +160,7 @@ export class IDEServer {
             if (transport.sessionId) {
               this.log(`Session closed: ${transport.sessionId}`);
               sessionsWithInitialNotification.delete(transport.sessionId);
-              delete transports[transport.sessionId];
+              delete this.transports[transport.sessionId];
             }
           };
           mcpServer.connect(transport);
@@ -199,13 +203,13 @@ export class IDEServer {
         const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
           | string
           | undefined;
-        if (!sessionId || !transports[sessionId]) {
+        if (!sessionId || !this.transports[sessionId]) {
           this.log('Invalid or missing session ID');
           res.status(400).send('Invalid or missing session ID');
           return;
         }
 
-        const transport = transports[sessionId];
+        const transport = this.transports[sessionId];
         try {
           await transport.handleRequest(req, res);
         } catch (error) {
@@ -217,11 +221,14 @@ export class IDEServer {
           }
         }
 
-        if (!sessionsWithInitialNotification.has(sessionId)) {
+        if (
+          this.openFilesManager &&
+          !sessionsWithInitialNotification.has(sessionId)
+        ) {
           sendIdeContextUpdateNotification(
             transport,
             this.log.bind(this),
-            openFilesManager,
+            this.openFilesManager,
           );
           sessionsWithInitialNotification.add(sessionId);
         }
@@ -233,11 +240,21 @@ export class IDEServer {
         const address = (this.server as HTTPServer).address();
         if (address && typeof address !== 'string') {
           this.port = address.port;
+          this.portFile = path.join(
+            os.tmpdir(),
+            `gemini-ide-server-${this.port}.json`,
+          );
+          this.ppidPortFile = path.join(
+            os.tmpdir(),
+            `gemini-ide-server-${process.ppid}.json`,
+          );
           this.log(`IDE server listening on port ${this.port}`);
+
           await writePortAndWorkspace(
             context,
             this.port,
             this.portFile,
+            this.ppidPortFile,
             this.log,
           );
         }
@@ -246,14 +263,35 @@ export class IDEServer {
     });
   }
 
-  async updateWorkspacePath(): Promise<void> {
-    if (this.context && this.port) {
+  broadcastIdeContextUpdate() {
+    if (!this.openFilesManager) {
+      return;
+    }
+    for (const transport of Object.values(this.transports)) {
+      sendIdeContextUpdateNotification(
+        transport,
+        this.log.bind(this),
+        this.openFilesManager,
+      );
+    }
+  }
+
+  async syncEnvVars(): Promise<void> {
+    if (
+      this.context &&
+      this.server &&
+      this.port &&
+      this.portFile &&
+      this.ppidPortFile
+    ) {
       await writePortAndWorkspace(
         this.context,
         this.port,
         this.portFile,
+        this.ppidPortFile,
         this.log,
       );
+      this.broadcastIdeContextUpdate();
     }
   }
 
@@ -275,10 +313,19 @@ export class IDEServer {
     if (this.context) {
       this.context.environmentVariableCollection.clear();
     }
-    try {
-      await fs.unlink(this.portFile);
-    } catch (_err) {
-      // Ignore errors if the file doesn't exist.
+    if (this.portFile) {
+      try {
+        await fs.unlink(this.portFile);
+      } catch (_err) {
+        // Ignore errors if the file doesn't exist.
+      }
+    }
+    if (this.ppidPortFile) {
+      try {
+        await fs.unlink(this.ppidPortFile);
+      } catch (_err) {
+        // Ignore errors if the file doesn't exist.
+      }
     }
   }
 }
@@ -296,40 +343,27 @@ const createMcpServer = (diffManager: DiffManager) => {
     {
       description:
         '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejcted.',
-      inputSchema: z.object({
-        filePath: z.string(),
-        // TODO(chrstn): determine if this should be required or not.
-        newContent: z.string().optional(),
-      }).shape,
+      inputSchema: OpenDiffRequestSchema.shape,
     },
-    async ({
-      filePath,
-      newContent,
-    }: {
-      filePath: string;
-      newContent?: string;
-    }) => {
-      await diffManager.showDiff(filePath, newContent ?? '');
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Showing diff for ${filePath}`,
-          },
-        ],
-      };
+    async ({ filePath, newContent }: z.infer<typeof OpenDiffRequestSchema>) => {
+      await diffManager.showDiff(filePath, newContent);
+      return { content: [] };
     },
   );
   server.registerTool(
     'closeDiff',
     {
       description: '(IDE Tool) Close an open diff view for a specific file.',
-      inputSchema: z.object({
-        filePath: z.string(),
-      }).shape,
+      inputSchema: CloseDiffRequestSchema.shape,
     },
-    async ({ filePath }: { filePath: string }) => {
-      const content = await diffManager.closeDiff(filePath);
+    async ({
+      filePath,
+      suppressNotification,
+    }: z.infer<typeof CloseDiffRequestSchema>) => {
+      const content = await diffManager.closeDiff(
+        filePath,
+        suppressNotification,
+      );
       const response = { content: content ?? undefined };
       return {
         content: [

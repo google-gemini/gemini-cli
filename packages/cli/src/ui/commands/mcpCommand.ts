@@ -4,16 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   SlashCommand,
   SlashCommandActionReturn,
   CommandContext,
-  CommandKind,
   MessageActionReturn,
 } from './types.js';
-
+import { CommandKind } from './types.js';
+import type { DiscoveredMCPPrompt } from '@google/gemini-cli-core';
 import {
-  DiscoveredMCPPrompt,
   DiscoveredMCPTool,
   getMCPDiscoveryState,
   getMCPServerStatus,
@@ -21,6 +20,7 @@ import {
   MCPServerStatus,
   mcpServerRequiresOAuth,
   getErrorMessage,
+  MCPOAuthTokenStorage,
 } from '@google/gemini-cli-core';
 import { appEvents, AppEvent } from '../../utils/events.js';
 
@@ -143,9 +143,10 @@ const getMcpStatus = async (
         const { MCPOAuthTokenStorage } = await import(
           '@google/gemini-cli-core'
         );
-        const hasToken = await MCPOAuthTokenStorage.getToken(serverName);
+        const tokenStorage = new MCPOAuthTokenStorage();
+        const hasToken = await tokenStorage.getCredentials(serverName);
         if (hasToken) {
-          const isExpired = MCPOAuthTokenStorage.isTokenExpired(hasToken.token);
+          const isExpired = tokenStorage.isTokenExpired(hasToken.token);
           if (isExpired) {
             message += ` ${COLOR_YELLOW}(OAuth token expired)${RESET_COLOR}`;
           } else {
@@ -392,7 +393,8 @@ const authCommand: SlashCommand = {
       }
 
       const mcpServerUrl = server.httpUrl || server.url;
-      await MCPOAuthProvider.authenticate(
+      const authProvider = new MCPOAuthProvider(new MCPOAuthTokenStorage());
+      await authProvider.authenticate(
         serverName,
         oauthConfig,
         mcpServerUrl,

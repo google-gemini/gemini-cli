@@ -4,20 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fsPromises from 'fs/promises';
+import * as fsPromises from 'node:fs/promises';
 import React from 'react';
 import { Text } from 'ink';
-import { Colors } from '../colors.js';
-import {
+import { theme } from '../semantic-colors.js';
+import type {
   CommandContext,
   SlashCommand,
   MessageActionReturn,
-  CommandKind,
   SlashCommandActionReturn,
 } from './types.js';
+import { CommandKind } from './types.js';
 import { decodeTagName } from '@google/gemini-cli-core';
-import path from 'path';
-import { HistoryItemWithoutId, MessageType } from '../types.js';
+import path from 'node:path';
+import type { HistoryItemWithoutId } from '../types.js';
+import { MessageType } from '../types.js';
 
 interface ChatDetail {
   name: string;
@@ -125,7 +126,7 @@ const saveCommand: SlashCommand = {
             Text,
             null,
             'A checkpoint with the tag ',
-            React.createElement(Text, { color: Colors.AccentPurple }, tag),
+            React.createElement(Text, { color: theme.text.accent }, tag),
             ' already exists. Do you want to overwrite it?',
           ),
           originalInvocation: {

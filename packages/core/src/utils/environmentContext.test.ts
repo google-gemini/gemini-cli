@@ -17,7 +17,7 @@ import {
   getEnvironmentContext,
   getDirectoryContextString,
 } from './environmentContext.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { getFolderStructure } from './getFolderStructure.js';
 
 vi.mock('../config/config.js');

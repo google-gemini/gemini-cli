@@ -6,15 +6,19 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { executeToolCall } from './nonInteractiveToolExecutor.js';
-import {
+import type {
   ToolRegistry,
   ToolCallRequestInfo,
   ToolResult,
   Config,
+} from '../index.js';
+import {
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   ToolErrorType,
   ApprovalMode,
 } from '../index.js';
-import { Part } from '@google/genai';
+import type { Part } from '@google/genai';
 import { MockTool } from '../test-utils/tools.js';
 
 describe('executeToolCall', () => {
@@ -28,11 +32,13 @@ describe('executeToolCall', () => {
 
     mockToolRegistry = {
       getTool: vi.fn(),
+      getAllToolNames: vi.fn(),
     } as unknown as ToolRegistry;
 
     mockConfig = {
       getToolRegistry: () => mockToolRegistry,
       getApprovalMode: () => ApprovalMode.DEFAULT,
+      getAllowedTools: () => [],
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
@@ -40,6 +46,18 @@ describe('executeToolCall', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getUseSmartEdit: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     abortController = new AbortController();
@@ -72,7 +90,12 @@ describe('executeToolCall', () => {
       callId: 'call1',
       error: undefined,
       errorType: undefined,
+      outputFile: undefined,
       resultDisplay: 'Success!',
+      contentLength:
+        typeof toolResult.llmContent === 'string'
+          ? toolResult.llmContent.length
+          : undefined,
       responseParts: [
         {
           functionResponse: {
@@ -94,6 +117,10 @@ describe('executeToolCall', () => {
       prompt_id: 'prompt-id-2',
     };
     vi.mocked(mockToolRegistry.getTool).mockReturnValue(undefined);
+    vi.mocked(mockToolRegistry.getAllToolNames).mockReturnValue([
+      'testTool',
+      'anotherTool',
+    ]);
 
     const response = await executeToolCall(
       mockConfig,
@@ -101,18 +128,21 @@ describe('executeToolCall', () => {
       abortController.signal,
     );
 
+    const expectedErrorMessage =
+      'Tool "nonexistentTool" not found in registry. Tools must use the exact names that are registered. Did you mean one of: "testTool", "anotherTool"?';
     expect(response).toStrictEqual({
       callId: 'call2',
-      error: new Error('Tool "nonexistentTool" not found in registry.'),
+      error: new Error(expectedErrorMessage),
       errorType: ToolErrorType.TOOL_NOT_REGISTERED,
-      resultDisplay: 'Tool "nonexistentTool" not found in registry.',
+      resultDisplay: expectedErrorMessage,
+      contentLength: expectedErrorMessage.length,
       responseParts: [
         {
           functionResponse: {
             name: 'nonexistentTool',
             id: 'call2',
             response: {
-              error: 'Tool "nonexistentTool" not found in registry.',
+              error: expectedErrorMessage,
             },
           },
         },
@@ -155,6 +185,7 @@ describe('executeToolCall', () => {
         },
       ],
       resultDisplay: 'Invalid parameters',
+      contentLength: 'Invalid parameters'.length,
     });
   });
 
@@ -198,6 +229,7 @@ describe('executeToolCall', () => {
         },
       ],
       resultDisplay: 'Execution failed',
+      contentLength: 'Execution failed'.length,
     });
   });
 
@@ -225,6 +257,7 @@ describe('executeToolCall', () => {
       error: new Error('Something went very wrong'),
       errorType: ToolErrorType.UNHANDLED_EXCEPTION,
       resultDisplay: 'Something went very wrong',
+      contentLength: 'Something went very wrong'.length,
       responseParts: [
         {
           functionResponse: {
@@ -265,7 +298,9 @@ describe('executeToolCall', () => {
       callId: 'call6',
       error: undefined,
       errorType: undefined,
+      outputFile: undefined,
       resultDisplay: 'Image processed',
+      contentLength: undefined,
       responseParts: [
         {
           functionResponse: {
@@ -279,5 +314,57 @@ describe('executeToolCall', () => {
         imageDataPart,
       ],
     });
+  });
+
+  it('should calculate contentLength for a string llmContent', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call7',
+      name: 'testTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-7',
+    };
+    const toolResult: ToolResult = {
+      llmContent: 'This is a test string.',
+      returnDisplay: 'String returned',
+    };
+    vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
+    mockTool.executeFn.mockReturnValue(toolResult);
+
+    const response = await executeToolCall(
+      mockConfig,
+      request,
+      abortController.signal,
+    );
+
+    expect(response.contentLength).toBe(
+      typeof toolResult.llmContent === 'string'
+        ? toolResult.llmContent.length
+        : undefined,
+    );
+  });
+
+  it('should have undefined contentLength for array llmContent with no string parts', async () => {
+    const request: ToolCallRequestInfo = {
+      callId: 'call8',
+      name: 'testTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-8',
+    };
+    const toolResult: ToolResult = {
+      llmContent: [{ inlineData: { mimeType: 'image/png', data: 'fakedata' } }],
+      returnDisplay: 'Image data returned',
+    };
+    vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockTool);
+    mockTool.executeFn.mockReturnValue(toolResult);
+
+    const response = await executeToolCall(
+      mockConfig,
+      request,
+      abortController.signal,
+    );
+
+    expect(response.contentLength).toBeUndefined();
   });
 });
