@@ -14,6 +14,7 @@ import {
   MCPServerStatus,
   isNodeError,
   parseAndFormatApiError,
+  safeLiteralReplace,
 } from '@google/gemini-cli-core';
 import type {
   ToolConfirmationPayload,
@@ -518,7 +519,9 @@ export class Task {
     if (oldString === '' && !isNewFile) {
       return currentContent;
     }
-    return currentContent.replaceAll(oldString, newString);
+
+    // Use intelligent replacement that handles $ sequences safely
+    return safeLiteralReplace(currentContent, oldString, newString);
   }
 
   async scheduleToolCalls(
