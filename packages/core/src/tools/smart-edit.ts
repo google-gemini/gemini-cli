@@ -820,8 +820,14 @@ A good instruction should concisely answer:
               }
               correctedNewString = restoration.output;
             }
-          } catch {
-            // Swallow any dynamic import / restoration issues silently; fallback to original new_string.
+          } catch (restorationError) {
+            if (this.config.getDebugMode()) {
+              console.debug(
+                'Error during escape restoration in smart-edit proposal:',
+                restorationError,
+              );
+            }
+            // Fallback to original new_string.
           }
 
           return applyReplacement(
