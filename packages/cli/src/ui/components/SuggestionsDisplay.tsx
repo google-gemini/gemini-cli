@@ -5,7 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
-import { theme } from '../semantic-colors.js';
+import { Colors } from '../colors.js';
 import { PrepareLabel } from './PrepareLabel.js';
 import { CommandKind } from '../commands/types.js';
 import { CompletionMode } from '../hooks/useCommandCompletion.js';
@@ -68,7 +68,7 @@ export function SuggestionsDisplay({
   );
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
-const isSlashCommandMode = completionMode === CompletionMode.SLASH;
+  const isSlashCommandMode = completionMode === CompletionMode.SLASH;
   let commandNameWidth = 0;
 
   if (isSlashCommandMode) {
@@ -84,12 +84,12 @@ const isSlashCommandMode = completionMode === CompletionMode.SLASH;
   }
   return (
     <Box flexDirection="column" paddingX={1} width={width}>
-      {scrollOffset > 0 && <Text color={theme.text.primary}>▲</Text>}
+      {scrollOffset > 0 && <Text color={Colors.Foreground}>▲</Text>}
 
       {visibleSuggestions.map((suggestion, index) => {
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
-            const textColor = isActive ? theme.text.accent : theme.text.secondary;
+            const textColor = isActive ? Colors.AccentPurple : Colors.Gray;
 
         // For file path completions, truncate very long paths to prevent overflow
         const displayLabel =
@@ -116,7 +116,7 @@ const isSlashCommandMode = completionMode === CompletionMode.SLASH;
                   <Box width={commandNameWidth} flexShrink={0}>
                     {labelElement}
                     {suggestion.commandKind === CommandKind.MCP_PROMPT && (
-                      <Text color={theme.text.secondary}> [MCP]</Text>
+                      <Text color={Colors.Gray}> [MCP]</Text>
                     )}
                   </Box>
                   {suggestion.description && (
