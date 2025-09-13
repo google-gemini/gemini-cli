@@ -114,7 +114,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       const durationMs = Date.now() - startTime;
       this._logApiResponse(
         durationMs,
-        response.modelVersion || '',
+        response.modelVersion || req.model,
         userPromptId,
         response.usageMetadata,
         JSON.stringify(response),
