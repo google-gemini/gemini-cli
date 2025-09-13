@@ -63,7 +63,13 @@ describe('loadServerHierarchicalMemory', () => {
     // Some tests set this to a different value.
     setGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
     // Clean up the temporary directory to prevent resource leaks.
-    await fsPromises.rm(testRootDir, { recursive: true, force: true });
+    // Use maxRetries option for robust cleanup without race conditions
+    await fsPromises.rm(testRootDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 3,
+      retryDelay: 10,
+    });
   });
 
   describe('when untrusted', () => {
@@ -354,9 +360,11 @@ describe('loadServerHierarchicalMemory', () => {
       .spyOn(console, 'debug')
       .mockImplementation(() => {});
 
-    for (let i = 0; i < 100; i++) {
-      await createEmptyDir(path.join(cwd, `deep_dir_${i}`));
-    }
+    // Create directories in parallel for better performance
+    const dirPromises = Array.from({ length: 100 }, (_, i) =>
+      createEmptyDir(path.join(cwd, `deep_dir_${i}`)),
+    );
+    await Promise.all(dirPromises);
 
     // Pass the custom limit directly to the function
     await loadServerHierarchicalMemory(
