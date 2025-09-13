@@ -1,0 +1,17 @@
+{
+  "api": {
+    "baseUrl": "https://api.example.com",
+    "timeout": 30000,
+    "retries": 3
+  },
+  "security": {
+    "tokenExpiry": "1h",
+    "maxLoginAttempts": 5,
+    "lockoutDuration": "15m"
+  },
+  "logging": {
+    "level": "info",
+    "maskSensitiveData": true,
+    "remoteEndpoint": "https://logs.example.com"
+  }
+}
