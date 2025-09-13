@@ -248,6 +248,16 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the window title bar',
         showInDialog: true,
       },
+      showStatusInTitle: {
+        type: 'boolean',
+        label: 'Show Status in Title',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Show Gemini CLI status and thoughts in the terminal window title',
+        showInDialog: true,
+      },
       hideTips: {
         type: 'boolean',
         label: 'Hide Tips',
