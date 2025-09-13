@@ -2193,6 +2193,18 @@ describe('Settings Loading and Merging', () => {
         allowMCPServers: ['serverA'],
       });
     });
+
+    it('should correctly migrate customWittyPhrases', () => {
+      const v2Settings = {
+        ui: {
+          customWittyPhrases: ['test phrase'],
+        },
+      };
+      const v1Settings = migrateSettingsToV1(v2Settings);
+      expect(v1Settings).toEqual({
+        customWittyPhrases: ['test phrase'],
+      });
+    });
   });
 
   describe('loadEnvironment', () => {
