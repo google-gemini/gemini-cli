@@ -27,7 +27,8 @@ export async function handleInstall(args: InstallArgs) {
       if (
         source.startsWith('http://') ||
         source.startsWith('https://') ||
-        source.startsWith('git@')
+        source.startsWith('git@') ||
+        source.startsWith('sso://')
       ) {
         installMetadata = {
           source,
