@@ -572,8 +572,14 @@ Expectation for required parameters:
               }
               correctedNewString = restoration.output;
             }
-          } catch {
+          } catch (err) {
             // If the helper fails for any reason, fall back silently.
+            if (this.config.getDebugMode()) {
+              console.debug(
+                'Failed to restore collapsed escape sequences in edit proposal:',
+                err,
+              );
+            }
           }
           return applyReplacement(
             currentContent,
