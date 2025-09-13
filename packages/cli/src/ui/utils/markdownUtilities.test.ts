@@ -487,7 +487,8 @@ Regular paragraph content.`;
         if (beforeSplit.includes('Item A')) {
           expect(beforeSplit).toContain('Item B');
         }
-        // Note: Blockquotes can be split between separate blocks since \n\n terminates them
+        // Note: Blockquotes and tables can be split between separate blocks since \n\n terminates them
+        expect(afterSplit).toBeDefined();
       });
     });
   });

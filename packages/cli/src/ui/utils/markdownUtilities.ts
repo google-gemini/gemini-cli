@@ -129,21 +129,19 @@ const endsWithHeader = (content: string, index: number): boolean => {
  * Checks if a position would split within a blockquote structure
  * Note: Since \n\n terminates a blockquote per Markdown spec, splits at \n\n are always valid
  */
-const isWithinBlockquote = (content: string, index: number): boolean => {
+const isWithinBlockquote = (_content: string, _index: number): boolean =>
   // Since we only split at \n\n positions and \n\n terminates blockquotes,
   // splitting at \n\n is always safe for blockquotes - never "within" one
-  return false;
-};
+  false;
 
 /**
  * Checks if a position would split within a table structure
  * Note: Since \n\n terminates a table per Markdown spec, splits at \n\n are always valid
  */
-const isWithinTable = (content: string, index: number): boolean => {
+const isWithinTable = (_content: string, _index: number): boolean =>
   // Since we only split at \n\n positions and \n\n terminates tables,
   // splitting at \n\n is always safe for tables - never "within" one
-  return false;
-};
+  false;
 
 /**
  * Finds the last safe split point in markdown content to preserve structure integrity.
