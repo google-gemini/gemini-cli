@@ -498,8 +498,14 @@ export class WriteFileTool
             }
             proposed = restoration.output;
           }
-        } catch {
+        } catch (err) {
           // Silent fallback: if restoration logic fails, we keep the proposed content as-is.
+          if (this.config.getDebugMode()) {
+            console.debug(
+              'Failed to restore collapsed escape sequences in write-file proposal:',
+              err
+            );
+          }
         }
         return proposed;
       },
