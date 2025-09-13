@@ -25,6 +25,7 @@ import { validateAuthMethodWithSettings } from './useAuth.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { clearCachedCredentialFile } from '@google/gemini-cli-core';
 import { Text } from 'ink';
+import '../../i18n/index.js';
 
 // Mocks
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
