@@ -40,7 +40,7 @@ export const Composer = () => {
 
   const { contextFileNames, showAutoAcceptIndicator } = uiState;
 
-  // Compute the framed width to align with the prompt container
+  // Use the container width of InputPrompt for width of DetailedMessagesDisplay
   const { promptContainerWidth } = useMemo(
     () => calculatePromptWidths(uiState.terminalWidth),
     [uiState.terminalWidth],

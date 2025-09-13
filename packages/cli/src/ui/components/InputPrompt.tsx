@@ -53,6 +53,7 @@ export interface InputPromptProps {
   isShellFocused?: boolean;
 }
 
+// The input content, input container, and input suggestions list may have different widths
 export const calculatePromptWidths = (terminalWidth: number) => {
   const widthFraction = 0.9;
   const FRAME_PADDING_AND_BORDER = 4; // Border (2) + padding (2)
