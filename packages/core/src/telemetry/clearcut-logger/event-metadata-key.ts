@@ -6,6 +6,8 @@
 
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
+  // Deleted enums: 24
+
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
   // ==========================================================================
@@ -77,6 +79,9 @@ export enum EventMetadataKey {
   // Logs the tool call error type, if any.
   GEMINI_CLI_TOOL_CALL_ERROR_TYPE = 19,
 
+  // Logs the length of tool output
+  GEMINI_CLI_TOOL_CALL_CONTENT_LENGTH = 93,
+
   // ==========================================================================
   // GenAI API Request Event Keys
   // ===========================================================================
@@ -96,9 +101,6 @@ export enum EventMetadataKey {
 
   // Logs the duration of the API call in milliseconds.
   GEMINI_CLI_API_RESPONSE_DURATION_MS = 23,
-
-  // Logs the error message of the API call, if any.
-  GEMINI_CLI_API_ERROR_MESSAGE = 24,
 
   // Logs the input token count of the API call.
   GEMINI_CLI_API_RESPONSE_INPUT_TOKEN_COUNT = 25,
@@ -347,4 +349,23 @@ export enum EventMetadataKey {
 
   // Logs the status of the extension install.
   GEMINI_CLI_EXTENSION_INSTALL_STATUS = 88,
+
+  // Logs the status of the extension uninstall
+  GEMINI_CLI_EXTENSION_UNINSTALL_STATUS = 96,
+
+  // ==========================================================================
+  // Tool Output Truncated Event Keys
+  // ===========================================================================
+
+  // Logs the original length of the tool output.
+  GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_ORIGINAL_LENGTH = 89,
+
+  // Logs the truncated length of the tool output.
+  GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_TRUNCATED_LENGTH = 90,
+
+  // Logs the threshold at which the tool output was truncated.
+  GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_THRESHOLD = 91,
+
+  // Logs the number of lines the tool output was truncated to.
+  GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_LINES = 92,
 }
