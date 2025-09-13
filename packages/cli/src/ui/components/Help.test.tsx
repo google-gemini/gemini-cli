@@ -7,10 +7,11 @@
 /** @vitest-environment jsdom */
 
 import { render } from 'ink-testing-library';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { Help } from './Help.js';
 import type { SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
+import '../../i18n/index.js';
 
 const mockCommands: readonly SlashCommand[] = [
   {
@@ -45,6 +46,15 @@ const mockCommands: readonly SlashCommand[] = [
 ];
 
 describe('Help Component', () => {
+  beforeAll(async () => {
+    // Ensure i18next is ready and has loaded resources
+    const i18next = (await import('../../i18n/index.js')).default;
+    // Wait for i18next to be fully initialized
+    if (!i18next.isInitialized) {
+      await i18next.init();
+    }
+  });
+
   it('renders help component with mock commands', () => {
     const { lastFrame } = render(<Help commands={mockCommands} />);
     expect(lastFrame()).toMatchSnapshot();

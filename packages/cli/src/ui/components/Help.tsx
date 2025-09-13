@@ -8,176 +8,161 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { type SlashCommand, CommandKind } from '../commands/types.js';
+import { useTranslation } from '../../i18n/useTranslation.js';
+import { renderStyledText } from '../utils/styledText.js';
 
 interface Help {
   commands: readonly SlashCommand[];
 }
 
-export const Help: React.FC<Help> = ({ commands }) => (
-  <Box
-    flexDirection="column"
-    marginBottom={1}
-    borderColor={theme.border.default}
-    borderStyle="round"
-    padding={1}
-  >
-    {/* Basics */}
-    <Text bold color={theme.text.primary}>
-      Basics:
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        Add context
+export const Help: React.FC<Help> = ({ commands }) => {
+  const { t } = useTranslation('help');
+
+  return (
+    <Box
+      flexDirection="column"
+      marginBottom={1}
+      borderColor={theme.border.default}
+      borderStyle="round"
+      padding={1}
+    >
+      {/* Basics */}
+      <Text bold color={theme.text.primary}>
+        {t('sections.basics')}
       </Text>
-      : Use{' '}
-      <Text bold color={theme.text.accent}>
-        @
-      </Text>{' '}
-      to specify files for context (e.g.,{' '}
-      <Text bold color={theme.text.accent}>
-        @src/myFile.ts
+      <Text color={theme.text.primary}>
+        {renderStyledText(t('basics.addContext'), {
+          symbol: <Text bold color={theme.text.accent}>@</Text>,
+          example: <Text bold color={theme.text.accent}>@src/myFile.ts</Text>
+        }, theme.text.primary)}
       </Text>
-      ) to target specific files or folders.
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        Shell mode
+      <Text color={theme.text.primary}>
+        {renderStyledText(t('basics.shellMode'), {
+          symbol: <Text bold color={theme.text.accent}>!</Text>,
+          example: <Text bold color={theme.text.accent}>!npm run start</Text>,
+          natural: <Text bold color={theme.text.accent}>start server</Text>
+        }, theme.text.primary)}
       </Text>
-      : Execute shell commands via{' '}
-      <Text bold color={theme.text.accent}>
-        !
-      </Text>{' '}
-      (e.g.,{' '}
-      <Text bold color={theme.text.accent}>
-        !npm run start
-      </Text>
-      ) or use natural language (e.g.{' '}
-      <Text bold color={theme.text.accent}>
-        start server
-      </Text>
-      ).
-    </Text>
 
     <Box height={1} />
 
-    {/* Commands */}
-    <Text bold color={theme.text.primary}>
-      Commands:
-    </Text>
-    {commands
-      .filter((command) => command.description && !command.hidden)
-      .map((command: SlashCommand) => (
-        <Box key={command.name} flexDirection="column">
-          <Text color={theme.text.primary}>
-            <Text bold color={theme.text.accent}>
-              {' '}
-              /{command.name}
+      {/* Commands */}
+      <Text bold color={theme.text.primary}>
+        {t('sections.commands')}
+      </Text>
+      {commands
+        .filter((command) => command.description && !command.hidden)
+        .map((command: SlashCommand) => (
+          <Box key={command.name} flexDirection="column">
+            <Text color={theme.text.primary}>
+              <Text bold color={theme.text.accent}>
+                {' '}
+                /{command.name}
+              </Text>
+              {command.kind === CommandKind.MCP_PROMPT && (
+                <Text color={theme.text.secondary}> [MCP]</Text>
+              )}
+              {command.description && ' - ' + command.description}
             </Text>
-            {command.kind === CommandKind.MCP_PROMPT && (
-              <Text color={theme.text.secondary}> [MCP]</Text>
-            )}
-            {command.description && ' - ' + command.description}
-          </Text>
-          {command.subCommands &&
-            command.subCommands
-              .filter((subCommand) => !subCommand.hidden)
-              .map((subCommand) => (
-                <Text key={subCommand.name} color={theme.text.primary}>
-                  <Text bold color={theme.text.accent}>
-                    {'   '}
-                    {subCommand.name}
+            {command.subCommands &&
+              command.subCommands
+                .filter((subCommand) => !subCommand.hidden)
+                .map((subCommand) => (
+                  <Text key={subCommand.name} color={theme.text.primary}>
+                    <Text bold color={theme.text.accent}>
+                      {'   '}
+                      {subCommand.name}
+                    </Text>
+                    {subCommand.description && ' - ' + subCommand.description}
                   </Text>
-                  {subCommand.description && ' - ' + subCommand.description}
-                </Text>
-              ))}
-        </Box>
-      ))}
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        {' '}
-        !{' '}
+                ))}
+          </Box>
+        ))}
+      <Text color={theme.text.primary}>
+        <Text bold color={theme.text.accent}>
+          {' '}
+          !{' '}
+        </Text>
+        - {t('shellCommand')}
       </Text>
-      - shell command
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text color={theme.text.secondary}>[MCP]</Text> - Model Context Protocol
-      command (from external servers)
-    </Text>
+      <Text color={theme.text.primary}>
+        <Text color={theme.text.secondary}>[MCP]</Text> - {t('mcpCommand')}
+      </Text>
 
     <Box height={1} />
 
-    {/* Shortcuts */}
-    <Text bold color={theme.text.primary}>
-      Keyboard Shortcuts:
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        Alt+Left/Right
-      </Text>{' '}
-      - Jump through words in the input
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        Ctrl+C
-      </Text>{' '}
-      - Quit application
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        {process.platform === 'win32' ? 'Ctrl+Enter' : 'Ctrl+J'}
-      </Text>{' '}
-      {process.platform === 'linux'
-        ? '- New line (Alt+Enter works for certain linux distros)'
-        : '- New line'}
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        Ctrl+L
-      </Text>{' '}
-      - Clear the screen
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        {process.platform === 'darwin' ? 'Ctrl+X / Meta+Enter' : 'Ctrl+X'}
-      </Text>{' '}
-      - Open input in external editor
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        Ctrl+Y
-      </Text>{' '}
-      - Toggle YOLO mode
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        Enter
-      </Text>{' '}
-      - Send message
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        Esc
-      </Text>{' '}
-      - Cancel operation / Clear input (double press)
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        Shift+Tab
-      </Text>{' '}
-      - Toggle auto-accepting edits
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
-        Up/Down
-      </Text>{' '}
-      - Cycle through your prompt history
-    </Text>
-    <Box height={1} />
-    <Text color={theme.text.primary}>
-      For a full list of shortcuts, see{' '}
-      <Text bold color={theme.text.accent}>
-        docs/keyboard-shortcuts.md
+      {/* Shortcuts */}
+      <Text bold color={theme.text.primary}>
+        {t('sections.shortcuts')}
       </Text>
-    </Text>
-  </Box>
-);
+      <Text color={theme.text.primary}>
+        <Text bold color={theme.text.accent}>
+          Alt+Left/Right
+        </Text>{' '}
+        - {t('shortcuts.altLeftRight')}
+      </Text>
+      <Text color={theme.text.primary}>
+        <Text bold color={theme.text.accent}>
+          Ctrl+C
+        </Text>{' '}
+        - {t('shortcuts.ctrlC')}
+      </Text>
+      <Text color={theme.text.primary}>
+        <Text bold color={theme.text.accent}>
+          {process.platform === 'win32' ? 'Ctrl+Enter' : 'Ctrl+J'}
+        </Text>{' '}
+        - {process.platform === 'linux'
+          ? t('shortcuts.ctrlJLinux')
+          : t('shortcuts.ctrlJ')}
+      </Text>
+      <Text color={theme.text.primary}>
+        <Text bold color={theme.text.accent}>
+          Ctrl+L
+        </Text>{' '}
+        - {t('shortcuts.ctrlL')}
+      </Text>
+      <Text color={theme.text.primary}>
+        <Text bold color={theme.text.accent}>
+          {process.platform === 'darwin' ? 'Ctrl+X / Meta+Enter' : 'Ctrl+X'}
+        </Text>{' '}
+        - {t('shortcuts.ctrlX')}
+      </Text>
+      <Text color={theme.text.primary}>
+        <Text bold color={theme.text.accent}>
+          Ctrl+Y
+        </Text>{' '}
+        - {t('shortcuts.ctrlY')}
+      </Text>
+      <Text color={theme.text.primary}>
+        <Text bold color={theme.text.accent}>
+          Enter
+        </Text>{' '}
+        - {t('shortcuts.enter')}
+      </Text>
+      <Text color={theme.text.primary}>
+        <Text bold color={theme.text.accent}>
+          Esc
+        </Text>{' '}
+        - {t('shortcuts.esc')}
+      </Text>
+      <Text color={theme.text.primary}>
+        <Text bold color={theme.text.accent}>
+          Shift+Tab
+        </Text>{' '}
+        - {t('shortcuts.shiftTab')}
+      </Text>
+      <Text color={theme.text.primary}>
+        <Text bold color={theme.text.accent}>
+          Up/Down
+        </Text>{' '}
+        - {t('shortcuts.upDown')}
+      </Text>
+      <Box height={1} />
+      <Text color={theme.text.primary}>
+        {renderStyledText(t('shortcutsDocs'), {
+          docsPath: <Text bold color={theme.text.accent}>docs/keyboard-shortcuts.md</Text>
+        }, theme.text.primary)}
+      </Text>
+    </Box>
+  );
+};
