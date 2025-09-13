@@ -24,6 +24,7 @@ import {
   updateExtension,
   type Extension,
   type ExtensionInstallMetadata,
+  overrideExtensionForWorkspace,
 } from './extension.js';
 import {
   GEMINI_DIR,
@@ -34,7 +35,7 @@ import {
   ExtensionUninstallEvent,
 } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
-import { SettingScope, loadSettings } from './settings.js';
+import { SettingScope, loadSettings, USER_SETTINGS_PATH } from './settings.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { ExtensionUpdateState } from '../ui/state/extensions.js';
 
@@ -114,11 +115,11 @@ const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 describe('loadExtensions', () => {
   let tempHomeDir: string;
   let userExtensionsDir: string;
-
   beforeEach(() => {
     tempHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
+
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
     vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
 
@@ -128,6 +129,8 @@ describe('loadExtensions', () => {
 
   afterEach(() => {
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    fs.rmSync(userExtensionsDir, { recursive: true, force: true });
+    fs.rmSync(USER_SETTINGS_PATH, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
 
@@ -200,14 +203,7 @@ describe('loadExtensions', () => {
       name: 'ext2',
       version: '2.0.0',
     });
-
-    const settingsDir = path.join(tempHomeDir, GEMINI_DIR);
-    fs.mkdirSync(settingsDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(settingsDir, 'settings.json'),
-      JSON.stringify({ extensions: { disabled: ['ext1'] } }),
-    );
-
+    disableExtension('ext1', SettingScope.User);
     const extensions = loadExtensions();
     const activeExtensions = annotateActiveExtensions(
       extensions,
@@ -366,6 +362,36 @@ describe('loadExtensions', () => {
     expect(serverConfig.env).toBeDefined();
     expect(serverConfig.env!.MISSING_VAR).toBe('$UNDEFINED_ENV_VAR');
     expect(serverConfig.env!.MISSING_VAR_BRACES).toBe('${ALSO_UNDEFINED}');
+  });
+
+  it('should load a disabled extension if it has a workspace override', () => {
+    createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'ext1',
+      version: '1.0.0',
+    });
+    createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'ext2',
+      version: '1.0.0',
+    });
+
+    // Disable ext1 at user level
+    disableExtension('ext1', SettingScope.User);
+
+    // Without override, only ext2 should be loaded
+    let extensions = loadExtensions(tempHomeDir);
+    expect(extensions).toHaveLength(1);
+    expect(extensions[0].config.name).toBe('ext2');
+
+    // Add a workspace override for ext1
+    overrideExtensionForWorkspace('ext1', tempHomeDir);
+
+    // With override, both extensions should be loaded
+    extensions = loadExtensions(tempHomeDir);
+    expect(extensions).toHaveLength(2);
+    const names = extensions.map((e) => e.config.name).sort();
+    expect(names).toEqual(['ext1', 'ext2']);
   });
 });
 
@@ -735,6 +761,8 @@ describe('performWorkspaceExtensionMigration', () => {
   afterEach(() => {
     fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    fs.rmSync(USER_SETTINGS_PATH, { recursive: true, force: true });
+
     vi.restoreAllMocks();
   });
 
@@ -803,14 +831,16 @@ describe('performWorkspaceExtensionMigration', () => {
       loadExtension(ext1Path)!,
       loadExtension(ext2Path)!,
     ];
-    const failed =
-      await performWorkspaceExtensionMigration(extensionsToMigrate);
+    const failed = await performWorkspaceExtensionMigration(
+      extensionsToMigrate,
+      tempWorkspaceDir,
+    );
 
     expect(failed).toEqual([]);
 
     const userExtensionsDir = path.join(tempHomeDir, GEMINI_DIR, 'extensions');
     const userExt1Path = path.join(userExtensionsDir, 'ext1');
-    const extensions = loadExtensions();
+    const extensions = loadExtensions(tempWorkspaceDir);
 
     expect(extensions).toHaveLength(2);
     const metadataPath = path.join(userExt1Path, INSTALL_METADATA_FILENAME);
@@ -818,7 +848,22 @@ describe('performWorkspaceExtensionMigration', () => {
     const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
     expect(metadata).toEqual({
       source: ext1Path,
-      type: 'local',
+      type: 'link',
+    });
+    const settings = loadSettings(tempWorkspaceDir);
+    const disabledExtensions =
+      settings.forScope(SettingScope.User).settings.extensions?.disabled ?? [];
+    expect(new Set(disabledExtensions)).toEqual(new Set(['ext1', 'ext2']));
+    const overridesPath = path.join(
+      tempHomeDir,
+      GEMINI_DIR,
+      'workspace-extension-overrides.json',
+    );
+    expect(fs.existsSync(overridesPath)).toBe(true);
+    const overrides = JSON.parse(fs.readFileSync(overridesPath, 'utf-8'));
+    expect(overrides).toEqual({
+      ext1: [tempWorkspaceDir],
+      ext2: [tempWorkspaceDir],
     });
   });
 
@@ -838,7 +883,10 @@ describe('performWorkspaceExtensionMigration', () => {
       },
     ];
 
-    const failed = await performWorkspaceExtensionMigration(extensions);
+    const failed = await performWorkspaceExtensionMigration(
+      extensions,
+      tempWorkspaceDir,
+    );
     expect(failed).toEqual(['ext2']);
   });
 });
@@ -889,6 +937,8 @@ describe('updateExtension', () => {
     // Clean up before each test
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
     fs.mkdirSync(userExtensionsDir, { recursive: true });
+    fs.rmSync(USER_SETTINGS_PATH, { recursive: true, force: true });
+
     vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
 
     vi.mocked(execSync).mockClear();
@@ -1259,6 +1309,7 @@ describe('disableExtension', () => {
   afterEach(() => {
     fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    fs.rmSync(USER_SETTINGS_PATH, { recursive: true, force: true });
   });
 
   it('should disable an extension at the user scope', () => {
@@ -1314,6 +1365,7 @@ describe('enableExtension', () => {
     fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
+    fs.rmSync(USER_SETTINGS_PATH, { recursive: true, force: true });
   });
 
   afterAll(() => {

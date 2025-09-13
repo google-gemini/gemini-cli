@@ -40,7 +40,15 @@ For example, `gemini extensions disable extension-name` will disable the extensi
 
 ### Enabling an extension
 
-You can re-enable extensions using `gemini extensions enable extension-name`. Note that if an extension is disabled at the user-level, enabling it at the workspace level will not do anything.
+You can re-enable extensions using `gemini extensions enable extension-name`.
+
+#### Workspace Overrides
+
+If an extension is disabled at the user-level, you can still enable it for a specific workspace by using the `--override` flag.
+
+`gemini extensions enable extension-name --scope=Workspace --override`
+
+This command creates a "workspace override" for the extension. The extension will become active in the current workspace, while remaining disabled in all other workspaces. This allows you to selectively enable extensions on a project-by-project basis without affecting your global configuration.
 
 ### Updating an extension
 
