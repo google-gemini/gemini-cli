@@ -33,6 +33,7 @@ import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
+import type { ExtensionUpdateState } from '../state/extensions.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
@@ -43,6 +44,9 @@ interface SlashCommandProcessorActions {
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
+  setExtensionsUpdateState: (
+    updateState: Map<string, ExtensionUpdateState>,
+  ) => void;
 }
 
 /**
@@ -59,6 +63,7 @@ export const useSlashCommandProcessor = (
   setIsProcessing: (isProcessing: boolean) => void,
   setGeminiMdFileCount: (count: number) => void,
   actions: SlashCommandProcessorActions,
+  extensionsUpdateState: Map<string, ExtensionUpdateState>,
   isConfigInitialized: boolean,
 ) => {
   const session = useSessionStats();
@@ -101,16 +106,17 @@ export const useSlashCommandProcessor = (
     return l;
   }, [config]);
 
-  const [pendingCompressionItem, setPendingCompressionItem] =
-    useState<HistoryItemWithoutId | null>(null);
+  const [pendingItem, setPendingItem] = useState<HistoryItemWithoutId | null>(
+    null,
+  );
 
   const pendingHistoryItems = useMemo(() => {
     const items: HistoryItemWithoutId[] = [];
-    if (pendingCompressionItem != null) {
-      items.push(pendingCompressionItem);
+    if (pendingItem != null) {
+      items.push(pendingItem);
     }
     return items;
-  }, [pendingCompressionItem]);
+  }, [pendingItem]);
 
   const addMessage = useCallback(
     (message: Message) => {
@@ -182,12 +188,14 @@ export const useSlashCommandProcessor = (
         },
         loadHistory,
         setDebugMessage: actions.setDebugMessage,
-        pendingItem: pendingCompressionItem,
-        setPendingItem: setPendingCompressionItem,
+        pendingItem,
+        setPendingItem,
         toggleCorgiMode: actions.toggleCorgiMode,
         toggleVimEnabled,
         setGeminiMdFileCount,
         reloadCommands,
+        extensionsUpdateState,
+        setExtensionsUpdateState: actions.setExtensionsUpdateState,
       },
       session: {
         stats: session.stats,
@@ -205,12 +213,13 @@ export const useSlashCommandProcessor = (
       refreshStatic,
       session.stats,
       actions,
-      pendingCompressionItem,
-      setPendingCompressionItem,
+      pendingItem,
+      setPendingItem,
       toggleVimEnabled,
       sessionShellAllowlist,
       setGeminiMdFileCount,
       reloadCommands,
+      extensionsUpdateState,
     ],
   );
 

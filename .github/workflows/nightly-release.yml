@@ -10,6 +10,11 @@ on:
         required: true
         type: 'boolean'
         default: true
+      force_skip_tests:
+        description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
+        required: false
+        type: 'boolean'
+        default: false
 
 jobs:
   release:
@@ -29,6 +34,12 @@ jobs:
       - name: 'Install Dependencies'
         run: 'npm ci'
 
+      - name: 'Run Tests'
+        uses: './.github/actions/run-tests'
+        with:
+          force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+
       - name: 'Get Nightly Version'
         id: 'nightly_version'
         env:
@@ -44,10 +55,10 @@ jobs:
         uses: './.github/actions/publish-release'
         with:
           release-version: '${{ steps.nightly_version.outputs.RELEASE_VERSION }}'
+          release-tag: '${{ steps.nightly_version.outputs.RELEASE_TAG }}'
           npm-tag: '${{ steps.nightly_version.outputs.NPM_TAG }}'
           wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
-          release-branch: 'main'
           previous-tag: '${{ steps.nightly_version.outputs.PREVIOUS_TAG }}'
