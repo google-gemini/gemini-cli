@@ -41,7 +41,7 @@ export const Composer = () => {
   const { contextFileNames, showAutoAcceptIndicator } = uiState;
 
   // Use the container width of InputPrompt for width of DetailedMessagesDisplay
-  const { promptContainerWidth } = useMemo(
+  const { containerWidth } = useMemo(
     () => calculatePromptWidths(uiState.terminalWidth),
     [uiState.terminalWidth],
   );
@@ -170,7 +170,7 @@ export const Composer = () => {
               maxHeight={
                 uiState.constrainHeight ? debugConsoleMaxHeight : undefined
               }
-              width={promptContainerWidth}
+              width={containerWidth}
             />
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
           </Box>

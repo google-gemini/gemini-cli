@@ -70,12 +70,12 @@ export const calculatePromptWidths = (terminalWidth: number) => {
 
   const inputWidth = Math.max(MIN_CONTENT_WIDTH, innerContentWidth);
   const FRAME_OVERHEAD = FRAME_PADDING_AND_BORDER + PROMPT_PREFIX_WIDTH;
-  const promptContainerWidth = inputWidth + FRAME_OVERHEAD;
+  const containerWidth = inputWidth + FRAME_OVERHEAD;
   const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 1.0));
 
   return {
     inputWidth,
-    promptContainerWidth,
+    containerWidth,
     suggestionsWidth,
     frameOverhead: FRAME_OVERHEAD,
   } as const;

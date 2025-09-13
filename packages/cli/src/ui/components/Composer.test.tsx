@@ -53,7 +53,7 @@ vi.mock('./InputPrompt.js', () => ({
   calculatePromptWidths: vi.fn(() => ({
     inputWidth: 80,
     suggestionsWidth: 40,
-    promptContainerWidth: 84,
+    containerWidth: 84,
   })),
 }));
 
