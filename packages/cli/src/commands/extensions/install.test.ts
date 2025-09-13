@@ -26,4 +26,15 @@ describe('extensions install command', () => {
       validationParser.parse('install some-url --path /some/path'),
     ).toThrow('Arguments source and path are mutually exclusive');
   });
+
+  it('should call installExtension with the correct arguments for a custom protocol', async () => {
+    const parser = yargs([]).command(installCommand);
+    await parser.parseAsync('install sso://my-internal-host/my-repo');
+    const { installExtension } = await import('../../config/extension.js');
+    expect(installExtension).toHaveBeenCalledWith({
+      source: 'sso://my-internal-host/my-repo',
+      type: 'git',
+      ref: undefined,
+    });
+  });
 });
