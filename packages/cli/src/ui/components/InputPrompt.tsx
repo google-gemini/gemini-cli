@@ -974,6 +974,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             width={suggestionsWidth}
             scrollOffset={activeCompletion.visibleStartIndex}
             userInput={buffer.text}
+            mode={
+              buffer.text.startsWith('/') &&
+              !reverseSearchActive &&
+              !commandSearchActive
+                ? 'slash'
+                : 'reverse'
+            }
             expandedIndex={expandedSuggestionIndex}
           />
         </Box>

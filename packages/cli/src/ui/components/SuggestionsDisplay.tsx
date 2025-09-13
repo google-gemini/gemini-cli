@@ -23,6 +23,7 @@ interface SuggestionsDisplayProps {
   width: number;
   scrollOffset: number;
   userInput: string;
+  mode: 'reverse' | 'slash';
   expandedIndex?: number;
 }
 
@@ -36,6 +37,7 @@ export function SuggestionsDisplay({
   width,
   scrollOffset,
   userInput,
+  mode,
   expandedIndex,
 }: SuggestionsDisplayProps) {
   if (isLoading) {
@@ -64,7 +66,8 @@ export function SuggestionsDisplay({
   const maxLabelLength = Math.max(
     ...suggestions.map((s) => getFullLabel(s).length),
   );
-  const commandColumnWidth = Math.min(maxLabelLength, Math.floor(width * 0.5));
+  const commandColumnWidth =
+    mode === 'slash' ? Math.min(maxLabelLength, Math.floor(width * 0.5)) : 0;
 
   return (
     <Box flexDirection="column" paddingX={1} width={width}>
@@ -88,7 +91,11 @@ export function SuggestionsDisplay({
 
         return (
           <Box key={`${suggestion.value}-${originalIndex}`} flexDirection="row">
-            <Box width={commandColumnWidth} flexShrink={0}>
+            <Box
+              {...(mode === 'slash'
+                ? { width: commandColumnWidth, flexShrink: 0 as const }
+                : { flexShrink: 1 as const })}
+            >
               <Box>
                 {labelElement}
                 {suggestion.commandKind === CommandKind.MCP_PROMPT && (
