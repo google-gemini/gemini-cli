@@ -47,6 +47,7 @@ import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import process from 'node:process';
 import { useHistory } from './hooks/useHistoryManager.js';
+import { useEvents, Event } from './hooks/useEventManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
@@ -797,6 +798,28 @@ Logging in with Google... Please restart Gemini CLI to continue.
       appEvents.off(AppEvent.LogError, logErrorHandler);
     };
   }, [handleNewMessage]);
+
+  const eventManager = useEvents(settings);
+  const previousEvent = useRef<Event | null>(null);
+  useEffect(() => {
+    let event = null;
+    switch (streamingState) {
+      case StreamingState.Idle:
+        event = Event.Idle;
+        break;
+      case StreamingState.WaitingForConfirmation:
+        event = Event.Confirm;
+        break;
+      default:
+        break;
+    }
+
+    if (event !== null && event !== previousEvent.current) {
+      eventManager.notify(event);
+    }
+
+    previousEvent.current = event;
+  }, [streamingState, eventManager]);
 
   const handleEscapePromptChange = useCallback((showPrompt: boolean) => {
     setShowEscapePrompt(showPrompt);

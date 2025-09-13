@@ -393,6 +393,16 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  events: {
+    type: 'array',
+    label: 'Events',
+    category: 'UI',
+    requiresRestart: false,
+    default: [],
+    description: 'Event handlers.',
+    showInDialog: false,
+  },
+
   ide: {
     type: 'object',
     label: 'IDE',

@@ -50,6 +50,7 @@ vi.mock('ink', async (importOriginal) => {
 
 vi.mock('./hooks/useQuotaAndFallback.js');
 vi.mock('./hooks/useHistoryManager.js');
+vi.mock('./hooks/useEventManager.js');
 vi.mock('./hooks/useThemeCommand.js');
 vi.mock('./auth/useAuth.js');
 vi.mock('./hooks/useEditorSettings.js');
@@ -82,6 +83,7 @@ vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
 
 import { useHistory } from './hooks/useHistoryManager.js';
+import { useEvents } from './hooks/useEventManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
@@ -112,6 +114,7 @@ describe('AppContainer State Management', () => {
   // Create typed mocks for all hooks
   const mockedUseQuotaAndFallback = useQuotaAndFallback as Mock;
   const mockedUseHistory = useHistory as Mock;
+  const mockedUseEventManager = useEvents as Mock;
   const mockedUseThemeCommand = useThemeCommand as Mock;
   const mockedUseAuthCommand = useAuthCommand as Mock;
   const mockedUseEditorSettings = useEditorSettings as Mock;
@@ -603,6 +606,80 @@ describe('AppContainer State Management', () => {
         resizePtySpy.mock.calls[resizePtySpy.mock.calls.length - 1];
       // Check the height argument specifically
       expect(lastCall[2]).toBe(1);
+    });
+  });
+
+  describe('EventManager Integration', () => {
+    it('should call notify with Idle event when streaming state is Idle', () => {
+      const mockNotify = vi.fn();
+      mockedUseEventManager.mockReturnValue({ notify: mockNotify });
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(mockNotify).toHaveBeenCalledWith('idle');
+    });
+
+    it('should call notify with Confirm event when streaming state is WaitingForConfirmation', () => {
+      const mockNotify = vi.fn();
+      mockedUseEventManager.mockReturnValue({ notify: mockNotify });
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'waiting_for_confirmation',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(mockNotify).toHaveBeenCalledWith('confirm');
+    });
+
+    it('should not call notify for other streaming states', () => {
+      const mockNotify = vi.fn();
+      mockedUseEventManager.mockReturnValue({ notify: mockNotify });
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(mockNotify).not.toHaveBeenCalled();
     });
   });
 });
