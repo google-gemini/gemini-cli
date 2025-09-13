@@ -127,48 +127,22 @@ const endsWithHeader = (content: string, index: number): boolean => {
 
 /**
  * Checks if a position would split within a blockquote structure
+ * Note: Since \n\n terminates a blockquote per Markdown spec, splits at \n\n are always valid
  */
 const isWithinBlockquote = (content: string, index: number): boolean => {
-  // Check if we're in the middle of a blockquote
-  const nextContent = content.substring(
-    index,
-    Math.min(index + 150, content.length),
-  );
-  const nextLines = nextContent.split('\n').slice(0, 4);
-
-  // Check if next lines continue the blockquote pattern
-  const blockquotePattern = /^[\s]*>\s*/;
-  return nextLines.some((line) => blockquotePattern.test(line));
+  // Since we only split at \n\n positions and \n\n terminates blockquotes,
+  // splitting at \n\n is always safe for blockquotes - never "within" one
+  return false;
 };
 
 /**
  * Checks if a position would split within a table structure
- * LIMITATION: Uses basic heuristics that may miss complex table formats
- * FUTURE: Consider using a dedicated markdown parser for robust table detection
+ * Note: Since \n\n terminates a table per Markdown spec, splits at \n\n are always valid
  */
 const isWithinTable = (content: string, index: number): boolean => {
-  // Check the lines around the split point for table patterns
-  const beforeContent = content.substring(Math.max(0, index - 100), index);
-  const afterContent = content.substring(
-    index,
-    Math.min(index + 100, content.length),
-  );
-
-  const beforeLines = beforeContent.split('\n').slice(-2);
-  const afterLines = afterContent.split('\n').slice(0, 2);
-
-  const tableRowPattern = /^\s*\|.*\|\s*$/;
-  const tableSeparatorPattern = /^\s*\|?\s*(:?-+:?\s*\|?\s*)+\s*$/;
-
-  // Check if we have table-like content before and after
-  const hasTableBefore = beforeLines.some(
-    (line) => tableRowPattern.test(line) || tableSeparatorPattern.test(line),
-  );
-  const hasTableAfter = afterLines.some(
-    (line) => tableRowPattern.test(line) || tableSeparatorPattern.test(line),
-  );
-
-  return hasTableBefore && hasTableAfter;
+  // Since we only split at \n\n positions and \n\n terminates tables,
+  // splitting at \n\n is always safe for tables - never "within" one
+  return false;
 };
 
 /**
