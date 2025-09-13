@@ -1,0 +1,52 @@
+# Security Zone - Highest priority, requires security-lead approval
+/security/ @security-lead
+/src/security/ @security-lead
+/src/config/trustedFolders.ts @security-lead
+/src/config/settings.ts @security-lead
+/src/commands/mcp.ts @security-lead
+/src/commands/mcp.test.ts @security-lead
+**/env* @security-lead
+**/trust* @security-lead
+**/auth* @security-lead
+**/secret* @security-lead
+**/token* @security-lead
+**/credential* @security-lead
+
+# Performance Zone
+/perf/ @perf-lead
+/src/**/perf*/ @perf-lead
+**/performance* @perf-lead
+**/benchmark* @perf-lead
+**/optimization* @perf-lead
+
+# Config & Environment Zone
+/config/ @config-lead
+/src/**/config*/ @config-lead
+/src/config/ @config-lead
+**/environment* @config-lead
+**/settings* @config-lead
+
+# Logging & Telemetry Zone
+/logging/ @logging-lead
+/src/**/log*/ @logging-lead
+**/telemetry* @logging-lead
+**/metrics* @logging-lead
+
+# Documentation Zone
+/docs/ @docs-lead
+README.md @docs-lead
+**/*.md @docs-lead
+**/doc*/ @docs-lead
+
+# General Code Review Requirements
+# All PRs require at least one owner approval from their zone
+# Security zone changes require both security-lead and at least one other zone owner
+# Global requirements apply to all files not covered above
+* @security-lead @perf-lead @config-lead @logging-lead @docs-lead
+
+# Exemptions for CI and automation
+.github/workflows/ @security-lead
+.github/actions/ @security-lead
+scripts/ @security-lead
+**/test*/ @security-lead
+**/spec*/ @security-lead

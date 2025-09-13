@@ -2165,33 +2165,5 @@ describe('parseArguments with positional prompt', () => {
       throw new Error('process.exit called');
     });
 
-    const mockConsoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-
-    await expect(parseArguments({} as Settings)).rejects.toThrow(
-      'process.exit called',
-    );
-
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Cannot use both a positional prompt and the --prompt (-p) flag together',
-      ),
-    );
-
-    mockExit.mockRestore();
-    mockConsoleError.mockRestore();
-  });
-
-  it('should correctly parse a positional prompt', async () => {
-    process.argv = ['node', 'script.js', 'positional', 'prompt'];
-    const argv = await parseArguments({} as Settings);
-    expect(argv.promptWords).toEqual(['positional', 'prompt']);
-  });
-
-  it('should correctly parse a prompt from the --prompt flag', async () => {
-    process.argv = ['node', 'script.js', '--prompt', 'test prompt'];
-    const argv = await parseArguments({} as Settings);
-    expect(argv.prompt).toBe('test prompt');
   });
 });

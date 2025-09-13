@@ -1,0 +1,60 @@
+title = "gitleaks config"
+
+[allowlist]
+description = "Allow common false positives"
+paths = [
+    "**/docs/**",
+    "**/*.md",
+    "**/test/**",
+    "**/*test*",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.git/**"
+]
+
+[[rules]]
+id = "generic-api-key"
+regex = '''(?i)(api[_-]?key|token|secret)[=:]\s*['"]?[A-Za-z0-9_\-]{16,}['"]?'''
+tags = ["key","token","secret"]
+entropy = 3.5
+
+[[rules]]
+id = "aws-access-key"
+regex = '''(AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY)[=:]\s*['"]?[A-Za-z0-9/+=]{20,}['"]?'''
+tags = ["aws","key"]
+
+[[rules]]
+id = "google-api-key"
+regex = '''(?i)(AIza[0-9A-Za-z-_]{35}|AIzaSy[A-Za-z0-9-_]{33})'''
+tags = ["google","api","key"]
+
+[[rules]]
+id = "github-token"
+regex = '''ghp_[0-9a-zA-Z]{36}'''
+tags = ["github","token"]
+
+[[rules]]
+id = "slack-token"
+regex = '''xox[baprs]-([0-9a-zA-Z]{10,48})'''
+tags = ["slack","token"]
+
+[[rules]]
+id = "generic-password"
+regex = '''(?i)password[=:]\s*['"]?[A-Za-z0-9!@#$%^&*()_+-=]{8,}['"]?'''
+tags = ["password"]
+entropy = 4.0
+
+[[rules]]
+id = "jwt-token"
+regex = '''eyJ[A-Za-z0-9-_=]+\.eyJ[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*'''
+tags = ["jwt","token"]
+
+[[rules]]
+id = "private-key"
+regex = '''-----BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY-----'''
+tags = ["private","key"]
+
+[[rules]]
+id = "gemini-api-key"
+regex = '''(?i)(GEMINI_API_KEY|GOOGLE_AI_API_KEY)[=:]\s*['"]?[A-Za-z0-9_-]{20,}['"]?'''
+tags = ["gemini","google","api","key"]
