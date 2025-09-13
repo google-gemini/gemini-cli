@@ -61,7 +61,9 @@ describe('truncateWithEllipsis Utility Function', () => {
     it('should truncate with ellipsis when text is longer than maxLength', () => {
       expect(truncateWithEllipsis('verylongtext', 8)).toBe('veryl...');
       expect(truncateWithEllipsis('hello world', 8)).toBe('hello...');
-      expect(truncateWithEllipsis('abcdefghijklmnopqrstuvwxyz', 10)).toBe('abcdefg...');
+      expect(truncateWithEllipsis('abcdefghijklmnopqrstuvwxyz', 10)).toBe(
+        'abcdefg...',
+      );
     });
 
     it('should handle edge case maxLength values', () => {
@@ -79,8 +81,11 @@ describe('truncateWithEllipsis Utility Function', () => {
 
   describe('Real-world Scenarios', () => {
     it('should handle file path truncation appropriately', () => {
-      const longPath = '/src/components/ui/SuggestionsDisplay/SuggestionsDisplay.tsx';
-      expect(truncateWithEllipsis(longPath, 30)).toBe('/src/components/ui/Suggesti...');
+      const longPath =
+        '/src/components/ui/SuggestionsDisplay/SuggestionsDisplay.tsx';
+      expect(truncateWithEllipsis(longPath, 30)).toBe(
+        '/src/components/ui/Suggesti...',
+      );
       expect(truncateWithEllipsis(longPath, 20)).toBe('/src/components/u...');
     });
 
@@ -91,8 +96,11 @@ describe('truncateWithEllipsis Utility Function', () => {
     });
 
     it('should preserve word boundaries where possible in display contexts', () => {
-      const description = 'This is a very long description that should be truncated';
-      expect(truncateWithEllipsis(description, 20)).toBe('This is a very lo...');
+      const description =
+        'This is a very long description that should be truncated';
+      expect(truncateWithEllipsis(description, 20)).toBe(
+        'This is a very lo...',
+      );
     });
   });
 
@@ -116,7 +124,9 @@ describe('truncateWithEllipsis Utility Function', () => {
     it('should handle very large maxLength values', () => {
       const text = 'normal text';
       expect(truncateWithEllipsis(text, 1000)).toBe('normal text');
-      expect(truncateWithEllipsis(text, Number.MAX_SAFE_INTEGER)).toBe('normal text');
+      expect(truncateWithEllipsis(text, Number.MAX_SAFE_INTEGER)).toBe(
+        'normal text',
+      );
     });
   });
 
@@ -172,7 +182,7 @@ describe('SuggestionsDisplay Component Integration', () => {
         scrollOffset={0}
         userInput="test"
         completionMode={CompletionMode.SLASH}
-      />
+      />,
     );
     expect(lastFrame()).toBeTruthy();
   });
@@ -187,7 +197,7 @@ describe('SuggestionsDisplay Component Integration', () => {
         scrollOffset={0}
         userInput="/custom @"
         completionMode={CompletionMode.AT}
-      />
+      />,
     );
 
     const output = lastFrame();
@@ -207,7 +217,7 @@ describe('SuggestionsDisplay Component Integration', () => {
         scrollOffset={0}
         userInput="/"
         completionMode={CompletionMode.SLASH}
-      />
+      />,
     );
 
     const output = lastFrame();
@@ -226,7 +236,7 @@ describe('SuggestionsDisplay Component Integration', () => {
         scrollOffset={0}
         userInput="test"
         completionMode={CompletionMode.SLASH}
-      />
+      />,
     );
 
     const output = lastFrame();
@@ -243,7 +253,7 @@ describe('SuggestionsDisplay Component Integration', () => {
         scrollOffset={0}
         userInput="test"
         completionMode={CompletionMode.SLASH}
-      />
+      />,
     );
 
     const output = lastFrame();

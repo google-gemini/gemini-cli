@@ -129,7 +129,12 @@ export function useCommandCompletion(
       }
 
       const codePoints = toCodePoints(currentLine);
-      for (let i = cursorCol - 1; i >= 0; i--) {
+      // Start from cursorCol, but if it's a space, also check cursorCol - 1
+      const startSearch =
+        cursorCol < codePoints.length && codePoints[cursorCol] === ' '
+          ? cursorCol - 1
+          : cursorCol;
+      for (let i = startSearch; i >= 0; i--) {
         const char = codePoints[i];
 
         if (char === ' ') {
