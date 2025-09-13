@@ -28,9 +28,7 @@ npm install -g @google/gemini-cli@latest
 npm install -g @google/gemini-cli@nightly
 ```
 
-# Release Process.
-
-Where `x.y.z` is the next version to be released. In most all cases for the weekly release this will be an increment on `y`, aka minor version update. Major version updates `x` will need broader coordination and communication. For patches `z` see below. When possible we will do our best to adher to https://semver.org/
+# Release Process
 
 Our release cadence is new releases are sent to a preview channel for a week and then promoted to stable after a week. Version numbers will follow SemVer with weekly releases incrementing the minor version. Patches and bug fixes to both preview and stable releases will increment the patch version.
 
@@ -38,23 +36,15 @@ Our release cadence is new releases are sent to a preview channel for a week and
 
 Each night at UTC 0000 we will auto deploy a nightly release from `main`. This will be a version of the next production release, x.y.z, with the nightly tag.
 
-## Create Preview Release
+## Weekly Release Promotion
 
-Each Tuesday at UTC 2359 we will auto deploy a preview release of the next production release x.y.z.
+Each Tuesday, the on-call engineer will trigger the "Promote Release" workflow. This single action automates the entire weekly release process:
 
-- This will happen as a scheduled instance of the ‘release’ action. It will be cut off of Main.
-- This will create a branch `release/vx.y.z-preview.n`
-- We will run evals and smoke testing against this branch and the npm package. For now this should be manual smoke testing, we don't have a dedicated matrix or specific detailed process. There is work coming soon to make this more formalized and automatic see https://github.com/google-gemini/gemini-cli/issues/3788
-- Users installing `@preview` will get this release as well
+1.  **Promotes Preview to Stable:** The workflow identifies the latest `preview` release and promotes it to `stable`. This becomes the new `latest` version on npm.
+2.  **Promotes Nightly to Preview:** The latest `nightly` release is then promoted to become the new `preview` version.
+3.  **Prepares for next Nightly:** A pull request is automatically created and merged to bump the version in `main` in preparation for the next nightly release.
 
-## Promote Stable Release
-
-After one week (On the following Tuesday) with all signals a go, we will manually release at 2000 UTC via the current on-call person.
-
-- The release action will be used with the source branch as `release/vx.y.z-preview.n`
-- The version will be x.y.z
-- The releaser will create and merge a pr into main with the version changes.
-- Smoke tests and manual validation will be run. For now this should be manual smoke testing, we don't have a dedicated matrix or specific detailed process. There is work coming soon to make this more formalized and automatic see https://github.com/google-gemini/gemini-cli/issues/3788
+This process ensures a consistent and reliable release cadence with minimal manual intervention.
 
 ## Patching Releases
 
@@ -79,7 +69,11 @@ The workflow will automatically find the merge commit SHA and begin the patch pr
 
 **Option B: Manually Triggering the Workflow**
 
-Navigate to the **Actions** tab and run the **Create Patch PR** workflow.
+Follow the manual release process using the "Patch Release" GitHub Actions workflow.
+
+- **Type**: Select whether you are patching a `stable` or `preview` release. The workflow will automatically calculate the next patch version.
+- **Ref**: Use your source branch as the reference (ex. `release/v0.2.0-preview.0`)
+  Navigate to the **Actions** tab and run the **Create Patch PR** workflow.
 
 - **Commit**: The full SHA of the commit on `main` that you want to cherry-pick.
 - **Channel**: The channel you want to patch (`stable` or `preview`).
@@ -174,14 +168,28 @@ This fully automated process ensures that patches are created and released consi
 
 ## How To Release
 
-Releases are managed through the [release.yml](https://github.com/google-gemini/gemini-cli/actions/workflows/release.yml) GitHub Actions workflow. To perform a manual release for a patch or hotfix:
+Releases are managed through GitHub Actions workflows.
+
+### Weekly Promotions
+
+To perform the weekly promotion of `preview` to `stable` and `nightly` to `preview`:
 
 1.  Navigate to the **Actions** tab of the repository.
-2.  Select the **Release** workflow from the list.
+2.  Select the **Promote Release** workflow from the list.
+3.  Click the **Run workflow** dropdown button.
+4.  Leave **Dry Run** as `true` to test the workflow without publishing, or set to `false` to perform a live release.
+5.  Click **Run workflow**.
+
+### Patching a Release
+
+To perform a manual release for a patch or hotfix:
+
+1.  Navigate to the **Actions** tab of the repository.
+2.  Select the **Patch Release** workflow from the list.
 3.  Click the **Run workflow** dropdown button.
 4.  Fill in the required inputs:
-    - **Version**: The exact version to release (e.g., `v0.2.1`).
-    - **Ref**: The branch or commit SHA to release from (defaults to `main`).
+    - **Type**: Select whether you are patching a `stable` or `preview` release.
+    - **Ref**: The branch or commit SHA to release from.
     - **Dry Run**: Leave as `true` to test the workflow without publishing, or set to `false` to perform a live release.
 5.  Click **Run workflow**.
 

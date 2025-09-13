@@ -315,5 +315,20 @@ describe('SettingsSchema', () => {
           .description,
       ).toBe('Enable debug logging of keystrokes to the console.');
     });
+
+    it('should have useModelRouter setting in schema', () => {
+      expect(
+        getSettingsSchema().experimental.properties.useModelRouter,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().experimental.properties.useModelRouter.type,
+      ).toBe('boolean');
+      expect(
+        getSettingsSchema().experimental.properties.useModelRouter.category,
+      ).toBe('Experimental');
+      expect(
+        getSettingsSchema().experimental.properties.useModelRouter.default,
+      ).toBe(false);
+    });
   });
 });

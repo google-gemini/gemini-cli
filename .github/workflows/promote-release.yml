@@ -8,6 +8,11 @@ on:
         required: true
         type: 'boolean'
         default: true
+      force_skip_tests:
+        description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
+        required: false
+        type: 'boolean'
+        default: false
 
 jobs:
   calculate-versions:
@@ -99,50 +104,22 @@ jobs:
         working-directory: './release'
         run: 'npm ci'
 
-      - name: 'Configure Git User'
-        working-directory: './release'
-        run: |-
-          git config user.name "gemini-cli-robot"
-          git config user.email "gemini-cli-robot@google.com"
-
-      - name: 'Create and switch to a release branch'
-        working-directory: './release'
-        id: 'release_branch'
-        run: |
-          BRANCH_NAME="release/v${{ matrix.version }}"
-          git switch -c "${BRANCH_NAME}"
-          echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
-
-      - name: 'Update package versions'
-        working-directory: './release'
-        run: 'npm run release:version "${{ matrix.version }}"'
-
-      - name: 'Commit and Conditionally Push package versions'
-        working-directory: './release'
-        env:
-          BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
-          DRY_RUN: '${{ github.event.inputs.dry_run }}'
-          RELEASE_TAG: 'v${{ matrix.version }}'
-        run: |-
-          git add package.json package-lock.json packages/*/package.json
-          git commit -m "chore(release): ${RELEASE_TAG}"
-          if [[ "${DRY_RUN}" == "false" ]]; then
-            echo "Pushing release branch to remote..."
-            git push --set-upstream origin "${BRANCH_NAME}" --follow-tags
-          else
-            echo "Dry run enabled. Skipping push."
-          fi
+      - name: 'Run Tests'
+        uses: './.github/actions/run-tests'
+        with:
+          force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
 
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
           release-version: '${{ matrix.version }}'
+          release-tag: 'v${{ matrix.version }}'
           npm-tag: '${{ matrix.npm-tag }}'
           wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
-          release-branch: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           previous-tag: '${{ matrix.previous-tag }}'
           working-directory: './release'
 
@@ -188,7 +165,7 @@ jobs:
           BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           DRY_RUN: '${{ github.event.inputs.dry_run }}'
         run: |-
-          git add package.json package-lock.json packages/*/package.json
+          git add package.json npm-shrinkwrap.json packages/*/package.json
           git commit -m "chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
           if [[ "${DRY_RUN}" == "false" ]]; then
             echo "Pushing release branch to remote..."

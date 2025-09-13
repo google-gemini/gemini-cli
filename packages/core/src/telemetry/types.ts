@@ -535,6 +535,7 @@ export type TelemetryEvent =
   | ContentRetryEvent
   | ContentRetryFailureEvent
   | ExtensionInstallEvent
+  | ExtensionUninstallEvent
   | ToolOutputTruncatedEvent;
 
 export class ExtensionInstallEvent implements BaseTelemetryEvent {
@@ -588,5 +589,19 @@ export class ToolOutputTruncatedEvent implements BaseTelemetryEvent {
     this.truncated_content_length = details.truncatedContentLength;
     this.threshold = details.threshold;
     this.lines = details.lines;
+  }
+}
+
+export class ExtensionUninstallEvent implements BaseTelemetryEvent {
+  'event.name': 'extension_uninstall';
+  'event.timestamp': string;
+  extension_name: string;
+  status: 'success' | 'error';
+
+  constructor(extension_name: string, status: 'success' | 'error') {
+    this['event.name'] = 'extension_uninstall';
+    this['event.timestamp'] = new Date().toISOString();
+    this.extension_name = extension_name;
+    this.status = status;
   }
 }
