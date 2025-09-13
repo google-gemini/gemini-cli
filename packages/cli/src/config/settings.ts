@@ -26,12 +26,15 @@ import {
   type SettingsSchema,
   type SettingDefinition,
   getSettingsSchema,
+  getDefaultSettings,
 } from './settingsSchema.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 
-function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
+export function getMergeStrategyForPath(
+  path: string[],
+): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
   let currentSchema: SettingsSchema | undefined = getSettingsSchema();
 
@@ -326,6 +329,7 @@ export function migrateSettingsToV1(
 }
 
 function mergeSettings(
+  schemaDefaults: Settings,
   system: Settings,
   systemDefaults: Settings,
   user: Settings,
@@ -336,13 +340,15 @@ function mergeSettings(
 
   // Settings are merged with the following precedence (last one wins for
   // single values):
-  // 1. System Defaults
-  // 2. User Settings
-  // 3. Workspace Settings
-  // 4. System Settings (as overrides)
+  // 1. Schema Defaults
+  // 2. System Defaults
+  // 3. User Settings
+  // 4. Workspace Settings
+  // 5. System Settings (as overrides)
   return customDeepMerge(
     getMergeStrategyForPath,
     {}, // Start with an empty object
+    schemaDefaults,
     systemDefaults,
     user,
     safeWorkspace,
@@ -358,6 +364,7 @@ export class LoadedSettings {
     workspace: SettingsFile,
     isTrusted: boolean,
     migratedInMemorScopes: Set<SettingScope>,
+    schemaDefaults: Settings,
   ) {
     this.system = system;
     this.systemDefaults = systemDefaults;
@@ -365,6 +372,7 @@ export class LoadedSettings {
     this.workspace = workspace;
     this.isTrusted = isTrusted;
     this.migratedInMemorScopes = migratedInMemorScopes;
+    this.schemaDefaults = schemaDefaults;
     this._merged = this.computeMergedSettings();
   }
 
@@ -374,6 +382,7 @@ export class LoadedSettings {
   readonly workspace: SettingsFile;
   readonly isTrusted: boolean;
   readonly migratedInMemorScopes: Set<SettingScope>;
+  readonly schemaDefaults: Settings;
 
   private _merged: Settings;
 
@@ -383,6 +392,7 @@ export class LoadedSettings {
 
   private computeMergedSettings(): Settings {
     return mergeSettings(
+      this.schemaDefaults,
       this.system.settings,
       this.systemDefaults.settings,
       this.user.settings,
@@ -643,10 +653,13 @@ export function loadSettings(
     workspaceSettings.ui.theme = DefaultDark.name;
   }
 
+  const schemaDefaults = getDefaultSettings();
+
   // For the initial trust check, we can only use user and system settings.
   const initialTrustCheckSettings = customDeepMerge(
     getMergeStrategyForPath,
     {},
+    schemaDefaults,
     systemSettings,
     userSettings,
   );
@@ -655,6 +668,7 @@ export function loadSettings(
 
   // Create a temporary merged settings object to pass to loadEnvironment.
   const tempMergedSettings = mergeSettings(
+    schemaDefaults,
     systemSettings,
     systemDefaultSettings,
     userSettings,
@@ -704,6 +718,7 @@ export function loadSettings(
     },
     isTrusted,
     migratedInMemorScopes,
+    schemaDefaults,
   );
 }
 

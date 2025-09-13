@@ -49,10 +49,12 @@ import {
 import * as fs from 'node:fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
 import { isWorkspaceTrusted } from './trustedFolders.js';
+import { getDefaultSettings } from './settingsSchema.js';
 
 // These imports will get the versions from the vi.mock('./settings.js', ...) factory.
 import {
   loadSettings,
+  saveSettings,
   USER_SETTINGS_PATH, // This IS the mocked path.
   getSystemSettingsPath,
   getSystemDefaultsPath,
@@ -60,6 +62,7 @@ import {
   migrateSettingsToV1,
   needsMigration,
   type Settings,
+  type SettingsFile,
   loadEnvironment,
 } from './settings.js';
 import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
@@ -126,7 +129,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.system.settings).toEqual({});
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
-      expect(settings.merged).toEqual({});
+      expect(settings.merged).toEqual(getDefaultSettings());
     });
 
     it('should load system settings if only system file exists', () => {
@@ -158,8 +161,17 @@ describe('Settings Loading and Merging', () => {
       expect(settings.system.settings).toEqual(systemSettingsContent);
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual({});
+      const defaultSettings = getDefaultSettings();
       expect(settings.merged).toEqual({
-        ...systemSettingsContent,
+        ...defaultSettings,
+        ui: {
+          ...defaultSettings.ui,
+          theme: 'system-default',
+        },
+        tools: {
+          ...defaultSettings.tools,
+          sandbox: false,
+        },
       });
     });
 
@@ -193,8 +205,17 @@ describe('Settings Loading and Merging', () => {
       );
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual({});
+      const defaultSettings = getDefaultSettings();
       expect(settings.merged).toEqual({
-        ...userSettingsContent,
+        ...defaultSettings,
+        ui: {
+          ...defaultSettings.ui,
+          theme: 'dark',
+        },
+        context: {
+          ...defaultSettings.context,
+          fileName: 'USER_CONTEXT.md',
+        },
       });
     });
 
@@ -226,8 +247,17 @@ describe('Settings Loading and Merging', () => {
       );
       expect(settings.user.settings).toEqual({});
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
+      const defaultSettings = getDefaultSettings();
       expect(settings.merged).toEqual({
-        ...workspaceSettingsContent,
+        ...defaultSettings,
+        tools: {
+          ...defaultSettings.tools,
+          sandbox: true,
+        },
+        context: {
+          ...defaultSettings.context,
+          fileName: 'WORKSPACE_CONTEXT.md',
+        },
       });
     });
 
@@ -291,20 +321,27 @@ describe('Settings Loading and Merging', () => {
       expect(settings.system.settings).toEqual(systemSettingsContent);
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
+      const defaultSettings = getDefaultSettings();
       expect(settings.merged).toEqual({
+        ...defaultSettings,
         ui: {
+          ...defaultSettings.ui,
           theme: 'system-theme',
         },
+        context: {
+          ...defaultSettings.context,
+          fileName: 'WORKSPACE_CONTEXT.md',
+        },
         tools: {
+          ...defaultSettings.tools,
           sandbox: false,
           core: ['tool1'],
         },
-        telemetry: { enabled: false },
-        context: {
-          fileName: 'WORKSPACE_CONTEXT.md',
-        },
         mcp: {
           allowed: ['server1', 'server2'],
+        },
+        telemetry: {
+          enabled: false,
         },
       });
     });
@@ -344,19 +381,9 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
+      const defaultSettings = getDefaultSettings();
       expect(settings.merged).toEqual({
-        ui: {
-          theme: 'legacy-dark',
-        },
-        general: {
-          vimMode: true,
-        },
-        context: {
-          fileName: 'LEGACY_CONTEXT.md',
-        },
-        model: {
-          name: 'gemini-pro',
-        },
+        ...defaultSettings,
         mcpServers: {
           'legacy-server-1': {
             command: 'npm',
@@ -368,6 +395,22 @@ describe('Settings Loading and Merging', () => {
             args: ['server2.js'],
             description: 'Legacy Server 2',
           },
+        },
+        general: {
+          ...defaultSettings.general,
+          vimMode: true,
+        },
+        ui: {
+          ...defaultSettings.ui,
+          theme: 'legacy-dark',
+        },
+        model: {
+          ...defaultSettings.model,
+          name: 'gemini-pro',
+        },
+        context: {
+          ...defaultSettings.context,
+          fileName: 'LEGACY_CONTEXT.md',
         },
         mcp: {
           allowed: ['legacy-server-1'],
@@ -438,7 +481,7 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.advanced?.excludedEnvVars).toEqual(
         expect.arrayContaining(['USER_VAR', 'WORKSPACE_VAR']),
       );
-      expect(settings.merged.advanced?.excludedEnvVars).toHaveLength(2);
+      expect(settings.merged.advanced?.excludedEnvVars).toHaveLength(4);
     });
 
     it('should merge all settings files with the correct precedence', () => {
@@ -503,9 +546,15 @@ describe('Settings Loading and Merging', () => {
       expect(settings.system.settings).toEqual(systemSettingsContent);
       expect(settings.user.settings).toEqual(userSettingsContent);
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
+      const defaultSettings = getDefaultSettings();
       expect(settings.merged).toEqual({
+        ...defaultSettings,
+        ui: {
+          ...defaultSettings.ui,
+          theme: 'system-theme',
+        },
         context: {
-          fileName: 'WORKSPACE_CONTEXT.md',
+          ...defaultSettings.context,
           includeDirectories: [
             '/system/defaults/dir',
             '/user/dir1',
@@ -513,14 +562,13 @@ describe('Settings Loading and Merging', () => {
             '/workspace/dir',
             '/system/dir',
           ],
+          fileName: 'WORKSPACE_CONTEXT.md',
         },
-        telemetry: false,
         tools: {
+          ...defaultSettings.tools,
           sandbox: false,
         },
-        ui: {
-          theme: 'system-theme',
-        },
+        telemetry: false,
       });
     });
 
@@ -655,6 +703,7 @@ describe('Settings Loading and Merging', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.merged.advanced?.excludedEnvVars).toEqual([
         'DEBUG',
+        'DEBUG_MODE',
         'NODE_ENV',
         'CUSTOM_VAR',
       ]);
@@ -678,6 +727,8 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.merged.advanced?.excludedEnvVars).toEqual([
+        'DEBUG',
+        'DEBUG_MODE',
         'WORKSPACE_DEBUG',
         'WORKSPACE_VAR',
       ]);
@@ -720,6 +771,7 @@ describe('Settings Loading and Merging', () => {
       ]);
       expect(settings.merged.advanced?.excludedEnvVars).toEqual([
         'DEBUG',
+        'DEBUG_MODE',
         'NODE_ENV',
         'USER_VAR',
         'WORKSPACE_DEBUG',
@@ -802,8 +854,9 @@ describe('Settings Loading and Merging', () => {
       (fs.readFileSync as Mock).mockReturnValue('{}');
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.merged.telemetry).toBeUndefined();
-      expect(settings.merged.ui).toBeUndefined();
-      expect(settings.merged.mcpServers).toBeUndefined();
+      const defaults = getDefaultSettings();
+      expect(settings.merged.ui).toEqual(defaults.ui);
+      expect(settings.merged.mcpServers).toEqual(defaults.mcpServers);
     });
 
     it('should merge MCP servers correctly, with workspace taking precedence', () => {
@@ -932,7 +985,7 @@ describe('Settings Loading and Merging', () => {
       (mockFsExistsSync as Mock).mockReturnValue(false); // No settings files exist
       (fs.readFileSync as Mock).mockReturnValue('{}');
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.mcpServers).toBeUndefined();
+      expect(settings.merged.mcpServers).toEqual({});
     });
 
     it('should merge MCP servers from system, user, and workspace with system taking precedence', () => {
@@ -1128,7 +1181,10 @@ describe('Settings Loading and Merging', () => {
       (mockFsExistsSync as Mock).mockReturnValue(false); // No settings files exist
       (fs.readFileSync as Mock).mockReturnValue('{}');
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.model).toBeUndefined();
+      expect(settings.merged.model).toEqual({
+        maxSessionTurns: -1,
+        skipNextSpeakerCheck: true,
+      });
     });
 
     it('should ignore chatCompression if contextPercentageThreshold is invalid', () => {
@@ -1621,6 +1677,83 @@ describe('Settings Loading and Merging', () => {
       delete process.env['TEST_PORT'];
     });
 
+    it('should use a non-default value from a settings file over the default value', () => {
+      // For this test, we'll use `privacy.usageStatisticsEnabled`, which defaults to `true`.
+      // We will set it to `false` in a settings file and verify it's `false` in the merged result.
+      const defaultSettings = getDefaultSettings();
+      expect(defaultSettings.privacy?.usageStatisticsEnabled).toBe(true);
+
+      const userSettingsContent = {
+        privacy: {
+          usageStatisticsEnabled: false, // Set to a non-default value.
+        },
+      };
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH) {
+            return JSON.stringify(userSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // The merged value should be `false` from the user settings, overriding the default.
+      expect(settings.merged.privacy?.usageStatisticsEnabled).toBe(false);
+    });
+
+    it('should correctly merge settings with workspace overriding user and resetting to default', () => {
+      const defaultValue = getDefaultSettings().context.discoveryMaxDirs;
+      expect(defaultValue).toBe(200);
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) =>
+          p === USER_SETTINGS_PATH || p === MOCK_WORKSPACE_SETTINGS_PATH,
+      );
+
+      // User sets a non-default value.
+      const userSettingsContent = {
+        context: {
+          discoveryMaxDirs: 500,
+        },
+      };
+
+      // Workspace sets it back to the default value.
+      const workspaceSettingsContent = {
+        context: {
+          discoveryMaxDirs: defaultValue,
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH) {
+            return JSON.stringify(userSettingsContent);
+          }
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
+            return JSON.stringify(workspaceSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Check individual settings were loaded correctly
+      expect(settings.user.settings.context?.discoveryMaxDirs).toBe(500);
+      expect(settings.workspace.settings.context?.discoveryMaxDirs).toBe(
+        defaultValue,
+      );
+
+      // The merged result should be the default value, as workspace takes precedence.
+      expect(settings.merged.context.discoveryMaxDirs).toBe(defaultValue);
+    });
+
     describe('when GEMINI_CLI_SYSTEM_SETTINGS_PATH is set', () => {
       const MOCK_ENV_SYSTEM_SETTINGS_PATH = '/mock/env/system/settings.json';
 
@@ -1658,7 +1791,94 @@ describe('Settings Loading and Merging', () => {
         expect(settings.system.path).toBe(MOCK_ENV_SYSTEM_SETTINGS_PATH);
         expect(settings.system.settings).toEqual(systemSettingsContent);
         expect(settings.merged).toEqual({
-          ...systemSettingsContent,
+          mcpServers: {},
+          general: {
+            vimMode: false,
+            disableAutoUpdate: false,
+            disableUpdateNag: false,
+            checkpointing: {
+              enabled: false,
+            },
+            enablePromptCompletion: false,
+            debugKeystrokeLogging: false,
+          },
+          ui: {
+            customThemes: {},
+            hideWindowTitle: false,
+            hideTips: false,
+            hideBanner: false,
+            hideContextSummary: false,
+            footer: {
+              hideCWD: false,
+              hideSandboxStatus: false,
+              hideModelInfo: false,
+            },
+            hideFooter: false,
+            showMemoryUsage: false,
+            showLineNumbers: false,
+            showCitations: false,
+            customWittyPhrases: [],
+            accessibility: {
+              disableLoadingPhrases: false,
+            },
+            theme: 'env-var-theme',
+          },
+          ide: {
+            enabled: false,
+            hasSeenNudge: false,
+          },
+          output: {
+            format: 'text',
+          },
+          privacy: {
+            usageStatisticsEnabled: true,
+          },
+          model: {
+            maxSessionTurns: -1,
+            skipNextSpeakerCheck: true,
+          },
+          context: {
+            discoveryMaxDirs: 200,
+            includeDirectories: [],
+            loadMemoryFromIncludeDirectories: false,
+            fileFiltering: {
+              respectGitIgnore: true,
+              respectGeminiIgnore: true,
+              enableRecursiveFileSearch: true,
+              disableFuzzySearch: false,
+            },
+          },
+          tools: {
+            usePty: false,
+            autoAccept: false,
+            useRipgrep: true,
+            truncateToolOutputThreshold: 4000000,
+            truncateToolOutputLines: 1000,
+            sandbox: true,
+            enableToolOutputTruncation: false,
+            shell: {
+              pager: 'cat',
+              showColor: false,
+            },
+          },
+          useSmartEdit: false,
+          security: {
+            folderTrust: {
+              enabled: false,
+            },
+          },
+          advanced: {
+            autoConfigureMemory: false,
+            excludedEnvVars: ['DEBUG', 'DEBUG_MODE'],
+          },
+          experimental: {
+            extensionManagement: true,
+            useModelRouter: false,
+          },
+          extensions: {
+            disabled: [],
+            workspacesWithMigrationNudge: [],
+          },
         });
       });
     });
@@ -1759,8 +1979,9 @@ describe('Settings Loading and Merging', () => {
         'DEBUG',
       ]);
       expect(settings.merged.advanced?.excludedEnvVars).toEqual([
-        'NODE_ENV',
         'DEBUG',
+        'DEBUG_MODE',
+        'NODE_ENV',
       ]);
     });
 
@@ -1799,6 +2020,7 @@ describe('Settings Loading and Merging', () => {
       ]);
       expect(settings.merged.advanced?.excludedEnvVars).toEqual([
         'DEBUG',
+        'DEBUG_MODE',
         'NODE_ENV',
         'USER_VAR',
         'WORKSPACE_DEBUG',
@@ -2309,6 +2531,116 @@ describe('Settings Loading and Merging', () => {
         someUnrecognizedKey: 'value',
       };
       expect(needsMigration(settings)).toBe(false);
+    });
+  });
+});
+
+describe('saveSettings', () => {
+  let mockFsWriteFileSync: Mocked<typeof fs.writeFileSync>;
+  let mockFsMkdirSync: Mocked<typeof fs.mkdirSync>;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockFsWriteFileSync = vi.mocked(fs.writeFileSync);
+    mockFsMkdirSync = vi.mocked(fs.mkdirSync);
+    (mockFsMkdirSync as Mock).mockImplementation(() => undefined);
+    vi.mocked(fs.existsSync).mockReturnValue(false); // Make sure mkdir is called
+    vi.mocked(fs.readFileSync).mockReturnValue('{}');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should write all provided user settings', () => {
+    const userSettingsFile: SettingsFile = {
+      path: USER_SETTINGS_PATH,
+      settings: {
+        ui: {
+          theme: 'a-non-default-theme', // custom
+        },
+        general: {
+          vimMode: true, // custom
+        },
+        tools: {
+          sandbox: false, // default
+        },
+      },
+    };
+
+    saveSettings(userSettingsFile);
+
+    // Verify that the directory is created
+    expect(mockFsMkdirSync).toHaveBeenCalledWith(
+      path.dirname(USER_SETTINGS_PATH),
+      {
+        recursive: true,
+      },
+    );
+
+    // Verify that the file is written to the correct path
+    expect(mockFsWriteFileSync).toHaveBeenCalledWith(
+      USER_SETTINGS_PATH,
+      expect.any(String),
+      'utf-8',
+    );
+
+    // Parse what was written
+    const writtenContent = JSON.parse(
+      mockFsWriteFileSync.mock.calls[0][1] as string,
+    );
+
+    // The settings are migrated to V1 before saving, so we expect V1 keys.
+    expect(writtenContent).toEqual({
+      sandbox: false,
+      theme: 'a-non-default-theme',
+      vimMode: true,
+    });
+  });
+
+  it('should write all provided workspace settings', () => {
+    const workspaceSettingsFile: SettingsFile = {
+      path: MOCK_WORKSPACE_SETTINGS_PATH,
+      settings: {
+        tools: {
+          autoAccept: true, // custom
+        },
+        context: {
+          discoveryMaxDirs: 500, // custom
+        },
+        general: {
+          vimMode: false, // default
+        },
+      },
+    };
+
+    saveSettings(workspaceSettingsFile);
+
+    // Verify that the directory is created
+    expect(mockFsMkdirSync).toHaveBeenCalledWith(
+      path.dirname(MOCK_WORKSPACE_SETTINGS_PATH),
+      {
+        recursive: true,
+      },
+    );
+
+    // Verify that the file is written to the correct path
+    expect(mockFsWriteFileSync).toHaveBeenCalledWith(
+      MOCK_WORKSPACE_SETTINGS_PATH,
+      expect.any(String),
+      'utf-8',
+    );
+
+    // Parse what was written
+    const writtenContent = JSON.parse(
+      mockFsWriteFileSync.mock.calls[0][1] as string,
+    );
+
+    // The settings are migrated to V1 before saving, so we expect V1 keys.
+    expect(writtenContent).toEqual({
+      autoAccept: true,
+      memoryDiscoveryMaxDirs: 500,
+      vimMode: false,
     });
   });
 });
