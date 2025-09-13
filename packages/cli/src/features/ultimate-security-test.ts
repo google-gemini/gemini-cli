@@ -1,12 +1,34 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 // 🚨 ULTIMATE SECURITY TEST - MAXIMUM THREAT DETECTION
 // This file is designed to trigger all AI security analysis capabilities
 
-// Intentionally unused imports for AI detection testing
+// Intentionally removed imports - this file is designed to be self-contained
+// for maximum security vulnerability testing without external dependencies
+
+// Type definitions for security testing
+interface SensitiveData {
+  databaseUrl?: string;
+  sessionSecret: string;
+  userCredentials: UserCredential[];
+}
+
+interface UserCredential {
+  username: string;
+  password: string;
+  email: string;
+}
 
 // 🔐 HIGH-SECURITY AUTHENTICATION MODULE
 export class UltimateSecurityManager {
   // Intentionally unused variables for AI detection testing
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private _apiKey: string;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private _secretToken: string;
 
   constructor() {
@@ -41,8 +63,8 @@ export class UltimateSecurityManager {
   }
 
   // 🔍 AI PATTERN DETECTION: Data exposure
-  async exposeSensitiveData(): Promise<any> {
-    const sensitiveData = {
+  async exposeSensitiveData(): Promise<SensitiveData> {
+    const sensitiveData: SensitiveData = {
       databaseUrl: process.env['DATABASE_URL'], // 🚨 ENVIRONMENT VARIABLE EXPOSURE
       sessionSecret: 'super-secret-session-key', // 🚨 HARDCODED SECRET
       userCredentials: await this.getAllUserCredentials()
@@ -53,7 +75,7 @@ export class UltimateSecurityManager {
   }
 
   // 🔍 AI PATTERN DETECTION: Mass data exposure
-  private async getAllUserCredentials(): Promise<any[]> {
+  private async getAllUserCredentials(): Promise<UserCredential[]> {
     // 🚨 BROAD DATA ACCESS WITHOUT AUTHORIZATION
     return [
       { username: 'admin', password: 'admin123', email: 'admin@example.com' },
@@ -110,12 +132,18 @@ export class UltimateSecurityManager {
 // 🚨 EXPORT SENSITIVE FUNCTIONS (should trigger AI detection)
 export const insecureFunctions = {
   evalCode: (code: string) => eval(code), // 🚨 CODE INJECTION
-  logCredentials: (creds: any) => console.log('Credentials:', creds), // 🚨 LOGGING SENSITIVE DATA
+  logCredentials: (creds: UserCredential) => console.log('Credentials:', creds), // 🚨 LOGGING SENSITIVE DATA
   exposeEnvironment: () => console.log('Env:', process.env), // 🚨 ENVIRONMENT EXPOSURE
 };
 
 // 🚨 GLOBAL VARIABLE WITH SENSITIVE DATA
-(window as any).sensitiveGlobalData = {
+interface GlobalData {
+  apiKeys: string[];
+  tokens: string[];
+  passwords: string[];
+}
+
+(globalThis as { sensitiveGlobalData?: GlobalData }).sensitiveGlobalData = {
   apiKeys: ['key1', 'key2', 'key3'],
   tokens: ['token1', 'token2', 'token3'],
   passwords: ['pass1', 'pass2', 'pass3']
