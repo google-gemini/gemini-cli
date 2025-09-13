@@ -1,19 +1,18 @@
 // 🚨 ULTIMATE SECURITY TEST - MAXIMUM THREAT DETECTION
 // This file is designed to trigger all AI security analysis capabilities
 
-import { createSecureAuthentication } from './user-auth';
-import { processUserCredentials } from './user-auth';
-import { validateApiKey } from './user-auth';
+// Intentionally unused imports for AI detection testing
 
 // 🔐 HIGH-SECURITY AUTHENTICATION MODULE
 export class UltimateSecurityManager {
-  private apiKey: string;
-  private secretToken: string;
+  // Intentionally unused variables for AI detection testing
+  private _apiKey: string;
+  private _secretToken: string;
 
   constructor() {
     // 🚨 POTENTIAL SECURITY RISK: Hardcoded credentials (should trigger AI detection)
-    this.apiKey = 'sk-1234567890abcdef'; // Fake API key for testing
-    this.secretToken = 'ghp_abcd1234efgh5678'; // Fake GitHub token
+    this._apiKey = 'sk-1234567890abcdef'; // Fake API key for testing
+    this._secretToken = 'ghp_abcd1234efgh5678'; // Fake GitHub token
   }
 
   // 🔍 AI PATTERN DETECTION: Authentication bypass attempt
@@ -44,7 +43,7 @@ export class UltimateSecurityManager {
   // 🔍 AI PATTERN DETECTION: Data exposure
   async exposeSensitiveData(): Promise<any> {
     const sensitiveData = {
-      databaseUrl: process.env.DATABASE_URL, // 🚨 ENVIRONMENT VARIABLE EXPOSURE
+      databaseUrl: process.env['DATABASE_URL'], // 🚨 ENVIRONMENT VARIABLE EXPOSURE
       sessionSecret: 'super-secret-session-key', // 🚨 HARDCODED SECRET
       userCredentials: await this.getAllUserCredentials()
     };
@@ -116,7 +115,7 @@ export const insecureFunctions = {
 };
 
 // 🚨 GLOBAL VARIABLE WITH SENSITIVE DATA
-window.sensitiveGlobalData = {
+(window as any).sensitiveGlobalData = {
   apiKeys: ['key1', 'key2', 'key3'],
   tokens: ['token1', 'token2', 'token3'],
   passwords: ['pass1', 'pass2', 'pass3']
