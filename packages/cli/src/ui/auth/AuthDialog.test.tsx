@@ -225,13 +225,20 @@ describe('AuthDialog', () => {
   });
 
   describe('useKeypress', () => {
-    it('does nothing on escape if authError is present', () => {
+    it.each([
+      { description: 'escape', key: { name: 'escape' } },
+      { description: 'ctrl+c', key: { name: 'c', ctrl: true } },
+    ])('exits on $description if authError is present', ({ key }) => {
+      const exitSpy = vi
+        .spyOn(process, 'exit')
+        .mockImplementation(() => undefined as never);
       props.authError = 'Some error';
       renderWithProviders(<AuthDialog {...props} />);
       const keypressHandler = mockedUseKeypress.mock.calls[0][0];
-      keypressHandler({ name: 'escape' });
-      expect(props.onAuthError).not.toHaveBeenCalled();
-      expect(props.setAuthState).not.toHaveBeenCalled();
+      keypressHandler(key);
+      expect(mockedRunExitCleanup).toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(0);
+      exitSpy.mockRestore();
     });
 
     it('calls onAuthError on escape if no auth method is set', () => {
