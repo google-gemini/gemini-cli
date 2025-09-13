@@ -40,6 +40,14 @@ vi.mock('./App.js', () => ({
   App: TestContextConsumer,
 }));
 
+vi.mock('ink', async (importOriginal) => {
+  const original = await importOriginal<typeof import('ink')>();
+  return {
+    ...original,
+    measureElement: vi.fn(),
+  };
+});
+
 vi.mock('./hooks/useQuotaAndFallback.js');
 vi.mock('./hooks/useHistoryManager.js');
 vi.mock('./hooks/useThemeCommand.js');
@@ -92,6 +100,9 @@ import { useSessionStats } from './contexts/SessionContext.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
+import { measureElement } from 'ink';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
+import { ShellExecutionService } from '@google/gemini-cli-core';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
@@ -554,6 +565,44 @@ describe('AppContainer State Management', () => {
       // You can even verify that the plumbed function is callable
       capturedUIActions.handleProQuotaChoice('auth');
       expect(mockHandler).toHaveBeenCalledWith('auth');
+    });
+  });
+
+  describe('Terminal Height Calculation', () => {
+    const mockedMeasureElement = measureElement as Mock;
+    const mockedUseTerminalSize = useTerminalSize as Mock;
+
+    it('should prevent terminal height from being less than 1', () => {
+      const resizePtySpy = vi.spyOn(ShellExecutionService, 'resizePty');
+      // Arrange: Simulate a small terminal and a large footer
+      mockedUseTerminalSize.mockReturnValue({ columns: 80, rows: 5 });
+      mockedMeasureElement.mockReturnValue({ width: 80, height: 10 }); // Footer is taller than the screen
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+        activePtyId: 'some-id',
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      // Assert: The shell should be resized to a minimum height of 1, not a negative number.
+      // The old code would have tried to set a negative height.
+      expect(resizePtySpy).toHaveBeenCalled();
+      const lastCall =
+        resizePtySpy.mock.calls[resizePtySpy.mock.calls.length - 1];
+      // Check the height argument specifically
+      expect(lastCall[2]).toBe(1);
     });
   });
 });
