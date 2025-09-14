@@ -42,6 +42,7 @@
     "lint": "eslint . --ext .ts,.tsx && eslint integration-tests",
     "lint:fix": "eslint . --fix && eslint integration-tests --fix",
     "lint:ci": "eslint . --ext .ts,.tsx --max-warnings 0 && eslint integration-tests --max-warnings 0",
+    "lint:all": "node scripts/lint.js",
     "format": "prettier --experimental-cli --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "preflight": "npm run clean && npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci",
@@ -58,7 +59,8 @@
   "files": [
     "bundle/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "npm-shrinkwrap.json"
   ],
   "devDependencies": {
     "@types/marked": "^5.0.2",
