@@ -2168,12 +2168,12 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should correctly migrate customWittyPhrases', () => {
-      const v2Settings = {
+      const v2Settings: Partial<Settings> = {
         ui: {
           customWittyPhrases: ['test phrase'],
         },
       };
-      const v1Settings = migrateSettingsToV1(v2Settings);
+      const v1Settings = migrateSettingsToV1(v2Settings as Settings);
       expect(v1Settings).toEqual({
         customWittyPhrases: ['test phrase'],
       });
@@ -2236,7 +2236,7 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should return false for settings that are already in V2 format', () => {
-      const v2Settings = {
+      const v2Settings: Partial<Settings> = {
         ui: {
           theme: 'dark',
         },
