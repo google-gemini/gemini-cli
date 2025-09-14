@@ -4,34 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
-import { useCallback, useEffect, useState, useRef } from 'react';
-import { Box, Text } from 'ink';
-import { theme } from '../semantic-colors.js';
-import { SuggestionsDisplay } from './SuggestionsDisplay.js';
-import { useInputHistory } from '../hooks/useInputHistory.js';
-import type { TextBuffer } from './shared/text-buffer.js';
-import { logicalPosToOffset } from './shared/text-buffer.js';
-import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
-import chalk from 'chalk';
-import stringWidth from 'string-width';
-import { useShellHistory } from '../hooks/useShellHistory.js';
-import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
-import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
-import type { Key } from '../hooks/useKeypress.js';
-import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
-import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode } from '@google/gemini-cli-core';
-import { parseInputForHighlighting } from '../utils/highlight.js';
+import chalk from 'chalk';
+import { Box, Text } from 'ink';
+import * as path from 'node:path';
+import type React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import stringWidth from 'string-width';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import { useInputHistory } from '../hooks/useInputHistory.js';
+import type { Key } from '../hooks/useKeypress.js';
+import { useKeypress } from '../hooks/useKeypress.js';
+import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
+import { useShellHistory } from '../hooks/useShellHistory.js';
+import { Command, keyMatchers } from '../keyMatchers.js';
+import { theme } from '../semantic-colors.js';
+import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import {
+  cleanupOldClipboardImages,
   clipboardHasImage,
   saveClipboardImage,
-  cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
-import * as path from 'node:path';
-import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
+import { parseInputForHighlighting } from '../utils/highlight.js';
+import { cpLen, cpSlice, toCodePoints } from '../utils/textUtils.js';
+import type { TextBuffer } from './shared/text-buffer.js';
+import { logicalPosToOffset } from './shared/text-buffer.js';
+import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 
 export interface InputPromptProps {
   buffer: TextBuffer;
@@ -76,7 +76,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [escPressCount, setEscPressCount] = useState(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [recentPasteTime, setRecentPasteTime] = useState<number | null>(null);
+  const [recentPasteTime] = useState<number | null>(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [dirs, setDirs] = useState<readonly string[]>(
@@ -200,7 +200,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   ]);
 
   // Handle clipboard image pasting with Ctrl+V
-  const handleClipboardImage = useCallback(async () => {
+  const handleClipboardImage = useCallback(async (): Promise<boolean> => {
     try {
       if (await clipboardHasImage()) {
         const imagePath = await saveClipboardImage(config.getTargetDir());
@@ -240,11 +240,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
           // Insert at cursor position
           buffer.replaceRangeByOffset(offset, offset, textToInsert);
+          return true;
         }
       }
     } catch (error) {
       console.error('Error handling clipboard image:', error);
     }
+    return false;
   }, [buffer, config]);
 
   const handleInput = useCallback(
@@ -255,21 +257,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.paste) {
-        // Record paste time to prevent accidental auto-submission
-        setRecentPasteTime(Date.now());
-
-        // Clear any existing paste timeout
-        if (pasteTimeoutRef.current) {
-          clearTimeout(pasteTimeoutRef.current);
+        const isMac = process.platform === 'darwin';
+        if (isMac) {
+          // On macOS, Cmd+V arrives as a generic paste event. We check for an
+          // image and handle it, otherwise we fall through to regular text paste.
+          handleClipboardImage().then((imageWasPasted) => {
+            if (imageWasPasted) {
+              return;
+            }
+            buffer.handleInput(key);
+          });
+          return;
         }
 
-        // Clear the paste protection after a safe delay
-        pasteTimeoutRef.current = setTimeout(() => {
-          setRecentPasteTime(null);
-          pasteTimeoutRef.current = null;
-        }, 500);
-
-        // Ensure we never accidentally interpret paste as regular input.
+        // On other platforms, we rely on the specific Ctrl+V keybinding for
+        // images, so any generic paste event is treated as text.
         buffer.handleInput(key);
         return;
       }
