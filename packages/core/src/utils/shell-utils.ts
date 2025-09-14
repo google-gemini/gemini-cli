@@ -60,7 +60,7 @@ function detectParentShell(): ShellConfiguration {
   // Priority 2: Check LOGINSHELL if SHELL is not set
   if (loginShell && loginShell.includes('bash')) {
     return {
-      executable: 'bash',
+      executable: loginShell,
       argsPrefix: ['-c'],
       shell: 'bash',
     };
