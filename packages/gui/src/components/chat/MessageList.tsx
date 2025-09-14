@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import type React from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -15,6 +16,7 @@ import ToolConfirmationMessage from './ToolConfirmationMessage';
 import { multiModelService } from '@/services/multiModelService';
 import type { ChatMessage, ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolCall } from '@/types';
 import 'katex/dist/katex.min.css';
+
 
 // React Markdown component props interface
 // Note: Using any here due to react-markdown's complex internal types
@@ -168,7 +170,11 @@ interface MessageListProps {
   onTemplateSaved?: () => void;
 }
 
-export const MessageList: React.FC<MessageListProps> = ({
+interface MessageListHandle {
+  scrollToBottom: () => void;
+}
+
+export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
   messages,
   isStreaming,
   isThinking,
@@ -176,11 +182,35 @@ export const MessageList: React.FC<MessageListProps> = ({
   toolConfirmation,
   onToolConfirm,
   onTemplateSaved,
-}) => {
+}, ref) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const lastMessageCountRef = useRef(messages.length);
-  const shouldAutoScrollRef = useRef(true);
+
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    scrollToBottom: () => {
+      scrollToBottom();
+    }
+  }), []);
+
+  // Configure virtualizer with dynamic height measurement
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => 150, // Simplified initial height estimate
+    // Provide unique key for each message to prevent cross-session state confusion
+    getItemKey: (index) => messages[index]?.id || `fallback-${index}`,
+    // Key: Enable dynamic height measurement
+    measureElement: (element) => {
+      // Measure actual element height including margins
+      const rect = element.getBoundingClientRect();
+      const computedStyle = window.getComputedStyle(element);
+      const marginTop = parseFloat(computedStyle.marginTop);
+      const marginBottom = parseFloat(computedStyle.marginBottom);
+      return rect.height + marginTop + marginBottom;
+    },
+    overscan: 5, // Pre-render 5 messages before/after viewport for smooth scrolling
+  });
 
   // Save message as template function
   const saveAsTemplate = async (message: ChatMessage) => {
@@ -200,7 +230,6 @@ export const MessageList: React.FC<MessageListProps> = ({
       };
       
       await multiModelService.addCustomTemplate(template);
-      console.log('Template saved successfully');
       
       // Refresh the template list in the sidebar
       if (onTemplateSaved) {
@@ -211,96 +240,100 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
   };
 
-  const scrollToBottom = (smooth = true) => {
-    messagesEndRef.current?.scrollIntoView({ 
-      behavior: smooth ? 'smooth' : 'auto' 
-    });
-  };
-
-  const checkIfAtBottom = () => {
-    if (!containerRef.current) return true;
-    
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    const threshold = 100; // pixels from bottom
-    return scrollHeight - scrollTop - clientHeight < threshold;
-  };
-
-  const handleScroll = () => {
-    shouldAutoScrollRef.current = checkIfAtBottom();
-  };
-
-  // Only scroll when new messages are added and user is at bottom
-  useEffect(() => {
-    const newMessageAdded = messages.length > lastMessageCountRef.current;
-    lastMessageCountRef.current = messages.length;
-    
-    if (newMessageAdded && shouldAutoScrollRef.current) {
-      scrollToBottom();
-    }
-  }, [messages]);
-
-  // Handle streaming content updates more smoothly
-  useEffect(() => {
-    if (isStreaming && streamingContent && shouldAutoScrollRef.current) {
-      // Use requestAnimationFrame to throttle scroll updates during streaming
-      requestAnimationFrame(() => {
-        scrollToBottom(false); // Instant scroll for streaming to avoid lag
+  const scrollToBottom = useCallback((smooth = true) => {
+    if (containerRef.current) {
+      const behavior = smooth ? 'smooth' : 'instant';
+      // Scroll to the very bottom
+      containerRef.current.scrollTo({
+        top: containerRef.current.scrollHeight,
+        behavior
       });
     }
-  }, [streamingContent, isStreaming]);
-
-  // Scroll when thinking starts (for initial response)
-  useEffect(() => {
-    if (isThinking && shouldAutoScrollRef.current) {
-      scrollToBottom();
-    }
-  }, [isThinking]);
+  }, []);
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
-      onScroll={handleScroll}
+      className="flex-1 overflow-y-auto p-4 min-h-0"
+      data-message-container
     >
-      {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} onSaveAsTemplate={saveAsTemplate} />
-      ))}
-      
-      {/* Show tool confirmation if present */}
+      {/* Virtualization container */}
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const message = messages[virtualItem.index];
+
+          return (
+            <div
+              key={virtualItem.key}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+              className="mb-4"
+            >
+              <MessageBubble
+                message={message}
+                onSaveAsTemplate={saveAsTemplate}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Non-virtualized fixed content - tool confirmations and streaming messages */}
       {toolConfirmation && onToolConfirm && (
-        <div className="flex justify-center">
+        <div className="flex justify-center mt-4">
           <div className="w-full">
-            <ToolConfirmationMessage 
+            <ToolConfirmationMessage
               confirmationDetails={toolConfirmation}
               onConfirm={onToolConfirm}
             />
           </div>
         </div>
       )}
-      
+
       {/* Show thinking indicator when AI is processing */}
-      {isThinking && <TypingIndicator />}
-      
+      {isThinking && (
+        <div className="mt-4">
+          <TypingIndicator />
+        </div>
+      )}
+
       {/* Show streaming content when AI is responding - only if content is unique */}
-      {isStreaming && streamingContent && !messages.some(msg => 
+      {isStreaming && streamingContent && !messages.some(msg =>
         msg.role === 'assistant' && msg.content === streamingContent
       ) && (
-        <MessageBubble
-          message={{
-            id: 'streaming',
-            role: 'assistant',
-            content: streamingContent,
-            timestamp: new Date(),
-          }}
-          isStreaming
-          onSaveAsTemplate={saveAsTemplate}
-        />
+        <div className="mt-4">
+          <MessageBubble
+            message={{
+              id: 'streaming',
+              role: 'assistant',
+              content: streamingContent,
+              timestamp: new Date(),
+            }}
+            isStreaming
+            onSaveAsTemplate={saveAsTemplate}
+          />
+        </div>
       )}
-      
+
       <div ref={messagesEndRef} />
     </div>
   );
-};
+});
+
+MessageList.displayName = 'MessageList';
 
 // Component to display thinking sections in a collapsible format
 const ThinkingSection: React.FC<{ thinkingSections: string[] }> = ({ thinkingSections }) => {
