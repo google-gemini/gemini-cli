@@ -357,11 +357,9 @@ export class ShellExecutionService {
       const rows = shellExecutionConfig.terminalHeight ?? 30;
       const shellConfig = getShellConfiguration();
 
-      // Use the detected shell configuration
+      // Use the detected shell configuration consistently for all shells
       const shell = shellConfig.executable;
-      const args = shellConfig.shell === 'cmd'
-        ? ['/c', commandToExecute]
-        : shellConfig.argsPrefix.concat([commandToExecute]);
+      const args = shellConfig.argsPrefix.concat([commandToExecute]);
 
       const ptyProcess = ptyInfo.module.spawn(shell, args, {
         cwd,

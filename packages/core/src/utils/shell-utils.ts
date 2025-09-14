@@ -24,11 +24,10 @@ const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
  * Detection logic:
  * - **Unix-like systems**: Uses SHELL environment variable or defaults to bash
  * - **Windows Priority Order**:
- *   1. **SHELL variable**: Respects user's preferred shell (Git Bash, MSYS2, WSL, etc.)
+ *   1. **SHELL variable**: Respects user's preferred shell (Git Bash, MSYS2, WSL, zsh, etc.)
  *   2. **LOGINSHELL variable**: Fallback if SHELL is not set  
- *   3. **PowerShell via PSModulePath**: Detects PowerShell environment
- *   4. **PowerShell via ComSpec**: ComSpec points to powershell/pwsh
- *   5. **Final fallback**: cmd.exe
+ *   3. **PowerShell detection**: When PSModulePath exists or ComSpec points to powershell/pwsh
+ *   4. **Final fallback**: cmd.exe
  * 
  * @returns Shell configuration with executable path, args prefix, and shell type
  */
@@ -51,14 +50,6 @@ function detectParentShell(): ShellConfiguration {
 
   // Priority 1: Respect SHELL environment variable if set (Git Bash, MSYS2, WSL, etc.)
   if (shell) {
-    if (shell.includes('bash')) {
-      return {
-        executable: shell,
-        argsPrefix: ['-c'],
-        shell: 'bash',
-      };
-    }
-    // Could be other shells like zsh, fish, etc. - treat as bash for now
     return {
       executable: shell,
       argsPrefix: ['-c'],
@@ -75,23 +66,13 @@ function detectParentShell(): ShellConfiguration {
     };
   }
 
-  // Priority 3: PowerShell detection via PSModulePath
-  if (psModulePath) {
-    // Check if ComSpec points to PowerShell, otherwise assume standard PowerShell
-    const executable = comSpec && (comSpec.toLowerCase().includes('powershell') || comSpec.toLowerCase().includes('pwsh'))
-      ? comSpec
-      : 'powershell.exe';
+  // Priority 3 & 4: PowerShell detection (via PSModulePath or ComSpec)
+  const isComSpecPowerShell = comSpec && (comSpec.toLowerCase().includes('powershell') || comSpec.toLowerCase().includes('pwsh'));
+  if (psModulePath || isComSpecPowerShell) {
+    // If ComSpec points to PowerShell, use it; otherwise, default to powershell.exe
+    const executable = isComSpecPowerShell ? comSpec! : 'powershell.exe';
     return {
       executable,
-      argsPrefix: ['-NoProfile', '-Command'],
-      shell: 'powershell',
-    };
-  }
-
-  // Priority 4: PowerShell via ComSpec detection
-  if (comSpec && (comSpec.toLowerCase().includes('powershell') || comSpec.toLowerCase().includes('pwsh'))) {
-    return {
-      executable: comSpec,
       argsPrefix: ['-NoProfile', '-Command'],
       shell: 'powershell',
     };
