@@ -6,7 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
-import { AuthType } from '@google/gemini-cli-core';
+import { AuthType, OutputFormat } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
 import * as auth from './config/auth.js';
 import { type LoadedSettings } from './config/settings.js';
 
@@ -74,6 +75,10 @@ describe('validateNonInterActiveAuth', () => {
   it('exits if no auth type is configured or env vars set', async () => {
     const nonInteractiveConfig = {
       refreshAuth: refreshAuthMock,
+      getOutputFormat: vi.fn().mockReturnValue(OutputFormat.TEXT),
+      getContentGeneratorConfig: vi
+        .fn()
+        .mockReturnValue({ authType: undefined }),
     };
     try {
       await validateNonInteractiveAuth(
@@ -223,6 +228,10 @@ describe('validateNonInterActiveAuth', () => {
     vi.spyOn(auth, 'validateAuthMethod').mockReturnValue('Auth error!');
     const nonInteractiveConfig = {
       refreshAuth: refreshAuthMock,
+      getOutputFormat: vi.fn().mockReturnValue(OutputFormat.TEXT),
+      getContentGeneratorConfig: vi
+        .fn()
+        .mockReturnValue({ authType: undefined }),
     };
     try {
       await validateNonInteractiveAuth(
@@ -286,6 +295,10 @@ describe('validateNonInterActiveAuth', () => {
     process.env['GOOGLE_GENAI_USE_VERTEXAI'] = 'true';
     const nonInteractiveConfig = {
       refreshAuth: refreshAuthMock,
+      getOutputFormat: vi.fn().mockReturnValue(OutputFormat.TEXT),
+      getContentGeneratorConfig: vi
+        .fn()
+        .mockReturnValue({ authType: undefined }),
     };
     try {
       await validateNonInteractiveAuth(
@@ -302,5 +315,108 @@ describe('validateNonInterActiveAuth', () => {
       'The configured auth type is oauth-personal, but the current auth type is vertex-ai. Please re-authenticate with the correct type.',
     );
     expect(processExitSpy).toHaveBeenCalledWith(1);
+  });
+
+  describe('JSON output mode', () => {
+    it('prints JSON error when no auth is configured and exits with code 1', async () => {
+      const nonInteractiveConfig = {
+        refreshAuth: refreshAuthMock,
+        getOutputFormat: vi.fn().mockReturnValue(OutputFormat.JSON),
+        getContentGeneratorConfig: vi
+          .fn()
+          .mockReturnValue({ authType: undefined }),
+      };
+
+      let thrown: Error | undefined;
+      try {
+        await validateNonInteractiveAuth(
+          undefined,
+          undefined,
+          nonInteractiveConfig as unknown as Config,
+          mockSettings,
+        );
+      } catch (e) {
+        thrown = e as Error;
+      }
+
+      expect(thrown?.message).toBe('process.exit(1) called');
+      const errorArg = consoleErrorSpy.mock.calls[0]?.[0] as string;
+      const payload = JSON.parse(errorArg);
+      expect(payload.error.type).toBe('Error');
+      expect(payload.error.code).toBe(1);
+      expect(payload.error.message).toContain(
+        'Please set an Auth method in your',
+      );
+    });
+
+    it('prints JSON error when enforced auth mismatches current auth and exits with code 1', async () => {
+      mockSettings.merged.security.auth.enforcedType = AuthType.USE_GEMINI;
+      process.env['GOOGLE_GENAI_USE_GCA'] = 'true';
+
+      const nonInteractiveConfig = {
+        refreshAuth: refreshAuthMock,
+        getOutputFormat: vi.fn().mockReturnValue(OutputFormat.JSON),
+        getContentGeneratorConfig: vi
+          .fn()
+          .mockReturnValue({ authType: undefined }),
+      };
+
+      let thrown: Error | undefined;
+      try {
+        await validateNonInteractiveAuth(
+          undefined,
+          undefined,
+          nonInteractiveConfig as unknown as Config,
+          mockSettings,
+        );
+      } catch (e) {
+        thrown = e as Error;
+      }
+
+      expect(thrown?.message).toBe('process.exit(1) called');
+      {
+        const errorArg = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const payload = JSON.parse(errorArg);
+        expect(payload.error.type).toBe('Error');
+        expect(payload.error.code).toBe(1);
+        expect(payload.error.message).toContain(
+          'The configured auth type is gemini-api-key, but the current auth type is oauth-personal.',
+        );
+      }
+    });
+
+    it('prints JSON error when validateAuthMethod fails and exits with code 1', async () => {
+      vi.spyOn(auth, 'validateAuthMethod').mockReturnValue('Auth error!');
+      process.env['GEMINI_API_KEY'] = 'fake-key';
+
+      const nonInteractiveConfig = {
+        refreshAuth: refreshAuthMock,
+        getOutputFormat: vi.fn().mockReturnValue(OutputFormat.JSON),
+        getContentGeneratorConfig: vi
+          .fn()
+          .mockReturnValue({ authType: undefined }),
+      };
+
+      let thrown: Error | undefined;
+      try {
+        await validateNonInteractiveAuth(
+          AuthType.USE_GEMINI,
+          undefined,
+          nonInteractiveConfig as unknown as Config,
+          mockSettings,
+        );
+      } catch (e) {
+        thrown = e as Error;
+      }
+
+      expect(thrown?.message).toBe('process.exit(1) called');
+      {
+        const errorArg = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const payload = JSON.parse(errorArg);
+        expect(payload.error.type).toBe('Error');
+        expect(payload.error.code).toBe(1);
+        expect(payload.error.message).toBe('Auth error!');
+      }
+    });
   });
 });
